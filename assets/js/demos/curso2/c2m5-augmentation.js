@@ -1,7 +1,7 @@
 /* Experimento: aumento de datos como en ImageDataGenerator (rotation_range, shifts, zoom_range, horizontal_flip, brightness_range, fill_mode="nearest") sobre una imagen sintética. */
 Lab.register("curso2/c2m5-augmentation", function (root, api) {
   var S = 72, NV = 8, par = { rot: 20, shift: 0.1, zoom: 0.2, flip: true, bri: 0.2 }, seed = 1;
-  /* imagen base: chapa con una abolladura (zona clara y zona oscura) y una flecha en la esquina para ver los giros */
+  /* imagen base: póster de prueba (una zona clara y una oscura) y una flecha en la esquina para ver los giros */
   var base = new Float32Array(S * S * 3), i, j;
   (function () {
     var g = api.rng(3);
@@ -41,7 +41,7 @@ Lab.register("curso2/c2m5-augmentation", function (root, api) {
   }
   var orig = toCanvas(base);
   variants = draws().map(function (v) { v.cv = toCanvas(v.arr); return v; });
-  var view = api.view(root, { aspect: 1.5, minH: 280, maxH: 420, label: "Imagen original y ocho versiones generadas con aumento de datos" });
+  var view = api.view(root, { aspect: 1.5, minH: 280, maxH: 420, label: "Póster de prueba original y ocho versiones generadas con aumento de datos" });
   var ui = api.controls(root), out = api.readout(root);
   function reg() { variants = draws().map(function (v) { v.cv = toCanvas(v.arr); return v; }); update(); }
   ui.slider({ label: "rotation_range (grados)", min: 0, max: 60, step: 5, value: par.rot, fmt: function (v) { return v + "°"; }, onInput: function (v) { par.rot = v; reg(); } });

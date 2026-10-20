@@ -15,9 +15,9 @@ Lab.register("curso3/c3m7-despliegue", function (root, api) {
     p = M.softmax(d);
   }
 
-  var view = api.view(root, { aspect: 2.1, minH: 190, maxH: 300, drag: true, label: "Rejilla de 8 por 8 para dibujar un dígito y barras con las probabilidades de cada clase" });
+  var view = api.view(root, { aspect: 2.1, minH: 190, maxH: 300, drag: true, label: "Rejilla de 8 por 8 para dibujar una carátula diminuta con una cifra y barras con las probabilidades de cada clase" });
   var ui = api.controls(root), out = api.readout(root);
-  ui.select({ label: "Cargar un dígito de ejemplo", options: [["", "— elige uno —"]].concat([0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map(function (k) { return [k, "un " + k]; })), value: "", onChange: function (v) { if (v !== "") load(+v); } });
+  ui.select({ label: "Cargar una carátula de ejemplo", options: [["", "— elige uno —"]].concat([0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map(function (k) { return [k, "cifra " + k]; })), value: "", onChange: function (v) { if (v !== "") load(+v); } });
   ui.segmented({ label: "Herramienta", options: [["paint", "Pintar"], ["erase", "Borrar"]], value: S.tool, onChange: function (v) { S.tool = v; } });
   ui.slider({ label: "Umbral de confianza", min: 0.3, max: 0.95, step: 0.01, value: S.thr, fmt: function (v) { return Math.round(v * 100) + " %"; }, onInput: function (v) { S.thr = v; update(); } });
   ui.button("Borrar todo", function () { img = new Array(64).fill(0); update(); });
@@ -38,13 +38,13 @@ Lab.register("curso3/c3m7-despliegue", function (root, api) {
   view.draw(function (ctx, w, h, C) {
     layout(w, h);
     var i, j, g = geo;
-    D.text(ctx, "tu dibujo (8 × 8)", g.x, 13, { size: 11, weight: 600, color: C.ink2 });
+    D.text(ctx, "tu carátula (8 × 8)", g.x, 13, { size: 11, weight: 600, color: C.ink2 });
     D.rect(ctx, g.x, g.y, g.s, g.s, C.surface);
     for (i = 0; i < 8; i++) for (j = 0; j < 8; j++) { var v = img[i * 8 + j] / 16; if (v > 0.02) { ctx.globalAlpha = Math.min(1, v); ctx.fillStyle = C.ink; ctx.fillRect(g.x + j * g.c + 0.5, g.y + i * g.c + 0.5, g.c - 1, g.c - 1); ctx.globalAlpha = 1; } }
     for (i = 0; i <= 8; i++) { D.line(ctx, g.x + i * g.c, g.y, g.x + i * g.c, g.y + g.s, C.line, 1); D.line(ctx, g.x, g.y + i * g.c, g.x + g.s, g.y + i * g.c, C.line, 1); }
     D.rect(ctx, g.x, g.y, g.s, g.s, null, C.ink, 1.5);
     var bw = w - g.bx - 54, bh = (h - 34) / 10, top = p.indexOf(Math.max.apply(null, p)), ok = p[top] >= S.thr;
-    D.text(ctx, "probabilidad de cada dígito", g.bx, 13, { size: 11, weight: 600, color: C.ink2 });
+    D.text(ctx, "probabilidad de cada cifra", g.bx, 13, { size: 11, weight: 600, color: C.ink2 });
     for (i = 0; i < 10; i++) {
       var y = 20 + i * bh;
       D.text(ctx, String(i), g.bx, y + bh * 0.72, { size: 11, weight: i === top ? 700 : 400, color: C.ink2, mono: true });

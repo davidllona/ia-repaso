@@ -6,8 +6,8 @@ Lab.register("curso2/c2m2-constructor-red", function (root, api) {
   var ui = api.controls(root), out = api.readout(root);
   var sl = [];
 
-  ui.select({ label: "Tarea (decide la capa final)", value: st.task, options: [["reg", "Regresión: 1 salida, sin activación"], ["bin", "Clasificación binaria: 1 salida, sigmoide"], ["multi", "Multiclase: N salidas, softmax"]], onChange: function (v) { st.task = v; update(); } });
-  var slIn = ui.slider({ label: "Entradas (features por muestra)", min: 1, max: 64, step: 1, value: st.nin, onInput: function (v) { st.nin = v; update(); } });
+  ui.select({ label: "Tarea (decide la capa final)", value: st.task, options: [["reg", "Regresión (minutos): 1 salida"], ["bin", "Binaria (¿la termina?): sigmoide"], ["multi", "Multiclase (género): softmax"]], onChange: function (v) { st.task = v; update(); } });
+  var slIn = ui.slider({ label: "Entradas (rasgos de cada película)", min: 1, max: 64, step: 1, value: st.nin, onInput: function (v) { st.nin = v; update(); } });
   var slK = ui.slider({ label: "Clases (solo multiclase)", min: 3, max: 10, step: 1, value: st.k, onInput: function (v) { st.k = v; update(); } });
   ui.segmented({ label: "Capas ocultas", value: 1, options: [[0, "0"], [1, "1"], [2, "2"], [3, "3"]], onChange: function (v) { st.nh = v; update(); } });
   for (var i = 0; i < 3; i++) (function (i) {
@@ -16,7 +16,8 @@ Lab.register("curso2/c2m2-constructor-red", function (root, api) {
   ui.select({ label: "Activación de las ocultas", value: st.act, options: [["relu", "relu"], ["tanh", "tanh"], ["sigmoid", "sigmoid"], ["linear", "ninguna (lineal)"]], onChange: function (v) { st.act = v; update(); } });
   ui.toggle({ label: "use_bias = True", value: true, onChange: function (v) { st.bias = v; update(); } });
   ui.button("Plantilla: dígitos (64 → 64 → 10)", function () { st.task = "multi"; st.nin = 64; st.nh = 1; st.u[0] = 64; st.k = 10; sync(); }, "primary");
-  ui.button("Plantilla: regresión (2 → 16 → 8 → 1)", function () { st.task = "reg"; st.nin = 2; st.nh = 2; st.u[0] = 16; st.u[1] = 8; sync(); });
+  ui.button("Plantilla: minutos vistos (2 → 16 → 8 → 1)", function () { st.task = "reg"; st.nin = 2; st.nh = 2; st.u[0] = 16; st.u[1] = 8; sync(); });
+  ui.button("Plantilla: película → género (4 → 8 → 8 → 3)", function () { st.task = "multi"; st.nin = 4; st.nh = 2; st.u[0] = 8; st.u[1] = 8; st.k = 3; sync(); });
 
   function sync() {
     var selects = ui.el.querySelectorAll("select"), segs = ui.el.querySelectorAll(".seg button");

@@ -32,19 +32,19 @@
 
     var vA = api.view(root, { aspect: 2.2, minH: 152, maxH: 172, label: "Canal de entrada 0: imagen, kernel y productos" });
     var vB = api.view(root, { aspect: 2.2, minH: 152, maxH: 172, label: "Canal de entrada 1: imagen, kernel y productos" });
-    var vO = api.view(root, { aspect: 2.2, minH: 152, maxH: 172, label: "Mapas de salida de los dos filtros" });
+    var vO = api.view(root, { aspect: 2.2, minH: 152, maxH: 172, label: "Mapas de salida de los dos filtros (críticos)" });
     var ui = api.controls(root), out = api.readout(root);
     ui.segmented({ label: "Filtro de salida", value: 0, options: [[0, "filtro 0"], [1, "filtro 1"]], onChange: function (v) { S.o = v; sb.set(S.bias[v], true); update(); } });
     var sp = ui.slider({ label: "Posición de la ventana", min: 0, max: 3, step: 1, value: 0, fmt: function (v) { return (v + 1) + " de 4"; }, onInput: function (v) { S.pos = v; update(); } });
     var sb = ui.slider({ label: "Sesgo (bias) del filtro", min: -3, max: 3, step: 0.5, value: S.bias[0], fmt: function (v) { return v.toFixed(1); }, onInput: function (v) { S.bias[S.o] = v; update(); } });
-    ui.toggle({ label: "Canal de entrada 1 activo", value: true, onChange: function (v) { S.on1 = v; update(); } });
+    ui.toggle({ label: "Canal de entrada 1 (azul) activo", value: true, onChange: function (v) { S.on1 = v; update(); } });
     ui.button("Siguiente posición ▶", function () { S.pos = (S.pos + 1) % 4; sp.set(S.pos, true); update(); }, "primary");
 
     function panel(c) {
       return function (ctx, w, h, C) {
         var p = posIJ(), g = 14, s = Math.max(16, Math.min(34, (w - 20 - 2 * g) / 7)), x0 = (w - (7 * s + 2 * g)) / 2, y0 = 30, a, b;
         var inactive = c === 1 && !S.on1, colr = c === 0 ? C.cobalto : C.terracota, wash = c === 0 ? C.cobaltoWash : C.terracotaWash, ink = c === 0 ? C.cobaltoInk : C.terracotaInk;
-        D.text(ctx, (w > 430 ? "canal de entrada " : "entrada ") + c + (inactive ? (w > 430 ? " (apagado)" : " (off)") : ""), x0, 14, { size: 11, weight: 600, color: inactive ? C.muted : ink });
+        D.text(ctx, (w > 430 ? "canal " : "entrada ") + c + (inactive ? (w > 430 ? " · apagado" : " (off)") : (w > 430 ? (c === 0 ? " (rojo)" : " (azul)") : "")), x0, 14, { size: 11, weight: 600, color: inactive ? C.muted : ink });
         D.text(ctx, "kernel K[" + S.o + "][" + c + "]", x0 + 3 * s + g, 14, { size: 11, weight: 600, color: C.ink2 });
         D.text(ctx, "productos", x0 + 5 * s + 2 * g, 14, { size: 11, weight: 600, color: C.ink2 });
         for (a = 0; a < 3; a++) for (b = 0; b < 3; b++) {

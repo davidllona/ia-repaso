@@ -1,4 +1,4 @@
-/* Experimento: data augmentation "viva". Una imagen sintética de 32×32 sufre giros, zoom, desplazamientos,
+/* Experimento: data augmentation "viva". Un póster de película en miniatura (sintético, 32×32) sufre giros, zoom, desplazamientos,
    inclinación, volteo, brillo y contraste. Los controles son los RANGOS de las capas de Keras
    (RandomRotation, RandomZoom, RandomTranslation, RandomContrast…) y se calcula cada píxel (interpolación bilineal). */
 Lab.register("curso3/c3m2-augmentation", function (root, api) {
@@ -86,7 +86,7 @@ Lab.register("curso3/c3m2-augmentation", function (root, api) {
     return list;
   }
 
-  var view = api.view(root, { aspect: 1.25, minH: 300, maxH: 600, label: "Doce versiones de una misma imagen tras aplicar transformaciones" });
+  var view = api.view(root, { aspect: 1.25, minH: 300, maxH: 600, label: "Doce versiones de un mismo póster tras aplicar transformaciones" });
   var ui = api.controls(root), out = api.readout(root);
   ui.segmented({ label: "Qué ver", options: [["ext", "Cada transformación al máximo"], ["rnd", "12 sorteos aleatorios"]], value: st.mode, onChange: function (v) { st.mode = v; update(); } });
   ui.slider({ label: "Giro ± (grados)", min: 0, max: 90, step: 5, value: st.rot, onInput: function (v) { st.rot = v; update(); } });

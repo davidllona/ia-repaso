@@ -6,8 +6,8 @@ Lab.register("curso1/escalado-distancias", function (root, api) {
   var mAge = M.mean(people.map(function (p) { return p.age; })), sAge = M.std(people.map(function (p) { return p.age; }));
   var mSal = M.mean(people.map(function (p) { return p.sal; })), sSal = M.std(people.map(function (p) { return p.sal; }));
 
-  var view = api.view(root, { aspect: 1.55, drag: true, minH: 300, label: "Personas según edad y salario, con las K más parecidas a la persona marcada" });
-  var plot = api.plot(view, { xr: [15, 75], yr: [10000, 160000], xlabel: "Edad (años)", ylabel: "Salario (€)", xticks: 6, yticks: 5,
+  var view = api.view(root, { aspect: 1.55, drag: true, minH: 300, label: "Usuarios según edad y minutos vistos al año, con los K más parecidos al usuario marcado" });
+  var plot = api.plot(view, { xr: [15, 75], yr: [10000, 160000], xlabel: "Edad (años)", ylabel: "Minutos vistos al año", xticks: 6, yticks: 5,
     yfmt: function (v) { return Math.round(v / 1000) + "k"; }, xfmt: function (v) { return Math.round(v); }, pad: { l: 52, r: 14, t: 12, b: 38 } });
   var ui = api.controls(root), out = api.readout(root);
   ui.segmented({ label: "Cómo medimos la distancia", options: [[false, "Sin escalar"], [true, "Con StandardScaler"]], value: false, onChange: function (v) { scaled = v; update(); } });
@@ -38,10 +38,10 @@ Lab.register("curso1/escalado-distancias", function (root, api) {
     ns.forEach(function (n) { a += n.a2; s += n.s2; });
     var pa = 100 * a / (a + s || 1);
     var ages = ns.map(function (n) { return n.p.age; }), minA = Math.min.apply(null, ages), maxA = Math.max.apply(null, ages);
-    out.set("Persona marcada: <b>" + Math.round(q.age) + " años</b>, <b>" + Math.round(q.sal / 1000) + "k €</b><br>" +
+    out.set("Usuario marcado: <b>" + Math.round(q.age) + " años</b>, <b>" + Math.round(q.sal / 1000) + "k min</b><br>" +
       "Vecinos elegidos: edades de <b>" + minA + "</b> a <b>" + maxA + " años</b><br>" +
-      "Parte de la distancia (al cuadrado) que aporta la <b>edad</b>: <b>" + pa.toFixed(1) + " %</b> · el salario: <b>" + (100 - pa).toFixed(1) + " %</b>" +
-      (!scaled && pa < 5 ? "<br><span class='bad'>La edad apenas cuenta: el modelo «ve» solo el salario.</span>" : scaled ? "<br><span class='good'>Con las dos variables en la misma escala, ambas influyen.</span>" : ""));
+      "Parte de la distancia (al cuadrado) que aporta la <b>edad</b>: <b>" + pa.toFixed(1) + " %</b> · los minutos: <b>" + (100 - pa).toFixed(1) + " %</b>" +
+      (!scaled && pa < 5 ? "<br><span class='bad'>La edad apenas cuenta: el modelo «ve» solo los minutos vistos.</span>" : scaled ? "<br><span class='good'>Con las dos variables en la misma escala, ambas influyen.</span>" : ""));
   }
   function move(px, py) {
     if (!plot.inside(px, py)) return;

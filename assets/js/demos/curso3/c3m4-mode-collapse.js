@@ -69,20 +69,20 @@ Lab.register("curso3/c3m4-mode-collapse", function (root, api) {
       ctx.globalAlpha = 0.75; meas.pts.forEach(function (q) { D.circle(ctx, pl.x(q[0]), pl.y(q[1]), 2.3, C.terracota); });
       ctx.restore();
       D.text(ctx, "paso " + S.step, pl.box.x + 6, pl.box.y + 15, { size: 12, weight: 700, mono: true, color: C.ink });
-      D.text(ctx, "azul = datos reales · naranja = generador", pl.box.x + 6, pl.box.y + pl.box.h - 7, { size: 10, color: C.muted });
+      D.text(ctx, "azul = pelis reales · naranja = pelis falsas", pl.box.x + 6, pl.box.y + pl.box.h - 7, { size: 10, color: C.muted });
     }
     var pl2 = api.plot(view2, { xr: [0, MAXS], yr: [0, K], pad: { l: 30, r: 14, t: 8, b: 36 }, xticks: 3, yticks: 2, xlabel: "pasos de entrenamiento", xfmt: function (v) { return Math.round(v); }, yfmt: function (v) { return Math.round(v); } });
     function draw2(ctx, w, h, C) {
       pl2.axes(ctx); ctx.save(); pl2.clip(ctx);
       var pts = S.hist.map(function (q) { return [pl2.x(q[0]), pl2.y(q[1])]; });
       if (pts.length > 1) D.path(ctx, pts, C.oliva, 2.6); if (pts.length) { var l = pts[pts.length - 1]; D.circle(ctx, l[0], l[1], 4, C.oliva, C.paper, 1.5); }
-      ctx.restore(); D.text(ctx, "modas cubiertas (de 8)", pl2.box.x + 6, pl2.box.y + 13, { size: 10, weight: 600, color: C.olivaInk });
+      ctx.restore(); D.text(ctx, "géneros (modas) cubiertos, de 8", pl2.box.x + 6, pl2.box.y + 13, { size: 10, weight: 600, color: C.olivaInk });
     }
     function f(v, k) { return v.toFixed(k === undefined ? 2 : k).replace(".", ","); }
     function update() {
       var o = S.out;
       out.set("<b>Paso " + S.step + " de " + MAXS + "</b>" + (o ? " · pérdida de D = " + f(o.dLoss, S.loss === "wgan" ? 3 : 2) + " · pérdida de G = " + f(o.gLoss, S.loss === "wgan" ? 3 : 2) : "") + "<br>" +
-        "<b>Modas cubiertas: " + meas.cov + " de 8</b> (una moda cuenta si recibe ≥ 5 % de las muestras) · puntos generados dentro de alguna moda: " + Math.round(meas.inside * 100) + " % · reparto de las muestras por moda (%): " + meas.cnt.map(function (c) { return Math.round(c / 5); }).join(" · ") + "<br>" +
+        "<b>Modas (géneros) cubiertas: " + meas.cov + " de 8</b> (una moda cuenta si recibe ≥ 5 % de las muestras) · puntos generados dentro de alguna moda: " + Math.round(meas.inside * 100) + " % · reparto de las muestras por moda (%): " + meas.cnt.map(function (c) { return Math.round(c / 5); }).join(" · ") + "<br>" +
         (S.step < 300 ? "Pulsa «Entrenar» y mira cómo el generador va encontrando las modas." :
           meas.cov >= 7 && meas.inside >= 0.5 ? "<span class='good'>El generador reparte sus muestras por casi todas las modas: GAN sana.</span>" :
             meas.cov >= 7 ? "Las ocho modas tienen alguna muestra, pero la mayoría de los puntos aún caen entre ellas (o el generador sigue oscilando): no es un colapso, es entrenamiento inestable." :

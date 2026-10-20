@@ -1,8 +1,8 @@
 /* Experimento: tokenizar un texto y puntuar su sentimiento con un diccionario (y ver sus límites: la negación). */
 Lab.register("curso1/c1m1-tokens-sentimiento", function (root, api) {
-  var POS = ["increíble", "espectacular", "genial", "bueno", "rápido"], NEG = ["horrible", "lento", "malo", "decepcionante", "tarde"];
-  var NEGADORES = ["no", "nunca", "tampoco", "ni"], ENT = { "Apple": "ORGANIZACIÓN", "California": "LUGAR", "Madrid": "LUGAR" };
-  var EJ = ["El servicio ha sido increíble", "Este móvil es espectacular", "El pedido llegó tarde y el envase es horrible", "No es nada bueno", "Apple presentó un nuevo producto en California", "Me gusta aprender IA"];
+  var POS = ["increíble", "espectacular", "genial", "bueno", "rápido"], NEG = ["horrible", "lento", "malo", "decepcionante", "aburrido"];
+  var NEGADORES = ["no", "nunca", "tampoco", "ni"], ENT = { "Netflix": "ORGANIZACIÓN", "Corea": "LUGAR", "Madrid": "LUGAR" };
+  var EJ = ["La película ha sido increíble", "Este final es espectacular", "El guion es lento y el final es horrible", "No es nada bueno", "Netflix grabó una serie nueva en Corea", "Me encanta Toy Story"];
   var texto = EJ[0], modo = "palabras", negar = false;
 
   var ui = api.controls(root);
@@ -16,7 +16,7 @@ Lab.register("curso1/c1m1-tokens-sentimiento", function (root, api) {
   var chips = api.el("div", { style: { display: "flex", flexWrap: "wrap", gap: "0.4rem", minHeight: "3.2rem", alignItems: "flex-start" } });
   root.appendChild(chips);
   root.appendChild(api.el("p", { style: { margin: "0", fontSize: "0.78rem", color: "var(--muted)", lineHeight: "1.45" },
-    html: "<b>Diccionario positivo:</b> " + POS.join(", ") + " · <b>negativo:</b> " + NEG.join(", ") + " · <b>entidades:</b> Apple (organización), California y Madrid (lugares)." }));
+    html: "<b>Diccionario positivo:</b> " + POS.join(", ") + " · <b>negativo:</b> " + NEG.join(", ") + " · <b>entidades:</b> Netflix (organización), Corea y Madrid (lugares)." }));
   var out = api.readout(root);
 
   function palabras(t) { return t.match(/[\p{L}\p{N}_]+/gu) || []; }

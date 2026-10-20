@@ -59,8 +59,8 @@
     var grid = api.el("div", { style: { display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(min(100%,190px),1fr))", gap: "10px", alignItems: "start" } });
     root.appendChild(grid);
     function cellDiv() { var c = api.el("div", { style: { minWidth: "0" } }); grid.appendChild(c); return c; }
-    var vIn = api.view(cellDiv(), { aspect: 1, minH: 190, maxH: 330, label: "Mapa de entrada de 7 por 7 con la ventana resaltada" });
-    var vOut = api.view(cellDiv(), { aspect: 1, minH: 190, maxH: 330, label: "Mapa de salida del pooling" });
+    var vIn = api.view(cellDiv(), { aspect: 1, minH: 190, maxH: 330, label: "Fotograma de 7 por 7 con la ventana resaltada" });
+    var vOut = api.view(cellDiv(), { aspect: 1, minH: 190, maxH: 330, label: "Miniatura resultante del pooling" });
     var ui = api.controls(root), out = api.readout(root);
     ui.segmented({ label: "Capa", value: S.kind, options: [["max", "MaxPool2d"], ["avg", "AvgPool2d"], ["adapt", "AdaptiveAvg"]], onChange: function (v) { S.kind = v; S.win = 0; fix(); update(); } });
     ui.segmented({ label: "kernel_size", value: S.k, options: [[2, "2"], [3, "3"]], onChange: function (v) { S.k = v; if (S.p > Math.floor(v / 2)) S.p = Math.floor(v / 2); S.win = 0; fix(); update(); } });
@@ -99,7 +99,7 @@
     function geom(v, cells, top) { var sz = Math.max(14, Math.min((v.w - 16) / cells, (v.h - top - 8) / cells)); return { sz: sz, x0: (v.w - sz * cells) / 2, y0: top }; }
     function drawIn(ctx, w, h, C) {
       var P = S.p, M = N + 2 * P, g = geom(vIn, M, 22), i, j, wi = winInfo(), mask = readMask();
-      D.text(ctx, "Entrada " + N + "×" + N + (P ? " + marco" : ""), w / 2, 14, { size: 11, align: "center", weight: 600, color: C.ink2 });
+      D.text(ctx, "Fotograma " + N + "×" + N + (P ? " + marco" : ""), w / 2, 14, { size: 11, align: "center", weight: 600, color: C.ink2 });
       for (i = 0; i < M; i++) for (j = 0; j < M; j++) {
         var ri = i - P, rj = j - P, real = ri >= 0 && ri < N && rj >= 0 && rj < N, x = g.x0 + j * g.sz, y = g.y0 + i * g.sz;
         D.rect(ctx, x, y, g.sz, g.sz, real ? C.surface : C.markerWash, C.line, 1);
@@ -118,7 +118,7 @@
       var m = outN(), c = cur(), i, j;
       if (m <= 0) { D.text(ctx, "no cabe ninguna ventana", w / 2, h / 2, { size: 12, align: "center", color: C.terracotaInk }); return; }
       var res = results(), g = geom(vOut, m, 22);
-      D.text(ctx, "Salida " + m + "×" + m, w / 2, 14, { size: 11, align: "center", weight: 600, color: C.ink2 });
+      D.text(ctx, "Miniatura " + m + "×" + m, w / 2, 14, { size: 11, align: "center", weight: 600, color: C.ink2 });
       var mx = 0; res.forEach(function (r) { r.forEach(function (v) { mx = Math.max(mx, v); }); });
       for (i = 0; i < m; i++) for (j = 0; j < m; j++) {
         var v = res[i][j], x = g.x0 + j * g.sz, y = g.y0 + i * g.sz, on = c && c.a === i && c.b === j;
@@ -151,7 +151,7 @@
       }
       if (S.kind !== "adapt" && m > 0) {
         var lost = readMask().reduce(function (a, r) { return a + r.filter(function (x) { return !x; }).length; }, 0);
-        t += lost ? "<br><span class='bad'>" + lost + " casillas de la entrada no las lee ninguna ventana (×): con ceil_mode=False el resto se descarta.</span>" : "<br><span class='good'>Todas las casillas de la entrada se leen.</span>";
+        t += lost ? "<br><span class='bad'>" + lost + " casillas del fotograma no las lee ninguna ventana (×): con ceil_mode=False el resto se descarta.</span>" : "<br><span class='good'>Todas las casillas del fotograma se leen.</span>";
       }
       out.set(t); vIn.redraw(); vOut.redraw();
     }

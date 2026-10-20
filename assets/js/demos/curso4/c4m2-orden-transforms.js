@@ -49,9 +49,9 @@ Lab.register("curso4/c4m2-orden-transforms", function (root, api) {
   }
   function minmax(im) { var mn = Infinity, mx = -Infinity; im.px.forEach(function (r) { r.forEach(function (v) { if (v < mn) mn = v; if (v > mx) mx = v; }); }); return [mn, mx]; }
 
-  var view = api.view(root, { aspect: 3.0, minH: 170, maxH: 250, label: "El dígito después de cada transformación, con su tipo, forma y rango" });
+  var view = api.view(root, { aspect: 3.0, minH: 170, maxH: 250, label: "El póster después de cada transformación, con su tipo, forma y rango" });
   var ui = api.controls(root), out = api.readout(root);
-  var selDig = ui.select({ label: "Imagen de partida", options: [["0", "un 0"], ["3", "un 3"], ["7", "un 7"]], value: S.dig, onChange: function (v) { S.dig = v; update(); } });
+  var selDig = ui.select({ label: "Póster de partida (un dígito 8×8)", options: [["0", "un 0"], ["3", "un 3"], ["7", "un 7"]], value: S.dig, onChange: function (v) { S.dig = v; update(); } });
   var sels = [0, 1, 2, 3].map(function (k) {
     return ui.select({ label: "Paso " + (k + 1), options: OPS, value: S.ops[k], onChange: function (v) { S.ops[k] = v; update(); } });
   });

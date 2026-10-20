@@ -104,16 +104,17 @@ Lab.register("curso5/c5m4-transfer-vivo", function (root, api) {
 
   var row = api.el("div", { class: "lab-row" }), colA = api.el("div"), colB = api.el("div");
   row.appendChild(colA); row.appendChild(colB); root.appendChild(row);
-  var v1 = api.view(colA, { aspect: 1.1, minH: 250, maxH: 340, label: "Frontera de decisión del método elegido sobre la tarea B" });
-  var pl = api.plot(v1, { xr: [-1.7, 1.7], yr: [-1.7, 1.7], xticks: 2, yticks: 2, pad: { l: 26, r: 14, t: 10, b: 20 }, grid: false, xfmt: function (v) { return +v.toFixed(1); }, yfmt: function (v) { return +v.toFixed(1); } });
+  var v1 = api.view(colA, { aspect: 1.1, minH: 250, maxH: 340, label: "Mapa de series: frontera entre comedia y terror del método elegido, sobre la tarea B" });
+  var pl = api.plot(v1, { xr: [-1.7, 1.7], yr: [-1.7, 1.7], xticks: 2, yticks: 2, pad: { l: 34, r: 14, t: 10, b: 34 }, grid: false, xlabel: "ritmo de la serie", ylabel: "oscuridad", xfmt: function (v) { return +v.toFixed(1); }, yfmt: function (v) { return +v.toFixed(1); } });
   var v2 = api.view(colB, { aspect: 1.1, minH: 250, maxH: 340, label: "Exactitud en el test de cada método" });
+  api.legend(root, [[api.colors().cobalto, "comedia"], [api.colors().terracota, "terror"]]);
   var ui = api.controls(root), out = api.readout(root);
-  ui.slider({ label: "Giro de la tarea B respecto a A (grados)", min: 0, max: 90, step: 5, value: S.theta, onInput: function (v) { S.theta = v; S.rep = null; prepara(); update(); } });
-  ui.slider({ label: "Puntos de entrenamiento por clase", min: 1, max: 15, step: 1, value: S.n, onInput: function (v) { S.n = v; S.rep = null; prepara(); update(); } });
+  ui.slider({ label: "Giro del mapa de series (B) respecto al de cine (A), en grados", min: 0, max: 90, step: 5, value: S.theta, onInput: function (v) { S.theta = v; S.rep = null; prepara(); update(); } });
+  ui.slider({ label: "Series de entrenamiento por género", min: 1, max: 15, step: 1, value: S.n, onInput: function (v) { S.n = v; S.rep = null; prepara(); update(); } });
   ui.slider({ label: "Ajuste fino: learning rate del cuerpo ÷ el de la cabeza", min: 0.01, max: 1, step: 0.01, value: S.ratio, fmt: function (v) { return v.toFixed(2); }, onInput: function (v) { S.ratio = v; S.rep = null; prepara(); update(); } });
   ui.segmented({ label: "Ver la frontera de", value: S.ver, options: METODOS.map(function (m) { return [m[0], m[1].replace("cuerpo preentrenado congelado", "preentrenado").replace("cuerpo aleatorio congelado", "aleatorio")]; }), onChange: function (v) { S.ver = v; update(); } });
-  ui.button("Otros puntos de entrenamiento", function () { S.seed += 7; S.rep = null; prepara(); update(); });
-  ui.button("Repetir con 15 sorteos de puntos", function () { repite(); update(); }, "primary");
+  ui.button("Otras series de entrenamiento", function () { S.seed += 7; S.rep = null; prepara(); update(); });
+  ui.button("Repetir con 15 sorteos de series", function () { repite(); update(); }, "primary");
 
   function draw1(ctx, w, h, C) {
     var b = pl.box, net = redes[S.ver], gx = 36, gy = 36, i, j;
@@ -149,17 +150,17 @@ Lab.register("curso5/c5m4-transfer-vivo", function (root, api) {
       D.text(ctx, short, x + ww / 2, h - 28, { size: w < 340 ? 9 : 10.5, color: C.ink2, align: "center" });
       D.text(ctx, short2, x + ww / 2, h - 15, { size: w < 340 ? 9 : 10.5, color: C.ink2, align: "center" });
     });
-    D.text(ctx, S.rep ? "barras: este sorteo · marca negra: media ± desv. de 15 sorteos" : "exactitud en el test (300 puntos por clase)", w / 2, 13, { size: 10, color: C.muted, align: "center" });
+    D.text(ctx, S.rep ? "barras: este sorteo · marca negra: media ± desv. de 15 sorteos" : "exactitud en el test (300 series por género)", w / 2, 13, { size: 10, color: C.muted, align: "center" });
   }
   prepara();
   v1.draw(draw1); v2.draw(draw2);
 
   function update() {
-    var s = "Base preentrenada en A (dos lunas sin girar): acierta <b>" + Math.round(accA * 100) + " %</b> en su test · tarea B: lunas giradas <b>" + S.theta + "°</b>, <b>" + (2 * S.n) + "</b> puntos de entrenamiento";
+    var s = "El crítico preentrenado con películas de cine (tarea A, mapa sin girar) acierta <b>" + Math.round(accA * 100) + " %</b> en su test · tarea B: series con el mapa girado <b>" + S.theta + "°</b>, <b>" + (2 * S.n) + "</b> series de entrenamiento";
     s += "<br>Este sorteo → desde cero <b>" + Math.round(accs.cero * 100) + " %</b> · aleatorio congelado <b>" + Math.round(accs.rand * 100) + " %</b> · preentrenado congelado <b>" + Math.round(accs.cong * 100) + " %</b> · ajuste fino <b>" + Math.round(accs.ft * 100) + " %</b>";
     s += "<br>El cuerpo del ajuste fino se ha movido el <b>" + (redes.mov * 100).toFixed(0) + " %</b> de su tamaño respecto al preentrenado";
     if (S.rep) s += "<br>Media de 15 sorteos → " + METODOS.map(function (m) { return m[1].replace("cuerpo ", "") + " <b>" + Math.round(S.rep[m[0]][0] * 100) + " ± " + Math.round(S.rep[m[0]][1] * 100) + "</b>"; }).join(" · ");
-    else s += "<br><span class='bad'>Una sola muestra de puntos es muy ruidosa: pulsa «Repetir con 15 sorteos» antes de sacar conclusiones.</span>";
+    else s += "<br><span class='bad'>Un solo sorteo de series es muy ruidoso: pulsa «Repetir con 15 sorteos de series» antes de sacar conclusiones.</span>";
     out.set(s); v1.redraw(); v2.redraw();
   }
   update();

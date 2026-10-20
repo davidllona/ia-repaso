@@ -1,7 +1,7 @@
 /* Experimento: atención multi-cabeza. Cuatro cabezas con matrices ELEGIDAS A MANO (no entrenadas) calculan de verdad q·k sobre una frase de 6 tokens;
    cada una mira a algo distinto. El número de cabezas h reparte d_model = 64 en h trozos de d_k = 64/h sin cambiar el número de parámetros. */
 Lab.register("curso3/c3m3-multicabeza", function (root, api) {
-  var D = api.d, TOK = ["la", "niña", "pequeña", "lee", "un", "libro"], N = 6;
+  var D = api.d, TOK = ["la", "niña", "pequeña", "ve", "una", "película"], N = 6;
   var TIPO = ["det", "nom", "adj", "ver", "det", "nom"];   // tipo de palabra
   var DMODEL = 64, S = { h: 4, q: 2 };
   function n(v, k) { return v.toFixed(k === undefined ? 2 : k).replace(".", ",").replace("-", "−"); }
@@ -26,7 +26,7 @@ Lab.register("curso3/c3m3-multicabeza", function (root, api) {
   }
   var MAPS = HEADS.map(attn);
   var narrow = (root.clientWidth || window.innerWidth) < 560;
-  var view = api.view(root, { aspect: narrow ? 0.85 : 3.0, minH: narrow ? 400 : 250, maxH: narrow ? 470 : 300, drag: false, label: "Mapas de atención de varias cabezas sobre la frase «la niña pequeña lee un libro»" });
+  var view = api.view(root, { aspect: narrow ? 0.85 : 3.0, minH: narrow ? 400 : 250, maxH: narrow ? 470 : 300, drag: false, label: "Mapas de atención de varias cabezas sobre el subtítulo «la niña pequeña ve una película»" });
   var ui = api.controls(root), out = api.readout(root);
   out.el.style.fontSize = "clamp(.7rem, 2.6vw, .82rem)";
   ui.segmented({ label: "Número de cabezas h", value: 4, options: [[1, "1"], [2, "2"], [3, "3"], [4, "4"]], onChange: function (v) { S.h = v; update(); } });
@@ -40,7 +40,7 @@ Lab.register("curso3/c3m3-multicabeza", function (root, api) {
   }
   view.draw(function (ctx, w, h, C) {
     var g = layout(w, h), k, i, j;
-    D.text(ctx, TOK.map(function (t, a) { return (a + 1) + " " + t; }).join("   "), w / 2, 12, { size: 11, align: "center", color: C.ink2, mono: true });
+    D.text(ctx, TOK.map(function (t, a) { return (a + 1) + " " + t; }).join(w < 420 ? "  " : "   "), w / 2, 12, { size: w < 420 ? 9.5 : 11, align: "center", color: C.ink2, mono: true });
     for (k = 0; k < S.h; k++) {
       var cx = g.x0 + (k % g.cols) * (g.mw + g.gap), cy = g.top + 18 + Math.floor(k / g.cols) * (g.mw + 20 + g.gap), A = MAPS[k];
       D.text(ctx, "Cabeza " + (k + 1) + ": " + HEADS[k].name, cx + g.mw / 2, cy - 6, { size: 11, align: "center", weight: 600, color: C.ink });

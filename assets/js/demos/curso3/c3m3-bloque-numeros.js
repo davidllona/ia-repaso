@@ -1,4 +1,4 @@
-/* Experimento: un bloque Transformer con NÚMEROS REALES (4 tokens, d_model = 4, 2 cabezas, d_ff = 8, pesos aleatorios con semilla, sin sesgos).
+/* Experimento: un bloque Transformer con NÚMEROS REALES (4 tokens = 4 películas de tu historial, d_model = 4, 2 cabezas, d_ff = 8, pesos aleatorios con semilla, sin sesgos).
    Se recorre paso a paso en versión post-LN (la del artículo y la de nuestro código) o pre-LN, con o sin conexión residual. */
 Lab.register("curso3/c3m3-bloque-numeros", function (root, api) {
   var D = api.d, N = 4, DM = 4, H = 2, DK = 2, FF = 8;
@@ -28,11 +28,11 @@ Lab.register("curso3/c3m3-bloque-numeros", function (root, api) {
     function skip(base, sub) { return S.res ? add(base, sub) : sub; }
     if (!S.pre) {
       a = mha(x); var s1 = skip(x, a.out), x1 = ln(s1), hid = relu(mm(x1, W1)), ff = mm(hid, W2), s2 = skip(x1, ff); y = ln(s2);
-      st = [["Entrada x", x, "(4, 4) = (tokens, d_model)", "Lo que llega al bloque: un vector de 4 números por token (el token 3 es 3 veces más grande a propósito)."],
-        ["Atención multi-cabeza", a.out, "(4, 4)", "MHA(x, x): cada token mezcla los valores de los demás con los pesos de las 2 cabezas (mapas abajo). Misma forma que la entrada."],
+      st = [["Entrada x", x, "(4, 4) = (películas, d_model)", "Lo que llega al bloque: un vector de 4 números por película (la ficha de la peli 3 es 3 veces más grande a propósito)."],
+        ["Atención multi-cabeza", a.out, "(4, 4)", "MHA(x, x): cada película mezcla los valores de las demás con los pesos de las 2 cabezas (mapas abajo). Misma forma que la entrada."],
         ["Suma residual x + atención", s1, "(4, 4)", S.res ? "Se suma la entrada original: la información que ya había no se pierde." : "SIN residual: se tira la entrada y solo queda lo que calculó la atención."],
-        ["LayerNorm (norm1)", x1, "(4, 4)", "Cada fila (token) queda con media 0 y desviación 1. Fíjate en que el token 3, enorme, vuelve a escala normal."],
-        ["Red feed-forward", ff, "(4, 4) tras pasar por (4, 8)", "Dense(8) + ReLU + Dense(4) aplicada a cada token por separado: sube a 8, anula los negativos y vuelve a 4."],
+        ["LayerNorm (norm1)", x1, "(4, 4)", "Cada fila (película) queda con media 0 y desviación 1. Fíjate en que la peli 3, enorme, vuelve a escala normal."],
+        ["Red feed-forward", ff, "(4, 4) tras pasar por (4, 8)", "Dense(8) + ReLU + Dense(4) aplicada a cada película por separado: sube a 8, anula los negativos y vuelve a 4."],
         ["Suma residual x1 + ffn", s2, "(4, 4)", S.res ? "Otra suma residual: x1 + ffn(x1)." : "SIN residual: solo queda la salida de la red feed-forward."],
         ["LayerNorm (norm2) = salida", y, "(4, 4)", "Salida del bloque: misma forma que la entrada, así que se pueden apilar bloques."]];
       st.maps = a.maps;
@@ -50,7 +50,7 @@ Lab.register("curso3/c3m3-bloque-numeros", function (root, api) {
     st.input = X; st.output = y; return st;
   }
   var ST = build();
-  var view = api.view(root, { aspect: 2.3, minH: 190, maxH: 250, label: "Matriz de 4 tokens por 4 números en el paso elegido del bloque Transformer" });
+  var view = api.view(root, { aspect: 2.3, minH: 190, maxH: 250, label: "Matriz de 4 películas por 4 números en el paso elegido del bloque Transformer" });
   var view2 = api.view(root, { aspect: 2.8, minH: 150, maxH: 200, label: "Mapas de atención de las dos cabezas del bloque (4 por 4)" });
   var ui = api.controls(root), out = api.readout(root);
   out.el.style.fontSize = "clamp(.7rem, 2.6vw, .82rem)";
@@ -66,7 +66,7 @@ Lab.register("curso3/c3m3-bloque-numeros", function (root, api) {
     var M = ST[S.step][1], cell = Math.max(22, Math.min(54, (w - 80) / DM, (h - 30) / N)), x0 = (w - cell * DM) / 2 + 24, y0 = 24, i, j;
     D.text(ctx, S.step + ". " + ST[S.step][0] + "  " + ST[S.step][2].replace(/ tras.*/, ""), w / 2, 14, { size: 11.5, align: "center", weight: 700 });
     for (i = 0; i < N; i++) {
-      D.text(ctx, "tok " + (i + 1), x0 - 6, y0 + i * cell + cell / 2 + 4, { size: 10.5, align: "right", color: C.muted });
+      D.text(ctx, "peli " + (i + 1), x0 - 6, y0 + i * cell + cell / 2 + 4, { size: 10.5, align: "right", color: C.muted });
       for (j = 0; j < DM; j++) {
         var v = M[i][j], x = x0 + j * cell, y = y0 + i * cell;
         D.rect(ctx, x, y, cell, cell, C.surface, C.line, 1);
@@ -88,7 +88,7 @@ Lab.register("curso3/c3m3-bloque-numeros", function (root, api) {
         if (cell >= 22) D.text(ctx, String(Math.round(v * 100)), x + cell / 2, y + cell / 2 + 3.5, { size: 9.5, mono: true, align: "center", color: v > 0.5 ? C.paper : C.ink });
       }
     }
-    D.text(ctx, "filas = token que consulta · casillas = peso en %", w / 2, h - 6, { size: 10, align: "center", color: C.muted });
+    D.text(ctx, "filas = película que consulta · casillas = peso en %", w / 2, h - 6, { size: 10, align: "center", color: C.muted });
   });
   function update() {
     view.redraw(); view2.redraw();

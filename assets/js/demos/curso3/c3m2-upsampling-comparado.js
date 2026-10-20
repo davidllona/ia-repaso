@@ -51,11 +51,11 @@ Lab.register("curso3/c3m2-upsampling-comparado", function (root, api) {
   var grid = api.el("div", { style: { display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(min(100%,210px),1fr))", gap: "10px" } });
   root.appendChild(grid);
   function cellDiv() { var c = api.el("div", { style: { minWidth: "0" } }); grid.appendChild(c); return c; }
-  var vX = api.view(cellDiv(), { aspect: 1, minH: 190, maxH: 280, label: "Imagen pequeña 4 por 4" });
+  var vX = api.view(cellDiv(), { aspect: 1, minH: 190, maxH: 280, label: "Miniatura de póster, 4 por 4" });
   var vA = api.view(cellDiv(), { aspect: 1, minH: 190, maxH: 280, label: "Método A, 8 por 8" });
   var vB = api.view(cellDiv(), { aspect: 1, minH: 190, maxH: 280, label: "Método B, 8 por 8" });
   var ui = api.controls(root), out = api.readout(root);
-  ui.select({ label: "Imagen 4×4 (toca una casilla para cambiarla)", options: [["diag", "Diagonal"], ["cruz", "Cruz"], ["tablero", "Tablero"], ["rampa", "Rampa"], ["rnd", "Aleatoria"]], value: "diag", onChange: function (v) { st.img = v; setImg(v); update(); } });
+  ui.select({ label: "Miniatura de póster 4×4 (toca una casilla para cambiarla)", options: [["diag", "Diagonal"], ["cruz", "Cruz"], ["tablero", "Tablero"], ["rampa", "Rampa"], ["rnd", "Aleatoria"]], value: "diag", onChange: function (v) { st.img = v; setImg(v); update(); } });
   ui.select({ label: "Método A", options: opts, value: st.a, onChange: function (v) { st.a = v; update(); } });
   ui.select({ label: "Método B", options: opts, value: st.b, onChange: function (v) { st.b = v; update(); } });
 
@@ -81,7 +81,7 @@ Lab.register("curso3/c3m2-upsampling-comparado", function (root, api) {
 
   function update() {
     var A = METHODS[st.a].f(X), B = METHODS[st.b].f(X), vmax = 9, i, j, mx = 0, mxIn = 0, me = 0;
-    paint(vX, X, "Entrada 4×4", vmax);
+    paint(vX, X, "Miniatura 4×4", vmax);
     paint(vA, A, "A · 8×8", vmax);
     paint(vB, B, "B · 8×8", vmax);
     for (i = 0; i < 8; i++) for (j = 0; j < 8; j++) {

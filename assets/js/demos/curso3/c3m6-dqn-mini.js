@@ -65,11 +65,11 @@ Lab.register("curso3/c3m6-dqn-mini", function (root, api) {
   function probe() { return -1 + GAMMA * Math.max.apply(null, fwd(S.target ? tgt : net, x(4)).q); }
   function record() { S.hist.push([S.steps, err(), probe()]); if (S.hist.length > MAXH / REC) S.hist.shift(); }
 
-  var v1 = api.view(root, { aspect: 2.1, minH: 190, maxH: 290, label: "Valores Q de la red frente a los Q verdaderos en cada casilla del pasillo" });
-  var p1 = api.plot(v1, { xr: [0, N - 1], yr: [-2, 12], xticks: N - 1, yticks: 7, xlabel: "casilla (la meta está a la derecha de la 7)", ylabel: "valor Q", pad: { l: 40, r: 18, t: 10, b: 34 }, xfmt: function (v) { return Math.round(v); }, yfmt: function (v) { return Math.round(v); } });
+  var v1 = api.view(root, { aspect: 2.1, minH: 190, maxH: 290, label: "Valores Q de la red frente a los Q verdaderos en cada pantalla del embudo de StreamFlix" });
+  var p1 = api.plot(v1, { xr: [0, N - 1], yr: [-2, 12], xticks: N - 1, yticks: 7, xlabel: "pantalla (tras la 7 viene la película)", ylabel: "valor Q", pad: { l: 40, r: 18, t: 10, b: 34 }, xfmt: function (v) { return Math.round(v); }, yfmt: function (v) { return Math.round(v); } });
   var v2 = api.view(root, { aspect: 2.4, minH: 170, maxH: 250, label: "Error medio de la red y objetivo de una transición fija a lo largo del entrenamiento" });
   var p2 = api.plot(v2, { xr: [0, 1000], yr: [0, 14], xticks: 4, yticks: 7, xlabel: "pasos de entrenamiento", ylabel: "error / objetivo", pad: { l: 40, r: 18, t: 10, b: 34 }, yfmt: function (v) { return String(+v.toFixed(2)).replace(".", ","); } });
-  api.legend(root, [[api.colors().cobalto, "error medio |Q red − Q verdadero|"], [api.colors().terracota, "objetivo y de la transición (4, →): vale 4,58 si todo va bien"]]);
+  api.legend(root, [[api.colors().cobalto, "error medio |Q red − Q verdadero|"], [api.colors().terracota, "objetivo y de la transición (4, avanzar): vale 4,58 si todo va bien"]]);
   var ui = api.controls(root), out = api.readout(root);
   ui.toggle({ label: "Replay buffer", value: true, onChange: function (v) { S.replay = v; stop(); init(); update(); } });
   ui.toggle({ label: "Red objetivo", value: false, onChange: function (v) { S.target = v; stop(); init(); update(); } });
@@ -96,8 +96,8 @@ Lab.register("curso3/c3m6-dqn-mini", function (root, api) {
     D.path(ctx, l, C.cobalto, 3); D.path(ctx, r, C.terracota, 3);
     l.forEach(function (q) { D.circle(ctx, q[0], q[1], 3.5, C.cobalto, C.paper, 1); }); r.forEach(function (q) { D.circle(ctx, q[0], q[1], 3.5, C.terracota, C.paper, 1); });
     ctx.restore();
-    D.text(ctx, "Q(s, derecha)", p1.box.x + 8, p1.box.y + 14, { size: 11, weight: 700, color: C.terracotaInk });
-    D.text(ctx, "Q(s, izquierda)", p1.box.x + 8, p1.box.y + 28, { size: 11, weight: 700, color: C.cobaltoInk });
+    D.text(ctx, "Q(s, avanzar)", p1.box.x + 8, p1.box.y + 14, { size: 11, weight: 700, color: C.terracotaInk });
+    D.text(ctx, "Q(s, retroceder)", p1.box.x + 8, p1.box.y + 28, { size: 11, weight: 700, color: C.cobaltoInk });
     D.text(ctx, (p1.box.w < 330 ? "línea = red · guiones = verdadero" : "trazo continuo = red · discontinuo = valor verdadero"), p1.box.x + p1.box.w - 6, p1.box.y + p1.box.h - 8, { align: "right", size: 10, color: C.muted });
   }
   function drawCurve(ctx, w, h, C) {
@@ -112,7 +112,7 @@ Lab.register("curso3/c3m6-dqn-mini", function (root, api) {
     var e = err(), ok = 0;
     for (var s = 0; s < N - 1; s++) { var q = fwd(net, x(s)).q; if (q[1] > q[0]) ok++; }
     out.set("Pasos: <b>" + S.steps + "</b> · replay buffer: <b>" + (S.replay ? buf.length + " / " + CAP + " transiciones" : "apagado (se aprende solo de la última transición)") + "</b> · red objetivo: <b>" + (S.target ? "activada (se copia cada " + S.sync + " pasos)" : "apagada (el objetivo se mueve con cada actualización)") + "</b><br>" +
-      "Error medio |Q red − Q verdadero| = <b>" + f(e) + "</b> · casillas donde la red prefiere ir a la derecha (lo correcto): <b>" + ok + " de " + (N - 1) + "</b> · objetivo y de la transición sonda = <b>" + f(probe()) + "</b> (valor exacto 4,58)");
+      "Error medio |Q red − Q verdadero| = <b>" + f(e) + "</b> · pantallas donde la red prefiere avanzar (lo correcto): <b>" + ok + " de " + (N - 1) + "</b> · objetivo y de la transición sonda = <b>" + f(probe()) + "</b> (valor exacto 4,58)");
     v1.redraw(); v2.redraw();
   }
   init(); v1.draw(drawQ); v2.draw(drawCurve); update();

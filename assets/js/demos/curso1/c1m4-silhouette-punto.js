@@ -49,6 +49,12 @@ function frame(ctx, plot, C, grid) {
   ctx.globalAlpha = 1; ctx.strokeStyle = C.ink; ctx.lineWidth = 1.5; ctx.strokeRect(b.x, b.y, b.w, b.h);
   ctx.restore();
 }
+/* Rótulos de los ejes: cada punto es un usuario de la plataforma, situado según lo que le gusta. */
+function axisCaps(ctx, plot, C, xt, yt) {
+  var b = plot.box, D = api.d;
+  D.text(ctx, xt, b.x + b.w / 2, b.y + b.h + 14, { size: 10.5, align: "center", color: C.ink2 });
+  D.text(ctx, yt, b.x - 6, b.y + b.h / 2, { size: 10.5, align: "center", color: C.ink2, rotate: -Math.PI / 2 });
+}
 function sq2(a, b) { var dx = a[0] - b[0], dy = a[1] - b[1]; return dx * dx + dy * dy; }
 function dist2(a, b) { return Math.sqrt(sq2(a, b)); }
 
@@ -193,12 +199,12 @@ var CEN = [[3.6, 3.2], [12.2, 3.6], [8.2, 7.9]], P = [], L = [], X = [5.3, 4.6],
   var r = api.rng(12), k, i;
   for (k = 0; k < 3; k++) for (i = 0; i < 7; i++) { P.push([CEN[k][0] + r.normal(0, 0.95), CEN[k][1] + r.normal(0, 0.95)]); L.push(k); }
 })();
-var view = api.view(root, { aspect: 1.6, minH: 230, maxH: 600, drag: true, label: "Tres grupos de puntos y un punto arrastrable cuyo silhouette se calcula en vivo" });
-var plot = api.plot(view, { xr: [0, 16], yr: [0, 10], pad: { l: 8, r: 8, t: 8, b: 8 } });
+var view = api.view(root, { aspect: 1.6, minH: 230, maxH: 600, drag: true, label: "Tres grupos de espectadores (drama, acción y comedia) y un usuario arrastrable cuyo silhouette se calcula en vivo" });
+var plot = api.plot(view, { xr: [0, 16], yr: [0, 10], pad: { l: 18, r: 8, t: 8, b: 22 } });
 var gview = api.view(root, { aspect: 9, minH: 62, maxH: 80, label: "Escala del silhouette de -1 a 1 con la posición del punto" });
 var ui = api.controls(root), out = api.readout(root);
-api.legend(root, [[api.colors().cobalto, "grupo 1"], [api.colors().terracota, "grupo 2"], [api.colors().oliva, "grupo 3"]]);
-ui.segmented({ label: "El punto arrastrable pertenece al…", options: [[0, "grupo 1"], [1, "grupo 2"], [2, "grupo 3"]], value: 0, onChange: function (v) { own = v; update(); } });
+api.legend(root, [[api.colors().cobalto, "grupo 1 · fans del drama"], [api.colors().terracota, "grupo 2 · fans de la acción"], [api.colors().oliva, "grupo 3 · fans de la comedia"]]);
+ui.segmented({ label: "El usuario «x» (arrastrable) pertenece al…", options: [[0, "grupo 1 (drama)"], [1, "grupo 2 (acción)"], [2, "grupo 3 (comedia)"]], value: 0, onChange: function (v) { own = v; update(); } });
 ui.toggle({ label: "Mostrar distancias y círculos a y b", value: true, onChange: function (v) { showLines = v; update(); } });
 
 function calc() {
@@ -213,7 +219,7 @@ function calc() {
 function fit() { var b = plot.box; plot.xr = [0, 10 * b.w / b.h]; }
 function draw(ctx, w, h, C) {
   var D = api.d, pal = palette(C), i, r = calc();
-  fit(); frame(ctx, plot, C); ctx.save(); plot.clip(ctx);
+  fit(); frame(ctx, plot, C); axisCaps(ctx, plot, C, "gusto por la acción →", "gusto por la comedia →"); ctx.save(); plot.clip(ctx);
   var xx = plot.x(X[0]), xy = plot.y(X[1]), sc = plot.x(1) - plot.x(0);
   if (showLines) {
     D.circle(ctx, xx, xy, r.b * sc, null, pal[r.bk], 2);
@@ -252,13 +258,13 @@ function update() {
   view.redraw(); gview.redraw();
   var r = calc(), cls, msg;
   if (r.s >= 0.5) { cls = "good"; msg = "Bien asignado: está claramente más cerca de su grupo que de cualquier otro."; }
-  else if (r.s >= 0.1) { cls = ""; msg = "Asignación floja: el punto está en una zona intermedia."; }
-  else if (r.s >= -0.1) { cls = "bad"; msg = "Punto frontera: a ≈ b, podría estar en cualquiera de los dos grupos."; }
+  else if (r.s >= 0.1) { cls = ""; msg = "Asignación floja: el usuario está en una zona intermedia."; }
+  else if (r.s >= -0.1) { cls = "bad"; msg = "Usuario de frontera: a ≈ b, podría estar en cualquiera de los dos grupos."; }
   else { cls = "bad"; msg = "Probablemente mal asignado: está más cerca del grupo " + (r.bk + 1) + " que del suyo."; }
   out.set("a(x) = distancia media a su grupo (" + (own + 1) + ") = <b>" + r.a.toFixed(2) + "</b><br>" +
     "b(x) = distancia media al grupo vecino más cercano (" + (r.bk + 1) + ") = <b>" + r.b.toFixed(2) + "</b><br>" +
     "s(x) = (b − a) / máx(a, b) = (" + r.b.toFixed(2) + " − " + r.a.toFixed(2) + ") / " + Math.max(r.a, r.b).toFixed(2) + " = <b>" + r.s.toFixed(2) + "</b><br>" +
-    "<span class='" + cls + "'>" + msg + "</span><br>Silhouette medio de los 22 puntos: <b>" + r.mean.toFixed(2) + "</b>");
+    "<span class='" + cls + "'>" + msg + "</span><br>Silhouette medio de los 22 usuarios: <b>" + r.mean.toFixed(2) + "</b>");
 }
 function move(px, py) {
   if (!plot.inside(px, py)) return;

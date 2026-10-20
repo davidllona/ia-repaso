@@ -29,14 +29,14 @@ Lab.register("curso1/c1m3-knn", function (root, api) {
   function predict(a, s) { return vote(neighbors(a, s)).pred; }
   function acc(set) { var ok = 0; set.forEach(function (p) { if (predict(p.a, p.s) === p.c) ok++; }); return ok / set.length; }
 
-  var view = api.view(root, { aspect: 1.5, minH: 280, drag: true, label: "Clientes según edad y salario; el color del fondo es la predicción de KNN y puedes arrastrar el punto marcado" });
-  var plot = api.plot(view, { xr: AR, yr: SR, xticks: 4, yticks: 5, xlabel: "edad (años)", ylabel: "salario (€)", pad: { l: 52, r: 12, t: 10, b: 38 },
+  var view = api.view(root, { aspect: 1.5, minH: 280, drag: true, label: "Series según la duración de sus capítulos y su número de reseñas; el color del fondo es la predicción de KNN y puedes arrastrar el punto marcado" });
+  var plot = api.plot(view, { xr: AR, yr: SR, xticks: 4, yticks: 5, xlabel: "duración de los capítulos (minutos)", ylabel: "reseñas (miles)", pad: { l: 52, r: 12, t: 10, b: 38 },
     xfmt: function (v) { return Math.round(v); }, yfmt: function (v) { return Math.round(v / 1000) + "k"; } });
   var ui = api.controls(root), out = api.readout(root);
   ui.slider({ label: "K (vecinos que votan)", min: 1, max: 31, step: 1, value: K, onInput: function (v) { K = v; update(); } });
   ui.segmented({ label: "Distancia", options: [[false, "Sin escalar"], [true, "Con StandardScaler"]], value: scaled, onChange: function (v) { scaled = v; update(); } });
   ui.button("Generar otros datos", function () { seed += 3; gen(); update(); });
-  api.legend(root, [[api.colors().cobalto, "se queda"], [api.colors().terracota, "cancela"]]);
+  api.legend(root, [[api.colors().cobalto, "la termina"], [api.colors().terracota, "la abandona"]]);
 
   function draw(ctx, w, h, C) {
     plot.axes(ctx);
@@ -58,11 +58,11 @@ Lab.register("curso1/c1m3-knn", function (root, api) {
   function update() {
     view.redraw();
     var ns = neighbors(q.a, q.s), v = vote(ns), tr = acc(train), te = acc(test), ages = ns.map(function (n) { return n.p.a; });
-    out.set("Punto marcado: <b>" + Math.round(q.a) + " años</b>, <b>" + Math.round(q.s / 1000) + "k €</b> · K = <b>" + K + "</b> (" + (scaled ? "con" : "sin") + " escalar)<br>" +
-      (K === 1 ? "Vota el vecino más cercano (de <b>" + ages[0] + "</b> años): <b>" : "Votan los " + K + " vecinos más cercanos (edades de <b>" + Math.min.apply(null, ages) + "</b> a <b>" + Math.max.apply(null, ages) + "</b>): <b>") + v.c0 + "</b> «se queda» y <b>" + v.c1 + "</b> «cancela» → predicción: <b>" + (v.pred ? "cancela" : "se queda") + "</b><br>" +
-      "Acierto en train (el punto se cuenta a sí mismo como vecino) = <b>" + (tr * 100).toFixed(1) + " %</b> · acierto en test (300 clientes nuevos) = <b>" + (te * 100).toFixed(1) + " %</b>" +
-      (!scaled && te < 0.7 ? "<br><span class='bad'>Sin escalar, el salario (números enormes) decide la distancia y la edad, que es lo que importa, apenas cuenta.</span>" : "") +
-      (scaled && te >= 0.8 ? "<br><span class='good'>Con las variables en la misma escala, KNN encuentra la frontera de la edad.</span>" : ""));
+    out.set("Serie marcada: capítulos de <b>" + Math.round(q.a) + " min</b>, <b>" + Math.round(q.s / 1000) + "k</b> reseñas · K = <b>" + K + "</b> (" + (scaled ? "con" : "sin") + " escalar)<br>" +
+      (K === 1 ? "Vota la serie vecina más cercana (capítulos de <b>" + ages[0] + "</b> min): <b>" : "Votan las " + K + " series vecinas más cercanas (capítulos de <b>" + Math.min.apply(null, ages) + "</b> a <b>" + Math.max.apply(null, ages) + "</b> min): <b>") + v.c0 + "</b> «la termina» y <b>" + v.c1 + "</b> «la abandona» → predicción: <b>" + (v.pred ? "la abandona" : "la termina") + "</b><br>" +
+      "Acierto en train (el punto se cuenta a sí mismo como vecino) = <b>" + (tr * 100).toFixed(1) + " %</b> · acierto en test (300 series nuevas) = <b>" + (te * 100).toFixed(1) + " %</b>" +
+      (!scaled && te < 0.7 ? "<br><span class='bad'>Sin escalar, las reseñas (números enormes) deciden la distancia y la duración de los capítulos, que es lo que importa, apenas cuenta.</span>" : "") +
+      (scaled && te >= 0.8 ? "<br><span class='good'>Con las variables en la misma escala, KNN encuentra la frontera de la duración.</span>" : ""));
   }
   function move(px, py) {
     if (!plot.inside(px, py)) return;

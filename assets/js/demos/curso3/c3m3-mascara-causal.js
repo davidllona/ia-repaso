@@ -1,7 +1,7 @@
 /* Experimento: máscara causal. 6 tokens con puntuaciones fijas; con la máscara cada fila solo reparte peso entre el token y los anteriores.
    Haz clic en un token y 'toca' su valor: se ve qué salidas cambian (sin máscara cambian todas; con máscara solo las de ese token y los siguientes). */
 Lab.register("curso3/c3m3-mascara-causal", function (root, api) {
-  var D = api.d, N = 6, TOK = ["el", "gato", "negro", "bebe", "leche", "."];
+  var D = api.d, N = 6, TOK = ["el", "niño", "ve", "Titanic", "hoy", "."]   // subtítulo de una escena;
   var S = { mask: true, t: 3, bump: 0 };
   var r = api.rng(21), SC = [], V = [], i, j;
   for (i = 0; i < N; i++) { SC.push([]); for (j = 0; j < N; j++) SC[i].push(Math.round(r.normal(0, 1.2) * 10) / 10); V.push(Math.round(r.normal(0, 1) * 10) / 10); }
@@ -14,7 +14,7 @@ Lab.register("curso3/c3m3-mascara-causal", function (root, api) {
     }
     return { A: A, O: O };
   }
-  var view = api.view(root, { aspect: 1.55, minH: 270, maxH: 380, drag: false, label: "Mapa de atención de 6 tokens y cambio de cada salida al modificar el valor del token elegido" });
+  var view = api.view(root, { aspect: 1.55, minH: 270, maxH: 380, drag: false, label: "Mapa de atención de las 6 palabras de un subtítulo y cambio de cada salida al modificar el valor del token elegido" });
   var ui = api.controls(root), out = api.readout(root);
   out.el.style.fontSize = "clamp(.72rem, 2.7vw, .84rem)";
   ui.toggle({ label: "Máscara causal (-∞ sobre la diagonal)", value: true, onChange: function (v) { S.mask = v; update(); } });

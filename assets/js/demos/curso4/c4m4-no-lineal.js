@@ -1,6 +1,6 @@
 /* Experimento: una neurona (regresión logística) solo dibuja una recta en las variables que le das.
    Si le añades variables nuevas calculadas a partir de las originales (x1², x2², x1·x2, x1²+x2²), la frontera
-   deja de ser una recta en el plano (x1, x2). Como el fragmento 16. */
+   deja de ser una recta en el plano (x1, x2). Como el fragmento 18. */
 Lab.register("curso4/c4m4-no-lineal", function (root, api) {
   var M = api.math, D = api.d;
   var S = { data: "circulos", feats: "xy", seed: 4 };

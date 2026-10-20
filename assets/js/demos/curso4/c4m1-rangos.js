@@ -4,7 +4,7 @@ Lab.register("curso4/c4m1-rangos", function (root, api) {
   var D = api.d;
   var DT = { float32: [4, true], float64: [8, true], int64: [8, false], int32: [4, false], int8: [1, false] };
   var st = { rank: 2, dims: [2, 3, 4], dtype: "float32", sel: null };
-  var view = api.view(root, { aspect: 2.1, minH: 210, maxH: 300, drag: true, label: "Tensor dibujado como números en celdas; pulsa una celda para ver su índice" });
+  var view = api.view(root, { aspect: 2.1, minH: 210, maxH: 300, label: "Tensor dibujado como notas en celdas (usuarios por películas); pulsa una celda para ver su índice" });
   var ui = api.controls(root), out = api.readout(root);
   ui.segmented({ label: "Rango (número de ejes)", value: 2, options: [[0, "0 · escalar"], [1, "1 · vector"], [2, "2 · matriz"], [3, "3 · cubo"]], onChange: function (v) { st.rank = v; st.sel = null; update(); } });
   var OPT = [[1, "1"], [2, "2"], [3, "3"], [4, "4"]];
@@ -41,7 +41,7 @@ Lab.register("curso4/c4m1-rangos", function (root, api) {
         D.text(ctx, txt, p[0] + L.cs / 2, p[1] + L.cs / 2 + 4, { align: "center", size: L.cs < 24 ? 9.5 : 12, mono: true, color: C.ink, weight: 600 });
       }
     }
-    var lab = st.rank === 0 ? "un solo número, sin ejes" : st.rank === 1 ? "1 eje: " + L.cols + " números en fila" : st.rank === 2 ? "2 ejes: " + L.rows + " filas × " + L.cols + " columnas" : "3 ejes: " + L.blocks + " bloques de " + L.rows + " × " + L.cols;
+    var lab = st.rank === 0 ? "una sola nota, sin ejes" : st.rank === 1 ? "1 eje: " + L.cols + " notas de un usuario, en fila" : st.rank === 2 ? "2 ejes: " + L.rows + " usuarios × " + L.cols + " películas" : "3 ejes: " + L.blocks + " meses de " + L.rows + " usuarios × " + L.cols + " películas";
     D.text(ctx, lab, w / 2, h - 8, { align: "center", size: 11.5, color: C.ink2, weight: 600 });
   }
   view.draw(draw);
@@ -61,7 +61,8 @@ Lab.register("curso4/c4m1-rangos", function (root, api) {
       "<br><b>t.dtype</b> = torch." + st.dtype + " · memoria = " + n + " × " + DT[st.dtype][0] + " bytes = <b>" + bytes + " bytes</b>";
     if (st.sel) {
       var k = st.sel, idx = r === 0 ? "t" : r === 1 ? "t[" + k[2] + "]" : r === 2 ? "t[" + k[1] + ", " + k[2] + "]" : "t[" + k[0] + ", " + k[1] + ", " + k[2] + "]";
-      h += "<br>Celda elegida: <b>" + idx + "</b> = " + val(flat(k[0], k[1], k[2]) + 1) + " (posición " + flat(k[0], k[1], k[2]) + " en memoria)";
+      var que = r === 0 ? "la nota" : r === 1 ? "película " + k[2] : r === 2 ? "usuario " + k[1] + ", película " + k[2] : "mes " + k[0] + ", usuario " + k[1] + ", película " + k[2];
+      h += "<br>Celda elegida: <b>" + idx + "</b> = " + val(flat(k[0], k[1], k[2]) + 1) + " (" + que + "; posición " + flat(k[0], k[1], k[2]) + " en memoria)";
     } else h += "<br>Pulsa una celda para ver su índice.";
     out.set(h); view.redraw();
   }

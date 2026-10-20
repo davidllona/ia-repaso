@@ -12,7 +12,7 @@ Lab.register("curso4/c4m1-memoria", function (root, api) {
     t43: { name: "x.view(3, 4).T", shape: [4, 3], strides: [1, 4] },
     cont: { name: "x.view(3, 4).T.contiguous()", shape: [4, 3], strides: [3, 1], copy: true }
   };
-  var view = api.view(root, { aspect: 1.55, minH: 300, maxH: 420, drag: true, label: "La memoria de 12 celdas y el tensor que la mira con una forma y unos strides" });
+  var view = api.view(root, { aspect: 1.55, minH: 300, maxH: 420, label: "La memoria de 12 carátulas seguidas y el tensor (parrilla) que las mira con una forma y unos strides" });
   var ui = api.controls(root), out = api.readout(root);
   ui.select({ label: "Vista sobre la misma memoria", value: "v34", options: [["v12", "x  (forma (12,))"], ["v34", "x.view(3, 4)"], ["v43", "x.view(4, 3)"], ["t43", "x.view(3, 4).T  (transpuesta)"], ["cont", "…T.contiguous()  (copia)"]], onChange: function (v) { st.op = v; st.copy = v === "cont" ? makeCopy() : null; st.msg = ""; update(); } });
   ui.button("Probar .view(12) sobre esta vista", function () {
@@ -35,7 +35,7 @@ Lab.register("curso4/c4m1-memoria", function (root, api) {
     var o = OPS[st.op], rows = o.shape.length === 1 ? 1 : o.shape[0], cols = o.shape.length === 1 ? o.shape[0] : o.shape[1];
     var sr = o.shape.length === 1 ? 0 : o.strides[0], sc = o.strides[o.strides.length - 1], r, c;
     var pad = 10, ms = Math.min(34, (w - 2 * pad) / 12);
-    D.text(ctx, "Memoria de x (12 celdas seguidas)", w / 2, 16, { align: "center", size: 12, weight: 700, color: C.ink });
+    D.text(ctx, "Memoria de x: 12 carátulas seguidas", w / 2, 16, { align: "center", size: 12, weight: 700, color: C.ink });
     var mx = (w - ms * 12) / 2, my = 24;
     for (i = 0; i < 12; i++) {
       var shade = st.op === "cont" ? C.surface : (i % 2 ? C.cobaltoWash : C.paper2);

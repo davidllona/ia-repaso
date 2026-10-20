@@ -1,16 +1,16 @@
 /* Experimento: multiclase (una sola clase correcta → softmax + CrossEntropyLoss) frente a multi-etiqueta
    (cada etiqueta es sí/no por separado → una sigmoide por salida + BCEWithLogitsLoss). Mismos logits, dos lecturas. */
 Lab.register("curso4/c4m5-softmax-vs-sigmoide", function (root, api) {
-  var D = api.d, M = api.math, K = 3, NAMES = ["playa", "perro", "noche"];
+  var D = api.d, M = api.math, K = 3, NAMES = ["drama", "comedia", "romance"];
   var S = { z: [2, -1, 0.5], th: 0.5 };
-  var view = api.view(root, { aspect: 2.3, minH: 165, maxH: 220, label: "Probabilidades de softmax y de sigmoide para tres etiquetas de una foto" });
+  var view = api.view(root, { aspect: 2.3, minH: 165, maxH: 220, label: "Probabilidades de softmax y de sigmoide para tres etiquetas de género de una película: drama, comedia y romance" });
   var ui = api.controls(root), out = api.readout(root);
   out.el.style.fontSize = "clamp(.68rem, 2.5vw, .8rem)";
   var sl = [0, 1, 2].map(function (k) {
     return ui.slider({ label: "logit z" + k + " (" + NAMES[k] + ")", min: -4, max: 4, step: 0.1, value: S.z[k], fmt: function (v) { return v.toFixed(1); }, onInput: function (v) { S.z[k] = v; update(); } });
   });
   ui.slider({ label: "umbral de la sigmoide", min: 0.1, max: 0.9, step: 0.05, value: S.th, fmt: function (v) { return v.toFixed(2); }, onInput: function (v) { S.th = v; update(); } });
-  ui.button("Playa y perro a la vez (3, 2.5, −3)", function () { S.z = [3, 2.5, -3]; sl.forEach(function (q, k) { q.set(S.z[k], true); }); update(); });
+  ui.button("Drama y comedia a la vez (3, 2.5, −3)", function () { S.z = [3, 2.5, -3]; sl.forEach(function (q, k) { q.set(S.z[k], true); }); update(); });
   view.draw(function (ctx, w, h, C) {
     var ps = M.softmax(S.z), pg = S.z.map(M.sigmoid), k, x0 = 56, pw = (w - x0 - 8) / 2, bh = Math.min(28, (h - 66) / K - 8);
     D.text(ctx, "softmax: reparte 1", x0 + pw / 2 - 4, 16, { size: 11, weight: 700, align: "center", color: C.cobaltoInk });

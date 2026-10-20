@@ -26,7 +26,7 @@ Lab.register("curso3/c3m6-q-gridworld", function (root, api) {
   function resetAll() { S.Q = zerosQ(); S.pos = START.slice(); S.steps = 0; S.eps_n = 0; S.last = null; S.lastRet = null; S.ret = 0; S.fresh = true; S.Qs = optimal(); }
   resetAll();
 
-  var view = api.view(root, { aspect: 1.4, minH: 250, maxH: 400, label: "Mundo de cuadrículas con la tabla Q: cuatro valores por casilla, uno por acción" });
+  var view = api.view(root, { aspect: 1.4, minH: 250, maxH: 400, label: "Pantalla de inicio de StreamFlix en cuadrícula con la tabla Q: cuatro valores por casilla, uno por botón del mando" });
   var ui = api.controls(root), out = api.readout(root);
   ui.slider({ label: "Tasa de aprendizaje α", min: 0.05, max: 1, step: 0.05, value: S.alpha, fmt: function (v) { return v.toFixed(2).replace(".", ","); }, onInput: function (v) { S.alpha = v; update(); } });
   ui.slider({ label: "Descuento γ", min: 0, max: 0.99, step: 0.01, value: S.gamma, fmt: function (v) { return v.toFixed(2).replace(".", ","); }, onInput: function (v) { S.gamma = v; S.Qs = optimal(); update(); } });
@@ -61,11 +61,11 @@ Lab.register("curso3/c3m6-q-gridworld", function (root, api) {
     var g = geom(w, h), fs = Math.max(8.5, Math.min(11.5, g.cw / 7.5));
     for (var r = 0; r < ROWS; r++) for (var c = 0; c < COLS; c++) {
       var x = g.m + c * g.cw, y = g.m + r * g.ch, cx = x + g.cw / 2, cy = y + g.ch / 2;
-      if (isWall(r, c)) { D.rect(ctx, x + 1, y + 1, g.cw - 2, g.ch - 2, C.line, C.ink, 1.2); D.text(ctx, "muro", cx, cy + 4, { align: "center", size: 11, color: C.muted }); continue; }
+      if (isWall(r, c)) { D.rect(ctx, x + 1, y + 1, g.cw - 2, g.ch - 2, C.line, C.ink, 1.2); D.text(ctx, "anuncio", cx, cy + 4, { align: "center", size: 11, color: C.muted }); continue; }
       if (term(r, c)) {
         var good = r === GOAL[0] && c === GOAL[1];
         D.rect(ctx, x + 1, y + 1, g.cw - 2, g.ch - 2, good ? C.olivaWash : C.terracotaWash, C.ink, 1.2);
-        D.text(ctx, good ? "META" : "HOYO", cx, cy - 2, { align: "center", size: 13, weight: 700, color: good ? C.olivaInk : C.terracotaInk });
+        D.text(ctx, good ? "TU PELI" : "SALIR", cx, cy - 2, { align: "center", size: 13, weight: 700, color: good ? C.olivaInk : C.terracotaInk });
         D.text(ctx, good ? "+10" : "−10", cx, cy + 15, { align: "center", size: 13, mono: true, color: good ? C.olivaInk : C.terracotaInk });
         continue;
       }
@@ -91,7 +91,7 @@ Lab.register("curso3/c3m6-q-gridworld", function (root, api) {
   function f(v, k) { return (v < -0.0005 ? "−" : "") + Math.abs(v).toFixed(k === undefined ? 2 : k).replace(".", ","); }
   function update() {
     var s = "", L = S.last;
-    if (!L) s = "La tabla Q empieza vacía (todo 0): el agente aún no sabe nada. Pulsa «Dar un paso».<br>";
+    if (!L) s = "La tabla Q empieza vacía (todo 0): el agente (el cursor del mando) aún no sabe nada. Pulsa «Dar un paso».<br>";
     else {
       s += "<b>Paso " + S.steps + "</b> (" + (L.explore ? "exploró al azar" : "explotó: la mejor acción conocida") + "): en s=(" + L.s + ") hizo <b>" + ARROW[L.a] + "</b> → r = <b>" + (L.r > 0 ? "+" : "−") + Math.abs(L.r) + "</b>, s′=(" + L.s2 + ")" + (L.term ? " <i>(final)</i>" : "") + "<br>";
       s += "objetivo = r + γ·máx Q(s′,·) = " + f(L.r, 0) + " + " + f(S.gamma) + "·" + f(L.maxNext) + " = <b>" + f(L.target) + "</b><br>";

@@ -40,8 +40,8 @@ Lab.register("curso4/c4m3-lr", function (root, api) {
     D.path(ctx, t.tr.map(function (v, k) { return [pA.x(k), pA.y(lg(v))]; }), C.cobalto, 2.5);
     D.path(ctx, t.va.map(function (v, k) { return [pA.x(k), pA.y(lg(v))]; }), C.terracota, 2.5, [5, 3]);
     ctx.restore();
-    D.text(ctx, "entrenamiento (línea azul)", pA.box.x + pA.box.w - 8, pA.box.y + 16, { size: 11, color: C.cobaltoInk, weight: 600, align: "right" });
-    D.text(ctx, "validación (rayada roja)", pA.box.x + pA.box.w - 8, pA.box.y + 31, { size: 11, color: C.terracotaInk, weight: 600, align: "right" });
+    D.text(ctx, "entrenamiento: 40 pelis (línea azul)", pA.box.x + pA.box.w - 8, pA.box.y + 16, { size: 11, color: C.cobaltoInk, weight: 600, align: "right" });
+    D.text(ctx, "validación: 20 pelis (rayada roja)", pA.box.x + pA.box.w - 8, pA.box.y + 31, { size: 11, color: C.terracotaInk, weight: 600, align: "right" });
   }
   function drawB(ctx, W, H, C) {
     var D = api.d, best = null;

@@ -55,12 +55,12 @@ Lab.register("curso1/c1m5-kfold", function (root, api) {
   ui.button("Ronda a ronda", function () { st.cur = st.cur >= st.K ? 1 : st.cur + 1; update(); }, "primary");
   ui.button("Calcular todas", function () { st.cur = st.K; update(); });
   var C0 = api.colors();
-  api.legend(root, [[C0.cobalto, "clase A (24 muestras)"], [C0.terracota, "clase B (6 muestras)"], [C0.marker, "resaltado = validación de esa ronda"]]);
+  api.legend(root, [[C0.cobalto, "terminó la serie (24 usuarios)"], [C0.terracota, "la abandonó (6 usuarios)"], [C0.marker, "resaltado = validación de esa ronda"]]);
 
   function draw(ctx, w, h, C) {
     var K = st.K, L = w < 420 ? 26 : 56, R = w < 420 ? 36 : 54, top = 26, bot = 10;
     var cw = (w - L - R) / N, rowH = (h - top - bot) / K, ch = Math.min(26, rowH - 4), k, j;
-    D.text(ctx, w < 420 ? "las 30 muestras →" : "las 30 muestras, tal como están en el conjunto de datos →", L, 13, { size: 10.5, color: C.muted });
+    D.text(ctx, w < 420 ? "los 30 usuarios →" : "los 30 usuarios, tal como están en el conjunto de datos →", L, 13, { size: 10.5, color: C.muted });
     D.text(ctx, "acierto", w - 4, 13, { size: 10.5, align: "right", color: C.muted });
     for (k = 0; k < K; k++) {
       var y0 = top + k * rowH + (rowH - ch) / 2, done = k < st.cur;
@@ -84,8 +84,8 @@ Lab.register("curso1/c1m5-kfold", function (root, api) {
     var sc = scores.slice(0, st.cur), m = M.mean(sc), s = M.std(sc);
     var noB = bInVal.slice(0, st.cur).filter(function (b) { return b === 0; }).length, bad = scores.slice(0, st.cur).filter(function (v) { return v < 0.5; }).length;
     out.set("rondas hechas: <b>" + st.cur + " de " + st.K + "</b> · aciertos: [" + sc.map(function (v) { return v.toFixed(2); }).join(", ") + "]<br>" +
-      "media ± desviación = <b>" + m.toFixed(3) + " ± " + s.toFixed(3) + "</b> · muestras de la clase B en cada validación: [" + bInVal.join(", ") + "]" +
-      (noB ? "<br><span class='bad'>" + noB + " fold(s) de validación SIN ninguna muestra de la clase B: el resultado de esa ronda no dice nada sobre B.</span>" : "") +
+      "media ± desviación = <b>" + m.toFixed(3) + " ± " + s.toFixed(3) + "</b> · usuarios que abandonaron en cada validación: [" + bInVal.join(", ") + "]" +
+      (noB ? "<br><span class='bad'>" + noB + " fold(s) de validación SIN ningún usuario que abandonó la serie: el resultado de esa ronda no dice nada sobre ellos.</span>" : "") +
       (bad ? "<br><span class='bad'>" + bad + " ronda(s) por debajo de 0,50: ¡peor que tirar una moneda!</span>" : "") +
       "<br>25 repartos hold-out al azar (test del mismo tamaño) dieron aciertos entre <b>" + holdMin.toFixed(2) + "</b> y <b>" + holdMax.toFixed(2) + "</b>: una sola partición es una lotería.");
   }

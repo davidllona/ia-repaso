@@ -16,7 +16,7 @@ Lab.register("curso2/c2m3-cnn-vs-dense", function (root, api) {
   }
   var view = api.view(root, { aspect: 2.0, minH: 190, maxH: 280, label: "Parámetros de tres modelos en escala logarítmica" });
   var ui = api.controls(root), out = api.readout(root);
-  ui.slider({ label: "Lado de la imagen (alto = ancho)", min: 0, max: SIZES.length - 1, step: 1, value: si, fmt: function (v) { return SIZES[v] + " × " + SIZES[v]; }, onInput: function (v) { si = v; update(); } });
+  ui.slider({ label: "Lado del fotograma (alto = ancho)", min: 0, max: SIZES.length - 1, step: 1, value: si, fmt: function (v) { return SIZES[v] + " × " + SIZES[v]; }, onInput: function (v) { si = v; update(); } });
   ui.segmented({ label: "Canales", options: [[1, "1 (gris)"], [3, "3 (color RGB)"]], value: ch, onChange: function (v) { ch = v; update(); } });
   ui.segmented({ label: "Neuronas de la capa densa", options: [[64, "64"], [128, "128"], [512, "512"]], value: U, onChange: function (v) { U = v; update(); } });
 
@@ -41,7 +41,7 @@ Lab.register("curso2/c2m3-cnn-vs-dense", function (root, api) {
   function update() {
     view.redraw();
     var c = counts(), H = SIZES[si];
-    out.set("Imagen " + H + "×" + H + "×" + ch + " → <b>" + fmtN(c.inputs) + "</b> números de entrada<br>" +
+    out.set("Fotograma " + H + "×" + H + "×" + ch + " → <b>" + fmtN(c.inputs) + "</b> números de entrada<br>" +
       "Primera capa: Dense(" + U + ") = <b>" + fmtN(c.denseFirst) + "</b> parámetros · Conv2D(16, 3×3) = <b>" + fmtN(c.convFirst) + "</b> (¡" + fmtN(Math.round(c.denseFirst / c.convFirst)) + " veces menos!)<br>" +
       "Modelo completo: densa <b>" + fmtN(c.dense) + "</b> · CNN <b>" + fmtN(c.cnn) + "</b> (" + (c.dense / c.cnn).toFixed(1) + "× menos) · CNN + GlobalAvgPool <b>" + fmtN(c.cnnGap) + "</b> (no depende del tamaño de la imagen)<br>" +
       "Memoria de los pesos de la densa (float32): <b>" + (c.dense * 4 / 1048576 >= 1 ? (c.dense * 4 / 1048576).toFixed(1) + " MB" : (c.dense * 4 / 1024).toFixed(1) + " KB") + "</b>");

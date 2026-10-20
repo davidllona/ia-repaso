@@ -34,8 +34,8 @@ Lab.register("curso5/c5m4-device", function (root, api) {
   var ui = api.controls(root), out = api.readout(root);
   ui.segmented({ label: "¿Tu ordenador tiene GPU (cuda)?", value: S.gpu, options: [["si", "sí"], ["no", "no"]], onChange: function (v) { S.gpu = v; update(); } });
   ui.segmented({ label: "Modelo", value: S.modelo, options: [["mueve", "modelo.to(dev)"], ["no", "no lo muevo"]], onChange: function (v) { S.modelo = v; update(); } });
-  ui.segmented({ label: "Imágenes x", value: S.x, options: [["reasigna", "x = x.to(dev)"], ["sin", "x.to(dev) a secas"], ["no", "no las muevo"]], onChange: function (v) { S.x = v; update(); } });
-  ui.segmented({ label: "Etiquetas y", value: S.y, options: [["mueve", "y = y.to(dev)"], ["no", "no las muevo"]], onChange: function (v) { S.y = v; update(); } });
+  ui.segmented({ label: "Carátulas x", value: S.x, options: [["reasigna", "x = x.to(dev)"], ["sin", "x.to(dev) a secas"], ["no", "no las muevo"]], onChange: function (v) { S.x = v; update(); } });
+  ui.segmented({ label: "Etiquetas y (géneros)", value: S.y, options: [["mueve", "y = y.to(dev)"], ["no", "no las muevo"]], onChange: function (v) { S.y = v; update(); } });
   ui.segmented({ label: "Luego imprimo salida.numpy()", value: S.numpy, options: [["no", "no"], ["si", "sí"]], onChange: function (v) { S.numpy = v; update(); } });
 
   function chip(ctx, x, y, w, h, txt, col, C, off) {

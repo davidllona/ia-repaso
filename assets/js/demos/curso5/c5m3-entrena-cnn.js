@@ -157,10 +157,10 @@
 
     var vLoss = api.view(root, { aspect: 2.3, minH: 190, maxH: 270, label: "Pérdida de entrenamiento de la CNN y de la red densa según las épocas" });
     api.legend(root, [[C0.cobalto, "CNN (55 parámetros)"], [C0.terracota, "red densa (851 parámetros)"]]);
-    var vBars = api.view(root, { aspect: 2.3, minH: 190, maxH: 250, label: "Acierto de cada modelo con el trazo centrado y con el trazo desplazado" });
-    var vFil = api.view(root, { aspect: 2.1, minH: 200, maxH: 280, label: "Filtros aprendidos por la CNN y ejemplos de imágenes de prueba" });
+    var vBars = api.view(root, { aspect: 2.3, minH: 190, maxH: 250, label: "Acierto de cada modelo con el logo centrado y con el logo desplazado" });
+    var vFil = api.view(root, { aspect: 2.1, minH: 200, maxH: 280, label: "Filtros aprendidos por la CNN y ejemplos de fotogramas de prueba" });
     var ui = api.controls(root), out = api.readout(root);
-    ui.segmented({ label: "Entrenar con el trazo…", value: S.where, options: [["center", "siempre en el centro"], ["any", "en cualquier sitio"]], onChange: function (v) { S.where = v; stop(); init(); pretrain(); update(); } });
+    ui.segmented({ label: "Entrenar con el logo…", value: S.where, options: [["center", "siempre en el centro"], ["any", "en cualquier sitio"]], onChange: function (v) { S.where = v; stop(); init(); pretrain(); update(); } });
     ui.segmented({ label: "learning rate", value: S.lr, options: [[0.03, "0,03"], [0.1, "0,1"], [0.3, "0,3"]], onChange: function (v) { S.lr = +v; } });
     var loop = api.loop(function () { if (S.remaining <= 0) return false; epoch(); S.remaining--; update(); return S.remaining > 0; }, { fps: 14 });
     function stop() { loop.stop(); S.remaining = 0; }
@@ -180,7 +180,7 @@
     }
     function drawBars(ctx, w, h, C) {
       var A = hist.acc, top = 40, bot = h - 40, bh = bot - top, groups = [["CNN", [A.cc, A.cs], C.cobalto], ["Densa", [A.dc, A.ds], C.terracota]], gw = (w - 40) / 2, i, j;
-      D.text(ctx, "acierto con 450 imágenes de prueba que el modelo no ha visto", w / 2, 13, { size: 11, align: "center", weight: 600, color: C.ink2 });
+      D.text(ctx, "acierto con 450 fotogramas de prueba que el modelo no ha visto", w / 2, 13, { size: 11, align: "center", weight: 600, color: C.ink2 });
       D.line(ctx, 20, bot - bh / 3, w - 20, bot - bh / 3, C.line, 1, [4, 4]);
       D.text(ctx, "azar 33 %", w / 2, bot - bh / 3 - 4, { size: 9.5, align: "center", color: C.muted });
       groups.forEach(function (g, gi) {
@@ -209,7 +209,7 @@
       D.text(ctx, "filtros 3×3 de la CNN (azul +, naranja −)", w / 2, 13, { size: 11, align: "center", weight: 600, color: C.ink2 });
       for (f = 0; f < F; f++) { heat(ctx, x0 + f * (3 * cs + gapF), 22, cs, cm.W[f], 3, mx, C); D.text(ctx, "f" + f, x0 + f * (3 * cs + gapF) + 1.5 * cs, 22 + 3 * cs + 12, { size: 10, align: "center", mono: true, color: C.muted }); }
       var es = Math.min(12, (w - 40) / (6 * 7 + 5 * 1.3)), eg = es * 1.3, et = 6 * 7 * es + 5 * eg, ex = (w - et) / 2, ey = 22 + 3 * cs + 52, k;
-      D.text(ctx, "imágenes de prueba: 3 centradas y 3 desplazadas", w / 2, ey - 8, { size: 11, align: "center", weight: 600, color: C.ink2 });
+      D.text(ctx, "fotogramas de prueba: 3 centrados y 3 desplazados", w / 2, ey - 8, { size: 11, align: "center", weight: 600, color: C.ink2 });
       for (k = 0; k < 6; k++) heat(ctx, ex + k * (7 * es + eg), ey, es, examples[k].map(function (v) { return Math.max(0, Math.min(1, v)); }), 7, 1, C);
     }
     init(); pretrain();
@@ -218,9 +218,9 @@
     function update() {
       var A = hist.acc, nc = hist.c.length;
       vLoss.redraw(); vBars.redraw(); vFil.redraw();
-      out.set("Época <b>" + S.epoch + "</b> · entrenando con el trazo " + (S.where === "center" ? "<b>siempre en el centro</b>" : "<b>en cualquier sitio</b>") + " (150 imágenes, minilotes de 10, SGD con lr = " + S.lr + ")<br>" +
+      out.set("Época <b>" + S.epoch + "</b> · entrenando con el logo " + (S.where === "center" ? "<b>siempre en el centro</b>" : "<b>en cualquier sitio</b>") + " (150 fotogramas, minilotes de 10, SGD con lr = " + S.lr + ")<br>" +
         "pérdida: CNN <b>" + (nc ? fmt2(hist.c[nc - 1]) : "—") + "</b> · densa <b>" + (nc ? fmt2(hist.d[nc - 1]) : "—") + "</b><br>" +
-        "acierto con el trazo centrado: CNN <b>" + pct(A.cc) + "</b>, densa <b>" + pct(A.dc) + "</b> · con el trazo desplazado: CNN <b>" + pct(A.cs) + "</b>, densa <b>" + pct(A.ds) + "</b>");
+        "acierto con el logo centrado: CNN <b>" + pct(A.cc) + "</b>, densa <b>" + pct(A.dc) + "</b> · con el logo desplazado: CNN <b>" + pct(A.cs) + "</b>, densa <b>" + pct(A.ds) + "</b>");
     }
     update();
     return { destroy: function () { loop.stop(); } };

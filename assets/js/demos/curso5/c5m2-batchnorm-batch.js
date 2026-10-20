@@ -20,15 +20,15 @@ Lab.register("curso5/c5m2-batchnorm-batch", function (root, api) {
 
   var row = api.el("div", { class: "lab-row" }), colA = api.el("div"), colB = api.el("div");
   row.appendChild(colA); row.appendChild(colB); root.appendChild(row);
-  var vA = api.view(colA, { aspect: 1.15, minH: 230, maxH: 340, label: "Las dos características del lote antes de BatchNorm" });
+  var vA = api.view(colA, { aspect: 1.15, minH: 230, maxH: 340, label: "Las notas de dos críticos a las películas del lote antes de BatchNorm" });
   var pA = api.plot(vA, { xr: [-8, 16], yr: [-6, 3], xticks: 4, yticks: 3, pad: { l: 30, r: 8, t: 20, b: 24 }, xfmt: function (v) { return Math.round(v); }, yfmt: function (v) { return Math.round(v); } });
   var vB = api.view(colB, { aspect: 1.15, minH: 230, maxH: 340, label: "El mismo lote después de BatchNorm en modo entrenamiento y en modo evaluación" });
   var pB = api.plot(vB, { xr: [-4, 4], yr: [-4, 4], xticks: 4, yticks: 4, pad: { l: 30, r: 8, t: 20, b: 24 }, xfmt: function (v) { return Math.round(v); }, yfmt: function (v) { return Math.round(v); } });
   var ui = api.controls(root), out = api.readout(root);
   out.el.style.fontSize = "clamp(.72rem, 2.7vw, .84rem)";
   ui.slider({ label: "Tamaño del lote N", min: 2, max: 64, step: 1, value: S.n, onInput: function (v) { S.n = v; reset(); update(); } });
-  ui.slider({ label: "Media de la característica 1", min: -4, max: 10, step: 0.5, value: S.mu1, fmt: function (v) { return v.toFixed(1); }, onInput: function (v) { S.mu1 = v; reset(); update(); } });
-  ui.slider({ label: "Desviación de la característica 1", min: 0.5, max: 5, step: 0.5, value: S.sd1, fmt: function (v) { return v.toFixed(1); }, onInput: function (v) { S.sd1 = v; reset(); update(); } });
+  ui.slider({ label: "Nota media del crítico 1", min: -4, max: 10, step: 0.5, value: S.mu1, fmt: function (v) { return v.toFixed(1); }, onInput: function (v) { S.mu1 = v; reset(); update(); } });
+  ui.slider({ label: "Desviación de las notas del crítico 1", min: 0.5, max: 5, step: 0.5, value: S.sd1, fmt: function (v) { return v.toFixed(1); }, onInput: function (v) { S.sd1 = v; reset(); update(); } });
   ui.slider({ label: "γ (weight de BatchNorm)", min: 0.2, max: 3, step: 0.1, value: S.gamma, fmt: function (v) { return v.toFixed(1); }, onInput: function (v) { S.gamma = v; update(); } });
   ui.slider({ label: "β (bias de BatchNorm)", min: -2, max: 2, step: 0.1, value: S.beta, fmt: function (v) { return v.toFixed(1); }, onInput: function (v) { S.beta = v; update(); } });
   ui.button("Procesar un lote nuevo", function () { newBatch(); update(); }, "primary");
@@ -40,7 +40,7 @@ Lab.register("curso5/c5m2-batchnorm-batch", function (root, api) {
     pA.axes(ctx); ctx.save(); pA.clip(ctx);
     S.batch.xs.forEach(function (x) { D.circle(ctx, pA.x(x[0]), pA.y(x[1]), 3.8, C.cobalto, C.paper, 1); });
     var b = S.batch; D.line(ctx, pA.x(b.m[0]), pA.box.y, pA.x(b.m[0]), pA.box.y + pA.box.h, C.cobaltoInk, 1.2, [4, 3]); D.line(ctx, pA.box.x, pA.y(b.m[1]), pA.box.x + pA.box.w, pA.y(b.m[1]), C.cobaltoInk, 1.2, [4, 3]);
-    ctx.restore(); D.text(ctx, "antes: característica 1 (→) y 2 (↑)", pA.box.x + 2, 13, { size: 11, color: C.ink2, weight: 600 });
+    ctx.restore(); D.text(ctx, "antes: crítico 1 (→) y crítico 2 (↑)", pA.box.x + 2, 13, { size: 11, color: C.ink2, weight: 600 });
   }
   function drawB(ctx, w, h, C) {
     pB.axes(ctx); ctx.save(); pB.clip(ctx);

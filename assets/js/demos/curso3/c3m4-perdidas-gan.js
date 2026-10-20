@@ -6,13 +6,13 @@ Lab.register("curso3/c3m4-perdidas-gan", function (root, api) {
   var v1 = api.view(root, { aspect: 2.5, minH: 150, maxH: 230, label: "Pérdida del generador según lo que opina el discriminador" });
   var v2 = api.view(root, { aspect: 2.5, minH: 150, maxH: 230, label: "Gradiente que recibe el generador según lo que opina el discriminador" });
   var ui = api.controls(root), out = api.readout(root);
-  var sl = ui.slider({ label: "Logit s del discriminador sobre un falso (p = σ(s))", min: -7, max: 7, step: 0.1, value: S.s, fmt: function (v) { return v.toFixed(1).replace(".", ",").replace("-", "−"); }, onInput: function (v) { S.s = v; update(); } });
-  ui.button("D casi seguro de que es falso (p ≈ 0)", function () { sl.set(-6); });
-  ui.button("D indeciso (p = 0,5)", function () { sl.set(0); });
-  ui.button("D engañado (p ≈ 1)", function () { sl.set(6); });
+  var sl = ui.slider({ label: "Logit s del crítico D sobre un póster falso (p = σ(s))", min: -7, max: 7, step: 0.1, value: S.s, fmt: function (v) { return v.toFixed(1).replace(".", ",").replace("-", "−"); }, onInput: function (v) { S.s = v; update(); } });
+  ui.button("El crítico lo huele (p ≈ 0)", function () { sl.set(-6); });
+  ui.button("Crítico indeciso (p = 0,5)", function () { sl.set(0); });
+  ui.button("Crítico engañado (p ≈ 1)", function () { sl.set(6); });
   var sig = function (s) { return 1 / (1 + Math.exp(-s)); };
   var P1 = api.plot(v1, { xr: [0, 1], yr: [-4, 4], pad: { l: 40, r: 10, t: 10, b: 26 }, xticks: 5, yticks: 4, xfmt: function (v) { return v.toFixed(1).replace(".", ","); }, yfmt: function (v) { return Math.round(v); } });
-  var P2 = api.plot(v2, { xr: [0, 1], yr: [-1.2, 0.2], pad: { l: 40, r: 10, t: 10, b: 34 }, xticks: 5, yticks: 7, xlabel: "p = D(G(z))  (probabilidad de «real» que da D a una muestra falsa)", xfmt: function (v) { return v.toFixed(1).replace(".", ","); }, yfmt: function (v) { return v.toFixed(1).replace(".", ",").replace("-", "−"); } });
+  var P2 = api.plot(v2, { xr: [0, 1], yr: [-1.2, 0.2], pad: { l: 40, r: 10, t: 10, b: 34 }, xticks: 5, yticks: 7, xlabel: "p = D(G(z))  (prob. de «real» según el crítico)", xfmt: function (v) { return v.toFixed(1).replace(".", ","); }, yfmt: function (v) { return v.toFixed(1).replace(".", ",").replace("-", "−"); } });
   function curves(P, ctx, f1, f2, C, p) {
     var a = [], b = [], x;
     for (x = 0.003; x < 0.9975; x += 0.004) { a.push([P.x(x), P.y(f1(x))]); b.push([P.x(x), P.y(f2(x))]); }

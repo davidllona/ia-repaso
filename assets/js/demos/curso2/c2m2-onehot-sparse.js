@@ -2,12 +2,12 @@
 Lab.register("curso2/c2m2-onehot-sparse", function (root, api) {
   var M = api.math, st = { C: 4, fmt: "int", loss: "sparse", seed: 3, real: "mnist" };
   var N = 6, logits, ys;
-  var REAL = { mnist: ["MNIST (60 000 imágenes, 10 clases)", 60000, 10], cifar: ["CIFAR-100 (50 000 imágenes, 100 clases)", 50000, 100],
-    imagenet: ["ImageNet-1k (1 281 167 imágenes, 1000 clases)", 1281167, 1000], vocab: ["Modelo de lenguaje (1 000 000 de ejemplos, 50 000 palabras)", 1000000, 50000] };
+  var REAL = { mnist: ["Dígitos MNIST · 10 clases", 60000, 10], genero: ["Géneros de peli · 20 clases", 1000000, 20],
+    sub: ["Subgéneros · 1000 clases", 1000000, 1000], catalogo: ["Catálogo · 50 000 títulos", 1000000, 50000] };
 
-  var tbl = api.table(root, ["n.º", "p (softmax)", "y", "−ln p[y]"]);
+  var tbl = api.table(root, ["peli", "p (softmax)", "y", "−ln p[y]"]);
   var ui = api.controls(root), out = api.readout(root);
-  ui.slider({ label: "Número de clases C", min: 3, max: 6, step: 1, value: st.C, onInput: function (v) { st.C = v; gen(); update(); } });
+  ui.slider({ label: "Número de clases C (géneros)", min: 3, max: 6, step: 1, value: st.C, onInput: function (v) { st.C = v; gen(); update(); } });
   ui.segmented({ label: "Formato de las etiquetas y", value: st.fmt, options: [["int", "enteros: 2, 0, 1…"], ["oh", "One-Hot: [0,0,1,0]"]], onChange: function (v) { st.fmt = v; update(); } });
   ui.select({ label: "loss en compile()", value: st.loss, options: [["sparse", "sparse_categorical_crossentropy"], ["cat", "categorical_crossentropy"]], onChange: function (v) { st.loss = v; update(); } });
   ui.select({ label: "Escala real (para el cálculo de memoria)", value: st.real, options: Object.keys(REAL).map(function (k) { return [k, REAL[k][0]]; }), onChange: function (v) { st.real = v; update(); } });
@@ -45,7 +45,7 @@ Lab.register("curso2/c2m2-onehot-sparse", function (root, api) {
     var R = REAL[st.real], nOh = R[1] * R[2], bOh = nOh * 4, bInt = R[1] * 4;
     var conv = st.fmt === "oh" ? "y = keras.utils.to_categorical(y_enteros, num_classes=" + st.C + ")" : "y = y_enteros   # tal cual, sin convertir";
     out.set("y.shape = <b>" + shape + "</b> · compile(loss=\"" + lossName.replace(/_/g, "_<wbr>") + "\")<br><span style='opacity:.85'>" + conv + "</span><br>" + msg +
-      "<br><br>Memoria de las etiquetas en " + R[0].split(" (")[0] + ": enteros <b>" + fmtN(R[1]) + "</b> valores ≈ " + bytes(bInt) + " · One-Hot <b>" + fmtN(nOh) + "</b> valores ≈ " + bytes(bOh) + " (" + fmtN(R[2]) + " veces más)");
+      "<br><br>Memoria de las etiquetas en " + R[0].split(" · ")[0] + ": enteros <b>" + fmtN(R[1]) + "</b> valores ≈ " + bytes(bInt) + " · One-Hot <b>" + fmtN(nOh) + "</b> valores ≈ " + bytes(bOh) + " (" + fmtN(R[2]) + " veces más)");
   }
   gen(); update();
 });

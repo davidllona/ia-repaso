@@ -32,9 +32,9 @@
   Lab.register("curso5/c5m3-tamano-salida", function (root, api) {
     var D = api.d;
     var S = { n: 10, k: 3, s: 1, p: 0, d: 1, same: false, win: 0 };
-    var view = api.view(root, { aspect: 1.7, minH: 250, maxH: 340, label: "Imagen con su marco de ceros y las casillas que mira una ventana del filtro" });
+    var view = api.view(root, { aspect: 1.7, minH: 250, maxH: 340, label: "Fotograma con sus bandas negras de padding y las casillas que mira una ventana del filtro" });
     var ui = api.controls(root), out = api.readout(root);
-    var slN = ui.slider({ label: "Lado de la imagen n", min: 4, max: 14, step: 1, value: S.n, onInput: function (v) { S.n = v; update(); } });
+    var slN = ui.slider({ label: "Lado del fotograma n", min: 4, max: 14, step: 1, value: S.n, onInput: function (v) { S.n = v; update(); } });
     var slK = ui.slider({ label: "kernel_size k", min: 1, max: 7, step: 1, value: S.k, onInput: function (v) { S.k = v; update(); } });
     var slS = ui.slider({ label: "stride s", min: 1, max: 4, step: 1, value: S.s, onInput: function (v) { S.s = v; update(); } });
     var slP = ui.slider({ label: "padding p (por cada lado)", min: 0, max: 4, step: 1, value: S.p, onInput: function (v) { S.p = v; update(); } });
@@ -73,7 +73,7 @@
         smp.r.forEach(function (rr) { smp.c.forEach(function (cc) { D.rect(ctx, x0 + cc * cell, y0 + rr * cell, cell, cell, C.terracotaWash, C.terracota, 2); }); });
         D.rect(ctx, x0 + win.b * c.s * cell, y0 + win.a * c.s * cell, ext * cell, ext * cell, null, C.cobalto, 2);
       }
-      D.text(ctx, "marco amarillo = padding · borde negro = imagen · × = nadie la mira", w / 2, y0 + M * cell + 17, { size: 10.5, align: "center", color: C.muted });
+      D.text(ctx, "amarillo = padding · negro = fotograma · × = sin mirar", w / 2, y0 + M * cell + 17, { size: 10.5, align: "center", color: C.muted });
     }
     view.draw(draw);
 
@@ -85,14 +85,14 @@
       var cov = covered(c.n, c.k, c.s, c.pl, c.pr, c.d), lost = cov.filter(function (v) { return !v; }).length;
       var code = "nn.Conv2d(1, 1, kernel_size=" + c.k + (S.same ? ", padding='same'" : (c.s !== 1 ? ", stride=" + c.s : "") + (S.p ? ", padding=" + S.p : "")) + (c.d !== 1 ? ", dilation=" + c.d : "") + ")";
       var padTxt = S.same ? (c.pl === c.pr ? "2·" + c.pl : c.pl + " + " + c.pr) : "2·" + c.pl;
-      var t = "<code>" + code + "</code> sobre una imagen de " + c.n + "×" + c.n + "<br>" +
-        "ventana efectiva: d·(k−1)+1 = " + c.d + "·" + (c.k - 1) + "+1 = <b>" + ext + "</b> &nbsp;·&nbsp; imagen con marco: " + c.n + " + " + padTxt + " = <b>" + tot + "</b><br>" +
+      var t = "<code>" + code + "</code> sobre un fotograma de " + c.n + "×" + c.n + "<br>" +
+        "ventana efectiva: d·(k−1)+1 = " + c.d + "·" + (c.k - 1) + "+1 = <b>" + ext + "</b> &nbsp;·&nbsp; fotograma con marco: " + c.n + " + " + padTxt + " = <b>" + tot + "</b><br>" +
         "salida = ⌊(" + tot + " − " + ext + ") / " + c.s + "⌋ + 1 = ";
-      if (c.m <= 0) t += "<span class='bad'><b>imposible</b>: la ventana (" + ext + ") es mayor que la imagen con marco (" + tot + "). PyTorch lanza un RuntimeError.</span>";
+      if (c.m <= 0) t += "<span class='bad'><b>imposible</b>: la ventana (" + ext + ") es mayor que el fotograma con marco (" + tot + "). PyTorch lanza un RuntimeError.</span>";
       else {
         t += "<b>" + c.m + "</b> → mapa de <b>" + c.m + "×" + c.m + " = " + (c.m * c.m) + "</b> valores por canal. Parámetros del filtro: " + (c.k * c.k) + " pesos + 1 sesgo (no dependen de n).";
-        if (lost) t += "<br><span class='bad'>" + lost + " fila(s) y columna(s) de la imagen no las mira ninguna ventana (marcadas con ×).</span>";
-        else t += "<br><span class='good'>Todas las casillas de la imagen las mira alguna ventana.</span>";
+        if (lost) t += "<br><span class='bad'>" + lost + " fila(s) y columna(s) del fotograma no las mira ninguna ventana (marcadas con ×).</span>";
+        else t += "<br><span class='good'>Todas las casillas del fotograma las mira alguna ventana.</span>";
         if (S.same && S.s !== 1) t += "<br>PyTorch no admite padding='same' con stride &gt; 1 (lanza ValueError); aquí se usa stride 1.";
         if (S.same && c.s === 1) t += "<br>Con padding='same' y stride 1 la salida mide lo mismo que la entrada (" + c.n + ").";
       }

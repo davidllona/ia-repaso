@@ -60,7 +60,7 @@ Lab.register("curso4/c4m3-multiple", function (root, api) {
     ctx.restore();
   }
   function drawB(ctx, W, H, C) {
-    var D = api.d, names = ["w₁", "w₂", "b"], q, bx = pB.box, gw = bx.w / 3;
+    var D = api.d, names = ["w₁ presup.", "w₂ rivales", "b sesgo"], q, bx = pB.box, gw = bx.w / 3;
     pB.axes(ctx); ctx.save(); pB.clip(ctx);
     D.line(ctx, bx.x, pB.y(0), bx.x + bx.w, pB.y(0), C.ink, 1.5);
     for (q = 0; q < 3; q++) {

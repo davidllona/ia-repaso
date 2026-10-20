@@ -209,7 +209,7 @@ Lab.register("curso5/c5m2-grad-capas", function (root, api) {
     D.line(ctx, pL.x(0), pL.y(Math.LN2), pL.x(xm), pL.y(Math.LN2), C.muted, 1, [4, 4]);
     D.path(ctx, hist.map(function (q) { return [pL.x(q[0]), pL.y(Math.min(q[1], 0.8))]; }), C.cobalto, 2.4);
     ctx.restore();
-    D.text(ctx, "0,693 = lanzar una moneda", pL.box.x + pL.box.w - 4, pL.y(Math.LN2) - 4, { size: 10.5, align: "right", color: C.muted });
+    D.text(ctx, "0,693 = tirar una moneda", pL.box.x + pL.box.w - 4, pL.y(Math.LN2) - 4, { size: 10.5, align: "right", color: C.muted });
   }
   vL.draw(drawL);
 

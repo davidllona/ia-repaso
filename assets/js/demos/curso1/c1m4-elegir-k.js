@@ -49,6 +49,12 @@ function frame(ctx, plot, C, grid) {
   ctx.globalAlpha = 1; ctx.strokeStyle = C.ink; ctx.lineWidth = 1.5; ctx.strokeRect(b.x, b.y, b.w, b.h);
   ctx.restore();
 }
+/* Rótulos de los ejes: cada punto es un usuario de la plataforma, situado según lo que le gusta. */
+function axisCaps(ctx, plot, C, xt, yt) {
+  var b = plot.box, D = api.d;
+  D.text(ctx, xt, b.x + b.w / 2, b.y + b.h + 13, { size: 10, align: "center", color: C.ink2 });
+  D.text(ctx, yt, b.x - 5, b.y + b.h / 2, { size: 10, align: "center", color: C.ink2, rotate: -Math.PI / 2 });
+}
 function sq2(a, b) { var dx = a[0] - b[0], dy = a[1] - b[1]; return dx * dx + dy * dy; }
 function dist2(a, b) { return Math.sqrt(sq2(a, b)); }
 
@@ -210,18 +216,18 @@ function bestBy(f, dir) { var b = null; for (var k = 2; k <= KMAX; k++) if (!b |
 
 var row = api.el("div", { class: "lab-row" }), left = api.el("div"), right = api.el("div", { style: { display: "flex", flexDirection: "column", gap: "0.6rem" } });
 row.appendChild(left); row.appendChild(right); root.appendChild(row);
-var view = api.view(left, { aspect: 1.6, minH: 190, maxH: 420, label: "Puntos coloreados según el resultado de K-Means con el K elegido" });
-var plot = api.plot(view, { xr: [0, 16], yr: [0, 10], pad: { l: 6, r: 6, t: 6, b: 6 } });
+var view = api.view(left, { aspect: 1.6, minH: 190, maxH: 420, label: "Usuarios coloreados según el tipo de espectador que encuentra K-Means con el K elegido" });
+var plot = api.plot(view, { xr: [0, 16], yr: [0, 10], pad: { l: 16, r: 6, t: 6, b: 20 } });
 var v1 = api.view(right, { aspect: 2.5, minH: 125, maxH: 200, label: "Curva del codo: inercia según K" });
 var p1 = api.plot(v1, { xr: [1, KMAX], yr: [0, 1], xticks: KMAX - 1, yticks: 2, pad: { l: 40, r: 10, t: 22, b: 22 }, xfmt: function (t) { return Math.round(t); } });
 var v2 = api.view(right, { aspect: 2.5, minH: 125, maxH: 200, label: "Silhouette medio según K" });
 var p2 = api.plot(v2, { xr: [1, KMAX], yr: [0, 1], xticks: KMAX - 1, yticks: 2, pad: { l: 40, r: 10, t: 22, b: 22 }, xfmt: function (t) { return Math.round(t); } });
-api.legend(root, [[api.colors().ink, "línea continua: el K que pruebas"], [api.colors().oliva, "línea discontinua: grupos reales"]]);
+api.legend(root, [[api.colors().ink, "línea continua: el K que pruebas"], [api.colors().oliva, "línea discontinua: tipos de espectador reales"]]);
 var ui = api.controls(root);
-ui.slider({ label: "Grupos reales que hay en los datos", min: 2, max: 6, step: 1, value: G, onInput: function (v) { G = v; compute(); K = Math.min(Math.max(2, K), KMAX); update(); } });
-ui.slider({ label: "Dispersión de cada grupo", min: 0.5, max: 2.2, step: 0.1, value: SD, fmt: function (v) { return v.toFixed(1); }, onInput: function (v) { SD = v; compute(); update(); } });
+ui.slider({ label: "Tipos de espectador que hay de verdad", min: 2, max: 6, step: 1, value: G, onInput: function (v) { G = v; compute(); K = Math.min(Math.max(2, K), KMAX); update(); } });
+ui.slider({ label: "Dispersión de cada grupo (gustos más variados)", min: 0.5, max: 2.2, step: 0.1, value: SD, fmt: function (v) { return v.toFixed(1); }, onInput: function (v) { SD = v; compute(); update(); } });
 var ks = ui.slider({ label: "K que pruebas", min: 2, max: KMAX, step: 1, value: K, onInput: function (v) { K = v; update(); } });
-ui.toggle({ label: "Revelar los grupos reales", value: true, onChange: function (v) { showTrue = v; update(); } });
+ui.toggle({ label: "Marcar los tipos reales en las curvas", value: true, onChange: function (v) { showTrue = v; update(); } });
 ui.button("Datos nuevos", function () { seed += 5; compute(); update(); });
 var out = api.readout(root);
 var tbl = api.table(root, ["K", "Inercia", "Silhouette", "D-B"]);
@@ -229,7 +235,7 @@ var tbl = api.table(root, ["K", "Inercia", "Silhouette", "D-B"]);
 function fit() { var b = plot.box; plot.xr = [0, 10 * b.w / b.h]; }
 function drawScatter(ctx, w, h, C) {
   var D = api.d, pal = palette(C), r = res[K - 1], i;
-  fit(); frame(ctx, plot, C, false); ctx.save(); plot.clip(ctx);
+  fit(); frame(ctx, plot, C, false); axisCaps(ctx, plot, C, "gusto por la acción →", "gusto por la comedia →"); ctx.save(); plot.clip(ctx);
   for (i = 0; i < P.length; i++) shape(ctx, r.run.lab[i], plot.x(P[i][0]), plot.y(P[i][1]), 3.6, pal[r.run.lab[i]], C.ink, 0.6);
   for (i = 0; i < r.run.C.length; i++) { D.circle(ctx, plot.x(r.run.C[i][0]), plot.y(r.run.C[i][1]), 8, pal[i], C.ink, 2.5); }
   ctx.restore();
@@ -258,8 +264,8 @@ function update() {
   view.redraw(); v1.redraw(); v2.redraw();
   var r = res[K - 1], bs = bestBy(function (x) { return x.sil; }, 1), bd = bestBy(function (x) { return x.db; }, -1);
   out.set("K = <b>" + K + "</b> → inercia = <b>" + r.inertia.toFixed(1) + "</b> · silhouette = <b>" + r.sil.toFixed(3) + "</b> · Davies–Bouldin (D-B) = <b>" + r.db.toFixed(3) + "</b><br>" +
-    "Mejor K según silhouette: <b>" + bs.k + "</b> · según Davies–Bouldin (menor es mejor): <b>" + bd.k + "</b> · grupos reales: <b>" + G + "</b><br>" +
-    (bs.k === G ? "<span class='good'>El silhouette acierta el número real de grupos.</span>" : "<span class='bad'>El silhouette ya no coincide con los " + G + " grupos reales: cuando los grupos se solapan (más dispersión o más grupos en el mismo espacio) no hay un K «correcto» claro.</span>"));
+    "Mejor K según silhouette: <b>" + bs.k + "</b> · según Davies–Bouldin (menor es mejor): <b>" + bd.k + "</b> · tipos reales: <b>" + G + "</b><br>" +
+    (bs.k === G ? "<span class='good'>El silhouette acierta el número real de tipos de espectador.</span>" : "<span class='bad'>El silhouette ya no coincide con los " + G + " tipos reales: cuando los gustos se mezclan (más dispersión o más tipos en el mismo espacio) no hay un K «correcto» claro.</span>"));
   tbl.set(res.slice(1).map(function (x) {
     var cur = x.k === K, f = function (t) { return cur ? "<b>" + t + "</b>" : t; };
     return [f(x.k + (x.k === bs.k ? " ★" : "")), f(x.inertia.toFixed(1)), f(x.sil.toFixed(3)), f(x.db.toFixed(3))];

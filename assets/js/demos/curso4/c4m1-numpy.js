@@ -45,16 +45,16 @@ Lab.register("curso4/c4m1-numpy", function (root, api) {
     tag(lx, 34, "arr", "np." + aDt, C.cobaltoWash);
     tag(lx, 34 + 96, "t", "torch." + tDt, C.terracotaWash);
     if (shared) {
-      mem(mx, 80, st.mem1, C.olivaWash, "memoria (un solo bloque)");
+      mem(mx, 80, st.mem1, C.olivaWash, "notas de 4 películas (un solo bloque)");
       D.arrow(ctx, lx + bx + 54, 56, mx - 4, 90, C.cobaltoInk, 1.8);
       D.arrow(ctx, lx + bx + 54, 152, mx - 4, 108, C.terracotaInk, 1.8);
-      D.text(ctx, "mismo bloque → lo que cambies en uno lo ve el otro", w / 2, h - 10, { align: "center", size: 11, color: C.olivaInk, weight: 600 });
+      D.text(ctx, "misma lista → lo que cambies en uno lo ve el otro", w / 2, h - 10, { align: "center", size: 11, color: C.olivaInk, weight: 600 });
     } else {
-      mem(mx, 36, st.mem1, C.cobaltoWash, "memoria de arr");
-      mem(mx, 142, st.mem2, C.terracotaWash, "memoria de t (copia)");
+      mem(mx, 36, st.mem1, C.cobaltoWash, "notas de arr");
+      mem(mx, 142, st.mem2, C.terracotaWash, "notas de t (copia)");
       D.arrow(ctx, lx + bx + 54, 56, mx - 4, 54, C.cobaltoInk, 1.8);
       D.arrow(ctx, lx + bx + 54, 152, mx - 4, 160, C.terracotaInk, 1.8);
-      D.text(ctx, "dos bloques → cada uno cambia por su cuenta", w / 2, h - 10, { align: "center", size: 11, color: C.terracotaInk, weight: 600 });
+      D.text(ctx, "dos listas → cada una cambia por su cuenta", w / 2, h - 10, { align: "center", size: 11, color: C.terracotaInk, weight: 600 });
     }
   }
   view.draw(draw);

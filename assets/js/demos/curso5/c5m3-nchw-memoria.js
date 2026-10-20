@@ -35,7 +35,7 @@
     var S = { mode: "nchw", C: 3, H: 2, W: 3, sel: { c: 1, h: 0, w: 2 } };
     var CHN = [["cobalto", "cobaltoWash", "cobaltoInk"], ["terracota", "terracotaWash", "terracotaInk"], ["oliva", "olivaWash", "olivaInk"], ["marker", "markerWash", "ink"]];
 
-    var view = api.view(root, { aspect: 1.9, minH: 300, maxH: 360, drag: false, label: "Un tensor con C canales de H por W píxeles, y la tira de memoria donde se guardan sus números" });
+    var view = api.view(root, { aspect: 1.9, minH: 300, maxH: 360, drag: false, label: "Un póster en miniatura con C canales de H por W píxeles, y la tira de memoria donde se guardan sus números" });
     var ui = api.controls(root), out = api.readout(root);
     ui.segmented({ label: "Formato", value: S.mode, options: [["nchw", "NCHW"], ["nhwc", "NHWC"], ["cl", "NCHW + channels_last"]], onChange: function (v) { S.mode = v; update(); } });
     ui.slider({ label: "Canales C", min: 1, max: 4, step: 1, value: S.C, onInput: function (v) { S.C = v; fix(); update(); } });
@@ -67,12 +67,14 @@
       return { T: T, per: per, cell: cell, rows: rows, x0: (w - cell * per) / 2, y0: y0 };
     }
 
+    /* con 3 canales son las tres láminas de tinta del póster; con 1, el gris */
+    function tinta(c) { return S.C === 3 ? " · " + ["rojo", "verde", "azul"][c] : S.C === 1 ? " · gris" : ""; }
     function draw(ctx, w, h, C) {
       var P = planes(w, h), G = memGeom(w, P.bottom + 34), a, c, hh, ww;
-      D.text(ctx, (w > 520 ? "Tensor " + MODES[S.mode].logical + ", N = 1: cada casilla muestra su posición en memoria" : "Cada casilla = su posición en memoria"), w / 2, 14, { size: 10.5, align: "center", color: C.ink2, weight: 600 });
+      D.text(ctx, (w > 520 ? "Póster en miniatura " + MODES[S.mode].logical + ", N = 1: cada casilla muestra su posición en memoria" : "Cada casilla = su posición en memoria"), w / 2, 14, { size: 10.5, align: "center", color: C.ink2, weight: 600 });
       P.list.forEach(function (pl) {
         var col = CHN[pl.c];
-        D.text(ctx, "canal " + pl.c, pl.x + (pl.cell * S.W) / 2, pl.y - 3, { size: 10.5, align: "center", color: C[col[2]], weight: 600 });
+        D.text(ctx, "canal " + pl.c + (pl.cell * S.W >= 66 ? tinta(pl.c) : ""), pl.x + (pl.cell * S.W) / 2, pl.y - 3, { size: 10.5, align: "center", color: C[col[2]], weight: 600 });
         for (hh = 0; hh < S.H; hh++) for (ww = 0; ww < S.W; ww++) {
           var isSel = S.sel.c === pl.c && S.sel.h === hh && S.sel.w === ww, x = pl.x + ww * pl.cell, y = pl.y + hh * pl.cell;
           D.rect(ctx, x, y, pl.cell, pl.cell, C[col[1]], isSel ? C.ink : C[col[0]], isSel ? 3 : 1);

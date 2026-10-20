@@ -49,6 +49,12 @@ function frame(ctx, plot, C, grid) {
   ctx.globalAlpha = 1; ctx.strokeStyle = C.ink; ctx.lineWidth = 1.5; ctx.strokeRect(b.x, b.y, b.w, b.h);
   ctx.restore();
 }
+/* Rótulos de los ejes: cada punto es un usuario de la plataforma, situado según lo que le gusta. */
+function axisCaps(ctx, plot, C, xt, yt) {
+  var b = plot.box, D = api.d;
+  D.text(ctx, xt, b.x + b.w / 2, b.y + b.h + 14, { size: 10.5, align: "center", color: C.ink2 });
+  D.text(ctx, yt, b.x - 6, b.y + b.h / 2, { size: 10.5, align: "center", color: C.ink2, rotate: -Math.PI / 2 });
+}
 function sq2(a, b) { var dx = a[0] - b[0], dy = a[1] - b[1]; return dx * dx + dy * dy; }
 function dist2(a, b) { return Math.sqrt(sq2(a, b)); }
 
@@ -206,8 +212,8 @@ function stats(t) {
   P.forEach(function (p) { var z = p[0] * c + p[1] * s; sum2 += z * z; var e = -p[0] * s + p[1] * c; perp += e * e; });
   return { cap: sum2 / (N - 1), lost: perp / (N - 1) };
 }
-var view = api.view(root, { aspect: 1.5, minH: 240, maxH: 520, drag: true, label: "Nube de puntos con una recta que se puede girar y las proyecciones de los puntos sobre ella" });
-var plot = api.plot(view, { xr: [-6, 6], yr: [-4.5, 4.5], pad: { l: 8, r: 8, t: 8, b: 8 } });
+var view = api.view(root, { aspect: 1.5, minH: 240, maxH: 520, drag: true, label: "Nube de 60 usuarios, situados según sus horas de acción y de comedia, con una recta que se puede girar y las proyecciones de los usuarios sobre ella" });
+var plot = api.plot(view, { xr: [-6, 6], yr: [-4.5, 4.5], pad: { l: 18, r: 8, t: 8, b: 22 } });
 var cview = api.view(root, { aspect: 3.0, minH: 140, maxH: 230, label: "Varianza capturada según el ángulo de la recta" });
 var cplot = api.plot(cview, { xr: [0, 180], yr: [0, 1], xticks: 4, yticks: 2, xlabel: "ángulo de la recta (grados)", pad: { l: 44, r: 12, t: 22, b: 36 }, xfmt: function (v) { return Math.round(v) + "°"; }, yfmt: function (v) { return v.toFixed(1); } });
 var ui = api.controls(root);
@@ -230,7 +236,7 @@ function go(target) {
 function fit() { var b = plot.box, ratio = b.w / b.h; plot.xr = [-4.5 * ratio, 4.5 * ratio]; }
 function draw(ctx, w, h, C) {
   var D = api.d, c = Math.cos(theta * Math.PI / 180), s = Math.sin(theta * Math.PI / 180), i;
-  fit(); frame(ctx, plot, C); ctx.save(); plot.clip(ctx);
+  fit(); frame(ctx, plot, C); axisCaps(ctx, plot, C, "horas de acción (centradas) →", "horas de comedia →"); ctx.save(); plot.clip(ctx);
   D.line(ctx, plot.x(-30 * c), plot.y(-30 * s), plot.x(30 * c), plot.y(30 * s), C.terracota, 3);
   for (i = 0; i < N; i++) {
     var p = P[i], z = p[0] * c + p[1] * s, fx = z * c, fy = z * s;

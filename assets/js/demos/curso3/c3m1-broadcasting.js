@@ -11,8 +11,8 @@ Lab.register("curso3/c3m1-broadcasting", function (root, api) {
   var view = api.view(root, { aspect: 2.6, minH: 200, maxH: 280, label: "Los dos tensores estirados al tamaño común y el resultado de operarlos" });
   var ui = api.controls(root), out = api.readout(root);
   var OPT = [[1, "1"], [2, "2"], [3, "3"], [4, "4"]];
-  ui.select({ label: "A: filas", value: st.a0, options: OPT, onChange: function (v) { st.a0 = +v; update(); } });
-  ui.select({ label: "A: columnas", value: st.a1, options: OPT, onChange: function (v) { st.a1 = +v; update(); } });
+  ui.select({ label: "A: filas (películas)", value: st.a0, options: OPT, onChange: function (v) { st.a0 = +v; update(); } });
+  ui.select({ label: "A: columnas (semanas)", value: st.a1, options: OPT, onChange: function (v) { st.a1 = +v; update(); } });
   ui.segmented({ label: "Rango de B", value: 1, options: [[1, "rango 1: (n,)"], [2, "rango 2: (f, n)"]], onChange: function (v) { st.rb = v; update(); } });
   var sb0 = ui.select({ label: "B: filas (solo rango 2)", value: st.b0, options: OPT, onChange: function (v) { st.b0 = +v; update(); } });
   var sb1 = ui.select({ label: "B: columnas", value: st.b1, options: OPT, onChange: function (v) { st.b1 = +v; update(); } });
@@ -84,6 +84,7 @@ Lab.register("curso3/c3m1-broadcasting", function (root, api) {
   function update() {
     sb0.el.disabled = st.rb === 1; sb0.el.parentNode.style.opacity = st.rb === 1 ? 0.4 : 1;
     var an = analyse(), s = "";
+    s += "<i>A = puntos de cada película en cada semana (filas = películas, columnas = semanas) · B = bonus que se suma</i><br>";
     s += "<b>A</b> " + fmt(an.sa) + " · <b>B</b> " + fmt(an.sb) + (an.sb.length === 1 ? " → se trata como " + fmt(an.pb) + " (se añade un 1 por la izquierda)" : "") + "<br>";
     s += "Eje 1 (derecha): " + an.sa[1] + " frente a " + an.pb[1] + " · Eje 0: " + an.sa[0] + " frente a " + an.pb[0] + "<br>";
     if (an.bad < 0) s += "<span class='good'>Compatibles</span> → forma del resultado <b>" + fmt(an.res) + "</b>";

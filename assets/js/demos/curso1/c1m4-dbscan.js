@@ -49,6 +49,12 @@ function frame(ctx, plot, C, grid) {
   ctx.globalAlpha = 1; ctx.strokeStyle = C.ink; ctx.lineWidth = 1.5; ctx.strokeRect(b.x, b.y, b.w, b.h);
   ctx.restore();
 }
+/* Rótulos de los ejes: cada punto es un usuario de la plataforma, situado según lo que le gusta. */
+function axisCaps(ctx, plot, C, xt, yt) {
+  var b = plot.box, D = api.d;
+  D.text(ctx, xt, b.x + b.w / 2, b.y + b.h + 14, { size: 10.5, align: "center", color: C.ink2 });
+  D.text(ctx, yt, b.x - 6, b.y + b.h / 2, { size: 10.5, align: "center", color: C.ink2, rotate: -Math.PI / 2 });
+}
 function sq2(a, b) { var dx = a[0] - b[0], dy = a[1] - b[1]; return dx * dx + dy * dy; }
 function dist2(a, b) { return Math.sqrt(sq2(a, b)); }
 
@@ -200,13 +206,13 @@ function gen() {
 function run() { res = dbscan(P, EPS, MIN); }
 function startSel() { for (var i = 0; i < P.length; i++) if (res.core[i]) { sel = i; return; } sel = 0; }
 
-var view = api.view(root, { aspect: 1.6, minH: 230, maxH: 600, drag: true, label: "Puntos en el plano coloreados según DBSCAN: núcleo, borde y ruido" });
-var plot = api.plot(view, { xr: [0, 16], yr: [0, 10], pad: { l: 8, r: 8, t: 8, b: 8 } });
+var view = api.view(root, { aspect: 1.6, minH: 230, maxH: 600, drag: true, label: "Usuarios situados según sus gustos y coloreados según DBSCAN: núcleo, borde y ruido" });
+var plot = api.plot(view, { xr: [0, 16], yr: [0, 10], pad: { l: 18, r: 8, t: 8, b: 22 } });
 var ui = api.controls(root);
 ui.slider({ label: "eps (radio del vecindario)", min: 0.15, max: 2.4, step: 0.05, value: EPS, fmt: function (v) { return v.toFixed(2); }, onInput: function (v) { EPS = v; run(); update(); } });
-ui.slider({ label: "min_samples (vecinos mínimos para ser núcleo)", min: 2, max: 12, step: 1, value: MIN, onInput: function (v) { MIN = v; run(); update(); } });
-ui.segmented({ label: "Al tocar el gráfico…", options: [["inspect", "Inspeccionar un punto"], ["add", "Añadir puntos"]], value: mode, onChange: function (v) { mode = v; update(); } });
-ui.button("Quitar los puntos añadidos", function () { P.length = base; run(); if (sel >= P.length) sel = 0; update(); });
+ui.slider({ label: "min_samples (usuarios mínimos para ser núcleo)", min: 2, max: 12, step: 1, value: MIN, onInput: function (v) { MIN = v; run(); update(); } });
+ui.segmented({ label: "Al tocar el gráfico…", options: [["inspect", "Inspeccionar un usuario"], ["add", "Añadir usuarios"]], value: mode, onChange: function (v) { mode = v; update(); } });
+ui.button("Quitar los usuarios añadidos", function () { P.length = base; run(); if (sel >= P.length) sel = 0; update(); });
 var out = api.readout(root);
 var lg = api.el("div", { class: "lab-legend" });
 lg.appendChild(api.el("span", { text: "● núcleo (relleno)" })); lg.appendChild(api.el("span", { text: "○ borde (más pequeño, hueco)" })); lg.appendChild(api.el("span", { text: "✕ ruido" })); lg.appendChild(api.el("span", { text: "forma y color = grupo" }));
@@ -215,7 +221,7 @@ root.appendChild(lg);
 function fit() { var b = plot.box; plot.xr = [0, 10 * b.w / b.h]; }
 function draw(ctx, w, h, C) {
   var D = api.d, pal = palette(C), i, j;
-  fit(); frame(ctx, plot, C); ctx.save(); plot.clip(ctx);
+  fit(); frame(ctx, plot, C); axisCaps(ctx, plot, C, "gusto por la acción →", "gusto por la comedia →"); ctx.save(); plot.clip(ctx);
   var sc = plot.x(1) - plot.x(0);
   // vecindario del punto inspeccionado
   if (res && sel < P.length) {
@@ -236,10 +242,10 @@ function draw(ctx, w, h, C) {
 function update() {
   view.redraw();
   var nc = 0, nb = 0, nn = 0, i; res.type.forEach(function (t) { if (t === "nucleo") nc++; else if (t === "borde") nb++; else nn++; });
-  var s = "eps = <b>" + EPS.toFixed(2) + "</b> · min_samples = <b>" + MIN + "</b> → <b>" + res.k + " grupos</b> · núcleo: <b>" + nc + "</b> · borde: <b>" + nb + "</b> · ruido: <b>" + nn + "</b> · puntos totales: <b>" + P.length + "</b>";
+  var s = "eps = <b>" + EPS.toFixed(2) + "</b> · min_samples = <b>" + MIN + "</b> → <b>" + res.k + " grupos</b> · núcleo: <b>" + nc + "</b> · borde: <b>" + nb + "</b> · ruido: <b>" + nn + "</b> · usuarios totales: <b>" + P.length + "</b>";
   if (sel < P.length) {
     var cnt = res.nb[sel].length, t = res.type[sel];
-    s += "<br>Punto marcado: tiene <b>" + cnt + "</b> puntos dentro de eps (contándose a sí mismo) " + (cnt >= MIN ? "≥" : "<") + " " + MIN + " → <b>" + (t === "nucleo" ? "NÚCLEO" : t === "borde" ? "BORDE" : "RUIDO") + "</b>" +
+    s += "<br>Usuario marcado: tiene <b>" + cnt + "</b> usuarios dentro de eps (contándose a sí mismo) " + (cnt >= MIN ? "≥" : "<") + " " + MIN + " → <b>" + (t === "nucleo" ? "NÚCLEO" : t === "borde" ? "BORDE" : "RUIDO") + "</b>" +
       (t === "borde" ? " (no llega al mínimo, pero está dentro del radio de un núcleo)" : t === "ruido" ? " (no llega al mínimo y ningún núcleo lo alcanza)" : "");
   }
   if (nn > P.length * 0.5) s += "<br><span class='bad'>Casi todo es ruido: eps es demasiado pequeño (o min_samples demasiado grande) para esta densidad.</span>";

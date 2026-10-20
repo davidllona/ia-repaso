@@ -5,12 +5,12 @@ Lab.register("curso1/c1m2-r2", function (root, api) {
   var noise = 22, slope = 34;
   var ys = [], fit, xm, ym, sst, sse;
 
-  var view = api.view(root, { aspect: 1.75, minH: 270, label: "Coches según el motor y las emisiones, con la media de las emisiones y una recta cuya pendiente puedes cambiar" });
-  var plot = api.plot(view, { xr: [0, 6], yr: [0, 450], xticks: 6, yticks: 6, xlabel: "Tamaño del motor (litros)", ylabel: "CO₂ (g/km)", pad: { l: 52, r: 14, t: 12, b: 40 } });
+  var view = api.view(root, { aspect: 1.75, minH: 270, label: "Películas según su presupuesto y las horas vistas, con la media de horas vistas y una recta cuya pendiente puedes cambiar" });
+  var plot = api.plot(view, { xr: [0, 6], yr: [0, 450], xticks: 6, yticks: 6, xlabel: "Presupuesto (decenas de millones de €)", ylabel: "Horas vistas (miles)", pad: { l: 52, r: 14, t: 12, b: 40 } });
   var bars = api.view(root, { aspect: 6.5, minH: 96, maxH: 120, label: "Barras: variación total de y y parte que la recta no explica" });
   api.legend(root, [[api.colors().muted, "error del «modelo tonto» (siempre la media)"], [api.colors().terracota, "error de tu recta"]]);
   var ui = api.controls(root), out = api.readout(root);
-  ui.slider({ label: "Ruido de los datos (desviación, g/km)", min: 0, max: 70, step: 1, value: noise, onInput: function (v) { noise = v; calc(); update(); } });
+  ui.slider({ label: "Ruido de los datos (desviación, miles de horas)", min: 0, max: 70, step: 1, value: noise, onInput: function (v) { noise = v; calc(); update(); } });
   var sl = ui.slider({ label: "Pendiente de tu recta (pasa siempre por el centro de los datos)", min: -20, max: 80, step: 0.5, value: slope, fmt: function (v) { return v.toFixed(1); }, onInput: function (v) { slope = v; calc(); update(); } });
   ui.button("Poner la pendiente óptima (OLS)", function () { slope = Math.round(fit.m * 2) / 2; sl.set(slope, true); calc(); update(); }, "primary");
 

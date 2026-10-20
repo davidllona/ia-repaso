@@ -160,7 +160,7 @@ Lab.register("curso5/c5m2-carrera-red", function (root, api) {
   var KEYS = ["sgd", "momentum", "rmsprop", "adam"];
   var NAME = { sgd: "SGD", momentum: "SGD + momentum", rmsprop: "RMSprop", adam: "Adam" };
   var S = { kind: "spiral", depth: 4, multExp: 0, show: "adam", run: false, seed: 1 };
-  var DS = { moons: "Dos lunas", circles: "Círculos", spiral: "Espiral", xor: "XOR" };
+  var DS = { moons: "Dos lunas (dos géneros)", circles: "Círculos (un género rodea al otro)", spiral: "Espiral (géneros entrelazados)", xor: "XOR (géneros en diagonal)" };
   var data, nets, hist, MAXT = 1000;
 
   function build() {
@@ -177,7 +177,7 @@ Lab.register("curso5/c5m2-carrera-red", function (root, api) {
   row.appendChild(colA); row.appendChild(colB); root.appendChild(row);
   var vL = api.view(colA, { aspect: 1.15, minH: 230, maxH: 340, label: "Pérdida de entrenamiento de los cuatro optimizadores, en escala logarítmica" });
   var pL = api.plot(vL, { xr: [0, 300], yr: [-4, 1], xticks: 3, yticks: 5, xlabel: "pasos", pad: { l: 42, r: 8, t: 14, b: 32 }, xfmt: function (v) { return Math.round(v); }, yfmt: function (v) { return "1e" + Math.round(v); } });
-  var vM = api.view(colB, { aspect: 1.15, minH: 230, maxH: 340, label: "Frontera de decisión de la red elegida y datos de entrenamiento" });
+  var vM = api.view(colB, { aspect: 1.15, minH: 230, maxH: 340, label: "Frontera de decisión de la red elegida entre dos géneros de películas y datos de entrenamiento" });
   var pM = api.plot(vM, { xr: [-2, 2], yr: [-2, 2], xticks: 4, yticks: 4, pad: { l: 30, r: 8, t: 14, b: 24 }, xfmt: function (v) { return Math.round(v); }, yfmt: function (v) { return Math.round(v); } });
   var ui = api.controls(root), out = api.readout(root);
   out.el.style.fontSize = "clamp(.72rem, 2.7vw, .84rem)";
@@ -213,6 +213,7 @@ Lab.register("curso5/c5m2-carrera-red", function (root, api) {
     data.tr.forEach(function (p) { D.circle(ctx, pM.x(p.x), pM.y(p.y), 3.4, p.l ? C.terracota : C.cobalto, C.paper, 1); });
     ctx.restore();
     D.text(ctx, NAME[S.show] + " tras " + net.t + " pasos", b.x + 2, 11, { size: 11, color: C.ink2, weight: 600 });
+    D.text(ctx, "→ humor · ↑ tensión", b.x + b.w - 2, b.y + b.h - 5, { size: 10, color: C.muted, align: "right" });
   }
   build();
   vL.draw(drawL); vM.draw(drawM);
@@ -226,7 +227,7 @@ Lab.register("curso5/c5m2-carrera-red", function (root, api) {
     });
     tb.set(rows);
     var t = nets.sgd.t;
-    out.set(t < 2 ? "Pulsa «Carrera»: las cuatro redes parten de los mismos pesos y ven los mismos 100 puntos. Solo cambia la regla de actualización." :
+    out.set(t < 2 ? "Pulsa «Carrera»: las cuatro redes parten de los mismos pesos y ven las mismas 100 películas. Solo cambia la regla de actualización." :
       "Paso <b>" + t + "</b> (pérdida en train y test = entropía cruzada binaria) · la pérdida de entrenamiento más baja es la de <b>" + NAME[best] + "</b> (" + nets[best].loss.toExponential(1).replace("e-", "e−") + ").<br>Fíjate en la pérdida de test: hundir la de entrenamiento no garantiza que la de test baje (con 100 puntos hay sobreajuste).");
     vL.redraw(); vM.redraw();
   }

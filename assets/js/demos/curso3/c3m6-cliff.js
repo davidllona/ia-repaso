@@ -56,7 +56,7 @@ Lab.register("curso3/c3m6-cliff", function (root, api) {
     });
     update();
   }
-  var v1 = api.view(root, { aspect: 3.1, minH: 112, maxH: 190, label: "Mundo del acantilado de 4 por 12 con los caminos greedy de Q-learning y de SARSA" });
+  var v1 = api.view(root, { aspect: 3.1, minH: 112, maxH: 190, label: "Mundo del acantilado de 4 por 12 (los botones de cancelar suscripción, −100, son la fila de abajo) con los caminos greedy de Q-learning y de SARSA" });
   var v2 = api.view(root, { aspect: 1.9, minH: 200, maxH: 320, label: "Recompensa por episodio durante el entrenamiento para SARSA y Q-learning" });
   var p = api.plot(v2, { xr: [0, EPIS], yr: [-140, 20], xticks: 5, yticks: 4, xlabel: "episodio", ylabel: "recompensa del episodio", pad: { l: 54, r: 16, t: 10, b: 36 } });
   var ui = api.controls(root), out = api.readout(root);
@@ -71,7 +71,7 @@ Lab.register("curso3/c3m6-cliff", function (root, api) {
       if (isCliff(s)) fill = C.terracotaWash; else if (s === GOAL) fill = C.olivaWash; else if (s === START) fill = C.cobaltoWash;
       D.rect(ctx, x + 0.5, y + 0.5, cw - 1, ch - 1, fill, C.line, 1);
       if (r === 3) {
-        var t = isCliff(s) ? "☠" : (s === GOAL ? "G" : (s === START ? "S" : ""));
+        var t = isCliff(s) ? "✖" : (s === GOAL ? "G" : (s === START ? "S" : ""));
         if (t) D.text(ctx, t, x + cw / 2, y + ch / 2 + 5, { align: "center", size: Math.min(14, cw * 0.55), weight: 700, color: isCliff(s) ? C.terracotaInk : C.ink });
       }
     }

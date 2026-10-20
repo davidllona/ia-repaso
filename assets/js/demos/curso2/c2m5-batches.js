@@ -1,8 +1,8 @@
 /* Experimento: batch, step y epoch con un generador de carpetas. 300 imágenes y batch_size 32 → 10 steps (el último con 12). shuffle=False deja batches de una sola clase. */
 Lab.register("curso2/c2m5-batches", function (root, api) {
   var N = 300, B = 32, EP = 5, shuffle = true, step = 1, loop, playing = false;
-  var view = api.view(root, { aspect: 1.7, minH: 250, maxH: 380, label: "Imágenes del conjunto de entrenamiento agrupadas en batches" });
-  api.legend(root, [[api.colors().terracota, "crack (carpeta 0)"], [api.colors().cobalto, "dent (carpeta 1)"]]);
+  var view = api.view(root, { aspect: 1.7, minH: 250, maxH: 380, label: "Pósters del conjunto de entrenamiento agrupados en batches" });
+  api.legend(root, [[api.colors().terracota, "comedia (carpeta 0)"], [api.colors().cobalto, "terror (carpeta 1)"]]);
   var ui = api.controls(root), out = api.readout(root), sl, playBtn;
   function stepsPE() { return Math.ceil(N / B); }
   function total() { return stepsPE() * EP; }
@@ -38,8 +38,8 @@ Lab.register("curso2/c2m5-batches", function (root, api) {
     view.redraw();
     var c = cur(), nd = c.ids.filter(isDent).length, spe = stepsPE(), last = N - (spe - 1) * B;
     out.set("<b>" + N + "</b> imágenes / batch_size <b>" + B + "</b> = " + (N / B).toFixed(3).replace(".", ",") + " → <b>" + spe + "</b> steps por época (el último con <b>" + last + "</b> imágenes) · épocas: " + EP + " → <b>" + total() + "</b> steps en total<br>" +
-      "Época <b>" + (c.ep + 1) + "/" + EP + "</b> · step <b>" + (c.k + 1) + "/" + spe + "</b> (lo que Keras escribe como «" + (c.k + 1) + "/" + spe + "») · este batch trae <b>" + c.ids.length + "</b> imágenes: <span style='color:var(--terracota-ink)'>" + (c.ids.length - nd) + " crack</span> y <span style='color:var(--cobalto-ink)'>" + nd + " dent</span>" +
-      (!shuffle && (nd === 0 || nd === c.ids.length) ? "<br><span class='bad'>Con shuffle=False este batch es de una sola clase: la red solo ve «" + (nd ? "dent" : "crack") + "» en estos steps. Por eso el generador de train usa shuffle=True.</span>" : ""));
+      "Época <b>" + (c.ep + 1) + "/" + EP + "</b> · step <b>" + (c.k + 1) + "/" + spe + "</b> (lo que Keras escribe como «" + (c.k + 1) + "/" + spe + "») · este batch trae <b>" + c.ids.length + "</b> imágenes: <span style='color:var(--terracota-ink)'>" + (c.ids.length - nd) + " comedia</span> y <span style='color:var(--cobalto-ink)'>" + nd + " terror</span>" +
+      (!shuffle && (nd === 0 || nd === c.ids.length) ? "<br><span class='bad'>Con shuffle=False este batch es de una sola clase: la red solo ve pósters de «" + (nd ? "terror" : "comedia") + "» en estos steps. Por eso el generador de train usa shuffle=True.</span>" : ""));
   }
   update();
   return { destroy: function () { loop.stop(); } };

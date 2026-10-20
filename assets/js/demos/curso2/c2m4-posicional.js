@@ -44,11 +44,11 @@ Lab.register("curso2/c2m4-posicional", function (root, api) {
     // fila y columna elegidas
     D.rect(ctx, x0, y0 + S.pos * ch, bw, ch, null, C.ink, 2);
     D.rect(ctx, x0 + S.dim * cw, y0, cw, bh, null, C.marker, 2.5);
-    D.text(ctx, "dimensiones → (izquierda: ondas rápidas · derecha: ondas lentas)", x0, 13, { size: 11, color: C.ink2 });
+    D.text(ctx, w < 440 ? "dimensiones → (izq.: ondas rápidas · der.: lentas)" : "dimensiones → (izquierda: ondas rápidas · derecha: ondas lentas)", x0, 13, { size: 11, color: C.ink2 });
     D.text(ctx, "pos", 6, y0 + 10, { size: 11, color: C.ink2 });
     [0, 10, 20, 30, 39].forEach(function (q) { D.text(ctx, String(q), x0 - 5, y0 + q * ch + ch * 0.75, { size: 10.5, mono: true, color: C.muted, align: "right" }); });
   }
-  var plot2 = api.plot(view2, { xr: [0, NP - 1], yr: [-1, 1], xticks: 8, yticks: 4, xlabel: "posición", pad: { l: 40, r: 12, t: 40, b: 36 }, yfmt: function (v) { return n(v, 1); }, xfmt: function (v) { return Math.round(v); } });
+  var plot2 = api.plot(view2, { xr: [0, NP - 1], yr: [-1, 1], xticks: 8, yticks: 4, xlabel: "posición (nº de capítulo o de palabra)", pad: { l: 40, r: 12, t: 40, b: 36 }, yfmt: function (v) { return n(v, 1); }, xfmt: function (v) { return Math.round(v); } });
   function simil(a, b) { var s = 0, j; for (j = 0; j < S.d; j++) s += pe(a, j, S.d) * pe(b, j, S.d); return s / (S.d / 2); }
   function draw2(ctx, w, h, C) {
     plot2.axes(ctx);

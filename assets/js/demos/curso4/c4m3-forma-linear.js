@@ -7,9 +7,9 @@ Lab.register("curso4/c4m3-forma-linear", function (root, api) {
   var Wf = [[1, 2, 0, -1], [3, -1, 1, 2], [-2, 1, 2, 0]];
   var bf = [0.5, -1, 1];
   var ui = api.controls(root);
-  var sN = ui.slider({ label: "Tamaño del lote N (filas de X)", min: 1, max: 4, step: 1, value: N, fmt: function (v) { return v; }, onInput: function (v) { N = v; fixSel(); render(); } });
-  var sI = ui.slider({ label: "in_features (columnas de X)", min: 1, max: 4, step: 1, value: nin, fmt: function (v) { return v; }, onInput: function (v) { nin = v; fixSel(); render(); } });
-  var sO = ui.slider({ label: "out_features (salidas)", min: 1, max: 3, step: 1, value: nout, fmt: function (v) { return v; }, onInput: function (v) { nout = v; fixSel(); render(); } });
+  var sN = ui.slider({ label: "Tamaño del lote N (películas = filas de X)", min: 1, max: 4, step: 1, value: N, fmt: function (v) { return v; }, onInput: function (v) { N = v; fixSel(); render(); } });
+  var sI = ui.slider({ label: "in_features (datos de cada película = columnas de X)", min: 1, max: 4, step: 1, value: nin, fmt: function (v) { return v; }, onInput: function (v) { nin = v; fixSel(); render(); } });
+  var sO = ui.slider({ label: "out_features (cosas que se predicen)", min: 1, max: 3, step: 1, value: nout, fmt: function (v) { return v; }, onInput: function (v) { nout = v; fixSel(); render(); } });
   var host = api.el("div", { style: { display: "flex", flexWrap: "wrap", gap: "14px 10px", alignItems: "flex-start", justifyContent: "center" } });
   root.appendChild(host);
   var out = api.readout(root);
@@ -44,17 +44,17 @@ Lab.register("curso4/c4m3-forma-linear", function (root, api) {
     for (c = 0; c < nout; c++) br[0].push({ t: fmt(bf[c]), hi: c === sc });
     for (a = 0; a < N; a++) { Yr.push([]); for (c = 0; c < nout; c++) (function (a, c) { Yr[a].push({ t: fmt(yhat(a, c)), hi: a === sa && c === sc, c: "y", click: function () { sel = [a, c]; render(); } }); })(a, c); }
     host.innerHTML = "";
-    host.appendChild(block("X", "(" + N + ", " + nin + ")", Xr));
+    host.appendChild(block("X", "(" + N + ", " + nin + ") · una fila por película", Xr));
     host.appendChild(op("· Wᵀ"));
     host.appendChild(block("weight  W", "(" + nout + ", " + nin + ") · se usa su traspuesta", Wr));
     host.appendChild(op("+"));
     host.appendChild(block("bias", "(" + nout + ")", br));
     host.appendChild(op("="));
-    host.appendChild(block("ŷ = model(X)", "(" + N + ", " + nout + ")", Yr));
+    host.appendChild(block("ŷ = model(X)", "(" + N + ", " + nout + ") · una fila por película", Yr));
     var terms = [], k2;
     for (k2 = 0; k2 < nin; k2++) terms.push(fmt(Xf[sa][k2]) + "·" + fmt(Wf[sc][k2]));
     var tot = nin * nout + nout;
-    out.set("nn.Linear(<b>" + nin + "</b>, <b>" + nout + "</b>) · lote de <b>" + N + "</b> muestras<br>" +
+    out.set("nn.Linear(<b>" + nin + "</b>, <b>" + nout + "</b>) · lote de <b>" + N + "</b> películas<br>" +
       "X: (" + N + ", " + nin + ") · Wᵀ: (" + nin + ", " + nout + ") + b: (" + nout + ") → ŷ: <b>(" + N + ", " + nout + ")</b><br>" +
       "ŷ[" + (sa + 1) + "," + (sc + 1) + "] = " + terms.join(" + ") + " + " + fmt(bf[sc]) + " = <b>" + fmt(yhat(sa, sc)) + "</b>  (haz clic en otra celda de ŷ)<br>" +
       "parámetros = out·in + out = " + nout + "·" + nin + " + " + nout + " = <b>" + tot + "</b> · parámetros no dependen de N");

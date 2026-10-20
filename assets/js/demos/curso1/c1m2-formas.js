@@ -2,11 +2,11 @@
 Lab.register("curso1/c1m2-formas", function (root, api) {
   var M = api.math;
   var kinds = {
-    lineal:  { name: "Lineal", x: [1, 12], f: function (x) { return 20 + 6 * x; }, sd: 6, mult: false },
-    u:       { name: "Curva en U (cuadrática)", x: [1, 12], f: function (x) { return 12 + 1.1 * (x - 6.5) * (x - 6.5); }, sd: 3, mult: false },
-    expo:    { name: "Exponencial (crece cada vez más rápido)", x: [1, 12], f: function (x) { return 12 * Math.exp(0.25 * x); }, sd: 0.08, mult: true },
-    log:     { name: "Logarítmica (rendimientos decrecientes)", x: [1, 12], f: function (x) { return 20 + 40 * Math.log(x); }, sd: 5, mult: false },
-    seno:    { name: "Periódica (estacional, periodo 12)", x: [1, 24], f: function (x) { return 50 + 25 * Math.sin(2 * Math.PI * x / 12 + 0.6); }, sd: 4, mult: false }
+    lineal:  { name: "Lineal (presupuesto → horas)", x: [1, 12], f: function (x) { return 20 + 6 * x; }, sd: 6, mult: false },
+    u:       { name: "Curva en U (duración → abandono)", x: [1, 12], f: function (x) { return 12 + 1.1 * (x - 6.5) * (x - 6.5); }, sd: 3, mult: false },
+    expo:    { name: "Exponencial (serie viral)", x: [1, 12], f: function (x) { return 12 * Math.exp(0.25 * x); }, sd: 0.08, mult: true },
+    log:     { name: "Logarítmica (promoción → horas)", x: [1, 12], f: function (x) { return 20 + 40 * Math.log(x); }, sd: 5, mult: false },
+    seno:    { name: "Periódica (horas por mes)", x: [1, 24], f: function (x) { return 50 + 25 * Math.sin(2 * Math.PI * x / 12 + 0.6); }, sd: 4, mult: false }
   };
   var kind = "expo", model = "recta", P = 12, showTruth = false, pts = [], zs = [];
   var r = api.rng(5), i; for (i = 0; i < 24; i++) zs.push(r.normal(0, 1));
@@ -39,7 +39,16 @@ Lab.register("curso1/c1m2-formas", function (root, api) {
   }
 
   var view = api.view(root, { aspect: 1.7, minH: 270, label: "Datos con una relación escondida y la curva que ajusta la regresión sobre las columnas elegidas" });
-  var plot = api.plot(view, { xr: [0, 18], yr: [0, 300], xticks: 6, yticks: 5, xlabel: "x", ylabel: "y", pad: { l: 46, r: 12, t: 12, b: 38 } });
+  var po = { xr: [0, 18], yr: [0, 300], xticks: 6, yticks: 5, xlabel: "x", ylabel: "y", pad: { l: 46, r: 12, t: 12, b: 38 } };
+  var plot = api.plot(view, po);
+  // Qué significan x e y en cada caso (solo cambia el rótulo de los ejes)
+  var axisNames = {
+    lineal: ["presupuesto (×10 M€)", "horas vistas (miles)"],
+    u:      ["duración (×10 min)", "abandono (%)"],
+    expo:   ["semanas desde el estreno", "espectadores"],
+    log:    ["inversión en promoción", "horas vistas (miles)"],
+    seno:   ["mes (1 a 24)", "horas vistas (miles)"]
+  };
   var ui = api.controls(root), out = api.readout(root);
   ui.select({ label: "¿Qué relación esconden los datos?", options: Object.keys(kinds).map(function (k) { return [k, kinds[k].name]; }), value: kind, onChange: function (v) { kind = v; build(); update(); } });
   ui.select({ label: "¿Qué columnas le damos a la regresión lineal?", options: [["recta", "x  (una recta)"], ["cuad", "x, x²"], ["cub", "x, x², x³"], ["log", "ln(x)"], ["exp", "x → ajusta ln(y)  (exponencial)"], ["per", "sen y cos con periodo P"]], value: model, onChange: function (v) { model = v; update(); } });
@@ -53,7 +62,7 @@ Lab.register("curso1/c1m2-formas", function (root, api) {
   }
   function draw(ctx, w, h, C) {
     var D = api.d, R = ranges(), m = model_(model), k = kinds[kind], i;
-    plot.xr = R.xr; plot.yr = R.yr; plot.axes(ctx); ctx.save(); plot.clip(ctx);
+    plot.xr = R.xr; plot.yr = R.yr; po.xlabel = axisNames[kind][0]; po.ylabel = axisNames[kind][1]; plot.axes(ctx); ctx.save(); plot.clip(ctx);
     if (showTruth) { var tr = []; for (i = 0; i <= 150; i++) { var x = R.xr[1] * i / 150; tr.push([plot.x(x), plot.y(k.f(x))]); } D.path(ctx, tr, C.muted, 2, [3, 4]); }
     var a = [], b = [];
     for (i = 0; i <= 200; i++) { var x2 = R.xr[1] * i / 200, pt = [plot.x(x2), plot.y(m.pred(x2))]; (x2 <= R.xmax + 1e-9 ? a : b).push(pt); }

@@ -40,8 +40,9 @@ Lab.register("curso2/c2m3-constructor-cnn", function (root, api) {
 
   var view = api.view(root, { aspect: 2.4, minH: 150, maxH: 300, label: "Parámetros de cada capa de la red, en barras horizontales" });
   var tbl = api.table(root, ["Capa (tipo)", "Output shape", "Param #", "% del total"]);
+  (function () { var t = root.querySelector("table.lab-table"), w = api.el("div", { style: { overflowX: "auto" } }); t.style.minWidth = "520px"; t.parentNode.insertBefore(w, t); w.appendChild(t); })();
   var out = api.readout(root), ui = api.controls(root);
-  var inSel = ui.select({ label: "Imagen de entrada", options: [["a", "28×28×1 (dígito en gris)"], ["b", "32×32×3 (color pequeño)"], ["c", "64×64×3"], ["d", "224×224×3 (foto)"], ["e", "100×100×3 (la CNN de las notas)"]], value: inKey, onChange: function (v) { inKey = v; msg = ""; update(); } });
+  var inSel = ui.select({ label: "Imagen de entrada", options: [["a", "28×28×1 (dígito en gris)"], ["b", "32×32×3 (miniatura de póster)"], ["c", "64×64×3"], ["d", "224×224×3 (fotograma)"], ["e", "100×100×3 (póster, la CNN de las notas)"]], value: inKey, onChange: function (v) { inKey = v; msg = ""; update(); } });
   ui.select({ label: "Conv2D · filtros", options: [8, 16, 32, 64, 128].map(function (n) { return [n, String(n)]; }), value: cfg.filters, onChange: function (v) { cfg.filters = +v; } });
   ui.select({ label: "Conv2D · kernel", options: [[1, "1×1"], [3, "3×3"], [5, "5×5"], [7, "7×7"]], value: cfg.k, onChange: function (v) { cfg.k = +v; } });
   ui.select({ label: "Conv2D · stride", options: [[1, "1"], [2, "2"]], value: cfg.s, onChange: function (v) { cfg.s = +v; } });

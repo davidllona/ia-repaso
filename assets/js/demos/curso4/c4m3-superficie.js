@@ -42,9 +42,10 @@ Lab.register("curso4/c4m3-superficie", function (root, api) {
   function grad(w, b) { var gw = 0, gb = 0, i; for (i = 0; i < n; i++) { var e = w * X[i] + b - Y[i]; gw += 2 * e * X[i] / n; gb += 2 * e / n; } return [gw, gb]; }
   var row = api.el("div", { class: "lab-row" }); root.appendChild(row);
   var p1 = api.el("div", { style: { minWidth: 0 } }), p2 = api.el("div", { style: { minWidth: 0 } }); row.appendChild(p1); row.appendChild(p2);
-  var vA = api.view(p1, { aspect: 1.05, minH: 250, label: "Los tres puntos y la recta con los parámetros elegidos" });
-  var pA = api.plot(vA, { xr: [0, 4], yr: [-2, 10], xticks: 4, yticks: 4, xlabel: "x", ylabel: "y", pad: { l: 40, r: 12, t: 12, b: 36 } });
-  var vB = api.view(p2, { aspect: 1.05, minH: 250, drag: true, label: "El coste MSE en función de los parámetros: haz clic o arrastra para elegir w y b" });
+  var vA = api.view(p1, { aspect: 1.05, minH: 250, label: "Las tres películas (presupuesto y horas vistas) y la recta con los parámetros elegidos" });
+  var pA = api.plot(vA, { xr: [0, 4], yr: [-2, 10], xticks: 4, yticks: 4, xlabel: "presupuesto x (×10 M€)", ylabel: "horas vistas y", pad: { l: 40, r: 12, t: 12, b: 36 } });
+  var coarse = !!(window.matchMedia && matchMedia("(pointer:coarse)").matches);
+  var vB = api.view(p2, { aspect: 1.05, minH: 250, drag: !coarse, label: "El coste MSE en función de los parámetros: haz clic o arrastra para elegir w y b" });
   var po = { xr: [-1, 7], yr: [-5, 3], xticks: 4, yticks: 4, xlabel: "w", ylabel: "b", pad: { l: 40, r: 12, t: 12, b: 36 } };
   var pB = api.plot(vB, po);
   var heat = makeHeat(vB);
@@ -66,7 +67,7 @@ Lab.register("curso4/c4m3-superficie", function (root, api) {
     for (i = 0; i < n; i++) D.line(ctx, pA.x(X[i]), pA.y(Y[i]), pA.x(X[i]), pA.y(w * X[i] + b), C.terracota, 2.5);
     for (i = 0; i < n; i++) D.circle(ctx, pA.x(X[i]), pA.y(Y[i]), 6, C.terracota, C.paper, 1.5);
     ctx.restore();
-    D.text(ctx, "la recta ŷ = w·x + b", pA.box.x + 8, pA.box.y + 16, { size: 11, color: C.cobaltoInk, weight: 600 });
+    D.text(ctx, "recta de predicción ŷ = w·x + b", pA.box.x + 8, pA.box.y + 16, { size: 11, color: C.cobaltoInk, weight: 600 });
   }
   function drawB(ctx, W, H, C) {
     var D = api.d, bx = pB.box, g = grad(w, b), i;
@@ -111,6 +112,7 @@ Lab.register("curso4/c4m3-superficie", function (root, api) {
     if (mode === "dos") { b = api.math.clamp(Math.round(pB.iy(py) * 20) / 20, -5, 3); sb.set(b, true); }
     update();
   }
-  vB.pointer({ down: pick, drag: pick });
+  /* táctil: la pantalla no se queda atrapada en el mapa (se desplaza con normalidad); un toque corto elige el punto */
+  vB.pointer({ down: function (px, py) { if (!coarse) pick(px, py); }, drag: function (px, py) { if (!coarse) pick(px, py); }, up: function (px, py, e) { if (coarse && e.type === "pointerup") pick(px, py); } });
   vA.draw(drawA); vB.draw(drawB); update();
 });

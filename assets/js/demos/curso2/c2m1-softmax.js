@@ -1,10 +1,11 @@
-/* Experimento: softmax (logits → probabilidades), temperatura, entropía cruzada y su gradiente p − y. */
+/* Experimento: softmax (logits → probabilidades), temperatura, entropía cruzada y su gradiente p − y.
+   Disfraz: la red mira el tráiler de una película y decide su género (acción, comedia, terror). */
 Lab.register("curso2/c2m1-softmax", function (root, api) {
   var M = api.math, D = api.d, C0 = api.colors();
-  var NAMES = ["gato", "perro", "ave"];
+  var NAMES = ["acción", "comedia", "terror"];
   var S = { z: [2.0, 1.0, 0.1], T: 1, cls: 0 };
 
-  var view = api.view(root, { aspect: 2.1, minH: 250, maxH: 380, label: "Tres paneles: logits, probabilidades softmax y gradiente de la entropía cruzada" });
+  var view = api.view(root, { aspect: 2.1, minH: 250, maxH: 380, label: "Tres paneles para los géneros acción, comedia y terror: logits, probabilidades softmax y gradiente de la entropía cruzada" });
   var ui = api.controls(root), out = api.readout(root);
   out.el.style.fontSize = "clamp(.72rem, 2.7vw, .84rem)";
   var sl = [];
@@ -12,7 +13,7 @@ Lab.register("curso2/c2m1-softmax", function (root, api) {
     sl.push(ui.slider({ label: "Logit z de «" + n + "»", min: -4, max: 4, step: 0.1, value: S.z[i], fmt: function (v) { return v.toFixed(1); }, onInput: function (v) { S.z[i] = v; update(); } }));
   });
   ui.slider({ label: "Temperatura T (1 = softmax normal)", min: 0.2, max: 4, step: 0.1, value: 1, fmt: function (v) { return v.toFixed(1); }, onInput: function (v) { S.T = v; update(); } });
-  ui.segmented({ label: "Clase correcta (la etiqueta real, en verde)", value: 0, options: [[0, "gato"], [1, "perro"], [2, "ave"]], onChange: function (v) { S.cls = v; update(); } });
+  ui.segmented({ label: "Género real de la película (la etiqueta correcta, en verde)", value: 0, options: NAMES.map(function (n, i) { return [i, n]; }), onChange: function (v) { S.cls = v; update(); } });
 
   function probs() { return M.softmax(S.z, S.T); }
 
@@ -30,7 +31,7 @@ Lab.register("curso2/c2m1-softmax", function (root, api) {
     });
     var bw = Math.min(40, pw / 5), mid = top + ph / 2, fs = pw < 150 ? 9.5 : 11;
     for (i = 0; i < 3; i++) {
-      var cx1 = pw * 0.5 + (i - 1) * pw * 0.3, cx2 = pw + cx1, cx3 = 2 * pw + cx1;
+      var cx1 = pw * 0.5 + (i - 1) * pw * 0.34, cx2 = pw + cx1, cx3 = 2 * pw + cx1;
       var isC = i === S.cls;
       // logits
       var zh = S.z[i] / 4 * (ph / 2 - 14);
@@ -48,7 +49,7 @@ Lab.register("curso2/c2m1-softmax", function (root, api) {
       D.rect(ctx, cx3 - bw / 2, gh >= 0 ? mid - gh : mid, bw, Math.abs(gh), g[i] < 0 ? C.oliva : C.terracota, C.ink, 1.2);
       D.text(ctx, g[i].toFixed(3), cx3, gh >= 0 ? mid - gh - 5 : mid - gh + 14, { size: fs, mono: true, weight: 600, align: "center" });
       // nombres
-      [cx1, cx2, cx3].forEach(function (cx) { D.text(ctx, NAMES[i], cx, h - 7, { size: Math.min(12, pw / 9), align: "center", weight: isC ? 700 : 400, color: isC ? C.olivaInk : C.ink2 }); });
+      [cx1, cx2, cx3].forEach(function (cx) { D.text(ctx, NAMES[i], cx, h - 7, { size: Math.min(12, pw / 9, pw * 0.34 / 3.7), align: "center", weight: isC ? 700 : 400, color: isC ? C.olivaInk : C.ink2 }); });
     }
   }
 

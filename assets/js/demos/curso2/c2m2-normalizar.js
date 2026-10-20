@@ -5,9 +5,9 @@ Lab.register("curso2/c2m2-normalizar", function (root, api) {
   var data, mom, WR = [-1, 5];
 
   var view = api.view(root, { aspect: 1.55, minH: 260, maxH: 400, drag: false, label: "Paisaje de la pérdida en el plano de los dos pesos, con el camino del descenso de gradiente" });
-  var plot = api.plot(view, { xr: WR, yr: WR, xticks: 6, yticks: 6, grid: false, xlabel: "peso w₁ (feature pequeña)", ylabel: "peso w₂ (feature grande)", pad: { l: 44, r: 10, t: 10, b: 36 } });
+  var plot = api.plot(view, { xr: WR, yr: WR, xticks: 6, yticks: 6, grid: false, xlabel: "peso w₁ (presupuesto)", ylabel: "peso w₂ (días desde estreno)", pad: { l: 44, r: 10, t: 10, b: 36 } });
   var ui = api.controls(root), out = api.readout(root);
-  ui.slider({ label: "Escala de la feature 2 (desviación típica)", min: 1, max: 30, step: 1, value: st.s, onInput: function (v) { st.s = v; moments(); update(); } });
+  ui.slider({ label: "Escala de la feature 2: días desde el estreno (desviación típica)", min: 1, max: 30, step: 1, value: st.s, onInput: function (v) { st.s = v; moments(); update(); } });
   ui.slider({ label: "learning_rate", min: 0, max: LRS.length - 1, step: 1, value: st.lri, fmt: function (v) { return LRS[v]; }, onInput: function (v) { st.lri = v; update(); } });
   ui.slider({ label: "Pasos de gradient descent dibujados", min: 0, max: 150, step: 1, value: st.steps, onInput: function (v) { st.steps = v; update(); } });
   ui.toggle({ label: "Normalizar las entradas (media 0, desviación 1)", value: st.norm, onChange: function (v) { st.norm = v; moments(); update(); } });
@@ -78,7 +78,7 @@ Lab.register("curso2/c2m2-normalizar", function (root, api) {
     var lr = LRS[st.lri], pts = path(st.steps, lr), last = pts[pts.length - 1], L = loss(last[0], last[1]), div = !isFinite(L) || Math.abs(last[0]) > 1e6 || L > 1e6;
     var need = stepsToGoal(lr), needTxt = need === -1 ? "<span class='bad'>nunca: diverge</span>" : need === -2 ? "<span class='bad'>más de 4 000</span>" : "<b>" + need + "</b>";
     var s1 = st.norm ? 1 : 1, s2 = st.norm ? 1 : st.s, cond = Math.pow(s2 / s1, 2);
-    out.set((st.norm ? "entradas <b>normalizadas</b> (ambas con desviación 1)" : "entradas <b>sin normalizar</b> (desviaciones 1 y " + st.s + ")") + " · learning_rate <b>" + lr + "</b><br>" +
+    out.set((st.norm ? "entradas <b>normalizadas</b> (ambas con desviación 1)" : "entradas <b>sin normalizar</b> (desviaciones 1 y " + st.s + ": presupuesto y días)") + " · learning_rate <b>" + lr + "</b><br>" +
       "tras " + (pts.length - 1) + " pasos: w = (" + (div ? "∞" : last[0].toFixed(2)) + ", " + (div ? "∞" : last[1].toFixed(2)) + ") · pérdida = <b>" + (div ? "→ ∞ (explota)" : L.toFixed(3)) + "</b> (mínimo posible " + mom.lmin.toFixed(3) + ")<br>" +
       "pasos para llegar casi al mínimo con este learning_rate: " + needTxt + " · lo «alargado» del valle ≈ " + (cond < 1.5 ? "1 (circular)" : cond.toFixed(0) + " : 1") +
       (div ? "<br><span class='bad'>Con un learning_rate tan grande para la feature de escala grande, cada paso se pasa de largo y el error crece.</span>" : need >= 0 && need < 40 ? "<br><span class='good'>El valle es casi redondo: un learning_rate cómodo sirve para los dos pesos.</span>" : "<br><span class='bad'>Valle muy alargado: o el learning_rate es pequeño (lento) o grande (explota). No hay un valor bueno para los dos pesos a la vez.</span>"));

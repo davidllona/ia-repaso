@@ -17,7 +17,7 @@ Lab.register("curso4/c4m1-broadcast", function (root, api) {
     ui.button("(2,3) + (2,)  ¡error!", function () { setAB(2, 4); }),
     ui.button("(32,10) + (10,)  (sesgo)", function () { setAB(7, 8); })
   ];
-  var sp = [0, 1, 2].map(function (k) { return ui.slider({ label: "y_pred[" + k + "] (el real es " + (k + 1) + ")", min: -1, max: 5, step: 0.5, value: k + 1, fmt: function (v) { return v.toFixed(1); }, onInput: function (v) { st.p[k] = v; update(); } }); });
+  var sp = [0, 1, 2].map(function (k) { return ui.slider({ label: "Nota predicha de " + ["Toy Story", "Shrek", "Titanic"][k] + " (la real es " + (k + 1) + ")", min: -1, max: 5, step: 0.5, value: k + 1, fmt: function (v) { return v.toFixed(1); }, onInput: function (v) { st.p[k] = v; update(); } }); });
   var tg = ui.toggle({ label: "Arreglar: y_real.reshape(-1, 1)", value: false, onChange: function (v) { st.fix = v; update(); } });
   function setAB(a, b) { st.a = a; st.b = b; selA.set(a); selB.set(b); update(); }
   function hide(el, on) { var c = el.closest ? el.closest(".ctl") : null; if (c) c.style.display = on ? "none" : ""; }
@@ -77,7 +77,7 @@ Lab.register("curso4/c4m1-broadcast", function (root, api) {
           D.text(ctx, dd.toFixed(1), ox + j * cs + cs / 2, oy + i * cs + cs / 2 + 4, { align: "center", size: 12, mono: true, color: diag ? C.olivaInk : C.terracotaInk, weight: diag ? 700 : 400 });
         }
       }
-      D.text(ctx, "verde = pares correctos · naranja = pares «todos contra todos»", w / 2, oy + 3 * cs + 20, { align: "center", size: 10.5, color: C.muted });
+      D.text(ctx, "verde = cada peli con su nota · naranja = con la de otras pelis", w / 2, oy + 3 * cs + 20, { align: "center", size: 10.5, color: C.muted });
     } else {
       D.text(ctx, w < 460 ? "con reshape(-1, 1)  →  forma (3, 1)" : "y_pred − y_real.reshape(-1, 1)  →  forma (3, 1)", w / 2, 18, { align: "center", size: 12, weight: 700 });
       ox = Math.max(ox, w < 460 ? 150 : 0);

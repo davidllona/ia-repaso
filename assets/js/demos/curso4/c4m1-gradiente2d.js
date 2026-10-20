@@ -8,9 +8,12 @@ Lab.register("curso4/c4m1-gradiente2d", function (root, api) {
     saddle: { name: "x·y  (silla de montar)", f: function (x, y) { return x * y; }, gx: function (x, y) { return y; }, gy: function (x, y) { return x; }, fr: [-9, 9] }
   };
   var st = { fn: "bowl", x: 2, y: 1, lr: 0.1, steps: 0 };
-  var view = api.view(root, { aspect: 1.75, minH: 260, maxH: 380, drag: true, label: "Mapa de alturas de f(x, y) con el punto, las derivadas parciales y el gradiente" });
+  var coarse = !!(window.matchMedia && window.matchMedia("(pointer:coarse)").matches);   /* en táctil no se arrastra: hay deslizadores */
+  var view = api.view(root, { aspect: 1.75, minH: 260, maxH: 380, drag: !coarse, label: "Mapa del error f(x, y) según dos pesos, con el punto, las derivadas parciales y el gradiente" });
   var ui = api.controls(root), out = api.readout(root);
   ui.select({ label: "Función f(x, y)", value: "bowl", options: Object.keys(F).map(function (k) { return [k, F[k].name]; }), onChange: function (v) { st.fn = v; st.steps = 0; update(); } });
+  var sgx = ui.slider({ label: "Posición x (peso del género)", min: -3, max: 3, step: 0.05, value: st.x, fmt: function (v) { return v.toFixed(2); }, onInput: function (v) { st.x = v; st.steps = 0; update(); } });
+  var sgy = ui.slider({ label: "Posición y (peso de la duración)", min: -3, max: 3, step: 0.05, value: st.y, fmt: function (v) { return v.toFixed(2); }, onInput: function (v) { st.y = v; st.steps = 0; update(); } });
   var slr = ui.slider({ label: "Tamaño del paso (lr)", min: 0.02, max: 0.3, step: 0.01, value: st.lr, fmt: function (v) { return v.toFixed(2); }, onInput: function (v) { st.lr = v; update(); } });
   ui.button("Un paso cuesta abajo", function () { step(1); }, "primary");
   ui.button("10 pasos", function () { step(10); });
@@ -18,7 +21,7 @@ Lab.register("curso4/c4m1-gradiente2d", function (root, api) {
   function step(k) { var f = F[st.fn]; for (var q = 0; q < k; q++) { var gx = f.gx(st.x, st.y), gy = f.gy(st.x, st.y); st.x -= st.lr * gx; st.y -= st.lr * gy; st.steps++; } st.x = M.clamp(st.x, -3, 3); st.y = M.clamp(st.y, -3, 3); update(); }
   var p;
   function draw(ctx, w, h, C) {
-    var f = F[st.fn]; p = api.plot(view, { xr: [-3, 3], yr: [-3, 3], xticks: 6, yticks: 6, pad: { l: 40, r: 10, t: 10, b: 40 }, grid: false, xlabel: "x", ylabel: "y", xfmt: function (t) { return Math.round(t); }, yfmt: function (t) { return Math.round(t); } });
+    var f = F[st.fn]; p = api.plot(view, { xr: [-3, 3], yr: [-3, 3], xticks: 6, yticks: 6, pad: { l: 40, r: 10, t: 10, b: 40 }, grid: false, xlabel: "x (peso del género)", ylabel: "y (peso de la duración)", xfmt: function (t) { return Math.round(t); }, yfmt: function (t) { return Math.round(t); } });
     p.axes(ctx);
     var b = p.box, nx = 48, ny = 30, cwid = b.w / nx, chei = b.h / ny, i, j, fr = f.fr;
     ctx.save(); p.clip(ctx);
@@ -42,10 +45,11 @@ Lab.register("curso4/c4m1-gradiente2d", function (root, api) {
     D.text(ctx, "∇f", px + clampv(gx * sc) + (gx >= 0 ? 6 : -6), py - clampv(gy * sc) + (gy >= 0 ? -6 : 14), { align: gx >= 0 ? "left" : "right", size: 11, weight: 700 });
   }
   view.draw(draw);
-  view.pointer({ down: mv, drag: mv });
+  if (!coarse) view.pointer({ down: mv, drag: mv });
   function mv(px, py) { if (!p || !p.inside(px, py)) return; st.x = Math.round(p.ix(px) * 20) / 20; st.y = Math.round(p.iy(py) * 20) / 20; st.steps = 0; update(); }
   function update() {
     var f = F[st.fn], x = st.x, y = st.y, e = 1e-4;
+    sgx.set(x, true); sgy.set(y, true);
     var nx = (f.f(x + e, y) - f.f(x - e, y)) / (2 * e), ny = (f.f(x, y + e) - f.f(x, y - e)) / (2 * e);
     var gx = f.gx(x, y), gy = f.gy(x, y), n = Math.sqrt(gx * gx + gy * gy);
     out.set("Punto (x, y) = (<b>" + x.toFixed(2) + "</b>, <b>" + y.toFixed(2) + "</b>) · f = <b>" + f.f(x, y).toFixed(3) + "</b>" + (st.steps ? " · pasos dados: " + st.steps : "") +

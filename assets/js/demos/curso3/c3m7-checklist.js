@@ -9,7 +9,7 @@ Lab.register("curso3/c3m7-checklist", function (root, api) {
   box.style.cssText = "margin-top:10px;font-size:0.95em;line-height:1.5";
 
   function sel(label, key, opts) { ui.select({ label: label, options: opts, value: S[key], onChange: function (v) { S[key] = v; render(); } }); }
-  sel("Tipo de datos", "data", [["tabla", "Tabla (filas y columnas)"], ["imagen", "Imágenes"], ["serie", "Serie temporal"], ["texto", "Texto"]]);
+  sel("Tipo de datos", "data", [["tabla", "Tabla (una ficha por película)"], ["imagen", "Imágenes (carátulas)"], ["serie", "Serie temporal (visionado día a día)"], ["texto", "Texto (reseñas)"]]);
   sel("Datos etiquetados", "labels", [["pocos", "Pocos (menos de 1.000)"], ["medio", "Bastantes (1.000 a 50.000)"], ["muchos", "Muchísimos (más de 50.000)"]]);
   sel("Qué quieres predecir", "target", [["numero", "Un número (regresión)"], ["clase", "Una categoría (clasificación)"]]);
   ui.button("Desmarcar todo", function () { done = {}; render(); });
@@ -22,7 +22,7 @@ Lab.register("curso3/c3m7-checklist", function (root, api) {
     var d = S.data, l = S.labels, s = [], notes = [];
     if (d === "tabla") {
       s.push("Baselines: predecir la media (o la clase mayoritaria), regresión lineal/logística y random forest. Son rápidos y te dicen cuánto hay que ganar.");
-      if (l === "pocos") { s.push("Con tan pocos datos, valida con validación cruzada (un solo reparto es ruido) y espera que <b>la red no gane</b> a los modelos clásicos, como en load_diabetes."); notes.push("Una red grande con pocas filas memoriza el ruido."); }
+      if (l === "pocos") { s.push("Con tan pocos datos, valida con validación cruzada (un solo reparto es ruido) y espera que <b>la red no gane</b> a los modelos clásicos, como en load_diabetes."); notes.push("Una red grande con pocas filas memoriza el ruido, como quien se sabe de memoria las pocas películas que ha visto sin entender sus gustos."); }
       else { s.push("Red en API funcional: Dense + BatchNormalization + Dropout + L2, EarlyStopping y ReduceLROnPlateau. Compárala con 3-5 semillas, no con una."); s.push("Keras Tuner (RandomSearch) sobre neuronas, dropout, L2 y learning rate."); }
       notes.push("Escalado, imputación y one-hot se ajustan solo con el train (ColumnTransformer dentro de un flujo).");
     } else if (d === "imagen") {
@@ -30,7 +30,7 @@ Lab.register("curso3/c3m7-checklist", function (root, api) {
       else if (l === "medio") { s.push("Transfer learning con fine-tuning de varios bloques y data augmentation; compara con una CNN pequeña propia."); }
       else { s.push("Con muchos datos puedes afinar casi toda la red o incluso entrenar desde cero si tus imágenes se parecen poco a ImageNet (rayos X, microscopio). Usa tf.data con prefetch."); }
       notes.push("Usa el preprocesado que espera la base (preprocess_input) y llama a la base con training=False.");
-      notes.push("Revisa que el aumento no cambie la etiqueta (voltear un 2 horizontalmente no da un 2).");
+      notes.push("Revisa que el aumento no cambie la etiqueta (voltear una carátula con el título impreso lo deja ilegible).");
     } else if (d === "serie") {
       s.push("Baselines de verdad: «repite el último valor» y la media móvil. Una red que no los supera no sirve.");
       s.push("Ventanas deslizantes (timeseries_dataset_from_array) y modelo lineal/random forest con retardos; después LSTM o Transformer (módulo 3) si hay patrón que lo justifique.");
@@ -40,13 +40,13 @@ Lab.register("curso3/c3m7-checklist", function (root, api) {
       s.push(l === "pocos" ? "Reutiliza un modelo preentrenado (embeddings o un Transformer) y entrena solo una cabeza pequeña." : "Ajusta (fine-tuning) un Transformer preentrenado; entrenar uno desde cero necesita muchísimos más datos.");
       notes.push("Fija el vocabulario/tokenizador con el train y reutilízalo tal cual para val, test y producción.");
     }
-    if (S.target === "clase") notes.push("Mira el reparto de clases: si una es el 5 %, «predecir siempre la otra» ya acierta el 95 %.");
+    if (S.target === "clase") notes.push("Mira el reparto de clases: si solo el 5 % de los usuarios cancela la suscripción, «nadie cancela» ya acierta el 95 %.");
     return { steps: s, notes: notes };
   }
   function steps() {
     var sp = specifics();
     return [].concat(
-      ["Defino qué decisión se toma con la predicción, la métrica de éxito (" + metric() + ") y el coste de equivocarse."],
+      ["Defino qué decisión se toma con la predicción (p. ej. «¿qué película recomiendo?»), la métrica de éxito (" + metric() + ") y el coste de equivocarse."],
       ["Separo train / validación / test <b>antes</b> de mirar o transformar nada, y guardo el test sin tocar."],
       sp.steps.slice(0, 1),
       ["Monto el preprocesado como parte del flujo (sin fugas) y miro los datos: huecos, rangos, desbalance, duplicados."],

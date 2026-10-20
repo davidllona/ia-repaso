@@ -6,7 +6,7 @@ Lab.register("curso3/c3m1-formas", function (root, api) {
   var st = { rank: 3, dims: [2, 3, 4], axis: "none", keep: false };
   var DIMOPT = [[1, "1"], [2, "2"], [3, "3"], [4, "4"], [6, "6"], [8, "8"], [12, "12"], [24, "24"], [-1, "-1"]];
 
-  var view = api.view(root, { aspect: 2.0, minH: 230, maxH: 330, label: "Los 24 números del tensor dispuestos según la forma elegida" });
+  var view = api.view(root, { aspect: 2.0, minH: 230, maxH: 330, label: "Los 24 capítulos, con sus visualizaciones en miles, dispuestos según la forma elegida" });
   var ui = api.controls(root), out = api.readout(root);
   var segRank = ui.segmented({ label: "Rango (número de ejes)", value: 3, options: [[1, "1"], [2, "2"], [3, "3"]], onChange: function (v) { st.rank = v; fixAxis(); update(); } });
   var sel = [];
@@ -72,7 +72,7 @@ Lab.register("curso3/c3m1-formas", function (root, api) {
     if (!R.ok) {
       D.rect(ctx, 0, 0, w, h, C.terracotaWash);
       D.text(ctx, "Forma imposible", w / 2, h / 2 - 8, { align: "center", size: 18, weight: 700, color: C.terracotaInk });
-      D.text(ctx, "los números no caben", w / 2, h / 2 + 14, { align: "center", size: 13, color: C.terracotaInk });
+      D.text(ctx, "los 24 capítulos no caben", w / 2, h / 2 + 14, { align: "center", size: 13, color: C.terracotaInk });
       return;
     }
     var s = R.shape.slice(); while (s.length < 3) s.unshift(1);
@@ -99,7 +99,7 @@ Lab.register("curso3/c3m1-formas", function (root, api) {
         if (best.sz >= 17) D.text(ctx, String(n), cx + jj * best.sz + best.sz / 2, cy + ii * best.sz + best.sz / 2 + 4, { align: "center", size: best.sz >= 26 ? 12 : 10.5, mono: true, color: C.ink });
       }
     }
-    if (best.sz < 17) D.text(ctx, "(números 1 a 24, en orden de filas)", w / 2, h - 6, { align: "center", size: 10.5, color: C.muted });
+    if (best.sz < 17) D.text(ctx, "(visualizaciones 1 a 24 mil, en orden)", w / 2, h - 6, { align: "center", size: 10.5, color: C.muted });
   }
 
   function update() {
@@ -108,7 +108,9 @@ Lab.register("curso3/c3m1-formas", function (root, api) {
     var shape = R.shape;
     s += "<code>tf.reshape(x, " + fmtShape(st.dims.slice(0, st.rank)) + ")</code> → forma <b>" + fmtShape(shape) + "</b>, rango <b>" + shape.length + "</b>, <b>" + N + "</b> elementos";
     if (R.inferred) s += " <span class='good'>(el -1 era " + shape[st.dims.slice(0, st.rank).indexOf(-1)] + ")</span>";
-    s += ".<br>Los números siguen en el mismo orden 1, 2, 3… : <b>reshape solo cambia cómo los agrupas</b>.";
+    s += ".<br>Los 24 capítulos siguen en el mismo orden (1, 2, 3…): <b>reshape solo cambia cómo los agrupas</b>.";
+    var meaning = shape.join(",") === "2,3,4" ? "2 series × 3 temporadas × 4 capítulos" : shape.join(",") === "4,6" ? "4 series × 6 capítulos" : shape.join(",") === "24" ? "24 capítulos en fila" : "";
+    if (meaning) s += "<br>Aquí: <b>" + meaning + "</b>.";
     if (st.axis !== "none") {
       var rd = reduceTensor(shape, st.axis);
       var rs = rd.shape, shownShape = st.keep && st.axis !== "all" ? rd.keepShape : (st.keep && st.axis === "all" ? shape.map(function () { return 1; }) : rs);

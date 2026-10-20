@@ -14,7 +14,7 @@ Lab.register("curso4/c4m2-normalize", function (root, api) {
   var ui = api.controls(root), out = api.readout(root);
   var sMu = ui.slider({ label: "mean", min: 0, max: 1, step: 0.01, value: S.mu, fmt: function (v) { return v.toFixed(2); }, onInput: function (v) { S.mu = v; update(); } });
   var sSd = ui.slider({ label: "std", min: 0.1, max: 1, step: 0.01, value: S.sd, fmt: function (v) { return v.toFixed(2); }, onInput: function (v) { S.sd = v; update(); } });
-  ui.slider({ label: "un píxel de ejemplo (0–255)", min: 0, max: 255, step: 1, value: S.px, onInput: function (v) { S.px = v; update(); } });
+  ui.slider({ label: "un píxel del póster (0–255)", min: 0, max: 255, step: 1, value: S.px, onInput: function (v) { S.px = v; update(); } });
   function setMS(m, s) { S.mu = m; S.sd = s; sMu.set(m, true); sSd.set(s, true); update(); }
   ui.button("0.5 / 0.5", function () { setMS(0.5, 0.5); });
   ui.button("estadísticas del dataset", function () { setMS(Math.round(mu0 * 1e4) / 1e4, Math.round(sd0 * 1e4) / 1e4); }, "primary");

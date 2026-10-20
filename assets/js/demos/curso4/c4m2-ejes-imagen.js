@@ -7,7 +7,7 @@ Lab.register("curso4/c4m2-ejes-imagen", function (root, api) {
   var CN = ["R", "G", "B"], S = { r: 1, c: 1, bad: false };
   var flat = []; PX.forEach(function (row) { row.forEach(function (p) { p.forEach(function (v) { flat.push(v); }); }); });
 
-  var view = api.view(root, { aspect: 1.9, minH: 260, maxH: 340, label: "La imagen como array (alto, ancho, canal) y como tensor (canal, alto, ancho)" });
+  var view = api.view(root, { aspect: 1.9, minH: 260, maxH: 340, label: "El póster de 2×3 píxeles como array (alto, ancho, canal) y como tensor (canal, alto, ancho)" });
   var ui = api.controls(root), out = api.readout(root);
   ui.slider({ label: "fila del píxel", min: 0, max: H - 1, step: 1, value: S.r, onInput: function (v) { S.r = v; update(); } });
   ui.slider({ label: "columna del píxel", min: 0, max: W - 1, step: 1, value: S.c, onInput: function (v) { S.c = v; update(); } });

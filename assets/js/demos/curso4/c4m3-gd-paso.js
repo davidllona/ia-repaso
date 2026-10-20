@@ -43,16 +43,17 @@ Lab.register("curso4/c4m3-gd-paso", function (root, api) {
   w = w0; b = b0; k = 0; trail = [[w, b]]; hist = [mse(w, b)]; status = "run";
   var row = api.el("div", { class: "lab-row" }); root.appendChild(row);
   var p1 = api.el("div", { style: { minWidth: 0 } }), p2 = api.el("div", { style: { minWidth: 0 } }); row.appendChild(p1); row.appendChild(p2);
-  var vA = api.view(p1, { aspect: 1.05, minH: 250, label: "Los tres puntos y la recta actual" });
-  var pA = api.plot(vA, { xr: [0, 4], yr: [-2, 12], xticks: 4, yticks: 7, xlabel: "x", ylabel: "y", pad: { l: 40, r: 12, t: 12, b: 36 } });
-  var vB = api.view(p2, { aspect: 1.05, minH: 250, drag: true, label: "Mapa del coste con el camino del descenso; haz clic para elegir el punto de partida" });
+  var vA = api.view(p1, { aspect: 1.05, minH: 250, label: "Las tres películas (presupuesto y horas vistas) y la recta actual" });
+  var pA = api.plot(vA, { xr: [0, 4], yr: [-2, 12], xticks: 4, yticks: 7, xlabel: "presupuesto x (×10 M€)", ylabel: "horas vistas y", pad: { l: 40, r: 12, t: 12, b: 36 } });
+  var coarse = !!(window.matchMedia && matchMedia("(pointer:coarse)").matches);
+  var vB = api.view(p2, { aspect: 1.05, minH: 250, drag: !coarse, label: "Mapa del coste con el camino del descenso; haz clic para elegir el punto de partida" });
   var pB = api.plot(vB, { xr: [-1, 7], yr: [-5, 3], xticks: 4, yticks: 4, xlabel: "w", ylabel: "b", pad: { l: 40, r: 12, t: 12, b: 36 } });
   var heat = makeHeat(vB);
   var vC = api.view(root, { aspect: 4.2, minH: 120, maxH: 170, label: "Curva de aprendizaje: log del MSE frente al paso" });
   var pC = api.plot(vC, { xr: [0, 60], yr: [-6, 3], xticks: 6, yticks: 3, xlabel: "paso", yfmt: function (t) { return "1e" + t; }, pad: { l: 46, r: 12, t: 8, b: 32 } });
   var ui = api.controls(root);
   var sl = ui.slider({ label: "learning rate (lr)", min: 0.005, max: 0.3, step: 0.005, value: lr, fmt: function (v) { return v.toFixed(3); }, onInput: function (v) { lr = v; reset(); } });
-  ui.toggle({ label: "Centrar x (x = −1, 0, 1)", value: false, onChange: function (on) { centered = on; setData(); } });
+  ui.toggle({ label: "Centrar x (presupuesto − media: −1, 0, 1)", value: false, onChange: function (on) { centered = on; setData(); } });
   ui.button("Un paso", function () { if (!loop.running) step(); }, "primary");
   var bPlay = ui.button("Ejecutar", function () {
     if (loop.running) { loop.stop(); return; }
@@ -86,7 +87,7 @@ Lab.register("curso4/c4m3-gd-paso", function (root, api) {
     for (i = 0; i < n; i++) D.line(ctx, pA.x(X[i]), pA.y(Y[i]), pA.x(X[i]), pA.y(w * X[i] + b), C.terracota, 2.5);
     for (i = 0; i < n; i++) D.circle(ctx, pA.x(X[i]), pA.y(Y[i]), 6, C.terracota, C.paper, 1.5);
     ctx.restore();
-    D.text(ctx, "recta actual", pA.box.x + 8, pA.box.y + 16, { size: 11, color: C.cobaltoInk, weight: 600 });
+    D.text(ctx, "recta de predicción actual", pA.box.x + 8, pA.box.y + 16, { size: 11, color: C.cobaltoInk, weight: 600 });
   }
   function drawB(ctx, W, H, C) {
     var D = api.d, i, bx = pB.box;
@@ -120,7 +121,8 @@ Lab.register("curso4/c4m3-gd-paso", function (root, api) {
     if (!pB.inside(px, py)) return;
     w0 = Math.round(pB.ix(px) * 10) / 10; b0 = Math.round(pB.iy(py) * 10) / 10; reset();
   }
-  vB.pointer({ down: pick, drag: pick });
+  /* táctil: la pantalla no se queda atrapada en el mapa (se desplaza con normalidad); un toque corto elige el punto */
+  vB.pointer({ down: function (px, py) { if (!coarse) pick(px, py); }, drag: function (px, py) { if (!coarse) pick(px, py); }, up: function (px, py, e) { if (coarse && e.type === "pointerup") pick(px, py); } });
   vA.draw(drawA); vB.draw(drawB); vC.draw(drawC); reset();
   return { destroy: function () { loop.stop(); } };
 });

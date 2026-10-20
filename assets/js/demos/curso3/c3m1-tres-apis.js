@@ -4,8 +4,8 @@ Lab.register("curso3/c3m1-tres-apis", function (root, api) {
   var el = api.el;
   var REQ = [
     ["rama", "Ramas o atajos (Add, Concatenate)"],
-    ["multin", "Varias entradas (p. ej. imagen + datos de tabla)"],
-    ["multout", "Varias salidas (p. ej. clase + valor)"],
+    ["multin", "Varias entradas (p. ej. carátula + datos del usuario)"],
+    ["multout", "Varias salidas (p. ej. ¿le gustará? + cuántas horas verá)"],
     ["share", "Una misma capa usada en dos sitios (pesos compartidos)"],
     ["dyn", "Un if / while de Python que depende de los datos dentro del modelo"],
     ["intro", "Quiero summary() con conexiones, plot_model y sacar capas intermedias"]

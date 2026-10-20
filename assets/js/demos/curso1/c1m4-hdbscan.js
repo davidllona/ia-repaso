@@ -49,6 +49,12 @@ function frame(ctx, plot, C, grid) {
   ctx.globalAlpha = 1; ctx.strokeStyle = C.ink; ctx.lineWidth = 1.5; ctx.strokeRect(b.x, b.y, b.w, b.h);
   ctx.restore();
 }
+/* Rótulos de los ejes: cada punto es un usuario de la plataforma, situado según lo que le gusta. */
+function axisCaps(ctx, plot, C, xt, yt) {
+  var b = plot.box, D = api.d;
+  D.text(ctx, xt, b.x + b.w / 2, b.y + b.h + 14, { size: 10.5, align: "center", color: C.ink2 });
+  D.text(ctx, yt, b.x - 6, b.y + b.h / 2, { size: 10.5, align: "center", color: C.ink2, rotate: -Math.PI / 2 });
+}
 function sq2(a, b) { var dx = a[0] - b[0], dy = a[1] - b[1]; return dx * dx + dy * dy; }
 function dist2(a, b) { return Math.sqrt(sq2(a, b)); }
 
@@ -210,20 +216,20 @@ function compute() {
   if (method === "dbscan") { var d = dbscan(P, EPS, MIN); res = { lab: d.lab, type: d.type, prob: null, k: d.k }; }
   else { var h = HD.h[String(MCS[mi])]; var kk = 0; h.lab.forEach(function (l) { if (l + 1 > kk) kk = l + 1; }); res = { lab: h.lab, type: h.lab.map(function (l) { return l < 0 ? "ruido" : "nucleo"; }), prob: h.prob, k: kk }; }
 }
-var view = api.view(root, { aspect: 1.6, minH: 230, maxH: 600, label: "Tres grupos de densidades distintas con ruido, coloreados por DBSCAN o por HDBSCAN" });
-var plot = api.plot(view, { xr: [0, 16], yr: [0, 10], pad: { l: 8, r: 8, t: 8, b: 8 } });
+var view = api.view(root, { aspect: 1.6, minH: 230, maxH: 600, label: "Usuarios de tres grupos con densidades distintas (dos clubes de fans muy parecidos entre sí y un público general disperso) más usuarios sueltos, coloreados por DBSCAN o por HDBSCAN" });
+var plot = api.plot(view, { xr: [0, 16], yr: [0, 10], pad: { l: 18, r: 8, t: 8, b: 22 } });
 var ui = api.controls(root);
 ui.segmented({ label: "Algoritmo", options: [["dbscan", "DBSCAN (calculado aquí)"], ["hdbscan", "HDBSCAN (precalculado)"]], value: method, onChange: function (v) { method = v; compute(); update(); } });
 var sE = ui.slider({ label: "DBSCAN: eps", min: 0.1, max: 2.5, step: 0.05, value: EPS, fmt: function (v) { return v.toFixed(2); }, onInput: function (v) { EPS = v; method = "dbscan"; compute(); update(); } });
 var sM = ui.slider({ label: "DBSCAN: min_samples", min: 2, max: 12, step: 1, value: MIN, onInput: function (v) { MIN = v; method = "dbscan"; compute(); update(); } });
 var sH = ui.slider({ label: "HDBSCAN: min_cluster_size", min: 0, max: MCS.length - 1, step: 1, value: mi, fmt: function (v) { return MCS[v]; }, onInput: function (v) { mi = v; method = "hdbscan"; compute(); update(); } });
-ui.toggle({ label: "Ver los 3 grupos reales", value: false, onChange: function (v) { showTruth = v; update(); } });
+ui.toggle({ label: "Ver los 3 grupos reales (clubes de fans y público general)", value: false, onChange: function (v) { showTruth = v; update(); } });
 var out = api.readout(root);
-var lg = api.el("div", { class: "lab-legend" }); lg.appendChild(api.el("span", { text: "forma y color = grupo" })); lg.appendChild(api.el("span", { text: "✕ ruido" })); lg.appendChild(api.el("span", { text: "en HDBSCAN, un punto más transparente = menos confianza (probabilities_)" })); root.appendChild(lg);
+var lg = api.el("div", { class: "lab-legend" }); lg.appendChild(api.el("span", { text: "forma y color = grupo" })); lg.appendChild(api.el("span", { text: "✕ usuario suelto (ruido)" })); lg.appendChild(api.el("span", { text: "en HDBSCAN, un punto más transparente = menos confianza (probabilities_)" })); root.appendChild(lg);
 
 function fit() { var b = plot.box; plot.xr = [0, 10 * b.w / b.h]; }
 function draw(ctx, w, h, C) {
-  var pal = palette(C), i; fit(); frame(ctx, plot, C); ctx.save(); plot.clip(ctx);
+  var pal = palette(C), i; fit(); frame(ctx, plot, C); axisCaps(ctx, plot, C, "gusto por la acción →", "gusto por la comedia →"); ctx.save(); plot.clip(ctx);
   for (i = 0; i < P.length; i++) {
     var x = plot.x(P[i][0]), y = plot.y(P[i][1]), l = showTruth ? truth[i] : res.lab[i];
     ctx.globalAlpha = (!showTruth && res.prob) ? 0.3 + 0.7 * res.prob[i] : 1;
@@ -237,11 +243,11 @@ function update() {
   view.redraw();
   var nn = res.lab.filter(function (l) { return l < 0; }).length, rec = recovered(res.lab);
   var name = method === "dbscan" ? "DBSCAN (eps = " + EPS.toFixed(2) + ", min_samples = " + MIN + ")" : "HDBSCAN (min_cluster_size = " + MCS[mi] + ", sin eps)";
-  out.set((showTruth ? "<b>Mostrando los grupos reales</b> (✕ = ruido sembrado)<br>" : "") + name + " → <b>" + res.k + " grupos</b> + <b>" + nn + " puntos de ruido</b><br>" +
+  out.set((showTruth ? "<b>Mostrando los grupos reales</b> (✕ = usuario suelto sembrado)<br>" : "") + name + " → <b>" + res.k + " grupos</b> + <b>" + nn + " usuarios sueltos (ruido)</b><br>" +
     "Grupos reales recuperados limpiamente (ni fundidos ni perdidos): <b>" + rec + " de 3</b>" +
-    (rec === 3 ? "<br><span class='good'>Los tres: el denso y estrecho de la izquierda, su vecino pegado y el disperso de la derecha.</span>" :
-      method === "dbscan" ? "<br><span class='bad'>" + (EPS < 0.9 ? "Con eps pequeño los dos densos se separan, pero el grupo disperso se deshace en ruido." : "Con eps grande el grupo disperso aparece, pero los dos densos se funden en uno.") + "</span>" :
-        "<br><span class='bad'>min_cluster_size demasiado grande para el tamaño de estos grupos (55 puntos cada uno).</span>"));
+    (rec === 3 ? "<br><span class='good'>Los tres: el club de fans de la izquierda, el club vecino pegado a él y el público general disperso de la derecha.</span>" :
+      method === "dbscan" ? "<br><span class='bad'>" + (EPS < 0.9 ? "Con eps pequeño los dos clubes de fans se separan, pero el público general (disperso) se deshace en ruido." : "Con eps grande aparece el público general, pero los dos clubes de fans se funden en uno.") + "</span>" :
+        "<br><span class='bad'>min_cluster_size demasiado grande para el tamaño de estos grupos (55 usuarios cada uno).</span>"));
 }
 compute(); view.draw(draw); update();
 

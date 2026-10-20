@@ -60,6 +60,8 @@ Lab.register("curso2/c2m2-shallow-deep", function (root, api) {
       tr.X.forEach(function (p, i) { D.circle(ctx, plot.x(p[0]), plot.y(p[1]), 3.4, tr.Y[i][0] ? C.terracota : C.cobalto, C.paper, 1); });
       ctx.restore();
       D.text(ctx, title, b.x, 15, { size: 12, weight: 700, color: col(C) });
+      C2.halo(ctx, "● thriller", b.x + 8, b.y + b.h - 8, { size: 10.5, bg: C.surface }); D.text(ctx, "● thriller", b.x + 8, b.y + b.h - 8, { size: 10.5, weight: 600, color: C.terracotaInk });
+      C2.halo(ctx, "● comedia", b.x + 74, b.y + b.h - 8, { size: 10.5, bg: C.surface }); D.text(ctx, "● comedia", b.x + 74, b.y + b.h - 8, { size: 10.5, weight: 600, color: C.cobaltoInk });
     };
   }
   function drawC(ctx, w, h, C) {

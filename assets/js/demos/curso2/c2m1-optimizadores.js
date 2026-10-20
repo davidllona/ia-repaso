@@ -1,5 +1,6 @@
 /* Experimento: carrera de optimizadores (SGD, Momentum, RMSprop, Adam) sobre un valle estrecho y alargado.
-   Coste: f(x, y) = ½·(0,25·u² + 40·v²), con (u, v) = (x, y) girados un ángulo (0° o 30°). Mínimo en (0, 0). */
+   Coste: f(x, y) = ½·(0,25·u² + 40·v²), con (u, v) = (x, y) girados un ángulo (0° o 30°). Mínimo en (0, 0).
+   Disfraz: dos «perillas» del recomendador de Netflix: w1 = peso de la popularidad (poco sensible), w2 = peso del género (muy sensible). */
 Lab.register("curso2/c2m1-optimizadores", function (root, api) {
   var M = api.math, D = api.d, C0 = api.colors();
   var A = 0.25, B = 40, START = [-4, 0.8], MAXSTEPS = 250;
@@ -31,8 +32,8 @@ Lab.register("curso2/c2m1-optimizadores", function (root, api) {
   }
   function stepAll() { S.run.forEach(stepOne); S.t++; }
 
-  var view = api.view(root, { aspect: 2.5, minH: 240, maxH: 380, label: "Curvas de nivel de un valle estrecho con los recorridos de cuatro optimizadores" });
-  var po = { xr: [-5, 5], yr: [-1.6, 1.6], xticks: 10, yticks: 4, xlabel: "peso w₁ (valle largo)", ylabel: "w₂ (estrecho)", pad: { l: 40, r: 12, t: 12, b: 36 }, xfmt: function (v) { return Math.round(v); }, yfmt: function (v) { return +v.toFixed(1); } };
+  var view = api.view(root, { aspect: 2.5, minH: 240, maxH: 380, label: "Curvas de nivel del coste de ajustar dos perillas del recomendador, con los recorridos de cuatro optimizadores" });
+  var po = { xr: [-5, 5], yr: [-1.6, 1.6], xticks: 10, yticks: 4, xlabel: "perilla w₁ · popularidad (valle largo)", ylabel: "w₂ · género", pad: { l: 40, r: 12, t: 12, b: 36 }, xfmt: function (v) { return Math.round(v); }, yfmt: function (v) { return +v.toFixed(1); } };
   var plot = api.plot(view, po);
   var ui = api.controls(root);
   var table = api.table(root, ["Optimizador", "coste f", "dist. al mínimo"]);
@@ -77,8 +78,8 @@ Lab.register("curso2/c2m1-optimizadores", function (root, api) {
     });
     ctx.restore();
     D.circle(ctx, plot.x(0), plot.y(0), 5, null, C.olivaInk, 2);
-    D.text(ctx, "mínimo", plot.x(0) + 8, plot.y(0) + 18, { size: 11, color: C.olivaInk, weight: 600 });
-    D.text(ctx, "salida", plot.x(START[0]) + 6, plot.y(START[1]) - 10, { size: 11, color: C.ink2, weight: 600 });
+    D.text(ctx, "ajuste ideal", plot.x(0) + 8, plot.y(0) + 18, { size: 11, color: C.olivaInk, weight: 600 });
+    D.text(ctx, "inicio", plot.x(START[0]) + 6, plot.y(START[1]) - 10, { size: 11, color: C.ink2, weight: 600 });
     S.run.forEach(function (o, ki) {
       if (o.dead) return;
       var q = o.p; if (plot.inside(plot.x(q[0]), plot.y(q[1]))) D.circle(ctx, plot.x(q[0]), plot.y(q[1]), 6, colorOf(C, KINDS[ki][2]), C.paper, 2);

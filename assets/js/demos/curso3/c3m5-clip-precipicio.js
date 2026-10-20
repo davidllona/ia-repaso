@@ -1,7 +1,7 @@
 /* Experimento: el «precipicio» de la pérdida. f(w) = 0,05·w² + 2·e^{3(w−2)}: un cuenco suave con una pared casi vertical a la derecha.
    Descenso de gradiente con paso η·g. Sin recorte, un gradiente enorme lanza el peso lejos. Con clipnorm=c el paso nunca pasa de η·c. */
 Lab.register("curso3/c3m5-clip-precipicio", function (root, api) {
-  var D = api.d, M = api.math, STEPS = 40;
+  var D = api.d, M = api.math, STEPS = 40, coarse = !!(window.matchMedia && matchMedia("(pointer:coarse)").matches);
   var S = { w0: 3, lr: 0.1, c: 3, clip: true };
   function f(w) { return 0.05 * w * w + 2 * Math.exp(3 * (w - 2)); }
   function g(w) { return 0.1 * w + 6 * Math.exp(3 * (w - 2)); }
@@ -16,7 +16,7 @@ Lab.register("curso3/c3m5-clip-precipicio", function (root, api) {
     }
     return { ws: ws, gs: gs };
   }
-  var view = api.view(root, { aspect: 2.1, minH: 230, maxH: 340, drag: true, label: "Pérdida con un precipicio y los recorridos del descenso sin recorte y con clipnorm" });
+  var view = api.view(root, { aspect: 2.1, minH: 230, maxH: 340, drag: !coarse, label: "Pérdida con un precipicio y los recorridos del descenso sin recorte y con clipnorm" });
   var plot = api.plot(view, { xr: [-8, 4], yr: [0, 6], xticks: 6, yticks: 3, xlabel: "peso w", ylabel: "pérdida", pad: { l: 40, r: 14, t: 14, b: 34 }, xfmt: function (v) { return Math.round(v); }, yfmt: function (v) { return Math.round(v); } });
   var ui = api.controls(root), out = api.readout(root);
   ui.slider({ label: "learning rate η", min: 0.01, max: 0.2, step: 0.01, value: S.lr, fmt: function (v) { return v.toFixed(2); }, onInput: function (v) { S.lr = v; update(); } });

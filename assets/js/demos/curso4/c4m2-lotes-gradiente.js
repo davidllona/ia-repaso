@@ -1,4 +1,4 @@
-/* Experimento: por qué lotes. Un dataset de 240 puntos (y = 3x + ruido) y un modelo y = w·x.
+/* Experimento: por qué lotes. Un catálogo de 240 películas (x = nota de la crítica, y = valoración de los usuarios = 3x + ruido) y un modelo y = w·x.
    Para el valor actual de w se calcula el gradiente de la pérdida con TODOS los datos (la «verdad») y con
    muchos lotes aleatorios de tamaño B. Se ve cuánto se dispersa el gradiente según B y cuántos pasos por época se hacen. */
 Lab.register("curso4/c4m2-lotes-gradiente", function (root, api) {
@@ -24,7 +24,7 @@ Lab.register("curso4/c4m2-lotes-gradiente", function (root, api) {
   var view2 = api.view(root, { aspect: 4.2, minH: 120, maxH: 170, label: "Para cada tamaño de lote: pasos por época y ruido del gradiente" });
   var ui = api.controls(root), out = api.readout(root);
   ui.slider({ label: "batch_size B", min: 0, max: SIZES.length - 1, step: 1, value: S.bi, fmt: function (v) { return SIZES[v]; }, onInput: function (v) { S.bi = v; update(); } });
-  ui.slider({ label: "valor actual de w", min: 0, max: 4, step: 0.1, value: S.w, fmt: function (v) { return v.toFixed(1); }, onInput: function (v) { S.w = v; update(); } });
+  ui.slider({ label: "valor actual de w (peso de la crítica)", min: 0, max: 4, step: 0.1, value: S.w, fmt: function (v) { return v.toFixed(1); }, onInput: function (v) { S.w = v; update(); } });
   ui.button("Sortear otros 400 lotes", function () { S.seed++; update(); }, "primary");
 
   var stats = {};
@@ -48,7 +48,7 @@ Lab.register("curso4/c4m2-lotes-gradiente", function (root, api) {
     }
     var xf = pad.l + (full - lo) / (hi - lo) * (w - pad.l - pad.r);
     D.line(ctx, xf, pad.t - 4, xf, pad.t + ph, C.terracota, 2.5);
-    D.text(ctx, "gradiente con los 240 datos = " + full.toFixed(2), M.clamp(xf, 90, w - 90), 13, { size: 11, color: C.terracotaInk, align: "center", weight: 600 });
+    D.text(ctx, "gradiente con las 240 películas = " + full.toFixed(2), M.clamp(xf, 90, w - 90), 13, { size: 11, color: C.terracotaInk, align: "center", weight: 600 });
     D.text(ctx, "valor del gradiente estimado con un lote de " + B + " →", w / 2, h - 8, { size: 11, color: C.muted, align: "center" });
     D.text(ctx, "cada barra: cuántos de los 400 lotes dieron ese valor", w / 2, h - 21, { size: 10, color: C.muted, align: "center" });
   }
@@ -71,7 +71,7 @@ Lab.register("curso4/c4m2-lotes-gradiente", function (root, api) {
   function update() {
     compute();
     var B = SIZES[S.bi], st = stats[B], full = fullGrad(S.w), steps = Math.ceil(N / B);
-    out.set("Con B = <b>" + B + "</b>: <b>" + steps + "</b> pasos de gradiente por época (⌈240/" + B + "⌉) · gradiente real (240 datos) = <b>" + full.toFixed(3) + "</b><br>" +
+    out.set("Con B = <b>" + B + "</b>: <b>" + steps + "</b> pasos de gradiente por época (⌈240/" + B + "⌉) · gradiente real (240 películas) = <b>" + full.toFixed(3) + "</b><br>" +
       "media de los 400 lotes = <b>" + st.mean.toFixed(3) + "</b> (casi igual: el lote es un estimador <em>sin sesgo</em>) · desviación = <b class='" + (st.sd > 1 ? "bad" : "good") + "'>" + st.sd.toFixed(3) + "</b>" +
       " (con B = 1 era " + stats[1].sd.toFixed(3) + "; ruido ≈ σ₁/√B = " + (stats[1].sd / Math.sqrt(B)).toFixed(3) + ")" +
       (B === N ? "<br><span class='good'>B = 240: el gradiente sale idéntico en todos los lotes (no hay ruido) pero solo das 1 paso por época.</span>" : (B === 1 ? "<br><span class='bad'>B = 1: 240 pasos por época, pero cada uno apunta a veces en dirección contraria al buen camino.</span>" : "")));

@@ -20,7 +20,7 @@ Lab.register("curso1/c1m5-f1-armonica", function (root, api) {
   var seg = ui.segmented({ label: "Qué medida combina precision y recall", options: [[0.5, "F0.5 (pesa más la precision)"], [1, "F1 (equilibrada)"], [2, "F2 (pesa más el recall)"]], value: st.beta, onChange: function (v) { st.beta = v; update(); } });
   ui.button("Precision 0,9 · recall 0,1", function () { st.p = 0.9; st.r = 0.1; update(); });
   ui.button("Precision = recall = 0,6", function () { st.p = 0.6; st.r = 0.6; update(); });
-  ui.button("Caso del fraude: 0,43 y 0,60", function () { st.p = 0.4286; st.r = 0.6; update(); });
+  ui.button("Caso de los éxitos: 0,43 y 0,60", function () { st.p = 0.4286; st.r = 0.6; update(); });
   var C0 = api.colors();
   api.legend(root, [[C0.ink, "línea de puntos: media aritmética = 0,5"], [C0.muted, "línea discontinua: precision = recall"]]);
 

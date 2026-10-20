@@ -28,8 +28,8 @@ Lab.register("curso5/c5m4-resnet-tamanos", function (root, api) {
 
   var view = api.view(root, { aspect: 1.9, minH: 190, maxH: 280, label: "Tamaño del mapa de características en cada etapa de ResNet-18" });
   var ui = api.controls(root), out = api.readout(root);
-  var sl = ui.slider({ label: "Lado de la imagen de entrada (píxeles)", min: 32, max: 448, step: 32, value: S.lado, onInput: function (v) { S.lado = v; update(); } });
-  ui.button("Volver a 224 (el tamaño de ImageNet)", function () { sl.set(224); }, "primary");
+  var sl = ui.slider({ label: "Lado de la carátula de entrada (píxeles)", min: 32, max: 448, step: 32, value: S.lado, onInput: function (v) { S.lado = v; update(); } });
+  ui.button("Volver a 224 (el tamaño con que se entrenó)", function () { sl.set(224); }, "primary");
 
   function draw(ctx, w, h, C) {
     var z = sizes(S.lado), n = z.length, i, cellW = (w - 8) / n, baseY = h - 46, maxPx = h - 80, fs = w < 420 ? 9.5 : 11;
@@ -44,19 +44,19 @@ Lab.register("curso5/c5m4-resnet-tamanos", function (root, api) {
       D.text(ctx, z[i].n === "fc" ? "1000" : (z[i].lado + "²"), cx, h - 16, { size: fs, mono: true, color: C.cobaltoInk, align: "center", weight: 600 });
       D.text(ctx, z[i].n === "fc" ? "" : ("×" + z[i].c), cx, 14, { size: fs, mono: true, color: C.terracotaInk, align: "center" });
     }
-    D.text(ctx, w < 460 ? "lado² abajo · canales arriba" : "lado² (abajo) y canales (arriba); el tamaño del cuadrado es proporcional al lado", w / 2, h - 3, { size: 9.5, color: C.muted, align: "center" });
+    D.text(ctx, w < 560 ? "lado² abajo · canales arriba" : "lado² (abajo) y canales, o «críticos» (arriba); el cuadrado es proporcional al lado", w / 2, h - 3, { size: 9.5, color: C.muted, align: "center" });
   }
   view.draw(draw);
 
   function update() {
     var z = sizes(S.lado), i, tot = 0, s = "";
     for (i = 0; i < ET.length; i++) tot += ET[i].par;
-    s += "Entrada <b>" + S.lado + "×" + S.lado + "×3</b> = " + fmt(S.lado * S.lado * 3) + " números → ";
+    s += "Carátula de entrada <b>" + S.lado + "×" + S.lado + "×3</b> = " + fmt(S.lado * S.lado * 3) + " números → ";
     for (i = 0; i < 6; i++) s += z[i].n + " <b>" + z[i].lado + "×" + z[i].lado + "×" + z[i].c + "</b>" + (i < 5 ? " → " : "");
     s += "<br><b>avgpool</b> promedia los " + z[5].lado + "×" + z[5].lado + " = " + (z[5].lado * z[5].lado) + " posiciones de cada canal en un vector de <b>512</b> números y <b>fc</b> da 1000 puntuaciones: con cualquier lado la red funciona, pero sus pesos se entrenaron con 224.";
     s += "<br>Parámetros totales: <b>" + fmt(tot) + "</b> (layer4: <b>" + (100 * 8393728 / tot).toFixed(1).replace(".", ",") + " %</b>) <b>sin depender del lado</b>; lo que sí crece con el lado es la memoria: conv1 produce <b>" + fmt(z[0].lado * z[0].lado * 64) + "</b> números por imagen.";
     if (z[5].lado < 2) s += "<br><span class='bad'>layer4 se queda en 1×1: ya casi no hay estructura espacial que promediar.</span>";
-    else if (S.lado !== 224) s += "<br><span class='bad'>No es el tamaño con que se entrenó (224): funciona, pero los objetos se ven a otra escala y suele rendir peor.</span>";
+    else if (S.lado !== 224) s += "<br><span class='bad'>No es el tamaño con que se entrenó (224): funciona, pero los pósters se ven a otra escala (como un crítico acostumbrado a un tamaño de pantalla) y suele rendir peor.</span>";
     else s += "<br><span class='good'>Es el tamaño de ImageNet: 7×7×512 justo antes de avgpool.</span>";
     out.set(s); view.redraw();
   }

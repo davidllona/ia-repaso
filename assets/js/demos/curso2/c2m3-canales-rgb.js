@@ -20,7 +20,7 @@ Lab.register("curso2/c2m3-canales-rgb", function (root, api) {
   var grid = api.el("div", { style: { display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(min(100%,135px),1fr))", gap: "8px", alignItems: "start" } });
   root.appendChild(grid);
   function cellDiv() { var c = api.el("div", { style: { minWidth: "0" } }); grid.appendChild(c); return c; }
-  var vs = [0, 1, 2, 3].map(function (n) { return api.view(cellDiv(), { aspect: 1, minH: 120, maxH: 300, drag: true, label: n === 0 ? "Imagen compuesta con los tres canales" : "Canal " + names[n - 1] }); });
+  var vs = [0, 1, 2, 3].map(function (n) { return api.view(cellDiv(), { aspect: 1, minH: 120, maxH: 300, drag: true, label: n === 0 ? "Fotograma compuesto con los tres canales" : "Canal " + names[n - 1] }); });
   var ui = api.controls(root), out = api.readout(root);
   ui.slider({ label: "Intensidad del canal rojo", min: 0, max: 100, step: 5, value: 100, fmt: function (v) { return v + " %"; }, onInput: function (v) { k[0] = v / 100; update(); } });
   ui.slider({ label: "Intensidad del canal verde", min: 0, max: 100, step: 5, value: 100, fmt: function (v) { return v + " %"; }, onInput: function (v) { k[1] = v / 100; update(); } });
@@ -33,7 +33,7 @@ Lab.register("curso2/c2m3-canales-rgb", function (root, api) {
   vs.forEach(function (v, n) {
     v.draw(function (ctx, w, h, C) {
       var g = geom(v, 18), i, j;
-      api.d.text(ctx, n === 0 ? "Imagen (24×24×3)" : names[n - 1], w / 2, 13, { size: 11, weight: 600, align: "center", color: C.ink2 });
+      api.d.text(ctx, n === 0 ? "Fotograma 24×24×3" : names[n - 1], w / 2, 13, { size: 11, weight: 600, align: "center", color: C.ink2 });
       for (i = 0; i < S; i++) for (j = 0; j < S; j++) {
         var c = img[i][j], col;
         if (n === 0) col = rgb(c[0] * k[0], c[1] * k[1], c[2] * k[2]);

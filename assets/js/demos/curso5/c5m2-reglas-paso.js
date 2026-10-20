@@ -3,7 +3,7 @@
 Lab.register("curso5/c5m2-reglas-paso", function (root, api) {
   var D = api.d, C0 = api.colors(), T = 40;
   var S = { pat: "const", lrExp: -2, mu: 0.9, alpha: 0.99, b1: 0.9, b2: 0.999, scale: 1 };
-  var PAT = { const: "Constante g = 1", alt: "Alterna +1, −1, +1, −1…", noisy: "Ruidoso: media 1, desviación 2", decay: "Decae hacia 0 (cerca del mínimo)", step: "Cambia de signo a mitad (+1 y luego −1)" };
+  var PAT = { const: "Constante g = 1 (todos piden lo mismo)", alt: "Alterna +1, −1, +1, −1… (un día más, otro menos)", noisy: "Ruidoso: media 1, desviación 2 (cada lote opina distinto)", decay: "Decae hacia 0 (la predicción ya casi acierta)", step: "Cambia de signo a mitad (+1 y luego −1)" };
   var R = api.rng(9), noise = []; for (var q = 0; q < T; q++) noise.push(R.normal(0, 1));
   function grads() {
     var g = [], t;
@@ -36,7 +36,7 @@ Lab.register("curso5/c5m2-reglas-paso", function (root, api) {
   var ui = api.controls(root), out = api.readout(root);
   out.el.style.fontSize = "clamp(.72rem, 2.7vw, .84rem)";
   var tb = api.table(root, ["regla", "t=1", "t=40", "Σ"]);
-  ui.select({ label: "Gradientes que reciben las cuatro reglas", value: S.pat, options: Object.keys(PAT).map(function (k) { return [k, PAT[k]]; }), onChange: function (v) { S.pat = v; update(); } });
+  ui.select({ label: "Gradientes que le llegan al peso «comedia»", value: S.pat, options: Object.keys(PAT).map(function (k) { return [k, PAT[k]]; }), onChange: function (v) { S.pat = v; update(); } });
   ui.slider({ label: "Escala de los gradientes (×)", min: -2, max: 2, step: 0.5, value: 0, fmt: function (v) { return "×" + Math.pow(10, v).toPrecision(2).replace(/\.0+$/, ""); }, onInput: function (v) { S.scale = Math.pow(10, v); update(); } });
   ui.slider({ label: "Learning rate (escala log)", min: -4, max: -1, step: 0.1, value: S.lrExp, fmt: function (v) { return Math.pow(10, v).toPrecision(2); }, onInput: function (v) { S.lrExp = v; update(); } });
   ui.slider({ label: "μ del momentum", min: 0, max: 0.99, step: 0.01, value: S.mu, fmt: function (v) { return v.toFixed(2); }, onInput: function (v) { S.mu = v; update(); } });

@@ -7,7 +7,7 @@ Lab.register("curso3/c3m1-multi-perdida", function (root, api) {
   var ce = P.reduce(function (a, p) { return a - Math.log(p); }, 0) / P.length, r2 = R.reduce(function (a, r) { return a + r * r; }, 0) / R.length;
   var view = api.view(root, { aspect: 6, minH: 100, maxH: 112, label: "Barra con la parte de la pérdida total que aporta cada salida" });
   var ui = api.controls(root), out = api.readout(root);
-  ui.slider({ label: "Tamaño típico del objetivo de regresión (10^e)", min: 0, max: 3, step: 0.1, value: S.e, fmt: function (v) { return "10^" + v.toFixed(1) + " = " + Math.round(Math.pow(10, v)); }, onInput: function (v) { S.e = v; update(); } });
+  ui.slider({ label: "Escala de «valor» (10 ≈ horas vistas; 100–1000 ≈ si lo mides en minutos)", min: 0, max: 3, step: 0.1, value: S.e, fmt: function (v) { return "10^" + v.toFixed(1) + " = " + Math.round(Math.pow(10, v)); }, onInput: function (v) { S.e = v; update(); } });
   var swc = ui.slider({ label: "loss_weights de «clase»", min: 0, max: 2, step: 0.05, value: S.wc, fmt: function (v) { return v.toFixed(2); }, onInput: function (v) { S.wc = v; update(); } });
   var sv = ui.slider({ label: "loss_weights de «valor» (10^k)", min: -4, max: 1, step: 0.1, value: S.ev, fmt: function (v) { return "10^" + v.toFixed(1) + " = " + Math.pow(10, v).toPrecision(2); }, onInput: function (v) { S.ev = v; update(); } });
   ui.button("Equilibrar las dos aportaciones", function () {

@@ -1,13 +1,15 @@
 /* Experimento: regresión logística con DOS variables. p = sigmoide(w1·x1 + w2·x2 + b); la frontera p = 0.5 es la recta
-   w1·x1 + w2·x2 + b = 0. Se entrena en vivo con BCE y descenso del gradiente (todos los datos). Como el fragmento 13. */
+   w1·x1 + w2·x2 + b = 0. Se entrena en vivo con BCE y descenso del gradiente (todos los datos). Como el fragmento 15.
+   Ejemplo: x1 = días sin abrir la app, x2 = series abandonadas a medias; azul = cancelan, naranja = se quedan. */
 Lab.register("curso4/c4m4-frontera-2d", function (root, api) {
   var M = api.math, D = api.d;
   var S = { sep: 2.0, lr: 0.3, seed: 3, epoch: 0, w1: 0, w2: 0, b: 0, mapa: true };
   var pts, loop, hist, ready = false;
 
   var wrap = api.el("div", { style: { maxWidth: "560px", margin: "0 auto" } }); root.appendChild(wrap);
-  var view = api.view(wrap, { aspect: 1.1, minH: 280, maxH: 520, label: "Dos grupos de puntos, la recta frontera y el mapa de probabilidad" });
-  var plot = api.plot(view, { xr: [-1, 7], yr: [-1, 7], xticks: 8, yticks: 8, xlabel: "x1", ylabel: "x2", pad: { l: 38, r: 10, t: 10, b: 36 }, grid: false });
+  var view = api.view(wrap, { aspect: 1.1, minH: 280, maxH: 520, label: "Usuarios que se quedan y usuarios que cancelan, la recta frontera y el mapa de probabilidad" });
+  var plot = api.plot(view, { xr: [-1, 7], yr: [-1, 7], xticks: 8, yticks: 8, xlabel: "x1 = días sin abrir la app", ylabel: "x2 = series abandonadas", pad: { l: 38, r: 10, t: 10, b: 36 }, grid: false });
+  api.legend(root, [[api.colors().cobalto, "usuarios que cancelan"], [api.colors().terracota, "usuarios que se quedan"]]);
   var ui = api.controls(root), out = api.readout(root);
   ui.slider({ label: "Distancia entre los grupos", min: 0.5, max: 4, step: 0.1, value: S.sep, fmt: function (v) { return v.toFixed(1); }, onInput: function (v) { S.sep = v; regen(); } });
   ui.slider({ label: "Learning rate", min: 0.02, max: 3, step: 0.02, value: S.lr, fmt: function (v) { return v.toFixed(2); }, onInput: function (v) { S.lr = v; } });

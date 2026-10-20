@@ -47,13 +47,13 @@ Lab.register("curso3/c3m7-augmentation", function (root, api) {
 
   var view = api.view(root, { aspect: 1.45, minH: 300, maxH: 400, label: "Dígito original, versión transformada al azar y ocho variantes con la etiqueta que predice el clasificador de juguete" });
   var ui = api.controls(root), out = api.readout(root);
-  ui.select({ label: "Dígito", options: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map(function (k) { return [k, String(k)]; }), value: S.digit, onChange: function (v) { S.digit = +v; update(); } });
+  ui.select({ label: "Cifra de la carátula", options: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map(function (k) { return [k, String(k)]; }), value: S.digit, onChange: function (v) { S.digit = +v; update(); } });
   ui.slider({ label: "Rotación máxima (±grados)", min: 0, max: 180, step: 5, value: S.rot, onInput: function (v) { S.rot = v; update(); } });
   ui.slider({ label: "Desplazamiento máximo (±píxeles de 32)", min: 0, max: 10, step: 0.5, value: S.shift, fmt: function (v) { return v.toFixed(1).replace(".", ","); }, onInput: function (v) { S.shift = v; update(); } });
   ui.slider({ label: "Zoom máximo (±%)", min: 0, max: 50, step: 5, value: S.zoom, onInput: function (v) { S.zoom = v; update(); } });
   ui.toggle({ label: "Volteo horizontal (50 % de las veces)", value: S.flip, onChange: function (v) { S.flip = v; update(); } });
   ui.button("Sortear otras transformaciones", function () { S.seed++; update(); });
-  api.legend(root, [[api.colors().olivaInk, "el clasificador sigue viendo el mismo dígito"], [api.colors().terracotaInk, "ve otro dígito: la etiqueta se rompería"]]);
+  api.legend(root, [[api.colors().olivaInk, "el clasificador sigue leyendo la misma cifra"], [api.colors().terracotaInk, "lee otra cifra: la etiqueta se rompería"]]);
 
   function img(ctx, im, x, y, s, C) {
     var c = s / 32, i, j; D.rect(ctx, x, y, s, s, C.surface);
@@ -63,14 +63,14 @@ Lab.register("curso3/c3m7-augmentation", function (root, api) {
   view.draw(function (ctx, w, h, C) {
     if (!cur) return;
     var narrow = w < 460, big = narrow ? (w - 36) / 2 : Math.min(150, (w - 60) / 4), x0 = 12, y0 = 20, gap = narrow ? 12 : 16;
-    img(ctx, base32(S.digit), x0, y0, big, C); D.text(ctx, "original", x0 + big / 2, y0 - 6, { align: "center", size: 11, weight: 600, color: C.ink2 });
-    img(ctx, cur.img, x0 + big + gap, y0, big, C); D.text(ctx, "una versión al azar", x0 + big * 1.5 + gap, y0 - 6, { align: "center", size: 11, weight: 600, color: C.ink2 });
+    img(ctx, base32(S.digit), x0, y0, big, C); D.text(ctx, "carátula original", x0 + big / 2, y0 - 6, { align: "center", size: 11, weight: 600, color: C.ink2 });
+    img(ctx, cur.img, x0 + big + gap, y0, big, C); D.text(ctx, "cartel torcido al azar", x0 + big * 1.5 + gap, y0 - 6, { align: "center", size: 11, weight: 600, color: C.ink2 });
     var pr = cur.p, top = pr.indexOf(Math.max.apply(null, pr)), ok = top === S.digit;
     var tx = narrow ? x0 : x0 + 2 * big + 2 * gap, ty = narrow ? y0 + big + 20 : y0 + 12;
     D.text(ctx, "ve un «" + top + "» (" + Math.round(pr[top] * 100) + " %)", tx, ty + (narrow ? 4 : 0), { size: 14, weight: 700, color: ok ? C.olivaInk : C.terracotaInk });
     D.text(ctx, "giro " + cur.t.rot.toFixed(0) + "°, desplaz. (" + cur.t.dx.toFixed(1).replace(".", ",") + "; " + cur.t.dy.toFixed(1).replace(".", ",") + "), zoom ×" + cur.t.zoom.toFixed(2).replace(".", ",") + (cur.t.flip ? ", volteado" : ""), tx, ty + 18, { size: 10.5, color: C.muted });
     var th = (narrow ? y0 + big + 56 : y0 + big + 30), cell = Math.min(60, (w - 24 - 7 * 8) / 8), k;
-    D.text(ctx, "otras 8 versiones al azar con los mismos límites:", x0, th - 6, { size: 11, weight: 600, color: C.ink2 });
+    D.text(ctx, "otros 8 carteles al azar con los mismos límites:", x0, th - 6, { size: 11, weight: 600, color: C.ink2 });
     for (k = 0; k < 8; k++) {
       var cx = x0 + k * (cell + 8), cy = th + 2;
       img(ctx, thumbs[k].img, cx, cy, cell, C);
@@ -81,7 +81,7 @@ Lab.register("curso3/c3m7-augmentation", function (root, api) {
   function update() {
     recompute();
     var pct = Math.round(stats.keep * 100);
-    out.set("<b>Dígito " + S.digit + "</b> — en 300 sorteos con estos límites, el clasificador sigue viendo un " + S.digit + " en el <b><span class='" + (pct >= 90 ? "good" : "bad") + "'>" + pct + " %</span></b> de los casos" +
+    out.set("<b>Cifra " + S.digit + "</b> — en 300 sorteos con estos límites, el clasificador sigue viendo un " + S.digit + " en el <b><span class='" + (pct >= 90 ? "good" : "bad") + "'>" + pct + " %</span></b> de los casos" +
       (stats.orig !== S.digit ? " <span class='bad'>(¡ni siquiera el original lo acierta!)</span>" : "") +
       (pct < 90 ? "<br>Por debajo del 90 %: esas transformaciones <b>cambian la etiqueta</b> con demasiada frecuencia; entrenarías a la red con ejemplos mal etiquetados." : "<br>Aumento seguro: la etiqueta se conserva y la red verá más variedad sin que se la engañes."));
     view.redraw();

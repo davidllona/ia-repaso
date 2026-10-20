@@ -6,7 +6,7 @@ Lab.register("curso3/c3m1-grafo", function (root, api) {
   var view = api.view(root, { aspect: 2.1, minH: 240, maxH: 330, label: "Grafo de capas de un modelo funcional con atajo y rama opcional" });
   var lst = api.readout(root);
   var ui = api.controls(root), out = api.readout(root);
-  var sNin = ui.slider({ label: "Entradas (features)", min: 2, max: 32, step: 1, value: st.nin, onInput: function (v) { st.nin = v; update(); } });
+  var sNin = ui.slider({ label: "Entradas (datos del usuario)", min: 2, max: 32, step: 1, value: st.nin, onInput: function (v) { st.nin = v; update(); } });
   var sA = ui.slider({ label: "Neuronas de densa_a", min: 2, max: 64, step: 1, value: st.a, onInput: function (v) { st.a = v; update(); } });
   var sB = ui.slider({ label: "Neuronas de densa_b", min: 2, max: 64, step: 1, value: st.b, onInput: function (v) { st.b = v; update(); } });
   var sR = ui.slider({ label: "Neuronas de la rama paralela", min: 2, max: 32, step: 1, value: st.r, onInput: function (v) { st.r = v; update(); } });

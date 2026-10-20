@@ -36,7 +36,7 @@ Lab.register("curso1/c1m5-roc-pr", function (root, api) {
     return { tp: tp, fp: fp, fn: fn, tn: tn };
   }
 
-  var strip = api.view(root, { aspect: 3.6, minH: 138, maxH: 170, drag: true, label: "Muestras positivas y negativas ordenadas por puntuación con una línea de umbral arrastrable" });
+  var strip = api.view(root, { aspect: 3.6, minH: 138, maxH: 170, drag: true, label: "Películas que te gustan y que no te gustan, ordenadas por puntuación, con una línea de umbral arrastrable" });
   var row = api.el("div", { class: "lab-row" }), c1 = api.el("div"), c2 = api.el("div");
   row.appendChild(c1); row.appendChild(c2); root.appendChild(row);
   var vR = api.view(c1, { aspect: 1.1, minH: 230, maxH: 380, label: "Curva ROC: tasa de falsos positivos frente a tasa de verdaderos positivos" });
@@ -46,8 +46,8 @@ Lab.register("curso1/c1m5-roc-pr", function (root, api) {
   var ui = api.controls(root), out = api.readout(root);
   var sThr = ui.slider({ label: "Umbral", min: 0, max: 1, step: 0.01, value: st.thr, fmt: function (v) { return v.toFixed(2); }, onInput: function (v) { st.thr = v; update(); } });
   var sD = ui.slider({ label: "Separación del modelo (modo aleatorio)", min: 0.2, max: 4, step: 0.1, value: st.d, fmt: function (v) { return v.toFixed(1); }, onInput: function (v) { st.d = v; if (st.mode === "rand") { build(); update(); } } });
-  var sPrev = ui.slider({ label: "Positivos (modo aleatorio)", min: 10, max: 50, step: 5, value: 30, fmt: function (v) { return v + " %"; }, onInput: function (v) { st.prev = v / 100; if (st.mode === "rand") { build(); update(); } } });
-  ui.segmented({ label: "Datos", options: [["text", "10 ejemplos del texto"], ["rand", "80 muestras al azar"]], value: st.mode, onChange: function (v) { st.mode = v; build(); update(); } });
+  var sPrev = ui.slider({ label: "Pelis que te gustan (modo aleatorio)", min: 10, max: 50, step: 5, value: 30, fmt: function (v) { return v + " %"; }, onInput: function (v) { st.prev = v / 100; if (st.mode === "rand") { build(); update(); } } });
+  ui.segmented({ label: "Datos", options: [["text", "10 ejemplos del texto"], ["rand", "80 películas al azar"]], value: st.mode, onChange: function (v) { st.mode = v; build(); update(); } });
   var running = false;
   var loop = api.loop(function () {
     st.thr -= 0.01; if (st.thr <= 0) { st.thr = 0; sThr.set(0, true); update(); running = false; return false; }
@@ -64,7 +64,7 @@ Lab.register("curso1/c1m5-roc-pr", function (root, api) {
   });
   ui.button("Umbral a 1", function () { loop.stop(); st.thr = 1; sThr.set(1, true); update(); });
   var C0 = api.colors();
-  api.legend(root, [[C0.terracota, "positivo real"], [C0.cobalto, "negativo real"]]);
+  api.legend(root, [[C0.terracota, "te gusta (real)"], [C0.cobalto, "no te gusta (real)"]]);
 
   var G = { L: 12, R: 12 };
   function X(s, w) { return G.L + s * (w - G.L - G.R); }
@@ -82,8 +82,8 @@ Lab.register("curso1/c1m5-roc-pr", function (root, api) {
     });
     D.line(ctx, tx, 3, tx, 8 + bh + 2, C.ink, 2.5);
     D.circle(ctx, tx, 4, 4, C.ink);
-    D.text(ctx, "positivos reales ↑", G.L + 5, 21, { size: 10, color: C.terracotaInk, weight: 600 });
-    D.text(ctx, "negativos reales ↓", G.L + 5, mid + 13, { size: 10, color: C.cobaltoInk, weight: 600 });
+    D.text(ctx, "te gustan ↑", G.L + 5, 21, { size: 10, color: C.terracotaInk, weight: 600 });
+    D.text(ctx, "no te gustan ↓", G.L + 5, mid + 13, { size: 10, color: C.cobaltoInk, weight: 600 });
     for (var t = 0; t <= 4; t++) D.text(ctx, String(t / 4).replace("0.", "."), X(t / 4, w), h - 21, { size: 10.5, align: "center", color: C.muted, mono: true });
     D.text(ctx, "puntuación del modelo", w / 2, h - 6, { size: 10.5, align: "center", color: C.ink2, weight: 500 });
   }

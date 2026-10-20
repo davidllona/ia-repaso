@@ -19,9 +19,9 @@
     var S = { i: 2, c: 1, H: 128, F: 16 };
     function fmt(n) { return String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, "."); }
 
-    var view = api.view(root, { aspect: 1.5, minH: 270, maxH: 360, label: "Parámetros y multiplicaciones de una red densa y de dos CNN, en escala logarítmica" });
+    var view = api.view(root, { aspect: 1.5, minH: 270, maxH: 360, label: "Parámetros y multiplicaciones de una red densa y de dos CNN sobre un póster, en escala logarítmica" });
     var ui = api.controls(root), out = api.readout(root);
-    ui.slider({ label: "Lado de la imagen n", min: 0, max: SIZES.length - 1, step: 1, value: S.i, fmt: function (v) { return SIZES[v] + "×" + SIZES[v]; }, onInput: function (v) { S.i = v; update(); } });
+    ui.slider({ label: "Lado del póster n", min: 0, max: SIZES.length - 1, step: 1, value: S.i, fmt: function (v) { return SIZES[v] + "×" + SIZES[v]; }, onInput: function (v) { S.i = v; update(); } });
     ui.segmented({ label: "Canales", value: S.c, options: [[1, "1 (gris)"], [3, "3 (color)"]], onChange: function (v) { S.c = v; update(); } });
     ui.segmented({ label: "Neuronas ocultas de la densa", value: S.H, options: [[32, "32"], [128, "128"], [512, "512"]], onChange: function (v) { S.H = v; update(); } });
     ui.segmented({ label: "Filtros de la 1.ª conv (F)", value: S.F, options: [[8, "8"], [16, "16"], [32, "32"]], onChange: function (v) { S.F = v; update(); } });
@@ -53,7 +53,7 @@
 
     function update() {
       var n = SIZES[S.i], M = models(n, S.c, S.H, S.F), d = M.dense, f = M.cnnFlat, g = M.cnnGap;
-      out.set("Imagen <b>" + n + "×" + n + "×" + S.c + "</b> = " + fmt(n * n * S.c) + " valores de entrada.<br>" +
+      out.set("Póster en miniatura <b>" + n + "×" + n + "×" + S.c + "</b> = " + fmt(n * n * S.c) + " valores de entrada.<br>" +
         "Densa: <b>" + fmt(d.params) + "</b> parámetros · CNN+Flatten: <b>" + fmt(f.params) + "</b> (" + (d.params / f.params).toFixed(1) + "× menos; su <code>Flatten</code> da " + fmt(f.flat) + " valores) · CNN+GAP: <b>" + fmt(g.params) + "</b> (" + (d.params / g.params).toFixed(0) + "× menos, <b>siempre los mismos</b> sea cual sea n).<br>" +
         "Multiplicaciones por imagen: densa <b>" + fmt(d.macs) + "</b> · CNN <b>" + fmt(f.macs) + "</b>" + (f.macs > d.macs ? " → <span class='bad'>la CNN calcula " + (f.macs / d.macs).toFixed(1) + "× más que la densa</span>" : " → la CNN calcula " + (d.macs / f.macs).toFixed(1) + "× menos") + ".");
       view.redraw();

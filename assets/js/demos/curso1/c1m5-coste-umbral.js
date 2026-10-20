@@ -23,15 +23,15 @@ Lab.register("curso1/c1m5-coste-umbral", function (root, api) {
     }
   }
 
-  var view = api.view(root, { aspect: 1.75, minH: 270, label: "Coste total en euros según el umbral, con la parte debida a falsas alarmas y la debida a positivos no detectados" });
+  var view = api.view(root, { aspect: 1.75, minH: 270, label: "Coste total en euros según el umbral, con la parte debida a descuentos innecesarios y la debida a bajas no detectadas" });
   var plot = api.plot(view, { xr: [0, 1], yr: [0, 1], xticks: 5, yticks: 4, xlabel: "umbral de decisión", ylabel: "coste (€)", pad: { l: 56, r: 12, t: 20, b: 38 },
     yfmt: function (v) { return v >= 1000 ? (v / 1000).toFixed(v % 1000 ? 1 : 0) + "k" : Math.round(v); } });
   var ui = api.controls(root), out = api.readout(root);
-  ui.slider({ label: "Coste de una falsa alarma (FP)", min: 1, max: 50, step: 1, value: st.cfp, fmt: function (v) { return v + " €"; }, onInput: function (v) { st.cfp = v; recompute(); update(); } });
-  ui.slider({ label: "Coste de un positivo no detectado (FN)", min: 1, max: 200, step: 1, value: st.cfn, fmt: function (v) { return v + " €"; }, onInput: function (v) { st.cfn = v; recompute(); update(); } });
+  ui.slider({ label: "Coste de un descuento a quien no se iba (FP)", min: 1, max: 50, step: 1, value: st.cfp, fmt: function (v) { return v + " €"; }, onInput: function (v) { st.cfp = v; recompute(); update(); } });
+  ui.slider({ label: "Coste de una baja no detectada (FN)", min: 1, max: 200, step: 1, value: st.cfn, fmt: function (v) { return v + " €"; }, onInput: function (v) { st.cfn = v; recompute(); update(); } });
   var sT = ui.slider({ label: "Umbral que usas", min: 0.02, max: 0.98, step: 0.01, value: st.thr, fmt: function (v) { return v.toFixed(2); }, onInput: function (v) { st.thr = v; update(); } });
   var C0 = api.colors();
-  api.legend(root, [[C0.cobalto, "coste de falsas alarmas (FP)"], [C0.terracota, "coste de positivos no detectados (FN)"], [C0.ink, "coste total"]]);
+  api.legend(root, [[C0.cobalto, "coste de descuentos de más (FP)"], [C0.terracota, "coste de bajas no detectadas (FN)"], [C0.ink, "coste total"]]);
 
   function draw(ctx, w, h, C) {
     var ymax = Math.max.apply(null, curve.map(function (c) { return Math.max(c.total, c.cfp, c.cfn); }));

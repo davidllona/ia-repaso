@@ -7,7 +7,7 @@ Lab.register("curso2/c2m5-escenarios", function (root, api) {
   var HEAD = [["Dense 512", 12845568], ["Dense 512", 262656], ["Dense 1", 513]];
   var sc = 2, nTop = 3;
   var view = api.view(root, { aspect: 1.25, minH: 330, maxH: 430, label: "Capas de VGG16 y cabeza: congeladas o entrenables" });
-  api.legend(root, [[api.colors().muted, "congelada (no se actualiza)"], [api.colors().terracota, "entrenable"]]);
+  api.legend(root, [[api.colors().muted, "congelada (lo que el crítico ya sabe)"], [api.colors().terracota, "entrenable (lo que aprende de tu género)"]]);
   var ui = api.controls(root), out = api.readout(root), sl;
   ui.segmented({ label: "Escenario", options: [[1, "1 · Feature extraction"], [2, "2 · Transfer learning"], [3, "3 · Fine-tuning"]], value: sc, onChange: function (v) { sc = v; update(); } });
   sl = ui.slider({ label: "Fine-tuning: últimas capas Conv descongeladas", min: 0, max: 13, step: 1, value: nTop, fmt: function (v) { return v + (v === 3 ? " (bloque 5)" : ""); }, onInput: function (v) { nTop = v; if (sc !== 3) { sc = 3; segSet(); } update(); } });

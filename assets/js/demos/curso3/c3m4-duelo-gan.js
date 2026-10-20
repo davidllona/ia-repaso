@@ -20,7 +20,7 @@ Lab.register("curso3/c3m4-duelo-gan", function (root, api) {
     var view = api.view(root, { aspect: 1.65, minH: 250, maxH: 400, label: "Distribución real, distribución generada y curva del discriminador" });
     var view2 = api.view(root, { aspect: 5, minH: 90, maxH: 130, label: "Pérdidas del discriminador y del generador" });
     var ui = api.controls(root), out = api.readout(root);
-    ui.select({ label: "Distribución real", value: "uno", options: [["uno", "Una campana"], ["dos", "Dos campanas"], ["tres", "Tres campanas"]], onChange: function (v) { S.target = v; fresh(); } });
+    ui.select({ label: "Distribución real", value: "uno", options: [["uno", "Una campana (duración parecida)"], ["dos", "Dos campanas (cortos y largos)"], ["tres", "Tres campanas (cortos, normales, maratones)"]], onChange: function (v) { S.target = v; fresh(); } });
     var sD = ui.slider({ label: "Learning rate de D", min: 0.0001, max: 0.01, step: 0.0001, value: S.lrD, fmt: function (v) { return v.toFixed(4).replace(".", ","); }, onInput: function (v) { S.lrD = v; } });
     var sG = ui.slider({ label: "Learning rate de G", min: 0.0001, max: 0.01, step: 0.0001, value: S.lrG, fmt: function (v) { return v.toFixed(4).replace(".", ","); }, onInput: function (v) { S.lrG = v; } });
     var sK = ui.slider({ label: "Pasos de D por cada paso de G", min: 1, max: 6, step: 1, value: S.kD, fmt: function (v) { return v; }, onInput: function (v) { S.kD = v; } });
@@ -67,7 +67,7 @@ Lab.register("curso3/c3m4-duelo-gan", function (root, api) {
       if (!handle.loop) handle.loop = api.loop(function () { burst(10); if (S.step >= MAXS) { S.running = false; return false; } }, { fps: 24, onState: function (on) { S.running = on; } });
       S.running = true; handle.loop.start();
     }
-    var pl = api.plot(view, { xr: [-5, 5], yr: [0, 1.2], pad: { l: 34, r: 34, t: 10, b: 28 }, xticks: 5, yticks: 4, xlabel: "x", xfmt: function (v) { return Math.round(v); }, yfmt: function (v) { return v.toFixed(1).replace(".", ","); } });
+    var pl = api.plot(view, { xr: [-5, 5], yr: [0, 1.2], pad: { l: 34, r: 34, t: 10, b: 40 }, xticks: 5, yticks: 4, xlabel: "duración de la peli (escala inventada)", xfmt: function (v) { return Math.round(v); }, yfmt: function (v) { return v.toFixed(1).replace(".", ","); } });
     function curve(fn, C, col, wash, wd) {
       var pts = [], x; for (x = -5; x <= 5.001; x += 0.08) pts.push([pl.x(x), pl.y(Math.min(1.19, fn(x)))]);
       if (wash) { ctx_fill(pts, wash); } D.path(view.ctx, pts, col, wd);
@@ -86,9 +86,9 @@ Lab.register("curso3/c3m4-duelo-gan", function (root, api) {
       D.line(ctx, pl.x(-5), pl.y(0.6), pl.x(5), pl.y(0.6), C.muted, 1, [2, 4]);
       ctx.restore();
       var b = pl.box; D.text(ctx, "D = 1", b.x + b.w + 4, b.y + 4, { size: 10, color: C.olivaInk, mono: true }); D.text(ctx, "0,5", b.x + b.w + 4, pl.y(0.6) + 4, { size: 10, color: C.olivaInk, mono: true }); D.text(ctx, "0", b.x + b.w + 4, b.y + b.h, { size: 10, color: C.olivaInk, mono: true });
-      D.text(ctx, "— real", b.x + 6, b.y + 14, { size: 11, weight: 700, color: C.cobaltoInk });
-      D.text(ctx, "— generador", b.x + 6, b.y + 28, { size: 11, weight: 700, color: C.terracotaInk });
-      D.text(ctx, "- - D(x) (derecha)", b.x + 6, b.y + 42, { size: 11, weight: 700, color: C.olivaInk });
+      D.text(ctx, "— pelis reales", b.x + 6, b.y + 14, { size: 11, weight: 700, color: C.cobaltoInk });
+      D.text(ctx, "— pelis falsas (G)", b.x + 6, b.y + 28, { size: 11, weight: 700, color: C.terracotaInk });
+      D.text(ctx, "- - crítico D(x) (derecha)", b.x + 6, b.y + 42, { size: 11, weight: 700, color: C.olivaInk });
       D.text(ctx, "paso " + S.step, b.x + b.w - 6, b.y + 14, { size: 11, mono: true, weight: 700, color: C.ink, align: "right" });
     }
     var pl2 = api.plot(view2, { xr: [0, MAXS], yr: [0, 2.4], pad: { l: 34, r: 14, t: 8, b: 36 }, xticks: 4, yticks: 2, xlabel: "pasos", xfmt: function (v) { return Math.round(v); }, yfmt: function (v) { return v.toFixed(1).replace(".", ","); } });

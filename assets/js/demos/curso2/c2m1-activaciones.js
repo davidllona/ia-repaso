@@ -1,6 +1,9 @@
-/* Experimento: catálogo de funciones de activación con su derivada y la zona de saturación (gradiente ≈ 0). */
+/* Experimento: catálogo de funciones de activación con su derivada y la zona de saturación (gradiente ≈ 0).
+   Disfraz: z = las «ganas» sin procesar de ver una peli; f(z) = lo que sale de la neurona. */
 Lab.register("curso2/c2m1-activaciones", function (root, api) {
   var M = api.math, D = api.d;
+  // En pantallas táctiles el dedo puede desplazar la página en vertical; el arrastre horizontal (o el slider) mueve z.
+  var coarse = !!(window.matchMedia && window.matchMedia("(pointer: coarse)").matches);
   var S = { act: "sigmoid", z: 2.5 };
   var ACT = {
     sigmoid: { name: "Sigmoide", f: function (z) { return 1 / (1 + Math.exp(-z)); }, df: function (z) { var s = 1 / (1 + Math.exp(-z)); return s * (1 - s); },
@@ -19,8 +22,8 @@ Lab.register("curso2/c2m1-activaciones", function (root, api) {
   var row = api.el("div", { class: "lab-row" });
   var colA = api.el("div"), colB = api.el("div");
   row.appendChild(colA); row.appendChild(colB); root.appendChild(row);
-  var v1 = api.view(colA, { aspect: 1.15, minH: 230, maxH: 400, drag: true, label: "Función de activación f(z) con el punto z elegido" });
-  var v2 = api.view(colB, { aspect: 1.15, minH: 230, maxH: 400, drag: true, label: "Derivada f'(z) con la zona de saturación sombreada" });
+  var v1 = api.view(colA, { aspect: 1.15, minH: 230, maxH: 400, drag: !coarse, label: "Función de activación f(z) con el punto z elegido" });
+  var v2 = api.view(colB, { aspect: 1.15, minH: 230, maxH: 400, drag: !coarse, label: "Derivada f'(z) con la zona de saturación sombreada" });
   var po1 = { xr: [-8, 8], yr: [-0.25, 1.25], xticks: 8, yticks: 6, xlabel: "z", ylabel: "f(z)", pad: { l: 46, r: 12, t: 12, b: 36 }, xfmt: function (v) { return Math.round(v); } };
   var po2 = { xr: [-8, 8], yr: [-0.05, 0.3], xticks: 8, yticks: 7, xlabel: "z", ylabel: "f′(z)", pad: { l: 46, r: 12, t: 12, b: 36 }, xfmt: function (v) { return Math.round(v); } };
   var p1 = api.plot(v1, po1), p2 = api.plot(v2, po2);
@@ -28,8 +31,8 @@ Lab.register("curso2/c2m1-activaciones", function (root, api) {
   var ui = api.controls(root), out = api.readout(root);
   out.el.style.fontSize = "clamp(.72rem, 2.7vw, .84rem)";
   ui.select({ label: "Función de activación", value: S.act, options: Object.keys(ACT).map(function (k) { return [k, ACT[k].name]; }), onChange: function (v) { S.act = v; update(); } });
-  var sl = ui.slider({ label: "z (también puedes arrastrar en los gráficos)", min: -8, max: 8, step: 0.1, value: S.z, fmt: function (v) { return v.toFixed(1); }, onInput: function (v) { S.z = v; update(); } });
-  api.legend(root, [[api.colors().cobalto, "f(z): lo que sale de la neurona"], [api.colors().terracota, "f′(z): cuánto gradiente la atraviesa"], [api.colors().marker, "zona saturada: f′ < 0,02"]]);
+  var sl = ui.slider({ label: "z = ganas sin procesar de ver la peli (también puedes arrastrar en los gráficos)", min: -8, max: 8, step: 0.1, value: S.z, fmt: function (v) { return v.toFixed(1); }, onInput: function (v) { S.z = v; update(); } });
+  api.legend(root, [[api.colors().cobalto, "f(z): lo que sale de la neurona (sus «ganas»)"], [api.colors().terracota, "f′(z): cuánto gradiente la atraviesa"], [api.colors().marker, "zona saturada: f′ < 0,02"]]);
 
   function satBands(ctx, p, C) {
     var A = ACT[S.act], b = p.box, x, run = null, i, N = Math.max(60, Math.floor(b.w / 3));
@@ -84,7 +87,7 @@ Lab.register("curso2/c2m1-activaciones", function (root, api) {
       "z = <b>" + S.z.toFixed(1) + "</b> → f(z) = <b>" + f.toFixed(4) + "</b> · f′(z) = <b>" + sci(d) + "</b><br>" +
       (sat ? "<span class='bad'>Zona SATURADA: el gradiente se multiplica por " + sci(d) + " y casi no llega a las capas anteriores.</span>"
            : "<span class='good'>Zona activa: el gradiente pasa multiplicado por " + sci(d) + ".</span>") +
-      "<br>Si 5 capas seguidas estuvieran en este z: " + sci(d) + "<sup>5</sup> = <b>" + (n5 === 0 ? "0" : n5.toExponential(1)) + "</b>"
+      "<br>Si 5 neuronas seguidas (cinco críticos que se pasan el recado) estuvieran en este z: " + sci(d) + "<sup>5</sup> = <b>" + (n5 === 0 ? "0" : n5.toExponential(1)) + "</b>"
     );
     v1.redraw(); v2.redraw();
   }

@@ -1,21 +1,21 @@
 /* Experimento: MaxPooling2D seguido de UpSampling2D: el tamaño vuelve, los detalles no. */
 Lab.register("curso2/c2m5-pool-upsample", function (root, api) {
   var N = 6, M = N / 2, PRE = {
-    alineado: ["Rectángulo alineado con los bloques 2×2", [[0,0,0,0,0,0],[0,0,0,0,0,0],[0,0,9,9,9,9],[0,0,9,9,9,9],[0,0,9,9,9,9],[0,0,9,9,9,9]]],
-    movido: ["Mismo rectángulo, corrido 1 píxel", [[0,0,0,0,0,0],[0,0,0,0,0,0],[0,0,0,9,9,9],[0,0,9,9,9,9],[0,0,9,9,9,9],[0,0,9,9,9,9]]],
-    ruido: ["Textura fina (ruido)", [[9,0,9,0,9,0],[0,9,0,9,0,9],[9,0,9,0,9,0],[0,9,0,9,0,9],[9,0,9,0,9,0],[0,9,0,9,0,9]]],
-    linea: ["Línea fina de 1 píxel", [[0,0,0,0,0,0],[0,0,0,0,0,0],[0,0,0,0,0,0],[9,9,9,9,9,9],[0,0,0,0,0,0],[0,0,0,0,0,0]]]
+    alineado: ["Recuadro alineado a bloques 2×2", [[0,0,0,0,0,0],[0,0,0,0,0,0],[0,0,9,9,9,9],[0,0,9,9,9,9],[0,0,9,9,9,9],[0,0,9,9,9,9]]],
+    movido: ["Mismo recuadro, corrido 1 píxel", [[0,0,0,0,0,0],[0,0,0,0,0,0],[0,0,0,9,9,9],[0,0,9,9,9,9],[0,0,9,9,9,9],[0,0,9,9,9,9]]],
+    ruido: ["Grano de película (textura fina)", [[9,0,9,0,9,0],[0,9,0,9,0,9],[9,0,9,0,9,0],[0,9,0,9,0,9],[9,0,9,0,9,0],[0,9,0,9,0,9]]],
+    linea: ["Subtítulo: línea fina de 1 píxel", [[0,0,0,0,0,0],[0,0,0,0,0,0],[0,0,0,0,0,0],[9,9,9,9,9,9],[0,0,0,0,0,0],[0,0,0,0,0,0]]]
   };
   var img, mode = "max", wrap = api.el("div", { style: { display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(min(100%,150px),1fr))", gap: "10px", alignItems: "start" } });
   root.appendChild(wrap);
   function cell() { var c = api.el("div", { style: { minWidth: "0" } }); wrap.appendChild(c); return c; }
-  var vA = api.view(cell(), { aspect: 1, minH: 140, maxH: 300, label: "Imagen original 6×6" });
+  var vA = api.view(cell(), { aspect: 1, minH: 140, maxH: 300, label: "Carátula original 6×6" });
   var vB = api.view(cell(), { aspect: 1, minH: 140, maxH: 300, label: "Tras el pooling 3×3" });
   var vC = api.view(cell(), { aspect: 1, minH: 140, maxH: 300, label: "Tras UpSampling2D 6×6" });
   var ui = api.controls(root), out = api.readout(root);
   function load(k) { img = PRE[k][1].map(function (r) { return r.slice(); }); }
   load("alineado");
-  ui.select({ label: "Imagen", options: Object.keys(PRE).map(function (k) { return [k, PRE[k][0]]; }), value: "alineado", onChange: function (v) { load(v); update(); } });
+  ui.select({ label: "Carátula de prueba", options: Object.keys(PRE).map(function (k) { return [k, PRE[k][0]]; }), value: "alineado", onChange: function (v) { load(v); update(); } });
   ui.segmented({ label: "Pooling", options: [["max", "máximo"], ["avg", "media"]], value: mode, onChange: function (v) { mode = v; update(); } });
   function pooled() {
     var o = [], i, j;
@@ -42,7 +42,7 @@ Lab.register("curso2/c2m5-pool-upsample", function (root, api) {
     if (i >= 0 && i < N && j >= 0 && j < N) { img[i][j] = img[i][j] >= 9 ? 0 : (img[i][j] === 0 ? 9 : 0); update(); }
   } });
   vA.canvas.classList.remove("no-cursor"); vA.canvas.style.cursor = "pointer";
-  grid(vA, "Original 6×6 (toca para cambiar)", function (i, j) { return img[i][j]; }, N);
+  grid(vA, "Carátula 6×6 (toca para cambiar)", function (i, j) { return img[i][j]; }, N);
   grid(vB, "Tras el pooling 3×3", function (i, j) { return P[i][j]; }, M);
   grid(vC, "Tras UpSampling2D 6×6", function (i, j) { return U[i][j]; }, N, function (i, j) { return img[i][j]; });
   function update() {

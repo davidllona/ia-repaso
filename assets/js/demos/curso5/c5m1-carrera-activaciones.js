@@ -116,10 +116,11 @@ Lab.register("curso5/c5m1-carrera-activaciones", function (root, api) {
   }
   var viewL = api.view(root, { aspect: 2.1, minH: 190, maxH: 320, label: "Pérdida de entrenamiento de las cuatro activaciones" });
   var plotL = api.plot(viewL, { xr: [0, 100], yr: [0, 1], xticks: 5, yticks: 4, xlabel: "pasos de entrenamiento", ylabel: "pérdida", pad: { l: 46, r: 24, t: 12, b: 38 }, xfmt: function (v) { return Math.round(v); } });
-  var viewM = api.view(root, { aspect: 4.2, minH: 80, maxH: 150, label: "Frontera de decisión de cada activación" });
+  var viewM = api.view(root, { aspect: 4.2, minH: 80, maxH: 150, label: "Mapa de gustos de los usuarios con la frontera de decisión de cada activación" });
   var ui = api.controls(root), tb = api.table(root, ["activación", "pérdida", "% train", "% test", "muertas"]), out = api.readout(root);
   var C0 = api.colors();
   api.legend(root, [[C0.cobalto, "sigmoide"], [C0.terracota, "tanh"], [C0.oliva, "ReLU"], [C0.ink2, "LeakyReLU (0.01)"]]);
+  api.legend(root, [[C0.cobalto, "usuario que termina la serie (fondo azul)"], [C0.terracota, "usuario que la abandona (fondo rojo)"]]);
   ui.select({ label: "Datos", value: S.data, options: Object.keys(DATASETS).map(function (k) { return [k, DATASETS[k]]; }), onChange: function (v) { S.data = v; genData(); build(); } });
   ui.slider({ label: "H: neuronas ocultas", min: 2, max: 16, step: 1, value: S.H, fmt: function (v) { return v; }, onInput: function (v) { S.H = v; build(); } });
   ui.select({ label: "Optimizador", value: S.opt, options: [["sgd", "SGD (descenso simple)"], ["adam", "Adam"]], onChange: function (v) { S.opt = v; build(); } });

@@ -8,9 +8,9 @@ Lab.register("curso1/c1m2-limite-decision", function (root, api) {
   var th = [-1, 0.05, 0.05], thr = 0.5, cust = { d: 30, h: 10 };
   function rgba(hex, a) { var s = hex.replace("#", ""); if (s.length === 3) s = s.split("").map(function (c) { return c + c; }).join(""); var n = parseInt(s, 16); return "rgba(" + (n >> 16 & 255) + "," + (n >> 8 & 255) + "," + (n & 255) + "," + a + ")"; }
 
-  var view = api.view(root, { aspect: 1.35, minH: 300, drag: true, label: "Clientes según días sin entrar y horas de uso, con el mapa de probabilidad y la recta que separa las dos decisiones" });
-  var plot = api.plot(view, { xr: [0, 45], yr: [0, 40], xticks: 5, yticks: 4, xlabel: "Días sin entrar", ylabel: "Horas de uso al mes", pad: { l: 48, r: 12, t: 12, b: 40 } });
-  api.legend(root, [[api.colors().cobalto, "se quedó"], [api.colors().terracota, "canceló"], [api.colors().marker, "cliente nuevo (haz clic para moverlo)"]]);
+  var view = api.view(root, { aspect: 1.35, minH: 300, drag: true, label: "Suscriptores según días sin abrir la aplicación y horas de uso, con el mapa de probabilidad y la recta que separa las dos decisiones" });
+  var plot = api.plot(view, { xr: [0, 45], yr: [0, 40], xticks: 5, yticks: 4, xlabel: "Días sin abrir la aplicación", ylabel: "Horas de uso al mes", pad: { l: 48, r: 12, t: 12, b: 40 } });
+  api.legend(root, [[api.colors().cobalto, "se quedó"], [api.colors().terracota, "canceló"], [api.colors().marker, "usuario nuevo (haz clic para moverlo)"]]);
   var ui = api.controls(root), out = api.readout(root);
   var sl = [
     ui.slider({ label: "θ₀ (intercepto)", min: -10, max: 4, step: 0.05, value: th[0], fmt: function (v) { return v.toFixed(2); }, onInput: function (v) { th[0] = v; update(); } }),
@@ -59,7 +59,7 @@ Lab.register("curso1/c1m2-limite-decision", function (root, api) {
     var lg = Math.log(thr / (1 - thr)), ok = 0, ll = 0;
     pts.forEach(function (p) { var q = M.clamp(M.sigmoid(z(p.d, p.h)), 1e-9, 1 - 1e-9); if ((q >= thr ? 1 : 0) === p.y) ok++; ll -= p.y ? Math.log(q) : Math.log(1 - q); });
     var zc = z(cust.d, cust.h), pc = M.sigmoid(zc);
-    out.set("Cliente nuevo: <b>" + cust.d.toFixed(0) + " días</b>, <b>" + cust.h.toFixed(0) + " h/mes</b> → z = <b>" + zc.toFixed(2) + "</b> → p̂(cancela) = <b>" + pc.toFixed(3) + "</b> → <b>" + (pc >= thr ? "cancela" : "se queda") + "</b><br>" +
+    out.set("Usuario nuevo: <b>" + cust.d.toFixed(0) + " días</b>, <b>" + cust.h.toFixed(0) + " h/mes</b> → z = <b>" + zc.toFixed(2) + "</b> → p̂(cancela) = <b>" + pc.toFixed(3) + "</b> → <b>" + (pc >= thr ? "cancela" : "se queda") + "</b><br>" +
       "Frontera: " + th[0].toFixed(2) + " + " + th[1].toFixed(2) + "·días + " + th[2].toFixed(2) + "·horas = <b>" + lg.toFixed(2) + "</b> (es una recta)<br>" +
       "Aciertos: <b>" + ok + " / " + N + "</b> (" + (100 * ok / N).toFixed(0) + " %) · log-loss = <b>" + (ll / N).toFixed(3) + "</b> · los círculos con aro son fallos");
   }

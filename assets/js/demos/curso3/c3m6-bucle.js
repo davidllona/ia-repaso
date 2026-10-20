@@ -1,4 +1,4 @@
-/* Experimento: el bucle agente-entorno a mano. Tú eres el agente: eliges una acción, el entorno (un mundo de cuadrículas)
+/* Experimento: el bucle agente-entorno a mano. Tú eres el agente (el cursor del mando sobre la pantalla de inicio de StreamFlix, una cuadrícula de carátulas): eliges una acción, el entorno
    devuelve un nuevo estado y una recompensa, y el retorno (suma de recompensas) se va acumulando. */
 Lab.register("curso3/c3m6-bucle", function (root, api) {
   var D = api.d, M = api.math;
@@ -8,7 +8,7 @@ Lab.register("curso3/c3m6-bucle", function (root, api) {
   var rnd = api.rng(7);
   var S = { pos: START.slice(), t: 0, G: 0, Gd: 0, path: [START.slice()], done: false, last: null, hist: [], slip: false, ep: 1 };
 
-  var view = api.view(root, { aspect: 1.5, minH: 230, maxH: 360, label: "Mundo de cuadrículas 4 por 3: el agente parte de abajo a la izquierda, la meta da +10 y el hoyo −10" });
+  var view = api.view(root, { aspect: 1.5, minH: 230, maxH: 360, label: "Pantalla de inicio de StreamFlix en cuadrícula de 4 por 3: el cursor parte de abajo a la izquierda, tu película da +10 y el botón Salir −10" });
   var ui = api.controls(root);
   var out = api.readout(root);
   var tbl = api.table(root, ["t", "s", "a", "r", "s′"]);
@@ -29,7 +29,7 @@ Lab.register("curso3/c3m6-bucle", function (root, api) {
     S.Gd += Math.pow(GAMMA, S.t) * r; S.G += r; S.t++;
     S.pos = to; S.path.push(to.slice());
     S.last = { from: from, a: a, real: real, r: r, to: to };
-    S.hist.push([S.t, "(" + from[0] + "," + from[1] + ")", ARROW[a] + (real !== a ? " <span class='bad'>(patinó: " + ARROW[real] + ")</span>" : ""), (r > 0 ? "+" : "") + r, "(" + to[0] + "," + to[1] + ")" + (S.done ? " <b>fin</b>" : "")]);
+    S.hist.push([S.t, "(" + from[0] + "," + from[1] + ")", ARROW[a] + (real !== a ? " <span class='bad'>(falló: " + ARROW[real] + ")</span>" : ""), (r > 0 ? "+" : "") + r, "(" + to[0] + "," + to[1] + ")" + (S.done ? " <b>fin</b>" : "")]);
     update();
   }
   function reset() {
@@ -38,7 +38,7 @@ Lab.register("curso3/c3m6-bucle", function (root, api) {
   }
   ["↑ arriba", "→ derecha", "↓ abajo", "← izquierda"].forEach(function (t, i) { ui.button(t, function () { act(i); }, "primary"); });
   ui.button("Nuevo episodio", reset, "warm");
-  ui.toggle({ label: "Suelo resbaladizo (20 % de patinar)", value: false, onChange: function (v) { S.slip = v; reset(); } });
+  ui.toggle({ label: "Mando con fallos (20 % de pulsar otra dirección)", value: false, onChange: function (v) { S.slip = v; reset(); } });
 
   function geom(w, h) {
     var m = 8, cw = (w - 2 * m) / COLS, ch = (h - 2 * m - 16) / ROWS;
@@ -48,9 +48,9 @@ Lab.register("curso3/c3m6-bucle", function (root, api) {
     var g = geom(w, h), r, c;
     for (r = 0; r < ROWS; r++) for (c = 0; c < COLS; c++) {
       var x = g.m + c * g.cw, y = g.m + r * g.ch, fill = C.surface, lab = null, col = C.ink2;
-      if (isWall(r, c)) { fill = C.line; lab = "muro"; col = C.muted; }
-      else if (r === GOAL[0] && c === GOAL[1]) { fill = C.olivaWash; lab = "META +10"; col = C.olivaInk; }
-      else if (r === PIT[0] && c === PIT[1]) { fill = C.terracotaWash; lab = "HOYO −10"; col = C.terracotaInk; }
+      if (isWall(r, c)) { fill = C.line; lab = "anuncio"; col = C.muted; }
+      else if (r === GOAL[0] && c === GOAL[1]) { fill = C.olivaWash; lab = "TU PELI +10"; col = C.olivaInk; }
+      else if (r === PIT[0] && c === PIT[1]) { fill = C.terracotaWash; lab = "SALIR −10"; col = C.terracotaInk; }
       else if (r === START[0] && c === START[1]) { lab = "inicio"; col = C.muted; }
       D.rect(ctx, x + 1, y + 1, g.cw - 2, g.ch - 2, fill, C.ink, 1.2);
       if (lab) D.text(ctx, lab, x + g.cw / 2, y + 15, { align: "center", size: Math.min(12, g.cw / 7), weight: 600, color: col });
@@ -62,17 +62,17 @@ Lab.register("curso3/c3m6-bucle", function (root, api) {
     pts.forEach(function (p, i) { if (i < pts.length - 1) D.circle(ctx, p[0], p[1], 3, C.cobalto); });
     var ap = pts[pts.length - 1], rad = Math.min(g.cw, g.ch) * 0.2;
     D.circle(ctx, ap[0], ap[1], rad, C.terracota, C.ink, 2);
-    D.text(ctx, "círculo naranja = agente · cada paso cuesta −1 · casilla (fila,columna)", w / 2, h - 5, { align: "center", size: 10.5, color: C.muted });
+    D.text(ctx, "naranja = cursor · cada pulsación −1 · casilla (fila,col)", w / 2, h - 5, { align: "center", size: 10.5, color: C.muted });
   }
   function update() {
     var s = "";
-    if (S.t === 0) s = "Episodio <b>" + S.ep + "</b>: el agente está en el estado <b>(2,0)</b>. Elige una acción con los botones.";
+    if (S.t === 0) s = "Episodio <b>" + S.ep + "</b>: el agente (el cursor) está en el estado <b>(2,0)</b>. Elige una acción con los botones.";
     else {
       var L = S.last;
-      s = "Episodio <b>" + S.ep + "</b> · paso <b>" + S.t + "</b>: en (" + L.from + ") hizo <b>" + NAME[L.a] + "</b>" + (L.real !== L.a ? " (patinó y fue " + NAME[L.real] + ")" : "") + " → recibió <b>r = " + L.r + "</b> y pasó a (" + L.to + ").";
+      s = "Episodio <b>" + S.ep + "</b> · paso <b>" + S.t + "</b>: en (" + L.from + ") hizo <b>" + NAME[L.a] + "</b>" + (L.real !== L.a ? " (el botón falló y fue " + NAME[L.real] + ")" : "") + " → recibió <b>r = " + L.r + "</b> y pasó a (" + L.to + ").";
     }
     s += "<br>Retorno sin descontar G = <b>" + S.G + "</b> · retorno descontado (γ = 0,9) = <b>" + S.Gd.toFixed(2).replace(".", ",") + "</b>";
-    if (S.done) s += "<br><span class='" + (S.G > 0 ? "good" : "bad") + "'>Episodio terminado: " + (S.pos[0] === GOAL[0] && S.pos[1] === GOAL[1] ? "llegaste a la meta." : "caíste en el hoyo.") + "</span> Pulsa «Nuevo episodio».";
+    if (S.done) s += "<br><span class='" + (S.G > 0 ? "good" : "bad") + "'>Episodio terminado: " + (S.pos[0] === GOAL[0] && S.pos[1] === GOAL[1] ? "llegaste a tu película." : "pulsaste «Salir».") + "</span> Pulsa «Nuevo episodio».";
     out.set(s);
     tbl.set(S.hist.slice(-6));
     view.redraw();

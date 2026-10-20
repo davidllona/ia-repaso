@@ -43,11 +43,11 @@ Lab.register("curso1/c1m3-multiclase", function (root, api) {
   }
   function acc() { var ok = 0; pts.forEach(function (p) { if (predict(p[0], p[1]).cls === p[2]) ok++; }); return ok / pts.length; }
 
-  var view = api.view(root, { aspect: 1.6, minH: 270, drag: true, label: "Tres clases en el plano, las fronteras de los clasificadores binarios y la región de cada clase" });
-  var plot = api.plot(view, { xr: XR, yr: YR, xticks: 5, yticks: 5, grid: false, pad: { l: 30, r: 10, t: 10, b: 24 }, xfmt: function (v) { return v; }, yfmt: function (v) { return v; } });
+  var view = api.view(root, { aspect: 1.6, minH: 270, drag: true, label: "Películas de terror, comedia y romance según su tono y su ritmo, las fronteras de los clasificadores binarios y la región de cada género" });
+  var plot = api.plot(view, { xr: XR, yr: YR, xticks: 5, yticks: 5, grid: false, xlabel: "tono: oscuro → alegre", ylabel: "ritmo →", pad: { l: 26, r: 10, t: 10, b: 36 }, xfmt: function () { return ""; }, yfmt: function () { return ""; } });
   var ui = api.controls(root), out = api.readout(root);
   ui.segmented({ label: "Estrategia", options: [["ovr", "One-vs-Rest (3 modelos)"], ["ovo", "One-vs-One (3 modelos)"]], value: mode, onChange: function (v) { mode = v; update(); } });
-  api.legend(root, [[api.colors().cobalto, "clase A"], [api.colors().terracota, "clase B"], [api.colors().oliva, "clase C"]]);
+  api.legend(root, [[api.colors().cobalto, "A = terror"], [api.colors().terracota, "B = comedia"], [api.colors().oliva, "C = romance"]]);
 
   function line(ctx, m, C, color, label) {
     var b = plot.box, X0 = 5, S = 3, pts2 = [], t;
@@ -82,7 +82,7 @@ Lab.register("curso1/c1m3-multiclase", function (root, api) {
   function update() {
     view.redraw();
     var pr = predict(q.x, q.y), txt;
-    if (mode === "ovr") txt = "<b>One-vs-Rest</b>: un modelo por clase («esa clase» contra «todas las demás»). Probabilidades en el punto marcado: A = <b>" + pr.ps[0].toFixed(2) + "</b> · B = <b>" + pr.ps[1].toFixed(2) + "</b> · C = <b>" + pr.ps[2].toFixed(2) + "</b> → gana la mayor: <b>" + NAMES[pr.cls] + "</b>.";
+    if (mode === "ovr") txt = "<b>One-vs-Rest</b>: un modelo por clase («ese género» contra «todos los demás»). Probabilidades en el punto marcado: A = <b>" + pr.ps[0].toFixed(2) + "</b> · B = <b>" + pr.ps[1].toFixed(2) + "</b> · C = <b>" + pr.ps[2].toFixed(2) + "</b> → gana la mayor: <b>" + NAMES[pr.cls] + "</b>.";
     else txt = "<b>One-vs-One</b>: un modelo por pareja de clases. Votos en el punto marcado: " + pr.det.map(function (d) { return NAMES[d[0]] + " vs " + NAMES[d[1]] + " → <b>" + NAMES[d[2]] + "</b>"; }).join(" · ") + " → recuento A = <b>" + pr.votes[0] + "</b>, B = <b>" + pr.votes[1] + "</b>, C = <b>" + pr.votes[2] + "</b> → gana <b>" + NAMES[pr.cls] + "</b>.";
     var cnt = [0, 0, 0]; pts.forEach(function (p) { if (predict(p[0], p[1]).cls === p[2]) cnt[p[2]]++; });
     txt += "<br>Acierto en train: <b>" + (acc() * 100).toFixed(1) + " %</b> (A " + cnt[0] + "/20 · B " + cnt[1] + "/20 · C " + cnt[2] + "/20)";

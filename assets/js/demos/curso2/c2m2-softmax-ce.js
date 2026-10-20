@@ -1,17 +1,17 @@
 /* Experimento: softmax y entropía cruzada categórica con logits editables. */
 Lab.register("curso2/c2m2-softmax-ce", function (root, api) {
   var M = api.math;
-  var NAMES = ["gato", "perro", "conejo", "pájaro", "pez"];
+  var NAMES = ["acción", "comedia", "terror", "romance", "animación"];
   var st = { k: 3, z: [2.0, 1.0, 0.1, -1.0, 0.5], y: 0 };
   var sl = [];
 
-  var view = api.view(root, { aspect: 2.3, minH: 200, maxH: 280, label: "Probabilidades que da softmax para cada clase, junto a la etiqueta One-Hot" });
-  var tbl = api.table(root, ["clase", "z", "e^z", "p", "y", "y·ln p"]);
+  var view = api.view(root, { aspect: 2.3, minH: 200, maxH: 280, label: "Probabilidades que da softmax para cada género de película, junto a la etiqueta One-Hot" });
+  var tbl = api.table(root, ["género", "z", "e^z", "p", "y", "y·ln p"]);
   var view2 = api.view(root, { aspect: 3.2, minH: 140, maxH: 200, label: "Curva de la pérdida −ln(p): cuanto menos probabilidad a la clase correcta, más pérdida" });
   var plot2 = api.plot(view2, { xr: [0, 1], yr: [0, 5], xticks: 5, yticks: 5, xlabel: "p = probabilidad que la red da a la clase CORRECTA", ylabel: "−ln(p)", pad: { l: 44, r: 12, t: 10, b: 34 } });
   var ui = api.controls(root), out = api.readout(root);
-  var slK = ui.slider({ label: "Número de clases", min: 2, max: 5, step: 1, value: st.k, onInput: function (v) { st.k = v; if (st.y >= v) { st.y = 0; segSet(); } update(); } });
-  var seg = ui.segmented({ label: "Clase verdadera (la etiqueta)", value: 0, options: [[0, "0 gato"], [1, "1 perro"], [2, "2 conejo"], [3, "3 pájaro"], [4, "4 pez"]], onChange: function (v) { st.y = Math.min(v, st.k - 1); update(); } });
+  var slK = ui.slider({ label: "Número de géneros (clases)", min: 2, max: 5, step: 1, value: st.k, onInput: function (v) { st.k = v; if (st.y >= v) { st.y = 0; segSet(); } update(); } });
+  var seg = ui.segmented({ label: "Género verdadero de la película (la etiqueta)", value: 0, options: [[0, "0 acción"], [1, "1 comedia"], [2, "2 terror"], [3, "3 romance"], [4, "4 animación"]], onChange: function (v) { st.y = Math.min(v, st.k - 1); update(); } });
   for (var i = 0; i < 5; i++) (function (i) {
     sl[i] = ui.slider({ label: "logit z" + i + " (" + NAMES[i] + ")", min: -4, max: 6, step: 0.1, value: st.z[i], fmt: function (v) { return v.toFixed(1); }, onInput: function (v) { st.z[i] = v; update(); } });
   })(i);
@@ -26,7 +26,7 @@ Lab.register("curso2/c2m2-softmax-ce", function (root, api) {
     D.text(ctx, "probabilidad (softmax)", left, 9, { size: 10.5, color: C.muted });
     for (i = 0; i < k; i++) {
       var y0 = top + i * rowH + rowH * 0.16, bh = rowH * 0.68, isT = i === st.y;
-      D.text(ctx, "clase " + i, 10, y0 + bh / 2 + 4, { size: 11.5, weight: isT ? 700 : 500, color: isT ? C.terracotaInk : C.ink });
+      D.text(ctx, NAMES[i], 10, y0 + bh / 2 + 4, { size: 11.5, weight: isT ? 700 : 500, color: isT ? C.terracotaInk : C.ink });
       D.rect(ctx, left, y0, right - left - 4, bh, C.surface, C.line, 1);
       D.rect(ctx, left, y0, (right - left - 4) * p[i], bh, isT ? C.terracota : C.cobalto, null);
       var lab = p[i].toFixed(3);

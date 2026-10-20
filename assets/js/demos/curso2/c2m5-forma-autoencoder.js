@@ -21,9 +21,9 @@ Lab.register("curso2/c2m5-forma-autoencoder", function (root, api) {
     conv("Conv 1 (sigmoid)", 1);
     return { rows: rows, total: tot, n: n, bi: bi, bn: bn, bc: bc, sizes: sizes };
   }
-  view = api.view(root, { aspect: 3.2, minH: 110, maxH: 150, label: "Embudo del autoencoder: tamaño de cada capa" });
+  view = api.view(root, { aspect: 3.2, minH: 110, maxH: 150, label: "Embudo del autoencoder (del póster al código y vuelta): tamaño de cada capa" });
   ui = api.controls(root);
-  ui.select({ label: "Tamaño de la imagen de entrada", options: [[28, "28×28 (como en las notas)"], [32, "32×32"], [25, "25×25 (impar)"]], value: n0, onChange: function (v) { n0 = +v; update(); } });
+  ui.select({ label: "Tamaño del póster de entrada", options: [[28, "28×28 (como en las notas)"], [32, "32×32"], [25, "25×25 (impar)"]], value: n0, onChange: function (v) { n0 = +v; update(); } });
   ui.segmented({ label: "padding de convoluciones y pooling", options: [["same", "same"], ["valid", "valid"]], value: pad, onChange: function (v) { pad = v; update(); } });
   ui.select({ label: "Filtros de la capa exterior", options: [[8, "8"], [16, "16 (notas)"], [32, "32"]], value: f1, onChange: function (v) { f1 = +v; update(); } });
   ui.select({ label: "Filtros de la capa interior", options: [[4, "4"], [8, "8 (notas)"], [16, "16"]], value: f2, onChange: function (v) { f2 = +v; update(); } });

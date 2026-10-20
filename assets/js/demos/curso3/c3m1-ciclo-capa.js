@@ -6,8 +6,8 @@ Lab.register("curso3/c3m1-ciclo-capa", function (root, api) {
   var view = api.view(root, { aspect: 2.4, minH: 200, maxH: 280, label: "Tensor de entrada, pesos de la capa y tensor de salida, con sus formas" });
   var ui = api.controls(root), out = api.readout(root);
   ui.slider({ label: "unidades (argumento de __init__)", min: 1, max: 6, step: 1, value: S.u, onInput: function (v) { S.u = v; update(); } });
-  ui.slider({ label: "features de la 1.ª llamada", min: 1, max: 6, step: 1, value: S.n1, onInput: function (v) { S.n1 = v; update(); } });
-  ui.slider({ label: "features de la 2.ª llamada", min: 1, max: 6, step: 1, value: S.n2, onInput: function (v) { S.n2 = v; update(); } });
+  ui.slider({ label: "notas por usuario en la 1.ª llamada (features)", min: 1, max: 6, step: 1, value: S.n1, onInput: function (v) { S.n1 = v; update(); } });
+  ui.slider({ label: "notas por usuario en la 2.ª llamada (features)", min: 1, max: 6, step: 1, value: S.n2, onInput: function (v) { S.n2 = v; update(); } });
   ui.button("◀ Atrás", function () { if (S.ph > 0) S.ph--; update(); });
   ui.button("Paso ▶", function () { if (S.ph < 3) S.ph++; update(); }, "primary");
   ui.button("Reiniciar", function () { S.ph = 0; update(); }, "warm");
@@ -29,9 +29,9 @@ Lab.register("curso3/c3m1-ciclo-capa", function (root, api) {
       box(ctx, w / 2 - bw / 2 - 10, y + 44, bw + 20, 60, C.cobaltoWash, C.ink, [["CapaDensa", 12, true], ["built = False", 11], ["pesos: []", 11]], C);
       return;
     }
-    box(ctx, x1, y, bw, bh, C.paper, C.ink, [["x" + (ph === 2 ? "2" : ph === 3 ? "3" : ""), 12, true], [shp([bt, nin]), 11], ["batch × features", 9.5, false, C.muted]], C);
+    box(ctx, x1, y, bw, bh, C.paper, C.ink, [["x" + (ph === 2 ? "2" : ph === 3 ? "3" : ""), 12, true], [shp([bt, nin]), 11], [bw >= 118 ? "usuarios × notas" : "usuario×nota", 9.5, false, C.muted]], C);
     box(ctx, x2, y, bw, bh + 18, built ? C.cobaltoWash : C.surface, err ? C.terracota : C.ink, [["CapaDensa", 12, true], ["built = True", 10.5], ["W " + shp([S.n1, S.u]), 11, true], ["b " + shp([S.u]), 11, true]], C);
-    box(ctx, x3, y, bw, bh, err ? C.terracotaWash : C.olivaWash, err ? C.terracota : C.ink, err ? [["ERROR", 12, true, C.terracotaInk], ["matmul", 10.5], [shp([bt, nin]) + "·" + shp([S.n1, S.u]), 9.5]] : [["y", 12, true], [shp([bt, S.u]), 11], ["batch × unidades", 9.5, false, C.muted]], C);
+    box(ctx, x3, y, bw, bh, err ? C.terracotaWash : C.olivaWash, err ? C.terracota : C.ink, err ? [["ERROR", 12, true, C.terracotaInk], ["matmul", 10.5], [shp([bt, nin]) + "·" + shp([S.n1, S.u]), 9.5]] : [["y", 12, true], [shp([bt, S.u]), 11], [bw >= 118 ? "usuarios × unidades" : "usuario×unid.", 9.5, false, C.muted]], C);
     D.arrow(ctx, x1 + bw, y + bh / 2, x2 - 2, y + bh / 2, C.ink, 2);
     D.arrow(ctx, x2 + bw, y + bh / 2, x3 - 2, y + bh / 2, err ? C.terracota : C.ink, 2);
     D.text(ctx, "y = x·W + b", (x2 + x3 + bw) / 2 - bw / 2 + 0, y + bh + 36, { align: "center", size: 11.5, mono: true, color: C.ink2, weight: 600 });

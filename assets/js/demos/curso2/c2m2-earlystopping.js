@@ -100,6 +100,8 @@ Lab.register("curso2/c2m2-earlystopping", function (root, api) {
     va.X.forEach(function (p, i) { D.circle(ctx, plot2.x(p[0]), plot2.y(p[1]), 2.6, null, va.Y[i][0] ? C.terracota : C.cobalto, 1); });
     tr.X.forEach(function (p, i) { D.circle(ctx, plot2.x(p[0]), plot2.y(p[1]), 4.6, tr.Y[i][0] ? C.terracota : C.cobalto, C.paper, 1.4); });
     ctx.restore();
+    C2.halo(ctx, "● thriller", b.x + 8, b.y + 18, { size: 11, bg: C.surface }); D.text(ctx, "● thriller", b.x + 8, b.y + 18, { size: 11, weight: 600, color: C.terracotaInk });
+    C2.halo(ctx, "● comedia", b.x + 8, b.y + 34, { size: 11, bg: C.surface }); D.text(ctx, "● comedia", b.x + 8, b.y + 34, { size: 11, weight: 600, color: C.cobaltoInk });
     D.text(ctx, "modelo de la época " + modelEpoch() + (modelEpoch() !== shown ? " (pesos restaurados)" : ""), b.x + b.w / 2, h - 6, { align: "center", size: 11, weight: 600, color: C.ink });
   }
   function drawAll() {
@@ -110,7 +112,7 @@ Lab.register("curso2/c2m2-earlystopping", function (root, api) {
       (st.use ? "no se dispara: val_loss siguió mejorando hasta el final" : "la mejor val_loss fue <b>" + res.best.toFixed(3) + "</b> en la época <b>" + res.bestEp + "</b>, pero se ha entrenado hasta la " + MAXEP);
     var gap = hist.vloss[Math.min(shown, MAXEP) - 1] - hist.loss[Math.min(shown, MAXEP) - 1];
     out.set(line1 + "<br>" + line2 + "<br>modelo mostrado: época <b>" + e + "</b> · loss " + tl.toFixed(3) + " · val_loss <b>" + vl.toFixed(3) + "</b> · val_accuracy <b>" + (100 * va_).toFixed(1) + " %</b>" +
-      (shown >= 80 && gap > 0.25 && !(res.stop && shown >= res.stop && st.restore) ? "<br><span class='bad'>Sobreajuste: loss sigue bajando, val_loss sube. El modelo memoriza los " + tr.X.length + " puntos de entrenamiento.</span>" : ""));
+      (shown >= 80 && gap > 0.25 && !(res.stop && shown >= res.stop && st.restore) ? "<br><span class='bad'>Sobreajuste: loss sigue bajando, val_loss sube. El modelo memoriza las " + tr.X.length + " películas de entrenamiento.</span>" : ""));
   }
   train(); recompute(true);
   view.draw(draw); view2.draw(draw2);

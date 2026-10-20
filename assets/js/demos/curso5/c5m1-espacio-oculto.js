@@ -4,6 +4,7 @@
 Lab.register("curso5/c5m1-espacio-oculto", function (root, api) {
   var D = api.d, M = api.math;
   var PTS = [[0, 0], [0, 1], [1, 0], [1, 1]], T = [0, 1, 1, 0];
+  var WHO = ["ninguna", "solo Shrek", "solo Toy Story", "las dos"];
   var S = { act: "relu", c1: 0, c2: 1, v1: 1, v2: -2, th: 0.5 };
   var ACT = {
     id: { name: "Ninguna (identidad)", f: function (z) { return z; } },
@@ -13,8 +14,8 @@ Lab.register("curso5/c5m1-espacio-oculto", function (root, api) {
 
   var row = api.el("div", { class: "lab-row" }), colA = api.el("div"), colB = api.el("div");
   row.appendChild(colA); row.appendChild(colB); root.appendChild(row);
-  var vA = api.view(colA, { aspect: 1.05, minH: 240, maxH: 380, label: "Plano de entrada con las dos rectas de las neuronas ocultas" });
-  var pA = api.plot(vA, { xr: [-0.5, 1.5], yr: [-0.5, 1.5], xticks: 4, yticks: 4, xlabel: "x1", ylabel: "x2", pad: { l: 38, r: 10, t: 24, b: 34 }, xfmt: function (v) { return +v.toFixed(1); }, yfmt: function (v) { return +v.toFixed(1); } });
+  var vA = api.view(colA, { aspect: 1.05, minH: 240, maxH: 380, label: "Plano de los cuatro tipos de usuario (Toy Story, Shrek) con las dos rectas de las neuronas ocultas" });
+  var pA = api.plot(vA, { xr: [-0.5, 1.5], yr: [-0.5, 1.5], xticks: 4, yticks: 4, xlabel: "x1 · Toy Story", ylabel: "x2 · Shrek", pad: { l: 38, r: 10, t: 24, b: 34 }, xfmt: function (v) { return +v.toFixed(1); }, yfmt: function (v) { return +v.toFixed(1); } });
   var vB = api.view(colB, { aspect: 1.05, minH: 240, maxH: 380, label: "Espacio oculto (h1, h2) con la recta de la neurona de salida" });
   var pB = api.plot(vB, { xr: [-0.5, 2.5], yr: [-0.5, 2.5], xticks: 6, yticks: 6, xlabel: "h1", ylabel: "h2", pad: { l: 38, r: 10, t: 24, b: 34 }, xfmt: function (v) { return +v.toFixed(1); }, yfmt: function (v) { return +v.toFixed(1); } });
   var ui = api.controls(root), out = api.readout(root);
@@ -70,6 +71,9 @@ Lab.register("curso5/c5m1-espacio-oculto", function (root, api) {
     PTS.forEach(function (q, i) {
       D.circle(ctx, pA.x(q[0]), pA.y(q[1]), 11, T[i] ? C.cobalto : C.terracota, C.paper, 2);
       D.text(ctx, String(T[i]), pA.x(q[0]), pA.y(q[1]) + 4, { size: 12, align: "center", weight: 700, color: C.paper });
+      ctx.save(); ctx.font = "600 10px 'IBM Plex Sans',system-ui,sans-serif"; var tw = ctx.measureText(WHO[i]).width; ctx.restore();
+      D.rect(ctx, pA.x(q[0]) - tw / 2 - 2, pA.y(q[1]) + 15, tw + 4, 15, C.paper);   // fondo para que las rectas no pisen el texto
+      D.text(ctx, WHO[i], pA.x(q[0]), pA.y(q[1]) + 26, { size: 10, align: "center", weight: 600, color: C.ink2 });
     });
   });
   vB.draw(function (ctx, w, h, C) {
@@ -103,7 +107,7 @@ Lab.register("curso5/c5m1-espacio-oculto", function (root, api) {
     for (i = 0; i < 4; i++) {
       var h = hid(i), s = score(h), pred = s > S.th, good = pred === (T[i] === 1);
       if (good) ok++;
-      lines += "(" + PTS[i][0] + "," + PTS[i][1] + ") → h = (" + h[0].toFixed(2) + ", " + h[1].toFixed(2) + ") → v·h = " + s.toFixed(2).replace("-", "−") + " → clase " + (pred ? 1 : 0) + " (debe ser " + T[i] + ") " + (good ? "<span class='good'>✓</span>" : "<span class='bad'>✗</span>") + "<br>";
+      lines += "(" + PTS[i][0] + "," + PTS[i][1] + ") " + WHO[i] + " → h = (" + h[0].toFixed(2) + ", " + h[1].toFixed(2) + ") → v·h = " + s.toFixed(2).replace("-", "−") + " → clase " + (pred ? 1 : 0) + " (aviso: debe ser " + T[i] + ") " + (good ? "<span class='good'>✓</span>" : "<span class='bad'>✗</span>") + "<br>";
     }
     out.set(lines + "Aciertos: <b>" + ok + " de 4</b>" + (bestNote ? "<br>" + bestNote : ""));
     bestNote = "";

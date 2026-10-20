@@ -49,14 +49,14 @@ Lab.register("curso4/c4m5-entrena-softmax", function (root, api) {
   function build() { stop(); S.ep = 0; initNet(); hist = [[0, evalSet(Xtr, Ytr).loss]]; update(); }
   var row = api.el("div", { class: "lab-row" }), colA = api.el("div"), colB = api.el("div");
   row.appendChild(colA); row.appendChild(colB); root.appendChild(row);
-  var view = api.view(colA, { aspect: 1.0, minH: 240, maxH: 400, label: "Mapa de la clase que predice la regresión softmax con los puntos de entrenamiento y de test" });
+  var view = api.view(colA, { aspect: 1.0, minH: 240, maxH: 400, label: "Mapa del género que predice la regresión softmax con los tráilers de entrenamiento y de test (dos rasgos por tráiler)" });
   var plot = api.plot(view, { xr: [-HM, HM], yr: [-HM, HM], xticks: 4, yticks: 4, pad: { l: 30, r: 12, t: 8, b: 22 }, xfmt: function (v) { return +v.toFixed(1); }, yfmt: function (v) { return +v.toFixed(1); } });
   var viewL = api.view(colB, { aspect: 1.0, minH: 240, maxH: 400, label: "Curva de la pérdida de entrenamiento por época" });
   var optL = { xr: [0, 40], yr: [0, 1.5], xticks: 4, yticks: 3, xlabel: "épocas", pad: { l: 40, r: 12, t: 24, b: 36 }, xfmt: function (v) { return Math.round(v); } };
   var plotL = api.plot(viewL, optL);
   var ui = api.controls(root), out = api.readout(root);
   out.el.style.fontSize = "clamp(.68rem, 2.5vw, .8rem)";
-  ui.select({ label: "Datos", value: S.data, options: [["blobs3", "Tres nubes"], ["blobs4", "Cuatro nubes"], ["rings", "Tres anillos concéntricos"]], onChange: function (v) { S.data = v; gen(); build(); } });
+  ui.select({ label: "Catálogo de tráilers", value: S.data, options: [["blobs3", "Tres géneros (tres grupos)"], ["blobs4", "Cuatro géneros (cuatro grupos)"], ["rings", "Tres géneros mezclados en anillos"]], onChange: function (v) { S.data = v; gen(); build(); } });
   ui.select({ label: "Tamaño del lote (batch)", value: S.batch, options: [["1", "1 muestra (SGD puro)"], ["16", "16 muestras (mini-batch)"], ["all", "todas (batch completo)"]], onChange: function (v) { S.batch = v; update(); } });
   ui.slider({ label: "tasa de aprendizaje lr", min: -2, max: 1, step: 0.05, value: S.lrExp, fmt: function (v) { return Math.pow(10, v).toFixed(2); }, onInput: function (v) { S.lrExp = v; update(); } });
   var btn = ui.button("▶ Entrenar", function () {
@@ -66,8 +66,8 @@ Lab.register("curso4/c4m5-entrena-softmax", function (root, api) {
   }, "primary");
   ui.button("+10 épocas", function () { stop(); for (var i = 0; i < 10 && S.ep < MAXEP; i++) epoch(); update(); });
   ui.button("Pesos nuevos", function () { S.wseed++; build(); });
-  ui.button("Otros datos", function () { S.dseed++; gen(); build(); });
-  api.legend(root, [[api.colors().cobalto, "clase 0"], [api.colors().terracota, "clase 1"], [api.colors().oliva, "clase 2"], [api.colors().marker, "clase 3 (solo con 4 nubes)"]]);
+  ui.button("Otros tráilers", function () { S.dseed++; gen(); build(); });
+  api.legend(root, [[api.colors().cobalto, "acción (clase 0)"], [api.colors().terracota, "comedia (clase 1)"], [api.colors().oliva, "terror (clase 2)"], [api.colors().marker, "animación (clase 3, solo con 4 géneros)"]]);
   var loop = api.loop(function () { var n = S.batch === "all" ? 4 : 1; for (var i = 0; i < n && S.ep < MAXEP; i++) epoch(); update(); if (S.ep >= MAXEP) { stop(); return false; } }, { fps: 24 });
   function stop() { S.run = false; if (loop) loop.stop(); btn.textContent = "▶ Entrenar"; }
   function cls(C) { return [C.cobalto, C.terracota, C.oliva, C.marker]; }
@@ -102,7 +102,7 @@ Lab.register("curso4/c4m5-entrena-softmax", function (root, api) {
     var a = evalSet(Xtr, Ytr), b = evalSet(Xte, Yte), N = Xtr.length, B = S.batch === "all" ? N : +S.batch, per = Math.ceil(N / B);
     out.set("Época <b>" + S.ep + "</b> · actualizaciones de pesos = " + S.ep + " × " + per + " = <b>" + (S.ep * per) + "</b> · parámetros = " + S.K + "·2 + " + S.K + " = <b>" + (S.K * 3) + "</b><br>" +
       "pérdida (train) = <b>" + a.loss.toFixed(3) + "</b> · acierto train = <b>" + (a.acc * 100).toFixed(0) + " %</b> · test = <b>" + (b.acc * 100).toFixed(0) + " %</b> · lr = " + Math.pow(10, S.lrExp).toFixed(2) +
-      (S.data === "rings" && a.acc < 0.7 ? "<br><span class='bad'>Con anillos concéntricos una sola capa lineal no puede: las fronteras son rectas.</span>" : ""));
+      (S.data === "rings" && a.acc < 0.7 ? "<br><span class='bad'>Con los géneros mezclados en anillos una sola capa lineal no puede: las fronteras son rectas.</span>" : ""));
     view.redraw(); viewL.redraw();
   }
   gen(); build();

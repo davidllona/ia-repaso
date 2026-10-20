@@ -1,6 +1,7 @@
 /* Experimento: la matriz de confusión. Tú cambias las decisiones del modelo y ves qué casilla cambia y qué TIPO de error cometes. */
 Lab.register("curso1/c1m1-confusion", function (root, api) {
   var CORREOS = ["Gana un iPhone gratis", "Herencia millonaria", "Tu cuenta está bloqueada", "Pastillas milagro", "Último día: premio", "Reunión a las 10", "Factura de la luz", "Tu pedido ha salido", "Entrega de la tesis", "Acta del equipo", "Fotos de las vacaciones", "Cita del dentista", "Informe trimestral", "Cumple de Marta", "Billete de tren", "Contrato firmado"];
+  var PELIS = ["Titanic", "Matrix", "Toy Story", "El Rey León", "Shrek", "Los Vengadores", "Harry Potter", "Frozen", "Avatar", "Joker", "Up", "Coco", "Gladiator", "Jurassic Park", "Cars", "Buscando a Nemo"];
   var N = CORREOS.length, dominio = "spam";
   var orden = api.rng(9).shuffle(CORREOS.map(function (c, i) { return i; }));
   var real = orden.map(function (i) { return i < 5; });           /* los 5 primeros textos son spam */
@@ -8,7 +9,7 @@ Lab.register("curso1/c1m1-confusion", function (root, api) {
   var pred = [];
   var D = {
     spam: { pos: "Spam", neg: "No spam", item: function (i) { return txt[i]; }, fp: "correo bueno mandado a la carpeta de spam: lo pierdes", fn: "spam que cuela en tu bandeja: molesta, pero no es grave" },
-    salud: { pos: "Enfermo", neg: "Sano", item: function (i) { return "Paciente " + (i + 1); }, fp: "sano diagnosticado como enfermo: un susto y más pruebas", fn: "enfermo dado por sano: no se trata a tiempo (el error grave)" }
+    estrenos: { pos: "Te interesa", neg: "No te interesa", item: function (i) { return PELIS[orden[i]]; }, fp: "aviso de una película que no te interesa: una notificación de más", fn: "película que esperabas y no te avisan: te la pierdes (el error grave)" }
   };
 
   function preset(kind) {
@@ -25,7 +26,7 @@ Lab.register("curso1/c1m1-confusion", function (root, api) {
   preset("ejemplo");
 
   var ui = api.controls(root);
-  ui.segmented({ label: "Dónde lo aplicamos", options: [["spam", "Filtro de spam"], ["salud", "Diagnóstico médico"]], value: dominio, onChange: function (v) { dominio = v; render(); } });
+  ui.segmented({ label: "Dónde lo aplicamos", options: [["spam", "Filtro de spam"], ["estrenos", "Aviso de estrenos"]], value: dominio, onChange: function (v) { dominio = v; render(); } });
   ui.button("Modelo del ejemplo", function () { preset("ejemplo"); render(); });
   ui.button("Modelo perfecto", function () { preset("perfecto"); render(); });
   ui.button("Todo es positivo", function () { preset("todo"); render(); });

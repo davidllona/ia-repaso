@@ -20,15 +20,15 @@ Lab.register("curso2/c2m4-puertas-lstm", function (root, api) {
     R = { z: z, f: f, i: i, g: g, o: o, keep: keep, add: add, c: c, tc: tc, h: h };
   }
 
-  var view = api.view(root, { aspect: 1.7, minH: 385, maxH: 400, label: "Cinta transportadora de la celda de memoria de una LSTM con las puertas de olvido, entrada y salida" });
+  var view = api.view(root, { aspect: 1.7, minH: 385, maxH: 400, label: "Cinta con el resumen de la trama (la celda de memoria) de una LSTM, con las puertas de olvido, entrada y salida" });
   var ui = api.controls(root), out = api.readout(root);
   out.el.style.fontSize = "clamp(.72rem, 2.7vw, .84rem)";
   function sl(label, key, lo, hi, step) {
     ui.slider({ label: label, min: lo, max: hi, step: step, value: S[key], fmt: function (v) { return n(v, 2); }, onInput: function (v) { S[key] = v; update(); } });
   }
-  sl("Entrada xₜ", "x", -2, 2, 0.05);
-  sl("Estado oculto anterior hₜ₋₁", "h", -1, 1, 0.05);
-  sl("Memoria anterior cₜ₋₁ (la cinta)", "c", -3, 3, 0.05);
+  sl("Entrada xₜ (el capítulo de hoy)", "x", -2, 2, 0.05);
+  sl("Estado anterior hₜ₋₁ (lo que contaste ayer)", "h", -1, 1, 0.05);
+  sl("Memoria anterior cₜ₋₁ (tu resumen de la trama)", "c", -3, 3, 0.05);
   sl("Sesgo de la puerta de OLVIDO (b_f)", "bf", -5, 5, 0.1);
   sl("Sesgo de la puerta de ENTRADA (b_i)", "bi", -5, 5, 0.1);
   sl("Sesgo de la puerta de SALIDA (b_o)", "bo", -5, 5, 0.1);
@@ -60,7 +60,7 @@ Lab.register("curso2/c2m4-puertas-lstm", function (root, api) {
   }
   function draw(ctx, w, h, C) {
     var beltY = 122, base = beltY - 8;
-    D.text(ctx, "CELDA DE MEMORIA  c  (la cinta transportadora)", 12, 16, { size: 11.5, color: C.muted, weight: 500 });
+    D.text(ctx, "MEMORIA c: el resumen de la trama (la cinta)", 12, 16, { size: 11.5, color: C.muted, weight: 500 });
     var x0 = w * 0.09, xf = w * 0.27, xk = w * 0.42, xp = w * 0.55, xc = w * 0.70, xo = w * 0.87;
     // cinta
     D.rect(ctx, 8, beltY - 6, w - 16, 12, C.paper2 || C.surface, C.ink, 1.5);
@@ -81,7 +81,7 @@ Lab.register("curso2/c2m4-puertas-lstm", function (root, api) {
     D.circle(ctx, xp, beltY, 12, C.surface, C.ink, 2);
     D.text(ctx, "+", xp, beltY + 5, { size: 17, align: "center", weight: 600 });
     D.arrow(ctx, xp, beltY + 74, xp, beltY + 14, C.oliva, 2);
-    D.text(ctx, "lo nuevo  i·g", xp, beltY + 90, { size: 11, align: "center", weight: 600, color: C.olivaInk });
+    D.text(ctx, "lo nuevo de hoy  i·g", xp, beltY + 90, { size: 11, align: "center", weight: 600, color: C.olivaInk });
     D.text(ctx, n(R.i, 2) + " × " + n(R.g, 2) + " = " + n(R.add, 2), xp, beltY + 104, { size: 10.5, align: "center", mono: true, color: C.ink2 });
     // c_t
     bar(ctx, xc, base, R.c, C.cobalto, C, 18);

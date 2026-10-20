@@ -28,9 +28,9 @@ Lab.register("curso1/c1m5-curva-aprendizaje", function (root, api) {
     cache[key] = res; return res;
   }
 
-  var view = api.view(root, { aspect: 1.75, minH: 270, maxH: 430, label: "Curva de aprendizaje: error de entrenamiento y de validación según el número de muestras de entrenamiento" });
+  var view = api.view(root, { aspect: 1.75, minH: 270, maxH: 430, label: "Curva de aprendizaje: error de entrenamiento y de validación según el número de películas de entrenamiento" });
   var lo = Math.log10(SIZES[0]), hi = Math.log10(SIZES[SIZES.length - 1]);
-  var plot = api.plot(view, { xr: [lo - 0.03, hi + 0.03], yr: [-2, 1], xticks: 3, yticks: 3, ylabel: "error (MSE, escala log)", xlabel: "muestras de entrenamiento", pad: { l: 52, r: 12, t: 14, b: 38 },
+  var plot = api.plot(view, { xr: [lo - 0.03, hi + 0.03], yr: [-2, 1], xticks: 3, yticks: 3, ylabel: "error (MSE, escala log)", xlabel: "películas de entrenamiento", pad: { l: 52, r: 12, t: 14, b: 38 },
     xfmt: function () { return ""; }, yfmt: function (v) { return String(+Math.pow(10, v).toPrecision(2)); } });
   var ui = api.controls(root), out = api.readout(root);
   var sDeg = ui.slider({ label: "Complejidad del modelo (grado del polinomio)", min: 1, max: 10, step: 1, value: st.deg, onInput: function (v) { st.deg = v; update(); } });
@@ -60,10 +60,10 @@ Lab.register("curso1/c1m5-curva-aprendizaje", function (root, api) {
     var res = curve(), last = res[res.length - 1], first = res[0], mid = res[7], fl = st.noise * st.noise, gap = last.va - last.tr, gapMid = mid.va - mid.tr, verdict, cls;
     if (last.va > 2.2 * fl && gap < 0.45 * last.va) { verdict = "Sesgo alto (infraajuste): las dos curvas se juntan en un error alto. Más datos NO ayudan; hace falta un modelo más flexible o mejores variables."; cls = "bad"; }
     else if (gap > 0.35 * last.va && gap > 0.5 * fl) { verdict = "Varianza alta (sobreajuste): sigue habiendo un hueco grande entre train y validación. Ayudan más datos, menos complejidad o regularización."; cls = "bad"; }
-    else if (gapMid > 0.6 * mid.va && gapMid > fl) { verdict = "Varianza alta con pocos datos: con " + mid.n + " muestras el hueco es de " + gapMid.toFixed(3) + " y se va cerrando al añadir datos (con " + last.n + " ya es " + gap.toFixed(3) + "). Aquí MÁS DATOS SÍ AYUDAN."; cls = "bad"; }
+    else if (gapMid > 0.6 * mid.va && gapMid > fl) { verdict = "Varianza alta con pocos datos: con " + mid.n + " películas el hueco es de " + gapMid.toFixed(3) + " y se va cerrando al añadir datos (con " + last.n + " ya es " + gap.toFixed(3) + "). Aquí MÁS DATOS SÍ AYUDAN."; cls = "bad"; }
     else { verdict = "Buen ajuste: las dos curvas se acercan al ruido irreducible. Más datos apenas cambiarían nada."; cls = "good"; }
-    out.set("con <b>" + first.n + "</b> muestras: train = <b>" + first.tr.toFixed(3) + "</b>, validación = <b>" + (first.va > 9.9 ? ">9.9" : first.va.toFixed(3)) + "</b><br>" +
-      "con <b>" + last.n + "</b> muestras: train = <b>" + last.tr.toFixed(3) + "</b>, validación = <b>" + last.va.toFixed(3) + "</b> · hueco = <b>" + gap.toFixed(3) + "</b> · ruido σ² = " + fl.toFixed(3) + "<br><span class='" + cls + "'>" + verdict + "</span>");
+    out.set("con <b>" + first.n + "</b> películas: train = <b>" + first.tr.toFixed(3) + "</b>, validación = <b>" + (first.va > 9.9 ? ">9.9" : first.va.toFixed(3)) + "</b><br>" +
+      "con <b>" + last.n + "</b> películas: train = <b>" + last.tr.toFixed(3) + "</b>, validación = <b>" + last.va.toFixed(3) + "</b> · hueco = <b>" + gap.toFixed(3) + "</b> · ruido σ² = " + fl.toFixed(3) + "<br><span class='" + cls + "'>" + verdict + "</span>");
   }
   buildVal(); view.draw(draw); update();
 });

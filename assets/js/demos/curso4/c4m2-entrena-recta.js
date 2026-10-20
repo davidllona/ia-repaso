@@ -1,4 +1,4 @@
-/* Experimento: entrenar y = w·x + b con mini-batches. Los mismos 240 puntos (y = 3x + 1 + ruido 0.1) y los mismos hiperparámetros,
+/* Experimento: entrenar y = w·x + b con mini-batches. Las mismas 240 películas (x = nota de la crítica, y = valoración de los usuarios = 3x + 1 + ruido 0.1) y los mismos hiperparámetros,
    con batch_size = 240, 40, 8 y 1. Cada paso calcula el gradiente del MSE del lote y actualiza w y b (descenso del gradiente real, en JavaScript).
    Se pinta la pérdida con TODOS los datos tras cada paso, frente a las épocas. */
 Lab.register("curso4/c4m2-entrena-recta", function (root, api) {
@@ -24,8 +24,8 @@ Lab.register("curso4/c4m2-entrena-recta", function (root, api) {
     }
     return { w: w, b: b, steps: steps, pts: pts, loss: lossAll(w, b), spe: spe };
   }
-  var vA = api.view(root, { aspect: 2.2, minH: 220, maxH: 290, label: "Pérdida con todos los datos frente al número de épocas, para cuatro tamaños de lote" });
-  var vB = api.view(root, { aspect: 2.4, minH: 180, maxH: 250, label: "Los datos y la recta aprendida con el tamaño de lote elegido" });
+  var vA = api.view(root, { aspect: 2.2, minH: 220, maxH: 290, label: "Pérdida con las 240 películas frente al número de épocas, para cuatro tamaños de lote" });
+  var vB = api.view(root, { aspect: 2.4, minH: 180, maxH: 250, label: "Las 240 películas (nota de la crítica frente a valoración de los usuarios) y la recta aprendida con el tamaño de lote elegido" });
   var ui = api.controls(root), out = api.readout(root);
   ui.slider({ label: "learning rate", min: 0.01, max: 0.5, step: 0.01, value: S.lr, fmt: function (v) { return v.toFixed(2); }, onInput: function (v) { S.lr = v; update(); } });
   ui.slider({ label: "épocas", min: 1, max: 10, step: 1, value: S.E, onInput: function (v) { S.E = v; update(); } });
@@ -34,8 +34,8 @@ Lab.register("curso4/c4m2-entrena-recta", function (root, api) {
   var C0 = api.colors();
   api.legend(root, [[C0.cobalto, "B = 240 (lote completo)"], [C0.terracota, "B = 40 (mini-batch)"], [C0.oliva, "B = 8"], [C0.marker, "B = 1 (SGD)"]]);
 
-  var pl = api.plot(vA, { xr: [0, 5], yr: [-3, 1], xticks: 5, yticks: 4, xlabel: "épocas", ylabel: "pérdida (MSE) · escala log₁₀", pad: { l: 50, r: 12, t: 12, b: 36 }, yfmt: function (v) { return "1e" + (v >= 0 ? "+" : "") + Math.round(v); } });
-  var pl2 = api.plot(vB, { xr: [-1, 1], yr: [-3, 5], xticks: 4, yticks: 4, xlabel: "x", ylabel: "y", pad: { l: 40, r: 12, t: 10, b: 32 } });
+  var pl = api.plot(vA, { xr: [0, 5], yr: [-3, 1], xticks: 5, yticks: 4, xlabel: "épocas", ylabel: "pérdida (MSE) · escala log₁₀", pad: { l: 58, r: 12, t: 12, b: 36 }, yfmt: function (v) { return "1e" + (v >= 0 ? "+" : "") + Math.round(v); } });
+  var pl2 = api.plot(vB, { xr: [-1, 1], yr: [-3, 5], xticks: 4, yticks: 4, xlabel: "nota de la crítica (centrada)", ylabel: "valoración usuarios", pad: { l: 40, r: 12, t: 10, b: 36 } });
   function drawA(ctx, w, h, C) {
     pl.xr = [0, S.E]; pl.axes(ctx); ctx.save(); pl.clip(ctx);
     var cols = [C.cobalto, C.terracota, C.oliva, C.marker];

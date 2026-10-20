@@ -4,13 +4,13 @@ Lab.register("curso4/c4m2-collate", function (root, api) {
   var D = api.d, M = api.math;
   var FR = [[5, 2, 9], [7, 1], [3, 8, 4, 6], [2], [4, 4, 1, 5, 3], [6, 9]];
   var S = { mode: "pad", B: 3, same: false, C: 1, Hh: 8, W: 8 };
-  var view = api.view(root, { aspect: 2.4, minH: 230, maxH: 330, label: "Muestras y lote resultante" });
+  var view = api.view(root, { aspect: 2.4, minH: 230, maxH: 330, label: "Muestras (subtítulos o pósters) y lote resultante" });
   var ui = api.controls(root), out = api.readout(root);
-  ui.segmented({ label: "Tipo de muestra", options: [["seq", "frases (longitud variable)"], ["img", "imágenes (tamaño fijo)"]], value: "seq", onChange: function (v) { S.type = v; update(); } });
+  ui.segmented({ label: "Tipo de muestra", options: [["seq", "subtítulos (frases de longitud variable)"], ["img", "pósters (tamaño fijo)"]], value: "seq", onChange: function (v) { S.type = v; update(); } });
   ui.segmented({ label: "collate_fn", options: [["def", "por defecto"], ["pad", "con padding"]], value: "pad", onChange: function (v) { S.mode = v; update(); } });
   ui.slider({ label: "batch_size B", min: 1, max: 6, step: 1, value: S.B, onInput: function (v) { S.B = v; update(); } });
-  ui.slider({ label: "canales C (imágenes)", min: 1, max: 3, step: 1, value: 1, onInput: function (v) { S.C = v; update(); } });
-  ui.slider({ label: "alto = ancho (imágenes)", min: 4, max: 32, step: 4, value: 8, onInput: function (v) { S.Hh = v; S.W = v; update(); } });
+  ui.slider({ label: "canales C (pósters)", min: 1, max: 3, step: 1, value: 1, onInput: function (v) { S.C = v; update(); } });
+  ui.slider({ label: "alto = ancho (pósters)", min: 4, max: 32, step: 4, value: 8, onInput: function (v) { S.Hh = v; S.W = v; update(); } });
   S.type = "seq";
 
   function drawSeq(ctx, w, h, C) {

@@ -6,10 +6,10 @@ Lab.register("curso2/c2m3-stride-padding", function (root, api) {
   var grid = api.el("div", { style: { display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(min(100%,230px),1fr))", gap: "10px" } });
   root.appendChild(grid);
   function cellDiv() { var c = api.el("div", { style: { minWidth: "0" } }); grid.appendChild(c); return c; }
-  var vIn = api.view(cellDiv(), { aspect: 1, minH: 220, maxH: 400, label: "Imagen de entrada con su borde de padding y la ventana del filtro" });
+  var vIn = api.view(cellDiv(), { aspect: 1, minH: 220, maxH: 400, label: "Fotograma de entrada con su borde de padding y la ventana del filtro" });
   var vOut = api.view(cellDiv(), { aspect: 1, minH: 220, maxH: 400, label: "Mapa de salida: una casilla por cada posición de la ventana" });
   var ui = api.controls(root), out = api.readout(root);
-  var slN = ui.slider({ label: "n = lado de la imagen", min: 3, max: 10, step: 1, value: n, onInput: function (v) { n = v; fix(); update(); } });
+  var slN = ui.slider({ label: "n = lado del fotograma", min: 3, max: 10, step: 1, value: n, onInput: function (v) { n = v; fix(); update(); } });
   var slF = ui.slider({ label: "f = lado del filtro", min: 1, max: 7, step: 1, value: f, onInput: function (v) { f = v; fix(); update(); } });
   var slS = ui.slider({ label: "s = stride (paso)", min: 1, max: 4, step: 1, value: s, onInput: function (v) { s = v; fix(); update(); } });
   var slP = ui.slider({ label: "p = padding (ceros por cada lado)", min: 0, max: 3, step: 1, value: p, onInput: function (v) { p = v; fix(); update(); } });
@@ -35,7 +35,7 @@ Lab.register("curso2/c2m3-stride-padding", function (root, api) {
   }
   vIn.draw(function (ctx, w, h, C) {
     var D = api.d, T = n + 2 * p, g = geom(vIn, T, 22), m = outSize(), i, j;
-    D.text(ctx, "Entrada " + n + "×" + n + (p ? " + padding " + p : ""), w / 2, 14, { size: 11, weight: 600, align: "center", color: C.ink2 });
+    D.text(ctx, "Fotograma " + n + "×" + n + (p ? " + padding " + p : ""), w / 2, 14, { size: 11, weight: 600, align: "center", color: C.ink2 });
     var wi = m ? Math.floor(pos / m) : 0, wj = m ? pos % m : 0;
     var used = m ? (m - 1) * s + f : 0;
     for (i = 0; i < T; i++) for (j = 0; j < T; j++) {

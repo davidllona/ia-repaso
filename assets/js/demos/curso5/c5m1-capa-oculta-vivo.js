@@ -115,8 +115,8 @@ Lab.register("curso5/c5m1-capa-oculta-vivo", function (root, api) {
 
   var row = api.el("div", { class: "lab-row" }), colA = api.el("div"), colB = api.el("div");
   row.appendChild(colA); row.appendChild(colB); root.appendChild(row);
-  var view = api.view(colA, { aspect: 1.0, minH: 250, maxH: 420, label: "Mapa de probabilidad de la red con las rectas de las neuronas ocultas" });
-  var plot = api.plot(view, { xr: [-HM, HM], yr: [-HM, HM], xticks: 4, yticks: 4, pad: { l: 30, r: 14, t: 8, b: 22 }, xfmt: function (v) { return +v.toFixed(1); }, yfmt: function (v) { return +v.toFixed(1); } });
+  var view = api.view(colA, { aspect: 1.0, minH: 250, maxH: 420, label: "Mapa de gustos de los usuarios con la probabilidad de que terminen la serie y las rectas de las neuronas ocultas" });
+  var plot = api.plot(view, { xr: [-HM, HM], yr: [-HM, HM], xticks: 4, yticks: 4, xlabel: "x₁ · gusto por la acción", ylabel: "x₂ · comedia", pad: { l: 40, r: 14, t: 8, b: 38 }, xfmt: function (v) { return +v.toFixed(1); }, yfmt: function (v) { return +v.toFixed(1); } });
   var viewT = api.view(colB, { aspect: 1.45, minH: 170, maxH: 280, label: "Miniaturas de lo que calcula cada neurona oculta" });
   var viewL = api.view(colB, { aspect: 2.4, minH: 120, maxH: 190, label: "Curva de pérdida durante el entrenamiento" });
   var plotL = api.plot(viewL, { xr: [0, 100], yr: [0, 1], xticks: 4, yticks: 2, xlabel: "pasos", pad: { l: 40, r: 24, t: 20, b: 34 }, xfmt: function (v) { return Math.round(v); } });
@@ -136,7 +136,7 @@ Lab.register("curso5/c5m1-capa-oculta-vivo", function (root, api) {
   ui.button("+100 pasos", function () { stop(); for (var i = 0; i < 100; i++) one(); update(); });
   ui.button("Reiniciar pesos", function () { S.seed++; build(); });
   ui.button("Otros datos", function () { S.dseed++; genData(); build(); });
-  api.legend(root, [[C0.cobalto, "clase 1"], [C0.terracota, "clase 0"], [C0.muted, "lleno = entrenamiento · aro = test · rayas = z = 0 de cada neurona"]]);
+  api.legend(root, [[C0.cobalto, "termina la serie (clase 1)"], [C0.terracota, "la abandona (clase 0)"], [C0.muted, "cada punto es un usuario · lleno = entrenamiento · aro = test · rayas = z = 0 de cada neurona"]]);
 
   function one() {
     net.step(Xtr, Ytr, Math.pow(10, S.lrExp), "adam"); S.step++;
@@ -216,7 +216,7 @@ Lab.register("curso5/c5m1-capa-oculta-vivo", function (root, api) {
     var a = net.lossAcc(Xtr, Ytr), b = net.lossAcc(Xte, Yte), nd = distinct(), msg;
     if (S.step === 0) msg = "Pulsa «Entrenar». Los pesos iniciales son aleatorios" + (S.sym ? " <b>pero idénticos en todas las neuronas</b>." : " (distintos en cada neurona).");
     else if (nd < net.H && net.H > 1) msg = "<span class='bad'>Solo " + nd + " neurona" + (nd > 1 ? "s" : "") + " distinta" + (nd > 1 ? "s" : "") + " de " + net.H + ": las demás son copias exactas y no aportan nada.</span>";
-    else if (a.acc >= 0.97 && b.acc >= 0.9) msg = "<span class='good'>Resuelto: la red separa las clases y acierta también en test.</span>";
+    else if (a.acc >= 0.97 && b.acc >= 0.9) msg = "<span class='good'>Resuelto: la red separa a quien termina la serie de quien la abandona y acierta también con usuarios nuevos (test).</span>";
     else if (a.acc < 0.9) msg = "Todavía no la separa bien: más pasos, más neuronas u otra activación.";
     else msg = "Casi resuelto.";
     out.set("Paso <b>" + S.step + "</b> · parámetros: <b>" + net.nparams() + "</b> · pérdida = <b>" + a.loss.toFixed(3) + "</b><br>" +

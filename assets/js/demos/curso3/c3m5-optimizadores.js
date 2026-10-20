@@ -3,7 +3,7 @@
    y añadir ruido al gradiente (como el ruido del mini-batch). Las reglas son las de Keras: SGD, SGD+momentum 0,9,
    Nesterov, RMSprop (rho 0,9) y Adam (β1 0,9; β2 0,999). */
 Lab.register("curso3/c3m5-optimizadores", function (root, api) {
-  var D = api.d, C0 = api.colors();
+  var D = api.d, C0 = api.colors(), coarse = !!(window.matchMedia && matchMedia("(pointer:coarse)").matches);
   var A = 3, MAXSTEPS = 400;
   var KINDS = [["sgd", "SGD", "ink"], ["mom", "SGD + momentum", "terracota"], ["nes", "Nesterov", "marker"], ["rms", "RMSprop", "oliva"], ["adam", "Adam", "cobalto"]];
   var S = { lrExp: -2, noise: 0, start: [-1.5, 2.4], on: { sgd: true, mom: true, nes: false, rms: false, adam: true }, t: 0, run: null };
@@ -34,7 +34,7 @@ Lab.register("curso3/c3m5-optimizadores", function (root, api) {
   }
   function stepAll() { S.run.forEach(function (o) { if (S.on[o.id]) stepOne(o); }); S.t++; }
 
-  var view = api.view(root, { aspect: 1.9, minH: 250, maxH: 400, drag: true, label: "Curvas de nivel de un valle curvo con los recorridos de los optimizadores elegidos" });
+  var view = api.view(root, { aspect: 1.9, minH: 250, maxH: 400, drag: !coarse, label: "Curvas de nivel de un valle curvo con los recorridos de los optimizadores elegidos" });
   var plot = api.plot(view, { xr: [-2, 2], yr: [-1, 3], xticks: 4, yticks: 4, xlabel: "peso w₁", ylabel: "w₂", pad: { l: 40, r: 12, t: 12, b: 36 } });
   var ui = api.controls(root);
   ui.slider({ label: "Learning rate η (el mismo para todos)", min: -3, max: -0.7, step: 0.05, value: S.lrExp, fmt: function (v) { return Math.pow(10, v).toFixed(3); }, onInput: function (v) { S.lrExp = v; restart(); } });
@@ -94,7 +94,7 @@ Lab.register("curso3/c3m5-optimizadores", function (root, api) {
     D.circle(ctx, plot.x(1), plot.y(1), 6, null, C.ink, 2);
     D.text(ctx, "mínimo", plot.x(1) + 9, plot.y(1) + 4, { size: 11, weight: 600, color: C.ink });
     D.circle(ctx, plot.x(S.start[0]), plot.y(S.start[1]), 5, C.paper, C.ink, 2);
-    D.text(ctx, "inicio (arrástralo)", plot.x(S.start[0]) + 9, plot.y(S.start[1]) - 7, { size: 11, color: C.ink2 });
+    D.text(ctx, coarse ? "inicio (toca para moverlo)" : "inicio (arrástralo)", plot.x(S.start[0]) + 9, plot.y(S.start[1]) - 7, { size: 11, color: C.ink2 });
   }
   init();
   view.draw(draw);

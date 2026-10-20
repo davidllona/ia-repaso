@@ -1,20 +1,22 @@
-/* Experimento: retorno descontado G = Σ γ^t · r_t. Dos caminos con recompensas editables (arrastra las barras);
+/* Experimento: retorno descontado G = Σ γ^t · r_t. Dos recomendaciones (A y B) con recompensas editables (arrastra las barras);
    el slider de γ pondera el futuro y puede cambiar cuál de los dos caminos es mejor. */
 Lab.register("curso3/c3m6-retorno", function (root, api) {
   var D = api.d, M = api.math;
   var N = 8;
   var PRESETS = {
-    moneda: { n: "Moneda ya (+10) o meta lejos (+30 al final)", A: [10, 0, 0, 0, 0, 0, 0, 0], B: [0, 0, 0, 0, 0, 0, 0, 30] },
-    camino: { n: "Un paso de −1 en cada casilla y premio final", A: [-1, -1, -1, 12, 0, 0, 0, 0], B: [-1, -1, -1, -1, -1, -1, -1, 20] },
-    riesgo: { n: "Atajo con castigo al final (−15) o rodeo seguro", A: [1, 1, 1, 8, -15, 0, 0, 0], B: [1, 1, 1, 1, 1, 1, 1, 4] }
+    moneda: { n: "Éxito ya (+10) o serie larga (+30)", A: [10, 0, 0, 0, 0, 0, 0, 0], B: [0, 0, 0, 0, 0, 0, 0, 30] },
+    camino: { n: "Anuncios (−1) y premio final", A: [-1, -1, -1, 12, 0, 0, 0, 0], B: [-1, -1, -1, -1, -1, -1, -1, 20] },
+    riesgo: { n: "Estreno polémico o clásico seguro", A: [1, 1, 1, 8, -15, 0, 0, 0], B: [1, 1, 1, 1, 1, 1, 1, 4] }
   };
   var S = { gamma: 0.9, A: PRESETS.moneda.A.slice(), B: PRESETS.moneda.B.slice() };
-  var view = api.view(root, { aspect: 1.55, minH: 250, maxH: 380, drag: true, label: "Barras de recompensa de dos caminos A y B, y su contribución tras descontar con γ" });
+  var view = api.view(root, { aspect: 1.55, minH: 250, maxH: 380, drag: !matchMedia("(pointer:coarse)").matches, label: "Barras de recompensa de dos recomendaciones A y B, y su contribución tras descontar con γ" });
   var p = api.plot(view, { xr: [0, N], yr: [-20, 40], xticks: N, yticks: 6, ylabel: "recompensa r", pad: { l: 44, r: 10, t: 12, b: 46 }, xfmt: function () { return ""; }, yfmt: function (v) { return Math.round(v); } });
-  api.legend(root, [[api.colors().cobalto, "camino A"], [api.colors().terracota, "camino B"], [api.colors().muted, "contorno = recompensa r · relleno = γᵗ·r (lo que cuenta)"]]);
+  api.legend(root, [[api.colors().cobalto, "recomendación A"], [api.colors().terracota, "recomendación B"], [api.colors().muted, "contorno = recompensa r · relleno = γᵗ·r (lo que cuenta)"]]);
   var ui = api.controls(root), out = api.readout(root);
   var sl = ui.slider({ label: "Factor de descuento γ", min: 0.3, max: 1, step: 0.01, value: S.gamma, fmt: function (v) { return v.toFixed(2).replace(".", ","); }, onInput: function (v) { S.gamma = v; update(); } });
-  var sel = ui.select({ label: "Ejemplo", options: Object.keys(PRESETS).map(function (k) { return [k, PRESETS[k].n]; }), value: "moneda", onChange: function (k) { S.A = PRESETS[k].A.slice(); S.B = PRESETS[k].B.slice(); update(); } });
+  var sel = ui.select({ label: "Ejemplo", options: Object.keys(PRESETS).map(function (k) { return [k, PRESETS[k].n]; }), value: "moneda", onChange: function (k) { S.A = PRESETS[k].A.slice(); S.B = PRESETS[k].B.slice(); slB.set(S.B[N - 1], true); update(); } });
+  /* alternativa al arrastre (en pantallas táctiles el lienzo no se arrastra, para no bloquear el scroll) */
+  var slB = ui.slider({ label: "Recompensa de B en el último paso (t = 7)", min: -20, max: 40, step: 1, value: S.B[N - 1], fmt: function (v) { return String(v).replace("-", "−"); }, onInput: function (v) { S.B[N - 1] = v; update(); } });
 
   function G(seq, g) { var s = 0; for (var t = 0; t < seq.length; t++) s += Math.pow(g, t) * seq[t]; return s; }
   function draw(ctx, w, h, C) {
@@ -45,7 +47,7 @@ Lab.register("curso3/c3m6-retorno", function (root, api) {
     var f = (px - b.x) / b.w * N, t = Math.min(N - 1, Math.floor(f)), frac = f - t;
     return { seq: frac < 0.5 ? S.A : S.B, t: t };
   }
-  function setv(y) { drag.seq[drag.t] = M.clamp(Math.round(p.iy(y)), -20, 40); update(); }
+  function setv(y) { drag.seq[drag.t] = M.clamp(Math.round(p.iy(y)), -20, 40); slB.set(S.B[N - 1], true); update(); }
   view.pointer({ down: function (x, y) { drag = hit(x, y); if (drag) setv(y); }, drag: function (x, y) { if (drag) setv(y); }, up: function () { drag = null; } });
 
   function terms(seq, g) {

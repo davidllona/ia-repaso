@@ -29,7 +29,7 @@ Lab.register("curso3/c3m3-contador-params", function (root, api) {
   out.el.style.fontSize = "clamp(.72rem, 2.7vw, .84rem)";
   var C0 = api.colors();
   api.legend(root, [[C0.oliva, "entrada / embeddings"], [C0.cobalto, "atención"], [C0.terracota, "feed-forward"], [C0.marker, "LayerNorm"], [C0.muted, "salida"]]);
-  ui.segmented({ label: "Modelo", value: "texto", options: [["texto", "Mini-GPT de texto"], ["serie", "Serie temporal"]], onChange: function (v) { S.tipo = v; update(); } });
+  ui.segmented({ label: "Modelo", value: "texto", options: [["texto", "Mini-GPT de texto"], ["serie", "Serie de audiencia"]], onChange: function (v) { S.tipo = v; update(); } });
   var sd = ui.slider({ label: "d_model", min: 8, max: 256, step: 8, value: S.d, onInput: function (v) { S.d = v; update(); } });
   ui.segmented({ label: "Cabezas h", value: 2, options: [[1, "1"], [2, "2"], [4, "4"], [8, "8"]], onChange: function (v) { S.h = v; update(); } });
   ui.slider({ label: "d_ff (red feed-forward)", min: 8, max: 1024, step: 8, value: S.ff, onInput: function (v) { S.ff = v; update(); } });

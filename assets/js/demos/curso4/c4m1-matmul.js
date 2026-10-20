@@ -7,13 +7,13 @@ Lab.register("curso4/c4m1-matmul", function (root, api) {
   var TB = [[1, 0, 2, 1], [0, 1, 1, 0], [1, 1, 0, 2], [2, 1, 1, 0]];
   function A(r, c) { return TA[r][c]; }
   function B(r, c) { return TB[r][c]; }
-  var view = api.view(root, { aspect: 2.2, minH: 230, maxH: 320, drag: true, label: "Producto de matrices: fila de A por columna de B da una celda de C" });
+  var view = api.view(root, { aspect: 2.2, minH: 230, maxH: 320, label: "Producto de matrices: fila de A por columna de B da una celda de C" });
   var ui = api.controls(root), out = api.readout(root);
   var OPT = [[1, "1"], [2, "2"], [3, "3"], [4, "4"]];
-  var selM = ui.select({ label: "A tiene m filas", value: 2, options: OPT, onChange: function (v) { st.m = +v; clamp(); update(); } });
-  var selN = ui.select({ label: "A tiene n columnas", value: 3, options: OPT, onChange: function (v) { st.n = +v; update(); } });
-  var selP = ui.select({ label: "B tiene p filas", value: 3, options: OPT, onChange: function (v) { st.p = +v; update(); } });
-  var selK = ui.select({ label: "B tiene k columnas", value: 2, options: OPT, onChange: function (v) { st.k = +v; clamp(); update(); } });
+  var selM = ui.select({ label: "A tiene m filas (usuarios)", value: 2, options: OPT, onChange: function (v) { st.m = +v; clamp(); update(); } });
+  var selN = ui.select({ label: "A tiene n columnas (géneros)", value: 3, options: OPT, onChange: function (v) { st.n = +v; update(); } });
+  var selP = ui.select({ label: "B tiene p filas (géneros)", value: 3, options: OPT, onChange: function (v) { st.p = +v; update(); } });
+  var selK = ui.select({ label: "B tiene k columnas (películas)", value: 2, options: OPT, onChange: function (v) { st.k = +v; clamp(); update(); } });
   ui.button("Siguiente celda ▶", function () {
     if (st.n !== st.p) return;
     st.j++; if (st.j >= st.k) { st.j = 0; st.i = (st.i + 1) % st.m; } update();
@@ -48,6 +48,7 @@ Lab.register("curso4/c4m1-matmul", function (root, api) {
         D.text(ctx, String(txt), xs[q] + c * cs + cs / 2, oy + r * cs + cs / 2 + 4, { align: "center", size: cs < 24 ? 10 : 12.5, mono: true, color: C.ink, weight: hot ? 700 : 400 });
       }
     });
+    D.text(ctx, w < 480 ? "A: usuarios × géneros · B: géneros × películas" : "A: gustos de cada usuario por género · B: géneros de cada película · C: afinidad", w / 2, h - 5, { align: "center", size: 10, color: C.muted });
     D.text(ctx, "@", xs[0] + st.n * cs + gap / 2, oy + st.m * cs / 2 + 5, { align: "center", size: 16, weight: 700, color: C.ink });
     D.text(ctx, "=", xs[1] + st.k * cs + gap / 2, oy + st.m * cs / 2 + 5, { align: "center", size: 16, weight: 700, color: C.ink });
   }
@@ -65,7 +66,7 @@ Lab.register("curso4/c4m1-matmul", function (root, api) {
       var parts = [], terms = [];
       for (var t = 0; t < st.n; t++) { parts.push("(" + A(st.i, t) + ")·(" + B(t, st.j) + ")"); terms.push(A(st.i, t) * B(t, st.j)); }
       s += "<span class='good'>Compatibles</span> → C tiene forma <b>(" + st.m + ", " + st.k + ")</b> y " + st.m * st.k + " celdas, cada una con " + st.n + " productos.<br>";
-      s += "C[" + st.i + "," + st.j + "] = fila " + st.i + " de A · columna " + st.j + " de B = " + parts.join(" + ") + " = " + terms.map(function (q) { return q < 0 ? "(" + q + ")" : q; }).join(" + ") + " = <b>" + cval(st.i, st.j) + "</b>";
+      s += "C[" + st.i + "," + st.j + "] = afinidad del usuario " + st.i + " con la película " + st.j + " = fila " + st.i + " de A · columna " + st.j + " de B = " + parts.join(" + ") + " = " + terms.map(function (q) { return q < 0 ? "(" + q + ")" : q; }).join(" + ") + " = <b>" + cval(st.i, st.j) + "</b>";
     }
     out.set(s); view.redraw();
   }

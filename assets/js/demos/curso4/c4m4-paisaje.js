@@ -1,6 +1,6 @@
-/* Experimento: el mapa de la pérdida en el plano (w, b) con los 14 alumnos, para MSE y para BCE.
+/* Experimento: el mapa de la pérdida en el plano (w, b) con los 14 usuarios, para MSE y para BCE.
    Cada color es un nivel de pérdida (las líneas oscuras separan niveles). Se hace clic para elegir el punto de partida y se
-   deja bajar el descenso del gradiente con las dos pérdidas. Mismos datos y cuentas que el fragmento 19. */
+   deja bajar el descenso del gradiente con las dos pérdidas. Mismos datos (14 usuarios: días sin abrir la app -> canceló) y cuentas que el fragmento 12. */
 Lab.register("curso4/c4m4-paisaje", function (root, api) {
   var M = api.math, D = api.d;
   var X = [0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5, 5.5, 6, 7, 8];
@@ -37,7 +37,7 @@ Lab.register("curso4/c4m4-paisaje", function (root, api) {
   ["mse", "bce"].forEach(function (k) {
     var cell = api.el("div");
     grid.appendChild(cell);
-    var v = api.view(cell, { aspect: 1.1, minH: 250, maxH: 400, drag: true, label: "Mapa de la pérdida " + k.toUpperCase() + " en el plano (w, b)" });
+    var v = api.view(cell, { aspect: 1.1, minH: 250, maxH: 400, drag: !matchMedia("(pointer:coarse)").matches, label: "Mapa de la pérdida " + k.toUpperCase() + " en el plano (w, b)" });
     var p = api.plot(v, { xr: WR, yr: BR, xticks: 7, yticks: 4, xlabel: "w", ylabel: "b", pad: { l: 40, r: 8, t: 24, b: 34 }, grid: false, xfmt: function (t) { return +t.toFixed(1); } });
     P[k] = { v: v, p: p, trail: [] };
     v.pointer({ down: function (px, py) { pick(k, px, py); }, drag: function (px, py) { pick(k, px, py); } });

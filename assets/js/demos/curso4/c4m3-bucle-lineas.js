@@ -33,7 +33,7 @@ Lab.register("curso4/c4m3-bucle-lineas", function (root, api) {
   function f(v, k) { return v === null ? "None" : v.toFixed(k === undefined ? 3 : k); }
   function stepLine() {
     var i, dw = 0, db = 0;
-    if (pc === 0) { yhat = X.map(function (x) { return w * x + b; }); msg = "forward: ŷ = w·x + b con w = " + f(w) + ", b = " + f(b) + "."; }
+    if (pc === 0) { yhat = X.map(function (x) { return w * x + b; }); msg = "forward: predice las horas de las 3 películas, ŷ = w·x + b con w = " + f(w) + ", b = " + f(b) + "."; }
     else if (pc === 1) { loss = 0; for (i = 0; i < n; i++) loss += (yhat[i] - Y[i]) * (yhat[i] - Y[i]) / n; run.push(loss); msg = "MSE = " + f(loss, 4) + ". (Esta época se anota en la gráfica.)"; }
     else if (pc === 2) {
       if (noZero) msg = "(esta línea no está: los .grad se quedan como estaban)";

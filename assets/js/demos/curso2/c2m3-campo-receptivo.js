@@ -7,12 +7,13 @@ Lab.register("curso2/c2m3-campo-receptivo", function (root, api) {
       var s = L.t === "p" ? 2 : 1;
       r = r + (L.k - 1) * j; j = j * s;
       n = n >= L.k ? Math.floor((n - L.k) / s) + 1 : 0;
-      rows.push({ name: (L.t === "c" ? "Conv2D " : "MaxPooling2D ") + L.k + "×" + L.k, n: n, r: r, j: j });
+      rows.push({ name: (L.t === "c" ? "Conv " : "MaxPool ") + L.k + "×" + L.k, n: n, r: r, j: j });
     });
     return rows;
   }
-  var view = api.view(root, { aspect: 1.5, minH: 250, maxH: 340, label: "Imagen de 28 por 28 con cuadrados concéntricos: la zona que ve una neurona de cada capa" });
-  var tbl = api.table(root, ["Capa", "Mapa de salida", "Campo receptivo", "Salto entre vecinas"]);
+  var view = api.view(root, { aspect: 1.5, minH: 250, maxH: 340, label: "Fotograma de 28 por 28 con cuadrados concéntricos: la zona que ve una neurona de cada capa" });
+  var tbl = api.table(root, ["Capa", "Mapa", "Campo receptivo", "Salto"]);
+  (function () { var t = root.querySelector("table.lab-table"), w = api.el("div", { style: { overflowX: "auto" } }); t.style.minWidth = "440px"; t.parentNode.insertBefore(w, t); w.appendChild(t); })();
   var ui = api.controls(root), out = api.readout(root);
   ui.button("+ Conv 3×3", function () { if (stack.length < 8) stack.push({ t: "c", k: 3 }); update(); }, "primary");
   ui.button("+ Conv 5×5", function () { if (stack.length < 8) stack.push({ t: "c", k: 5 }); update(); }, "primary");
@@ -23,7 +24,7 @@ Lab.register("curso2/c2m3-campo-receptivo", function (root, api) {
 
   view.draw(function (ctx, w, h, C) {
     var D = api.d, rows = calc(), s = Math.min((w - 16) / N0, (h - 22) / N0), x0 = (w - s * N0) / 2, y0 = 18, i, j;
-    D.text(ctx, "Imagen 28×28 · cuadrados = lo que ve UNA neurona tras cada capa", w / 2, 12, { size: 11, weight: 600, align: "center", color: C.ink2 });
+    D.text(ctx, "Fotograma 28×28 · cuadrado = lo que ve una neurona", w / 2, 12, { size: 11, weight: 600, align: "center", color: C.ink2 });
     for (i = 0; i < N0; i++) for (j = 0; j < N0; j++) D.rect(ctx, x0 + j * s, y0 + i * s, s, s, C.surface, C.line, 1);
     var cols = [C.cobalto, C.terracota, C.oliva, C.marker, C.ink, C.cobalto, C.terracota, C.oliva];
     ctx.save(); ctx.beginPath(); ctx.rect(x0, y0, s * N0, s * N0); ctx.clip();

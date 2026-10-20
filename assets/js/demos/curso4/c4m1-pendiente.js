@@ -58,6 +58,7 @@ Lab.register("curso4/c4m1-pendiente", function (root, api) {
     var s = "<b>f(x)</b> = " + f.name + " en x = " + x0.toFixed(1) + ": f(x) = <b>" + f.f(x0).toFixed(4) + "</b> · f(x+h) = " + f.f(x0 + hv).toFixed(4) +
       "<br>Pendiente de la secante (f(x+h) − f(x)) / h = <b>" + m.toFixed(4) + "</b> (naranja) · derivada exacta f'(x) = <b>" + md.toFixed(4) + "</b> (verde)" +
       "<br>Diferencia: " + Math.abs(m - md).toExponential(2);
+    if (st.fn === "x2") s += "<br>Si x son las estrellas que se equivoca la predicción de una nota, f(x) = x² es el castigo: la derivada dice cuánto sube el castigo por cada estrella más de error.";
     if (st.fn === "relu" && Math.abs(x0) < 0.05) s += "<br><span class='bad'>En x = 0 ReLU tiene una esquina: la secante da 1 (h &gt; 0) pero la derivada «exacta» no existe. PyTorch usa por convención 0.</span>";
     out.set(s); v1.redraw(); v2.redraw();
   }

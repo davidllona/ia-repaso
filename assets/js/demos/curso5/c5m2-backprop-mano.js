@@ -5,8 +5,8 @@ Lab.register("curso5/c5m2-backprop-mano", function (root, api) {
   var P = { w11: 1, w12: 0.5, b1: -1, w21: -1, w22: 1, b2: 0.5, v1: 2, v2: -1, c: 0.5 };
   var S = { x1: 1, x2: 2, y: 2, lr: 0.01, phase: 0, steps: 0 };
   var PH = [
-    "Forward: z₁ = w₁₁x₁ + w₁₂x₂ + b₁, h = ReLU(z), ŷ = v₁h₁ + v₂h₂ + c, L = (ŷ − y)²",
-    "Empezamos por el final: ∂L/∂ŷ = 2(ŷ − y)",
+    "Forward: del usuario (x₁ acción, x₂ comedia) a la nota predicha para Shrek: z₁ = w₁₁x₁ + w₁₂x₂ + b₁, h = ReLU(z), ŷ = v₁h₁ + v₂h₂ + c, L = (ŷ − y)²",
+    "Empezamos por el final, por la queja de las reseñas: ∂L/∂ŷ = 2(ŷ − y)",
     "Capa de salida: ∂L/∂v_j = (∂L/∂ŷ)·h_j y ∂L/∂c = ∂L/∂ŷ",
     "Retroceder una capa: ∂L/∂h_j = (∂L/∂ŷ)·v_j",
     "Cruzar la ReLU: δ_j = ∂L/∂z_j = (∂L/∂h_j)·[z_j > 0]  (la derivada de ReLU es 1 o 0)",
@@ -32,14 +32,14 @@ Lab.register("curso5/c5m2-backprop-mano", function (root, api) {
   function f4(v) { return (Math.abs(v) < 5e-5 ? 0 : v).toFixed(4).replace("-", "−"); }
   function f3(v) { return (Math.abs(v) < 5e-4 ? 0 : v).toFixed(3).replace("-", "−"); }
 
-  var view = api.view(root, { aspect: 1.9, minH: 230, maxH: 300, label: "Red 2-2-1 con los valores del forward arriba de cada neurona y los deltas del backward debajo" });
+  var view = api.view(root, { aspect: 1.9, minH: 230, maxH: 300, label: "Red 2-2-1 de gustos (acción y comedia) a nota predicha, con los valores del forward arriba de cada neurona y los deltas del backward debajo" });
   var ui = api.controls(root);
   var bstep = ui.button("Paso siguiente ▸", function () { if (S.phase < 6) S.phase++; update(); }, "primary");
   ui.button("◂ Paso anterior", function () { if (S.phase > 0) S.phase--; update(); });
   ui.button("Aplicar la actualización y repetir", function () { applyStep(); });
-  ui.slider({ label: "Entrada x₁", min: -2, max: 2, step: 0.1, value: S.x1, fmt: function (v) { return v.toFixed(1); }, onInput: function (v) { S.x1 = v; update(); } });
-  ui.slider({ label: "Entrada x₂", min: -2, max: 2, step: 0.1, value: S.x2, fmt: function (v) { return v.toFixed(1); }, onInput: function (v) { S.x2 = v; update(); } });
-  ui.slider({ label: "Respuesta correcta y", min: -2, max: 4, step: 0.1, value: S.y, fmt: function (v) { return v.toFixed(1); }, onInput: function (v) { S.y = v; update(); } });
+  ui.slider({ label: "Gusto por la acción x₁", min: -2, max: 2, step: 0.1, value: S.x1, fmt: function (v) { return v.toFixed(1); }, onInput: function (v) { S.x1 = v; update(); } });
+  ui.slider({ label: "Gusto por la comedia x₂", min: -2, max: 2, step: 0.1, value: S.x2, fmt: function (v) { return v.toFixed(1); }, onInput: function (v) { S.x2 = v; update(); } });
+  ui.slider({ label: "Nota real que puso el usuario y", min: -2, max: 4, step: 0.1, value: S.y, fmt: function (v) { return v.toFixed(1); }, onInput: function (v) { S.y = v; update(); } });
   var sb2 = ui.slider({ label: "Bias b₂ de la neurona oculta 2 (bájalo para «matarla»)", min: -4, max: 2, step: 0.1, value: P.b2, fmt: function (v) { return v.toFixed(1); }, onInput: function (v) { P.b2 = v; update(); } });
   ui.slider({ label: "Learning rate", min: 0.002, max: 0.04, step: 0.002, value: S.lr, fmt: function (v) { return v.toFixed(3); }, onInput: function (v) { S.lr = v; update(); } });
   var out = api.readout(root);
@@ -75,6 +75,9 @@ Lab.register("curso5/c5m2-backprop-mano", function (root, api) {
     }
     D.text(ctx, S.x1.toFixed(1), N.x1[0], N.x1[1] - r - 5, { size: fs, mono: true, align: "center", color: C.ink2 });
     D.text(ctx, S.x2.toFixed(1), N.x2[0], N.x2[1] + r + 13, { size: fs, mono: true, align: "center", color: C.ink2 });
+    D.text(ctx, "acción", N.x1[0], N.x1[1] + r + 14, { size: fs, mono: true, align: "center", color: C.muted });
+    D.text(ctx, "comedia", N.x2[0], N.x2[1] - r - 5, { size: fs, mono: true, align: "center", color: C.muted });
+    D.text(ctx, "Shrek", N.o[0], N.o[1] + r + 29, { size: fs, mono: true, align: "center", color: C.muted });
     D.text(ctx, "z=" + f2(f.z1), N.h1[0], N.h1[1] - r - 16, { size: fs, mono: true, align: "center", color: C.ink2 });
     D.text(ctx, "h=" + f2(f.h1), N.h1[0], N.h1[1] - r - 4, { size: fs, mono: true, align: "center", color: C.cobaltoInk, weight: 500 });
     D.text(ctx, "z=" + f2(f.z2), N.h2[0], N.h2[1] + r + 12, { size: fs, mono: true, align: "center", color: C.ink2 });
@@ -85,7 +88,7 @@ Lab.register("curso5/c5m2-backprop-mano", function (root, api) {
     if (ph >= 1) tag((small ? "∂ŷ=" : "∂L/∂ŷ=") + f2(g.dy), N.o[0], N.o[1] + r + 13, "center", tc, 500);
     if (ph >= 3) { var nm = small ? "∂h=" : "∂L/∂h="; tag(nm + f2(g.dh1), N.h1[0] + r + 6, N.h1[1] + 4 - (small ? 12 : 0), "left", tc, 400); tag(nm + f2(g.dh2), N.h2[0] + r + 6, N.h2[1] + 4 + (small ? 12 : 0), "left", tc, 400); }
     if (ph >= 4) { tag("δ₁=" + f2(g.d1), N.h1[0] - r - 6, N.h1[1] + 4, "right", tc, 500); tag("δ₂=" + f2(g.d2), N.h2[0] - r - 6, N.h2[1] + 4, "right", tc, 500); }
-    if (dead1 || dead2) D.text(ctx, "neurona apagada (z ≤ 0)", w / 2, h - 5, { size: 11, align: "center", color: C.muted });
+    if (dead1 || dead2) D.text(ctx, "neurona apagada (z ≤ 0): ya no opina", w / 2, h - 5, { size: 11, align: "center", color: C.muted });
   }
   view.draw(draw);
 

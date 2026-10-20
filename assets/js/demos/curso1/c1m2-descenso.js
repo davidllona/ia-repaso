@@ -5,8 +5,8 @@ Lab.register("curso1/c1m2-descenso", function (root, api) {
     bowl: { name: "Un solo valle (regresión)", J: function (t) { return 0.5 * (t - 1) * (t - 1); }, dJ: function (t) { return t - 1; }, yr: [0, 14], yt: 7, start: 3.2, lr: 0.3 },
     two:  { name: "Dos valles (redes neuronales)", J: function (t) { return Math.pow(t * t - 4, 2) / 64 + 0.15 * t; }, dJ: function (t) { return 4 * t * (t * t - 4) / 64 + 0.15; }, yr: [-1, 3], yt: 4, start: 3.2, lr: 0.5 }
   };
-  var view = api.view(root, { aspect: 1.9, minH: 260, drag: true, label: "Curva de coste con una bola que baja siguiendo el gradiente" });
-  var po = { xr: [-4, 4], yr: T.bowl.yr, xticks: 8, yticks: 7, xlabel: "valor del parámetro θ", ylabel: "coste J(θ)", pad: { l: 46, r: 12, t: 12, b: 40 } };
+  var view = api.view(root, { aspect: 1.9, minH: 260, drag: true, label: "Curva de coste del recomendador con una bola que baja siguiendo el gradiente" });
+  var po = { xr: [-4, 4], yr: T.bowl.yr, xticks: 8, yticks: 7, xlabel: "parámetro θ (peso del género «acción»)", ylabel: "coste J(θ): fallos", pad: { l: 46, r: 12, t: 12, b: 40 } };
   var plot = api.plot(view, po);
   var view2 = api.view(root, { aspect: 4.5, minH: 110, maxH: 160, label: "Coste en cada iteración" });
   var plot2 = api.plot(view2, { xr: [0, 20], yr: [0, 10], xticks: 5, yticks: 2, xlabel: "iteración", pad: { l: 46, r: 12, t: 8, b: 32 } });

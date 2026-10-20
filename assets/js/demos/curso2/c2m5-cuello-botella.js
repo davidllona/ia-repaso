@@ -151,8 +151,8 @@ Lab.register("curso2/c2m5-cuello-botella", function (root, api) {
     var io = new IntersectionObserver(function (es) { if (es[0].isIntersecting) { io.disconnect(); fn(); } });
     io.observe(root);
   }
-  var view = api.view(root, { aspect: 1.15, minH: 330, maxH: 470, label: "Imágenes originales y reconstruidas por el autoencoder, y curva del error" });
-  api.legend(root, [[api.colors().cobalto, "Autoencoder (error en imágenes de test)"], [api.colors().terracota, "PCA con k componentes"], [api.colors().muted, "imagen media (no usa información)"]]);
+  var view = api.view(root, { aspect: 1.15, minH: 330, maxH: 470, label: "Pósters de juguete originales y reconstruidos por el autoencoder, y curva del error" });
+  api.legend(root, [[api.colors().cobalto, "Autoencoder (error en pósters de test)"], [api.colors().terracota, "PCA con k componentes"], [api.colors().muted, "imagen media (no usa información)"]]);
   var ui = api.controls(root), out = api.readout(root), btn;
   ui.segmented({ label: "Tamaño del cuello de botella (k)", options: [[1, "1"], [2, "2"], [4, "4"], [8, "8"], [16, "16"]], value: k,
     onChange: function (v) { k = v; init(); train(CHUNK); update(); } });
@@ -166,8 +166,8 @@ Lab.register("curso2/c2m5-cuello-botella", function (root, api) {
   view.draw(function (ctx, w, h, C) {
     var padX = 10, gap = 6, cell = Math.min(92, (w - 2 * padX - gap * (NS - 1)) / NS), s = cell / S;
     var x0 = (w - (cell * NS + gap * (NS - 1))) / 2, y1 = 22, y2 = y1 + cell + 30;
-    api.d.text(ctx, "Originales (8×8 = 64 números)", x0, 14, { size: 11, weight: 600, color: C.ink2 });
-    api.d.text(ctx, "Reconstruidas desde " + k + " número" + (k > 1 ? "s" : ""), x0, y2 - 8, { size: 11, weight: 600, color: C.ink2 });
+    api.d.text(ctx, "Pósters de juguete (8×8 = 64 números)", x0, 14, { size: 11, weight: 600, color: C.ink2 });
+    api.d.text(ctx, "Reconstruidos desde " + k + " número" + (k > 1 ? "s" : ""), x0, y2 - 8, { size: 11, weight: 600, color: C.ink2 });
     shown.forEach(function (im, q) {
       drawImg(ctx, im, x0 + q * (cell + gap), y1, s, C);
       drawImg(ctx, net.predict(im), x0 + q * (cell + gap), y2, s, C);

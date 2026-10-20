@@ -14,7 +14,7 @@ Lab.register("curso3/c3m1-densa-mano", function (root, api) {
   var view2 = api.view(root, { aspect: 5, minH: 90, maxH: 120, label: "Pérdida en cada paso de descenso" });
   var ui = api.controls(root), out = api.readout(root);
   function sl(l, a, i, mn, mx) { return ui.slider({ label: l, min: mn, max: mx, step: 0.1, value: S[a][i], fmt: function (v) { return v.toFixed(1); }, onInput: function (v) { S[a][i] = v; S.hist = [loss()]; update(); } }); }
-  sl("x₁", "x", 0, -3, 3); sl("x₂", "x", 1, -3, 3); sl("objetivo t₁", "t", 0, -1, 2); sl("objetivo t₂", "t", 1, -1, 2);
+  sl("x₁ (comedias vistas)", "x", 0, -3, 3); sl("x₂ (películas de acción vistas)", "x", 1, -3, 3); sl("objetivo t₁ (Toy Story: 1 sí, 0 no)", "t", 0, -1, 2); sl("objetivo t₂ (Matrix: 1 sí, 0 no)", "t", 1, -1, 2);
   ui.select({ label: "activación f", value: "relu", options: [["linear", "linear (ninguna)"], ["relu", "relu"], ["sigmoid", "sigmoid"], ["tanh", "tanh"]], onChange: function (v) { S.act = v; S.hist = [loss()]; update(); } });
   ui.slider({ label: "learning rate", min: 0.01, max: 0.5, step: 0.01, value: S.lr, fmt: function (v) { return v.toFixed(2); }, onInput: function (v) { S.lr = v; update(); } });
   ui.button("Un paso: W ← W − lr·∂L/∂W", function () { step(1); }, "primary");
@@ -64,6 +64,7 @@ Lab.register("curso3/c3m1-densa-mano", function (root, api) {
       D.circle(ctx, xi[i], yi[i], r, C.paper, C.ink, 2);
       D.text(ctx, "x" + (i + 1), xi[i], yi[i] - 3, { align: "center", size: 11, weight: 700, mono: true });
       D.text(ctx, n2(S.x[i], 1), xi[i], yi[i] + 10, { align: "center", size: 10.5, mono: true, color: C.ink2 });
+      D.text(ctx, i === 0 ? "comedias" : "acción", xi[i], i === 0 ? yi[i] - r - 6 : yi[i] + r + 14, { align: "center", size: 10, color: C.muted });
     }
     for (j = 0; j < 2; j++) {
       D.circle(ctx, xo, yo[j], r + 3, C.cobaltoWash, C.ink, 2);
@@ -74,6 +75,7 @@ Lab.register("curso3/c3m1-densa-mano", function (root, api) {
       D.rect(ctx, xt - 20, yo[j] - 12, 40, 24, C.olivaWash, C.ink, 1.5);
       D.text(ctx, "t" + (j + 1) + "=" + n2(S.t[j], 1), xt, yo[j] + 4, { align: "center", size: 10.5, mono: true, weight: 600 });
       D.arrow(ctx, xo + r + 6, yo[j], xt - 22, yo[j], C.muted, 1.4);
+      D.text(ctx, j === 0 ? "Toy Story" : "Matrix", xt, j === 0 ? yo[j] - 18 : yo[j] + 26, { align: "center", size: 10, color: C.muted });
     }
     D.text(ctx, "L = " + n2(f.L, 4), w * 0.88, h * 0.5 + 4, { align: "center", size: 11.5, mono: true, weight: 700, color: C.terracotaInk });
   }

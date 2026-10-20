@@ -43,15 +43,15 @@ Lab.register("curso1/c1m3-arbol-profundidad", function (root, api) {
   function acc(set, cap) { var ok = 0; set.forEach(function (p) { if (predict(p, cap) === p[2]) ok++; }); return ok / set.length; }
   function leaves(nd, cap) { return (nd.left && nd.depth < cap) ? leaves(nd.left, cap) + leaves(nd.right, cap) : 1; }
 
-  var view = api.view(root, { aspect: 1.7, minH: 250, label: "Frontera de decisión de un árbol de decisión con la profundidad elegida" });
-  var plot = api.plot(view, { xr: XR, yr: YR, xticks: 6, yticks: 3, pad: { l: 34, r: 10, t: 10, b: 26 }, xfmt: function (v) { return v.toFixed(1); }, yfmt: function (v) { return v.toFixed(1); } });
+  var view = api.view(root, { aspect: 1.7, minH: 250, label: "Películas infantiles y thrillers según su nivel de violencia y de suspense, y frontera de decisión de un árbol con la profundidad elegida" });
+  var plot = api.plot(view, { xr: XR, yr: YR, xticks: 6, yticks: 3, xlabel: "nivel de violencia →", ylabel: "nivel de suspense →", pad: { l: 26, r: 10, t: 10, b: 36 }, xfmt: function () { return ""; }, yfmt: function () { return ""; } });
   var view2 = api.view(root, { aspect: 3.2, minH: 130, maxH: 200, label: "Acierto en train y en test según la profundidad máxima" });
   var plot2 = api.plot(view2, { xr: [1, MAXD], yr: [0.5, 1], xticks: 11, yticks: 2, xlabel: "profundidad máxima (max_depth)", pad: { l: 40, r: 10, t: 10, b: 34 }, yfmt: function (v) { return Math.round(v * 100) + "%"; } });
   var ui = api.controls(root), out = api.readout(root);
   ui.slider({ label: "Profundidad máxima (max_depth)", min: 1, max: MAXD, step: 1, value: depth, onInput: function (v) { depth = v; update(); } });
   ui.slider({ label: "Ruido de los datos", min: 0.1, max: 0.5, step: 0.05, value: noise, fmt: function (v) { return v.toFixed(2); }, onInput: function (v) { noise = v; gen(); update(); } });
   ui.button("Generar otros datos", function () { seed += 5; gen(); update(); });
-  api.legend(root, [[api.colors().cobalto, "clase A (train)"], [api.colors().terracota, "clase B (train)"], [api.colors().ink, "círculos pequeños huecos: datos de test"]]);
+  api.legend(root, [[api.colors().cobalto, "infantiles (train)"], [api.colors().terracota, "thrillers (train)"], [api.colors().ink, "círculos pequeños huecos: películas de test"]]);
 
   function draw(ctx, w, h, C) {
     plot.axes(ctx);
@@ -77,8 +77,8 @@ Lab.register("curso1/c1m3-arbol-profundidad", function (root, api) {
   function update() {
     view.redraw(); view2.redraw();
     var a = accs[depth - 1], tr = a[1], te = a[2], v, cls;
-    if (tr < 0.8 && te < 0.8) { v = "Infraajuste: el árbol es demasiado simple y ni siquiera acierta bien con los datos que ha visto."; cls = "bad"; }
-    else if (tr - te > 0.08) { v = "Sobreajuste: acierta casi todo el entrenamiento, pero falla bastante más en datos nuevos."; cls = "bad"; }
+    if (tr < 0.8 && te < 0.8) { v = "Infraajuste: el árbol es demasiado simple y ni siquiera acierta bien con las películas que ya conoce."; cls = "bad"; }
+    else if (tr - te > 0.08) { v = "Sobreajuste: se sabe de memoria las películas que ya conoce, pero falla bastante más con películas nuevas."; cls = "bad"; }
     else { v = "Buen equilibrio: acierto parecido y alto en train y en test."; cls = "good"; }
     out.set("max_depth = <b>" + depth + "</b> · hojas = <b>" + leaves(tree, depth) + "</b> · acierto en train = <b>" + (tr * 100).toFixed(1) + " %</b> · en test = <b>" + (te * 100).toFixed(1) + " %</b><br><span class='" + cls + "'>" + v + "</span>");
   }

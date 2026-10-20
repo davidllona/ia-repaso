@@ -7,12 +7,12 @@ Lab.register("curso4/c4m4-entrena-1d", function (root, api) {
   var S = { data: "solape", lr: 0.5, modo: "batch", curva: "loss", epoch: 0, updates: 0, max: 1000, w: 0, b: 0 };
   var rng, hist, loop, ready = false;
 
-  var view = api.view(root, { aspect: 1.9, minH: 230, maxH: 360, label: "Los 14 alumnos y la curva sigmoide que se va ajustando durante el entrenamiento" });
-  var plot = api.plot(view, { xr: [0, 9], yr: [-0.2, 1.2], xticks: 9, yticks: 7, xlabel: "horas de estudio", ylabel: "p", pad: { l: 40, r: 10, t: 10, b: 36 }, yfmt: function (v) { return (+v.toFixed(1)).toString(); } });
+  var view = api.view(root, { aspect: 1.9, minH: 230, maxH: 360, label: "Los 14 usuarios y la curva sigmoide que se va ajustando durante el entrenamiento" });
+  var plot = api.plot(view, { xr: [0, 9], yr: [-0.2, 1.2], xticks: 9, yticks: 7, xlabel: "días sin abrir la app", ylabel: "p (cancelar)", pad: { l: 40, r: 10, t: 10, b: 36 }, yfmt: function (v) { return (+v.toFixed(1)).toString(); } });
   var view2 = api.view(root, { aspect: 3.4, minH: 150, maxH: 230, label: "Curva de aprendizaje" });
   var plot2 = api.plot(view2, { xr: [0, 100], yr: [0, 0.8], xticks: 4, yticks: 4, xlabel: "época", ylabel: "pérdida", pad: { l: 46, r: 16, t: 10, b: 34 } });
   var ui = api.controls(root), out = api.readout(root);
-  ui.select({ label: "Datos", value: S.data, options: [["solape", "Con solapamiento (los de siempre)"], ["separable", "Perfectamente separables (corte en 3.25 h)"]], onChange: function (v) { S.data = v; reset(); } });
+  ui.select({ label: "Datos", value: S.data, options: [["solape", "Con solapamiento (los de siempre)"], ["separable", "Perfectamente separables (corte en 3.25 días)"]], onChange: function (v) { S.data = v; reset(); } });
   ui.segmented({ label: "Cuántos datos por actualización", options: [["batch", "Todos (14)"], ["mini", "Mini-batch (4)"], ["sgd", "Uno (SGD)"]], value: S.modo, onChange: function (v) { S.modo = v; reset(); } });
   ui.slider({ label: "Learning rate", min: 0.05, max: 3, step: 0.05, value: S.lr, fmt: function (v) { return v.toFixed(2); }, onInput: function (v) { S.lr = v; reset(); } });
   ui.segmented({ label: "Curva inferior", options: [["loss", "Pérdida"], ["w", "Valor de w"]], value: S.curva, onChange: function (v) { S.curva = v; view2.redraw(); } });
@@ -69,7 +69,7 @@ Lab.register("curso4/c4m4-entrena-1d", function (root, api) {
     var fx = Math.abs(S.w) > 1e-6 ? (-S.b / S.w) : null, ok = accAll(), msg = "";
     if (S.data === "separable" && S.epoch > 200) msg = "<br><span class='bad'>Datos separables: la pérdida sigue bajando hacia 0 y w sigue creciendo sin parar (no existe un mínimo finito).</span>";
     out.set("época <b>" + S.epoch + "</b> · actualizaciones hechas: <b>" + S.updates + "</b> · lr = " + S.lr.toFixed(2) + "<br>" +
-      "w = <b>" + S.w.toFixed(3) + "</b> · b = <b>" + S.b.toFixed(3) + "</b> · pérdida BCE = <b>" + lossAll().toFixed(4) + "</b> · accuracy = <b>" + ok + " de 14</b>" + (fx !== null ? " · frontera en <b>" + fx.toFixed(2) + " h</b>" : "") + msg);
+      "w = <b>" + S.w.toFixed(3) + "</b> · b = <b>" + S.b.toFixed(3) + "</b> · pérdida BCE = <b>" + lossAll().toFixed(4) + "</b> · accuracy = <b>" + ok + " de 14</b>" + (fx !== null ? " · frontera en <b>" + fx.toFixed(2) + " días</b>" : "") + msg);
   }
   ready = true; reset();
   return { destroy: function () { loop.stop(); } };

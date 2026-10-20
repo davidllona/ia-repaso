@@ -27,16 +27,16 @@ Lab.register("curso1/c1m3-sesgo-varianza", function (root, api) {
     }
   }
 
-  var view = api.view(root, { aspect: 1.7, minH: 250, label: "Treinta ajustes del mismo modelo con treinta conjuntos de datos distintos, su media y la función real" });
-  var plot = api.plot(view, { xr: [-1, 1], yr: [-1.8, 1.8], xticks: 4, yticks: 4, pad: { l: 36, r: 10, t: 10, b: 24 }, xfmt: function (v) { return v.toFixed(1); }, yfmt: function (v) { return v.toFixed(1); } });
-  var view2 = api.view(root, { aspect: 3.1, minH: 140, maxH: 210, label: "Sesgo al cuadrado, varianza y su suma según la complejidad del modelo" });
+  var view = api.view(root, { aspect: 1.7, minH: 250, label: "Treinta predicciones del número de usuarios conectados a Netflix a cada hora de la noche, hechas con treinta conjuntos de datos distintos, su media y la curva real" });
+  var plot = api.plot(view, { xr: [-1, 1], yr: [-1.8, 1.8], xticks: 4, yticks: 4, xlabel: "hora de la noche", ylabel: "usuarios conectados", pad: { l: 26, r: 20, t: 10, b: 36 }, xfmt: function (v) { return (22 + 2 * v) + " h"; }, yfmt: function () { return ""; } });
+  var view2 = api.view(root, { aspect: 3.1, minH: 140, maxH: 210, label: "Sesgo al cuadrado, varianza y su suma según la complejidad del recomendador" });
   var plot2 = api.plot(view2, { xr: [1, MAXD], yr: [0, 0.3], xticks: 9, yticks: 3, xlabel: "complejidad del modelo (grado del polinomio)", pad: { l: 44, r: 10, t: 10, b: 34 }, yfmt: function (v) { return v.toFixed(2); } });
   var ui = api.controls(root), out = api.readout(root);
   ui.slider({ label: "Complejidad (grado del polinomio)", min: 1, max: MAXD, step: 1, value: deg, onInput: function (v) { deg = v; update(); } });
-  ui.slider({ label: "Datos de entrenamiento por ajuste", min: 8, max: 60, step: 1, value: N, onInput: function (v) { N = v; compute(); update(); } });
+  ui.slider({ label: "Datos de entrenamiento por recomendador", min: 8, max: 60, step: 1, value: N, onInput: function (v) { N = v; compute(); update(); } });
   ui.slider({ label: "Ruido de los datos (σ)", min: 0.1, max: 0.5, step: 0.05, value: noise, fmt: function (v) { return v.toFixed(2); }, onInput: function (v) { noise = v; compute(); update(); } });
   var C0 = api.colors();
-  api.legend(root, [[C0.muted, "función real"], [C0.terracota, "cada ajuste (30)"], [C0.ink, "media de los 30 ajustes"], [C0.cobalto, "sesgo²"], [C0.oliva, "varianza"]]);
+  api.legend(root, [[C0.muted, "curva real"], [C0.terracota, "cada recomendador (30)"], [C0.ink, "media de los 30"], [C0.cobalto, "sesgo²"], [C0.oliva, "varianza"]]);
 
   function draw(ctx, w, h, C) {
     plot.axes(ctx); ctx.save(); plot.clip(ctx);
@@ -64,8 +64,8 @@ Lab.register("curso1/c1m3-sesgo-varianza", function (root, api) {
   function update() {
     view.redraw(); view2.redraw();
     var s = stats[deg - 1], tot = s.b2 + s.va, s2 = noise * noise, v, cls = "good";
-    if (s.b2 > Math.max(0.02, 0.4 * s2) && s.b2 > s.va) { v = "Sesgo alto: la media de los ajustes se aleja de la función real (infraajuste). Entrenar con más datos no lo arregla."; cls = "bad"; }
-    else if (s.va > Math.max(0.05, s2) && s.va > s.b2) { v = "Varianza alta: cada ajuste es muy distinto de los demás (sobreajuste). Más datos o un modelo más simple lo reducen."; cls = "bad"; }
+    if (s.b2 > Math.max(0.02, 0.4 * s2) && s.b2 > s.va) { v = "Sesgo alto: la media de los recomendadores se aleja de la curva real (infraajuste). Entrenar con más datos no lo arregla."; cls = "bad"; }
+    else if (s.va > Math.max(0.05, s2) && s.va > s.b2) { v = "Varianza alta: cada recomendador da una curva muy distinta de las demás (sobreajuste). Más datos o un modelo más simple lo reducen."; cls = "bad"; }
     else v = "Sesgo y varianza equilibrados: ninguna de las dos fuentes de error domina.";
     out.set("grado <b>" + deg + "</b> · sesgo² = <b>" + s.b2.toFixed(3) + "</b> · varianza = <b>" + s.va.toFixed(3) + "</b> · ruido irreducible σ² = <b>" + s2.toFixed(3) + "</b><br>" +
       "Error esperado en test ≈ sesgo² + varianza + σ² = " + s.b2.toFixed(3) + " + " + s.va.toFixed(3) + " + " + s2.toFixed(3) + " = <b>" + (tot + s2).toFixed(3) + "</b><br><span class='" + cls + "'>" + v + "</span>");

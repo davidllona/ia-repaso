@@ -5,7 +5,7 @@ Lab.register("curso2/c2m2-anatomia-fit", function (root, api) {
 
   var view = api.view(root, { aspect: 3.2, minH: 250, maxH: 250, label: "Conjunto de datos dividido en lotes; épocas completadas y paso actual" });
   var ui = api.controls(root), out = api.readout(root);
-  ui.slider({ label: "Muestras del dataset (N)", min: 50, max: 2000, step: 50, value: st.N, onInput: function (v) { st.N = v; reset(); } });
+  ui.slider({ label: "Valoraciones de películas del dataset (N)", min: 50, max: 2000, step: 50, value: st.N, onInput: function (v) { st.N = v; reset(); } });
   ui.select({ label: "batch_size", value: st.batch, options: [[8, "8"], [16, "16"], [32, "32"], [64, "64"], [128, "128"], [256, "256"]], onChange: function (v) { st.batch = +v; reset(); } });
   ui.slider({ label: "epochs", min: 1, max: 10, step: 1, value: st.epochs, onInput: function (v) { st.epochs = v; reset(); } });
   ui.select({ label: "validation_split", value: st.vs, options: [[0, "0 (sin validación)"], [0.1, "0.1"], [0.2, "0.2"], [0.3, "0.3"]], onChange: function (v) { st.vs = +v; reset(); } });
@@ -37,8 +37,8 @@ Lab.register("curso2/c2m2-anatomia-fit", function (root, api) {
     var D = api.d, g = geom(), x0 = 14, x1 = w - 14, bw = x1 - x0, barY = 52, barH = 38, i;
     var ep = Math.min(st.epochs - 1, Math.floor(done / g.steps)), stepIn = done >= g.total ? g.steps : done - ep * g.steps;
     var narrow = w < 520;
-    D.text(ctx, (narrow ? "" : "dataset: ") + st.N + " muestras = " + g.ntr + " entreno" + (g.nva ? " + " + g.nva + " validación" : ""), x0, 18, { size: 12, weight: 600, color: C.ink });
-    D.text(ctx, narrow ? "cada bloque = un lote de " + st.batch + " = 1 actualización" : "cada bloque es un lote (batch) = " + st.batch + " muestras; en cada bloque se actualizan los pesos UNA vez", x0, 36, { size: 10.5, color: C.muted });
+    D.text(ctx, (narrow ? "" : "dataset: ") + st.N + " valoraciones = " + g.ntr + " entreno" + (g.nva ? " + " + g.nva + " validación" : ""), x0, 18, { size: 12, weight: 600, color: C.ink });
+    D.text(ctx, narrow ? "cada bloque = un lote de " + st.batch + " = 1 actualización" : "cada bloque es un lote (batch) de " + st.batch + " valoraciones: pesos actualizados UNA vez", x0, 36, { size: 10.5, color: C.muted });
     var trW = bw * g.ntr / st.N;
     D.rect(ctx, x0, barY, trW, barH, C.surface, null);
     for (i = 0; i < g.steps; i++) {
@@ -59,7 +59,7 @@ Lab.register("curso2/c2m2-anatomia-fit", function (root, api) {
       var cx = x0 + trW * (stepIn + 0.5) * st.batch / g.ntr; cx = Math.min(cx, x0 + trW);
       D.arrow(ctx, cx, barY - 8, cx, barY - 1, C.terracota, 2);
       var s1 = stepIn * st.batch + 1, s2 = Math.min(g.ntr, (stepIn + 1) * st.batch);
-      var lab = "lote " + (stepIn + 1) + ": muestras " + s1 + "–" + s2, tw = lab.length * 6.2;
+      var lab = "lote " + (stepIn + 1) + ": valoraciones " + s1 + "–" + s2, tw = lab.length * 6.2;
       D.text(ctx, "", cx, barY - 12, {});
       D.text(ctx, lab, Math.max(x0 + tw / 2, Math.min(w - 14 - tw / 2, cx)), barY + barH + 16, { align: "center", size: 11, color: C.terracotaInk, weight: 600 });
     } else D.text(ctx, "fit() terminado", w / 2, barY + barH + 16, { align: "center", size: 11, color: C.olivaInk, weight: 600 });
@@ -83,7 +83,7 @@ Lab.register("curso2/c2m2-anatomia-fit", function (root, api) {
     view.redraw();
     var g = geom(), ep = Math.min(st.epochs, Math.floor(done / g.steps) + 1), stepIn = done >= g.total ? g.steps : done % g.steps;
     var fill = 20, nf = Math.round(fill * stepIn / g.steps), bar = new Array(nf + 1).join("━") + new Array(fill - nf + 1).join("╌");
-    var lastTxt = g.last < st.batch ? "El último lote solo tiene <b>" + g.last + "</b> muestras (" + g.ntr + " no es múltiplo de " + st.batch + ")." : "Todos los lotes tienen " + st.batch + " muestras (" + g.ntr + " es múltiplo de " + st.batch + ").";
+    var lastTxt = g.last < st.batch ? "El último lote solo tiene <b>" + g.last + "</b> valoraciones (" + g.ntr + " no es múltiplo de " + st.batch + ")." : "Todos los lotes tienen " + st.batch + " valoraciones (" + g.ntr + " es múltiplo de " + st.batch + ").";
     out.set("steps_per_epoch = ceil(" + g.ntr + " / " + st.batch + ") = <b>" + g.steps + "</b> · actualizaciones totales = " + st.epochs + " × " + g.steps + " = <b>" + g.total + "</b><br>" +
       lastTxt + (g.nva ? "<br>validation_split=" + st.vs + " aparta las <b>últimas " + g.nva + "</b> filas (" + g.ntr + " = int(" + st.N + " × " + (1 - st.vs).toFixed(1) + ")): no se mezclan antes." : "") +
       "<br>Epoch " + ep + "/" + st.epochs + "&nbsp; " + stepIn + "/" + g.steps + " " + bar);

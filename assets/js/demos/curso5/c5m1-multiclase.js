@@ -123,8 +123,8 @@ Lab.register("curso5/c5m1-multiclase", function (root, api) {
   }
   var row = api.el("div", { class: "lab-row" }), colA = api.el("div"), colB = api.el("div");
   row.appendChild(colA); row.appendChild(colB); root.appendChild(row);
-  var view = api.view(colA, { aspect: 1.0, minH: 250, maxH: 420, drag: true, label: "Mapa de la clase que predice la red, con los puntos de entrenamiento" });
-  var plot = api.plot(view, { xr: [-HM, HM], yr: [-HM, HM], xticks: 4, yticks: 4, pad: { l: 30, r: 14, t: 8, b: 22 }, xfmt: function (v) { return +v.toFixed(1); }, yfmt: function (v) { return +v.toFixed(1); } });
+  var view = api.view(colA, { aspect: 1.0, minH: 250, maxH: 420, drag: !matchMedia("(pointer:coarse)").matches, label: "Mapa de tráilers con el género que predice la red (acción, comedia o terror) y los tráilers de entrenamiento" });
+  var plot = api.plot(view, { xr: [-HM, HM], yr: [-HM, HM], xticks: 4, yticks: 4, xlabel: "x₁ · ritmo del tráiler", ylabel: "x₂ · humor", pad: { l: 40, r: 14, t: 8, b: 38 }, xfmt: function (v) { return +v.toFixed(1); }, yfmt: function (v) { return +v.toFixed(1); } });
   var viewP = api.view(colB, { aspect: 1.25, minH: 190, maxH: 300, label: "Logits y probabilidades del punto marcado" });
   var viewL = api.view(colB, { aspect: 2.4, minH: 110, maxH: 180, label: "Curva de pérdida" });
   var plotL = api.plot(viewL, { xr: [0, 100], yr: [0, 1.2], xticks: 4, yticks: 2, xlabel: "pasos", pad: { l: 40, r: 24, t: 20, b: 34 }, xfmt: function (v) { return Math.round(v); } });
@@ -141,7 +141,7 @@ Lab.register("curso5/c5m1-multiclase", function (root, api) {
   ui.button("+100 pasos", function () { stop(); for (var i = 0; i < 100; i++) one(); update(); });
   ui.button("Reiniciar pesos", function () { S.seed++; build(); });
   ui.button("Otros datos", function () { S.dseed++; genData(); build(); });
-  api.legend(root, [[C0.cobalto, "clase 0"], [C0.terracota, "clase 1"], [C0.oliva, "clase 2"], [C0.ink, "tu punto de prueba (clic en el mapa)"]]);
+  api.legend(root, [[C0.cobalto, "0 · acción"], [C0.terracota, "1 · comedia"], [C0.oliva, "2 · terror"], [C0.ink, "tu tráiler de prueba (toca o haz clic en el mapa)"]]);
 
   function one() {
     net.step(Xtr, Ytr, Math.pow(10, S.lrExp), "adam"); S.step++;
@@ -207,7 +207,7 @@ Lab.register("curso5/c5m1-multiclase", function (root, api) {
     var p = net.o, best = 0, k; for (k = 1; k < K; k++) if (p[k] > p[best]) best = k;
     out.set("Paso <b>" + S.step + "</b> · parámetros: <b>" + net.nparams() + "</b> (capa de salida: <b>" + K + "</b> neuronas × " + S.H + " + " + K + " sesgos) · pérdida = <b>" + a.loss.toFixed(3) + "</b><br>" +
       "acierto train = <b>" + (a.acc * 100).toFixed(0) + " %</b> · test = <b>" + (b.acc * 100).toFixed(0) + " %</b><br>" +
-      "Punto (" + S.probe[0].toFixed(2) + ", " + S.probe[1].toFixed(2) + "): probabilidades " + [0, 1, 2].map(function (q) { return (p[q] * 100).toFixed(1) + "%"; }).join(" / ") + " → <b>argmax = clase " + best + "</b>");
+      "Punto (" + S.probe[0].toFixed(2) + ", " + S.probe[1].toFixed(2) + "): probabilidades " + [0, 1, 2].map(function (q) { return (p[q] * 100).toFixed(1) + "%"; }).join(" / ") + " → <b>argmax = clase " + best + " (" + ["acción", "comedia", "terror"][best] + ")</b>");
     view.redraw(); viewP.redraw(); viewL.redraw();
   }
   genData(); build();

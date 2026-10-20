@@ -1,7 +1,7 @@
 /* Experimento: ajustar una recta a mano, ver los residuos, el MSE y compararlo con la solución OLS. */
 Lab.register("curso1/c1m2-recta-a-mano", function (root, api) {
   var M = api.math, r = api.rng(4), pts = [], i;
-  // 12 coches inventados: CO2 ≈ 115 + 34·motor + ruido
+  // 12 películas inventadas: horas vistas (miles) ≈ 115 + 34·presupuesto (×10 M€) + ruido
   for (i = 0; i < 12; i++) {
     var x = Math.round(r.range(1.0, 5.5) * 10) / 10;
     pts.push({ x: x, y: Math.round(115 + 34 * x + r.normal(0, 22)) });
@@ -9,11 +9,11 @@ Lab.register("curso1/c1m2-recta-a-mano", function (root, api) {
   var ols = M.linreg(pts.map(function (p) { return p.x; }), pts.map(function (p) { return p.y; }));
   var t0 = 160, t1 = 12, showOls = false, showSq = true;
 
-  var view = api.view(root, { aspect: 1.6, minH: 290, label: "Doce coches según el tamaño del motor y sus emisiones, con una recta ajustable y los errores de cada coche" });
-  var plot = api.plot(view, { xr: [0, 6], yr: [50, 350], xticks: 6, yticks: 6, xlabel: "Tamaño del motor (litros)", ylabel: "CO₂ (g/km)", pad: { l: 52, r: 14, t: 12, b: 40 } });
+  var view = api.view(root, { aspect: 1.6, minH: 290, label: "Doce películas según su presupuesto y las horas vistas en la primera semana, con una recta ajustable y los errores de cada película" });
+  var plot = api.plot(view, { xr: [0, 6], yr: [50, 350], xticks: 6, yticks: 6, xlabel: "Presupuesto (decenas de millones de €)", ylabel: "Horas vistas (miles)", pad: { l: 52, r: 14, t: 12, b: 40 } });
   var ui = api.controls(root), out = api.readout(root);
-  var s1 = ui.slider({ label: "Pendiente θ₁ (g/km por cada litro)", min: -10, max: 80, step: 0.5, value: t1, fmt: function (v) { return v.toFixed(1); }, onInput: function (v) { t1 = v; update(); } });
-  var s0 = ui.slider({ label: "Intercepto θ₀ (g/km con motor 0 L)", min: 0, max: 250, step: 1, value: t0, fmt: function (v) { return v.toFixed(0); }, onInput: function (v) { t0 = v; update(); } });
+  var s1 = ui.slider({ label: "Pendiente θ₁ (miles de horas por cada 10 M€)", min: -10, max: 80, step: 0.5, value: t1, fmt: function (v) { return v.toFixed(1); }, onInput: function (v) { t1 = v; update(); } });
+  var s0 = ui.slider({ label: "Intercepto θ₀ (miles de horas con presupuesto 0)", min: 0, max: 250, step: 1, value: t0, fmt: function (v) { return v.toFixed(0); }, onInput: function (v) { t0 = v; update(); } });
   ui.toggle({ label: "Dibujar los cuadrados del error", value: true, onChange: function (v) { showSq = v; update(); } });
   ui.toggle({ label: "Mostrar la recta OLS", value: false, onChange: function (v) { showOls = v; update(); } });
   ui.button("Poner mi recta donde la pone OLS", function () { t1 = Math.round(ols.m * 2) / 2; t0 = Math.round(ols.b); s1.set(t1, true); s0.set(t0, true); update(); }, "primary");
@@ -47,7 +47,7 @@ Lab.register("curso1/c1m2-recta-a-mano", function (root, api) {
     var me = stats(t0, t1), best = stats(ols.b, ols.m);
     var ratio = me.mse / best.mse;
     out.set("Tu recta: ŷ = <b>" + t0.toFixed(0) + " + " + t1.toFixed(1) + "·x</b><br>" +
-      "MSE = <b>" + me.mse.toFixed(0) + "</b> · RMSE = <b>" + Math.sqrt(me.mse).toFixed(1) + " g/km</b> · MAE = <b>" + me.mae.toFixed(1) + " g/km</b><br>" +
+      "MSE = <b>" + me.mse.toFixed(0) + "</b> · RMSE = <b>" + Math.sqrt(me.mse).toFixed(1) + " mil h</b> · MAE = <b>" + me.mae.toFixed(1) + " mil h</b><br>" +
       "Recta OLS: ŷ = " + ols.b.toFixed(1) + " + " + ols.m.toFixed(2) + "·x → MSE = <b>" + best.mse.toFixed(0) + "</b><br>" +
       (ratio < 1.03 ? "<span class='good'>Casi has llegado al mínimo posible.</span>" : "<span class='bad'>Tu error cuadrático es " + ratio.toFixed(1) + " veces el mínimo posible.</span>"));
   }

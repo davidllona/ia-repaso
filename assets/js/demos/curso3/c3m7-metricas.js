@@ -1,4 +1,4 @@
-/* Experimento: MAE, RMSE y R² calculados sobre 8 pisos. Los puntos predichos se pueden ARRASTRAR en vertical.
+/* Experimento: MAE, RMSE y R² calculados sobre 8 películas (audiencia en miles de espectadores). Los puntos predichos se pueden ARRASTRAR en vertical.
    R² = 1 - SSE/SST compara el error del modelo con el error de "predecir siempre la media" (el baseline). */
 Lab.register("curso3/c3m7-metricas", function (root, api) {
   var D = api.d;
@@ -16,12 +16,12 @@ Lab.register("curso3/c3m7-metricas", function (root, api) {
     if (S.outlier) dev[REAL.length - 1] += 90;
   }
 
-  var view = api.view(root, { aspect: 1.35, minH: 300, maxH: 400, drag: true, label: "Precio real frente a precio predicho de 8 pisos; la diagonal es la predicción perfecta y la horizontal, predecir siempre la media" });
-  var plot = api.plot(view, { xr: [60, 420], yr: [0, 480], xticks: 6, yticks: 6, grid: true, pad: { l: 46, r: 14, t: 14, b: 42 }, xlabel: "precio real (miles €)" });
+  var view = api.view(root, { aspect: 1.35, minH: 300, maxH: 400, drag: true, label: "Audiencia real frente a audiencia predicha de 8 películas; la diagonal es la predicción perfecta y la horizontal, predecir siempre la media" });
+  var plot = api.plot(view, { xr: [60, 420], yr: [0, 480], xticks: 6, yticks: 6, grid: true, pad: { l: 46, r: 14, t: 14, b: 42 }, xlabel: "audiencia real (miles de espectadores)" });
   var ui = api.controls(root), out = api.readout(root);
-  ui.slider({ label: "Error típico del modelo (σ, miles €)", min: 0, max: 80, step: 1, value: S.sigma, onInput: function (v) { S.sigma = v; apply(); update(); } });
-  ui.slider({ label: "Sesgo (el modelo tasa de más o de menos)", min: -60, max: 60, step: 1, value: S.bias, onInput: function (v) { S.bias = v; apply(); update(); } });
-  ui.toggle({ label: "Un piso muy mal tasado (+90)", value: S.outlier, onChange: function (v) { S.outlier = v; apply(); update(); } });
+  ui.slider({ label: "Error típico del modelo (σ, miles de espectadores)", min: 0, max: 80, step: 1, value: S.sigma, onInput: function (v) { S.sigma = v; apply(); update(); } });
+  ui.slider({ label: "Sesgo (el modelo calcula de más o de menos)", min: -60, max: 60, step: 1, value: S.bias, onInput: function (v) { S.bias = v; apply(); update(); } });
+  ui.toggle({ label: "Un estreno inesperado (+90)", value: S.outlier, onChange: function (v) { S.outlier = v; apply(); update(); } });
   ui.button("Otro sorteo de errores", function () { S.seed = S.seed % 9 + 1; regen(); update(); });
   api.legend(root, [[api.colors().terracota, "error del modelo"], [api.colors().muted, "error de predecir la media"], [api.colors().cobalto, "predicción (arrastra)"]]);
 

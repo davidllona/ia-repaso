@@ -70,7 +70,7 @@ Lab.register("curso4/c4m1-grafo", function (root, api) {
   view.draw(draw);
   function gs(v) { return v === null ? "None" : "tensor(" + f1(v) + ")"; }
   function update() {
-    var M = model(), s = "";
+    var M = model(), s = "x = horas de acción vistas · t = afinidad real · z = afinidad predicha · L = error<br>";
     s += "L.requires_grad = <b>" + (M.rg.L ? "True" : "False") + "</b> · L.grad_fn = <b>" + (M.rg.L ? "PowBackward0" : "None") + "</b>";
     if (!S.done) s += "<br>Aún no has llamado a backward(): w.grad = None, b.grad = None, x.grad = None.";
     else if (!M.ok) s += "<br><span class='bad'>L.backward() → RuntimeError: element 0 of tensors does not require grad and does not have a grad_fn</span><br>Ningún camino de L llega a un tensor con requires_grad=True, así que no hay nada que derivar.";

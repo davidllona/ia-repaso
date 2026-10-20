@@ -33,7 +33,7 @@ Lab.register("curso2/c2m4-forma-bloque", function (root, api) {
   var ui = api.controls(root), out = api.readout(root);
   out.el.style.fontSize = "clamp(.72rem, 2.7vw, .84rem)";
   function opts(a) { return a.map(function (v) { return [v, String(v)]; }); }
-  ui.select({ label: "Tamaño de lote (batch)", value: S.B, options: opts([1, 8, 32]), onChange: function (v) { S.B = +v; update(); } });
+  ui.select({ label: "Tamaño de lote (batch: cuántos textos a la vez)", value: S.B, options: opts([1, 8, 32]), onChange: function (v) { S.B = +v; update(); } });
   ui.select({ label: "Longitud de la secuencia n (tokens)", value: S.n, options: opts([16, 64, 128, 512, 1024, 2048, 4096]), onChange: function (v) { S.n = +v; update(); } });
   var selD = ui.select({ label: "Tamaño del modelo d_model", value: S.d, options: opts([64, 128, 256, 512, 768]), onChange: function (v) { S.d = +v; if (S.d % S.h) { S.h = 1; selH.set(1); } update(); } });
   var selH = ui.select({ label: "Cabezas de atención h (deben dividir a d_model)", value: S.h, options: opts([1, 2, 4, 8, 12, 16]), onChange: function (v) { var hv = +v; if (S.d % hv) { selH.set(S.h); out.set("<span class='bad'>" + hv + " cabezas no dividen a d_model = " + S.d + ": d_model / h debe ser entero.</span>"); return; } S.h = hv; update(); } });

@@ -8,7 +8,7 @@ Lab.register("curso2/c2m2-playground", function (root, api) {
   var row = api.el("div", { class: "lab-row" });
   var cellA = api.el("div"), cellB = api.el("div");
   row.appendChild(cellA); row.appendChild(cellB); root.appendChild(row);
-  var view = api.view(cellA, { aspect: 1.1, minH: 270, maxH: 400, label: "Frontera de decisión de la red y puntos de entrenamiento y de validación" });
+  var view = api.view(cellA, { aspect: 1.1, minH: 270, maxH: 400, label: "Frontera de decisión de la red entre thrillers y comedias, con las películas de entrenamiento y de validación" });
   var plot = api.plot(view, { xr: [-1.4, 1.4], yr: [-1.3, 1.3], xticks: 4, yticks: 4, grid: false, xfmt: function () { return ""; }, yfmt: function () { return ""; }, pad: { l: 8, r: 8, t: 8, b: 8 } });
   var view2 = api.view(cellB, { aspect: 1.1, minH: 270, maxH: 400, label: "Curvas de loss de entrenamiento y de validación por época" });
   var plot2 = api.plot(view2, { xr: [0, 100], yr: [0, 1], xticks: 4, yticks: 4, xlabel: "época (epoch)", ylabel: "loss", xfmt: function (v) { return Math.round(v); }, pad: { l: 50, r: 8, t: 8, b: 36 } });
@@ -71,6 +71,9 @@ Lab.register("curso2/c2m2-playground", function (root, api) {
     val.X.forEach(function (p, i) { D.circle(ctx, plot.x(p[0]), plot.y(p[1]), 3.6, null, val.Y[i][0] ? C.terracota : C.cobalto, 1.6); });
     train.X.forEach(function (p, i) { D.circle(ctx, plot.x(p[0]), plot.y(p[1]), 4.2, train.Y[i][0] ? C.terracota : C.cobalto, C.paper, 1.2); });
     ctx.restore();
+    var b = plot.box;
+    C2.halo(ctx, "● thriller", b.x + 8, b.y + 18, { size: 11, bg: C.surface }); D.text(ctx, "● thriller", b.x + 8, b.y + 18, { size: 11, weight: 600, color: C.terracotaInk });
+    C2.halo(ctx, "● comedia", b.x + 8, b.y + 34, { size: 11, bg: C.surface }); D.text(ctx, "● comedia", b.x + 8, b.y + 34, { size: 11, weight: 600, color: C.cobaltoInk });
   }
   function drawB(ctx, w, h, C) {
     var D = api.d, n = hist.loss.length, xmax = Math.max(50, Math.ceil(n / 50) * 50), ymax = Math.max(0.5, hist.e0[0], hist.e0[1]);

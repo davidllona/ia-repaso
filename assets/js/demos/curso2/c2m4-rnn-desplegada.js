@@ -46,9 +46,9 @@ Lab.register("curso2/c2m4-rnn-desplegada", function (root, api) {
   var out = api.readout(root);
   var tab = api.table(root, ["t", "x", "z1", "z2", "h1", "h2"]);
 
-  ui.slider({ label: "Longitud de la secuencia (pasos)", min: 1, max: 8, step: 1, value: S.T, fmt: function (v) { return v; }, onInput: function (v) { S.T = v; S.sel = v; update(); } });
-  ui.slider({ label: "Primer valor x₁", min: -2, max: 2, step: 0.1, value: S.x1, fmt: function (v) { return n(v, 1); }, onInput: function (v) { S.x1 = v; update(); } });
-  ui.segmented({ label: "Resto de la secuencia", value: S.preset, options: [["texto", "2, 0, 0…"], ["pulso", "todo 0"], ["escalon", "= x₁"], ["azar", "al azar"]], onChange: function (v) { S.preset = v; update(); } });
+  ui.slider({ label: "Capítulos vistos (pasos)", min: 1, max: 8, step: 1, value: S.T, fmt: function (v) { return v; }, onInput: function (v) { S.T = v; S.sel = v; update(); } });
+  ui.slider({ label: "Acción del capítulo 1 (x₁)", min: -2, max: 2, step: 0.1, value: S.x1, fmt: function (v) { return n(v, 1); }, onInput: function (v) { S.x1 = v; update(); } });
+  ui.segmented({ label: "Acción del resto de capítulos", value: S.preset, options: [["texto", "2, 0, 0…"], ["pulso", "todo 0"], ["escalon", "= x₁"], ["azar", "al azar"]], onChange: function (v) { S.preset = v; update(); } });
 
   var C0 = api.colors();
   api.legend(root, [[C0.cobalto, "neurona 1 (h₁)"], [C0.terracota, "neurona 2 (h₂)"]]);
@@ -93,7 +93,7 @@ Lab.register("curso2/c2m4-rnn-desplegada", function (root, api) {
   }
   function draw2(ctx, w, h, C) {
     var T = S.T, g = cellGeom(w, T), t, mx = Math.max.apply(null, dh.concat([0.05])), base = h - 26, top = 24;
-    D.text(ctx, "Cuánto cambia hₜ si cambio x₁ en +0,5 (distancia entre los dos h)", 14, 14, { size: 11.5, color: C.ink2, weight: 500 });
+    D.text(ctx, w < 440 ? "Cuánto cambia hₜ si x₁ sube 0,5 (distancia entre h)" : "Cuánto cambia hₜ si cambio x₁ en +0,5 (distancia entre los dos h)", 14, 14, { size: w < 440 ? 11 : 11.5, color: C.ink2, weight: 500 });
     D.line(ctx, g.padL, base, w - 14, base, C.line, 1);
     for (t = 0; t < T; t++) {
       var cx = g.padL + g.cw * (t + 0.5), bh2 = (base - top - 4) * dh[t] / mx;

@@ -1,7 +1,8 @@
 /* Experimento: regresión múltiple. Cada variable aporta peso × valor; «manteniendo lo demás constante». */
 Lab.register("curso1/c1m2-multiple", function (root, api) {
   var M = api.math, r = api.rng(8), n = 400, rows = [], i;
-  // Coches inventados con una receta conocida (la "verdad"), igual que en el fragmento de código.
+  // Películas inventadas con una receta conocida (la "verdad"): horas vistas (miles). Misma receta que el CSV de coches del código:
+  // presupuesto = «motor», semanas de promoción = «cilindros», duración = «consumo», género acción = «diésel», documental = «etanol».
   var extra = { X: 0, D: 25, E: -40 };
   for (i = 0; i < n; i++) {
     var mo = Math.round(M.clamp(r.normal(3.3, 1.3), 1, 6.5) * 10) / 10;
@@ -15,16 +16,16 @@ Lab.register("curso1/c1m2-multiple", function (root, api) {
   for (a = 0; a < p; a++) { A.push(new Array(p).fill(0)); b.push(0); }
   rows.forEach(function (rw) { for (a = 0; a < p; a++) { b[a] += rw.f[a] * rw.y; for (c = 0; c < p; c++) A[a][c] += rw.f[a] * rw.f[c]; } });
   var th = M.solve(A, b);
-  var names = ["intercepto", "motor (L)", "cilindros", "consumo (L/100 km)", "es diésel", "es etanol"];
+  var names = ["intercepto", "presupuesto", "semanas de promo", "duración", "es de acción", "es documental"];
 
   var car = { mo: 2.0, ci: 4, co: 8.0, fu: "X" }, ref = null;
-  var view = api.view(root, { aspect: 2.1, minH: 250, label: "Cascada que suma las aportaciones de cada variable hasta la predicción de emisiones" });
+  var view = api.view(root, { aspect: 2.1, minH: 250, label: "Cascada que suma las aportaciones de cada variable hasta la predicción de horas vistas" });
   var ui = api.controls(root), out = api.readout(root);
-  ui.slider({ label: "Motor (litros)", min: 1, max: 6, step: 0.1, value: car.mo, fmt: function (v) { return v.toFixed(1); }, onInput: function (v) { car.mo = v; update(); } });
-  ui.slider({ label: "Cilindros", min: 4, max: 12, step: 2, value: car.ci, onInput: function (v) { car.ci = v; update(); } });
-  ui.slider({ label: "Consumo (L/100 km)", min: 4, max: 20, step: 0.1, value: car.co, fmt: function (v) { return v.toFixed(1); }, onInput: function (v) { car.co = v; update(); } });
-  ui.segmented({ label: "Combustible", options: [["X", "Gasolina"], ["D", "Diésel"], ["E", "Etanol"]], value: "X", onChange: function (v) { car.fu = v; update(); } });
-  ui.button("Fijar este coche como referencia", function () { ref = terms(); update(); }, "primary");
+  ui.slider({ label: "Presupuesto (×10 M€: 2,0 = 20 M€)", min: 1, max: 6, step: 0.1, value: car.mo, fmt: function (v) { return v.toFixed(1); }, onInput: function (v) { car.mo = v; update(); } });
+  ui.slider({ label: "Semanas de promoción", min: 4, max: 12, step: 2, value: car.ci, onInput: function (v) { car.ci = v; update(); } });
+  ui.slider({ label: "Duración (×10 min: 12 = 120 min)", min: 4, max: 20, step: 0.1, value: car.co, fmt: function (v) { return v.toFixed(1); }, onInput: function (v) { car.co = v; update(); } });
+  ui.segmented({ label: "Género", options: [["X", "Comedia"], ["D", "Acción"], ["E", "Documental"]], value: "X", onChange: function (v) { car.fu = v; update(); } });
+  ui.button("Fijar esta película como referencia", function () { ref = terms(); update(); }, "primary");
   ui.button("Quitar referencia", function () { ref = null; update(); });
 
   function terms() {
@@ -56,9 +57,9 @@ Lab.register("curso1/c1m2-multiple", function (root, api) {
     view.redraw();
     var t = terms(), tt = total(t);
     var s = "Pesos aprendidos: " + names.slice(1).map(function (nm, k) { return nm + " <b>" + th[k + 1].toFixed(1) + "</b>"; }).join(" · ") + "<br>" +
-      "Predicción: ŷ = <b>" + tt.toFixed(1) + " g/km</b>";
-    if (ref) { var d = tt - total(ref); s += "<br>Frente a la referencia: <b>" + (d >= 0 ? "+" : "") + d.toFixed(1) + " g/km</b>"; }
-    s += "<br>Subir 1 L de motor <i>manteniendo lo demás constante</i> suma <b>" + th[1].toFixed(1) + " g/km</b> (la verdad era 12).";
+      "Predicción: ŷ = <b>" + tt.toFixed(1) + " mil horas</b>";
+    if (ref) { var d = tt - total(ref); s += "<br>Frente a la referencia: <b>" + (d >= 0 ? "+" : "") + d.toFixed(1) + " mil horas</b>"; }
+    s += "<br>Subir una unidad de presupuesto (10 M€) <i>manteniendo lo demás constante</i> suma <b>" + th[1].toFixed(1) + " mil horas</b> (la verdad era 12).";
     out.set(s);
   }
   view.draw(draw); update();

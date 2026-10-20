@@ -11,8 +11,8 @@ Lab.register("curso3/c3m4-reparametrizacion", function (root, api) {
   newEps();
   var view = api.view(root, { aspect: 1.35, minH: 280, maxH: 420, drag: true, label: "Muestras de epsilon arriba y muestras de z = mu + sigma por epsilon abajo" });
   var ui = api.controls(root), out = api.readout(root);
-  ui.slider({ label: "Media μ", min: -3, max: 3, step: 0.1, value: S.mu, fmt: function (v) { return v.toFixed(1); }, onInput: function (v) { S.mu = v; update(); } });
-  ui.slider({ label: "Desviación σ", min: 0.1, max: 2, step: 0.05, value: S.sg, fmt: function (v) { return v.toFixed(2); }, onInput: function (v) { S.sg = v; update(); } });
+  ui.slider({ label: "Centro μ (dónde la coloca)", min: -3, max: 3, step: 0.1, value: S.mu, fmt: function (v) { return v.toFixed(1); }, onInput: function (v) { S.mu = v; update(); } });
+  ui.slider({ label: "Anchura σ (cuánto duda)", min: 0.1, max: 2, step: 0.05, value: S.sg, fmt: function (v) { return v.toFixed(2); }, onInput: function (v) { S.sg = v; update(); } });
   ui.button("Otras muestras de ε", function () { newEps(); update(); });
 
   var XR = [-5, 5];

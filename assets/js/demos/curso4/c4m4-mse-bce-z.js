@@ -14,7 +14,7 @@ Lab.register("curso4/c4m4-mse-bce-z", function (root, api) {
   api.legend(root, [[api.colors().terracota, "MSE: (p − y)²"], [api.colors().cobalto, "BCE: entropía cruzada"]]);
   var ui = api.controls(root), out = api.readout(root);
   var sZ = ui.slider({ label: "z (puntuación del modelo)", min: -8, max: 8, step: 0.1, value: S.z, fmt: function (v) { return v.toFixed(1); }, onInput: function (v) { S.z = v; update(); } });
-  ui.segmented({ label: "Respuesta correcta", options: [[1, "y = 1 (aprobó)"], [0, "y = 0 (suspendió)"]], value: S.y, onChange: function (v) { S.y = v; update(); } });
+  ui.segmented({ label: "Respuesta correcta", options: [[1, "y = 1 (canceló)"], [0, "y = 0 (se quedó)"]], value: S.y, onChange: function (v) { S.y = v; update(); } });
 
   function sig(z) { return 1 / (1 + Math.exp(-z)); }
   function Lmse(z) { var p = sig(z); return (p - S.y) * (p - S.y); }

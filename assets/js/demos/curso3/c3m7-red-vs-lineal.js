@@ -42,15 +42,15 @@ Lab.register("curso3/c3m7-red-vs-lineal", function (root, api) {
     st = { xs: xs, ys: ys, lin: lin, net: net, r2l: r2(pl, yt), r2n: r2(pn, yt), ceil: vf / (vf + S.noise * S.noise) };
   }
 
-  var view = api.view(root, { aspect: 1.7, minH: 250, maxH: 360, label: "Datos de entrenamiento, recta ajustada, red neuronal y función verdadera" });
-  var plot = api.plot(view, { xr: [-1, 1], yr: [-3, 3], xticks: 4, yticks: 6, grid: true, pad: { l: 40, r: 12, t: 12, b: 30 } });
+  var view = api.view(root, { aspect: 1.7, minH: 250, maxH: 360, label: "Duración y nota de las películas de entrenamiento, recta ajustada, red neuronal y función verdadera" });
+  var plot = api.plot(view, { xr: [-1, 1], yr: [-3, 3], xticks: 4, yticks: 6, grid: true, pad: { l: 40, r: 12, t: 12, b: 34 }, xlabel: "duración de la película (estandarizada)" });
   var ui = api.controls(root), out = api.readout(root);
-  ui.slider({ label: "Cuánto se curva la relación real", min: 0, max: 1, step: 0.05, value: S.a, fmt: function (v) { return v.toFixed(2).replace(".", ","); }, onInput: function (v) { S.a = v; update(); } });
-  ui.slider({ label: "Ruido de los datos (σ)", min: 0.05, max: 1.5, step: 0.05, value: S.noise, fmt: function (v) { return v.toFixed(2).replace(".", ","); }, onInput: function (v) { S.noise = v; update(); } });
-  ui.slider({ label: "Ejemplos de entrenamiento", min: 8, max: 300, step: 4, value: S.n, onInput: function (v) { S.n = v; update(); } });
+  ui.slider({ label: "Cuánto se curva la relación duración → nota", min: 0, max: 1, step: 0.05, value: S.a, fmt: function (v) { return v.toFixed(2).replace(".", ","); }, onInput: function (v) { S.a = v; update(); } });
+  ui.slider({ label: "Ruido: gustos impredecibles (σ)", min: 0.05, max: 1.5, step: 0.05, value: S.noise, fmt: function (v) { return v.toFixed(2).replace(".", ","); }, onInput: function (v) { S.noise = v; update(); } });
+  ui.slider({ label: "Películas con las que entrena", min: 8, max: 300, step: 4, value: S.n, onInput: function (v) { S.n = v; update(); } });
   ui.slider({ label: "Neuronas de la capa oculta", min: 2, max: 24, step: 1, value: S.H, onInput: function (v) { S.H = v; update(); } });
   ui.button("Otra muestra de datos", function () { S.seed = S.seed % 9 + 1; update(); });
-  api.legend(root, [[api.colors().muted, "datos de entrenamiento"], [api.colors().ink2, "función verdadera"], [api.colors().cobalto, "recta (regresión lineal)"], [api.colors().terracota, "red neuronal"]]);
+  api.legend(root, [[api.colors().muted, "películas de entrenamiento"], [api.colors().ink2, "función verdadera"], [api.colors().cobalto, "recta (regresión lineal)"], [api.colors().terracota, "red neuronal"]]);
 
   view.draw(function (ctx, w, h, C) {
     plot.axes(ctx);

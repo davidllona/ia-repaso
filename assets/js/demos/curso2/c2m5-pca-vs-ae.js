@@ -94,9 +94,9 @@ Lab.register("curso2/c2m5-pca-vs-ae", function (root, api) {
   loop = api.loop(function () { for (var q = 0; q < 25 && steps < MAXS; q++) { net.step(pts, pts, idx); steps++; } update(); return steps < MAXS; },
     { fps: 30, onState: function (s) { if (btn) btn.textContent = s ? "Entrenando…" : "Entrenar el autoencoder"; } });
   init();
-  var view = api.view(root, { aspect: 1.35, minH: 280, maxH: 460, label: "Puntos en un arco, su reconstrucción con PCA o con un autoencoder" });
+  var view = api.view(root, { aspect: 1.35, minH: 280, maxH: 460, label: "Películas descritas con dos números, formando un arco, y su reconstrucción con PCA o con un autoencoder" });
   var P = api.plot(view, { xr: [-1.5, 1.5], yr: [-0.5, 1.0], xticks: 6, yticks: 3 });
-  api.legend(root, [[api.colors().cobalto, "datos originales"], [api.colors().terracota, "reconstrucción (todo cae sobre la curva)"]]);
+  api.legend(root, [[api.colors().cobalto, "películas originales (2 números cada una)"], [api.colors().terracota, "reconstrucción (todo cae sobre la curva)"]]);
   var ui = api.controls(root), out = api.readout(root);
   ui.segmented({ label: "Modelo", options: [["pca", "PCA (recta, lineal)"], ["ae", "Autoencoder (no lineal)"]], value: mode, onChange: function (v) { mode = v; update(); } });
   btn = ui.button("Entrenar el autoencoder", function () { mode = "ae"; segSet(); if (steps >= MAXS) init(); if (api.reduceMotion) { while (steps < MAXS) { net.step(pts, pts, idx); steps++; } update(); } else loop.start(); }, "primary");

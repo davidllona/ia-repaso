@@ -22,7 +22,7 @@ Lab.register("curso3/c3m5-regulariza", function (root, api) {
   function pen(p, w) { return p === "l1" ? Math.abs(w[0]) + Math.abs(w[1]) : (p === "l2" ? w[0] * w[0] + w[1] * w[1] : 0); }
 
   var view = api.view(root, { aspect: 1.5, minH: 260, maxH: 420, label: "Contornos de la pérdida de datos, forma de la penalización y camino de la solución al subir lambda" });
-  var plot = api.plot(view, { xr: [-0.8, 3.2], yr: [-1, 2], grid: false, xticks: 1, yticks: 1, pad: { l: 34, r: 12, t: 12, b: 30 }, xfmt: function () { return ""; }, yfmt: function () { return ""; }, xlabel: "peso w₁", ylabel: "peso w₂" });
+  var plot = api.plot(view, { xr: [-0.8, 3.2], yr: [-1, 2], grid: false, xticks: 1, yticks: 1, pad: { l: 34, r: 12, t: 12, b: 30 }, xfmt: function () { return ""; }, yfmt: function () { return ""; }, xlabel: "w₁ (peso de «minutos vistos»)", ylabel: "w₂ («capítulos vistos»)" });
   var ui = api.controls(root), out = api.readout(root);
   ui.segmented({ label: "Regularizador", value: S.pen, options: [["none", "ninguno"], ["l1", "L1 · l1(λ)"], ["l2", "L2 · l2(λ)"]], onChange: function (v) { S.pen = v; update(); } });
   ui.slider({ label: "λ (el número que va dentro de l1(...) o l2(...))", min: 0, max: 1.6, step: 0.02, value: S.lam, fmt: function (v) { return v.toFixed(2); }, onInput: function (v) { S.lam = v; update(); } });

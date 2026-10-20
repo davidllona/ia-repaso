@@ -1,5 +1,6 @@
 /* Experimento: época, batch, mini-batch e iteración. 24 ejemplos; modelo ŷ = w·x con w = 0,5 fijo. Cada batch da una
-   estimación (ruidosa) del gradiente de TODO el dataset; cuanto más pequeño el batch, más ruido y más iteraciones por época. */
+   estimación (ruidosa) del gradiente de TODO el dataset; cuanto más pequeño el batch, más ruido y más iteraciones por época.
+   Disfraz: cada uno de los 24 ejemplos es una película (x = nota de la crítica, y = tu nota, ≈ el doble). */
 Lab.register("curso2/c2m1-batches", function (root, api) {
   var M = api.math, D = api.d, C0 = api.colors();
   var N = 24, W = 0.5;
@@ -13,7 +14,7 @@ Lab.register("curso2/c2m1-batches", function (root, api) {
   function batches() { var out = [], B = S.B; for (var i = 0; i < N; i += B) out.push(S.order.slice(i, i + B)); return out; }
   function bgrad(b) { return M.mean(b.map(function (i) { return g[i]; })); }
 
-  var view1 = api.view(root, { aspect: 4.6, minH: 100, maxH: 150, label: "Los 24 ejemplos del dataset y el batch actual" });
+  var view1 = api.view(root, { aspect: 4.6, minH: 100, maxH: 150, label: "Las 24 películas del catálogo de ejemplo y el batch actual" });
   var view2 = api.view(root, { aspect: 2.5, minH: 190, maxH: 330, label: "Gradiente estimado por cada batch frente al gradiente verdadero" });
   var gmin = Math.floor((Math.min.apply(null, g) - 2) / 5) * 5, gmax = Math.ceil((Math.max.apply(null, g) + 2) / 5) * 5;   // límites redondos (marcas cada 5)
   var plot2 = api.plot(view2, { xr: [gmin, gmax], yr: [0, 1], xticks: Math.round((gmax - gmin) / 5), yticks: 1, xlabel: "gradiente dL/dw estimado con el batch", pad: { l: 14, r: 14, t: 12, b: 36 }, grid: false, xfmt: function (v) { return Math.round(v); }, yfmt: function () { return ""; } });
@@ -24,7 +25,7 @@ Lab.register("curso2/c2m1-batches", function (root, api) {
   ui.button("Siguiente iteración", function () { var nb = batches().length; if (S.k >= nb) newEpoch(); S.k++; update(); }, "primary");
   ui.button("Terminar la época", function () { S.k = batches().length; update(); });
   ui.button("Nueva época (otro orden)", function () { newEpoch(); update(); });
-  api.legend(root, [[C0.terracota, "batch de esta iteración"], [C0.oliva, "ya usados en esta época"], [C0.muted, "pendientes"]]);
+  api.legend(root, [[C0.terracota, "películas del batch de esta iteración"], [C0.oliva, "ya vistas por la red en esta época"], [C0.muted, "pendientes"]]);
 
   function drawGrid(ctx, w, h, C) {
     var bs = batches(), cur = S.k > 0 ? bs[S.k - 1] : [], used = {}, k, cols = 12, rows = 2, gap = 4;
@@ -58,14 +59,14 @@ Lab.register("curso2/c2m1-batches", function (root, api) {
     var gs = bs.slice(0, done).map(bgrad), sd = gs.length > 1 ? M.std(gs) : 0;
     var all = bs.map(bgrad), sdAll = M.std(all);
     out.set(
-      "N = <b>" + N + "</b> ejemplos · batch_size = <b>" + S.B + "</b> → iteraciones por época = ⌈" + N + " / " + S.B + "⌉ = <b>" + nb + "</b> " +
+      "N = <b>" + N + "</b> películas · batch_size = <b>" + S.B + "</b> → iteraciones por época = ⌈" + N + " / " + S.B + "⌉ = <b>" + nb + "</b> " +
       "(cada iteración = 1 actualización de pesos)<br>" +
       "Iteración " + done + " de " + nb + " en esta época" + (done > 0 ? " · gradiente de este batch = <b>" + gs[done - 1].toFixed(2) + "</b> (el verdadero es " + gTrue.toFixed(2) + ")" : "") + "<br>" +
       "Dispersión de las estimaciones de la época (desv. típica): <b>" + sdAll.toFixed(2) + "</b>" +
       (S.B === N ? "<br>Con batch = dataset siempre sale el gradiente exacto, pero solo hay 1 actualización por época." :
-        S.B === 1 ? "<br>Con 1 ejemplo por batch hay " + N + " actualizaciones por época, pero cada una es muy ruidosa." :
+        S.B === 1 ? "<br>Con 1 película por batch hay " + N + " actualizaciones por época, pero cada una es muy ruidosa." :
         "<br>10 épocas = " + (10 * nb) + " actualizaciones con este batch_size.") +
-      (done === nb && nb > 0 ? "<br><span class='good'>Época completa: la red ha visto los " + N + " ejemplos exactamente una vez.</span>" : "")
+      (done === nb && nb > 0 ? "<br><span class='good'>Época completa: la red ha visto las " + N + " películas exactamente una vez.</span>" : "")
     );
     view1.redraw(); view2.redraw();
   }

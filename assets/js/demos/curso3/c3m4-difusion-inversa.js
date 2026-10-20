@@ -108,7 +108,7 @@ Lab.register("curso3/c3m4-difusion-inversa", function (root, api) {
       ctx.restore();
       var tl = S.i >= S.order.length ? "FIN: x₀ generado" : "siguiente: t = " + (S.order[S.i] + 1) + " de " + T;
       D.text(ctx, tl, pl.box.x + 6, pl.box.y + 16, { size: 12, weight: 700, mono: true, color: C.ink });
-      D.text(ctx, "azul = datos reales · naranja = puntos que se limpian · flechas = hacia dónde empuja la red", pl.box.x + 6, pl.box.y + pl.box.h - 7, { size: 10, color: C.muted });
+      D.text(ctx, "azul = pelis reales · naranja = pelis nuevas", pl.box.x + 6, pl.box.y + pl.box.h - 7, { size: 10, color: C.muted });
     }
     function f(v, k) { return v.toFixed(k === undefined ? 3 : k).replace("-", "−"); }
     function fv(v) { return "(" + f(v[0]) + ", " + f(v[1]) + ")"; }

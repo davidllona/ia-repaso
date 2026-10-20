@@ -92,9 +92,9 @@ Lab.register("curso2/c2m5-denoising", function (root, api) {
   loop = api.loop(function () { for (var j = 0; j < 3 && epochs < EP; j++) epoch(); update(); return epochs < EP; }, { fps: 30, onState: function (s) { if (btn) btn.disabled = s; } });
   function train() { init(); if (api.reduceMotion) { while (epochs < EP) epoch(); update(); } else loop.start(); }
   init();
-  var view = api.view(root, { aspect: 1.4, minH: 300, maxH: 410, label: "Imágenes limpias, ruidosas y limpiadas por el autoencoder" });
+  var view = api.view(root, { aspect: 1.4, minH: 300, maxH: 410, label: "Pósters de juguete limpios, ruidosos y limpiados por el autoencoder" });
   var ui = api.controls(root), out = api.readout(root);
-  ui.slider({ label: "Ruido de las imágenes de prueba (σ)", min: 0, max: 0.6, step: 0.05, value: sigma, fmt: function (v) { return v.toFixed(2).replace(".", ","); }, onInput: function (v) { sigma = v; update(); } });
+  ui.slider({ label: "Ruido de los pósters de prueba (σ)", min: 0, max: 0.6, step: 0.05, value: sigma, fmt: function (v) { return v.toFixed(2).replace(".", ","); }, onInput: function (v) { sigma = v; update(); } });
   ui.segmented({ label: "El autoencoder se entrena con…", options: [[true, "entrada ruidosa → objetivo limpio"], [false, "entrada limpia → objetivo limpio"]], value: withNoise, onChange: function (v) { withNoise = v; train(); } });
   btn = ui.button("Volver a entrenar (120 épocas)", function () { train(); }, "primary");
   function mix(a, b, t) {
@@ -103,7 +103,7 @@ Lab.register("curso2/c2m5-denoising", function (root, api) {
   }
   function drawImg(ctx, im, x0, y0, s, C) { var r, c; for (r = 0; r < 8; r++) for (c = 0; c < 8; c++) api.d.rect(ctx, x0 + c * s, y0 + r * s, s + 0.5, s + 0.5, mix(C.surface, C.cobalto, Math.max(0, Math.min(1, im[r * 8 + c])))); api.d.rect(ctx, x0, y0, s * 8, s * 8, null, C.line, 1); }
   view.draw(function (ctx, w, h, C) {
-    var gap = 8, cell = Math.min(100, (w - 20 - gap * (NS - 1)) / NS), s = cell / 8, x0 = (w - (cell * NS + gap * (NS - 1))) / 2, y = 18, rows = ["Limpias (lo que queremos)", "Con ruido (lo que entra)", "Salida del autoencoder"];
+    var gap = 8, cell = Math.min(100, (w - 20 - gap * (NS - 1)) / NS), s = cell / 8, x0 = (w - (cell * NS + gap * (NS - 1))) / 2, y = 18, rows = ["Póster limpio (lo que queremos)", "Con ruido, como señal mala (lo que entra)", "Salida del autoencoder"];
     rows.forEach(function (t, r) {
       var yy = y + r * (cell + 26);
       api.d.text(ctx, t, x0, yy - 5, { size: 11, weight: 600, color: C.ink2 });
@@ -123,7 +123,7 @@ Lab.register("curso2/c2m5-denoising", function (root, api) {
     en /= NTE; ed /= NTE;
     function f(v) { return v.toFixed(4).replace(".", ","); }
     out.set("σ de prueba = <b>" + sigma.toFixed(2).replace(".", ",") + "</b> · épocas: <b>" + epochs + "</b> (" + (withNoise ? "entrenado con ruido σ = 0,25" : "entrenado sin ruido") + ")<br>" +
-      "Error de la imagen ruidosa: <b>" + f(en) + "</b> · error tras el autoencoder: <span class='" + (ed < en ? "good" : "bad") + "'><b>" + f(ed) + "</b></span>" +
+      "Error del póster ruidoso: <b>" + f(en) + "</b> · error tras el autoencoder: <span class='" + (ed < en ? "good" : "bad") + "'><b>" + f(ed) + "</b></span>" +
       (ed < en ? " (" + (en / ed).toFixed(1).replace(".", ",") + " veces menos)" : " (no mejora)") + "<br>" +
       "Los píxeles negros ya no valen 0 tras el ruido y el <code>clip</code>: su media es <b>" + (bl / nb).toFixed(3).replace(".", ",") + "</b>.");
   }

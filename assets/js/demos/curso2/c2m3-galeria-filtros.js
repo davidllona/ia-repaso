@@ -47,11 +47,11 @@ Lab.register("curso2/c2m3-galeria-filtros", function (root, api) {
   var grid = api.el("div", { style: { display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(min(100%,230px),1fr))", gap: "10px" } });
   root.appendChild(grid);
   function cellDiv() { var c = api.el("div", { style: { minWidth: "0" } }); grid.appendChild(c); return c; }
-  var vA = api.view(cellDiv(), { aspect: 1, minH: 200, maxH: 420, label: "Imagen original sintética de 32 por 32 píxeles" });
-  var vB = api.view(cellDiv(), { aspect: 1, minH: 200, maxH: 420, label: "Imagen resultante tras aplicar el filtro" });
+  var vA = api.view(cellDiv(), { aspect: 1, minH: 200, maxH: 420, label: "Póster sintético original de 32 por 32 píxeles" });
+  var vB = api.view(cellDiv(), { aspect: 1, minH: 200, maxH: 420, label: "Póster resultante tras aplicar el filtro" });
   var ui = api.controls(root), out = api.readout(root);
   sel = ui.select({ label: "Filtro", options: Object.keys(F).map(function (k) { return [k, F[k][0]]; }), value: "sobelx", onChange: function (v) { if (F[v][1]) setK(F[v][1]); update(); } });
-  ui.slider({ label: "Ruido en la imagen", min: 0, max: 0.35, step: 0.01, value: 0, fmt: function (v) { return v.toFixed(2); }, onInput: function (v) { noise = v; mix(); update(); } });
+  ui.slider({ label: "Ruido (grano de la película)", min: 0, max: 0.35, step: 0.01, value: 0, fmt: function (v) { return v.toFixed(2); }, onInput: function (v) { noise = v; mix(); update(); } });
   ui.toggle({ label: "Aplicar ReLU a la salida", value: false, onChange: function (v) { relu = v; update(); } });
 
   var kbox = api.el("div", { style: { display: "grid", gridTemplateColumns: "repeat(3,70px)", gap: "4px" } });
@@ -80,7 +80,7 @@ Lab.register("curso2/c2m3-galeria-filtros", function (root, api) {
     api.d.rect(ctx, 0, 0, w, h, C.surface);
     drawPixels(ctx, w, h, function (i, j) { return img[i][j]; }, 0, S);
     api.d.rect(ctx, 0, 0, 112, 20, C.surface);
-    api.d.text(ctx, "Original (32×32)", 6, 14, { size: 11, weight: 600, color: C.ink2 });
+    api.d.text(ctx, "Póster (32×32)", 6, 14, { size: 11, weight: 600, color: C.ink2 });
   });
   vB.draw(function (ctx, w, h, C) {
     api.d.rect(ctx, 0, 0, w, h, C.surface);

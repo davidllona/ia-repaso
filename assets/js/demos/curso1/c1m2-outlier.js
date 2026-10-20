@@ -7,14 +7,14 @@ Lab.register("curso1/c1m2-outlier", function (root, api) {
   }
   var out0 = { x: 5.0, y: 285 }, o = { x: out0.x, y: out0.y }, withO = true;
 
-  var view = api.view(root, { aspect: 1.6, minH: 290, drag: true, label: "Diez coches y un coche extra que puedes arrastrar; dos rectas: la de mínimos cuadrados y la de error absoluto" });
-  var plot = api.plot(view, { xr: [0, 6], yr: [0, 400], xticks: 6, yticks: 8, xlabel: "Tamaño del motor (litros)", ylabel: "CO₂ (g/km)", pad: { l: 52, r: 14, t: 12, b: 40 } });
-  api.legend(root, [[api.colors().terracota, "recta OLS (minimiza el error al cuadrado)"], [api.colors().cobalto, "recta MAE (minimiza el error absoluto)"], [api.colors().oliva, "OLS sin el coche extra"]]);
+  var view = api.view(root, { aspect: 1.6, minH: 290, drag: true, label: "Diez películas y una película extra que puedes arrastrar; dos rectas: la de mínimos cuadrados y la de error absoluto" });
+  var plot = api.plot(view, { xr: [0, 6], yr: [0, 400], xticks: 6, yticks: 8, xlabel: "Presupuesto (decenas de millones de €)", ylabel: "Horas vistas (miles)", pad: { l: 52, r: 14, t: 12, b: 40 } });
+  api.legend(root, [[api.colors().terracota, "recta OLS (minimiza el error al cuadrado)"], [api.colors().cobalto, "recta MAE (minimiza el error absoluto)"], [api.colors().oliva, "OLS sin la película extra"]]);
   var ui = api.controls(root), out = api.readout(root);
-  var sy = ui.slider({ label: "Emisiones del coche extra (g/km)", min: 0, max: 400, step: 1, value: o.y, fmt: function (v) { return v.toFixed(0); }, onInput: function (v) { o.y = v; update(); } });
-  var sx = ui.slider({ label: "Motor del coche extra (L)", min: 0.5, max: 5.8, step: 0.1, value: o.x, fmt: function (v) { return v.toFixed(1); }, onInput: function (v) { o.x = v; update(); } });
-  ui.toggle({ label: "Incluir el coche extra", value: true, onChange: function (v) { withO = v; update(); } });
-  ui.button("Colocarlo como un híbrido raro", function () { o.x = 5.0; o.y = 60; sx.set(5.0, true); sy.set(60, true); update(); }, "warm");
+  var sy = ui.slider({ label: "Horas vistas de la película extra (miles)", min: 0, max: 400, step: 1, value: o.y, fmt: function (v) { return v.toFixed(0); }, onInput: function (v) { o.y = v; update(); } });
+  var sx = ui.slider({ label: "Presupuesto de la película extra (×10 M€)", min: 0.5, max: 5.8, step: 0.1, value: o.x, fmt: function (v) { return v.toFixed(1); }, onInput: function (v) { o.x = v; update(); } });
+  ui.toggle({ label: "Incluir la película extra", value: true, onChange: function (v) { withO = v; update(); } });
+  ui.button("Colocarla como un fracaso de taquilla", function () { o.x = 5.0; o.y = 60; sx.set(5.0, true); sy.set(60, true); update(); }, "warm");
 
   function all() { return withO ? base.concat([o]) : base; }
   function olsFit(P) { return M.linreg(P.map(function (p) { return p.x; }), P.map(function (p) { return p.y; })); }
@@ -50,10 +50,10 @@ Lab.register("curso1/c1m2-outlier", function (root, api) {
     var shares = "";
     if (withO) {
       var e1 = o.y - (f1.b + f1.m * o.x), e2 = o.y - (f2.b + f2.m * o.x);
-      shares = "<br>El coche extra aporta el <b>" + (100 * e1 * e1 / sse).toFixed(0) + " %</b> del error cuadrático de OLS y el <b>" + (100 * Math.abs(e2) / sae).toFixed(0) + " %</b> del error absoluto de MAE.";
+      shares = "<br>La película extra aporta el <b>" + (100 * e1 * e1 / sse).toFixed(0) + " %</b> del error cuadrático de OLS y el <b>" + (100 * Math.abs(e2) / sae).toFixed(0) + " %</b> del error absoluto de MAE.";
     }
-    out.set("Pendiente sin el coche extra (OLS): <b>" + f0.m.toFixed(1) + "</b> g/km por litro<br>" +
-      "Con el coche extra → OLS: <b>" + f1.m.toFixed(1) + "</b> (cambia " + Math.abs(f1.m - f0.m).toFixed(1) + ") · MAE: <b>" + f2.m.toFixed(1) + "</b> (cambia " + Math.abs(f2.m - f0.m).toFixed(1) + ")" +
+    out.set("Pendiente sin la película extra (OLS): <b>" + f0.m.toFixed(1) + "</b> mil horas por cada 10 M€<br>" +
+      "Con la película extra → OLS: <b>" + f1.m.toFixed(1) + "</b> (cambia " + Math.abs(f1.m - f0.m).toFixed(1) + ") · MAE: <b>" + f2.m.toFixed(1) + "</b> (cambia " + Math.abs(f2.m - f0.m).toFixed(1) + ")" +
       shares);
   }
   function grab(px, py) {

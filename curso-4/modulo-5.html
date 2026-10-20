@@ -20,7 +20,7 @@
     <div>
       <p class="eyebrow">Curso 4 · Módulo 5</p>
       <h1>Softmax y clasificación multiclase</h1>
-      <p class="lead">En el módulo anterior un modelo contestaba «sí» o «no» con una sola neurona. Aquí damos el último paso del curso: <strong>más de dos clases</strong>. Verás cómo se pasa de <em>K</em> puntuaciones sueltas (los <strong>logits</strong>) a <em>K</em> probabilidades con la <strong>softmax</strong>, cómo se mide el error con la <strong>entropía cruzada</strong> y por qué <code>nn.CrossEntropyLoss</code> de PyTorch quiere <strong>logits</strong> y no probabilidades. Después entrenas una regresión softmax de verdad con los <strong>dígitos escritos a mano</strong> de scikit-learn, lees su <strong>matriz de confusión</strong> y aprendes a reconocer los errores de forma y de tipo que más tiempo hacen perder. Ya conoces softmax y crossentropy del Curso 2 (con Keras); aquí se repasan con calma y el centro es PyTorch.</p>
+      <p class="lead">En el módulo anterior un modelo contestaba «sí» o «no» con una sola neurona. Aquí damos el último paso del curso: <strong>más de dos clases</strong> (por ejemplo, adivinar si el tráiler de una película es de <em>acción</em>, <em>comedia</em> o <em>terror</em>). Verás cómo se pasa de <em>K</em> puntuaciones sueltas (los <strong>logits</strong>) a <em>K</em> probabilidades con la <strong>softmax</strong>, cómo se mide el error con la <strong>entropía cruzada</strong> y por qué <code>nn.CrossEntropyLoss</code> de PyTorch quiere <strong>logits</strong> y no probabilidades. Después entrenas una regresión softmax de verdad con los <strong>dígitos escritos a mano</strong> de scikit-learn, lees su <strong>matriz de confusión</strong> y aprendes a reconocer los errores de forma y de tipo que más tiempo hacen perder. Ya conoces softmax y crossentropy del Curso 2 (con Keras); aquí se repasan con calma y el centro es PyTorch.</p>
     </div>
     <div class="hero-tile" aria-hidden="true"></div>
   </div>
@@ -44,20 +44,20 @@
 <section>
 <h2 id="de-dos-a-k">De dos clases a K clases: una neurona por clase</h2>
 
-<p class="pregunta">Tu regresión logística del módulo anterior contestaba «sí» o «no» con <strong>una</strong> neurona. ¿Qué haces cuando las respuestas posibles son diez, como los dígitos del 0 al 9?</p>
+<p class="pregunta">Tu regresión logística del módulo anterior contestaba «sí» o «no» (por ejemplo, «¿terminará este usuario la película?») con <strong>una</strong> neurona. ¿Qué haces cuando las respuestas posibles son tres, como los géneros «acción», «comedia» y «terror»? ¿Y cuando son diez, como los dígitos del 0 al 9?</p>
 
 <div class="callout recuerda">
   <span class="lbl">Recuerda (Curso 2 y módulo 4)</span>
   <p>Un modelo <strong>binario</strong> es <code>nn.Linear(D, 1)</code>: una suma ponderada \( z = \mathbf{w}\cdot\mathbf{x} + b \) (el <em>logit</em>) que la <strong>sigmoide</strong> \( \sigma(z) = 1/(1+e^{-z}) \) convierte en una probabilidad entre 0 y 1; se entrena con la entropía cruzada binaria (<code>nn.BCEWithLogitsLoss</code>) y se decide «clase 1» si \( p > 0{,}5 \) (<a href="modulo-4.html">módulo 4</a>). La <strong>softmax</strong> y la <strong>entropía cruzada multiclase</strong> ya las viste con Keras (<code>Dense(C, activation="softmax")</code> + <code>sparse_categorical_crossentropy</code>) en el <a href="../curso-2/modulo-1.html#softmax">módulo 1</a> y el <a href="../curso-2/modulo-2.html#multiclase">módulo 2</a> del Curso 2. Aquí reconstruimos la idea desde cero pero con PyTorch, que tiene una diferencia importante: su pérdida espera <strong>logits</strong>, no probabilidades.</p>
 </div>
 
-<p>Con \( K \) clases la respuesta del modelo ya no es un número («la probabilidad de ser un 1»), sino un <strong>reparto de confianza entre \( K \) opciones</strong>: «un 70 % de que es un 3, un 20 % de que es un 8, un 10 % repartido entre las demás». Hace falta una probabilidad <em>por clase</em>, y todas juntas deben sumar 1, porque la imagen es <em>una sola</em> de las clases.</p>
+<p>Con \( K \) clases la respuesta del modelo ya no es un número («la probabilidad de ser un 1»), sino un <strong>reparto de confianza entre \( K \) opciones</strong>: «un 70 % de que el tráiler es de acción, un 20 % de que es de comedia, un 10 % de que es de terror». Hace falta una probabilidad <em>por clase</em>, y todas juntas deben sumar 1, porque la película es <em>de un solo género</em> (en este módulo, cada película tiene exactamente uno).</p>
 
-<p>¿Por qué no entrenar diez modelos binarios independientes («¿es un 0?», «¿es un 1?»…) y quedarse con el que más seguro esté? Se puede (se llama <em>uno contra todos</em>), pero cada modelo se entrena ignorando a los demás y sus diez «probabilidades» no suman 1. Lo que hacemos aquí es mejor: <strong>una neurona por clase, entrenadas a la vez y obligadas a competir</strong> entre sí mediante la softmax.</p>
+<p>¿Por qué no entrenar tres modelos binarios independientes («¿es de acción?», «¿es de comedia?», «¿es de terror?») y quedarse con el que más seguro esté? Se puede (se llama <em>uno contra todos</em>), pero cada modelo se entrena ignorando a los demás y sus «probabilidades» no suman 1. Lo que hacemos aquí es mejor: <strong>una neurona por clase, entrenadas a la vez y obligadas a competir</strong> entre sí mediante la softmax.</p>
 
 <div class="callout analogia">
   <span class="lbl">Analogía</span>
-  <p>Un concurso de talentos con \( K \) jueces. Cada juez es <em>especialista en una clase</em> (el juez 3 sabe qué hace un «3» un «3») y todos ven la misma actuación \( \mathbf{x} \). Cada uno apunta una <strong>puntuación</strong> (puede ser negativa, puede ser 40: no es un porcentaje). Las puntuaciones son los <strong>logits</strong>. Para convertirlas en un «reparto de votos» (que sume 100 %) el presentador aplica una regla justa: la <strong>softmax</strong>, que veremos en la siguiente sección. Y la clase ganadora es la del juez con la puntuación más alta.</p>
+  <p>Imagina que Netflix tiene \( K = 3 \) críticos, cada uno <em>especialista en un género</em>: el crítico de acción, el de comedia y el de terror. Todos ven el mismo tráiler \( \mathbf{x} \) y cada uno apunta una <strong>puntuación</strong> de «esto es de mi género» (puede ser negativa, puede ser 40: no es un porcentaje). Esas puntuaciones son los <strong>logits</strong>. Para convertirlas en un «reparto de votos» (que sume 100 %) se aplica una regla justa: la <strong>softmax</strong>, que veremos en la siguiente sección. Y el género ganador es el del crítico con la puntuación más alta.</p>
 </div>
 
 <h3>La arquitectura: la misma capa, con K salidas</h3>
@@ -77,19 +77,19 @@
 
 <div class="callout ejemplo">
   <span class="lbl">Ejemplo numérico · tres puntuaciones a mano</span>
-  <p>Una entrada con \( D = 2 \) características, \( \mathbf{x} = (2,\ 1) \), y \( K = 3 \) clases con</p>
+  <p>Un tráiler descrito con \( D = 2 \) características (cifras inventadas): \( x_1 = 2 \) escenas de acción y \( x_2 = 1 \) chiste, es decir \( \mathbf{x} = (2,\ 1) \). Hay \( K = 3 \) clases (0 = acción, 1 = comedia, 2 = terror) con</p>
   <p>\( W = \begin{pmatrix} 1 &amp; 1 \\ 0 &amp; 1 \\ -1 &amp; -1 \end{pmatrix} \) (una fila por clase) y \( \mathbf{b} = (0,\ 0,\ 2) \).</p>
   <ol class="pasos">
-    <li><strong>Clase 0:</strong> \( z_0 = 1\cdot 2 + 1\cdot 1 + 0 = \) <span class="res">3</span>.</li>
-    <li><strong>Clase 1:</strong> \( z_1 = 0\cdot 2 + 1\cdot 1 + 0 = \) <span class="res">1</span>.</li>
-    <li><strong>Clase 2:</strong> \( z_2 = (-1)\cdot 2 + (-1)\cdot 1 + 2 = \) <span class="res">−1</span>.</li>
+    <li><strong>Clase 0 (acción):</strong> \( z_0 = 1\cdot 2 + 1\cdot 1 + 0 = \) <span class="res">3</span>. (Al crítico de acción le suman tanto las escenas de acción como los chistes.)</li>
+    <li><strong>Clase 1 (comedia):</strong> \( z_1 = 0\cdot 2 + 1\cdot 1 + 0 = \) <span class="res">1</span>. (Solo le importan los chistes.)</li>
+    <li><strong>Clase 2 (terror):</strong> \( z_2 = (-1)\cdot 2 + (-1)\cdot 1 + 2 = \) <span class="res">−1</span>. (Parte con un sesgo de 2 y cada escena de acción o chiste le resta: un tráiler sin acción ni humor huele a terror.)</li>
   </ol>
-  <p>Los logits son \( \mathbf{z} = (3,\ 1,\ -1) \): la clase 0 es la que más puntúa. Todavía no son probabilidades (no suman 1 y uno es negativo). Estos mismos tres números son los que convertiremos en probabilidades en la siguiente sección. Parámetros de esta capa: \( 3\cdot 2 + 3 = 9 \). Con los dígitos (\( D = 64 \), \( K = 10 \)): \( 10\cdot 64 + 10 = 650 \).</p>
+  <p>Los logits son \( \mathbf{z} = (3,\ 1,\ -1) \): la clase 0 (acción) es la que más puntúa. Todavía no son probabilidades (no suman 1 y uno es negativo). Estos mismos tres números son los que convertiremos en probabilidades en la siguiente sección. Parámetros de esta capa: \( 3\cdot 2 + 3 = 9 \). Con los dígitos (\( D = 64 \), \( K = 10 \)): \( 10\cdot 64 + 10 = 650 \).</p>
 </div>
 
 <figure class="demo" data-demo="curso4/c4m5-regiones" data-titulo="Una neurona por clase: tres puntuaciones y quién gana">
-  <div class="haz">Arrastra la cruz por el mapa y mira las tres puntuaciones z0, z1, z2 y qué clase gana. Después sube el sesgo b0 y observa cómo crece la zona azul. Por último, mueve la escala s de 2 a 6 y a 0,5 y fíjate en las probabilidades de la derecha.</div>
-  <div class="observa">Cada flecha es una fila de W: la puntuación de una clase es mayor cuanto más alineado esté el punto con su flecha. Gana la clase con la puntuación más alta, y por eso el plano se reparte en <strong>zonas limitadas por rectas</strong> (con sesgos 0, las tres rectas se cortan en el origen). El sesgo <strong>desplaza</strong> las fronteras sin girarlas. La escala s no cambia qué clase gana cuando los sesgos son 0, solo lo <em>seguro</em> que se muestra la softmax: con s grande las probabilidades se acercan a 0 % y 100 %.</div>
+  <div class="haz">Cada punto del mapa es un tráiler descrito con dos rasgos (0 = un tráiler «normal»). Arrastra la cruz por el mapa y mira las tres puntuaciones z0 (acción), z1 (comedia), z2 (terror) y qué género gana. Después sube el sesgo b0 y observa cómo crece la zona azul (acción). Por último, mueve la escala s de 2 a 6 y a 0,5 y fíjate en las probabilidades de la derecha.</div>
+  <div class="observa">Cada flecha es una fila de W (lo que busca el crítico de ese género): la puntuación de un género es mayor cuanto más alineado esté el tráiler con su flecha. Gana el género con la puntuación más alta, y por eso el plano se reparte en <strong>zonas limitadas por rectas</strong> (con sesgos 0, las tres rectas se cortan en el origen). El sesgo <strong>desplaza</strong> las fronteras sin girarlas (es como un género con más tirón en el catálogo, que parte con ventaja). La escala s no cambia qué clase gana cuando los sesgos son 0, solo lo <em>seguro</em> que se muestra la softmax: con s grande las probabilidades se acercan a 0 % y 100 %.</div>
 </figure>
 
 <div class="callout ojo">
@@ -100,16 +100,16 @@
 <h3>El caso K = 2: vuelves a la regresión logística</h3>
 <p>Si \( K = 2 \), la softmax da \( p_1 = \dfrac{e^{z_1}}{e^{z_0}+e^{z_1}} \). Divide arriba y abajo entre \( e^{z_1} \):</p>
 <div class="formula">\[ p_1 = \frac{1}{1 + e^{-(z_1 - z_0)}} = \sigma(z_1 - z_0) \]</div>
-<p>Es <strong>la sigmoide de la diferencia de logits</strong>: la softmax de dos clases <em>es</em> la regresión logística, con \( z = z_1 - z_0 \). Esto explica algo que habrás visto en el módulo 4: con dos clases basta <strong>una</strong> neurona, porque solo importa la <em>diferencia</em> \( z_1 - z_0 \) (es decir, \( \mathbf{w}_1 - \mathbf{w}_0 \) y \( b_1 - b_0 \)); dos neuronas tienen el doble de parámetros pero exactamente el mismo poder. La softmax es la generalización natural de la sigmoide a \( K \) clases.</p>
+<p>Es <strong>la sigmoide de la diferencia de logits</strong>: la softmax de dos clases <em>es</em> la regresión logística, con \( z = z_1 - z_0 \). Esto explica algo que habrás visto en el módulo 4: con dos clases basta <strong>una</strong> neurona, porque solo importa la <em>diferencia</em> \( z_1 - z_0 \) (es decir, \( \mathbf{w}_1 - \mathbf{w}_0 \) y \( b_1 - b_0 \)); dos neuronas tienen el doble de parámetros pero exactamente el mismo poder. Es como un único crítico que solo decide «¿más acción que comedia?»: lo que cuenta es la diferencia entre sus dos notas. La softmax es la generalización natural de la sigmoide a \( K \) clases.</p>
 
 <figure class="demo" data-demo="curso4/c4m5-dos-clases" data-titulo="Con dos clases, softmax = sigmoide de la diferencia">
-  <div class="haz">Mueve z0 y z1 y compara la probabilidad p1 de la softmax con σ(z1 − z0). Pulsa «Sumar 2 a los dos» y observa qué pasa. Después pulsa «z0 = z1».</div>
+  <div class="haz">Mueve z0 y z1 (las puntuaciones de «acción» y «comedia» de un tráiler) y compara la probabilidad p1 de la softmax con σ(z1 − z0). Pulsa «Sumar 2 a los dos» y observa qué pasa. Después pulsa «z0 = z1».</div>
   <div class="observa">Las dos cuentas dan <strong>exactamente</strong> lo mismo (la diferencia es del orden de 1e-16: redondeo del ordenador). Si subes los dos logits a la vez, p1 no se mueve: la softmax solo mira la diferencia. Con z0 = z1 sale 50 % / 50 %, el punto medio de la sigmoide.</div>
 </figure>
 
 <table>
   <caption>Binaria o multiclase: qué cambia en PyTorch</caption>
-  <thead><tr><th></th><th>Binaria (módulo 4)</th><th>Multiclase (este módulo)</th></tr></thead>
+  <thead><tr><th></th><th>Binaria (módulo 4): «¿terminará la película?»</th><th>Multiclase (este módulo): «¿de qué género es?»</th></tr></thead>
   <tbody>
     <tr><th scope="row">Neuronas de salida</th><td>1 (<code>nn.Linear(D, 1)</code>)</td><td>\( K \) (<code>nn.Linear(D, K)</code>)</td></tr>
     <tr><th scope="row">Qué convierte logits en probabilidades</th><td>sigmoide</td><td>softmax</td></tr>
@@ -125,7 +125,7 @@
 <section>
 <h2 id="softmax">La softmax, paso a paso</h2>
 
-<p class="pregunta">La capa lineal te da tres puntuaciones, por ejemplo \( (3,\ 1,\ -1) \). No son probabilidades: no suman 1 y una es negativa. ¿Cómo las conviertes en tres probabilidades que sumen 1 <strong>sin cambiar quién va ganando</strong>?</p>
+<p class="pregunta">La capa lineal te da tres puntuaciones para el tráiler de una película: acción 3, comedia 1 y terror −1, es decir \( (3,\ 1,\ -1) \). No son probabilidades: no suman 1 y una es negativa. ¿Cómo las conviertes en tres probabilidades que sumen 1 <strong>sin cambiar quién va ganando</strong>?</p>
 
 <p>Primero lo ingenuo: dividir cada número entre la suma. Con \( (3, 1, -1) \) la suma es 3 y saldría \( (1;\ 0{,}33;\ -0{,}33) \): una «probabilidad» negativa, y la primera vale 1. Con \( (1, -1) \) habría que dividir entre 0. El problema son los <strong>negativos</strong>. Necesitamos antes una función que convierta cualquier número en uno <strong>positivo</strong> sin alterar el orden: la <strong>exponencial</strong> \( e^{z} \) (con \( e \approx 2{,}718 \)). Es positiva siempre, crece cuando \( z \) crece y se puede derivar. Primero exponenciar, luego dividir entre la suma:</p>
 
@@ -139,21 +139,21 @@
 <div class="callout ejemplo">
   <span class="lbl">Ejemplo numérico · los logits (3, 1, −1)</span>
   <table>
-    <thead><tr><th>Clase</th><th>logit \( z \)</th><th>\( e^{z} \)</th><th>\( p = e^{z} / 23{,}1717 \)</th></tr></thead>
+    <thead><tr><th>Género (clase)</th><th>logit \( z \)</th><th>\( e^{z} \)</th><th>\( p = e^{z} / 23{,}1717 \)</th></tr></thead>
     <tbody>
-      <tr><td>0</td><td>3</td><td>20,0855</td><td class="res">0,8668</td></tr>
-      <tr><td>1</td><td>1</td><td>2,7183</td><td class="res">0,1173</td></tr>
-      <tr><td>2</td><td>−1</td><td>0,3679</td><td class="res">0,0159</td></tr>
+      <tr><td>acción (0)</td><td>3</td><td>20,0855</td><td class="res">0,8668</td></tr>
+      <tr><td>comedia (1)</td><td>1</td><td>2,7183</td><td class="res">0,1173</td></tr>
+      <tr><td>terror (2)</td><td>−1</td><td>0,3679</td><td class="res">0,0159</td></tr>
       <tr><td><strong>Suma</strong></td><td></td><td>23,1717</td><td>1,0000 (0,8668 + 0,1173 + 0,0159 = 1)</td></tr>
     </tbody>
   </table>
-  <p>La red diría: «86,7 % de que es la clase 0, 11,7 % de la 1 y 1,6 % de la 2». El <a href="#frag-2">fragmento 2</a> hace exactamente esta cuenta con <code>torch.exp</code> y la compara con <code>torch.softmax</code>.</p>
+  <p>La red diría: «86,7 % de que el tráiler es de acción, 11,7 % de que es de comedia y 1,6 % de que es de terror». El <a href="#frag-2">fragmento 2</a> hace exactamente esta cuenta con <code>torch.exp</code> y la compara con <code>torch.softmax</code>.</p>
 </div>
 
 <h3>Lo que de verdad hace la softmax: mira diferencias</h3>
 <p>Fíjate en el cociente entre dos probabilidades: \( p_0/p_1 = e^{z_0}/e^{z_1} = e^{z_0 - z_1} \). Con los números: \( e^{3-1} = e^{2} = 7{,}389 \), y en efecto \( 0{,}8668/0{,}1173 = 7{,}39 \). <strong>El cociente entre las probabilidades de dos clases depende solo de la <em>diferencia</em> entre sus logits</strong>, no de su valor. Cada punto de diferencia multiplica la probabilidad relativa por \( e \approx 2{,}72 \). De aquí salen tres propiedades que conviene tener grabadas:</p>
 <ol>
-  <li><strong>Sumar la misma constante \( c \) a todos los logits no cambia nada</strong>: \( e^{z+c} = e^{c}\,e^{z} \) y el factor \( e^{c} \) se cancela al dividir. Con \( (13, 11, 9) = (3,1,-1) + 10 \) sale otra vez \( (0{,}8668;\ 0{,}1173;\ 0{,}0159) \). La softmax es <em>invariante a traslaciones</em>. (La siguiente sección lo aprovecha para evitar un problema numérico.)</li>
+  <li><strong>Sumar la misma constante \( c \) a todos los logits no cambia nada</strong>: \( e^{z+c} = e^{c}\,e^{z} \) y el factor \( e^{c} \) se cancela al dividir. Con \( (13, 11, 9) = (3,1,-1) + 10 \) sale otra vez \( (0{,}8668;\ 0{,}1173;\ 0{,}0159) \): es como si los tres críticos subieran su nota 10 puntos a la vez, nadie ha cambiado de opinión sobre qué género es el más probable. La softmax es <em>invariante a traslaciones</em>. (La siguiente sección lo aprovecha para evitar un problema numérico.)</li>
   <li><strong>El orden se conserva</strong>: el logit mayor da la probabilidad mayor. Por eso <code>argmax(logits)</code> y <code>argmax(softmax(logits))</code> dan siempre la misma clase y, para <em>decidir</em> la clase, no hace falta calcular la softmax.</li>
   <li><strong>Es un «máximo suave»</strong> (de ahí el nombre, <em>soft-max</em>). El <code>argmax</code> «duro» daría \( (1, 0, 0) \): todo o nada, y no se puede derivar (cambia a saltos). La softmax da \( (0{,}87;\ 0{,}12;\ 0{,}02) \): casi todo a la ganadora pero con un reparto suave que sí se puede derivar. Eso es lo que permite entrenar.</li>
 </ol>
@@ -180,7 +180,7 @@
 
 <div class="callout ejemplo">
   <span class="lbl">Ejemplo numérico · <code>dim=1</code> frente a <code>dim=0</code> (<a href="#frag-3">fragmento 3</a>)</span>
-  <p>Logits de 3 muestras y 4 clases. Con <code>dim=1</code> la primera fila, \( (3, 1, -1, 0) \), pasa a \( (0{,}8310;\ 0{,}1125;\ 0{,}0152;\ 0{,}0414) \) y cada <strong>fila</strong> suma 1. La segunda fila, con cuatro logits iguales \( (0{,}5) \), da \( (0{,}25;\ 0{,}25;\ 0{,}25;\ 0{,}25) \): reparto uniforme. Con <code>dim=0</code> son las <strong>columnas</strong> las que suman 1 y las filas suman \( 1{,}2285 \), \( 0{,}7588 \) y \( 2{,}0127 \): probabilidades sin sentido, pero <strong>sin ningún error</strong>.</p>
+  <p>Logits de 3 tráilers (3 filas) y 4 géneros (4 columnas: acción, comedia, terror, animación; cifras inventadas). Con <code>dim=1</code> la primera fila, \( (3, 1, -1, 0) \), pasa a \( (0{,}8310;\ 0{,}1125;\ 0{,}0152;\ 0{,}0414) \) y cada <strong>fila</strong> suma 1. La segunda fila, un tráiler que no da ninguna pista (cuatro logits iguales \( (0{,}5) \)), da \( (0{,}25;\ 0{,}25;\ 0{,}25;\ 0{,}25) \): reparto uniforme. Con <code>dim=0</code> son las <strong>columnas</strong> las que suman 1 y las filas suman \( 1{,}2285 \), \( 0{,}7588 \) y \( 2{,}0127 \): probabilidades sin sentido, pero <strong>sin ningún error</strong>.</p>
 </div>
 
 <div class="callout ojo">
@@ -189,7 +189,7 @@
 </div>
 
 <figure class="demo" data-demo="curso4/c4m5-softmax-vivo" data-titulo="Softmax en vivo: la cadena z, e^z, p">
-  <div class="haz">Deja los logits en (3, 1, −1, 0) y comprueba la fila de p: 0,8310 · 0,1125 · 0,0152 · 0,0414. Sube z1 hasta 3 y mira a quién perjudica. Luego mueve la constante c (que se suma a <strong>todos</strong>) y observa la columna de p. Prueba los botones «Todos iguales» y «Uno domina».</div>
+  <div class="haz">Las cuatro clases son acción, comedia, terror y animación. Deja los logits en (3, 1, −1, 0) y comprueba la fila de p: 0,8310 · 0,1125 · 0,0152 · 0,0414. Sube z1 (comedia) hasta 3 y mira a quién perjudica. Luego mueve la constante c (que se suma a <strong>todos</strong>) y observa la columna de p. Prueba los botones «Todos iguales» y «Uno domina».</div>
   <div class="observa">Subir un logit <strong>le quita</strong> probabilidad a los demás, porque todo suma 1. Mover c hace que cambien z + c y e^(z+c) pero <strong>no p</strong>: la constante se cancela al dividir (la línea de abajo muestra que el cambio máximo es del orden de 1e-16, puro redondeo). Con logits iguales el reparto es uniforme (1/K); con una diferencia grande, la ganadora se lleva casi todo.</div>
 </figure>
 </section>
@@ -198,7 +198,7 @@
 <section>
 <h2 id="estabilidad">Cuando la exponencial se desborda: restar el máximo y log-sum-exp</h2>
 
-<p class="pregunta">Tu red, mal inicializada o con entradas enormes, devuelve logits como 1000, 1001 y 1002. La fórmula de la softmax es correcta en matemáticas. ¿Qué pasa cuando la calcula un ordenador?</p>
+<p class="pregunta">Imagina que tu red, mal inicializada o con entradas enormes, da a acción, comedia y terror unas puntuaciones absurdas: 1000, 1001 y 1002. La fórmula de la softmax es correcta en matemáticas. ¿Qué pasa cuando la calcula un ordenador?</p>
 
 <p>Los números de <code>float32</code> (los que usa PyTorch por defecto) llegan como máximo a unos \( 3{,}4\cdot 10^{38} \). Como \( e^{88} \approx 1{,}65\cdot 10^{38} \) todavía cabe pero \( e^{89} \) no, <strong>a partir de un logit de 89 la exponencial da <code>inf</code></strong> (infinito). Y entonces \( \text{inf}/\text{inf} \) es <code>nan</code> (<em>not a number</em>). El <a href="#frag-4">fragmento 4</a> lo muestra con los logits \( (1000, 1001, 1002) \): <code>exp</code> sale <code>[inf, inf, inf]</code> y la «softmax ingenua» <code>[nan, nan, nan]</code>.</p>
 
@@ -211,7 +211,7 @@
     <li><strong>Exponenciales:</strong> \( e^{-2} = 0{,}1353 \), \( e^{-1} = 0{,}3679 \), \( e^{0} = 1 \). Suma: \( 1{,}5032 \).</li>
     <li><strong>Dividir:</strong> \( (0{,}1353;\ 0{,}3679;\ 1)/1{,}5032 = \) <span class="res">(0,0900; 0,2447; 0,6652)</span>.</li>
   </ol>
-  <p>Es el resultado correcto, y es el que da <code>torch.softmax</code>: lo hace por dentro siempre. Observa que \( (-2, -1, 0) \) tiene las mismas diferencias que \( (1000, 1001, 1002) \): por eso la respuesta es la misma.</p>
+  <p>Es el resultado correcto, y es el que da <code>torch.softmax</code>: lo hace por dentro siempre. Observa que \( (-2, -1, 0) \) tiene las mismas diferencias que \( (1000, 1001, 1002) \): por eso la respuesta es la misma. Es como restarle a cada crítico la nota del más entusiasta: nadie cambia de opinión sobre quién gana, pero los números se quedan pequeños.</p>
 </div>
 
 <h3>El logaritmo: <em>log-sum-exp</em></h3>
@@ -235,14 +235,14 @@
 <section>
 <h2 id="entropia-cruzada">De probabilidades a una pérdida: la entropía cruzada y su gradiente</h2>
 
-<p class="pregunta">Con diez probabilidades por imagen, ¿cómo sabe el modelo cuánto se ha equivocado, y en qué dirección tiene que mover sus pesos?</p>
+<p class="pregunta">La red reparte su confianza entre acción, comedia y terror para un tráiler. Se estrena la película y se sabe su género real. ¿Cómo sabe el modelo cuánto se ha equivocado (cuánto le «sorprende» el género real), y en qué dirección tiene que mover sus pesos?</p>
 
 <div class="callout recuerda">
   <span class="lbl">Recuerda (Curso 2, módulo 2 y módulo 4)</span>
   <p>La entropía cruzada binaria era \( -[\,y\ln p + (1-y)\ln(1-p)\,] \): solo cuenta la probabilidad que el modelo dio al resultado <em>que de verdad ocurrió</em>. La multiclase hace lo mismo. En el <a href="../curso-2/modulo-2.html#multiclase">Curso 2</a> la escribimos con un vector <em>one-hot</em> (todo ceros salvo un 1 en la clase correcta); aquí la escribimos directamente con el <strong>índice</strong> de la clase correcta, que es lo que usa PyTorch.</p>
 </div>
 
-<p>La idea es la de un apostante. Reparte su dinero entre las \( K \) clases según sus probabilidades \( p_k \). Cuando sale la clase correcta \( y \) solo le sirve lo que apostó a <em>esa</em>: \( p_y \). Si apostó mucho (\( p_y \) cercana a 1) acierta de lleno; si apostó poco, se «sorprende». La <strong>sorpresa</strong> se mide con \( -\ln p_y \): vale 0 si \( p_y = 1 \) y crece sin límite cuando \( p_y \to 0 \).</p>
+<p>La idea es la de la <strong>sorpresa</strong>. Se estrena <em>Shrek</em> y la red había repartido su confianza entre los \( K \) géneros con probabilidades \( p_k \). Solo importa lo que la red daba al género que <em>de verdad</em> tiene la película, \( p_y \): si había dicho «comedia, 87 %», no te sorprende nada; si había dicho «comedia, 1 %», te sorprende muchísimo. Esa <strong>sorpresa</strong> se mide con \( -\ln p_y \): vale 0 si \( p_y = 1 \) y crece sin límite cuando \( p_y \to 0 \).</p>
 
 <div class="formula">\[ L = -\ln p_{y} \qquad\text{y para un lote de } N \text{ muestras:}\qquad L = \frac{1}{N}\sum_{i=1}^{N} -\ln p_{i,\,y_i} \]</div>
 <p>donde \( y \) es la clase correcta (un entero de 0 a \( K-1 \)), \( p_y \) la probabilidad que la softmax dio a esa clase y \( y_i \) la clase correcta de la muestra \( i \). (Con one-hot sería \( -\sum_k y_k \ln p_k \): todos los sumandos con \( y_k = 0 \) desaparecen y queda el mismo \( -\ln p_y \).)</p>
@@ -255,22 +255,22 @@
 <p>Dos lecturas útiles. <strong>(1)</strong> Si el modelo no sabe nada y reparte por igual, \( p_y = 1/K \) y la pérdida es \( \ln K \): \( \ln 3 = 1{,}0986 \), \( \ln 10 = 2{,}3026 \). Esa es la <em>pérdida de adivinar</em>, el valor con el que debe empezar un modelo sin entrenar (lo comprobarás con los dígitos). <strong>(2)</strong> Equivocarse con seguridad sale carísimo: pasar de dar 10 % a dar 1 % a la clase correcta duplica la pérdida (2,30 → 4,61).</p>
 
 <div class="callout ejemplo">
-  <span class="lbl">Ejemplo numérico · un lote de 3 muestras y 3 clases (<a href="#frag-5">fragmento 5</a>)</span>
+  <span class="lbl">Ejemplo numérico · un lote de 3 tráilers y 3 géneros (cifras inventadas, <a href="#frag-5">fragmento 5</a>)</span>
   <table>
-    <thead><tr><th>Muestra</th><th>logits \( z \)</th><th>probabilidades \( p \)</th><th>clase correcta \( y \)</th><th>\( p_y \)</th><th>\( -\ln p_y \)</th></tr></thead>
+    <thead><tr><th>Tráiler (muestra)</th><th>logits \( z \)</th><th>probabilidades \( p \)</th><th>género real \( y \)</th><th>\( p_y \)</th><th>\( -\ln p_y \)</th></tr></thead>
     <tbody>
-      <tr><td>0</td><td>(3; 1; −1)</td><td>(0,8668; 0,1173; 0,0159)</td><td>0</td><td>0,8668</td><td>0,1429</td></tr>
-      <tr><td>1</td><td>(0,2; 0,1; 2)</td><td>(0,1257; 0,1138; 0,7605)</td><td>2</td><td>0,7605</td><td>0,2737</td></tr>
-      <tr><td>2</td><td>(1; 1; 1)</td><td>(0,3333; 0,3333; 0,3333)</td><td>1</td><td>0,3333</td><td>1,0986</td></tr>
+      <tr><td>0 · Los Vengadores</td><td>(3; 1; −1)</td><td>(0,8668; 0,1173; 0,0159)</td><td>acción (0)</td><td>0,8668</td><td>0,1429</td></tr>
+      <tr><td>1 · El Resplandor</td><td>(0,2; 0,1; 2)</td><td>(0,1257; 0,1138; 0,7605)</td><td>terror (2)</td><td>0,7605</td><td>0,2737</td></tr>
+      <tr><td>2 · Shrek (la red no tiene ni idea)</td><td>(1; 1; 1)</td><td>(0,3333; 0,3333; 0,3333)</td><td>comedia (1)</td><td>0,3333</td><td>1,0986</td></tr>
     </tbody>
   </table>
-  <p>La pérdida del lote es la media: \( (0{,}1429 + 0{,}2737 + 1{,}0986)/3 = 1{,}5152/3 = \) <span class="res">0,5051</span> (con <code>reduction="sum"</code> saldría 1,5153: la suma sin dividir). La tercera muestra, con tres logits iguales, es la «adivinanza»: \( \ln 3 = 1{,}0986 \).</p>
+  <p>La pérdida del lote es la media: \( (0{,}1429 + 0{,}2737 + 1{,}0986)/3 = 1{,}5152/3 = \) <span class="res">0,5051</span> (con <code>reduction="sum"</code> saldría 1,5153: la suma sin dividir). El tercer tráiler (Shrek), con tres logits iguales, es la «adivinanza»: \( \ln 3 = 1{,}0986 \). Es el que más sorprende; el que menos, Los Vengadores.</p>
 </div>
 
 <h3>La misma cuenta, sin calcular probabilidades</h3>
 <p>Como \( \ln p_y = z_y - \ln\sum_j e^{z_j} \), la pérdida se puede escribir sin tocar \( p \):</p>
 <div class="formula">\[ L = -z_y + \ln\sum_{j=1}^{K} e^{z_j} \]</div>
-<p>«Menos la puntuación de la clase correcta, más el log-sum-exp de todas». Para la muestra 0: \( -3 + \ln 23{,}1717 = -3 + 3{,}1429 = 0{,}1429 \) ✓. Es lo que calcula internamente PyTorch (con el log-sum-exp estable de la sección anterior) y lo que verás en la última línea del fragmento 5. Sale una interpretación: la pérdida baja si <strong>subes el logit de la clase correcta</strong> (primer término) o si <strong>bajas los logits de las demás</strong> (el log-sum-exp).</p>
+<p>«Menos la puntuación de la clase correcta, más el log-sum-exp de todas». Para Los Vengadores (muestra 0): \( -3 + \ln 23{,}1717 = -3 + 3{,}1429 = 0{,}1429 \) ✓. Es lo que calcula internamente PyTorch (con el log-sum-exp estable de la sección anterior) y lo que verás en la última línea del fragmento 5. Sale una interpretación: la pérdida baja si <strong>subes el logit de la clase correcta</strong> (primer término) o si <strong>bajas los logits de las demás</strong> (el log-sum-exp).</p>
 
 <h3>El gradiente: «lo que creías menos lo que debías creer»</h3>
 <p>Para entrenar hace falta la derivada de \( L \) respecto a cada logit \( z_k \). Con \( L = -z_y + \ln\sum_j e^{z_j} \):</p>
@@ -280,7 +280,7 @@
   <li><strong>Suma:</strong></li>
 </ol>
 <div class="formula">\[ \frac{\partial L}{\partial z_k} = p_k - y_k \]</div>
-<p>Es una de las coincidencias felices del aprendizaje automático: la derivada de «softmax + entropía cruzada» es simplemente <strong>predicción menos realidad</strong>. Con \( \mathbf{z} = (3, 1, -1) \) y clase correcta 0: \( \mathbf{p} - \mathbf{y} = (0{,}8668 - 1,\ 0{,}1173,\ 0{,}0159) = (-0{,}1332,\ 0{,}1173,\ 0{,}0159) \), exactamente lo que da autograd en el <a href="#frag-6">fragmento 6</a>. Cómo se lee:</p>
+<p>Es una de las coincidencias felices del aprendizaje automático: la derivada de «softmax + entropía cruzada» es simplemente <strong>predicción menos realidad</strong>. Con \( \mathbf{z} = (3, 1, -1) \) (acción, comedia, terror) y género real acción (clase 0): \( \mathbf{p} - \mathbf{y} = (0{,}8668 - 1,\ 0{,}1173,\ 0{,}0159) = (-0{,}1332,\ 0{,}1173,\ 0{,}0159) \), exactamente lo que da autograd en el <a href="#frag-6">fragmento 6</a>. Cómo se lee:</p>
 <ul>
   <li><strong>Clase correcta:</strong> \( p_y - 1 \) es siempre negativo (o 0). Como el descenso del gradiente <em>resta</em> el gradiente, el logit \( z_y \) <strong>sube</strong>, tanto más cuanto menos probabilidad le dabas (\( 1 - p_y \) = lo que te faltó).</li>
   <li><strong>Clases incorrectas:</strong> \( p_k \) es positivo, así que su logit <strong>baja</strong>, tanto más cuanto más creías en ellas.</li>
@@ -290,13 +290,13 @@
 </ul>
 
 <figure class="demo" data-demo="curso4/c4m5-gradiente-logits" data-titulo="El gradiente p − y empuja los logits">
-  <div class="haz">Con la clase correcta = 0 y lr = 1, pulsa «Un paso» varias veces y mira las tres columnas: logits z, probabilidades p y gradiente p − y. Cambia la clase correcta a 3 y repite. Prueba con lr = 4 y con lr = 0,1 y pulsa «10 pasos».</div>
+  <div class="haz">Las cuatro clases son acción, comedia, terror y animación. Con el género real = acción y lr = 1, pulsa «Un paso» varias veces y mira las tres columnas: logits z, probabilidades p y gradiente p − y. Cambia el género real a animación y repite. Prueba con lr = 4 y con lr = 0,1 y pulsa «10 pasos».</div>
   <div class="observa">El gradiente de la clase correcta es negativo (verde) y los demás positivos (naranja); su suma es siempre 0. Cada paso sube el logit correcto y baja los otros, y la pérdida −ln p baja. Cuanto más cerca de 1 está p de la clase correcta, más pequeño es el gradiente: los últimos pasos casi no mueven nada. Con lr muy grande las cosas se mueven a trompicones, y con lr = 0,1 tarda muchos pasos.</div>
 </figure>
 
 <div class="callout analogia">
   <span class="lbl">Analogía</span>
-  <p>El gradiente \( p - y \) es el <strong>reproche</strong> que recibe cada juez del concurso: al juez de la clase correcta le dicen «puntúa más alto, te faltó \( 1 - p_y \)»; a cada juez equivocado, «baja la nota, creías \( p_k \) en algo falso». Cuando todos coinciden con la realidad, no hay reproche.</p>
+  <p>El gradiente \( p - y \) es el <strong>reproche</strong> que recibe cada crítico de Netflix cuando se sabe el género real de la película: al crítico del género verdadero le dicen «puntúa más alto, te faltó \( 1 - p_y \)»; a cada crítico de otro género, «baja la nota, le dabas \( p_k \) a algo falso». Cuando todos coinciden con la realidad, no hay reproche.</p>
 </div>
 </section>
 
@@ -309,10 +309,10 @@
 
 <table>
   <caption>El contrato de <code>nn.CrossEntropyLoss</code></caption>
-  <thead><tr><th></th><th>Qué debe recibir</th><th>Ejemplo (N = 4 muestras, K = 3 clases)</th></tr></thead>
+  <thead><tr><th></th><th>Qué debe recibir</th><th>Ejemplo (N = 4 tráilers, K = 3 géneros)</th></tr></thead>
   <tbody>
     <tr><th scope="row">1.er argumento (<code>input</code>)</th><td><strong>logits</strong> sin softmax, <code>float32</code>, forma <code>(N, K)</code></td><td><code>modelo(x)</code> → forma <code>(4, 3)</code></td></tr>
-    <tr><th scope="row">2.º argumento (<code>target</code>)</th><td>un <strong>índice de clase</strong> por muestra, tipo <code>long</code> (<code>int64</code>), forma <code>(N,)</code>, valores de 0 a K−1</td><td><code>tensor([0, 2, 1, 2])</code></td></tr>
+    <tr><th scope="row">2.º argumento (<code>target</code>)</th><td>un <strong>índice de clase</strong> por muestra, tipo <code>long</code> (<code>int64</code>), forma <code>(N,)</code>, valores de 0 a K−1</td><td><code>tensor([0, 2, 1, 2])</code> (acción, terror, comedia, terror)</td></tr>
     <tr><th scope="row">Qué devuelve</th><td>un escalar (la media de las pérdidas de las muestras)</td><td>0,9357</td></tr>
   </tbody>
 </table>
@@ -336,7 +336,7 @@
 <p>Mucha gente, por costumbre de Keras o para «ver probabilidades», escribe el modelo así:</p>
 <pre class="ascii">def forward(self, x):
     return torch.softmax(self.lineal(x), dim=1)   # ← MAL si luego usas CrossEntropyLoss</pre>
-<p>PyTorch <strong>no se queja</strong>: la pérdida acepta cualquier tensor de la forma correcta. Pero ahora la softmax se aplica <em>dos veces</em>. Lo que le llega a la pérdida son probabilidades (números entre 0 y 1), y la pérdida les aplica otra softmax. Como la diferencia máxima entre dos «logits» ya es 1, la segunda softmax no puede pasar de \( e/(e + K - 1) \) para la clase ganadora: con \( K = 10 \) eso es \( 0{,}23 \). Resultado, en el <a href="#frag-8">fragmento 8</a> (una muestra, clase correcta 0, nueve clases más con logit 0):</p>
+<p>PyTorch <strong>no se queja</strong>: la pérdida acepta cualquier tensor de la forma correcta. Pero ahora la softmax se aplica <em>dos veces</em>. Lo que le llega a la pérdida son probabilidades (números entre 0 y 1), y la pérdida les aplica otra softmax. Como la diferencia máxima entre dos «logits» ya es 1, la segunda softmax no puede pasar de \( e/(e + K - 1) \) para la clase ganadora: con \( K = 10 \) eso es \( 0{,}23 \). Resultado, en el <a href="#frag-8">fragmento 8</a> (un tráiler, con 10 géneros en total: el correcto es el 0 y los otros nueve tienen logit 0):</p>
 <table>
   <thead><tr><th>logit \( z_0 \) de la clase correcta</th><th>0</th><th>2</th><th>5</th><th>10</th><th>20</th></tr></thead>
   <tbody>
@@ -354,23 +354,23 @@
 </figure>
 
 <h3>Las opciones de la pérdida</h3>
-<p><code>nn.CrossEntropyLoss(weight=None, ignore_index=-100, reduction='mean', label_smoothing=0.0)</code>. Con el lote de 2 muestras del <a href="#frag-9">fragmento 9</a> (logits \( (2; 1; 0{,}1) \) con clase 0, y \( (0{,}5; 2{,}5; 0{,}2) \) con clase 2; pérdidas individuales 0,4170 y 2,5116):</p>
+<p><code>nn.CrossEntropyLoss(weight=None, ignore_index=-100, reduction='mean', label_smoothing=0.0)</code>. Con el lote de 2 tráilers del <a href="#frag-9">fragmento 9</a> (cifras inventadas): <em>Los Vengadores</em>, con logits \( (2; 1; 0{,}1) \) y género real acción (clase 0), y <em>El Resplandor</em>, con logits \( (0{,}5; 2{,}5; 0{,}2) \) y género real terror (clase 2) pero la red cree que es comedia; pérdidas individuales 0,4170 y 2,5116:</p>
 <table>
   <thead><tr><th>Opción</th><th>Qué hace</th><th>Resultado con ese lote</th></tr></thead>
   <tbody>
     <tr><td><code>reduction="mean"</code> (por defecto)</td><td>Media de las pérdidas de las muestras</td><td>(0,4170 + 2,5116)/2 = <strong>1,4643</strong></td></tr>
     <tr><td><code>reduction="sum"</code></td><td>Suma, sin dividir</td><td>2,9286</td></tr>
     <tr><td><code>reduction="none"</code></td><td>Devuelve una pérdida por muestra (vector de N)</td><td>(0,4170; 2,5116)</td></tr>
-    <tr><td><code>weight=[1, 1, 3]</code></td><td>Cada muestra pesa lo que pese <em>su clase correcta</em>. Útil con clases desequilibradas (la rara pesa más). La media se divide entre la <strong>suma de pesos</strong>, no entre N</td><td>(1·0,4170 + 3·2,5116)/(1 + 3) = <strong>1,9879</strong></td></tr>
+    <tr><td><code>weight=[1, 1, 3]</code></td><td>Cada muestra pesa lo que pese <em>su clase correcta</em>. Útil con clases desequilibradas (si el catálogo tiene 1.000 comedias y solo 20 películas de terror, haces que el terror pese más para que el modelo no lo ignore). La media se divide entre la <strong>suma de pesos</strong>, no entre N</td><td>(1·0,4170 + 3·2,5116)/(1 + 3) = <strong>1,9879</strong></td></tr>
     <tr><td><code>label_smoothing=0.1</code></td><td>Suaviza el objetivo: en lugar de \( (1, 0, 0) \) usa \( (1-\varepsilon)\,\text{one-hot} + \varepsilon/K \). La pérdida de una muestra es \( (1-\varepsilon)(-\ln p_y) + \varepsilon\cdot\text{media}_k(-\ln p_k) \)</td><td>muestra 0: \( 0{,}9\cdot 0{,}4170 + 0{,}1\cdot 1{,}3837 = 0{,}5137 \); media del lote: <strong>1,4693</strong></td></tr>
     <tr><td>objetivo como probabilidades <code>(N, K)</code></td><td>Usa la distribución dada como objetivo: \( -\sum_k q_k \ln p_k \)</td><td>con \( q = (0{,}9; 0{,}05; 0{,}05) \) y \( (0, 0, 1) \): <strong>1,5368</strong></td></tr>
-    <tr><td><code>ignore_index=-100</code></td><td>Las muestras cuya etiqueta es −100 <strong>no cuentan</strong> (ni en la suma ni en la media). Sirve para rellenos (<em>padding</em>) o datos sin etiquetar</td><td>etiquetas \( (0, -100) \) → <strong>0,4170</strong>, igual que usar solo la 1.ª muestra</td></tr>
+    <tr><td><code>ignore_index=-100</code></td><td>Las muestras cuya etiqueta es −100 <strong>no cuentan</strong> (ni en la suma ni en la media). Sirve para rellenos (<em>padding</em>) o para tráilers a los que aún no se ha asignado género</td><td>etiquetas \( (0, -100) \) → <strong>0,4170</strong>, igual que usar solo la 1.ª muestra</td></tr>
   </tbody>
 </table>
-<p>Para qué sirve el <em>label smoothing</em>: con el objetivo \( (1, 0, 0) \) la pérdida solo llega a 0 si \( z_y \to \infty \), así que el modelo se anima a inflar los logits y a estar «demasiado seguro». Con \( (0{,}933; 0{,}033; 0{,}033) \) (para \( K = 3 \) y \( \varepsilon = 0{,}1 \)) su mejor pérdida es positiva y se frena antes. No lo necesitas para los dígitos, pero sí lo reconocerás en modelos grandes.</p>
+<p>Para qué sirve el <em>label smoothing</em>: con el objetivo \( (1, 0, 0) \) la pérdida solo llega a 0 si \( z_y \to \infty \), así que el modelo se anima a inflar los logits y a estar «demasiado seguro». Con \( (0{,}933; 0{,}033; 0{,}033) \) (para \( K = 3 \) y \( \varepsilon = 0{,}1 \)) su mejor pérdida es positiva y se frena antes (es como admitir que hay películas a medio camino, como una comedia de terror, y no dar nunca un 100 % redondo). No lo necesitas para los dígitos, pero sí lo reconocerás en modelos grandes.</p>
 
 <figure class="demo" data-demo="curso4/c4m5-opciones-loss" data-titulo="Las opciones de CrossEntropyLoss, con números">
-  <div class="haz">Con todo por defecto sale 1,4643. Sube el weight de la clase 2 a 3 (1,9879). Vuelve a 1 y pon label_smoothing = 0,1 (1,4693). Activa «ignore_index» (0,4170). Cambia reduction a sum y a none.</div>
+  <div class="haz">La muestra 0 es <em>Los Vengadores</em> (acción) y la 1 es <em>El Resplandor</em> (terror, clase 2). Con todo por defecto sale 1,4643. Sube el weight del terror (clase 2) a 3 (1,9879). Vuelve a 1 y pon label_smoothing = 0,1 (1,4693). Activa «ignore_index» (El Resplandor sin género asignado: 0,4170). Cambia reduction a sum y a none.</div>
   <div class="observa">La tabla recalcula cada muestra con la fórmula de PyTorch. El peso solo afecta a la muestra cuya <em>clase correcta</em> es la 2 y, con mean, se divide entre la suma de los pesos (por eso al subir el peso la media se acerca a la pérdida de esa muestra). El suavizado sube la pérdida de la muestra que ya iba bien y baja la de la que iba mal. Una muestra ignorada ya no cuenta para nada.</div>
 </figure>
 
@@ -386,7 +386,7 @@
 
 <p class="pregunta">Vas a ver estos errores varias veces esta semana. ¿Qué significa cada mensaje y cómo se arregla sin adivinar?</p>
 
-<p>La pérdida y el modelo comprueban la <strong>forma</strong> (<code>shape</code>) y el <strong>tipo</strong> (<code>dtype</code>) de los tensores. Los mensajes son parecidos pero dicen cosas distintas. Estos son los reales de esta versión de PyTorch (los ejecuta el <a href="#frag-7">fragmento 7</a>, con 4 muestras y 3 clases):</p>
+<p>La pérdida y el modelo comprueban la <strong>forma</strong> (<code>shape</code>) y el <strong>tipo</strong> (<code>dtype</code>) de los tensores. Los mensajes son parecidos pero dicen cosas distintas. Estos son los reales de esta versión de PyTorch (los ejecuta el <a href="#frag-7">fragmento 7</a>, con 4 tráilers y 3 géneros):</p>
 <table>
   <caption>Llamar a <code>nn.CrossEntropyLoss()(logits, y)</code> con logits de forma <code>(4, 3)</code></caption>
   <thead><tr><th>Lo que pasas como <code>y</code></th><th>Mensaje</th><th>Arreglo</th></tr></thead>
@@ -429,6 +429,8 @@
 <h2 id="digitos">Los datos: dígitos escritos a mano (y la verdad sobre MNIST)</h2>
 
 <p class="pregunta">¿Cómo se convierte la foto de un número escrito a mano en algo que una capa <code>nn.Linear</code> pueda leer?</p>
+
+<p>Hasta aquí los tráilers tenían solo 2 rasgos inventados. Para entrenar de verdad necesitamos datos reales, y usaremos los <strong>dígitos del 0 al 9</strong>. Es exactamente el mismo problema (10 «géneros» en lugar de 3), solo que el «tráiler» es una imagen y sus rasgos son los <strong>píxeles</strong>. Piensa en una carátula de película en miniatura: una cuadrícula de puntitos y, en cada puntito, un número que dice cuánto oscuro hay.</p>
 
 <div class="callout ojo">
   <span class="lbl">Ojo · sobre MNIST y los datos de este módulo</span>
@@ -493,13 +495,13 @@ fila 7:  56  57  58  59  60  61  62  63</pre>
 
 <div class="callout ejemplo">
   <span class="lbl">Ejemplo numérico · una plantilla de 4 píxeles</span>
-  <p>Imágenes de \( 2\times 2 \) píxeles (aplanadas: \( x_1, x_2, x_3, x_4 \)) y una plantilla «diagonal»: \( \mathbf{w} = (+1, -1, -1, +1) \), \( b = 0 \).</p>
+  <p>Carátulas diminutas de \( 2\times 2 \) píxeles (1 = píxel oscuro, 0 = claro; aplanadas: \( x_1, x_2, x_3, x_4 \)) y un crítico que busca carátulas con una franja «diagonal»: \( \mathbf{w} = (+1, -1, -1, +1) \), \( b = 0 \).</p>
   <table>
     <thead><tr><th>Imagen</th><th>\( \mathbf{x} \)</th><th>\( z = \mathbf{w}\cdot\mathbf{x} \)</th><th>Lectura</th></tr></thead>
     <tbody>
-      <tr><td>tinta en la diagonal principal</td><td>(1, 0, 0, 1)</td><td class="res">1 + 1 = 2</td><td>encaja con la plantilla: puntuación alta</td></tr>
-      <tr><td>tinta en la otra diagonal</td><td>(0, 1, 1, 0)</td><td class="res">−1 − 1 = −2</td><td>justo lo contrario: puntuación baja</td></tr>
-      <tr><td>todo en blanco</td><td>(0, 0, 0, 0)</td><td class="res">0</td><td>sin tinta no hay evidencia (solo cuenta el sesgo)</td></tr>
+      <tr><td>carátula con la diagonal principal oscura</td><td>(1, 0, 0, 1)</td><td class="res">1 + 1 = 2</td><td>encaja con la plantilla: puntuación alta</td></tr>
+      <tr><td>carátula con la otra diagonal oscura</td><td>(0, 1, 1, 0)</td><td class="res">−1 − 1 = −2</td><td>justo lo contrario: puntuación baja</td></tr>
+      <tr><td>carátula toda clara</td><td>(0, 0, 0, 0)</td><td class="res">0</td><td>sin píxeles oscuros no hay evidencia (solo cuenta el sesgo)</td></tr>
     </tbody>
   </table>
   <p>La puntuación mide <em>cuánto se parece la imagen a la plantilla, con signo</em>. Con 10 plantillas hay 10 puntuaciones, y la softmax las convierte en un reparto.</p>
@@ -535,14 +537,14 @@ fila 7:  56  57  58  59  60  61  62  63</pre>
 
 <div class="callout ejemplo">
   <span class="lbl">Ejemplo numérico · un paso completo</span>
-  <p>\( \mathbf{x} = (1,\ 2) \), clase correcta \( y = 0 \), \( W = \begin{pmatrix} 0{,}5 &amp; -0{,}5 \\ 0 &amp; 0{,}5 \\ -0{,}5 &amp; 0 \end{pmatrix} \), \( \mathbf{b} = (0, 0, 0) \), \( \eta = 0{,}5 \).</p>
+  <p>Un tráiler con 1 escena de acción y 2 chistes (cifras inventadas): \( \mathbf{x} = (1,\ 2) \). Es de <em>acción</em>: clase correcta \( y = 0 \) (1 = comedia, 2 = terror). \( W = \begin{pmatrix} 0{,}5 &amp; -0{,}5 \\ 0 &amp; 0{,}5 \\ -0{,}5 &amp; 0 \end{pmatrix} \), \( \mathbf{b} = (0, 0, 0) \), \( \eta = 0{,}5 \).</p>
   <ol class="pasos">
-    <li><strong>Logits:</strong> \( z_0 = 0{,}5\cdot 1 - 0{,}5\cdot 2 = -0{,}5 \); \( z_1 = 0\cdot 1 + 0{,}5\cdot 2 = 1 \); \( z_2 = -0{,}5\cdot 1 + 0 = -0{,}5 \). Es decir, \( (-0{,}5;\ 1;\ -0{,}5) \): la red cree que es la clase 1 (¡y es la 0!).</li>
+    <li><strong>Logits:</strong> \( z_0 = 0{,}5\cdot 1 - 0{,}5\cdot 2 = -0{,}5 \); \( z_1 = 0\cdot 1 + 0{,}5\cdot 2 = 1 \); \( z_2 = -0{,}5\cdot 1 + 0 = -0{,}5 \). Es decir, \( (-0{,}5;\ 1;\ -0{,}5) \): la red cree que es la clase 1, comedia (¡y es la 0, acción!).</li>
     <li><strong>Softmax:</strong> \( e^{-0{,}5} = 0{,}6065 \), \( e^{1} = 2{,}7183 \), \( e^{-0{,}5} = 0{,}6065 \); suma \( 3{,}9313 \) → \( \mathbf{p} = (0{,}1543;\ 0{,}6914;\ 0{,}1543) \).</li>
     <li><strong>Pérdida:</strong> \( -\ln p_0 = -\ln 0{,}1543 = \) <span class="res">1,869</span>.</li>
     <li><strong>Gradiente de los logits:</strong> \( \mathbf{p} - \mathbf{y} = (0{,}1543 - 1,\ 0{,}6914,\ 0{,}1543) = (-0{,}8457;\ 0{,}6914;\ 0{,}1543) \).</li>
     <li><strong>Gradiente de \( W \):</strong> cada fila \( k \) es \( (p_k - y_k)\cdot\mathbf{x} \): fila 0 \( = -0{,}8457\cdot(1, 2) = (-0{,}8457;\ -1{,}6914) \); fila 1 \( = 0{,}6914\cdot(1,2) = (0{,}6914;\ 1{,}3829) \); fila 2 \( = 0{,}1543\cdot(1,2) = (0{,}1543;\ 0{,}3086) \). El gradiente del sesgo es \( \mathbf{p}-\mathbf{y} \).</li>
-    <li><strong>Actualizar</strong> (\( W \leftarrow W - 0{,}5\cdot dW \)): fila 0 \( = (0{,}5 + 0{,}4229;\ -0{,}5 + 0{,}8457) = (0{,}9229;\ 0{,}3457) \) (la clase correcta <em>se parece más</em> a \( \mathbf{x} \)); fila 1 \( = (-0{,}3457;\ -0{,}1914) \) (la equivocada <em>se aleja</em>).</li>
+    <li><strong>Actualizar</strong> (\( W \leftarrow W - 0{,}5\cdot dW \)): fila 0 \( = (0{,}5 + 0{,}4229;\ -0{,}5 + 0{,}8457) = (0{,}9229;\ 0{,}3457) \) (la plantilla de acción, la clase correcta, <em>se parece más</em> a \( \mathbf{x} \)); fila 1 \( = (-0{,}3457;\ -0{,}1914) \) (la de comedia, la equivocada, <em>se aleja</em>).</li>
     <li><strong>Resultado:</strong> con los pesos nuevos, \( \mathbf{p} = (0{,}9138;\ 0{,}0407;\ 0{,}0455) \) y la pérdida baja de 1,869 a <span class="res">0,0901</span>.</li>
   </ol>
   <p>Una tasa de 0,5 con una sola muestra es un paso muy grande (por eso la pérdida casi desaparece de golpe). Con muchas muestras distintas, cada una tira de los pesos en su dirección y la media de todos esos tirones es lo que se llama el <strong>gradiente del lote</strong>. El fragmento 13 repite la cuenta con <code>backward()</code> y comprueba que el gradiente a mano (<code>dz.T @ x</code>) y el de autograd son idénticos.</p>
@@ -573,8 +575,8 @@ fila 7:  56  57  58  59  60  61  62  63</pre>
 </div>
 
 <figure class="demo" data-demo="curso4/c4m5-entrena-softmax" data-titulo="Entrenar una regresión softmax en 2D (y su límite)">
-  <div class="haz">Pulsa «▶ Entrenar» con «Tres nubes» y mira cómo el plano se reparte en tres zonas de colores y la pérdida baja desde ln 3. Cambia el lote a «1 muestra» y a «todas», y la tasa de aprendizaje a 0,01 y a 10. Luego elige «Tres anillos concéntricos» y entrena.</div>
-  <div class="observa">La pérdida empieza cerca de ln 3 = 1,099 (línea de puntos) y baja; el modelo tiene solo 9 parámetros (3·2 + 3). Con lote «todas» la curva es suave pero cada época es una sola actualización; con 1 muestra hay ruido. Con lr muy grande se oscila y con lr muy pequeño casi no se avanza. Con anillos concéntricos <strong>ninguna</strong> configuración funciona: la pérdida se queda cerca de ln 3 y el acierto de entrenamiento en torno al 40–50 % (con las nubes se llega a cerca del 90 %), porque cada frontera de una sola capa lineal es una <strong>recta</strong>. Eso es lo que arregla el Curso 5.</div>
+  <div class="haz">Cada punto es un tráiler descrito con dos rasgos (relleno = entrenamiento, hueco = test). Pulsa «▶ Entrenar» con «Tres géneros» y mira cómo el mapa se reparte en tres zonas de colores (acción, comedia, terror) y la pérdida baja desde ln 3. Cambia el lote a «1 muestra» y a «todas», y la tasa de aprendizaje a 0,01 y a 10. Luego elige «Tres géneros mezclados en anillos» y entrena.</div>
+  <div class="observa">La pérdida empieza cerca de ln 3 = 1,099 (línea de puntos) y baja; el modelo tiene solo 9 parámetros (3·2 + 3). Con lote «todas» la curva es suave pero cada época es una sola actualización; con 1 muestra hay ruido. Con lr muy grande se oscila y con lr muy pequeño casi no se avanza. Con los géneros mezclados en anillos concéntricos <strong>ninguna</strong> configuración funciona: la pérdida se queda cerca de ln 3 y el acierto de entrenamiento en torno al 40–50 % (con los grupos separados se llega a cerca del 90 %), porque cada frontera de una sola capa lineal es una <strong>recta</strong>. Eso es lo que arregla el Curso 5.</div>
 </figure>
 </section>
 
@@ -588,7 +590,7 @@ fila 7:  56  57  58  59  60  61  62  63</pre>
 <p>Con <code>torch.no_grad()</code> y el modelo en <code>eval()</code> se obtienen los logits del test; su <code>argmax(dim=1)</code> es la clase predicha y la softmax da la confianza. El <a href="#frag-15">fragmento 15</a> muestra: <strong>346 aciertos de 360 → accuracy 0,9611</strong> y, para la imagen 7 del test (un 2), las probabilidades \( 0{,}991 \) para la clase 2, \( 0{,}005 \) para la 3 y \( 0{,}001 \) para la 8, obtenidas con <code>torch.topk</code>. Comprueba también que <code>argmax</code> de los logits y de las probabilidades coinciden en <em>todas</em> las imágenes.</p>
 
 <h3>La matriz de confusión</h3>
-<p>El accuracy es un solo número: dice cuántas veces acierta, no <em>dónde</em> falla. La <strong>matriz de confusión</strong> es una tabla \( K\times K \): la <strong>fila</strong> es la clase <em>real</em>, la <strong>columna</strong> la clase <em>predicha</em>, y la celda \( (i, j) \) cuenta cuántas imágenes de la clase \( i \) se predijeron como \( j \). La <strong>diagonal</strong> son los aciertos; todo lo que está fuera son errores, y cada celda dice <em>qué confunde con qué</em>.</p>
+<p>El accuracy es un solo número: dice cuántas veces acierta, no <em>dónde</em> falla. La <strong>matriz de confusión</strong> es una tabla \( K\times K \): la <strong>fila</strong> es la clase <em>real</em>, la <strong>columna</strong> la clase <em>predicha</em>, y la celda \( (i, j) \) cuenta cuántas imágenes de la clase \( i \) se predijeron como \( j \). La <strong>diagonal</strong> son los aciertos; todo lo que está fuera son errores, y cada celda dice <em>qué confunde con qué</em>. Es la tabla que haría Netflix para ver, por ejemplo, cuántas películas de acción ha etiquetado el modelo por error como comedia.</p>
 
 <div class="callout ejemplo">
   <span class="lbl">Ejemplo numérico · precisión y recall de una clase (<a href="#frag-17">fragmento 17</a>)</span>
@@ -598,7 +600,7 @@ fila 7:  56  57  58  59  60  61  62  63</pre>
     <li><strong>FN</strong> (<em>false negatives</em>) = 7: eran 1 y se dijo otra cosa (el resto de su fila).</li>
     <li><strong>FP</strong> (<em>false positives</em>) = 3: se dijo 1 y era otro dígito (el resto de su columna).</li>
   </ul>
-  <p><strong>Recall</strong> (¿de los 1 que había, cuántos encontré?) \( = TP/(TP+FN) = 29/36 = 0{,}806 \). <strong>Precisión</strong> (¿de los que dije 1, cuántos lo eran?) \( = TP/(TP+FP) = 29/32 = 0{,}906 \). El 1 es el dígito que peor se encuentra (recall 0,806) y el que más se confunde con 9 (3 veces) y 8 (2 veces); el 8 tiene recall y precisión de 0,886 (31/35 en ambos). Los dígitos 2, 3, 4, 5 y 7 salen con 1,000 de recall.</p>
+  <p><strong>Recall</strong> (¿de los 1 que había, cuántos encontré?) \( = TP/(TP+FN) = 29/36 = 0{,}806 \). <strong>Precisión</strong> (¿de los que dije 1, cuántos lo eran?) \( = TP/(TP+FP) = 29/32 = 0{,}906 \). (Con películas sería: recall = de todas las de terror del catálogo, ¿cuántas encontró?; precisión = de las que etiquetó como terror, ¿cuántas lo eran de verdad?) El 1 es el dígito que peor se encuentra (recall 0,806) y el que más se confunde con 9 (3 veces) y 8 (2 veces); el 8 tiene recall y precisión de 0,886 (31/35 en ambos). Los dígitos 2, 3, 4, 5 y 7 salen con 1,000 de recall.</p>
 </div>
 
 <p>Se calcula en tres líneas: <code>cm[real, pred] += 1</code> en un bucle, o <code>torch.bincount(y_te * 10 + pred_te, minlength=100).view(10, 10)</code> (un truco: \( 10\cdot\text{real}+\text{pred} \) codifica la celda con un solo número), o <code>sklearn.metrics.confusion_matrix</code>; el fragmento 17 comprueba que las tres dan la misma matriz y calcula la precisión y el recall de cada clase dividiendo la diagonal entre las sumas de columnas y de filas.</p>
@@ -622,9 +624,9 @@ fila 7:  56  57  58  59  60  61  62  63</pre>
 <section>
 <h2 id="multietiqueta">Softmax o sigmoide: multiclase frente a multi-etiqueta</h2>
 
-<p class="pregunta">Una foto de playa con un perro: ¿es «playa» <em>o</em> «perro»? ¿O es «playa» <strong>y</strong> «perro» a la vez? ¿Cambia eso la capa de salida?</p>
+<p class="pregunta">Titanic: ¿es «drama» <em>o</em> «romance»? ¿O es «drama» <strong>y</strong> «romance» a la vez? ¿Cambia eso la capa de salida?</p>
 
-<p>La softmax <strong>obliga a elegir</strong>: sus probabilidades suman 1, así que si una sube, las otras bajan. Es lo correcto cuando <em>cada muestra tiene exactamente una clase</em> (un dígito es un 3 y solo un 3): clasificación <strong>multiclase</strong>. Pero hay problemas donde cada muestra puede tener <strong>varias etiquetas a la vez</strong> (una foto con «playa», «perro» y «atardecer»; un artículo con varios temas): clasificación <strong>multi-etiqueta</strong>. Ahí cada etiqueta es una pregunta de sí/no independiente y lo natural es una <strong>sigmoide por salida</strong>, con su propia probabilidad entre 0 y 1, sin que sumen nada.</p>
+<p>La softmax <strong>obliga a elegir</strong>: sus probabilidades suman 1, así que si una sube, las otras bajan. Es lo correcto cuando <em>cada muestra tiene exactamente una clase</em> (un dígito es un 3 y solo un 3): clasificación <strong>multiclase</strong>. Pero hay problemas donde cada muestra puede tener <strong>varias etiquetas a la vez</strong> (Titanic es «drama» y «romance» a la vez; una serie puede ser «comedia» y «thriller»): clasificación <strong>multi-etiqueta</strong>. Ahí cada etiqueta es una pregunta de sí/no independiente y lo natural es una <strong>sigmoide por salida</strong>, con su propia probabilidad entre 0 y 1, sin que sumen nada.</p>
 
 <table>
   <caption>Cómo elegir la salida y la pérdida</caption>
@@ -639,16 +641,16 @@ fila 7:  56  57  58  59  60  61  62  63</pre>
 
 <div class="callout ejemplo">
   <span class="lbl">Ejemplo numérico · los mismos logits, dos lecturas (<a href="#frag-19">fragmento 19</a>)</span>
-  <p>Logits de una foto para «playa», «perro» y «noche»: \( \mathbf{z} = (2;\ -1;\ 0{,}5) \).</p>
+  <p>Logits de <em>Titanic</em> (cifras inventadas) para «drama», «comedia» y «romance»: \( \mathbf{z} = (2;\ -1;\ 0{,}5) \).</p>
   <ul>
-    <li><strong>Softmax:</strong> \( (0{,}7856;\ 0{,}0391;\ 0{,}1753) \), suma 1: «lo más probable es la playa».</li>
-    <li><strong>Sigmoide por etiqueta:</strong> \( \sigma(2) = 0{,}8808 \), \( \sigma(-1) = 0{,}2689 \), \( \sigma(0{,}5) = 0{,}6225 \): suman 1,7722, y con umbral 0,5 la predicción es \( [1, 0, 1] \): «playa y noche».</li>
+    <li><strong>Softmax:</strong> \( (0{,}7856;\ 0{,}0391;\ 0{,}1753) \), suma 1: «lo más probable es que sea un drama».</li>
+    <li><strong>Sigmoide por etiqueta:</strong> \( \sigma(2) = 0{,}8808 \), \( \sigma(-1) = 0{,}2689 \), \( \sigma(0{,}5) = 0{,}6225 \): suman 1,7722, y con umbral 0,5 la predicción es \( [1, 0, 1] \): «drama y romance».</li>
     <li><strong>Pérdida</strong> con etiquetas reales \( (1, 0, 1) \): <code>BCEWithLogitsLoss</code> = media de tres entropías cruzadas binarias \( = \) 0,3048, y coincide con la cuenta a mano.</li>
   </ul>
 </div>
 
 <figure class="demo" data-demo="curso4/c4m5-softmax-vs-sigmoide" data-titulo="Softmax o sigmoide: los mismos logits, dos lecturas">
-  <div class="haz">Con los logits (2; −1; 0,5), compara la suma de las barras azules (softmax) con la de las naranjas (sigmoide). Pulsa «Playa y perro a la vez» y mira qué predice cada una. Después mueve el umbral de la sigmoide.</div>
+  <div class="haz">Con los logits de Titanic (2; −1; 0,5) para drama, comedia y romance, compara la suma de las barras azules (softmax) con la de las naranjas (sigmoide). Pulsa «Drama y comedia a la vez» (una dramedia) y mira qué predice cada una. Después mueve el umbral de la sigmoide.</div>
   <div class="observa">Con la softmax, si dos etiquetas son ciertas, <strong>se reparten el 100 %</strong> y ninguna llega a ser muy alta: (3; 2,5; −3) da 62 % y 38 %, aunque las dos son verdad. Con sigmoides, cada una se juzga sola: 95 % y 92 %. La sigmoide permite «ninguna» y «todas» (la suma no está limitada); la softmax no puede dejar a todas por debajo de 1/K. El <strong>umbral</strong> (0,5 por defecto) es un parámetro de decisión: bajarlo detecta más etiquetas (más falsos positivos), subirlo detecta menos.</div>
 </figure>
 
@@ -701,7 +703,7 @@ fila 7:  56  57  58  59  60  61  62  63</pre>
   <caption>Lineal, logística y softmax, lado a lado</caption>
   <thead><tr><th></th><th>Regresión lineal (M3)</th><th>Regresión logística (M4)</th><th>Regresión softmax (M5)</th></tr></thead>
   <tbody>
-    <tr><th scope="row">Qué predice</th><td>un número</td><td>la probabilidad de la clase 1</td><td>K probabilidades que suman 1</td></tr>
+    <tr><th scope="row">Qué predice</th><td>un número (p. ej. los minutos que verá un usuario)</td><td>la probabilidad de la clase 1 (p. ej. «¿terminará la película?»)</td><td>K probabilidades que suman 1 (p. ej. «¿de qué género es?»)</td></tr>
     <tr><th scope="row">Capa</th><td><code>nn.Linear(D, 1)</code></td><td><code>nn.Linear(D, 1)</code></td><td><code>nn.Linear(D, K)</code></td></tr>
     <tr><th scope="row">El modelo devuelve</th><td>\( \hat y \)</td><td>un logit (la sigmoide la pone la pérdida)</td><td>K logits (la softmax la pone la pérdida)</td></tr>
     <tr><th scope="row">Pérdida</th><td><code>nn.MSELoss</code></td><td><code>nn.BCEWithLogitsLoss</code></td><td><code>nn.CrossEntropyLoss</code></td></tr>
@@ -1244,7 +1246,7 @@ print(&quot;solo la 1.ª muestra   :&quot;, nn.CrossEntropyLoss()(logits[:1], y[
       <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
       <tbody>
         <tr data-lines="1-2"><td><code>import torch …</code></td><td>Importamos PyTorch y <code>nn</code>.</td></tr>
-        <tr data-lines="4-6"><td><code>logits = torch.tensor([[2.0, 1.0, 0.1], …</code></td><td>Dos muestras con tres clases. Etiquetas: la clase 0 para la primera y la clase 2 para la segunda. Las pérdidas individuales son 0,4170 y 2,5114.</td></tr>
+        <tr data-lines="4-6"><td><code>logits = torch.tensor([[2.0, 1.0, 0.1], …</code></td><td>Dos muestras con tres clases. Etiquetas: la clase 0 para la primera y la clase 2 para la segunda. Las pérdidas individuales son 0,4170 y 2,5116.</td></tr>
         <tr data-lines="8"><td><code>print(&quot;normal                :&quot;, nn.CrossEntropyLoss()(log …</code></td><td>Sin opciones: media de las dos, 1,4643.</td></tr>
         <tr data-lines="10-11"><td><code>pesos = torch.tensor([1.0, 1.0, 3.0]) …</code></td><td><code>weight=[1, 1, 3]</code> multiplica la pérdida de las muestras de la clase 2 por 3. Con <code>reduction="mean"</code> se divide entre la <em>suma de pesos</em> (no entre N): \( (1\cdot0{,}4170 + 3\cdot2{,}5114)/(1+3) = 1{,}9879 \).</td></tr>
         <tr data-lines="13"><td><code>print(&quot;label_smoothing=0.1   :&quot;, nn.CrossEntropyLoss(label …</code></td><td><code>label_smoothing=0.1</code> sustituye la etiqueta «100 % esta clase» por «90 % esta clase y el 10 % repartido entre todas»: penaliza un poco la seguridad excesiva y sube la pérdida (1,4693).</td></tr>
@@ -1444,7 +1446,7 @@ accuracy inicial: 0.096</pre>
 <article class="snippet" id="frag-13" data-lang="python">
   <header>
     <h3>13 · Un paso del descenso del gradiente con números pequeños</h3>
-    <p class="para-que"><strong>Para qué sirve</strong> Repite a mano, con una sola imagen de dos píxeles y tres clases, todo lo que ocurre en un paso: logits, probabilidades, pérdida, gradiente \( (p-y)^T x \), actualización y comprobación con autograd.</p>
+    <p class="para-que"><strong>Para qué sirve</strong> Repite a mano, con un solo tráiler de dos rasgos y tres clases (acción, comedia, terror), todo lo que ocurre en un paso: logits, probabilidades, pérdida, gradiente \( (p-y)^T x \), actualización y comprobación con autograd.</p>
   </header>
   <pre class="code"><code>import torch
 import torch.nn.functional as F
@@ -1485,12 +1487,12 @@ print(&quot;tras un paso -&gt; pérdida:&quot;, round(F.cross_entropy(z2, y).ite
       <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
       <tbody>
         <tr data-lines="1-2"><td><code>import torch …</code></td><td>Importamos PyTorch y el módulo funcional.</td></tr>
-        <tr data-lines="4-5"><td><code>x = torch.tensor([[1.0, 2.0]]) …</code></td><td>Una imagen de 2 píxeles, \( x = (1, 2) \), cuya clase correcta es la 0.</td></tr>
+        <tr data-lines="4-5"><td><code>x = torch.tensor([[1.0, 2.0]]) …</code></td><td>Un tráiler con 2 rasgos (1 escena de acción y 2 chistes), \( x = (1, 2) \), cuyo género real es acción: la clase 0. (Al código le da igual qué mida cada número; podrían ser 2 píxeles.)</td></tr>
         <tr data-lines="6-9"><td><code>W = torch.tensor([[ 0.5, -0.5], …</code></td><td>Una matriz de pesos de 3 clases × 2 entradas, elegida a mano, con <code>requires_grad=True</code>, y un sesgo de ceros.</td></tr>
         <tr data-lines="11-13"><td><code>z = x @ W.T + b …</code></td><td>Logits \( z = xW^T + b \), probabilidades por softmax y la pérdida (<code>cross_entropy</code> parte de los logits, no de <code>p</code>).</td></tr>
         <tr data-lines="14-16"><td><code>print(&quot;logits z        :&quot;, z.detach()) …</code></td><td>Imprime \( z = (-0{,}5;\ 1;\ -0{,}5) \), las probabilidades \( (0{,}1543;\ 0{,}6914;\ 0{,}1543) \) y la pérdida \( -\ln 0{,}1543 = 1{,}869 \).</td></tr>
         <tr data-lines="18"><td><code>perdida.backward()</code></td><td><code>backward()</code> calcula los gradientes de <code>W</code> y <code>b</code>.</td></tr>
-        <tr data-lines="19-21"><td><code>dz = (p - F.one_hot(y, 3)).detach() …</code></td><td>A mano: \( dz = p - y \) y \( dW = dz^T x \): cada fila de \( dW \) es el error de esa clase multiplicado por los píxeles de la imagen. <code>.detach()</code> saca <code>dz</code> del grafo de autograd.</td></tr>
+        <tr data-lines="19-21"><td><code>dz = (p - F.one_hot(y, 3)).detach() …</code></td><td>A mano: \( dz = p - y \) y \( dW = dz^T x \): cada fila de \( dW \) es el error de esa clase multiplicado por los rasgos de la entrada. <code>.detach()</code> saca <code>dz</code> del grafo de autograd.</td></tr>
         <tr data-lines="22-24"><td><code>print(&quot;dW de autograd  :&quot;, W.grad) …</code></td><td>El gradiente de autograd coincide con el de la cuenta a mano, y \( db = dz \).</td></tr>
         <tr data-lines="26-29"><td><code>lr = 0.5 …</code></td><td>Un paso de descenso con \( \eta = 0{,}5 \): <code>W -= lr * W.grad</code>, dentro de <code>no_grad()</code> porque estamos modificando parámetros y no queremos que eso quede registrado como una operación derivable.</td></tr>
         <tr data-lines="30-32"><td><code>z2 = x @ W.T + b …</code></td><td>Recalcula con los pesos nuevos: la probabilidad de la clase 0 sube de 0,1543 a 0,9138 y la pérdida baja de 1,869 a 0,0901.</td></tr>
@@ -1513,7 +1515,7 @@ dW de autograd  : tensor([[-0.8457, -1.6914],
 db de autograd  : tensor([-0.8457,  0.6914,  0.1543])
 tras un paso -&gt; p: tensor([[0.9138, 0.0407, 0.0455]])
 tras un paso -&gt; pérdida: 0.0901</pre>
-    <p>El gradiente a mano y el de autograd son idénticos, y un solo paso con tasa 0,5 baja la pérdida de 1,869 a 0,0901 (la clase 0 pasa de 15 % a 91 %). Con una tasa tan grande y una sola imagen es un salto enorme; en el bucle real cada paso promedia un lote de 32 imágenes que tiran en direcciones distintas, y la pérdida baja poco a poco.</p>
+    <p>El gradiente a mano y el de autograd son idénticos, y un solo paso con tasa 0,5 baja la pérdida de 1,869 a 0,0901 (la clase 0 pasa de 15 % a 91 %). Con una tasa tan grande y una sola muestra es un salto enorme; en el bucle real cada paso promedia un lote de 32 imágenes que tiran en direcciones distintas, y la pérdida baja poco a poco.</p>
   </div>
 </article>
 
@@ -1862,7 +1864,7 @@ print(&quot;predicción por umbral 0.5:&quot;, (p_sig &gt; 0.5).int().tolist())<
       <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
       <tbody>
         <tr data-lines="1-2"><td><code>import torch …</code></td><td>Importamos PyTorch y <code>nn</code>.</td></tr>
-        <tr data-lines="4"><td><code>logits = torch.tensor([[2.0, -1.0, 0.5]])</code></td><td>Los logits de una foto para tres etiquetas.</td></tr>
+        <tr data-lines="4"><td><code>logits = torch.tensor([[2.0, -1.0, 0.5]])</code></td><td>Los logits de una película (Titanic) para tres etiquetas: drama, comedia y romance.</td></tr>
         <tr data-lines="6-9"><td><code>p_soft = torch.softmax(logits, dim=1) …</code></td><td>Softmax (suma 1, una sola clase ganadora) y sigmoide (cada logit por separado, suma 1,7722). Se imprimen redondeadas.</td></tr>
         <tr data-lines="11-13"><td><code>etiquetas = torch.tensor([[1.0, 0.0, 1.0]]) …</code></td><td>Las etiquetas reales ahora son un vector de ceros y unos, <code>float</code>, con <strong>dos</strong> unos. <code>BCEWithLogitsLoss</code> aplica la sigmoide y la entropía cruzada binaria a cada salida y las promedia.</td></tr>
         <tr data-lines="14-15"><td><code>a_mano = -(etiquetas * torch.log(p_sig) + (1 - etiquetas) …</code></td><td>La cuenta a mano: \( -[y\ln\sigma + (1-y)\ln(1-\sigma)] \) en cada salida y su media.</td></tr>
@@ -2099,7 +2101,7 @@ for epoca in range(1, 6):
    "porque": "<code>CrossEntropyLoss</code> ya incluye el <code>log_softmax</code> (es <code>LogSoftmax</code> + <code>NLLLoss</code>), de forma numéricamente estable. Si le das probabilidades, les aplica otra softmax (el «doble softmax» del fragmento 8) y si le das clases enteras no tiene de dónde sacar el logaritmo. Dividir entre la suma de la fila tampoco ayuda: los logits pueden ser negativos."
   },
   {
-   "q": "Una muestra tiene logits \\((4;\\ 2)\\). ¿Qué probabilidad da la softmax a la primera clase?",
+   "q": "Un tráiler tiene logits \\((4;\\ 2)\\) para acción y comedia. ¿Qué probabilidad da la softmax a acción?",
    "opciones": [
     "0,88, es decir \\(\\sigma(2)\\): solo cuenta la diferencia entre los logits.",
     "0,67, que es \\(4/(4+2)\\).",
@@ -2110,7 +2112,7 @@ for epoca in range(1, 6):
    "porque": "\\(e^4/(e^4+e^2)\\) se simplifica dividiendo arriba y abajo por \\(e^2\\): \\(1/(1+e^{-2}) = \\sigma(2) = 0{,}8808\\). La softmax solo depende de las diferencias entre logits (por eso restar el máximo no cambia el resultado). 0,67 sería normalizar sin exponenciales y 0,98 usar el logit entero en la sigmoide."
   },
   {
-   "q": "Un modelo de 5 clases recién creado da la misma probabilidad a todas las clases. ¿Cuánto vale la entropía cruzada de una muestra?",
+   "q": "Un modelo de 5 géneros recién creado da la misma probabilidad a todos los géneros de un tráiler. ¿Cuánto vale la entropía cruzada de esa muestra?",
    "opciones": [
     "0,20",
     "0,69",
@@ -2121,7 +2123,7 @@ for epoca in range(1, 6):
    "porque": "Con probabilidades iguales a 1/5, la pérdida es \\(-\\ln(1/5) = \\ln 5 = 1{,}609\\). Esa es la referencia «no sé nada»: con K clases, un modelo sin entrenar debe empezar cerca de \\(\\ln K\\) (en el fragmento 12 son 2,42 con 10 clases frente a \\(\\ln 10 = 2{,}30\\)). 0,20 es la probabilidad, no la pérdida; 0,69 es \\(\\ln 2\\) (el caso de dos clases) y 5 es el número de clases."
   },
   {
-   "q": "Una muestra tiene probabilidades \\(p=(0{,}7;\\ 0{,}2;\\ 0{,}1)\\) y su clase correcta es la segunda (índice 1). ¿Cuál es el gradiente de la entropía cruzada respecto a los logits?",
+   "q": "Un tráiler tiene probabilidades \\(p=(0{,}7;\\ 0{,}2;\\ 0{,}1)\\) para acción, comedia y terror, y en realidad es una comedia (la segunda clase, índice 1). ¿Cuál es el gradiente de la entropía cruzada respecto a los logits?",
    "opciones": [
     "\\((0{,}7;\\ 0{,}2;\\ 0{,}1)\\)",
     "\\((0{,}7;\\ -0{,}8;\\ 0{,}1)\\)",
@@ -2198,7 +2200,7 @@ for epoca in range(1, 6):
    "porque": "Recall = diagonal / suma de la <em>fila</em> (de los 36 unos reales, 29 se encontraron) \\(= 0{,}806\\). 29/32 \\(= 0{,}906\\) es la <em>precisión</em> (de lo que se llamó «1», el 91 % lo era), que usa la columna. 29/360 divide entre todas las imágenes y 36/32 ni siquiera es una proporción menor que 1."
   },
   {
-   "q": "Una foto puede llevar a la vez varias etiquetas («playa», «perro», «atardecer»), sin que una excluya a las otras. ¿Qué salida y pérdida usarías?",
+   "q": "Una película puede llevar a la vez varias etiquetas de género («drama», «romance», «comedia»), sin que una excluya a las otras. ¿Qué salida y pérdida usarías?",
    "opciones": [
     "Una softmax y <code>CrossEntropyLoss</code>.",
     "Una sigmoide por etiqueta y <code>BCEWithLogitsLoss</code>, con etiquetas <code>float</code> de forma <code>(N, K)</code>.",
@@ -2206,7 +2208,7 @@ for epoca in range(1, 6):
     "Una sola neurona con sigmoide y la clase como número del 0 al 2."
    ],
    "correcta": 1,
-   "porque": "Una imagen puede tener varias etiquetas verdaderas, así que cada etiqueta es una pregunta de sí/no independiente: sigmoide por salida y <code>BCEWithLogitsLoss</code> con un vector de ceros y unos <code>float</code> (fragmento 19). La softmax obligaría a repartir el 100 % entre las etiquetas verdaderas, y una sola neurona con la clase como número supone un orden que no existe."
+   "porque": "Una película puede tener varias etiquetas verdaderas, así que cada etiqueta es una pregunta de sí/no independiente: sigmoide por salida y <code>BCEWithLogitsLoss</code> con un vector de ceros y unos <code>float</code> (fragmento 19). La softmax obligaría a repartir el 100 % entre las etiquetas verdaderas, y una sola neurona con la clase como número supone un orden que no existe."
   },
   {
    "q": "Con logits de 2 muestras y etiquetas <code>[0, -100]</code>, la pérdida de la primera es 0,417. ¿Qué devuelve <code>nn.CrossEntropyLoss()</code>?",
@@ -2228,7 +2230,7 @@ for epoca in range(1, 6):
 <section class="resumen">
 <h2 class="sin-num sin-toc">Resumen del módulo</h2>
 <ul>
-  <li><strong>De 2 a K clases:</strong> una neurona por clase, <code>nn.Linear(D, K)</code> con \( W \) de forma \( (K, D) \) y \( b \) de forma \( (K,) \): \( K\cdot D + K \) parámetros (650 con 64 entradas y 10 clases; 7.850 con 784). La salida son <strong>logits</strong>, puntuaciones sin límite.</li>
+  <li><strong>De 2 a K clases:</strong> una neurona por clase (un crítico por género), <code>nn.Linear(D, K)</code> con \( W \) de forma \( (K, D) \) y \( b \) de forma \( (K,) \): \( K\cdot D + K \) parámetros (650 con 64 entradas y 10 clases; 7.850 con 784). La salida son <strong>logits</strong>, puntuaciones sin límite.</li>
   <li><strong>Softmax:</strong> \( p_k = e^{z_k}/\sum_j e^{z_j} \). Positivas, suman 1, conserva el orden (el <code>argmax</code> no cambia), solo depende de las diferencias entre logits y con \( K=2 \) es la sigmoide de \( z_1 - z_0 \). Se aplica sobre <code>dim=1</code> en un lote <code>(N, K)</code>; con <code>dim=0</code> no hay error, pero está mal.</li>
   <li><strong>Estabilidad:</strong> \( e^{89} \) desborda <code>float32</code>; se resta el máximo (<em>log-sum-exp</em>), y <code>log_softmax</code> evita el \( \ln 0 \). PyTorch lo hace por dentro.</li>
   <li><strong>Entropía cruzada:</strong> \( L = -\ln p_y = -z_y + \operatorname{logsumexp}(z) \); sin entrenar vale \( \approx \ln K \) (2,42 frente a 2,30 con 10 clases). Su gradiente respecto a los logits es \( p - y \) (dividido entre N con la media), y el de los pesos \( (p-y)^T x \).</li>
@@ -2236,7 +2238,7 @@ for epoca in range(1, 6):
   <li><strong>Errores que se ven:</strong> etiquetas <code>float</code>/<code>int32</code> o one-hot <code>long</code> (RuntimeError de dtype), forma <code>(N, 1)</code>, clase fuera de rango (IndexError), logits traspuestos, lista de Python. El silencioso: <strong>Softmax + CrossEntropyLoss</strong> (doble softmax, la pérdida no baja de ≈1,46 con 10 clases).</li>
   <li><strong>Dígitos:</strong> <code>load_digits</code> (1.797 × 64, píxeles 0-16) escalado entre 0 y 1, partición 80/20 estratificada, <code>DataLoader</code> de lotes de 32. Modelo lineal entrenado con SGD (\( \eta = 0{,}5 \), 30 épocas): <strong>96,1 %</strong> de accuracy en test (346 de 360). MNIST (28×28) no se ha podido ejecutar aquí; cambia <code>nn.Flatten()</code> y <code>Linear(784, 10)</code>, no el bucle.</li>
   <li><strong>Evaluar:</strong> la matriz de confusión (filas = real, columnas = predicha; <code>bincount</code> de <code>real*10 + pred</code>), <strong>precisión</strong> por columnas y <strong>recall</strong> por filas, <code>topk</code> y mirar los errores. Con diez clases el accuracy esconde que el 1 tiene un recall de 0,81 y que el 8 se confunde con el 1.</li>
-  <li><strong>Multiclase o multi-etiqueta:</strong> una clase por muestra, softmax + <code>CrossEntropyLoss</code>; varias a la vez, sigmoide por salida + <code>BCEWithLogitsLoss</code> con etiquetas <code>float</code> <code>(N, K)</code>. Guardar y cargar con <code>state_dict()</code>, <code>torch.save</code> y <code>load_state_dict</code>.</li>
+  <li><strong>Multiclase o multi-etiqueta:</strong> una clase por muestra (un género por película), softmax + <code>CrossEntropyLoss</code>; varias a la vez (Titanic: drama y romance), sigmoide por salida + <code>BCEWithLogitsLoss</code> con etiquetas <code>float</code> <code>(N, K)</code>. Guardar y cargar con <code>state_dict()</code>, <code>torch.save</code> y <code>load_state_dict</code>.</li>
   <li><strong>Cierre del curso:</strong> tres modelos (lineal, logística, softmax), una capa lineal y tres cabezas distintas, y el mismo bucle de cinco pasos. Una sola capa solo separa con rectas; añadir una capa oculta de 32 neuronas pasó de 96,1 % a 97,2 % en test.</li>
 </ul>
 <p>Siguiente paso: has terminado el Curso 4. En el <a href="../curso-5/modulo-1.html">módulo 1 del Curso 5</a> damos el paso que este módulo solo ha asomado: las <strong>redes superficiales en PyTorch</strong>, con una capa oculta, funciones de activación y de nuevo la clasificación de dígitos. La salida seguirá siendo \( K \) logits y la pérdida <code>CrossEntropyLoss</code>; lo que cambia es lo que hay <em>antes</em>.</p>

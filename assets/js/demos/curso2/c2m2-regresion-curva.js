@@ -9,12 +9,12 @@ Lab.register("curso2/c2m2-regresion-curva", function (root, api) {
   var st = { fn: "onda", nh: 1, u: 8, ep: 200, out: "linear", seed: 5 };
   var net, X, Y, rr, trained, hist, loop;
 
-  var view = api.view(root, { aspect: 1.9, minH: 250, maxH: 380, label: "Puntos con ruido, función real y curva que ha aprendido la red" });
-  var plot = api.plot(view, { xr: [-3, 3], yr: [-2, 2], xticks: 6, yticks: 4, xlabel: "x (la entrada)", ylabel: "y (lo que predice)", pad: { l: 44, r: 10, t: 10, b: 36 } });
+  var view = api.view(root, { aspect: 1.9, minH: 250, maxH: 380, label: "Valoraciones de usuarios con ruido, patrón real de gustos y curva que ha aprendido la red" });
+  var plot = api.plot(view, { xr: [-3, 3], yr: [-2, 2], xticks: 6, yticks: 4, xlabel: "afinidad usuario–película (x)", ylabel: "ganas de verla (y)", pad: { l: 44, r: 10, t: 10, b: 36 } });
   var view2 = api.view(root, { aspect: 4.4, minH: 110, maxH: 150, label: "Error cuadrático medio (loss) por época" });
   var plot2 = api.plot(view2, { xr: [0, 100], yr: [0, 1], xticks: 5, yticks: 2, xlabel: "época (epoch)", ylabel: "loss", xfmt: function (v) { return Math.round(v); }, pad: { l: 52, r: 10, t: 8, b: 32 } });
   var ui = api.controls(root), out = api.readout(root);
-  ui.select({ label: "Función que hay que aprender", value: st.fn, options: [["onda", "onda + tendencia"], ["parabola", "parábola"], ["rapida", "onda rápida (más curvas)"]], onChange: function (v) { st.fn = v; rebuild(true); } });
+  ui.select({ label: "Patrón de gustos que hay que aprender", value: st.fn, options: [["onda", "onda + tendencia"], ["parabola", "parábola"], ["rapida", "onda rápida (más curvas)"]], onChange: function (v) { st.fn = v; rebuild(true); } });
   ui.segmented({ label: "Capas ocultas", value: 1, options: [[1, "1"], [2, "2"], [3, "3"]], onChange: function (v) { st.nh = v; rebuild(false); } });
   ui.slider({ label: "Neuronas por capa oculta", min: 1, max: 32, step: 1, value: st.u, onInput: function (v) { st.u = v; rebuild(false); } });
   ui.slider({ label: "epochs (épocas de entrenamiento)", min: 0, max: 600, step: 10, value: st.ep, onInput: function (v) { st.ep = v; retarget(); } });
@@ -64,9 +64,9 @@ Lab.register("curso2/c2m2-regresion-curva", function (root, api) {
     D.path(ctx, cur, C.terracota, 3);
     ctx.restore();
     var b = plot.box;
-    D.text(ctx, "- - función real", b.x + 8, b.y + 14, { size: 11, color: C.muted, weight: 600 });
-    D.text(ctx, "datos con ruido", b.x + 8, b.y + 28, { size: 11, color: C.cobaltoInk, weight: 600 });
-    D.text(ctx, "curva de la red", b.x + 8, b.y + 42, { size: 11, color: C.terracotaInk, weight: 600 });
+    D.text(ctx, "- - patrón real de gustos", b.x + 8, b.y + 14, { size: 11, color: C.muted, weight: 600 });
+    D.text(ctx, "valoraciones de usuarios", b.x + 8, b.y + 28, { size: 11, color: C.cobaltoInk, weight: 600 });
+    D.text(ctx, "lo que predice la red", b.x + 8, b.y + 42, { size: 11, color: C.terracotaInk, weight: 600 });
   }
   function draw2(ctx, w, h, C) {
     var D = api.d, n = hist.length, ymax = 0.5, i;
@@ -84,7 +84,7 @@ Lab.register("curso2/c2m2-regresion-curva", function (root, api) {
     else if (te > 0.12) { msg = "Todavía se queda corta: prueba más neuronas, más capas o más épocas."; cls = "bad"; }
     else if (te > 0.045 && st.u * st.nh <= 4) { msg = "Demasiado simple para esta función (infraajuste)."; cls = "bad"; }
     else msg = "La curva sigue a la función real: la red ha aprendido el patrón.";
-    out.set("épocas entrenadas <b>" + trained + "</b> / " + st.ep + " · loss (MSE) <b>" + (l === null ? "—" : l.toFixed(3)) + "</b> · error frente a la función real <b>" + te.toFixed(3) + "</b> · parámetros <b>" + net.nParams() + "</b><br><span class='" + cls + "'>" + msg + "</span>");
+    out.set("épocas entrenadas <b>" + trained + "</b> / " + st.ep + " · loss (MSE) <b>" + (l === null ? "—" : l.toFixed(3)) + "</b> · error frente al patrón real <b>" + te.toFixed(3) + "</b> · parámetros <b>" + net.nParams() + "</b><br><span class='" + cls + "'>" + msg + "</span>");
   }
   rebuild(true, true);
   view.draw(draw); view2.draw(draw2);

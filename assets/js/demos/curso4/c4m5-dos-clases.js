@@ -6,11 +6,11 @@ Lab.register("curso4/c4m5-dos-clases", function (root, api) {
   row.appendChild(colA); row.appendChild(colB); root.appendChild(row);
   var viewA = api.view(colA, { aspect: 1.5, minH: 200, maxH: 300, label: "Curva sigmoide de la diferencia de logits con el punto actual" });
   var plot = api.plot(viewA, { xr: [-8, 8], yr: [0, 1], xticks: 4, yticks: 4, xlabel: "d = z1 − z0", pad: { l: 40, r: 14, t: 12, b: 36 } });
-  var viewB = api.view(colB, { aspect: 1.5, minH: 200, maxH: 300, label: "Probabilidades de las dos clases por softmax" });
+  var viewB = api.view(colB, { aspect: 1.5, minH: 200, maxH: 300, label: "Probabilidades de acción y comedia por softmax" });
   var ui = api.controls(root), out = api.readout(root);
   out.el.style.fontSize = "clamp(.7rem, 2.6vw, .82rem)";
-  var s0 = ui.slider({ label: "logit z0 (clase 0)", min: -5, max: 5, step: 0.1, value: S.z0, fmt: function (v) { return v.toFixed(1); }, onInput: function (v) { S.z0 = v; update(); } });
-  var s1 = ui.slider({ label: "logit z1 (clase 1)", min: -5, max: 5, step: 0.1, value: S.z1, fmt: function (v) { return v.toFixed(1); }, onInput: function (v) { S.z1 = v; update(); } });
+  var s0 = ui.slider({ label: "logit z0 (acción, clase 0)", min: -5, max: 5, step: 0.1, value: S.z0, fmt: function (v) { return v.toFixed(1); }, onInput: function (v) { S.z0 = v; update(); } });
+  var s1 = ui.slider({ label: "logit z1 (comedia, clase 1)", min: -5, max: 5, step: 0.1, value: S.z1, fmt: function (v) { return v.toFixed(1); }, onInput: function (v) { S.z1 = v; update(); } });
   ui.button("Sumar 2 a los dos", function () { S.z0 = Math.min(5, S.z0 + 2); S.z1 = Math.min(5, S.z1 + 2); s0.set(S.z0, true); s1.set(S.z1, true); update(); });
   ui.button("z0 = z1", function () { S.z0 = S.z1; s0.set(S.z0, true); update(); });
   viewA.draw(function (ctx, w, h, C) {
@@ -26,7 +26,7 @@ Lab.register("curso4/c4m5-dos-clases", function (root, api) {
   });
   viewB.draw(function (ctx, w, h, C) {
     var p = M.softmax([S.z0, S.z1]), cl = [C.cobalto, C.terracota], k, bh = Math.min(34, (h - 60) / 2 - 8), x0 = 40, wmax = w - x0 - 58;
-    D.text(ctx, "softmax([z0, z1])", 10, 18, { size: 11, weight: 700, color: C.ink2 });
+    D.text(ctx, "softmax([z0, z1]): p0 = acción, p1 = comedia", 10, 18, { size: 11, weight: 700, color: C.ink2 });
     for (k = 0; k < 2; k++) {
       var y = 34 + k * (bh + 16);
       D.text(ctx, "p" + k, 10, y + bh / 2 + 5, { size: 13, weight: 700 });
@@ -40,7 +40,7 @@ Lab.register("curso4/c4m5-dos-clases", function (root, api) {
     var p = M.softmax([S.z0, S.z1]), d = S.z1 - S.z0, sg = M.sigmoid(d);
     out.set("softmax: p1 = e^" + S.z1.toFixed(1) + " / (e^" + S.z0.toFixed(1) + " + e^" + S.z1.toFixed(1) + ") = <b>" + p[1].toFixed(4) + "</b><br>" +
       "sigmoide: σ(z1 − z0) = σ(" + d.toFixed(1) + ") = <b>" + sg.toFixed(4) + "</b> · diferencia = " + Math.abs(p[1] - sg).toExponential(1) + "<br>" +
-      "Con 64 entradas: softmax 2 clases = 2·64 + 2 = <b>130</b> parámetros; una sigmoide = 64 + 1 = <b>65</b>. Solo cuenta la diferencia z1 − z0.");
+      "Con 64 rasgos por tráiler: softmax de 2 géneros = 2·64 + 2 = <b>130</b> parámetros; una sigmoide = 64 + 1 = <b>65</b>. Solo cuenta la diferencia z1 − z0.");
     viewA.redraw(); viewB.redraw();
   }
   update();

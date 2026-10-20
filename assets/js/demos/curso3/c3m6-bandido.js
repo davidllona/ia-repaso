@@ -1,4 +1,4 @@
-/* Experimento: bandido de 5 brazos con ε-greedy. Estimación incremental Q ← Q + (R − Q)/N. Se ve cuánto explora y cuánto gana. */
+/* Experimento: bandido de 5 brazos (5 películas que se pueden recomendar) con ε-greedy. Estimación incremental Q ← Q + (R − Q)/N. Se ve cuánto explora y cuánto gana. */
 Lab.register("curso3/c3m6-bandido", function (root, api) {
   var D = api.d, M = api.math;
   var K = 5, NAMES = ["A", "B", "C", "D", "E"];
@@ -12,15 +12,15 @@ Lab.register("curso3/c3m6-bandido", function (root, api) {
     S.hist = []; S.total = 0; S.last = null; S.rng = api.rng(500 + round);
   }
   init(false);
-  var v1 = api.view(root, { aspect: 2.0, minH: 210, maxH: 290, label: "Cinco máquinas tragaperras: valor estimado de cada brazo y número de veces que se ha tirado de él" });
-  var v2 = api.view(root, { aspect: 3.0, minH: 130, maxH: 190, label: "Recompensa media acumulada a lo largo de las tiradas" });
-  var p2 = api.plot(v2, { xr: [0, 100], yr: [-1, 2], xticks: 4, yticks: 3, xlabel: "tirada", ylabel: "media", pad: { l: 40, r: 16, t: 8, b: 32 }, yfmt: function (v) { return String(+v.toFixed(2)).replace(".", ","); } });
+  var v1 = api.view(root, { aspect: 2.0, minH: 210, maxH: 290, label: "Cinco películas: valor estimado de cada una y número de veces que se ha recomendado" });
+  var v2 = api.view(root, { aspect: 3.0, minH: 130, maxH: 190, label: "Recompensa media acumulada a lo largo de las recomendaciones" });
+  var p2 = api.plot(v2, { xr: [0, 100], yr: [-1, 2], xticks: 4, yticks: 3, xlabel: "recomendación", ylabel: "media", pad: { l: 40, r: 16, t: 8, b: 32 }, yfmt: function (v) { return String(+v.toFixed(2)).replace(".", ","); } });
   var ui = api.controls(root), out = api.readout(root);
   ui.slider({ label: "ε (probabilidad de explorar)", min: 0, max: 1, step: 0.01, value: S.eps, fmt: function (v) { return v.toFixed(2).replace(".", ","); }, onInput: function (v) { S.eps = v; update(); } });
-  ui.button("Tirar 1 vez", function () { pull(); update(); }, "primary");
-  ui.button("Tirar 100 veces", function () { for (var i = 0; i < 100; i++) pull(); update(); });
-  ui.button("Nuevas medias (otro bandido)", function () { init(true); update(); }, "warm");
-  ui.toggle({ label: "Mostrar las medias reales", value: true, onChange: function (v) { S.show = v; update(); } });
+  ui.button("Recomendar 1 vez", function () { pull(); update(); }, "primary");
+  ui.button("Recomendar 100 veces", function () { for (var i = 0; i < 100; i++) pull(); update(); });
+  ui.button("Nuevas medias (otro catálogo)", function () { init(true); update(); }, "warm");
+  ui.toggle({ label: "Mostrar los gustos reales (medias)", value: true, onChange: function (v) { S.show = v; update(); } });
 
   function best() { var b = 0; for (var i = 1; i < K; i++) if (S.mu[i] > S.mu[b]) b = i; return b; }
   function greedy() {
@@ -46,7 +46,7 @@ Lab.register("curso3/c3m6-bandido", function (root, api) {
       ctx.save(); ctx.fillStyle = (S.last && S.last.a === i) ? C.terracota : C.cobalto; ctx.globalAlpha = 0.85;
       ctx.fillRect(x, Math.min(Y(0), Y(q)), ww, Math.abs(Y(q) - Y(0))); ctx.restore();
       if (S.show) { D.line(ctx, x - 4, Y(S.mu[i]), x + ww + 4, Y(S.mu[i]), C.olivaInk, 3); }
-      D.text(ctx, "brazo " + NAMES[i] + (S.show && i === b ? " ★" : ""), x + ww / 2, h - 28, { align: "center", size: 11.5, weight: 700, color: C.ink });
+      D.text(ctx, "peli " + NAMES[i] + (S.show && i === b ? " ★" : ""), x + ww / 2, h - 28, { align: "center", size: 11.5, weight: 700, color: C.ink });
       D.text(ctx, "N=" + S.N[i], x + ww / 2, h - 13, { align: "center", size: 11, color: C.ink2, mono: true });
       D.text(ctx, f(q, 2), x + ww / 2, q >= 0 ? Y(q) - 5 : Y(q) + 13, { align: "center", size: 10.5, color: C.ink, mono: true, weight: 600 });
     }
@@ -62,16 +62,16 @@ Lab.register("curso3/c3m6-bandido", function (root, api) {
   }
   function update() {
     var s = "";
-    if (!S.last) s = "Todavía no has tirado de ninguna palanca: todas las estimaciones valen 0 (no sabemos nada).";
+    if (!S.last) s = "Todavía no has recomendado ninguna película: todas las estimaciones valen 0 (no sabemos nada).";
     else {
       var L = S.last;
-      s = "Última tirada: <b>" + (L.explore ? "exploró" : "explotó") + "</b> → brazo <b>" + NAMES[L.a] + "</b>, recompensa <b>" + f(L.R) + "</b>.<br>" +
+      s = "Última recomendación: <b>" + (L.explore ? "exploró" : "explotó") + "</b> → película <b>" + NAMES[L.a] + "</b>, recompensa <b>" + f(L.R) + "</b>.<br>" +
         "Q<sub>" + NAMES[L.a] + "</sub> nuevo = " + f(L.old) + " + (" + f(L.R) + " − " + f(L.old) + ")/" + L.n + " = <b>" + f(L.neu) + "</b>";
     }
     var n = S.hist.length;
     if (n) {
       var opt = S.N[best()] / n;
-      s += "<br>Tiradas: <b>" + n + "</b> · recompensa media: <b>" + f(S.total / n) + "</b> · mejor posible: " + f(S.mu[best()], 1) + " · veces que eligió el mejor brazo: <b>" + Math.round(100 * opt) + " %</b>";
+      s += "<br>Recomendaciones: <b>" + n + "</b> · recompensa media: <b>" + f(S.total / n) + "</b> · mejor posible: " + f(S.mu[best()], 1) + " · veces que recomendó la mejor película: <b>" + Math.round(100 * opt) + " %</b>";
     }
     out.set(s); v1.redraw(); v2.redraw();
   }

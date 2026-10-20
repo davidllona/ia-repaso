@@ -13,11 +13,11 @@ Lab.register("curso5/c5m4-normalizar", function (root, api) {
     return [nw, nh];
   }
 
-  var v1 = api.view(root, { aspect: 1.9, minH: 190, maxH: 270, label: "Foto original y la parte que queda tras Resize y CenterCrop" });
+  var v1 = api.view(root, { aspect: 1.9, minH: 190, maxH: 270, label: "Fotograma original y la parte que queda tras Resize y CenterCrop" });
   var v2 = api.view(root, { aspect: 2.3, minH: 170, maxH: 250, label: "Un píxel antes y después de Normalize, por canal" });
   var ui = api.controls(root), out = api.readout(root);
-  ui.slider({ label: "Ancho de la foto original", min: 200, max: 640, step: 20, value: S.W, onInput: function (v) { S.W = v; update(); } });
-  ui.slider({ label: "Alto de la foto original", min: 200, max: 640, step: 20, value: S.H, onInput: function (v) { S.H = v; update(); } });
+  ui.slider({ label: "Ancho del fotograma original", min: 200, max: 640, step: 20, value: S.W, onInput: function (v) { S.W = v; update(); } });
+  ui.slider({ label: "Alto del fotograma original", min: 200, max: 640, step: 20, value: S.H, onInput: function (v) { S.H = v; update(); } });
   ui.slider({ label: "Resize: lado corto", min: 128, max: 320, step: 16, value: S.R, onInput: function (v) { S.R = v; update(); } });
   ui.slider({ label: "CenterCrop: lado del cuadrado", min: 96, max: 320, step: 16, value: S.K, onInput: function (v) { S.K = v; update(); } });
   ui.slider({ label: "Píxel: canal rojo (0–255)", min: 0, max: 255, step: 1, value: S.r, onInput: function (v) { S.r = v; update(); } });
@@ -27,7 +27,7 @@ Lab.register("curso5/c5m4-normalizar", function (root, api) {
 
   function draw1(ctx, w, h, C) {
     var pad = 8, avW = w - 2 * pad, avH = h - 2 * pad - 16, sc = Math.min(avW / S.W, avH / S.H), iw = S.W * sc, ih = S.H * sc, ox = (w - iw) / 2, oy = pad + 4, i;
-    // foto sintética: cielo, suelo, sol y casa
+    // fotograma sintético: cielo, suelo, sol y casa
     D.rect(ctx, ox, oy, iw, ih * 0.62, C.cobaltoWash, null);
     D.rect(ctx, ox, oy + ih * 0.62, iw, ih * 0.38, C.olivaWash, null);
     D.circle(ctx, ox + iw * 0.8, oy + ih * 0.2, Math.min(iw, ih) * 0.09, C.marker, null);

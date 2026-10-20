@@ -157,7 +157,7 @@ Lab.register("curso5/c5m2-laboratorio", function (root, api) {
   /* ===== fin del motor ===== */
 
   var S = { kind: "moons", depth: 6, width: 16, act: "sigmoid", init: "default", drop: 0, bn: false, opt: "sgd", lrExp: -1, seed: 1, run: false };
-  var DS = { moons: "Dos lunas", circles: "Círculos", spiral: "Espiral", xor: "XOR" };
+  var DS = { moons: "Dos lunas (dos géneros)", circles: "Círculos (un género rodea al otro)", spiral: "Espiral (géneros entrelazados)", xor: "XOR (géneros en diagonal)" };
   var INIT = { small: "Pequeños N(0; 0,05)", default: "Por defecto de nn.Linear", xavier: "Xavier (uniforme)", he: "He (normal)", big: "Grandes N(0; 1)" };
   var OPT = { sgd: "SGD", momentum: "SGD + momentum 0,9", nesterov: "Nesterov 0,9", rmsprop: "RMSprop", adam: "Adam" };
   var data, net, hist, MAXT = 1500;
@@ -173,7 +173,7 @@ Lab.register("curso5/c5m2-laboratorio", function (root, api) {
 
   var row = api.el("div", { class: "lab-row" }), colA = api.el("div"), colB = api.el("div");
   row.appendChild(colA); row.appendChild(colB); root.appendChild(row);
-  var vM = api.view(colA, { aspect: 1.1, minH: 230, maxH: 350, label: "Frontera de decisión de tu red y puntos de entrenamiento" });
+  var vM = api.view(colA, { aspect: 1.1, minH: 230, maxH: 350, label: "Frontera de decisión de tu red entre dos géneros y películas de entrenamiento" });
   var pM = api.plot(vM, { xr: [-2, 2], yr: [-2, 2], xticks: 4, yticks: 4, pad: { l: 30, r: 8, t: 14, b: 24 }, xfmt: function (v) { return Math.round(v); }, yfmt: function (v) { return Math.round(v); } });
   var vL = api.view(colB, { aspect: 1.1, minH: 230, maxH: 350, label: "Pérdida de entrenamiento y de test a lo largo del entrenamiento" });
   var pL = api.plot(vL, { xr: [0, 500], yr: [-3, 1], xticks: 4, yticks: 4, xlabel: "pasos", pad: { l: 42, r: 8, t: 14, b: 32 }, xfmt: function (v) { return Math.round(v); }, yfmt: function (v) { return "1e" + Math.round(v); } });
@@ -194,7 +194,7 @@ Lab.register("curso5/c5m2-laboratorio", function (root, api) {
   ui.button("Receta buena", function () { setAll({ depth: 6, width: 16, act: "relu", init: "he", drop: 0.2, bn: true, opt: "adam", lrExp: -2 }); });
   ui.button("Otros pesos", function () { S.seed++; build(); });
   syncers.push(function () { [[cK, S.kind], [cD, S.depth], [cW, S.width], [cA, S.act], [cI, S.init], [cDr, S.drop], [cB, S.bn], [cO, S.opt], [cL, S.lrExp]].forEach(function (p) { if (p[0] && p[0].set) p[0].set(p[1], true); }); });
-  api.legend(root, [[C0.cobalto, "pérdida de entrenamiento"], [C0.terracota, "pérdida de test (300 puntos nuevos)"]]);
+  api.legend(root, [[C0.cobalto, "pérdida de entrenamiento"], [C0.terracota, "pérdida de test (300 películas nuevas)"]]);
   var loop = api.loop(function () { for (var i = 0; i < 5; i++) one(); update(); if (net.t >= MAXT) { stop(); return false; } }, { fps: 30 });
   function stop() { S.run = false; if (loop) loop.stop(); if (btn) btn.textContent = "▶ Entrenar"; }
   function one() { if (net.broken || net.t >= MAXT) return; net.step(); if (net.t % 5 === 0 || net.t < 10) { hist.tr.push([net.t, net.loss]); hist.te.push([net.t, net.evalSet(data.te).loss]); } }
@@ -218,6 +218,7 @@ Lab.register("curso5/c5m2-laboratorio", function (root, api) {
     data.tr.forEach(function (p) { D.circle(ctx, pM.x(p.x), pM.y(p.y), 3.8, p.l ? C.terracota : C.cobalto, C.paper, 1); });
     ctx.restore();
     D.text(ctx, "paso " + net.t + " de " + MAXT, b.x + 2, 11, { size: 11, color: C.ink2, weight: 600 });
+    D.text(ctx, "→ humor · ↑ tensión", b.x + b.w - 2, b.y + b.h - 5, { size: 10, color: C.muted, align: "right" });
   }
   build();
   vM.draw(drawM); vL.draw(drawL);
@@ -227,7 +228,7 @@ Lab.register("curso5/c5m2-laboratorio", function (root, api) {
     if (net.broken) v = "<span class='bad'>Los pesos se han vuelto infinitos (NaN). Baja el learning rate o cambia de activación.</span>";
     else if (net.t < 2) v = "Pulsa «Receta mala» y luego «Entrenar»; después «Receta buena» y compara.";
     else if (net.loss > 0.68 && net.t > 200) v = "<span class='bad'>Pérdida ≈ 0,693: la red no aprende. Mira el cociente de gradientes: probablemente las primeras capas no reciben señal.</span>";
-    else if (ev && ev.acc > 0.9) v = "<span class='good'>Buena red: " + (100 * ev.acc).toFixed(0) + " % de acierto en puntos que no ha visto.</span>";
+    else if (ev && ev.acc > 0.9) v = "<span class='good'>Buena red: " + (100 * ev.acc).toFixed(0) + " % de acierto en películas que no ha visto.</span>";
     else v = "Entrenando…";
     out.set("Parámetros entrenables: <b>" + net.nParams.toLocaleString("de-DE") + "</b> · paso <b>" + net.t + "</b> · pérdida train = <b>" + (net.t ? net.loss.toFixed(3) : "—") + "</b> · test = <b>" + (ev ? ev.loss.toFixed(3) : "—") + "</b> · acierto test = <b>" + (ev ? (100 * ev.acc).toFixed(0) + " %" : "—") + "</b><br>Gradiente capa 1 = <b>" + (net.t ? sci(g[0]) : "—") + "</b> · última capa = <b>" + (net.t ? sci(g[n - 1]) : "—") + "</b> · cociente = <b>" + (net.t ? sci(g[0] / g[n - 1]) : "—") + "</b><br>" + v);
     vM.redraw(); vL.redraw();

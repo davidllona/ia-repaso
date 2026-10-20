@@ -2,11 +2,13 @@
    clipnorm=c: si ‖g‖ > c, g se reescala a norma c (conserva la DIRECCIÓN).
    clipvalue=v: cada componente se recorta a [−v, v] (puede CAMBIAR la dirección). */
 Lab.register("curso3/c3m5-clip-geometria", function (root, api) {
-  var D = api.d, M = api.math;
+  var D = api.d, M = api.math, coarse = !!(window.matchMedia && matchMedia("(pointer:coarse)").matches);
   var S = { g: [4.2, 1.2], c: 2, v: 1.5, showN: true, showV: true };
-  var view = api.view(root, { aspect: 1.5, minH: 260, maxH: 420, drag: true, label: "Plano del gradiente con el círculo de clipnorm y el cuadrado de clipvalue" });
+  var view = api.view(root, { aspect: 1.5, minH: 260, maxH: 420, drag: !coarse, label: "Plano del gradiente con el círculo de clipnorm y el cuadrado de clipvalue" });
   var plot = api.plot(view, { xr: [-6, 6], yr: [-4, 4], grid: false, xticks: 1, yticks: 1, pad: { l: 34, r: 12, t: 12, b: 28 }, xfmt: function () { return ""; }, yfmt: function () { return ""; }, xlabel: "gradiente respecto a w₁", ylabel: "gradiente respecto a w₂" });
   var ui = api.controls(root), out = api.readout(root);
+  var sg1 = ui.slider({ label: "g₁ (gradiente respecto a w₁)", min: -6, max: 6, step: 0.05, value: S.g[0], fmt: function (v) { return v.toFixed(2); }, onInput: function (v) { S.g[0] = v; update(); } });
+  var sg2 = ui.slider({ label: "g₂ (gradiente respecto a w₂)", min: -3.5, max: 3.5, step: 0.05, value: S.g[1], fmt: function (v) { return v.toFixed(2); }, onInput: function (v) { S.g[1] = v; update(); } });
   ui.slider({ label: "clipnorm (radio del círculo)", min: 0.5, max: 5, step: 0.25, value: S.c, fmt: function (v) { return v.toFixed(2); }, onInput: function (v) { S.c = v; update(); } });
   ui.slider({ label: "clipvalue (lado del cuadrado ±v)", min: 0.5, max: 5, step: 0.25, value: S.v, fmt: function (v) { return v.toFixed(2); }, onInput: function (v) { S.v = v; update(); } });
   ui.toggle({ label: "ver clipnorm", value: true, onChange: function (v) { S.showN = v; update(); } });
@@ -15,7 +17,8 @@ Lab.register("curso3/c3m5-clip-geometria", function (root, api) {
 
   function setG(px, py) {
     if (!plot.inside(px, py)) { px = M.clamp(px, plot.box.x, plot.box.x + plot.box.w); py = M.clamp(py, plot.box.y, plot.box.y + plot.box.h); }
-    S.g = [Math.round(plot.ix(px) * 20) / 20, Math.round(plot.iy(py) * 20) / 20]; update();
+    S.g = [Math.round(plot.ix(px) * 20) / 20, Math.round(plot.iy(py) * 20) / 20];
+    sg1.set(M.clamp(S.g[0], -6, 6), true); sg2.set(M.clamp(S.g[1], -3.5, 3.5), true); update();
   }
   view.pointer({ down: setG, drag: setG });
   function norm(v) { return Math.sqrt(v[0] * v[0] + v[1] * v[1]); }

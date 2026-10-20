@@ -2,13 +2,13 @@
    Elige una forma de entrada y los in_channels de la capa y mira cómo la interpreta o por qué falla (mensajes reales de PyTorch 2.x). */
 (function () {
   var SHAPES = {
-    a: [[8, 8], "(8, 8): una imagen suelta"],
-    b: [[1, 8, 8], "(1, 8, 8): una imagen con canal, sin lote"],
-    c: [[5, 8, 8], "(5, 8, 8): lote de 5 sin canal"],
-    d: [[5, 1, 8, 8], "(5, 1, 8, 8): lote NCHW de grises"],
-    e: [[5, 8, 8, 1], "(5, 8, 8, 1): lote NHWC de grises (estilo Keras)"],
-    f: [[5, 3, 8, 8], "(5, 3, 8, 8): lote NCHW en color"],
-    g: [[5, 8, 8, 3], "(5, 8, 8, 3): lote NHWC en color (estilo Keras)"]
+    a: [[8, 8], "(8, 8): una miniatura suelta"],
+    b: [[1, 8, 8], "(1, 8, 8): una miniatura con canal, sin lote"],
+    c: [[5, 8, 8], "(5, 8, 8): lote de 5 miniaturas sin canal"],
+    d: [[5, 1, 8, 8], "(5, 1, 8, 8): lote NCHW de miniaturas en gris"],
+    e: [[5, 8, 8, 1], "(5, 8, 8, 1): lote NHWC en gris (estilo Keras)"],
+    f: [[5, 3, 8, 8], "(5, 3, 8, 8): lote NCHW de pósters en color"],
+    g: [[5, 8, 8, 3], "(5, 8, 8, 3): lote NHWC de pósters en color (estilo Keras)"]
   };
   var OUTC = 8, K = 3;
 

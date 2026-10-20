@@ -9,10 +9,10 @@ Lab.register("curso3/c3m2-tamano-dilatacion", function (root, api) {
   var grid = api.el("div", { style: { display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(min(100%,300px),1fr))", gap: "10px" } });
   root.appendChild(grid);
   function cellDiv() { var c = api.el("div", { style: { minWidth: "0" } }); grid.appendChild(c); return c; }
-  var vA = api.view(cellDiv(), { aspect: 2.0, minH: 190, maxH: 260, label: "Fila de la entrada, dientes del kernel dilatado y fila de salida" });
+  var vA = api.view(cellDiv(), { aspect: 2.0, minH: 190, maxH: 260, label: "Fila de la entrada (segundos de un tráiler), dientes del kernel dilatado y fila de salida" });
   var vB = api.view(cellDiv(), { aspect: 1.2, minH: 190, maxH: 260, label: "Huella 2D del kernel dilatado" });
   var ui = api.controls(root), out = api.readout(root);
-  var sN = ui.slider({ label: "n = entrada", min: 5, max: 20, step: 1, value: st.n, onInput: function (v) { st.n = v; fix(); update(); } });
+  var sN = ui.slider({ label: "n = segundos del tráiler (entrada)", min: 5, max: 20, step: 1, value: st.n, onInput: function (v) { st.n = v; fix(); update(); } });
   var sK = ui.slider({ label: "k = pesos por lado del kernel", min: 1, max: 7, step: 1, value: st.k, onInput: function (v) { st.k = v; fix(); update(); } });
   var sS = ui.slider({ label: "s = stride", min: 1, max: 4, step: 1, value: st.s, onInput: function (v) { st.s = v; fix(); update(); } });
   var sP = ui.slider({ label: "p = padding por lado", min: 0, max: 4, step: 1, value: st.p, onInput: function (v) { st.p = v; fix(); update(); } });
@@ -27,7 +27,7 @@ Lab.register("curso3/c3m2-tamano-dilatacion", function (root, api) {
     var D = api.d, T = st.n + 2 * st.p, m = outSize(), ke = kef(), maxC = Math.max(T, m, 8), cw = Math.min(30, (w - 12) / maxC), x0 = 6, i;
     var rowH = (h - 10) / 3, ch = Math.min(cw, rowH - 24);
     function label(t, y) { D.text(ctx, t, x0, y, { size: Math.min(11, w / 34), weight: 600, color: C.ink2 }); }
-    label("Entrada (n = " + st.n + ") con padding p = " + st.p + " → " + T + " casillas", 14);
+    label("Tráiler: n = " + st.n + " s, padding p = " + st.p + " → " + T + " casillas", 14);
     var y1 = 20;
     var start = m ? st.pos * st.s : 0;
     for (i = 0; i < T; i++) {

@@ -26,7 +26,7 @@ Lab.register("curso3/c3m6-valor-iter", function (root, api) {
     }
     S.V = NV; S.sweeps++; S.delta = delta; return delta;
   }
-  var view = api.view(root, { aspect: 1.5, minH: 230, maxH: 360, label: "Mundo de cuadrículas con el valor V de cada casilla y la mejor acción según Bellman" });
+  var view = api.view(root, { aspect: 1.5, minH: 230, maxH: 360, label: "Pantalla de inicio de StreamFlix en cuadrícula con el valor V de cada casilla y la mejor acción según Bellman" });
   var ui = api.controls(root), out = api.readout(root);
   ui.slider({ label: "Factor de descuento γ", min: 0.5, max: 0.99, step: 0.01, value: S.g, fmt: function (v) { return v.toFixed(2).replace(".", ","); }, onInput: function (v) { S.g = v; S.V = zeros(); S.sweeps = 0; S.delta = null; update(); } });
   ui.button("Un barrido", function () { sweep(); update(); }, "primary");
@@ -42,11 +42,11 @@ Lab.register("curso3/c3m6-valor-iter", function (root, api) {
     var g = geom(w, h), mx = 10, fs = Math.min(15, g.cw / 5.2);
     for (var r = 0; r < ROWS; r++) for (var c = 0; c < COLS; c++) {
       var x = g.m + c * g.cw, y = g.m + r * g.ch, fill = C.surface;
-      if (isWall(r, c)) { D.rect(ctx, x + 1, y + 1, g.cw - 2, g.ch - 2, C.line, C.ink, 1.2); D.text(ctx, "muro", x + g.cw / 2, y + g.ch / 2 + 4, { align: "center", size: 11, color: C.muted }); continue; }
+      if (isWall(r, c)) { D.rect(ctx, x + 1, y + 1, g.cw - 2, g.ch - 2, C.line, C.ink, 1.2); D.text(ctx, "anuncio", x + g.cw / 2, y + g.ch / 2 + 4, { align: "center", size: 11, color: C.muted }); continue; }
       if (term(r, c)) {
         var good = r === GOAL[0] && c === GOAL[1];
         D.rect(ctx, x + 1, y + 1, g.cw - 2, g.ch - 2, good ? C.olivaWash : C.terracotaWash, C.ink, 1.2);
-        D.text(ctx, good ? "META" : "HOYO", x + g.cw / 2, y + g.ch / 2 - 2, { align: "center", size: fs, weight: 700, color: good ? C.olivaInk : C.terracotaInk });
+        D.text(ctx, good ? "TU PELI" : "SALIR", x + g.cw / 2, y + g.ch / 2 - 2, { align: "center", size: fs, weight: 700, color: good ? C.olivaInk : C.terracotaInk });
         D.text(ctx, good ? "+10" : "−10", x + g.cw / 2, y + g.ch / 2 + fs + 2, { align: "center", size: fs, color: good ? C.olivaInk : C.terracotaInk, mono: true });
         continue;
       }

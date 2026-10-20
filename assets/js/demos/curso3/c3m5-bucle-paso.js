@@ -37,8 +37,8 @@ Lab.register("curso3/c3m5-bucle-paso", function (root, api) {
     if (S.ph === 4) { S.tot += c.loss; S.cnt++; }                         // Mean.update_state(loss)
   }
 
-  var vA = api.view(root, { aspect: 1.9, minH: 230, maxH: 330, label: "Datos, recta actual y lote en curso" });
-  var pA = api.plot(vA, { xr: [-2, 2], yr: [-3, 6], xticks: 4, yticks: 3, xlabel: "x", ylabel: "y", pad: { l: 34, r: 12, t: 30, b: 32 }, xfmt: function (v) { return +v.toFixed(0); }, yfmt: function (v) { return Math.round(v); } });
+  var vA = api.view(root, { aspect: 1.9, minH: 230, maxH: 330, label: "Películas (puntos), recta actual y lote en curso" });
+  var pA = api.plot(vA, { xr: [-2, 2], yr: [-3, 6], xticks: 4, yticks: 3, xlabel: "x (duración de la película, centrada)", ylabel: "y (nota)", pad: { l: 34, r: 12, t: 30, b: 32 }, xfmt: function (v) { return +v.toFixed(0); }, yfmt: function (v) { return Math.round(v); } });
   var vB = api.view(root, { aspect: 4.2, minH: 100, maxH: 150, label: "Pérdida media (Mean.result) al final de cada época" });
   var pB = api.plot(vB, { xr: [0, 12], yr: [0, 1], xticks: 6, yticks: 2, xlabel: "época", pad: { l: 40, r: 12, t: 12, b: 32 } });
   var ui = api.controls(root), out = api.readout(root);
@@ -71,7 +71,7 @@ Lab.register("curso3/c3m5-bucle-paso", function (root, api) {
       D.rect(ctx, bx.x + j * cw + 2, 6, cw - 4, 20, on ? C.terracota : (done ? C.olivaWash : C.surface), on ? C.ink : C.line, on ? 2 : 1);
       D.text(ctx, (j + 1) + " " + PH[j], bx.x + j * cw + cw / 2, 20, { align: "center", size: w < 420 ? 10 : 11.5, weight: on ? 700 : 500, color: on ? C.paper : C.ink2, mono: true });
     }
-    D.text(ctx, "discontinua: y = 2x + 1 (la verdad)", bx.x + 6, bx.y + 14, { size: 10.5, color: C.muted });
+    D.text(ctx, "discontinua: y = 2x + 1 (la nota «real»)", bx.x + 6, bx.y + 14, { size: 10.5, color: C.muted });
     D.text(ctx, "y = " + f2(S.w) + "·x + " + f2(S.b), bx.x + bx.w - 6, bx.y + bx.h - 8, { align: "right", size: 12, color: C.cobaltoInk, weight: 600, mono: true });
   }
   function drawB(ctx, w, h, C) {

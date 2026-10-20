@@ -1,5 +1,5 @@
 /* Experimento: errores típicos que se ven en las curvas. Se entrena de verdad (descenso de gradiente) una regresión lineal con dos variables
-   de pisos (superficie y antigüedad) y se rompe a propósito de cinco maneras: variables sin escalar, learning rate demasiado alto o demasiado bajo,
+   de películas (duración en minutos y años desde el estreno; se predicen los minutos que ve un usuario) y se rompe a propósito de cinco maneras: variables sin escalar, learning rate demasiado alto o demasiado bajo,
    y objetivo desalineado con las filas (barajar X e y por separado). La pérdida está dividida por la varianza de y: 1 = predecir siempre la media. */
 Lab.register("curso3/c3m7-errores", function (root, api) {
   var D = api.d, M = api.math;
@@ -36,7 +36,7 @@ Lab.register("curso3/c3m7-errores", function (root, api) {
   var plot = api.plot(view, { xr: [0, STEPS], yr: [-3, 2], xticks: 5, yticks: 5, grid: true, pad: { l: 46, r: 12, t: 12, b: 34 }, xlabel: "paso de entrenamiento",
     yfmt: function (v) { return v === -3 ? "0,001" : v === -2 ? "0,01" : v === -1 ? "0,1" : v === 0 ? "1" : v === 1 ? "10" : "100"; } });
   var ui = api.controls(root), out = api.readout(root);
-  var seg = ui.segmented({ label: "Qué se hace mal", options: [["bien", "Todo bien"], ["sin", "Sin escalar"], ["alto", "lr muy alto"], ["bajo", "lr muy bajo"], ["desal", "X e y desalineadas"]], value: S.bug,
+  var seg = ui.segmented({ label: "Qué se hace mal", options: [["bien", "Todo bien"], ["sin", "Sin escalar"], ["alto", "lr muy alto"], ["bajo", "lr muy bajo"], ["desal", "Notas desalineadas"]], value: S.bug,
     onChange: function (v) { S.bug = v; S.lr = PRESETS[v].lr; lrs.set(S.lr, true); update(); } });
   var lrs = ui.slider({ label: "Learning rate", min: 0.0001, max: 1.5, step: 0.0001, value: S.lr, fmt: function (v) { return v.toFixed(4).replace(".", ","); }, onInput: function (v) { S.lr = v; update(); } });
 
@@ -58,10 +58,10 @@ Lab.register("curso3/c3m7-errores", function (root, api) {
 
   var TXT = {
     bien: "Variables y objetivo estandarizados, learning rate razonable: la pérdida cae en picado y se queda en el suelo del ruido (≈ 0,06: es la fracción de la variación que es puro ruido).",
-    sin: "<b>Sin escalar</b>: la superficie vale ~85 y la antigüedad ~30, así que sus gradientes son enormes (y distintos entre sí). El mismo learning rate que funcionaba <b>se pasa de largo</b> y la pérdida explota. Baja el learning rate a 0,0001 y verás el otro síntoma: avanza a paso de tortuga.",
+    sin: "<b>Sin escalar</b>: la duración vale ~85 (minutos) y los años desde el estreno ~30, así que sus gradientes son enormes (y distintos entre sí). El mismo learning rate que funcionaba <b>se pasa de largo</b> y la pérdida explota. Baja el learning rate a 0,0001 y verás el otro síntoma: avanza a paso de tortuga.",
     alto: "<b>Learning rate demasiado alto</b>: cada paso salta al otro lado del valle y se aleja más de lo que se acerca. La pérdida crece en vez de bajar.",
     bajo: "<b>Learning rate demasiado bajo</b>: el modelo sí mejora, pero tan despacio que en 100 pasos apenas se ha movido. En Keras lo verías como una curva casi plana desde la primera época.",
-    desal: "<b>Filas y etiquetas desalineadas</b> (por ejemplo, barajar X e y por separado): ya no hay relación que aprender y la pérdida se queda en ≈ 1, el nivel de predecir la media. Es un fallo de datos, no de modelo: ¡no lo arregla ninguna red más grande!"
+    desal: "<b>Películas y notas desalineadas</b> (por ejemplo, barajar las películas y los minutos vistos por separado, de modo que lo que ve el usuario de Titanic acaba en la fila de Matrix): ya no hay relación que aprender y la pérdida se queda en ≈ 1, el nivel de predecir la media. Es un fallo de datos, no de modelo: ¡no lo arregla ninguna red más grande!"
   };
   function update() {
     train();

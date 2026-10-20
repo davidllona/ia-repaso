@@ -1,10 +1,10 @@
-/* Experimento: exploración frente a explotación en un pasillo con una recompensa pequeña cerca (+1) y una grande lejos (+10).
+/* Experimento: exploración frente a explotación en un pasillo de cine: la película de siempre cerca (+1) y el estreno genial lejos (+10).
    Se entrena Q-learning con cuatro estrategias ε y se promedian 30 semillas. */
 Lab.register("curso3/c3m6-explorar", function (root, api) {
   var D = api.d, M = api.math;
   var NC = 9, START = 2, GAMMA = 0.95, ALPHA = 0.5, EPIS = 300, SEEDS = 30, CAP = 100;
   var S = { decay: 0.99, seed0: 100, res: null };
-  var v0 = api.view(root, { aspect: 7, minH: 56, maxH: 78, label: "Pasillo de 9 casillas: recompensa +1 en el extremo izquierdo, +10 en el derecho, el agente empieza en la tercera" });
+  var v0 = api.view(root, { aspect: 7, minH: 56, maxH: 78, label: "Pasillo de cine con 9 puertas: la película de siempre (+1) en el extremo izquierdo, el estreno genial (+10) en el derecho, el agente empieza en la tercera" });
   var v1 = api.view(root, { aspect: 1.75, minH: 230, maxH: 360, label: "Recompensa final media por episodio con cuatro estrategias de exploración" });
   var p = api.plot(v1, { xr: [0, EPIS], yr: [0, 10], xticks: 6, yticks: 5, xlabel: "episodio de entrenamiento", ylabel: "recompensa final", pad: { l: 46, r: 16, t: 10, b: 36 } });
   var ui = api.controls(root), out = api.readout(root);
@@ -63,7 +63,7 @@ Lab.register("curso3/c3m6-explorar", function (root, api) {
       D.rect(ctx, x + 1, m, cw - 2, ch, fill, C.ink, 1.2);
       if (lab) D.text(ctx, lab, x + cw / 2, m + ch / 2 + 4, { align: "center", size: Math.min(12, cw / 3.2), weight: 700, color: C.ink });
     }
-    D.text(ctx, "pasillo: la recompensa pequeña está a 2 pasos, la grande a 6", w / 2, h - 3, { align: "center", size: 10.5, color: C.muted });
+    D.text(ctx, "pasillo: la peli de siempre a 2 pasos, el estreno a 6", w / 2, h - 3, { align: "center", size: 10.5, color: C.muted });
   }
   function drawCurve(ctx, w, h, C) {
     p.axes(ctx);
@@ -83,7 +83,7 @@ Lab.register("curso3/c3m6-explorar", function (root, api) {
       var last = r.avg.slice(EPIS - 50), m = M.mean(last);
       s += "<tr><td style='" + TD + "'><i style='display:inline-block;width:10px;height:10px;background:" + C[r.sch.key] + ";margin-right:6px'></i>" + r.sch.n + "</td><td style='text-align:center;" + TD + "'><b>" + f(m) + "</b></td><td style='text-align:center;" + TD + "'><b>" + r.right + "</b>/" + SEEDS + "</td></tr>";
     });
-    out.set(s + "</table><div style='font-size:12px;margin-top:4px'>Recompensa media: últimos 50 episodios, promedio de 30 semillas. Llega al +10: semillas (de 30) cuya política final, sin explorar, termina en la meta grande.</div>");
+    out.set(s + "</table><div style='font-size:12px;margin-top:4px'>Recompensa media: últimos 50 episodios, promedio de 30 semillas. Llega al +10: semillas (de 30) cuya política final, sin explorar, termina en el estreno (+10).</div>");
     v1.redraw();
   }
   v0.draw(drawCorr); v1.draw(drawCurve); run();

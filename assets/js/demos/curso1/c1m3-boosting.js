@@ -45,10 +45,10 @@ Lab.register("curso1/c1m3-boosting", function (root, api) {
     return tree(res, dep);
   }
 
-  var view = api.view(root, { aspect: 2.0, minH: 230, label: "Datos y predicción del modelo de boosting tras las etapas elegidas" });
-  var plot = api.plot(view, { xr: [0, 10], yr: [-1, 8], xticks: 5, yticks: 3, pad: { l: 36, r: 10, t: 10, b: 22 }, xfmt: function (v) { return v; }, yfmt: function (v) { return Math.round(v); } });
+  var view = api.view(root, { aspect: 2.0, minH: 230, label: "Horas de series a la semana según la edad del usuario, y predicción del modelo de boosting tras las etapas elegidas" });
+  var plot = api.plot(view, { xr: [0, 10], yr: [-1, 8], xticks: 5, yticks: 3, xlabel: "edad del usuario (años)", ylabel: "horas de series / semana", pad: { l: 36, r: 10, t: 10, b: 38 }, xfmt: function (v) { return Math.round(10 + 6 * v); }, yfmt: function (v) { return Math.round(v); } });
   var view2 = api.view(root, { aspect: 3.0, minH: 140, maxH: 200, label: "Residuos actuales y árbol que se añadirá a continuación" });
-  var plot2 = api.plot(view2, { xr: [0, 10], yr: [-4, 4], xticks: 5, yticks: 2, pad: { l: 36, r: 10, t: 8, b: 22 }, xfmt: function (v) { return v; }, yfmt: function (v) { return Math.round(v); } });
+  var plot2 = api.plot(view2, { xr: [0, 10], yr: [-4, 4], xticks: 5, yticks: 2, pad: { l: 36, r: 10, t: 8, b: 22 }, xfmt: function (v) { return Math.round(10 + 6 * v); }, yfmt: function (v) { return Math.round(v); } });
   var view3 = api.view(root, { aspect: 3.4, minH: 120, maxH: 180, label: "Error cuadrático medio en train y en test según el número de árboles" });
   var plot3 = api.plot(view3, { xr: [0, MAXM], yr: [0, 4], xticks: 8, yticks: 2, xlabel: "número de árboles añadidos", pad: { l: 36, r: 10, t: 8, b: 40 }, xfmt: function (v) { return Math.round(v); }, yfmt: function (v) { return v.toFixed(1); } });
   var ui = api.controls(root), out = api.readout(root), sM;
@@ -58,7 +58,7 @@ Lab.register("curso1/c1m3-boosting", function (root, api) {
   ui.button("+1 árbol", function () { stop(); m = Math.min(MAXM, m + 1); sM.set(m, true); update(); }, "primary");
   playBtn = ui.button("▶ Entrenar solo", function () { if (loop && loop.running) stop(); else start(); }, "warm");
   ui.button("Generar otros datos", function () { stop(); seed += 3; gen(); update(); });
-  api.legend(root, [[api.colors().cobalto, "datos"], [api.colors().terracota, "modelo F"], [api.colors().muted, "función real"], [api.colors().oliva, "residuos y árbol siguiente"]]);
+  api.legend(root, [[api.colors().cobalto, "usuarios (datos)"], [api.colors().terracota, "modelo F"], [api.colors().muted, "curva real"], [api.colors().oliva, "residuos y árbol siguiente"]]);
 
   function start() {
     if (api.reduceMotion) { m = Math.max(m, 30); sM.set(m, true); update(); return; }

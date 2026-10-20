@@ -24,12 +24,12 @@ Lab.register("curso1/c1m5-estratificar", function (root, api) {
     mine = split(st.rs + 1000);
   }
 
-  var view = api.view(root, { aspect: 1.9, minH: 240, label: "Histograma de cuántos positivos caen en test en 600 repartos, con y sin estratificar" });
+  var view = api.view(root, { aspect: 1.9, minH: 240, label: "Histograma de cuántas joyas de culto caen en test en 600 repartos, con y sin estratificar" });
   var po = { xr: [-0.5, 10.5], yr: [0, 100], xticks: 11, yticks: 4, ylabel: "repartos (de 600)", xfmt: function () { return ""; }, pad: { l: 50, r: 12, t: 16, b: 52 } };
   var plot = api.plot(view, po);
   var ui = api.controls(root), out = api.readout(root);
-  ui.slider({ label: "Muestras en total", min: 100, max: 1000, step: 50, value: st.n, onInput: function (v) { st.n = v; recompute(); update(); } });
-  ui.slider({ label: "Positivos en el dataset", min: 1, max: 20, step: 1, value: st.prev, fmt: function (v) { return v + " %"; }, onInput: function (v) { st.prev = v; recompute(); update(); } });
+  ui.slider({ label: "Películas en el catálogo", min: 100, max: 1000, step: 50, value: st.n, onInput: function (v) { st.n = v; recompute(); update(); } });
+  ui.slider({ label: "Joyas de culto en el catálogo", min: 1, max: 20, step: 1, value: st.prev, fmt: function (v) { return v + " %"; }, onInput: function (v) { st.prev = v; recompute(); update(); } });
   ui.slider({ label: "test_size", min: 10, max: 40, step: 5, value: st.test, fmt: function (v) { return (v / 100).toFixed(2); }, onInput: function (v) { st.test = v; recompute(); update(); } });
   ui.slider({ label: "random_state (un reparto concreto)", min: 0, max: 99, step: 1, value: st.rs, onInput: function (v) { st.rs = v; mine = split(st.rs + 1000); update(); } });
   ui.button("Otros 600 repartos", function () { st.seed++; recompute(); update(); }, "primary");
@@ -42,7 +42,7 @@ Lab.register("curso1/c1m5-estratificar", function (root, api) {
     plot.axes(ctx);
     var b = plot.box, bw = Math.max(3, b.w / (xmax + 1) * 0.7), k, every = xmax > 14 ? 2 : 1;
     for (k = 0; k <= xmax; k += every) D.text(ctx, String(k), plot.x(k), b.y + b.h + 15, { size: 11, align: "center", color: C.muted, mono: true });
-    D.text(ctx, "positivos que caen en el conjunto de test", b.x + b.w / 2, h - 8, { size: 12, align: "center", color: C.ink2, weight: 500 });
+    D.text(ctx, "joyas de culto que caen en el test", b.x + b.w / 2, h - 8, { size: 12, align: "center", color: C.ink2, weight: 500 });
     ctx.save(); plot.clip(ctx);
     hist.forEach(function (c, i) { if (c) D.rect(ctx, plot.x(i) - bw / 2, plot.y(c), bw, plot.y(0) - plot.y(c), C.terracota, null); });
     D.rect(ctx, plot.x(strat) - 3, b.y, 6, b.h, C.olivaInk, null);
@@ -59,9 +59,9 @@ Lab.register("curso1/c1m5-estratificar", function (root, api) {
     view.redraw();
     var mn = Math.min.apply(null, counts), mxv = Math.max.apply(null, counts), zero = counts.filter(function (c) { return c === 0; }).length;
     var low = counts.filter(function (c) { return c < strat * 0.5; }).length;
-    out.set("dataset: <b>" + st.n + "</b> muestras, <b>" + nPos + "</b> positivos · test de <b>" + nTest + "</b> muestras → lo «justo» serían <b>" + (nPos * nTest / st.n).toFixed(1) + "</b> positivos en test<br>" +
-      "sin stratify, en 600 repartos: de <b>" + mn + "</b> a <b>" + mxv + "</b> positivos en test · con <b>0</b> positivos: <span class='" + (zero ? "bad" : "good") + "'>" + zero + " repartos</span> · con menos de la mitad de lo justo: <b>" + low + "</b><br>" +
-      "con stratify: <b>" + strat + "</b> positivos en test, siempre");
+    out.set("catálogo: <b>" + st.n + "</b> películas, <b>" + nPos + "</b> joyas · test de <b>" + nTest + "</b> películas → lo «justo» serían <b>" + (nPos * nTest / st.n).toFixed(1) + "</b> joyas en test<br>" +
+      "sin stratify, en 600 repartos: de <b>" + mn + "</b> a <b>" + mxv + "</b> joyas en test · con <b>0</b> joyas: <span class='" + (zero ? "bad" : "good") + "'>" + zero + " repartos</span> · con menos de la mitad de lo justo: <b>" + low + "</b><br>" +
+      "con stratify: <b>" + strat + "</b> joyas en test, siempre");
   }
   recompute(); view.draw(draw); update();
 });

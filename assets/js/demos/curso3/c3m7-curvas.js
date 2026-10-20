@@ -53,7 +53,7 @@ Lab.register("curso3/c3m7-curvas", function (root, api) {
     run = { LT: LT, LV: LV, n: n2, best: bestS, stop: S.es && stop >= 0 ? stop : -1, jumps: jumps };
   }
 
-  var view = api.view(root, { aspect: 1.9, minH: 250, maxH: 340, label: "Pérdida de entrenamiento y de validación por época, en escala logarítmica" });
+  var view = api.view(root, { aspect: 1.9, minH: 250, maxH: 340, label: "Pérdida de entrenamiento (25 películas) y de validación (100 películas) por época, en escala logarítmica" });
   var plot = api.plot(view, { xr: [0, NMAX], yr: [-2, 0], xticks: 4, yticks: 2, grid: true, pad: { l: 46, r: 12, t: 12, b: 34 }, xlabel: "época",
     yfmt: function (v) { return v === -2 ? "0,01" : v === -1 ? "0,1" : "1"; } });
   var ui = api.controls(root), out = api.readout(root);

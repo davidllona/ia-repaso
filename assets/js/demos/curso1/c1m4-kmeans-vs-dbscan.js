@@ -49,6 +49,12 @@ function frame(ctx, plot, C, grid) {
   ctx.globalAlpha = 1; ctx.strokeStyle = C.ink; ctx.lineWidth = 1.5; ctx.strokeRect(b.x, b.y, b.w, b.h);
   ctx.restore();
 }
+/* Rótulos de los ejes: cada punto es un usuario de la plataforma, situado según lo que le gusta. */
+function axisCaps(ctx, plot, C, xt, yt) {
+  var b = plot.box, D = api.d;
+  D.text(ctx, xt, b.x + b.w / 2, b.y + b.h + 13, { size: 10, align: "center", color: C.ink2 });
+  D.text(ctx, yt, b.x - 5, b.y + b.h / 2, { size: 10, align: "center", color: C.ink2, rotate: -Math.PI / 2 });
+}
 function sq2(a, b) { var dx = a[0] - b[0], dy = a[1] - b[1]; return dx * dx + dy * dy; }
 function dist2(a, b) { return Math.sqrt(sq2(a, b)); }
 
@@ -211,9 +217,9 @@ var row = api.el("div", { class: "lab-row" }), cl = api.el("div"), cr = api.el("
 row.appendChild(cl); row.appendChild(cr); root.appendChild(row);
 var hl = api.el("p", { style: { margin: "0 0 .3rem", fontWeight: "600", fontSize: ".9rem" } }), hr = api.el("p", { style: { margin: "0 0 .3rem", fontWeight: "600", fontSize: ".9rem" } });
 cl.appendChild(hl); cr.appendChild(hr);
-var v1 = api.view(cl, { aspect: 1.6, minH: 190, maxH: 420, label: "Resultado de K-Means sobre los datos elegidos" });
-var v2 = api.view(cr, { aspect: 1.6, minH: 190, maxH: 420, label: "Resultado de DBSCAN sobre los mismos datos" });
-var p1 = api.plot(v1, { xr: [0, 16], yr: [0, 10], pad: { l: 5, r: 5, t: 5, b: 5 } }), p2 = api.plot(v2, { xr: [0, 16], yr: [0, 10], pad: { l: 5, r: 5, t: 5, b: 5 } });
+var v1 = api.view(cl, { aspect: 1.6, minH: 190, maxH: 420, label: "Resultado de K-Means sobre los usuarios elegidos" });
+var v2 = api.view(cr, { aspect: 1.6, minH: 190, maxH: 420, label: "Resultado de DBSCAN sobre los mismos usuarios" });
+var p1 = api.plot(v1, { xr: [0, 16], yr: [0, 10], pad: { l: 16, r: 5, t: 5, b: 20 } }), p2 = api.plot(v2, { xr: [0, 16], yr: [0, 10], pad: { l: 16, r: 5, t: 5, b: 20 } });
 var ui = api.controls(root);
 var segDS = ui.segmented({ label: "Datos", options: [["moons", "Dos lunas"], ["rings", "Dos anillos"], ["blobs", "Tres manchas"], ["noisy", "Manchas + ruido"]], value: DS, onChange: function (v) { DS = v; K = DEF[v][0]; EPS = DEF[v][1]; MIN = DEF[v][2]; sK.set(K, true); sE.set(EPS, true); sM.set(MIN, true); gen(); runKM(); runDB(); update(); } });
 var sK = ui.slider({ label: "K-Means: K", min: 2, max: 6, step: 1, value: K, onInput: function (v) { K = v; runKM(); update(); } });
@@ -221,11 +227,11 @@ var sE = ui.slider({ label: "DBSCAN: eps", min: 0.2, max: 2.0, step: 0.05, value
 var sM = ui.slider({ label: "DBSCAN: min_samples", min: 2, max: 12, step: 1, value: MIN, onInput: function (v) { MIN = v; runDB(); update(); } });
 ui.button("Datos nuevos", function () { seed++; gen(); runKM(); runDB(); update(); });
 var out = api.readout(root);
-var lg = api.el("div", { class: "lab-legend" }); lg.appendChild(api.el("span", { text: "forma y color = grupo que encuentra cada algoritmo" })); lg.appendChild(api.el("span", { text: "✕ = ruido (solo DBSCAN)" })); root.appendChild(lg);
+var lg = api.el("div", { class: "lab-legend" }); lg.appendChild(api.el("span", { text: "forma y color = grupo que encuentra cada algoritmo" })); lg.appendChild(api.el("span", { text: "✕ = usuario suelto, ruido (solo DBSCAN)" })); root.appendChild(lg);
 
 function fitP(p) { var b = p.box; p.xr = [0, 10 * b.w / b.h]; }
 function scatter(ctx, plt, C, lab, big) {
-  var pal = palette(C), i; fitP(plt); frame(ctx, plt, C, false); ctx.save(); plt.clip(ctx);
+  var pal = palette(C), i; fitP(plt); frame(ctx, plt, C, false); axisCaps(ctx, plt, C, "gusto por la acción →", "gusto por la comedia →"); ctx.save(); plt.clip(ctx);
   for (i = 0; i < P.length; i++) {
     var x = plt.x(P[i][0]), y = plt.y(P[i][1]);
     if (lab[i] < 0) cross(ctx, x, y, 3.2, C.ink, 1.6); else shape(ctx, lab[i], x, y, 3.5, pal[lab[i] % 10], C.ink, 0.6);
@@ -245,7 +251,7 @@ function update() {
   hl.textContent = "K-Means con K = " + K; hr.textContent = "DBSCAN con eps = " + EPS.toFixed(2) + ", min_samples = " + MIN;
   var a1 = ari(truth, km.lab), a2 = ari(truth, db.lab), s1 = meanSilNoNoise(km.lab), s2 = meanSilNoNoise(db.lab);
   out.set("K-Means: coincidencia con los grupos reales (índice de Rand ajustado) = <b>" + a1.toFixed(2) + "</b> · silhouette = <b>" + (s1 === null ? "—" : s1.toFixed(2)) + "</b><br>" +
-    "DBSCAN: coincidencia con los grupos reales = <b>" + a2.toFixed(2) + "</b> · silhouette = <b>" + (s2 === null ? "—" : s2.toFixed(2)) + "</b> · <b>" + db.k + " grupos</b> + <b>" + nn + " puntos de ruido</b><br>" +
+    "DBSCAN: coincidencia con los grupos reales = <b>" + a2.toFixed(2) + "</b> · silhouette = <b>" + (s2 === null ? "—" : s2.toFixed(2)) + "</b> · <b>" + db.k + " grupos</b> + <b>" + nn + " usuarios sueltos (ruido)</b><br>" +
     "<span style='opacity:.8'>1,00 = coinciden exactamente con los grupos reales; 0 = como repartir al azar.</span>");
 }
 gen(); runKM(); runDB();

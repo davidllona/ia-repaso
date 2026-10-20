@@ -2,8 +2,8 @@
 Lab.register("curso2/c2m3-pooling", function (root, api) {
   var IMGS = {
     texto: ["Ejemplo del texto (4×4)", [[1, 3, 2, 1], [4, 6, 5, 0], [7, 2, 9, 8], [1, 0, 3, 4]]],
-    mancha: ["Una mancha brillante (6×6)", [[0, 0, 0, 0, 0, 0], [0, 0, 1, 0, 0, 0], [0, 1, 9, 8, 1, 0], [0, 0, 8, 9, 1, 0], [0, 0, 1, 1, 0, 0], [0, 0, 0, 0, 0, 0]]],
-    borde: ["Un borde vertical (6×6)", [[1, 1, 2, 8, 9, 9], [1, 2, 1, 9, 8, 9], [2, 1, 1, 8, 9, 8], [1, 1, 2, 9, 9, 9], [1, 2, 1, 8, 8, 9], [2, 1, 1, 9, 9, 8]]]
+    mancha: ["Un foco brillante (6×6)", [[0, 0, 0, 0, 0, 0], [0, 0, 1, 0, 0, 0], [0, 1, 9, 8, 1, 0], [0, 0, 8, 9, 1, 0], [0, 0, 1, 1, 0, 0], [0, 0, 0, 0, 0, 0]]],
+    borde: ["El borde de la pantalla (6×6)", [[1, 1, 2, 8, 9, 9], [1, 2, 1, 9, 8, 9], [2, 1, 1, 8, 9, 8], [1, 1, 2, 9, 9, 9], [1, 2, 1, 8, 8, 9], [2, 1, 1, 9, 9, 8]]]
   };
   var base, N, f = 2, st = 2, pos = 0, shift = 0, playing = false, preset = "texto", stSel;
   function load(k) { preset = k; base = IMGS[k][1].map(function (r) { return r.slice(); }); N = base.length; shift = 0; pos = 0; }

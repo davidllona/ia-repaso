@@ -12,12 +12,13 @@ Lab.register("curso5/c5m1-activaciones", function (root, api) {
   ];
   function col(C, k) { return k === "sig" ? C.cobalto : k === "tanh" ? C.terracota : k === "relu" ? C.oliva : C.ink2; }
 
-  var vF = api.view(root, { aspect: 2.5, minH: 170, maxH: 260, drag: true, label: "Gráfica de las cuatro funciones de activación" });
+  var DRAG = !matchMedia("(pointer:coarse)").matches;   // en pantallas táctiles el deslizador sustituye al arrastre (no bloquea el scroll)
+  var vF = api.view(root, { aspect: 2.5, minH: 170, maxH: 260, drag: DRAG, label: "Gráfica de las cuatro funciones de activación" });
   var pF = api.plot(vF, { xr: [-6, 6], yr: [-1.5, 2.5], xticks: 6, yticks: 4, ylabel: "f(z)", pad: { l: 44, r: 10, t: 12, b: 22 }, xfmt: function (v) { return +v.toFixed(0); } });
-  var vD = api.view(root, { aspect: 2.5, minH: 150, maxH: 230, drag: true, label: "Gráfica de las derivadas de las cuatro activaciones" });
-  var pD = api.plot(vD, { xr: [-6, 6], yr: [0, 1.1], xticks: 6, yticks: 2, xlabel: "z (lo que recibe la neurona antes de activar)", ylabel: "f ′(z)", pad: { l: 44, r: 10, t: 12, b: 38 }, xfmt: function (v) { return +v.toFixed(0); }, yfmt: function (v) { return +v.toFixed(2); } });
+  var vD = api.view(root, { aspect: 2.5, minH: 150, maxH: 230, drag: DRAG, label: "Gráfica de las derivadas de las cuatro activaciones" });
+  var pD = api.plot(vD, { xr: [-6, 6], yr: [0, 1.1], xticks: 6, yticks: 2, xlabel: "z (ganas de ver la peli, antes de activar)", ylabel: "f ′(z)", pad: { l: 44, r: 10, t: 12, b: 38 }, xfmt: function (v) { return +v.toFixed(0); }, yfmt: function (v) { return +v.toFixed(2); } });
   var ui = api.controls(root);
-  var sZ = ui.slider({ label: "z", min: -6, max: 6, step: 0.05, value: S.z, fmt: function (v) { return v.toFixed(2); }, onInput: function (v) { S.z = v; update(); } });
+  var sZ = ui.slider({ label: "z (ganas brutas de ver la peli)", min: -6, max: 6, step: 0.05, value: S.z, fmt: function (v) { return v.toFixed(2); }, onInput: function (v) { S.z = v; update(); } });
   ui.slider({ label: "Capas seguidas que atraviesa el gradiente (n)", min: 1, max: 10, step: 1, value: S.n, fmt: function (v) { return v; }, onInput: function (v) { S.n = v; update(); } });
   ui.slider({ label: "negative_slope de LeakyReLU", min: 0, max: 0.5, step: 0.01, value: S.slope, fmt: function (v) { return v.toFixed(2); }, onInput: function (v) { S.slope = v; update(); } });
   api.legend(root, [[api.colors().cobalto, "sigmoide"], [api.colors().terracota, "tanh"], [api.colors().oliva, "ReLU"], [api.colors().ink2, "LeakyReLU"]]);
@@ -64,7 +65,7 @@ Lab.register("curso5/c5m1-activaciones", function (root, api) {
     out.set("En z = <b>" + S.z.toFixed(2) + "</b> el gradiente que llega a una capa lejana se multiplica por f ′(z) en cada una de las <b>" + S.n + "</b> capas:<br>" +
       "con sigmoide queda <b>" + sci(ds[0]) + "</b> de su valor original; con ReLU, <b>" + sci(ds[2]) + "</b>." +
       (Math.abs(S.z) > 4 ? "<br><span class='bad'>|z| grande: sigmoide y tanh están saturadas (derivada casi 0).</span>" : "") +
-      (S.z < 0 ? "<br>z negativa: la ReLU vale 0 y su derivada 0 (neurona apagada); LeakyReLU conserva " + S.slope.toFixed(2) + "." : ""));
+      (S.z < 0 ? "<br>z negativa (sin ganas): la ReLU vale 0 y su derivada 0 (neurona apagada); LeakyReLU conserva " + S.slope.toFixed(2) + "." : ""));
     vF.redraw(); vD.redraw();
   }
   update();

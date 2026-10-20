@@ -1,9 +1,11 @@
 /* Experimento: sin activación no lineal, dos capas colapsan en una y XOR es imposible; con ReLU sí se puede.
+   Disfraz: x1 = ¿has visto Toy Story?, x2 = ¿has visto Shrek?; y = 1 si te avisamos del estreno (solo si viste exactamente una).
    Red 2-2-1 con pesos fijos: h1 = f(x1 + x2), h2 = f(x1 + x2 - 1), y = h1 - 2·h2. f(z) = z si z > 0; alfa·z si no. */
 Lab.register("curso2/c2m1-sin-no-linealidad", function (root, api) {
   var M = api.math, D = api.d, C0 = api.colors();
   var S = { alfa: 1, p: 0 };
   var PTS = [[0, 0, 0], [0, 1, 1], [1, 0, 1], [1, 1, 0]];   // x1, x2, clase (XOR)
+  var WHO = ["ninguna de las dos", "solo Shrek", "solo Toy Story", "las dos"];
 
   function f(z) { return z > 0 ? z : S.alfa * z; }
   function net(x1, x2) {
@@ -14,8 +16,8 @@ Lab.register("curso2/c2m1-sin-no-linealidad", function (root, api) {
   var row = api.el("div", { class: "lab-row" });
   var colA = api.el("div"), colB = api.el("div");
   row.appendChild(colA); row.appendChild(colB); root.appendChild(row);
-  var view = api.view(colA, { aspect: 1.0, minH: 250, maxH: 440, label: "Plano de entradas del XOR con la salida de la red coloreada y los cuatro puntos" });
-  var plot = api.plot(view, { xr: [-0.5, 1.5], yr: [-0.5, 1.5], xticks: 4, yticks: 4, xlabel: "x₁", ylabel: "x₂", pad: { l: 46, r: 12, t: 12, b: 36 },
+  var view = api.view(colA, { aspect: 1.0, minH: 250, maxH: 440, label: "Plano de entradas del XOR (has visto Toy Story, has visto Shrek) con la salida de la red coloreada y los cuatro puntos" });
+  var plot = api.plot(view, { xr: [-0.5, 1.5], yr: [-0.5, 1.5], xticks: 4, yticks: 4, xlabel: "x₁ · ¿viste Toy Story?", ylabel: "x₂ · ¿viste Shrek?", pad: { l: 46, r: 12, t: 12, b: 36 },
     xfmt: function (v) { return +v.toFixed(1); }, yfmt: function (v) { return +v.toFixed(1); } });
   var view2 = api.view(colB, { aspect: 1.0, minH: 250, maxH: 440, label: "Diagrama de la red 2-2-1 con los valores del punto elegido" });
 
@@ -23,10 +25,10 @@ Lab.register("curso2/c2m1-sin-no-linealidad", function (root, api) {
   out.el.style.fontSize = "clamp(.72rem, 2.7vw, .84rem)";
   var slider = ui.slider({ label: "Pendiente de la parte negativa α  (1 = sin activación · 0 = ReLU)", min: 0, max: 1, step: 0.05, value: 1,
     fmt: function (v) { return v.toFixed(2); }, onInput: function (v) { S.alfa = v; update(); } });
-  ui.segmented({ label: "Punto que sigues por la red", value: 0, options: [[0, "(0, 0)"], [1, "(0, 1)"], [2, "(1, 0)"], [3, "(1, 1)"]], onChange: function (v) { S.p = v; update(); } });
+  ui.segmented({ label: "Espectador que sigues por la red (qué ha visto)", value: 0, options: [[0, "ninguna"], [1, "Shrek"], [2, "Toy Story"], [3, "las dos"]], onChange: function (v) { S.p = v; update(); } });
   ui.button("Sin activación (α = 1)", function () { slider.set(1); }, "warm");
   ui.button("ReLU (α = 0)", function () { slider.set(0); }, "primary");
-  api.legend(root, [[C0.cobalto, "la red responde «1»"], [C0.terracota, "la red responde «0»"]]);
+  api.legend(root, [[C0.cobalto, "la red responde «1»: te avisa"], [C0.terracota, "la red responde «0»: no te avisa"]]);
 
   function drawPlane(ctx, w, h, C) {
     var b = plot.box, n = 30, cw = b.w / n, ch = b.h / n, i, j;
@@ -87,7 +89,7 @@ Lab.register("curso2/c2m1-sin-no-linealidad", function (root, api) {
     var sep = Math.min.apply(null, one) > Math.max.apply(null, zero) || Math.max.apply(null, one) < Math.min.apply(null, zero);
     var hits = PTS.filter(function (p, k) { return (ys[k] > 0.5) === (p[2] === 1); }).length;
     out.set(
-      "Punto (" + P[0] + ", " + P[1] + "): h₁ = f(" + v(o.z1) + ") = <b>" + v(o.h1) + "</b> · h₂ = f(" + v(o.z2) + ") = <b>" + v(o.h2) + "</b><br>" +
+      "Punto (" + P[0] + ", " + P[1] + ") · ha visto " + WHO[S.p] + ": h₁ = f(" + v(o.z1) + ") = <b>" + v(o.h1) + "</b> · h₂ = f(" + v(o.z2) + ") = <b>" + v(o.h2) + "</b><br>" +
       "y = h₁ − 2·h₂ = " + v(o.h1) + " − 2·(" + v(o.h2) + ") = <b>" + v(o.y) + "</b><br>" +
       "Salidas de los 4 puntos: (0,0)→" + v(ys[0]) + " · (0,1)→" + v(ys[1]) + " · (1,0)→" + v(ys[2]) + " · (1,1)→" + v(ys[3]) + "<br>" +
       "Con umbral 0,5 aciertas <b>" + hits + " de 4</b>. " +

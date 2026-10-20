@@ -8,10 +8,10 @@ Lab.register("curso5/c5m1-parametros", function (root, api) {
   var view = api.view(root, { aspect: 3.6, minH: 110, maxH: 150, label: "Barra con la parte de los parámetros que corresponde a cada tensor" });
   var ui = api.controls(root), out = api.readout(root);
   var sIn, sH, sOut, sN;
-  sIn = ui.slider({ label: "d_in (características de entrada)", min: 1, max: 784, step: 1, value: S.din, fmt: function (v) { return v; }, onInput: function (v) { S.din = v; update(); } });
+  sIn = ui.slider({ label: "d_in (rasgos de cada película o usuario)", min: 1, max: 784, step: 1, value: S.din, fmt: function (v) { return v; }, onInput: function (v) { S.din = v; update(); } });
   sH = ui.slider({ label: "h (neuronas ocultas)", min: 1, max: 256, step: 1, value: S.h, fmt: function (v) { return v; }, onInput: function (v) { S.h = v; update(); } });
   sOut = ui.slider({ label: "d_out (neuronas de salida)", min: 1, max: 20, step: 1, value: S.dout, fmt: function (v) { return v; }, onInput: function (v) { S.dout = v; update(); } });
-  sN = ui.slider({ label: "N (tamaño del lote)", min: 1, max: 256, step: 1, value: S.n, fmt: function (v) { return v; }, onInput: function (v) { S.n = v; update(); } });
+  sN = ui.slider({ label: "N (lote: cuántas películas pasas a la vez)", min: 1, max: 256, step: 1, value: S.n, fmt: function (v) { return v; }, onInput: function (v) { S.n = v; update(); } });
   PRESETS.forEach(function (p) {
     ui.button(p[0], function () { S.din = p[1]; S.h = p[2]; S.dout = p[3]; S.n = p[4]; sIn.set(p[1], true); sH.set(p[2], true); sOut.set(p[3], true); sN.set(p[4], true); update(); });
   });
@@ -51,7 +51,7 @@ Lab.register("curso5/c5m1-parametros", function (root, api) {
   function update() {
     var P = parts(), tot = P.reduce(function (s, q) { return s + q.n; }, 0);
     out.set(
-      "x: <b>(" + S.n + ", " + S.din + ")</b> → linear1 (weight <b>(" + S.h + ", " + S.din + ")</b>, bias <b>(" + S.h + ",)</b>) → z1, h: <b>(" + S.n + ", " + S.h + ")</b><br>" +
+      "x (" + S.n + " filas, una por película del lote; " + S.din + " columnas, una por rasgo): <b>(" + S.n + ", " + S.din + ")</b> → linear1 (weight <b>(" + S.h + ", " + S.din + ")</b>, bias <b>(" + S.h + ",)</b>) → z1, h: <b>(" + S.n + ", " + S.h + ")</b><br>" +
       "h → linear2 (weight <b>(" + S.dout + ", " + S.h + ")</b>, bias <b>(" + S.dout + ",)</b>) → salida: <b>(" + S.n + ", " + S.dout + ")</b><br>" +
       "parámetros = " + S.din + "·" + S.h + " + " + S.h + " + " + S.h + "·" + S.dout + " + " + S.dout + " = <b>" + fmtN(tot) + "</b><br>" +
       "capa 1: <b>" + fmtN(P[0].n + P[1].n) + "</b> · capa 2: <b>" + fmtN(P[2].n + P[3].n) + "</b>" +

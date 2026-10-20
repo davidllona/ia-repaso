@@ -24,9 +24,9 @@ Lab.register("curso3/c3m5-batchnorm", function (root, api) {
   var ui = api.controls(root), out = api.readout(root);
   ui.slider({ label: "Tamaño del lote", min: 2, max: 64, step: 1, value: S.n, onInput: function (v) { S.n = v; reset(); } });
   ui.slider({ label: "momentum de las medias móviles", min: 0.5, max: 0.99, step: 0.01, value: S.mom, fmt: function (v) { return v.toFixed(2); }, onInput: function (v) { S.mom = v; reset(); } });
-  ui.slider({ label: "Media real del dato μ", min: 0, max: 10, step: 0.5, value: S.mu, fmt: function (v) { return v.toFixed(1); }, onInput: function (v) { S.mu = v; reset(); } });
-  ui.slider({ label: "Desviación real σ", min: 0.5, max: 4, step: 0.5, value: S.sd, fmt: function (v) { return v.toFixed(1); }, onInput: function (v) { S.sd = v; reset(); } });
-  ui.slider({ label: "x de prueba (para comparar los dos modos)", min: 0, max: 10, step: 0.5, value: S.xt, fmt: function (v) { return v.toFixed(1); }, onInput: function (v) { S.xt = v; update(); } });
+  ui.slider({ label: "Nota media real μ", min: 0, max: 10, step: 0.5, value: S.mu, fmt: function (v) { return v.toFixed(1); }, onInput: function (v) { S.mu = v; reset(); } });
+  ui.slider({ label: "Desviación real σ de las notas", min: 0.5, max: 4, step: 0.5, value: S.sd, fmt: function (v) { return v.toFixed(1); }, onInput: function (v) { S.sd = v; reset(); } });
+  ui.slider({ label: "Nota de prueba x (para comparar los dos modos)", min: 0, max: 10, step: 0.5, value: S.xt, fmt: function (v) { return v.toFixed(1); }, onInput: function (v) { S.xt = v; update(); } });
   ui.button("Entrenar 1 lote", function () { step(); update(); }, "primary");
   ui.button("Entrenar 10 lotes", function () { for (var i = 0; i < 10; i++) step(); update(); });
   ui.button("Reiniciar capa", function () { reset(); });
@@ -43,7 +43,7 @@ Lab.register("curso3/c3m5-batchnorm", function (root, api) {
     var X0 = -4, X1 = 12, Z0 = -4, Z1 = 4;
     function px(v) { return pA.box.x + 6 + (v - X0) / (X1 - X0) * (pA.box.w - 12); }
     function pz(v) { return pA.box.x + 6 + (v - Z0) / (Z1 - Z0) * (pA.box.w - 12); }
-    axis(y1, X0, X1, "Entrada: el lote tal cual", px);
+    axis(y1, X0, X1, "Entrada: las notas del lote tal cual", px);
     axis(y2, Z0, Z1, w < 480 ? "Salida normalizada con el lote" : "Salida en entrenamiento: (x − media_lote) / √(var_lote + ε)", pz);
     if (b && b.xs) {
       var sd = Math.sqrt(b.v);

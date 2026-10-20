@@ -1,11 +1,11 @@
 /* Experimento: qué hace el DataLoader con N muestras numeradas. Tres épocas seguidas: con shuffle=True el orden cambia en cada una;
-   con drop_last=True el último lote incompleto se descarta. Cada casilla es una muestra con su índice. */
+   con drop_last=True el último lote incompleto se descarta. Cada casilla es la ficha de una película con su índice. */
 Lab.register("curso4/c4m2-reparto-lotes", function (root, api) {
   var D = api.d, EP = 3;
   var S = { N: 10, B: 4, shuffle: true, drop: false, seed: 0 };
-  var view = api.view(root, { aspect: 3.0, minH: 190, maxH: 250, label: "Las muestras repartidas en lotes durante tres épocas" });
+  var view = api.view(root, { aspect: 3.0, minH: 190, maxH: 250, label: "Las fichas del catálogo repartidas en lotes durante tres épocas" });
   var ui = api.controls(root), out = api.readout(root);
-  var sN = ui.slider({ label: "N muestras del dataset", min: 3, max: 24, step: 1, value: S.N, onInput: function (v) { S.N = v; if (S.B > v) { S.B = v; sB.set(v, true); } update(); } });
+  var sN = ui.slider({ label: "N películas del catálogo", min: 3, max: 24, step: 1, value: S.N, onInput: function (v) { S.N = v; if (S.B > v) { S.B = v; sB.set(v, true); } update(); } });
   var sB = ui.slider({ label: "batch_size", min: 1, max: 24, step: 1, value: S.B, onInput: function (v) { S.B = Math.min(v, S.N); update(); } });
   ui.toggle({ label: "shuffle=True", value: true, onChange: function (v) { S.shuffle = v; update(); } });
   ui.toggle({ label: "drop_last=True", value: false, onChange: function (v) { S.drop = v; update(); } });
@@ -58,11 +58,11 @@ Lab.register("curso4/c4m2-reparto-lotes", function (root, api) {
     var first = E[0][0] ? E[0][0] : [];
     out.set("<code>DataLoader(ds, batch_size=" + S.B + ", shuffle=" + (S.shuffle ? "True" : "False") + (S.drop ? ", drop_last=True" : "") + ")</code> con N = " + S.N + "<br>" +
       "<code>len(cargador)</code> = " + (S.drop ? "⌊" : "⌈") + S.N + " / " + S.B + (S.drop ? "⌋" : "⌉") + " = <b>" + nb + "</b> lotes por época (" + full + " completos" + (rest && !S.drop ? " + 1 de " + rest : "") + ")" +
-      (S.drop && rest ? " · muestras que esta época se ignoran: <b>" + rest + "</b>" : "") + "<br>" +
-      "primer lote de la época 0: <b>(" + first.length + ", 1)</b> con muestras [" + first.join(", ") + "]" +
+      (S.drop && rest ? " · fichas que esta época se ignoran: <b>" + rest + "</b>" : "") + "<br>" +
+      "primer lote de la época 0: <b>(" + first.length + ", 1)</b> con fichas [" + first.join(", ") + "]" +
       " · pasos de gradiente en 3 épocas: <b>" + nb * EP + "</b>" +
-      (!S.shuffle ? "<br><span class='bad'>Sin shuffle las tres épocas son idénticas: si el dataset está ordenado por clase, el modelo ve primero todo un tipo y luego otro.</span>" : "<br><span class='good'>Con shuffle cada época reparte las muestras en lotes distintos, y cada muestra aparece una sola vez por época.</span>") +
-      (!S.drop && rest === 1 ? "<br><span class='bad'>El último lote tiene 1 sola muestra: gradiente muy ruidoso y fallo en BatchNorm. Usa drop_last=True.</span>" : ""));
+      (!S.shuffle ? "<br><span class='bad'>Sin shuffle las tres épocas son idénticas: si el catálogo está ordenado por género, el modelo ve primero todas las comedias y luego todo el terror.</span>" : "<br><span class='good'>Con shuffle cada época reparte las fichas en lotes distintos, y cada película aparece una sola vez por época.</span>") +
+      (!S.drop && rest === 1 ? "<br><span class='bad'>El último lote tiene 1 sola película: gradiente muy ruidoso y fallo en BatchNorm. Usa drop_last=True.</span>" : ""));
     view.redraw();
   }
   update();

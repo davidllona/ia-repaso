@@ -11,9 +11,9 @@ Lab.register("curso1/c1m2-logloss", function (root, api) {
   ui.toggle({ label: "Comparar con el error al cuadrado (1 − p̂)²", value: false, onChange: function (v) { showSq = v; update(); } });
   var out = api.readout(root);
 
-  var vB = api.view(root, { aspect: 2.6, minH: 190, label: "Pérdida de cada uno de los cuatro clientes y log-loss medio" });
-  var pB = api.plot(vB, { xr: [0, 4], yr: [0, 3], xticks: 4, yticks: 3, ylabel: "pérdida del cliente", xfmt: function () { return ""; }, pad: { l: 42, r: 12, t: 12, b: 40 } });
-  api.legend(root, [[api.colors().terracota, "cliente que canceló (realidad = 1)"], [api.colors().cobalto, "cliente que se quedó (realidad = 0)"], [api.colors().ink, "línea de puntos: log-loss medio"]]);
+  var vB = api.view(root, { aspect: 2.6, minH: 190, label: "Pérdida de cada uno de los cuatro usuarios y log-loss medio" });
+  var pB = api.plot(vB, { xr: [0, 4], yr: [0, 3], xticks: 4, yticks: 3, ylabel: "pérdida del usuario", xfmt: function () { return ""; }, pad: { l: 42, r: 12, t: 12, b: 40 } });
+  api.legend(root, [[api.colors().terracota, "usuario que canceló (realidad = 1)"], [api.colors().cobalto, "usuario que se quedó (realidad = 0)"], [api.colors().ink, "línea de puntos: log-loss medio"]]);
   var ui2 = api.controls(root);
   names.forEach(function (nm, k) {
     ui2.slider({ label: nm + " (" + (ys[k] ? "canceló" : "se quedó") + "): p̂ de cancelar", min: 0.01, max: 0.99, step: 0.01, value: ps[k], fmt: function (v) { return v.toFixed(2); }, onInput: function (v) { ps[k] = v; update(); } });

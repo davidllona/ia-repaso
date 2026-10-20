@@ -50,7 +50,7 @@ Lab.register("curso5/c5m2-capas-parametros", function (root, api) {
     var rows = layers(S.L, S.W, S.bn), tot = rows.reduce(function (a, r) { return a + r.p; }, 0);
     var wide = S.L * S.W, pw = 64 * wide + wide + wide * 10 + 10, buf = S.bn ? 2 * S.W * S.L : 0;
     var masUna = S.W * S.W + (S.bn ? 2 * S.W : S.W), dobleW = layers(S.L, Math.min(2 * S.W, 256), S.bn).reduce(function (a, r) { return a + r.p; }, 0);
-    var s = "Red profunda: <b>" + fmt(tot) + "</b> parámetros (" + fmt(tot * 4) + " bytes en float32) · una sola capa oculta de <b>" + wide + "</b> neuronas: <b>" + fmt(pw) + "</b> (<b>" + (pw / tot).toFixed(2) + "×</b> los de la profunda)" +
+    var s = "Entrada: carátula de 8×8 píxeles (64 valores) → 10 géneros.<br>Red profunda: <b>" + fmt(tot) + "</b> parámetros (" + fmt(tot * 4) + " bytes en float32) · una sola capa oculta de <b>" + wide + "</b> neuronas: <b>" + fmt(pw) + "</b> (<b>" + (pw / tot).toFixed(2) + "×</b> los de la profunda)" +
       "<br>Añadir <b>una capa más</b> de " + S.W + " neuronas cuesta <b>+" + fmt(masUna) + "</b>; <b>duplicar el ancho</b> a " + Math.min(2 * S.W, 256) + " lleva el total a <b>" + fmt(dobleW) + "</b> (" + (dobleW / tot).toFixed(1) + "×).";
     if (S.bn) s += "<br>Además hay " + fmt(buf) + " valores en buffers (running_mean y running_var): se guardan en state_dict pero <b>no</b> son parámetros.";
     if (S.cont === "lista") s += "<br><span class='bad'>Con una lista normal de Python: <b>len(list(model.parameters())) = 0</b>. torch.optim.SGD(...) lanza ValueError: optimizer got an empty parameter list, y state_dict() sale vacío.</span>";

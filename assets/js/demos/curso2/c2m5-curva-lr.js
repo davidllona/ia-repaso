@@ -92,7 +92,7 @@ Lab.register("curso2/c2m5-curva-lr", function (root, api) {
   var frozen = run(1, 0.05), ft = run(0, LRS[li]);
   var view = api.view(root, { aspect: 1.6, minH: 260, maxH: 400, label: "Error en validación durante el entrenamiento: base congelada o fine-tuning" });
   var P = api.plot(view, { xr: [0, STEPS], yr: [0, 1], xticks: 5, yticks: 5, xlabel: "pasos de entrenamiento", ylabel: "error (binary crossentropy)", pad: { l: 52 } });
-  api.legend(root, [[api.colors().oliva, "validación · base congelada"], [api.colors().terracota, "validación · fine-tuning"], [api.colors().muted, "entrenamiento · fine-tuning (discontinua)"]]);
+  api.legend(root, [[api.colors().oliva, "validación · base congelada (el crítico no cambia)"], [api.colors().terracota, "validación · fine-tuning (el crítico se retoca)"], [api.colors().muted, "entrenamiento · fine-tuning (discontinua)"]]);
   var ui = api.controls(root), out = api.readout(root);
   ui.slider({ label: "Learning rate del fine-tuning", min: 0, max: LRS.length - 1, step: 1, value: li, fmt: function (v) { return String(LRS[v]).replace(".", ","); }, onInput: function (v) { li = v; update(); } });
   function drawC(ctx, arr, col, w, dash) { api.d.path(ctx, arr.map(function (v, s) { return [P.x(s), P.y(Math.min(v, 1.04))]; }), col, w, dash); }

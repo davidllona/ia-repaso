@@ -85,15 +85,15 @@ Lab.register("curso1/c1m3-svm", function (root, api) {
     model = { al: al, b: b, sv: sv, w: w, viol: viol, acc: ok / n, C: C, fn: function (x, y) { var s = b, p = [x, y]; for (var m = 0; m < sv.length; m++) s += al[sv[m]] * pts[sv[m]][2] * kfun(pts[sv[m]], p); return s; } };
   }
 
-  var view = api.view(root, { aspect: 1.35, minH: 290, label: "Dos clases de puntos, la frontera de una SVM, su margen y los vectores de soporte con un aro" });
-  var plot = api.plot(view, { xr: XR, yr: YR, xticks: 5, yticks: 5, grid: false, pad: { l: 30, r: 10, t: 10, b: 24 }, xfmt: function (v) { return v; }, yfmt: function (v) { return v; } });
+  var view = api.view(root, { aspect: 1.35, minH: 290, label: "Películas infantiles y thrillers según su nivel de violencia y de suspense, la frontera de una SVM, su margen y los vectores de soporte con un aro" });
+  var plot = api.plot(view, { xr: XR, yr: YR, xticks: 5, yticks: 5, grid: false, xlabel: "nivel de violencia →", ylabel: "nivel de suspense →", pad: { l: 26, r: 10, t: 10, b: 36 }, xfmt: function () { return ""; }, yfmt: function () { return ""; } });
   var ui = api.controls(root), out = api.readout(root), sG;
-  ui.segmented({ label: "Datos", options: [["sep", "Separables"], ["over", "Solapados"], ["moons", "Lunas"], ["circ", "Círculos"]], value: data, onChange: function (v) { data = v; update(true); } });
+  ui.select({ label: "Datos", options: [["sep", "Separables"], ["over", "Solapados"], ["moons", "Lunas"], ["circ", "Círculos"]], value: data, onChange: function (v) { data = v; update(true); } });
   ui.segmented({ label: "Kernel", options: [["lin", "Lineal"], ["rbf", "RBF (gaussiano)"]], value: kernel, onChange: function (v) { kernel = v; update(); } });
   ui.slider({ label: "C (penalización por violar el margen)", min: -2, max: 2, step: 0.25, value: logC, fmt: function (v) { return String(+Math.pow(10, v).toPrecision(2)); }, onInput: function (v) { logC = v; update(); } });
   sG = ui.slider({ label: "γ (alcance del kernel RBF)", min: -1.5, max: 0.8, step: 0.1, value: logG, fmt: function (v) { return String(+Math.pow(10, v).toPrecision(2)); }, onInput: function (v) { logG = v; update(); } });
-  ui.toggle({ label: "Añadir un valor atípico naranja dentro de la zona azul", value: outlier, onChange: function (v) { outlier = v; update(true); } });
-  api.legend(root, [[api.colors().cobalto, "clase −1"], [api.colors().terracota, "clase +1"], [api.colors().ink, "aro = vector de soporte"]]);
+  ui.toggle({ label: "Añadir un thriller atípico (naranja) dentro de la zona de infantiles", value: outlier, onChange: function (v) { outlier = v; update(true); } });
+  api.legend(root, [[api.colors().cobalto, "infantiles (−1)"], [api.colors().terracota, "thrillers (+1)"], [api.colors().ink, "aro = vector de soporte"]]);
 
   function draw(ctx, w, h, C) {
     plot.axes(ctx);
@@ -130,12 +130,12 @@ Lab.register("curso1/c1m3-svm", function (root, api) {
     if (rebuild) makeData();
     sG.input.disabled = kernel !== "rbf";
     train(); view.redraw();
-    var m = model, txt = "Kernel <b>" + (kernel === "lin" ? "lineal" : "RBF, γ = " + String(+Math.pow(10, logG).toPrecision(2))) + "</b> · C = <b>" + String(+m.C.toPrecision(2)) + "</b> · <b>" + m.sv.length + "</b> vectores de soporte de " + pts.length + " puntos<br>";
+    var m = model, txt = "Kernel <b>" + (kernel === "lin" ? "lineal" : "RBF, γ = " + String(+Math.pow(10, logG).toPrecision(2))) + "</b> · C = <b>" + String(+m.C.toPrecision(2)) + "</b> · <b>" + m.sv.length + "</b> vectores de soporte de " + pts.length + " películas<br>";
     if (kernel === "lin") {
       var nw = Math.hypot(m.w[0], m.w[1]);
       txt += "w = (" + m.w[0].toFixed(2) + ", " + m.w[1].toFixed(2) + ") · b = " + m.b.toFixed(2) + " · ancho del margen = 2/‖w‖ = <b>" + (nw > 1e-9 ? (2 / nw).toFixed(2) : "∞") + "</b><br>";
     }
-    txt += "Puntos dentro del margen o mal clasificados: <b>" + m.viol + "</b> · acierto en train: <b>" + (m.acc * 100).toFixed(1) + " %</b><br><span style='opacity:.75'>Solucionador SMO simplificado: los números pueden diferir un poco de los de scikit-learn.</span>";
+    txt += "Películas dentro del margen o mal clasificadas: <b>" + m.viol + "</b> · acierto en train: <b>" + (m.acc * 100).toFixed(1) + " %</b><br><span style='opacity:.75'>Solucionador SMO simplificado: los números pueden diferir un poco de los de scikit-learn.</span>";
     out.set(txt);
   }
   makeData(); train(); view.draw(draw); update(false);

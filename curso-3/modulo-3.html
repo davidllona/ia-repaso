@@ -41,16 +41,16 @@
 <section>
 <h2 id="secuencias">Datos secuenciales y series temporales: de la serie a las ventanas</h2>
 
-<p class="pregunta">Tienes 2.000 medidas de un sensor, una detrás de otra. Una red de Keras espera ejemplos de forma fija, cada uno con su respuesta. ¿Cómo conviertes <em>una</em> fila larga de números en <em>miles</em> de ejemplos de entrenamiento?</p>
+<p class="pregunta">Netflix guarda 2.000 medidas de audiencia (cuántos espectadores tiene la plataforma en cada intervalo), una detrás de otra. Una red de Keras espera ejemplos de forma fija, cada uno con su respuesta. ¿Cómo conviertes <em>una</em> fila larga de números en <em>miles</em> de ejemplos de entrenamiento?</p>
 
-<p>Una <strong>secuencia</strong> es una lista de datos donde el orden importa: las palabras de una frase, las muestras de audio, el precio de una acción día a día. Una <strong>serie temporal</strong> es el caso en que cada dato es una medida tomada en un instante, a intervalos regulares. Lo que ya sabes de redes densas y CNN no se aplica directamente porque esas capas ven la entrada «de golpe» y con tamaño fijo; con una serie queremos que el modelo vea <em>un trozo del pasado</em> y prediga <em>lo que viene</em>. (Qué hacían las RNN y las LSTM con eso lo viste en el <a href="../curso-2/modulo-4.html">módulo 4 del Curso 2</a>; aquí usaremos Transformers.)</p>
+<p>Una <strong>secuencia</strong> es una lista de datos donde el orden importa: los capítulos que ves de una serie, las palabras de un subtítulo, la audiencia de un estreno día a día. Una <strong>serie temporal</strong> es el caso en que cada dato es una medida tomada en un instante, a intervalos regulares. Lo que ya sabes de redes densas y CNN no se aplica directamente porque esas capas ven la entrada «de golpe» y con tamaño fijo; con una serie queremos que el modelo vea <em>un trozo del pasado</em> y prediga <em>lo que viene</em>. (Qué hacían las RNN y las LSTM con eso lo viste en el <a href="../curso-2/modulo-4.html">módulo 4 del Curso 2</a>; aquí usaremos Transformers.)</p>
 
 <h3>La serie que usaremos en todo el módulo</h3>
-<p>No hay internet en este entorno de trabajo y, además, conviene <em>conocer la verdad</em> de los datos para juzgar al modelo. Por eso fabricamos una serie sintética con tres ingredientes típicos de una serie real:</p>
+<p>No hay internet en este entorno de trabajo y, además, conviene <em>conocer la verdad</em> de los datos para juzgar al modelo. Por eso fabricamos una serie sintética (imagina que cada número es la audiencia de una plataforma en un intervalo, en miles de espectadores; cifras inventadas) con tres ingredientes típicos de una serie real:</p>
 <ul>
-  <li><strong>Tendencia:</strong> una subida lenta, \(0{,}0008\,t\).</li>
-  <li><strong>Estacionalidad:</strong> patrones que se repiten: un seno de periodo 50 pasos y otro, más pequeño, de periodo 12.</li>
-  <li><strong>Ruido:</strong> variaciones aleatorias que ningún modelo puede predecir (desviación 0,15).</li>
+  <li><strong>Tendencia:</strong> una subida lenta, \(0{,}0008\,t\) (la plataforma gana suscriptores poco a poco).</li>
+  <li><strong>Estacionalidad:</strong> patrones que se repiten: un seno de periodo 50 pasos y otro, más pequeño, de periodo 12 (como una oleada de estrenos que vuelve cada cierto tiempo y un ritmo semanal más corto).</li>
+  <li><strong>Ruido:</strong> variaciones aleatorias que ningún modelo puede predecir (desviación 0,15): días buenos y malos sin motivo aparente.</li>
 </ul>
 <p>Todo con semilla fija, así que tú y yo vemos exactamente los mismos números. Con esta serie, el <em>mejor error posible</em> está limitado por el ruido: un modelo perfecto se equivocaría, de media, unos 0,12 en unidades originales (la media del valor absoluto de un ruido normal de desviación 0,15).</p>
 
@@ -63,7 +63,7 @@
 
 <div class="callout ejemplo">
   <span class="lbl">Ejemplo numérico</span>
-  <p>Serie de 10 valores: <code>10, 12, 14, 13, 15, 17, 16, 18, 20, 19</code>. Ventana \(w = 4\), horizonte \(h = 2\). Cada ejemplo es «cuatro valores seguidos → el valor que está dos pasos después del último».</p>
+  <p>Imagina los espectadores (en miles) que tiene una serie en sus 10 primeros días de estreno, <strong>cifras inventadas</strong>: <code>10, 12, 14, 13, 15, 17, 16, 18, 20, 19</code>. Ventana \(w = 4\), horizonte \(h = 2\). Cada ejemplo es «cuatro valores seguidos → el valor que está dos pasos después del último».</p>
   <table>
     <thead><tr><th>Ejemplo</th><th>Entrada X (4 valores)</th><th>Respuesta y</th><th>Cómo se elige y</th></tr></thead>
     <tbody>
@@ -77,7 +77,7 @@
   <ol class="pasos">
     <li>La primera ventana empieza en el instante 0 y la última tiene que dejar sitio al objetivo: su último valor X llega como mucho al instante \(n - h - 1\) (contando desde 0).</li>
     <li>Número de ejemplos: \(n - w - h + 1 = 10 - 4 - 2 + 1 = 5\). Salen 5 ventanas y las has visto las 5.</li>
-    <li>Con 1 medida por instante el tensor de entrada es <strong>(5, 4, 1)</strong>: <code>(ejemplos, pasos, rasgos)</code>. Si midieras también la humedad serían 2 rasgos: <code>(5, 4, 2)</code>.</li>
+    <li>Con 1 medida por instante el tensor de entrada es <strong>(5, 4, 1)</strong>: <code>(ejemplos, pasos, rasgos)</code>. Si apuntaras también la nota media de cada día serían 2 rasgos: <code>(5, 4, 2)</code>.</li>
   </ol>
 </div>
 
@@ -90,7 +90,7 @@
 </figure>
 
 <h3>Separar en el tiempo, no al azar</h3>
-<p>En un problema normal barajas los ejemplos y repartes el 80 % para entrenar. Con una serie eso es trampa: si el test contiene el instante 501 y el entrenamiento el 500 y el 502, el modelo «conoce» el futuro. La regla es <strong>entrenar con el pasado y evaluar con el futuro</strong>: primero cortas la serie en tres trozos seguidos (aquí 70 % train, 15 % validación, 15 % test) y <em>después</em> haces las ventanas dentro de cada trozo. Barajar las ventanas <em>dentro del entrenamiento</em> sí es correcto: cada ventana ya lleva su pasado dentro.</p>
+<p>En un problema normal barajas los ejemplos y repartes el 80 % para entrenar. Con una serie eso es trampa: si el test contiene el día 501 y el entrenamiento el 500 y el 502, el modelo «conoce» el futuro: es como predecir la audiencia de ayer sabiendo la de mañana. La regla es <strong>entrenar con el pasado y evaluar con el futuro</strong>: primero cortas la serie en tres trozos seguidos (aquí 70 % train, 15 % validación, 15 % test) y <em>después</em> haces las ventanas dentro de cada trozo. Barajar las ventanas <em>dentro del entrenamiento</em> sí es correcto: cada ventana ya lleva su pasado dentro.</p>
 
 <div class="callout ojo">
   <span class="lbl">Ojo</span>
@@ -101,10 +101,10 @@
 <p>Las redes aprenden mejor si los números de entrada son pequeños y están centrados (como en el módulo de preparación de datos del Curso 1, con <code>StandardScaler</code>). La fórmula es la misma: \(z = (x - \mu)/\sigma\), con \(\mu\) y \(\sigma\) calculadas <strong>con el trozo de entrenamiento</strong>.</p>
 <div class="callout ejemplo">
   <span class="lbl">Ejemplo numérico</span>
-  <p>Con los 7 primeros valores de la serie de arriba como «train» (<code>10, 12, 14, 13, 15, 17, 16</code>) y los 3 últimos como «test» (<code>18, 20, 19</code>):</p>
+  <p>Con los 7 primeros días de la serie de arriba como «train» (<code>10, 12, 14, 13, 15, 17, 16</code>) y los 3 últimos como «test» (<code>18, 20, 19</code>):</p>
   <ol class="pasos">
     <li>Media de train: \(\mu = 97/7 = 13{,}857\). Desviación: \(\sigma = 2{,}231\).</li>
-    <li>Test normalizado <em>con las cifras de train</em>: \((18 - 13{,}857)/2{,}231 = 1{,}857\); \((20 - 13{,}857)/2{,}231 = 2{,}753\); \((19 - 13{,}857)/2{,}231 = 2{,}305\). Los tres son mayores que todo lo que vio el modelo (la serie sube): <strong>es lo normal y es lo honesto</strong>.</li>
+    <li>Test normalizado <em>con las cifras de train</em>: \((18 - 13{,}857)/2{,}231 = 1{,}857\); \((20 - 13{,}857)/2{,}231 = 2{,}753\); \((19 - 13{,}857)/2{,}231 = 2{,}305\). Los tres son mayores que todo lo que vio el modelo (la serie se vuelve más popular y sube): <strong>es lo normal y es lo honesto</strong>.</li>
     <li>Si normalizaras el test con <em>sus propias</em> cifras saldría \((-1{,}225;\ 1{,}225;\ 0)\): habrías borrado justo la información de que el nivel subió.</li>
   </ol>
 </div>
@@ -126,18 +126,18 @@
 <p>La alternativa «de TensorFlow» es construir las ventanas con <code>tf.data</code>: <code>window</code> corta, <code>flat_map</code> convierte cada ventana en un tensor y <code>map</code> separa entrada y respuesta. Es más largo, pero te deja encadenar <code>shuffle</code>, <code>batch</code> y <code>prefetch</code> y es la base de cualquier canalización de datos a medida (fragmento 3).</p>
 
 <h3>Una línea base antes del modelo</h3>
-<p>Antes de entrenar nada, calcula lo que logra un método tonto. La <strong>persistencia</strong> predice «lo que viene es igual al último valor». Si tu Transformer no la supera claramente, no ha aprendido nada útil. En series estacionales hay otra línea base fuerte y barata: una <strong>regresión lineal sobre la ventana</strong> (cada valor futuro como combinación lineal de los \(w\) pasados). Los fragmentos 2 y 12 las calculan.</p>
+<p>Antes de entrenar nada, calcula lo que logra un método tonto. La <strong>persistencia</strong> predice «lo que viene es igual al último valor» (mañana habrá la misma audiencia que hoy). Si tu Transformer no la supera claramente, no ha aprendido nada útil. En series estacionales hay otra línea base fuerte y barata: una <strong>regresión lineal sobre la ventana</strong> (cada valor futuro como combinación lineal de los \(w\) pasados). Los fragmentos 2 y 12 las calculan.</p>
 </section>
 
 <!-- =============================================================== -->
 <section>
 <h2 id="limites-rnn">Por qué las RNN y las LSTM se quedan cortas</h2>
-<p class="pregunta">Si una LSTM ya sabe leer secuencias, ¿para qué inventar otra cosa?</p>
+<p class="pregunta">Si una LSTM ya sabe leer secuencias (recorrer tu historial de Netflix capítulo a capítulo), ¿para qué inventar otra cosa?</p>
 <p>Ya viste el detalle en el <a href="../curso-2/modulo-4.html">Curso 2, módulo 4</a>. Aquí lo que nos interesa son las tres limitaciones <em>de ingeniería</em> que empujaron a cambiar de arquitectura:</p>
 <ol>
-  <li><strong>No se puede paralelizar en el tiempo.</strong> El estado del paso \(t\) necesita el estado del paso \(t-1\). Para una secuencia de 1.000 pasos hay 1.000 cálculos <em>en fila</em>, aunque tengas miles de núcleos de GPU esperando.</li>
-  <li><strong>Los datos lejanos están lejos.</strong> Para que el paso 1.000 use algo del paso 1, la información pasa por 999 transformaciones y el gradiente por 999 multiplicaciones. Si cada una lo encoge un 10 % (factor 0,9), llega \(0{,}9^{100} \approx 0{,}00003\) tras solo 100 pasos.</li>
-  <li><strong>Cuello de botella.</strong> Todo el pasado cabe en un único vector de estado (por ejemplo 64 números). La atención, en cambio, deja <em>todos</em> los vectores del pasado disponibles y cada token elige lo que necesita.</li>
+  <li><strong>No se puede paralelizar en el tiempo.</strong> El estado del paso \(t\) necesita el estado del paso \(t-1\). Para un historial de 1.000 capítulos hay 1.000 cálculos <em>en fila</em>, aunque tengas miles de núcleos de GPU esperando: es como obligarte a ver los 1.000 capítulos uno tras otro, sin poder ver dos a la vez.</li>
+  <li><strong>Los datos lejanos están lejos.</strong> Para que el capítulo 1.000 use algo del capítulo 1 (aquella peli que viste hace años), la información pasa por 999 transformaciones y el gradiente por 999 multiplicaciones. Si cada una lo encoge un 10 % (factor 0,9), llega \(0{,}9^{100} \approx 0{,}00003\) tras solo 100 pasos.</li>
+  <li><strong>Cuello de botella.</strong> Todo el pasado cabe en un único vector de estado (por ejemplo 64 números): como resumir tus 1.000 capítulos vistos en una sola nota. La atención, en cambio, deja <em>todos</em> los vectores del pasado disponibles (la lista entera de lo que has visto) y cada token elige lo que necesita.</li>
 </ol>
 <table>
   <thead><tr><th></th><th>RNN / LSTM</th><th>Self-attention</th></tr></thead>
@@ -156,12 +156,16 @@
 <!-- =============================================================== -->
 <section>
 <h2 id="atencion">La atención escalada, pieza a pieza</h2>
-<p class="pregunta">Cada token tiene que decidir a cuáles de los demás mira y cuánto. ¿Qué cuentas hace falta escribir para que eso ocurra, y por qué precisamente esas?</p>
+<p class="pregunta">Cuando Netflix te propone qué ver, cada título de tu historial «opina» sobre cuánto se parece a los demás. Con tokens es igual: cada token tiene que decidir a cuáles de los demás mira y cuánto. ¿Qué cuentas hace falta escribir para que eso ocurra, y por qué precisamente esas?</p>
 
 <h3>Q, K y V son tres proyecciones aprendidas</h3>
 <p>Los tokens llegan como una matriz \(X\) de forma \((n, d_{model})\): una fila por token (\(n\) tokens, cada uno con \(d_{model}\) números). Se multiplica \(X\) por tres matrices de pesos que se <strong>aprenden</strong> durante el entrenamiento:</p>
 <div class="formula">\[ Q = X\,W_Q, \qquad K = X\,W_K, \qquad V = X\,W_V \qquad (W_Q, W_K \in \mathbb{R}^{d_{model}\times d_k},\; W_V \in \mathbb{R}^{d_{model}\times d_v}) \]</div>
 <p>Cada fila de \(Q\) es la «pregunta» de un token, cada fila de \(K\) es la «etiqueta» con la que se ofrece y cada fila de \(V\) es el «contenido» que aportará si alguien lo elige. Que sean matrices <em>aprendidas</em> es la clave: la red decide por sí misma qué significa «preguntar» y «ofrecerse». En Keras son capas <code>Dense</code> sin activación (el fragmento 8 las abre).</p>
+<div class="callout analogia">
+  <span class="lbl">Analogía</span>
+  <p>Tu historial de Netflix. <strong>Q</strong> (la pregunta) es lo que busca el título que te toca decidir: «quiero algo de animación». <strong>K</strong> (la etiqueta) es cómo se presenta cada título de tu historial: «yo soy muy de animación». <strong>V</strong> (el contenido) es lo que aporta si lo eliges: lo que has aprendido de ese título. La atención compara pregunta con etiqueta, reparte porcentajes y mezcla los contenidos según esos porcentajes.</p>
+</div>
 
 <h3>La fórmula, con sus formas</h3>
 <div class="formula">\[ \operatorname{Attention}(Q,K,V) = \operatorname{softmax}\!\left(\frac{Q\,K^{\top}}{\sqrt{d_k}}\right) V \]</div>
@@ -174,7 +178,7 @@
 
 <div class="callout ejemplo">
   <span class="lbl">Ejemplo numérico</span>
-  <p>Tres tokens y \(d_k = d_v = 2\). Para centrarnos en la fórmula damos \(Q\), \(K\) y \(V\) ya calculadas:</p>
+  <p>Tres tokens y \(d_k = d_v = 2\). Imagina que son tres títulos de tu historial: el token 1 es <strong>Toy Story</strong>, el 2 es <strong>Titanic</strong> y el 3 es <strong>Shrek</strong>, y cada uno se describe con dos números inventados: (animación, romance). Para centrarnos en la fórmula damos \(Q\), \(K\) y \(V\) ya calculadas (cada fila es un título):</p>
   <div class="formula">\[ Q = \begin{bmatrix} 1 & 0 \\ 0 & 1 \\ 1 & 1 \end{bmatrix},\quad
   K = \begin{bmatrix} 2 & 0 \\ 0 & 2 \\ 1 & 1 \end{bmatrix},\quad
   V = \begin{bmatrix} 1 & 0 \\ 0 & 1 \\ 1 & 1 \end{bmatrix} \]</div>
@@ -188,12 +192,12 @@
     <li><strong>Mezcla de valores.</strong> Fila 1: \(0{,}576\,(1,0) + 0{,}140\,(0,1) + 0{,}284\,(1,1) = (0{,}576 + 0{,}284;\ 0{,}140 + 0{,}284) = (0{,}860;\ 0{,}424)\):
       <div class="formula">\[ A\,V = \begin{bmatrix} 0{,}860 & 0{,}424 \\ 0{,}424 & 0{,}860 \\ 0{,}667 & 0{,}667 \end{bmatrix} \]</div></li>
   </ol>
-  <p>Lectura: el token 1 preguntó «algo parecido a (1, 0)», encontró casi igual a la clave 1 (la más alineada) y por eso su salida se parece sobre todo al valor 1. El token 3 preguntó algo «equidistante» y obtuvo la media de los tres. Los fragmentos 4 y 6 repiten estas cuentas con NumPy.</p>
+  <p>Lectura: Toy Story (token 1) preguntó «algo parecido a (1, 0)», es decir, animación pura; la etiqueta que mejor le encaja es la suya (la clave 1) y por eso su salida se parece sobre todo al valor 1. Shrek (token 3) busca un poco de animación y un poco de romance a partes iguales: le encajan igual los tres títulos y obtiene la media de los tres. Los fragmentos 4 y 6 repiten estas cuentas con NumPy.</p>
 </div>
 
 <figure class="demo" data-demo="curso3/c3m3-atencion-manual" data-titulo="Atención con tus propios números">
-  <div class="haz">Arrastra la punta de la flecha naranja (la consulta) hacia una flecha azul (una clave) y mira cómo cambia la fila del mapa de calor. Después escribe tú números en las casillas de V y comprueba la salida. Por último pulsa «Números al azar» y desactiva «Dividir entre √d_k».</div>
-  <div class="observa">El peso es alto cuando la consulta apunta en la misma dirección que la clave <em>y</em> es larga (el producto escalar mide las dos cosas). Los pesos de cada fila suman siempre 1 y la salida es una mezcla de las filas de V. Cambiar V no cambia los pesos; cambiar Q o K, sí.</div>
+  <div class="haz">Los tres títulos son Toy Story, Titanic y Shrek; el eje horizontal es «cuánta animación» y el vertical «cuánto romance». Arrastra la punta de la flecha naranja (lo que busca el título elegido) hacia una flecha azul (la etiqueta de otro título) y mira cómo cambia la fila del mapa de calor. Después escribe tú números en las casillas de V y comprueba la salida. Por último pulsa «Números al azar» y desactiva «Dividir entre √d_k».</div>
+  <div class="observa">El peso es alto cuando la consulta apunta en la misma dirección que la clave <em>y</em> es larga (el producto escalar mide las dos cosas). Los pesos de cada fila suman siempre 1 y la salida es una mezcla de las filas de V (lo que aporta cada título). Cambiar V no cambia los pesos; cambiar Q o K, sí.</div>
 </figure>
 
 <h3>Por qué se divide entre \(\sqrt{d_k}\)</h3>
@@ -201,31 +205,31 @@
 <p><strong>1. El tamaño de las puntuaciones crece con \(d_k\).</strong> Supón que cada número de \(q\) y de \(k\) es aleatorio con media 0 y varianza 1 (aproximadamente lo que ocurre al inicializar). El producto escalar es una suma de \(d_k\) términos \(q_i k_i\), cada uno con varianza \(1\cdot 1 = 1\) e independientes, así que la varianza de la suma es \(d_k\) y su desviación es \(\sqrt{d_k}\):</p>
 <div class="formula">\[ \operatorname{Var}(q\cdot k) = \sum_{i=1}^{d_k} \operatorname{Var}(q_i k_i) = d_k \quad\Rightarrow\quad \sigma(q\cdot k) = \sqrt{d_k}\quad\Rightarrow\quad \sigma\!\left(\frac{q\cdot k}{\sqrt{d_k}}\right) = 1 \]</div>
 <p>Con \(d_k = 4\) las puntuaciones oscilan unos ±2; con \(d_k = 512\), unos ±23. Dividir entre \(\sqrt{d_k}\) las deja siempre en torno a ±1, sea cual sea el tamaño de la cabeza (el fragmento 5 lo mide).</p>
-<p><strong>2. Puntuaciones grandes saturan el softmax.</strong> Con diferencias de 20 o 30 entre puntuaciones, \(e^{30}\) aplasta a todo lo demás: un peso vale casi 1 y el resto casi 0. Y en ese estado el softmax apenas reacciona a cambios pequeños. Su derivada es \(\partial p_i/\partial z_j = p_i(\delta_{ij} - p_j)\); si \(p_1 = 0{,}999\), la derivada de \(p_1\) respecto de su propia puntuación vale \(0{,}999\cdot 0{,}001 \approx 0{,}001\). Gradientes diminutos significan que la red casi no puede aprender a cambiar de opinión.</p>
+<p><strong>2. Puntuaciones grandes saturan el softmax.</strong> Con diferencias de 20 o 30 entre puntuaciones, \(e^{30}\) aplasta a todo lo demás: un peso vale casi 1 y el resto casi 0. Y en ese estado el softmax apenas reacciona a cambios pequeños. Su derivada es \(\partial p_i/\partial z_j = p_i(\delta_{ij} - p_j)\); si \(p_1 = 0{,}999\), la derivada de \(p_1\) respecto de su propia puntuación vale \(0{,}999\cdot 0{,}001 \approx 0{,}001\). Gradientes diminutos significan que la red casi no puede aprender a cambiar de opinión. Es como un recomendador que, ante puntuaciones enormes, mira solo <em>un</em> título de tu historial, se olvida del resto y ya no rectifica.</p>
 
 <figure class="demo" data-demo="curso3/c3m3-raiz-d" data-titulo="Qué le pasa al softmax si no dividimos">
-  <div class="haz">Con «Dividir entre √d_k» apagado, sube el tamaño de 2^1 a 2^10 y mira las barras de arriba. Después activa la división y repite. Pulsa «Otra consulta» varias veces.</div>
+  <div class="haz">Las 8 barras son cuánto mira una consulta a 8 títulos de un historial. Con «Dividir entre √d_k» apagado, sube el tamaño de 2^1 a 2^10 y mira las barras de arriba. Después activa la división y repite. Pulsa «Otra consulta» varias veces.</div>
   <div class="observa">Sin dividir, a partir de d_k = 64 casi toda la atención cae en una sola clave (peso máximo medio ≈ 0,9) y el gradiente medio se desploma. Dividiendo, el peso máximo medio se queda quieto en torno a 0,36 con cualquier d_k: el reparto tiene siempre el mismo «carácter». Por eso la división es parte de la fórmula, no una opción.</div>
 </figure>
 
 <h3>Máscaras: qué posiciones pueden mirarse</h3>
 <p>A veces un token <strong>no debe</strong> poder mirar a otro. La solución es sumar \(-\infty\) a esa puntuación antes del softmax: \(e^{-\infty} = 0\), así que el peso es exactamente 0 y los demás pesos se reparten el 100 %. Dos máscaras te encontrarás siempre:</p>
 <ul>
-  <li><strong>Máscara causal</strong> (<em>causal mask</em>): el token \(i\) solo puede mirar a los tokens \(j \le i\). Se usa en los <em>decoders</em> (GPT) y al predecir series para que, mientras entrenas con la frase entera, ningún token lea la respuesta que está a su derecha. La matriz de permisos es triangular inferior.</li>
+  <li><strong>Máscara causal</strong> (<em>causal mask</em>): el token \(i\) solo puede mirar a los tokens \(j \le i\): como no destripar una serie, al decidir sobre el capítulo 3 solo puedes usar los capítulos 1 y 2, nunca el 4. Se usa en los <em>decoders</em> (GPT) y al predecir series para que, mientras entrenas con la frase entera, ningún token lea la respuesta que está a su derecha. La matriz de permisos es triangular inferior.</li>
   <li><strong>Máscara de relleno</strong> (<em>padding mask</em>): al juntar frases de distinta longitud en un lote se rellena con ceros; esas posiciones vacías no deben recibir atención.</li>
 </ul>
 <div class="callout ejemplo">
   <span class="lbl">Ejemplo numérico</span>
-  <p>Con las puntuaciones escaladas del ejemplo anterior y máscara causal (3 tokens):</p>
+  <p>Con las puntuaciones escaladas del ejemplo anterior y máscara causal. Ahora el orden importa: has visto primero Toy Story, luego Titanic y por último Shrek, y cada título solo puede mirar a los que ya vio:</p>
   <ol class="pasos">
-    <li>Fila 1 (solo se ve a sí mismo): \((1{,}414;\,-\infty;\,-\infty)\) → pesos \((1; 0; 0)\).</li>
-    <li>Fila 2 (ve los tokens 1 y 2): \((0;\ 1{,}414;\,-\infty)\) → \(e^0 = 1\) y \(e^{1{,}414} = 4{,}113\), suma \(5{,}113\) → pesos \((0{,}196;\ 0{,}804;\ 0)\).</li>
-    <li>Fila 3 (ve a los tres): no cambia, \((0{,}333;\ 0{,}333;\ 0{,}333)\).</li>
-    <li>Salidas: fila 2 \(= 0{,}196\,(1,0) + 0{,}804\,(0,1) = (0{,}196;\ 0{,}804)\). Antes, sin máscara, la fila 2 daba \((0{,}424;\ 0{,}860)\): ya no recibe nada del token 3, que está en su futuro.</li>
+    <li>Fila 1 (Toy Story, solo se ve a sí mismo): \((1{,}414;\,-\infty;\,-\infty)\) → pesos \((1; 0; 0)\).</li>
+    <li>Fila 2 (Titanic, ve a Toy Story y a sí mismo): \((0;\ 1{,}414;\,-\infty)\) → \(e^0 = 1\) y \(e^{1{,}414} = 4{,}113\), suma \(5{,}113\) → pesos \((0{,}196;\ 0{,}804;\ 0)\).</li>
+    <li>Fila 3 (Shrek, ve a los tres): no cambia, \((0{,}333;\ 0{,}333;\ 0{,}333)\).</li>
+    <li>Salidas: fila 2 \(= 0{,}196\,(1,0) + 0{,}804\,(0,1) = (0{,}196;\ 0{,}804)\). Antes, sin máscara, la fila 2 daba \((0{,}424;\ 0{,}860)\): Titanic ya no recibe nada de Shrek, que está en su futuro (aún no lo has visto).</li>
   </ol>
 </div>
 <figure class="demo" data-demo="curso3/c3m3-mascara-causal" data-titulo="Tocar el futuro: con y sin máscara causal">
-  <div class="haz">Elige «bebe» como token que se toca y sube «Cuánto sumas» a +5. Mira qué barras de la derecha se mueven. Apaga la máscara y repite.</div>
+  <div class="haz">Las seis casillas son las palabras de un subtítulo: «el niño ve Titanic hoy .». Elige «Titanic» como token que se toca y sube «Cuánto sumas» a +5. Mira qué barras de la derecha se mueven. Apaga la máscara y repite.</div>
   <div class="observa">Con máscara, el cambio solo llega al token tocado y a los que vienen después: el pasado no puede enterarse del futuro. Sin máscara, cambian las salidas de todos, incluso las de los tokens anteriores. Esa «fuga hacia atrás» es exactamente la trampa que la máscara impide.</div>
 </figure>
 <div class="callout ojo">
@@ -234,12 +238,12 @@
 </div>
 
 <h3>Self-attention y cross-attention; el precio</h3>
-<p>Si \(Q\), \(K\) y \(V\) salen de la <em>misma</em> secuencia hablamos de <strong>self-attention</strong>. Si \(Q\) viene de una secuencia y \(K, V\) de otra (el decoder consultando al encoder en una traducción), es <strong>cross-attention</strong>; la fórmula no cambia. En ambos casos la matriz de pesos es \(n \times m\), con lo que el coste crece con el producto de las dos longitudes: con 4.096 tokens y 12 cabezas, solo las puntuaciones de una capa ocupan unos 800 MB en <code>float32</code> por ejemplo del lote.</p>
+<p>Si \(Q\), \(K\) y \(V\) salen de la <em>misma</em> secuencia hablamos de <strong>self-attention</strong>. Si \(Q\) viene de una secuencia y \(K, V\) de otra (el decoder consultando al encoder al traducir los subtítulos de una peli: el encoder lee el original y el decoder escribe la traducción), es <strong>cross-attention</strong>; la fórmula no cambia. En ambos casos la matriz de pesos es \(n \times m\), con lo que el coste crece con el producto de las dos longitudes: con 4.096 tokens y 12 cabezas, solo las puntuaciones de una capa ocupan unos 800 MB en <code>float32</code> por ejemplo del lote.</p>
 </section>
 <!-- =============================================================== -->
 <section>
 <h2 id="multicabeza">Atención multi-cabeza y <code>MultiHeadAttention</code></h2>
-<p class="pregunta">Una sola atención produce <em>un</em> reparto de pesos por token. Pero en «la niña pequeña lee un libro» la palabra «pequeña» necesita mirar a «niña» (¿a quién describo?) y la palabra «lee» necesita mirar a «niña» (¿quién lee?) y a «libro» (¿qué se lee?). ¿Cómo pedirle varias cosas a la vez?</p>
+<p class="pregunta">Una sola atención produce <em>un</em> reparto de pesos por token. Pero en un subtítulo como «la niña pequeña ve una película» la palabra «pequeña» necesita mirar a «niña» (¿a quién describo?) y la palabra «ve» necesita mirar a «niña» (¿quién mira?) y a «película» (¿qué se ve?). ¿Cómo pedirle varias cosas a la vez?</p>
 
 <p>La respuesta es repetir la atención varias veces en paralelo, cada una con sus propias matrices \(W_Q\), \(W_K\), \(W_V\). Cada repetición es una <strong>cabeza</strong> (<em>head</em>). El procedimiento con \(h\) cabezas:</p>
 <ol class="pasos">
@@ -252,7 +256,7 @@
 
 <div class="callout analogia">
   <span class="lbl">Analogía</span>
-  <p>Leer una frase con varios rotuladores: uno subraya «quién hace la acción», otro «qué adjetivo describe a cada nombre», otro «qué palabra va justo antes». Al final juntas los subrayados en una sola nota (la concatenación y \(W_O\)). Nadie programa qué subraya cada uno: lo descubre el entrenamiento.</p>
+  <p>Buscar una peli en Netflix con varios filtros a la vez (género, actor, año): cada filtro mira una cosa distinta de la misma ficha. Aquí, leer un subtítulo con varios rotuladores: uno subraya «quién hace la acción», otro «qué adjetivo describe a cada nombre», otro «qué palabra va justo antes». Al final juntas los subrayados en una sola nota (la concatenación y \(W_O\)). Nadie programa qué subraya cada uno: lo descubre el entrenamiento.</p>
 </div>
 
 <div class="callout ejemplo">
@@ -267,7 +271,7 @@
 </div>
 
 <figure class="demo" data-demo="curso3/c3m3-multicabeza" data-titulo="Cabezas que miran a cosas distintas">
-  <div class="haz">Con 4 cabezas, elige el token «pequeña» y mira la fila marcada en cada mapa. Luego elige «niña» y después «libro». Baja el número de cabezas a 1 y 2.</div>
+  <div class="haz">Con 4 cabezas, elige el token «pequeña» (de «la niña pequeña ve una película») y mira la fila marcada en cada mapa. Luego elige «niña» y después «película». Baja el número de cabezas a 1 y 2.</div>
   <div class="observa">Cada cabeza reparte la atención con su propia regla: una mira a la posición anterior, otra busca el sustantivo, otra el verbo, otra mira a todo por igual. Con una sola cabeza solo hay <em>un</em> reparto por token. Fíjate también en el parámetro de abajo: el número de parámetros de la capa no depende de h. (Aquí las matrices están elegidas a mano para que se vea el mecanismo; en un modelo real las cabezas las descubre el entrenamiento y rara vez son tan limpias.)</div>
 </figure>
 
@@ -295,7 +299,7 @@
 <!-- =============================================================== -->
 <section>
 <h2 id="posicion">Codificación posicional</h2>
-<p class="pregunta">La atención compara tokens con tokens, pero en ninguna parte de la fórmula aparece <em>dónde</em> está cada uno. ¿«El perro muerde al hombre» y «el hombre muerde al perro» son lo mismo para ella?</p>
+<p class="pregunta">La atención compara tokens con tokens, pero en ninguna parte de la fórmula aparece <em>dónde</em> está cada uno. ¿«Woody salva a Buzz» y «Buzz salva a Woody» son lo mismo para ella? (Mismas palabras, historia distinta; igual que ver la temporada 3 antes que la 1.)</p>
 <p>Casi. La self-attention es <strong>equivariante a permutaciones</strong>: si mezclas el orden de los tokens de entrada, las salidas salen mezcladas del mismo modo, con exactamente los mismos números. Para la capa, la frase es un <em>conjunto</em>, no una secuencia. El fragmento 9 lo comprueba: al barajar los tokens, la salida es la salida original barajada igual. La solución es <strong>inyectar la posición en los propios vectores</strong>: a cada token se le suma un vector que depende de en qué lugar está.</p>
 
 <h3>Codificación sinusoidal</h3>
@@ -315,7 +319,7 @@
       <tr><td>3</td><td>0,141</td><td>−0,990</td><td>0,030</td><td>1,000</td></tr>
     </tbody>
   </table>
-  <p>Las dos primeras dimensiones cambian rápido (distinguen posiciones vecinas); las dos últimas, muy despacio (distinguen «principio» de «final» de una secuencia larga). Es como un contador con una cifra de unidades que gira rápido y una de centenas que gira despacio, pero con ondas suaves en lugar de dígitos.</p>
+  <p>Las dos primeras dimensiones cambian rápido (distinguen posiciones vecinas); las dos últimas, muy despacio (distinguen «principio» de «final» de una secuencia larga). Es como numerar tus capítulos con «temporada y capítulo»: el capítulo cambia rápido y la temporada despacio, y juntos identifican cada episodio; aquí con ondas suaves en lugar de dígitos.</p>
 </div>
 
 <h3>Por qué senos y cosenos</h3>
@@ -326,7 +330,7 @@
 </ul>
 
 <figure class="demo" data-demo="curso3/c3m3-posicional" data-titulo="Relojes de posición y la similitud entre posiciones">
-  <div class="haz">Mueve «Posición p» y mira cómo giran las manecillas azules (la naranja es otra posición p'). Después mueve p' y compara las dos curvas de abajo.</div>
+  <div class="haz">Piensa en la posición como el número de capítulo dentro de una temporada. Mueve «Posición p» y mira cómo giran las manecillas azules (la naranja es otra posición p'). Después mueve p' y compara las dos curvas de abajo.</div>
   <div class="observa">La primera pareja gira muy deprisa y la última casi no se mueve: juntas identifican cada posición, como las agujas de un reloj. Y las dos curvas de similitud (para p y p') son <em>la misma</em>: la «cercanía» entre dos posiciones depende solo de su distancia. Prueba también con d_model = 4: solo hay dos manecillas, la rápida se repite cada 6,3 posiciones y la lenta casi no se mueve; con 16 hay ocho y la identificación es mucho más fina.</div>
 </figure>
 
@@ -356,7 +360,7 @@ Versión «post-LN» (la del artículo original y la de nuestro código): suma y
 <p>\(\gamma\) y \(\beta\) son dos vectores de \(d_{model}\) números que <strong>se aprenden</strong> (empiezan en 1 y 0) para que la red pueda «deshacer» la normalización si le conviene; \(\varepsilon\) es un número minúsculo para no dividir entre 0 (en <code>LayerNormalization</code> vale <code>0.001</code> por defecto; nuestro bloque usa <code>1e-6</code>).</p>
 <div class="callout ejemplo">
   <span class="lbl">Ejemplo numérico</span>
-  <p>Un token con \(d = 4\): \(x = (1, 2, 3, 10)\).</p>
+  <p>Un token con \(d = 4\): \(x = (1, 2, 3, 10)\). Piensa en una película que recibe cuatro notas de 0 a 10 (cifras inventadas): tres críticos le ponen 1, 2 y 3 y uno le pone un 10. LayerNorm las pasa a una escala común.</p>
   <ol class="pasos">
     <li>Media: \(\mu = (1+2+3+10)/4 = 4\).</li>
     <li>Varianza: \(((1-4)^2 + (2-4)^2 + (3-4)^2 + (10-4)^2)/4 = (9 + 4 + 1 + 36)/4 = 12{,}5\). Desviación: \(\sqrt{12{,}5} = 3{,}536\).</li>
@@ -365,15 +369,15 @@ Versión «post-LN» (la del artículo original y la de nuestro código): suma y
 </div>
 <p><strong>¿Por qué LayerNorm y no BatchNorm?</strong> BatchNorm calcula las estadísticas <em>a lo largo del lote</em> (una media por rasgo, mezclando ejemplos y tokens). Con secuencias de longitud variable, rellenos y lotes pequeños esas estadísticas son inestables, y en generación (un ejemplo cada vez) ni siquiera existen. LayerNorm usa solo los números del propio token: da igual el lote y la longitud.</p>
 <figure class="demo" data-demo="curso3/c3m3-layernorm-ejes" data-titulo="¿Sobre qué números se calcula la media?">
-  <div class="haz">Pulsa una casilla cualquiera con «LayerNorm (por token)»: se iluminan los 5 números de ese token. Cambia a «BatchNorm (por rasgo)» y pulsa otra casilla.</div>
-  <div class="observa">LayerNorm mira solo una fila (un token, todos sus rasgos). BatchNorm mira una columna entera atravesando todos los ejemplos y todos los tokens: 12 valores que no tienen nada que ver entre sí. Fíjate en la fórmula del texto: el valor de z que se muestra es la cuenta que acabamos de hacer a mano.</div>
+  <div class="haz">El tensor es un lote de 3 usuarios; cada usuario tiene 4 títulos de su historial y cada título está descrito con 5 números. Pulsa una casilla cualquiera con «LayerNorm (por token)»: se iluminan los 5 números de ese título. Cambia a «BatchNorm (por rasgo)» y pulsa otra casilla.</div>
+  <div class="observa">LayerNorm mira solo una fila (un título, todos sus rasgos). BatchNorm mira una columna entera atravesando todos los usuarios y todos los títulos: 12 valores que no tienen nada que ver entre sí. Fíjate en la fórmula del texto: el valor de z que se muestra es la cuenta que acabamos de hacer a mano.</div>
 </figure>
 
 <h3>2 · Conexión residual</h3>
 <p>En lugar de devolver solo lo que calcula el sub-bloque, se devuelve <strong>entrada + lo que calcula</strong>: \(y = x + F(x)\). Dos razones:</p>
 <ul>
   <li><strong>El camino directo.</strong> La derivada es \(\partial y/\partial x = 1 + F'(x)\): aunque \(F'\) sea casi 0, el gradiente pasa con valor 1. En 12 bloques con \(F' = 0{,}01\), el gradiente conserva \(1{,}01^{12} \approx 1{,}13\) en lugar de \(0{,}01^{12} = 10^{-24}\). Es el mismo truco que las ResNet y lo que permite apilar decenas de capas.</li>
-  <li><strong>Lo que había se conserva.</strong> El sub-bloque solo tiene que aprender la <em>corrección</em> a la entrada, no reconstruirla entera.</li>
+  <li><strong>Lo que había se conserva.</strong> El sub-bloque solo tiene que aprender la <em>corrección</em> a la entrada, no reconstruirla entera: es como entregar el guion original más las notas de corrección, en lugar de reescribirlo desde cero.</li>
 </ul>
 <div class="callout ojo">
   <span class="lbl">Ojo</span>
@@ -387,8 +391,8 @@ Versión «post-LN» (la del artículo original y la de nuestro código): suma y
 <p>Dónde se coloca la normalización cambia el comportamiento. <strong>Post-LN</strong> (artículo original): <code>x = LN(x + Sub(x))</code>. <strong>Pre-LN</strong> (GPT-2 en adelante): <code>x = x + Sub(LN(x))</code>, que deja el «carril» residual sin tocar y entrena de forma más estable con modelos muy profundos (en pre-LN se añade una LayerNorm final después del último bloque). Nuestro código usa post-LN por ser el de los tutoriales de Keras.</p>
 
 <figure class="demo" data-demo="curso3/c3m3-bloque-numeros" data-titulo="Un bloque Transformer con números reales">
-  <div class="haz">Pulsa «Siguiente» desde el paso 0 hasta el 6 y observa cómo cambian la matriz y las medias/desviaciones de cada token. Luego quita las conexiones residuales y repite. Por último prueba pre-LN.</div>
-  <div class="observa">Tras cada LayerNorm todas las filas tienen media 0 y desviación 1, incluida la del token 3, que entró con números triples. La atención y la FFN no cambian la forma (4 × 4). Al final, la «semejanza» entre la entrada y la salida es mayor con residuales que sin ellas: sin la suma, el bloque olvida lo que le llegó. Los mapas inferiores son los pesos de atención de las dos cabezas de este bloque.</div>
+  <div class="haz">Los 4 tokens son 4 películas de tu historial, cada una con una ficha de 4 números. Pulsa «Siguiente» desde el paso 0 hasta el 6 y observa cómo cambian la matriz y las medias/desviaciones de cada token. Luego quita las conexiones residuales y repite. Por último prueba pre-LN.</div>
+  <div class="observa">Tras cada LayerNorm todas las filas tienen media 0 y desviación 1, incluida la de la peli 3, que entró con números triples. La atención y la FFN no cambian la forma (4 × 4). Al final, la «semejanza» entre la entrada y la salida es mayor con residuales que sin ellas: sin la suma, el bloque olvida lo que le llegó. Los mapas inferiores son los pesos de atención de las dos cabezas de este bloque.</div>
 </figure>
 
 <h3>Cuántos parámetros tiene un bloque</h3>
@@ -403,7 +407,7 @@ Versión «post-LN» (la del artículo original y la de nuestro código): suma y
 <table>
   <thead><tr><th></th><th>Máscara</th><th>Se entrena para…</th><th>Sirve para</th></tr></thead>
   <tbody>
-    <tr><td><strong>Encoder</strong> (BERT)</td><td>Ninguna: cada token ve a los de ambos lados</td><td>Rellenar palabras tapadas («masked language model»): «el gato [MASK] leche» → «bebe»</td><td>Entender texto: clasificar, extraer, buscar, medir similitud. También es lo que usaremos con series.</td></tr>
+    <tr><td><strong>Encoder</strong> (BERT)</td><td>Ninguna: cada token ve a los de ambos lados</td><td>Rellenar palabras tapadas («masked language model»): «Shrek es una [MASK] de animación» → «película»</td><td>Entender texto: clasificar, extraer, buscar, medir similitud. También es lo que usaremos con series.</td></tr>
     <tr><td><strong>Decoder</strong> (GPT)</td><td>Causal: cada token solo ve hacia atrás</td><td>Predecir el token siguiente</td><td>Generar texto, código, etc. Es el que construiremos al final.</td></tr>
     <tr><td><strong>Encoder + decoder</strong> (Transformer original, T5)</td><td>Encoder libre; decoder causal con cross-attention al encoder</td><td>Secuencia → secuencia (traducir, resumir)</td><td>Cuando la entrada y la salida son textos distintos.</td></tr>
   </tbody>
@@ -420,7 +424,7 @@ Versión «post-LN» (la del artículo original y la de nuestro código): suma y
 <!-- =============================================================== -->
 <section>
 <h2 id="series">Un Transformer para series temporales</h2>
-<p class="pregunta">Un Transformer se inventó para palabras. ¿Qué cambia cuando los «tokens» son simples números de un sensor?</p>
+<p class="pregunta">Un Transformer se inventó para palabras. ¿Qué cambia cuando los «tokens» son simples números, como la audiencia de cada día de una plataforma?</p>
 
 <h3>Del token discreto al valor continuo</h3>
 <p>En texto, el primer paso es una tabla de búsqueda <code>Embedding</code> que convierte un id entero en un vector. Un valor de una serie ya es un número, no un id: no hay nada que buscar. El equivalente es una capa <code>Dense(d_model)</code> que lleva el valor (o los \(F\) rasgos de ese instante) a un vector de \(d_{model}\) números. Es una <strong>proyección lineal</strong>, la misma para todos los instantes. El resto es idéntico: se le suma la codificación posicional, pasa por los bloques y se lee la salida.</p>
@@ -432,7 +436,7 @@ Versión «post-LN» (la del artículo original y la de nuestro código): suma y
   → Dense(1)                    (lote, 1)        la predicción</pre>
 
 <h3>Regresión: predecir un valor</h3>
-<p>Para predecir el valor \(h = 10\) pasos adelante, la cabeza final es una <code>Dense(1)</code> <strong>sin activación</strong> (la salida puede ser cualquier número real) y la pérdida es el error cuadrático medio (<code>"mse"</code>); la métrica legible es el MAE, que está en las mismas unidades que la serie. Falta decidir cómo pasar de los 48 vectores a uno solo, y hay tres opciones habituales:</p>
+<p>Para predecir el valor \(h = 10\) pasos adelante (la audiencia diez medidas después del último dato), la cabeza final es una <code>Dense(1)</code> <strong>sin activación</strong> (la salida puede ser cualquier número real) y la pérdida es el error cuadrático medio (<code>"mse"</code>); la métrica legible es el MAE, que está en las mismas unidades que la serie. Falta decidir cómo pasar de los 48 vectores a uno solo, y hay tres opciones habituales:</p>
 <ul>
   <li><code>GlobalAveragePooling1D</code>: la media de los 48 vectores (la que usamos; robusta y sin parámetros).</li>
   <li>Quedarse con <strong>el último instante</strong> (<code>x[:, -1]</code>): el que más sabe del final de la ventana, que es lo que de verdad importa al predecir; con una máscara causal es lo más natural.</li>
@@ -454,19 +458,19 @@ Versión «post-LN» (la del artículo original y la de nuestro código): suma y
 </div>
 
 <h3>Clasificación: decir de qué tipo es una señal</h3>
-<p>Si en vez de un número queremos una <strong>categoría</strong> (¿qué tipo de señal es?), cambia solo el final: <code>Dense(n_clases, activation="softmax")</code> y la pérdida <code>sparse_categorical_crossentropy</code> (las etiquetas son enteros 0, 1, 2). El fragmento 13 fabrica 2.000 señales de 64 puntos de tres tipos —seno lento, seno rápido y un pico en una posición aleatoria— todas con ruido de desviación 0,5 (comparable a la amplitud, así que no es trivial). Con un solo bloque Transformer el acierto en test es de <strong>99,5 %</strong>, con los tres tipos en torno al 99–100 %. El pico es un buen ejemplo de por qué sirve la atención: aparece en cualquier posición y un solo token puede «encender» a los demás.</p>
+<p>Si en vez de un número queremos una <strong>categoría</strong> (¿qué tipo de curva de audiencia es?), cambia solo el final: <code>Dense(n_clases, activation="softmax")</code> y la pérdida <code>sparse_categorical_crossentropy</code> (las etiquetas son enteros 0, 1, 2). El fragmento 13 fabrica 2.000 señales de 64 puntos de tres tipos —seno lento, seno rápido y un pico en una posición aleatoria; imagina tres formas de curva de audiencia: oleada lenta, oleada rápida y pico viral de un día— todas con ruido de desviación 0,5 (comparable a la amplitud, así que no es trivial). Con un solo bloque Transformer el acierto en test es de <strong>99,5 %</strong>, con los tres tipos en torno al 99–100 %. El pico es un buen ejemplo de por qué sirve la atención: aparece en cualquier posición y un solo token puede «encender» a los demás.</p>
 <div class="callout analogia">
   <span class="lbl">Variantes que conviene conocer</span>
-  <p><strong>Varias variables</strong> (temperatura, humedad, presión): la entrada pasa a ser <code>(lote, pasos, 3)</code> y no cambia nada más. <strong>Predecir varios pasos a la vez</strong>: <code>Dense(h)</code> al final y un objetivo de \(h\) valores. <strong>Series muy largas</strong>: troceas en parches (como los Vision Transformers) para que \(n^2\) no se dispare.</p>
+  <p><strong>Varias variables</strong> (audiencia, minutos vistos, nota media): la entrada pasa a ser <code>(lote, pasos, 3)</code> y no cambia nada más. <strong>Predecir varios pasos a la vez</strong>: <code>Dense(h)</code> al final y un objetivo de \(h\) valores. <strong>Series muy largas</strong>: troceas en parches (como los Vision Transformers) para que \(n^2\) no se dispare.</p>
 </div>
 </section>
 <!-- =============================================================== -->
 <section>
 <h2 id="texto">Generación de texto con un Transformer decoder</h2>
-<p class="pregunta">Un GPT se entrena con una sola tarea: «dado lo anterior, adivina la siguiente palabra». ¿Cómo se monta eso en Keras de principio a fin, y cómo se elige la palabra cuando el modelo solo da probabilidades?</p>
+<p class="pregunta">Un GPT se entrena con una sola tarea: «dado lo anterior, adivina la siguiente palabra» (como el autocompletado de un subtítulo). ¿Cómo se monta eso en Keras de principio a fin, y cómo se elige la palabra cuando el modelo solo da probabilidades?</p>
 
 <h3>Los datos: una gramática propia, para saber la respuesta correcta</h3>
-<p>Sin internet no podemos bajar un corpus, y un texto sintético tiene una ventaja: podemos calcular <em>exactamente</em> cuánto vale un modelo perfecto. Escribimos una gramática pequeña de frases como «la niña pequeña lee un libro .» o «el gato negro duerme en el sofá .»: un sujeto (6 sustantivos, con su artículo <em>el/la</em>), un adjetivo opcional que <strong>concuerda en género</strong> (negro/negra, pequeño/pequeña) y un verbo con su complemento (<em>duerme en…</em>, <em>bebe…</em>, <em>lee…</em>, <em>corre por…</em>). Salen 144 frases distintas y generamos 1.500 al azar (10.115 palabras). Aprender esa gramática exige memoria de lo anterior: para escribir «negra» hay que acordarse de que el sustantivo era «gata».</p>
+<p>Sin internet no podemos bajar un corpus, y un texto sintético tiene una ventaja: podemos calcular <em>exactamente</em> cuánto vale un modelo perfecto. Imagina que son los subtítulos de una serie infantil muy sencilla. Escribimos una gramática pequeña de frases como «la niña pequeña lee un libro .» o «el gato negro duerme en el sofá .»: un sujeto (6 sustantivos, con su artículo <em>el/la</em>), un adjetivo opcional que <strong>concuerda en género</strong> (negro/negra, pequeño/pequeña) y un verbo con su complemento (<em>duerme en…</em>, <em>bebe…</em>, <em>lee…</em>, <em>corre por…</em>). Salen 144 frases distintas y generamos 1.500 al azar (10.115 palabras). Aprender esa gramática exige memoria de lo anterior: para escribir «negra» hay que acordarse de que el sustantivo era «gata».</p>
 
 <h3>Tokenización con <code>TextVectorization</code></h3>
 <p>Un modelo solo ve números, así que cada palabra se cambia por un id. <code>keras.layers.TextVectorization</code> hace todo el trayecto: <code>standardize</code> (qué limpieza aplicar: aquí solo pasar a minúsculas; la opción por defecto también borraría los signos de puntuación, incluido nuestro «.» que marca el final de frase), <code>split</code> (por espacios), y construye el <strong>vocabulario</strong> con <code>adapt</code>. El vocabulario reserva el id 0 para el relleno (cadena vacía) y el id 1 para las palabras desconocidas (<code>[UNK]</code>); aquí tiene 31 entradas: esas 2 más 29 palabras. Las palabras de verdad empiezan en el id 2 y están ordenadas de más a menos frecuentes.</p>
@@ -504,9 +508,9 @@ Versión «post-LN» (la del artículo original y la de nuestro código): suma y
 </ul>
 <div class="callout ejemplo">
   <span class="lbl">Ejemplo numérico</span>
-  <p>Cuatro palabras con logits \(z = (2,\ 1,\ 0,\ -1)\).</p>
+  <p>Cuatro palabras con logits \(z = (2,\ 1,\ 0,\ -1)\). Para verlo con Netflix, imagina que son cuatro películas candidatas a recomendarte: <strong>Toy Story</strong> (palabra 1), <strong>Shrek</strong> (2), <strong>Titanic</strong> (3) y <strong>Matrix</strong> (4), con puntuaciones inventadas. La temperatura mide lo «aventurero» que es el recomendador.</p>
   <table>
-    <thead><tr><th></th><th>palabra 1</th><th>palabra 2</th><th>palabra 3</th><th>palabra 4</th></tr></thead>
+    <thead><tr><th></th><th>Toy Story</th><th>Shrek</th><th>Titanic</th><th>Matrix</th></tr></thead>
     <tbody>
       <tr><td>\(T=1\): \(e^{z}\) = 7,389 · 2,718 · 1 · 0,368 (suma 11,475)</td><td class="res">0,644</td><td>0,237</td><td>0,087</td><td>0,032</td></tr>
       <tr><td>\(T=0{,}5\): \(z/T = (4, 2, 0, -2)\)</td><td class="res">0,865</td><td>0,117</td><td>0,016</td><td>0,002</td></tr>
@@ -514,7 +518,7 @@ Versión «post-LN» (la del artículo original y la de nuestro código): suma y
       <tr><td>\(T=1\) con top-\(k=2\): quedan 7,389 y 2,718 (suma 10,107)</td><td class="res">0,731</td><td>0,269</td><td>0</td><td>0</td></tr>
     </tbody>
   </table>
-  <p>Con \(T=0{,}5\) la palabra favorita pasa de 64,4 % a 86,5 %; con \(T=2\) baja a 45,5 % y la última sube del 3,2 % al 10,2 %. El top-2 ni siquiera deja que las palabras 3 y 4 entren en el sorteo.</p>
+  <p>Con \(T=0{,}5\) la favorita (Toy Story) pasa de 64,4 % a 86,5 %: el recomendador es más conservador; con \(T=2\) baja a 45,5 % y la última (Matrix) sube del 3,2 % al 10,2 %: se vuelve más aventurero. El top-2 ni siquiera deja que Titanic y Matrix entren en el sorteo.</p>
 </div>
 
 <figure class="demo" data-demo="curso3/c3m3-generacion" data-titulo="El mini-GPT del módulo, funcionando en tu navegador">
@@ -1829,7 +1833,7 @@ capas recuperadas: ['InputLayer', 'TokenAndPositionEmbedding', 'TransformerBlock
 <script type="application/json" class="quiz-data">
 {"titulo":"Cuestionario del módulo 3",
  "preguntas":[
-  {"q":"Tienes una serie de 100 valores y usas ventanas de 10 pasos, horizonte 3 y <code>sequence_stride=1</code>. ¿Cuántos ejemplos salen?",
+  {"q":"Tienes la audiencia de 100 días de una serie y usas ventanas de 10 pasos, horizonte 3 y <code>sequence_stride=1</code>. ¿Cuántos ejemplos salen?",
    "opciones":["87","90","88","97"],
    "correcta":2,
    "porque":"N = ⌊(n − w − h)/s⌋ + 1 = ⌊(100 − 10 − 3)/1⌋ + 1 = 88. El «+1» cuenta la primera ventana; 87 es olvidarlo. Con ventana 10 y horizonte 3, las últimas posiciones de la serie no pueden ser inicio de ventana porque su objetivo caería fuera."},
@@ -1841,7 +1845,7 @@ capas recuperadas: ['InputLayer', 'TokenAndPositionEmbedding', 'TransformerBlock
    "opciones":["1 antes y 1/4 después","16 antes y 4 después","8 antes y 2 después","4 antes y 1 después"],
    "correcta":3,
    "porque":"La varianza de q·k es la suma de d_k términos de varianza 1, es decir, d_k = 16; su desviación es √16 = 4. Al dividir entre √d_k = 4 queda 1. Sin esa división, con d_k grande la softmax se satura (un peso ≈ 1) y el gradiente casi desaparece."},
-  {"q":"Una consulta tiene puntuaciones (2, 0) con dos claves. ¿Qué pesos de atención da la softmax?",
+  {"q":"Un título busca qué ver a continuación y tiene puntuaciones (2, 0) con dos títulos del historial (dos claves). ¿Qué pesos de atención da la softmax?",
    "opciones":["50 % y 50 %","88 % y 12 %","99 % y 1 %","67 % y 33 %"],
    "correcta":1,
    "porque":"e² ≈ 7,389 y e⁰ = 1; la suma es 8,389. Los pesos son 7,389/8,389 ≈ 0,881 y 1/8,389 ≈ 0,119. Una diferencia de 2 puntos de puntuación ya se traduce en un reparto 88/12."},
@@ -1857,7 +1861,7 @@ capas recuperadas: ['InputLayer', 'TokenAndPositionEmbedding', 'TransformerBlock
    "opciones":["Da un error de forma","Nada: key_dim es el tamaño total de la clave","Keras ignora tres de las cuatro cabezas","<code>key_dim</code> es por cabeza: cada una trabajaría con 32 y la capa tendría 16.800 parámetros en vez de 4.224; lo habitual es <code>d_model // num_heads</code> = 8"],
    "correcta":3,
    "porque":"En Keras <code>key_dim</code> es el tamaño de Q y K <em>de cada cabeza</em>, no el total. Con 4 cabezas de 32 se proyecta a 128 números y luego se vuelve a 32: funciona, pero con casi cuatro veces más parámetros (16.800 frente a 4.224) y sin que cada cabeza sea «una porción» de d_model."},
-  {"q":"Un modelo con atención pero sin codificación posicional recibe «el perro muerde al hombre» y «el hombre muerde al perro», con los mismos embeddings. ¿Qué pasa?",
+  {"q":"Un modelo con atención pero sin codificación posicional recibe «Woody salva a Buzz» y «Buzz salva a Woody», con los mismos embeddings. ¿Qué pasa?",
    "opciones":["Da salidas totalmente distintas porque ve el orden","No distingue el orden: la salida de cada token es la misma, solo permutada, así que las dos frases son indistinguibles para el modelo","Falla con un error de forma","Solo distingue el orden si usa varias cabezas"],
    "correcta":1,
    "porque":"La atención compara tokens por su contenido; permutar la entrada permuta la salida de la misma forma (equivarianza a permutaciones). Sin una señal de posición, que se suma al embedding, el conjunto de vectores es el mismo en ambas frases. Las cabezas adicionales no arreglan eso."},
@@ -1865,7 +1869,7 @@ capas recuperadas: ['InputLayer', 'TokenAndPositionEmbedding', 'TransformerBlock
    "opciones":["Sobre los rasgos de cada token por separado, sin mezclar ejemplos ni tokens","Sobre el lote entero, rasgo a rasgo","Sobre todos los números del tensor a la vez","Sobre los pasos de cada ejemplo, rasgo a rasgo"],
    "correcta":0,
    "porque":"LayerNorm normaliza cada vector de rasgos con sus propios números (media 0, desviación 1) y luego aplica γ y β. Por eso no depende del tamaño del lote ni de la longitud de la secuencia. BatchNormalization, en cambio, calcula sus estadísticas sobre el lote (y los pasos) para cada rasgo."},
-  {"q":"Los logits de tres palabras son (2, 1, 0). Al dividir entre una temperatura T = 0,5 y aplicar softmax, ¿qué probabilidades salen?",
+  {"q":"Los logits de tres películas candidatas (Toy Story, Shrek y Titanic) son (2, 1, 0). Al dividir entre una temperatura T = 0,5 y aplicar softmax, ¿qué probabilidades salen?",
    "opciones":["(0,665; 0,245; 0,090)","(0,333; 0,333; 0,333)","(0,867; 0,117; 0,016)","(0,500; 0,300; 0,200)"],
    "correcta":2,
    "porque":"Los logits pasan a (4, 2, 0): e⁴ ≈ 54,6, e² ≈ 7,39 y e⁰ = 1, con suma 62,99; las probabilidades son 0,867; 0,117 y 0,016. Con T = 1 serían (0,665; 0,245; 0,090): una temperatura baja afila el reparto y una alta lo aplana."},
@@ -1873,7 +1877,7 @@ capas recuperadas: ['InputLayer', 'TokenAndPositionEmbedding', 'TransformerBlock
    "opciones":["0,693: es la probabilidad media de acertar","0,5: acierta la mitad de las veces","1: predice siempre la palabra correcta","≈ 2: es como dudar entre 2 palabras igual de probables en cada paso"],
    "correcta":3,
    "porque":"La perplejidad es e^pérdida: e^0,693 ≈ 2. Una pérdida de ln 2 equivale a repartir la probabilidad a partes iguales entre 2 candidatas. Una perplejidad de 1 sería el modelo perfecto (pérdida 0). Nuestro mini-GPT llega a 2,07 porque la gramática sintética deja esa incertidumbre irreducible."},
-  {"q":"Pasas de un Transformer que predice el siguiente valor de una serie (regresión) a otro que clasifica señales en 3 tipos. ¿Qué cambias en el código?",
+  {"q":"Pasas de un Transformer que predice el siguiente valor de una serie de audiencia (regresión) a otro que clasifica curvas de audiencia en 3 tipos. ¿Qué cambias en el código?",
    "opciones":["Los bloques Transformer y el número de cabezas","Solo la cabeza final y la pérdida: <code>Dense(1)</code> sin activación con <code>mse</code> pasa a <code>Dense(3, activation='softmax')</code> con entropía cruzada","La codificación posicional, que no sirve para clasificar","El tamaño de d_model, que debe ser igual al número de clases"],
    "correcta":1,
    "porque":"El tronco (embedding, posición, bloques, pooling) es el mismo; lo que cambia es qué se pide al final. En regresión la salida es un número sin acotar (una neurona sin activación, MSE); en clasificación son probabilidades que suman 1 (softmax) con entropía cruzada. d_model no tiene relación con el número de clases."}

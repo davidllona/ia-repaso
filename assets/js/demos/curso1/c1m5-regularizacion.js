@@ -87,7 +87,7 @@ Lab.register("curso1/c1m5-regularizacion", function (root, api) {
   ui.button("Ir al alpha elegido por validación cruzada", function () { var res = compute(st.mode); st.idx = argmin(res, "cv"); sl.set(st.idx, true); update(); }, "primary");
   ui.button("Nuevos datos", function () { st.seed++; gen(); update(); });
   var C0 = api.colors();
-  api.legend(root, [[C0.cobalto, "x1 (β = 3)"], [C0.terracota, "x2 (β = −2)"], [C0.oliva, "x3 (β = 1,5)"], [C0.muted, "x4 … x10 (ruido, β = 0)"]]);
+  api.legend(root, [[C0.cobalto, "x1 actores famosos (β = 3)"], [C0.terracota, "x2 duración (β = −2)"], [C0.oliva, "x3 premios (β = 1,5)"], [C0.muted, "x4 … x10 otros datos (ruido, β = 0)"]]);
   function fmtAlpha(a) { return a >= 100 ? a.toFixed(0) : a >= 1 ? a.toFixed(1) : a >= 0.1 ? a.toFixed(2) : a.toFixed(3); }
 
   function drawA(ctx, w, h, C) {

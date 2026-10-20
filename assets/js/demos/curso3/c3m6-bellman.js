@@ -3,7 +3,7 @@
 Lab.register("curso3/c3m6-bellman", function (root, api) {
   var D = api.d, M = api.math;
   var S = { g: 0.5, VA: 0, VB: 0, sweeps: 0 };
-  var view = api.view(root, { aspect: 2.9, minH: 170, maxH: 215, label: "Grafo de tres estados: A y B con sus probabilidades y recompensas, y el estado final T" });
+  var view = api.view(root, { aspect: 2.9, minH: 170, maxH: 215, label: "Grafo de tres estados: A (portada) y B (ficha de película) con sus probabilidades y recompensas, y el estado final T (película vista)" });
   var ui = api.controls(root), out = api.readout(root);
   var sg = ui.slider({ label: "Factor de descuento γ", min: 0, max: 0.95, step: 0.05, value: S.g, fmt: function (v) { return v.toFixed(2).replace(".", ","); }, onInput: function (v) { S.g = v; S.sweeps = 0; update(); } });
   var sa = ui.slider({ label: "Tu valor V(A)", min: 0, max: 12, step: 0.1, value: 0, fmt: function (v) { return v.toFixed(1).replace(".", ","); }, onInput: function (v) { S.VA = v; update(); } });
@@ -48,15 +48,17 @@ Lab.register("curso3/c3m6-bellman", function (root, api) {
     node(ax, ay, "A", S.VA, Math.abs(r.A - S.VA) < 0.05);
     node(bx, ay, "B", S.VB, Math.abs(r.B - S.VB) < 0.05);
     node(tx, ay, "T", 0, true, true);
-    D.text(ctx, "final", tx, ay + R + 14, { align: "center", size: fs, color: C.muted });
+    D.text(ctx, "película vista", tx, ay + R + 14, { align: "center", size: fs, color: C.muted });
+    D.text(ctx, "portada", ax, ay + R + 14, { align: "center", size: fs, color: C.muted });
+    D.text(ctx, "ficha de peli", bx, ay + R + 14, { align: "center", size: fs, color: C.muted });
     D.text(ctx, "el verde = el valor ya cumple Bellman", w / 2, h - 6, { align: "center", size: fs - 0.5, color: C.muted });
   }
   function update() {
     var r = rhs(), e = exact(), g = S.g;
     var dA = r.A - S.VA, dB = r.B - S.VB, okA = Math.abs(dA) < 0.05, okB = Math.abs(dB) < 0.05;
     out.set(
-      "<b>Estado A</b>: 0,5·(0 + " + f(g) + "·" + f(S.VA, 1) + ") + 0,5·(4 + " + f(g) + "·" + f(S.VB, 1) + ") = <b>" + f(r.A) + "</b> · tu V(A) = " + f(S.VA, 1) + " → <span class='" + (okA ? "good" : "bad") + "'>desfase " + f(dA) + "</span><br>" +
-      "<b>Estado B</b>: 0,4·(0 + " + f(g) + "·" + f(S.VA, 1) + ") + 0,6·(10 + " + f(g) + "·0) = <b>" + f(r.B) + "</b> · tu V(B) = " + f(S.VB, 1) + " → <span class='" + (okB ? "good" : "bad") + "'>desfase " + f(dB) + "</span><br>" +
+      "<b>Estado A</b> (portada): 0,5·(0 + " + f(g) + "·" + f(S.VA, 1) + ") + 0,5·(4 + " + f(g) + "·" + f(S.VB, 1) + ") = <b>" + f(r.A) + "</b> · tu V(A) = " + f(S.VA, 1) + " → <span class='" + (okA ? "good" : "bad") + "'>desfase " + f(dA) + "</span><br>" +
+      "<b>Estado B</b> (ficha): 0,4·(0 + " + f(g) + "·" + f(S.VA, 1) + ") + 0,6·(10 + " + f(g) + "·0) = <b>" + f(r.B) + "</b> · tu V(B) = " + f(S.VB, 1) + " → <span class='" + (okB ? "good" : "bad") + "'>desfase " + f(dB) + "</span><br>" +
       "Solución exacta (sistema 2×2): V(A) = <b>" + f(e.A) + "</b>, V(B) = <b>" + f(e.B) + "</b>" + (S.sweeps ? " · barridos dados: " + S.sweeps : "") +
       (okA && okB ? "<br><span class='good'>Tus dos valores cumplen la ecuación de Bellman: ya son los valores verdaderos.</span>" : ""));
     view.redraw();

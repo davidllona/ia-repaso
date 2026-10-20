@@ -18,7 +18,7 @@ Lab.register("curso5/c5m4-congelar", function (root, api) {
   var view = api.view(root, { aspect: 2.1, minH: 190, maxH: 270, drag: true, label: "Bloques de ResNet-18: cuáles se entrenan y hasta dónde llega el backward. Se puede pulsar un bloque." });
   var ui = api.controls(root), out = api.readout(root);
   var sm = ui.slider({ label: "Bloques entrenables (contando desde el final)", min: 1, max: 6, step: 1, value: S.m, onInput: function (v) { S.m = v; update(); } });
-  ui.slider({ label: "Número de clases de tu problema (K)", min: 2, max: 200, step: 1, value: S.K, onInput: function (v) { S.K = v; update(); } });
+  ui.slider({ label: "Número de géneros que quieres distinguir (K)", min: 2, max: 200, step: 1, value: S.K, onInput: function (v) { S.K = v; update(); } });
   ui.toggle({ label: "Sustituir fc por una capa nueva", value: S.nueva, onChange: function (v) { S.nueva = v; update(); } });
 
   view.pointer({ down: function (x, y) {
@@ -55,8 +55,8 @@ Lab.register("curso5/c5m4-congelar", function (root, api) {
     var s = "Entrenables: <b>" + fmt(tr) + "</b> de <b>" + fmt(tot) + "</b> parámetros (<b>" + (100 * tr / tot).toFixed(2).replace(".", ",") + " %</b>)";
     s += "<br>fc " + (S.nueva ? "nueva: 512·" + S.K + " + " + S.K + " = <b>" + fmt(512 * S.K + S.K) + "</b>" : "original (1000 clases): <b>513.000</b>") + " · el optimizador solo recibe los parámetros de los bloques que entrenan";
     s += "<br>Coste estimado de un paso (forward + backward): <b>" + (100 * coste).toFixed(0) + " %</b> del de entrenar toda la red. El ahorro viene de no calcular gradientes en los bloques anteriores al primero que entrena; congelar bloques del <i>medio</i> no evita pasar el gradiente por ellos.";
-    if (S.m === 1) s += "<br><span class='good'>Solo la cabeza: es la fase 1 del transfer learning (extractor de características).</span>";
-    else if (S.m === 6) s += "<br><span class='bad'>Todo entrenable: con pocos datos y learning rate alto se destruye lo preentrenado.</span>";
+    if (S.m === 1) s += "<br><span class='good'>Solo la cabeza: es la fase 1 del transfer learning (el crítico no cambia su forma de ver cine, solo aprende tus géneros).</span>";
+    else if (S.m === 6) s += "<br><span class='bad'>Todo entrenable: con pocos datos y learning rate alto se destruye lo preentrenado (el crítico olvida lo que sabía de cine).</span>";
     out.set(s); view.redraw();
   }
   update();

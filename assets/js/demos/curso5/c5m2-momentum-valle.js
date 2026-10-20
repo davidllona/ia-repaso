@@ -24,7 +24,7 @@ Lab.register("curso5/c5m2-momentum-valle", function (root, api) {
     if (!isFinite(m.w[0]) || Math.abs(m.w[0]) > 1e6 || Math.abs(m.w[1]) > 1e6) m.broken = true;
   }
 
-  var view = api.view(root, { aspect: 1.75, minH: 250, maxH: 400, drag: true, label: "Valle largo y estrecho con el camino de SGD y el de SGD con momentum, y las flechas de un paso" });
+  var view = api.view(root, { aspect: 1.75, minH: 250, maxH: 400, drag: !matchMedia("(pointer:coarse)").matches, label: "Valle largo y estrecho (dos perillas del recomendador) con el camino de SGD y el de SGD con momentum, y las flechas de un paso" });
   var plot = api.plot(view, { xr: XR, yr: YR, xticks: 6, yticks: 4, pad: { l: 34, r: 10, t: 10, b: 26 }, xfmt: function (v) { return Math.round(v); }, yfmt: function (v) { return +v.toFixed(1); } });
   var ui = api.controls(root), out = api.readout(root);
   out.el.style.fontSize = "clamp(.72rem, 2.7vw, .84rem)";
@@ -63,8 +63,8 @@ Lab.register("curso5/c5m2-momentum-valle", function (root, api) {
     D.circle(ctx, plot.x(0), plot.y(0), 4.5, null, C.ink, 1.6);
     D.circle(ctx, plot.x(S.start[0]), plot.y(S.start[1]), 6, C.marker, C.ink, 1.6);
     ctx.restore();
-    D.text(ctx, "mínimo", plot.x(0) + 8, plot.y(0) - 8, { size: 10.5, color: C.muted });
-    D.text(ctx, "arrastra el punto amarillo", plot.box.x + 6, plot.box.y + plot.box.h - 6, { size: 10.5, color: C.muted });
+    D.text(ctx, "meta", plot.x(0) + 8, plot.y(0) - 8, { size: 10.5, color: C.muted });
+    D.text(ctx, "toca o arrastra el punto amarillo", plot.box.x + 6, plot.box.y + plot.box.h - 6, { size: 10.5, color: C.muted });
   }
   reset();
   view.draw(draw);

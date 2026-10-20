@@ -1,4 +1,4 @@
-/* Experimento: UN paso del bucle de entrenamiento con cinco alumnos, columna a columna.
+/* Experimento: UN paso del bucle de entrenamiento con cinco usuarios (x = días sin abrir la app, y = canceló), columna a columna.
    z = w·x + b -> p = sigmoide(z) -> error p - y -> (p - y)·x -> medias = gradientes -> w y b nuevos.
    Es el fragmento 8: con w = 0, b = 0 y lr = 1 salen dw = -0.3, db = 0.1. */
 Lab.register("curso4/c4m4-paso-a-mano", function (root, api) {
@@ -6,8 +6,8 @@ Lab.register("curso4/c4m4-paso-a-mano", function (root, api) {
   var X = [1, 2, 3, 4, 5], Y = [0, 0, 0, 1, 1];
   var S = { w: 0, b: 0, lr: 1, pasos: 0 };
 
-  var view = api.view(root, { aspect: 2.0, minH: 200, maxH: 320, label: "Cinco alumnos, la curva actual y la curva después del paso" });
-  var plot = api.plot(view, { xr: [0, 6], yr: [-0.2, 1.2], xticks: 6, yticks: 7, xlabel: "x (horas)", ylabel: "p", pad: { l: 40, r: 10, t: 10, b: 36 }, yfmt: function (v) { return (+v.toFixed(1)).toString(); } });
+  var view = api.view(root, { aspect: 2.0, minH: 200, maxH: 320, label: "Cinco usuarios, la curva actual y la curva después del paso" });
+  var plot = api.plot(view, { xr: [0, 6], yr: [-0.2, 1.2], xticks: 6, yticks: 7, xlabel: "x (días sin abrir)", ylabel: "p", pad: { l: 40, r: 10, t: 10, b: 36 }, yfmt: function (v) { return (+v.toFixed(1)).toString(); } });
   var tabla = api.table(root, ["x", "y", "z = w·x + b", "p = σ(z)", "p − y", "(p − y)·x", "pérdida"]);
   var ui = api.controls(root), out = api.readout(root);
   var sW = ui.slider({ label: "w", min: -2, max: 3, step: 0.05, value: S.w, fmt: function (v) { return v.toFixed(2); }, onInput: function (v) { S.w = v; update(); } });

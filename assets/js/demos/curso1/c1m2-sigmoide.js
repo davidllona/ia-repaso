@@ -8,11 +8,11 @@ Lab.register("curso1/c1m2-sigmoide", function (root, api) {
   var t0 = -2, t1 = 0.1, thr = 0.5, xc = 30, showLin = false;
   var ols = M.linreg(pts.map(function (p) { return p.x; }), pts.map(function (p) { return p.y; }));
 
-  var view = api.view(root, { aspect: 1.65, minH: 290, drag: true, label: "Clientes según los días sin entrar (1 = canceló, 0 = se quedó) con la curva sigmoide y, si quieres, la recta de regresión lineal" });
-  var plot = api.plot(view, { xr: [0, 50], yr: [-0.4, 1.4], xticks: 5, yticks: 9, xlabel: "Días sin entrar en la plataforma", ylabel: "probabilidad de cancelar", yfmt: function (v) { return (Math.round(v * 10) / 10).toFixed(1); }, pad: { l: 48, r: 12, t: 12, b: 40 } });
-  api.legend(root, [[api.colors().cobalto, "se quedó (0)"], [api.colors().terracota, "canceló (1)"], [api.colors().ink, "sigmoide p̂ = σ(θ₀ + θ₁·x)"], [api.colors().marker, "cliente nuevo"]]);
+  var view = api.view(root, { aspect: 1.65, minH: 290, drag: true, label: "Suscriptores según los días sin abrir la aplicación (1 = canceló, 0 = se quedó) con la curva sigmoide y, si quieres, la recta de regresión lineal" });
+  var plot = api.plot(view, { xr: [0, 50], yr: [-0.4, 1.4], xticks: 5, yticks: 9, xlabel: "Días sin abrir la aplicación", ylabel: "probabilidad de cancelar", yfmt: function (v) { return (Math.round(v * 10) / 10).toFixed(1); }, pad: { l: 48, r: 12, t: 12, b: 40 } });
+  api.legend(root, [[api.colors().cobalto, "se quedó (0)"], [api.colors().terracota, "canceló (1)"], [api.colors().ink, "sigmoide p̂ = σ(θ₀ + θ₁·x)"], [api.colors().marker, "usuario nuevo"]]);
   var ui = api.controls(root), out = api.readout(root);
-  var s1 = ui.slider({ label: "Peso θ₁ de «días sin entrar»", min: 0, max: 0.8, step: 0.01, value: t1, fmt: function (v) { return v.toFixed(2); }, onInput: function (v) { t1 = v; update(); } });
+  var s1 = ui.slider({ label: "Peso θ₁ de «días sin abrir la app»", min: 0, max: 0.8, step: 0.01, value: t1, fmt: function (v) { return v.toFixed(2); }, onInput: function (v) { t1 = v; update(); } });
   var s0 = ui.slider({ label: "Intercepto θ₀", min: -20, max: 4, step: 0.1, value: t0, fmt: function (v) { return v.toFixed(1); }, onInput: function (v) { t0 = v; update(); } });
   var st = ui.slider({ label: "Umbral de decisión", min: 0.05, max: 0.95, step: 0.01, value: thr, fmt: function (v) { return v.toFixed(2); }, onInput: function (v) { thr = v; update(); } });
   ui.toggle({ label: "Mostrar la recta de regresión lineal", value: false, onChange: function (v) { showLin = v; update(); } });
@@ -61,10 +61,10 @@ Lab.register("curso1/c1m2-sigmoide", function (root, api) {
   function update() {
     view.redraw();
     var z = t0 + t1 * xc, p = M.sigmoid(z), m = metrics(), lin = ols.b + ols.m * xc;
-    out.set("Cliente nuevo con <b>" + xc.toFixed(0) + " días</b>: z = θ₀ + θ₁·x = <b>" + z.toFixed(2) + "</b> → p̂ = σ(z) = <b>" + p.toFixed(3) + "</b> · probabilidad de quedarse = <b>" + (1 - p).toFixed(3) + "</b> (suman 1)<br>" +
+    out.set("Usuario nuevo con <b>" + xc.toFixed(0) + " días</b>: z = θ₀ + θ₁·x = <b>" + z.toFixed(2) + "</b> → p̂ = σ(z) = <b>" + p.toFixed(3) + "</b> · probabilidad de quedarse = <b>" + (1 - p).toFixed(3) + "</b> (suman 1)<br>" +
       "Con umbral " + thr.toFixed(2) + ": <b>" + (p >= thr ? "cancela" : "se queda") + "</b> · frontera en " + (t1 > 1e-6 ? "<b>" + ((Math.log(thr / (1 - thr)) - t0) / t1).toFixed(1) + " días</b>" : "—") + "<br>" +
-      "Acierto sobre los 36 clientes = <b>" + (100 * m.acc).toFixed(0) + " %</b> · log-loss = <b>" + m.ll.toFixed(3) + "</b>" +
-      (showLin ? "<br>La recta lineal da <b>" + lin.toFixed(2) + "</b> para este cliente" + (lin < 0 || lin > 1 ? " <span class='bad'>(¡una «probabilidad» fuera de 0–1!)</span>" : "") : ""));
+      "Acierto sobre los 36 suscriptores = <b>" + (100 * m.acc).toFixed(0) + " %</b> · log-loss = <b>" + m.ll.toFixed(3) + "</b>" +
+      (showLin ? "<br>La recta lineal da <b>" + lin.toFixed(2) + "</b> para este usuario" + (lin < 0 || lin > 1 ? " <span class='bad'>(¡una «probabilidad» fuera de 0–1!)</span>" : "") : ""));
   }
   function setx(px, py) { if (!plot.inside(px, py)) return; xc = M.clamp(plot.ix(px), 0, 50); update(); }
   view.pointer({ down: setx, drag: setx });

@@ -35,12 +35,12 @@ Lab.register("curso2/c2m3-convolucion-paso", function (root, api) {
   var grid = api.el("div", { style: { display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(min(100%,150px),1fr))", gap: "10px", alignItems: "start" } });
   root.appendChild(grid);
   function cellDiv() { var c = api.el("div", { style: { minWidth: "0" } }); grid.appendChild(c); return c; }
-  var vImg = api.view(cellDiv(), { aspect: 1, minH: 150, maxH: 330, drag: false, label: "Imagen de entrada con la ventana de 3 por 3 señalada" });
+  var vImg = api.view(cellDiv(), { aspect: 1, minH: 150, maxH: 330, drag: false, label: "Fotograma de entrada con la ventana de 3 por 3 señalada" });
   var vMul = api.view(cellDiv(), { aspect: 1, minH: 150, maxH: 330, label: "Productos de cada píxel de la ventana por el peso del filtro" });
   var vOut = api.view(cellDiv(), { aspect: 1, minH: 150, maxH: 330, label: "Mapa de salida que se va construyendo" });
 
   var ui = api.controls(root), out = api.readout(root);
-  ui.segmented({ label: "Tamaño de la imagen", options: [[5, "5×5"], [6, "6×6"], [7, "7×7"]], value: N, onChange: function (v) { N = v; makeImg(); pos = 0; sl.input.max = outN() * outN() - 1; sl.set(0, true); update(); } });
+  ui.segmented({ label: "Tamaño del fotograma", options: [[5, "5×5"], [6, "6×6"], [7, "7×7"]], value: N, onChange: function (v) { N = v; makeImg(); pos = 0; sl.input.max = outN() * outN() - 1; sl.set(0, true); update(); } });
   presetSel = ui.select({ label: "Filtro predefinido", options: Object.keys(PRESETS).map(function (k) { return [k, PRESETS[k][0]]; }), value: "vder", onChange: function (v) { if (PRESETS[v][1]) { setFilter(PRESETS[v][1]); } update(); } });
   var sl = ui.slider({ label: "Paso (posición de la ventana)", min: 0, max: outN() * outN() - 1, step: 1, value: 0, fmt: function (v) { return (v + 1) + " de " + (outN() * outN()); }, onInput: function (v) { pos = v; update(); } });
   ui.slider({ label: "Bias b (se suma al final)", min: -10, max: 10, step: 1, value: 0, onInput: function (v) { bias = v; update(); } });
@@ -80,7 +80,7 @@ Lab.register("curso2/c2m3-convolucion-paso", function (root, api) {
   var TOP = 22;
   function drawImg(ctx, w, h, C) {
     var D = api.d, g = geom(vImg, N, TOP), wnd = windowAt(pos), i, j;
-    D.text(ctx, "Imagen " + N + "×" + N + " (toca un píxel)", w / 2, 14, { size: 11, align: "center", weight: 600, color: C.ink2 });
+    D.text(ctx, "Fotograma " + N + "×" + N + " (toca un píxel)", w / 2, 14, { size: 11, align: "center", weight: 600, color: C.ink2 });
     for (i = 0; i < N; i++) for (j = 0; j < N; j++) {
       D.rect(ctx, g.x0 + j * g.s, g.y0 + i * g.s, g.s, g.s, gray(img[i][j]), C.line, 1);
       D.text(ctx, String(img[i][j]), g.x0 + (j + 0.5) * g.s, g.y0 + (i + 0.5) * g.s + 4, { size: Math.min(15, g.s * 0.42), align: "center", mono: true, color: img[i][j] > 4 ? "#111" : "#f3f3f3" });

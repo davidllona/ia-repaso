@@ -1,4 +1,5 @@
-/* Experimento: forward propagation paso a paso en una red 2-2-1 (todas las multiplicaciones y sumas a la vista). */
+/* Experimento: forward propagation paso a paso en una red 2-2-1 (todas las multiplicaciones y sumas a la vista).
+   Disfraz: x1 = cuánto encaja el género con el usuario, x2 = duración de la peli, y = 1 si el usuario la termina. */
 Lab.register("curso2/c2m1-forward", function (root, api) {
   var M = api.math, D = api.d;
   var P0 = { w11: 0.4, w12: -0.6, b1: 0.1, w21: 0.7, w22: 0.2, b2: -0.3, v1: 0.5, v2: -0.8, c: 0.2 };
@@ -23,14 +24,14 @@ Lab.register("curso2/c2m1-forward", function (root, api) {
     return R;
   }
 
-  var view = api.view(root, { aspect: 2.0, minH: 290, maxH: 400, label: "Red neuronal 2-2-1 con los valores calculados paso a paso" });
+  var view = api.view(root, { aspect: 2.0, minH: 290, maxH: 400, label: "Red neuronal 2-2-1 que predice si un usuario terminará una película, con los valores calculados paso a paso" });
   var ui = api.controls(root), out = api.readout(root);
   out.el.style.fontSize = "clamp(.72rem, 2.7vw, .84rem)";
   function upd() { S.step = Math.min(S.step, 7); update(); }
-  ui.slider({ label: "Entrada x₁", min: -2, max: 2, step: 0.1, value: S.x1, fmt: function (v) { return v.toFixed(1); }, onInput: function (v) { S.x1 = v; upd(); } });
-  ui.slider({ label: "Entrada x₂", min: -2, max: 2, step: 0.1, value: S.x2, fmt: function (v) { return v.toFixed(1); }, onInput: function (v) { S.x2 = v; upd(); } });
+  ui.slider({ label: "x₁ · encaje del género con el usuario", min: -2, max: 2, step: 0.1, value: S.x1, fmt: function (v) { return v.toFixed(1); }, onInput: function (v) { S.x1 = v; upd(); } });
+  ui.slider({ label: "x₂ · duración de la peli", min: -2, max: 2, step: 0.1, value: S.x2, fmt: function (v) { return v.toFixed(1); }, onInput: function (v) { S.x2 = v; upd(); } });
   ui.select({ label: "Activación de la capa oculta", value: "sigmoid", options: [["sigmoid", "Sigmoide"], ["tanh", "tanh"], ["relu", "ReLU"]], onChange: function (v) { S.act = v; upd(); } });
-  ui.segmented({ label: "Respuesta correcta y (para la pérdida)", value: 1, options: [[1, "y = 1"], [0, "y = 0"]], onChange: function (v) { S.y = v; upd(); } });
+  ui.segmented({ label: "Respuesta correcta y (para la pérdida)", value: 1, options: [[1, "y = 1 (la termina)"], [0, "y = 0 (la abandona)"]], onChange: function (v) { S.y = v; upd(); } });
   ui.button("◀ Paso anterior", function () { S.step = Math.max(0, S.step - 1); update(); });
   ui.button("Paso siguiente ▶", function () { S.step = Math.min(7, S.step + 1); update(); }, "primary");
   ui.button("Calcular todo", function () { S.step = 7; update(); });
@@ -80,7 +81,7 @@ Lab.register("curso2/c2m1-forward", function (root, api) {
     var R = calc(), P = S.P, A = ACT[S.act], st = S.step, s = "";
     var titles = ["Paso 0 · Entran los datos", "Paso 1 · Suma ponderada de la neurona oculta 1", "Paso 2 · Activación de la neurona oculta 1",
       "Paso 3 · Suma ponderada de la neurona oculta 2", "Paso 4 · Activación de la neurona oculta 2", "Paso 5 · Suma ponderada de la salida",
-      "Paso 6 · Activación de la salida: la predicción", "Paso 7 · Pérdida (entropía cruzada binaria)"];
+      "Paso 6 · Activación de la salida: la predicción (¿la termina?)", "Paso 7 · Pérdida (entropía cruzada binaria)"];
     s += "<b>" + titles[st] + "</b><br>";
     if (st === 0) s += "x₁ = " + S.x1.toFixed(1) + " · x₂ = " + S.x2.toFixed(1) + ". Pulsa «Paso siguiente» y sigue cada multiplicación.";
     if (st === 1) s += "z₁ = w₁₁·x₁ + w₁₂·x₂ + b₁<br>&nbsp;&nbsp;&nbsp;= " + par(P.w11, 2) + "·" + par(S.x1, 1) + " + " + par(P.w12, 2) + "·" + par(S.x2, 1) + " + " + par(P.b1, 2) + "<br>&nbsp;&nbsp;&nbsp;= " + n4(P.w11 * S.x1) + " + " + par(P.w12 * S.x2, 4) + " + " + par(P.b1, 4) + " = <b>" + n4(R.z1) + "</b>";
@@ -88,7 +89,7 @@ Lab.register("curso2/c2m1-forward", function (root, api) {
     if (st === 3) s += "z₂ = w₂₁·x₁ + w₂₂·x₂ + b₂<br>&nbsp;&nbsp;&nbsp;= " + par(P.w21, 2) + "·" + par(S.x1, 1) + " + " + par(P.w22, 2) + "·" + par(S.x2, 1) + " + " + par(P.b2, 2) + "<br>&nbsp;&nbsp;&nbsp;= " + n4(P.w21 * S.x1) + " + " + par(P.w22 * S.x2, 4) + " + " + par(P.b2, 4) + " = <b>" + n4(R.z2) + "</b>";
     if (st === 4) s += "h₂ = " + A.sym + "(z₂) = " + A.def(R.z2) + " = <b>" + n4(R.h2) + "</b>";
     if (st === 5) s += "z_o = v₁·h₁ + v₂·h₂ + c<br>&nbsp;&nbsp;&nbsp;= " + par(P.v1, 2) + "·" + n4(R.h1) + " + " + par(P.v2, 2) + "·" + n4(R.h2) + " + " + par(P.c, 2) + "<br>&nbsp;&nbsp;&nbsp;= " + n4(P.v1 * R.h1) + " + " + par(P.v2 * R.h2, 4) + " + " + par(P.c, 4) + " = <b>" + n4(R.zo) + "</b>";
-    if (st === 6) s += "ŷ = σ(z_o) = 1 / (1 + e^(−" + n4(R.zo) + ")) = <b>" + n4(R.yh) + "</b> → la red dice «" + (R.yh > 0.5 ? "sí, probabilidad " : "no, probabilidad de «sí» ") + (R.yh * 100).toFixed(1) + " %»";
+    if (st === 6) s += "ŷ = σ(z_o) = 1 / (1 + e^(−" + n4(R.zo) + ")) = <b>" + n4(R.yh) + "</b> → la red dice «" + (R.yh > 0.5 ? "la terminará, probabilidad " : "la abandonará; probabilidad de terminarla ") + (R.yh * 100).toFixed(1) + " %»";
     if (st === 7) s += "L = −[y·ln(ŷ) + (1 − y)·ln(1 − ŷ)]<br>&nbsp;&nbsp;= " + (S.y === 1 ? "−ln(" + n4(R.yh) + ")" : "−ln(1 − " + n4(R.yh) + ")") + " = <b>" + n4(R.L) + "</b>" +
       (R.L > 0.6 ? "<br><span class='bad'>Pérdida alta: la red todavía no acierta.</span>" : "<br><span class='good'>Pérdida baja: la red acierta.</span>");
     out.set(s);

@@ -6,7 +6,7 @@ Lab.register("curso4/c4m2-workers", function (root, api) {
   var view = api.view(root, { aspect: 3.4, minH: 170, maxH: 230, label: "Diagrama de tiempos del proceso principal y de los trabajadores" });
   var ui = api.controls(root), out = api.readout(root);
   ui.slider({ label: "num_workers", min: 0, max: 4, step: 1, value: S.W, onInput: function (v) { S.W = v; update(); } });
-  ui.slider({ label: "preparar un lote (ms)", min: 5, max: 120, step: 5, value: S.load, onInput: function (v) { S.load = v; update(); } });
+  ui.slider({ label: "preparar un lote de pósters (ms)", min: 5, max: 120, step: 5, value: S.load, onInput: function (v) { S.load = v; update(); } });
   ui.slider({ label: "paso del modelo con un lote (ms)", min: 5, max: 120, step: 5, value: S.step, onInput: function (v) { S.step = v; update(); } });
 
   function simulate() {
@@ -55,7 +55,7 @@ Lab.register("curso4/c4m2-workers", function (root, api) {
       "tiempo total: <b>" + Math.round(sim.total) + " ms</b> (en serie serían " + base + " ms → ×" + (base / sim.total).toFixed(2) + " más rápido)<br>" +
       "el modelo está trabajando el <b class='" + (util > 0.9 ? "good" : "bad") + "'>" + Math.round(util * 100) + " %</b> del tiempo" +
       (util < 0.9 ? " y esperando datos el resto: la GPU/CPU del modelo se queda parada" : " (casi sin esperas)") +
-      "<br><span style='color:var(--muted)'>Tiempos ficticios, solo para ver el reparto: azul = preparar un lote (leer + transformar + apilar), naranja = un paso de entrenamiento.</span>");
+      "<br><span style='color:var(--muted)'>Tiempos ficticios, solo para ver el reparto: azul = preparar un lote de pósters (leer + transformar + apilar), naranja = un paso de entrenamiento.</span>");
     view.redraw();
   }
   update();

@@ -17,7 +17,7 @@ Lab.register("curso3/c3m3-raiz-d", function (root, api) {
   var sample;
   function newSample() { var dk = Math.pow(2, S.e), r = api.rng(S.seed * 7 + S.e + Math.floor(Math.random() * 1000)); sample = scores(r, dk); }
 
-  var view = api.view(root, { aspect: 2.6, minH: 170, maxH: 230, label: "Los 8 pesos de atención de una consulta con la dimensión elegida" });
+  var view = api.view(root, { aspect: 2.6, minH: 170, maxH: 230, label: "Los 8 pesos de atención de una consulta sobre 8 títulos de un historial, con la dimensión elegida" });
   var view2 = api.view(root, { aspect: 2.5, minH: 190, maxH: 250, label: "Peso máximo medio y gradiente medio según d_k, con y sin dividir entre raíz de d_k" });
   var plot2 = api.plot(view2, { xr: [1, 10], yr: [0, 1], xticks: 9, yticks: 4, xlabel: "d_k = 2^x", pad: { l: 36, r: 10, t: 12, b: 36 }, xfmt: function (v) { return Math.round(v); } });
   var ui = api.controls(root), out = api.readout(root);
@@ -58,7 +58,7 @@ Lab.register("curso3/c3m3-raiz-d", function (root, api) {
     var dk = Math.pow(2, S.e), a = stats(S.e, false), b = stats(S.e, true), p = weights(), mx = Math.max.apply(null, p);
     out.set("d_k = <b>" + dk + "</b> → las puntuaciones q·k tienen desviación ≈ √d_k = <b>" + n(Math.sqrt(dk), 1) + "</b>. Esta consulta: peso mayor = <b>" + n(mx, 2) + "</b> (" + (S.scale ? "dividiendo" : "sin dividir") + ").<br>" +
       "Media de " + TR + " consultas — <span class='bad'>sin dividir</span>: peso máximo <b>" + n(a.mx, 2) + "</b>, gradiente <b>" + n(a.gr, 3) + "</b> · <span class='good'>dividiendo</span>: peso máximo <b>" + n(b.mx, 2) + "</b>, gradiente <b>" + n(b.gr, 3) + "</b>" +
-      (a.mx > 0.85 ? "<br><span class='bad'>Sin dividir, el softmax casi es un «ganador se lo lleva todo» y su gradiente es casi 0: la red apenas puede aprender a cambiar de opinión.</span>" : ""));
+      (a.mx > 0.85 ? "<br><span class='bad'>Sin dividir, el softmax casi es un «ganador se lo lleva todo»: el recomendador mira un solo título del historial y su gradiente es casi 0, así que apenas puede aprender a cambiar de opinión.</span>" : ""));
   }
   newSample(); update();
 });

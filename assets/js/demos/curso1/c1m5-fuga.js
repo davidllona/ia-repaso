@@ -83,8 +83,8 @@ Lab.register("curso1/c1m5-fuga", function (root, api) {
   var ui0 = api.controls(root);
   ui0.segmented({ label: "Qué fuga quieres ver", options: [["A", "A · una columna con la respuesta"], ["B", "B · selección con todos los datos"]], value: st.sc, onChange: function (v) { st.sc = v; show(); update(); } });
   var uiA = api.controls(root), uiB = api.controls(root), out = api.readout(root);
-  uiA.slider({ label: "Cuánta respuesta lleva la columna «sospechosa»", min: 0, max: 1, step: 0.05, value: st.lam, fmt: function (v) { return Math.round(v * 100) + " %"; }, onInput: function (v) { st.lam = v; update(); } });
-  uiB.slider({ label: "Columnas candidatas (todas puro ruido)", min: 10, max: 1000, step: 10, value: st.dim, onInput: function (v) { st.dim = v; update(); } });
+  uiA.slider({ label: "Cuánto spoiler lleva la columna «sospechosa»", min: 0, max: 1, step: 0.05, value: st.lam, fmt: function (v) { return Math.round(v * 100) + " %"; }, onInput: function (v) { st.lam = v; update(); } });
+  uiB.slider({ label: "Datos candidatos de cada usuario (todos puro ruido)", min: 10, max: 1000, step: 10, value: st.dim, onInput: function (v) { st.dim = v; update(); } });
   uiB.slider({ label: "Columnas que se quedan (k)", min: 1, max: 30, step: 1, value: st.k, onInput: function (v) { st.k = v; update(); } });
   uiB.button("Otros 10 conjuntos de datos", function () { st.seed++; update(); }, "primary");
   function show() { uiA.el.style.display = st.sc === "A" ? "" : "none"; uiB.el.style.display = st.sc === "B" ? "" : "none"; }
@@ -93,7 +93,7 @@ Lab.register("curso1/c1m5-fuga", function (root, api) {
   function draw(ctx, w, h, C) {
     var bars, base, baseLabel;
     if (st.sc === "A") {
-      bars = [["validación", "(con la columna)", res.val, C.terracota], ["producción", "(la columna no existe)", res.prod, C.cobalto], ["modelo honesto", "(sin la columna)", res.honest, C.oliva]];
+      bars = [["validación", "(con el spoiler)", res.val, C.terracota], ["producción", "(sin spoiler)", res.prod, C.cobalto], ["modelo honesto", "(sin la columna)", res.honest, C.oliva]];
       base = 0.5; baseLabel = "azar = 0,50";
     } else {
       bars = [["con fuga", "(selección fuera)", res.bad, C.terracota], ["sin fuga", "(dentro de cada fold)", res.good, C.oliva]];
@@ -122,7 +122,7 @@ Lab.register("curso1/c1m5-fuga", function (root, api) {
         (res.val - res.honest > 0.1 ? "<br><span class='bad'>El resultado «brillante» (" + res.val.toFixed(2) + ") era una ilusión: venía de la columna que conocía la respuesta.</span>" : "<br><span class='good'>Con poca fuga la diferencia es pequeña; sube el porcentaje y mira qué ocurre.</span>"));
     } else {
       res = runB();
-      out.set("media de 10 conjuntos de puro ruido (40 muestras, " + st.dim + " columnas, quedan " + st.k + "):<br>" +
+      out.set("media de 10 conjuntos de puro ruido (40 usuarios, " + st.dim + " columnas, quedan " + st.k + "):<br>" +
         "selección fuera de la validación: <b>" + res.bad.toFixed(3) + "</b> · selección dentro de cada fold: <b>" + res.good.toFixed(3) + "</b><br>" +
         (res.bad - res.good > 0.1 ? "<span class='bad'>Con fuga «aprende» a predecir ruido (" + (res.bad * 100).toFixed(0) + " % de aciertos). Sin fuga: azar.</span>" : "<span class='good'>Con pocas columnas candidatas la trampa casi no funciona; súbelas.</span>"));
     }

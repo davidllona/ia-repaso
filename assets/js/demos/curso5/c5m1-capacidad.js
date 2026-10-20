@@ -113,7 +113,7 @@ Lab.register("curso5/c5m1-capacidad", function (root, api) {
     nets = HS.map(function (H) { return new Net(H, 2, 1, S.act, api.rng(11 + H), false); });
     update();
   }
-  var view = api.view(root, { aspect: 1.55, minH: 250, maxH: 460, label: "Seis redes con distinto número de neuronas ocultas sobre los mismos datos" });
+  var view = api.view(root, { aspect: 1.55, minH: 250, maxH: 460, label: "Seis redes con distinto número de neuronas ocultas sobre el mismo mapa de gustos de usuarios" });
   var ui = api.controls(root), tb = api.table(root, ["H", "parámetros", "% train", "% test"]), out = api.readout(root);
   ui.select({ label: "Datos", value: S.data, options: Object.keys(DATASETS).map(function (k) { return [k, DATASETS[k]]; }), onChange: function (v) { S.data = v; genData(); build(); } });
   ui.select({ label: "Activación oculta", value: S.act, options: [["relu", "ReLU"], ["tanh", "tanh"], ["sigmoid", "sigmoide"]], onChange: function (v) { S.act = v; build(); } });
@@ -127,7 +127,7 @@ Lab.register("curso5/c5m1-capacidad", function (root, api) {
   }, "primary");
   ui.button("Otros datos", function () { S.dseed++; genData(); build(); });
   ui.button("Reiniciar pesos", function () { build(); });
-  api.legend(root, [[api.colors().cobalto, "clase 1"], [api.colors().terracota, "clase 0"], [api.colors().muted, "lleno = entrenamiento · aro = test"]]);
+  api.legend(root, [[api.colors().cobalto, "termina la serie"], [api.colors().terracota, "la abandona"], [api.colors().muted, "cada punto es un usuario · lleno = entrenamiento · aro = test"]]);
 
   function tick() { nets.forEach(function (n) { n.step(Xtr, Ytr, 0.03, "adam"); }); S.step++; }
   var loop = api.loop(function () { for (var i = 0; i < STEPS && S.step < S.epochs; i++) tick(); update(); if (S.step >= S.epochs) { stop(); return false; } }, { fps: 30 });
@@ -171,7 +171,7 @@ Lab.register("curso5/c5m1-capacidad", function (root, api) {
     var best = 0, bk = 0; nets.forEach(function (n, k) { var a = n.lossAcc(Xte, Yte).acc; if (a > best + 1e-9) { best = a; bk = k; } });
     out.set("Paso <b>" + S.step + " / " + S.epochs + "</b> · datos: " + Xtr.length + " de entrenamiento y " + Xte.length + " de test.<br>" +
       (S.step === 0 ? "Pulsa «Entrenar las seis». Todas parten de pesos al azar distintos pero ven exactamente los mismos puntos." :
-        "Mejor en test: <b>H = " + HS[bk] + "</b> (" + (best * 100).toFixed(0) + " %). Si una red acierta mucho más en train que en test, está memorizando el ruido."));
+        "Mejor en test: <b>H = " + HS[bk] + "</b> (" + (best * 100).toFixed(0) + " %). Si una red acierta mucho más en train que en test, está memorizando a los usuarios que ya vio en lugar de entender sus gustos."));
     view.redraw();
   }
   genData(); build();

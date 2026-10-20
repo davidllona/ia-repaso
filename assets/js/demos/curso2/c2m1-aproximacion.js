@@ -1,13 +1,14 @@
 /* Experimento: aproximación universal. Una red 1 → n → 1 con n neuronas ReLU construye una curva «a trozos»:
-   f̂(x) = b + Σ cᵢ·ReLU(x − tᵢ). Aquí NO se entrena: se construyen los pesos a mano (interpolación) para ver qué es capaz de dibujar una red de ese tamaño. */
+   f̂(x) = b + Σ cᵢ·ReLU(x − tᵢ). Aquí NO se entrena: se construyen los pesos a mano (interpolación) para ver qué es capaz de dibujar una red de ese tamaño.
+   Disfraz: la curva es la audiencia de una serie a lo largo del tiempo (x = tiempo, y = audiencia; cifras inventadas). */
 Lab.register("curso2/c2m1-aproximacion", function (root, api) {
   var M = api.math, D = api.d;
   var X0 = -3, X1 = 3;
   var TARGETS = {
-    seno: { name: "Seno: sin(2x)", f: function (x) { return Math.sin(2 * x); } },
-    parabola: { name: "Parábola: 0,5·x² − 2", f: function (x) { return 0.5 * x * x - 2; } },
-    onda: { name: "Dos ondas: sin(x) + 0,5·sin(3x)", f: function (x) { return Math.sin(x) + 0.5 * Math.sin(3 * x); } },
-    escalon: { name: "Escalón suave: tanh(4x)", f: function (x) { return Math.tanh(4 * x); } }
+    seno: { name: "Audiencia que sube y baja: sin(2x)", f: function (x) { return Math.sin(2 * x); } },
+    parabola: { name: "Audiencia que se acelera: 0,5·x² − 2", f: function (x) { return 0.5 * x * x - 2; } },
+    onda: { name: "Dos temporadas: sin(x) + 0,5·sin(3x)", f: function (x) { return Math.sin(x) + 0.5 * Math.sin(3 * x); } },
+    escalon: { name: "Salto tras un estreno: tanh(4x)", f: function (x) { return Math.tanh(4 * x); } }
   };
   var S = { n: 4, tgt: "seno" };
 
@@ -21,10 +22,10 @@ Lab.register("curso2/c2m1-aproximacion", function (root, api) {
   }
   function fhat(B, x) { var s = B.b, i; for (i = 0; i < B.t.length; i++) s += B.c[i] * Math.max(0, x - B.t[i]); return s; }
 
-  var v1 = api.view(root, { aspect: 2.2, minH: 220, maxH: 360, label: "Función objetivo y aproximación hecha con neuronas ReLU" });
-  var p1 = api.plot(v1, { xr: [X0, X1], yr: [-2.6, 2.6], xticks: 6, yticks: 4, xlabel: "x", ylabel: "y", pad: { l: 46, r: 12, t: 12, b: 34 }, xfmt: function (v) { return Math.round(v); }, yfmt: function (v) { return +v.toFixed(2); } });
+  var v1 = api.view(root, { aspect: 2.2, minH: 220, maxH: 360, label: "Curva de audiencia de una serie y su aproximación hecha con neuronas ReLU" });
+  var p1 = api.plot(v1, { xr: [X0, X1], yr: [-2.6, 2.6], xticks: 6, yticks: 4, xlabel: "x · tiempo", ylabel: "y · audiencia", pad: { l: 46, r: 12, t: 12, b: 34 }, xfmt: function (v) { return Math.round(v); }, yfmt: function (v) { return +v.toFixed(2); } });
   var v2 = api.view(root, { aspect: 3.6, minH: 150, maxH: 240, label: "Aporte de cada neurona ReLU a la curva final" });
-  var p2 = api.plot(v2, { xr: [X0, X1], yr: [-5, 5], xticks: 6, yticks: 4, xlabel: "x", ylabel: "cᵢ·ReLU(x − tᵢ)", pad: { l: 46, r: 12, t: 10, b: 34 }, xfmt: function (v) { return Math.round(v); }, yfmt: function (v) { return +v.toFixed(0); } });
+  var p2 = api.plot(v2, { xr: [X0, X1], yr: [-5, 5], xticks: 6, yticks: 4, xlabel: "x · tiempo", ylabel: "cᵢ·ReLU(x − tᵢ)", pad: { l: 46, r: 12, t: 10, b: 34 }, xfmt: function (v) { return Math.round(v); }, yfmt: function (v) { return +v.toFixed(0); } });
   var ui = api.controls(root), out = api.readout(root);
   out.el.style.fontSize = "clamp(.72rem, 2.7vw, .84rem)";
   ui.slider({ label: "Neuronas ocultas ReLU (n)", min: 1, max: 20, step: 1, value: S.n, fmt: function (v) { return v; }, onInput: function (v) { S.n = v; update(); } });

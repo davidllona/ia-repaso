@@ -49,6 +49,12 @@ function frame(ctx, plot, C, grid) {
   ctx.globalAlpha = 1; ctx.strokeStyle = C.ink; ctx.lineWidth = 1.5; ctx.strokeRect(b.x, b.y, b.w, b.h);
   ctx.restore();
 }
+/* Rótulos de los ejes: cada punto es un usuario de la plataforma, situado según lo que le gusta. */
+function axisCaps(ctx, plot, C, xt, yt) {
+  var b = plot.box, D = api.d;
+  D.text(ctx, xt, b.x + b.w / 2, b.y + b.h + 14, { size: 10.5, align: "center", color: C.ink2 });
+  D.text(ctx, yt, b.x - 6, b.y + b.h / 2, { size: 10.5, align: "center", color: C.ink2, rotate: -Math.PI / 2 });
+}
 function sq2(a, b) { var dx = a[0] - b[0], dy = a[1] - b[1]; return dx * dx + dy * dy; }
 function dist2(a, b) { return Math.sqrt(sq2(a, b)); }
 
@@ -210,13 +216,13 @@ function placeInit(kind) {
   resetRun(); bestInertia = kmeansBest(P, K, 3, 10).inertia;
 }
 
-var view = api.view(root, { aspect: 1.6, minH: 230, maxH: 600, drag: true, label: "Puntos en el plano con sus centroides de K-Means, que se pueden arrastrar" });
-var plot = api.plot(view, { xr: [0, 16], yr: [0, 10], pad: { l: 8, r: 8, t: 8, b: 8 } });
+var view = api.view(root, { aspect: 1.6, minH: 230, maxH: 600, drag: true, label: "Usuarios de la plataforma situados según su gusto por la acción y por la comedia, con los centroides de K-Means, que se pueden arrastrar" });
+var plot = api.plot(view, { xr: [0, 16], yr: [0, 10], pad: { l: 18, r: 8, t: 8, b: 22 } });
 var ui = api.controls(root), out = api.readout(root);
-api.legend(root, [[api.colors().muted, "sin asignar"], [api.colors().cobalto, "grupo 1"], [api.colors().terracota, "grupo 2"], [api.colors().oliva, "grupo 3"], [api.colors().marker, "grupo 4"]]);
+api.legend(root, [[api.colors().muted, "usuario sin grupo"], [api.colors().cobalto, "tipo 1"], [api.colors().terracota, "tipo 2"], [api.colors().oliva, "tipo 3"], [api.colors().marker, "tipo 4"]]);
 
-var kslider = ui.slider({ label: "K (número de centroides)", min: 2, max: 6, step: 1, value: K, onInput: function (v) { K = v; placeInit("pp"); update(); } });
-ui.button("1 · Asignar puntos", function () { doAssign(); update(); });
+var kslider = ui.slider({ label: "K (cuántos tipos de espectador buscas)", min: 2, max: 6, step: 1, value: K, onInput: function (v) { K = v; placeInit("pp"); update(); } });
+ui.button("1 · Asignar usuarios", function () { doAssign(); update(); });
 ui.button("2 · Mover centroides", function () { doMove(); update(); });
 ui.button("Ejecutar hasta converger", function () { run(); }, "primary");
 ui.button("Centroides al azar", function () { placeInit("rand"); update(); });
@@ -264,7 +270,7 @@ function drawZones(ctx, C0, Cc) {
 function fit() { var b = plot.box; plot.xr = [0, 10 * b.w / b.h]; }
 function draw(ctx, w, h, Cc) {
   var D = api.d, pal = palette(Cc), i, k;
-  fit(); frame(ctx, plot, Cc);
+  fit(); frame(ctx, plot, Cc); axisCaps(ctx, plot, Cc, "gusto por la acción →", "gusto por la comedia →");
   if (zones) drawZones(ctx, C, Cc);
   ctx.save(); plot.clip(ctx);
   if (lab && phase === "assigned") for (i = 0; i < P.length; i++) D.line(ctx, plot.x(P[i][0]), plot.y(P[i][1]), plot.x(C[lab[i]][0]), plot.y(C[lab[i]][1]), pal[lab[i]], 1, [2, 3]);
@@ -286,7 +292,7 @@ function draw(ctx, w, h, Cc) {
 }
 function update() {
   view.redraw();
-  var stepTxt = { init: "centroides colocados", assigned: "puntos asignados al centroide más cercano", updated: "centroides movidos a la media de su grupo" }[phase];
+  var stepTxt = { init: "centroides colocados", assigned: "usuarios asignados al centroide más cercano", updated: "centroides movidos a la media de su grupo" }[phase];
   var cur = lab ? kInertia(P, lab, C) : null, sizes = "";
   if (lab) { var cnt = new Array(K).fill(0); lab.forEach(function (l) { cnt[l]++; }); sizes = "tamaños: <b>" + cnt.join(" · ") + "</b>"; }
   var s = "Iteración <b>" + iter + "</b> · estado: <b>" + stepTxt + "</b><br>" +

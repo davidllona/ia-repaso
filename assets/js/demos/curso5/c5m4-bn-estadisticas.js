@@ -18,16 +18,16 @@ Lab.register("curso5/c5m4-bn-estadisticas", function (root, api) {
 
   var row = api.el("div", { class: "lab-row" }), colA = api.el("div"), colB = api.el("div");
   row.appendChild(colA); row.appendChild(colB); root.appendChild(row);
-  var v1 = api.view(colA, { aspect: 1.3, minH: 220, maxH: 320, label: "Distribución real de los datos nuevos y la que cree la BatchNorm" });
-  var p1 = api.plot(v1, { xr: [-6, 8], yr: [0, 1.4], xticks: 7, yticks: 0, pad: { l: 8, r: 8, t: 18, b: 38 }, xlabel: "valor de la característica", xfmt: function (v) { return Math.round(v); }, yfmt: function () { return ""; } });
+  var v1 = api.view(colA, { aspect: 1.3, minH: 220, maxH: 320, label: "Distribución real de las carátulas nuevas y la que recuerda la BatchNorm" });
+  var p1 = api.plot(v1, { xr: [-6, 8], yr: [0, 1.4], xticks: 7, yticks: 0, pad: { l: 8, r: 8, t: 18, b: 38 }, xlabel: "valor de una característica del póster", xfmt: function (v) { return Math.round(v); }, yfmt: function () { return ""; } });
   var v2 = api.view(colB, { aspect: 1.3, minH: 220, maxH: 320, label: "Evolución de running_mean y running_var con los lotes" });
   var o2 = { xr: [0, 50], yr: [-2, 6], xticks: 5, yticks: 4, pad: { l: 30, r: 8, t: 18, b: 38 }, xlabel: "lotes procesados", xfmt: function (v) { return Math.round(v); }, yfmt: function (v) { return Math.round(v); } };
   var p2 = api.plot(v2, o2);
   var ui = api.controls(root), out = api.readout(root);
-  api.legend(root, [[api.colors().terracota, "datos nuevos (reales)"], [api.colors().cobalto, "lo que cree la BN (running_mean, running_var)"]]);
-  ui.slider({ label: "Media de los datos nuevos", min: -3, max: 3, step: 0.5, value: S.muB, fmt: function (v) { return v.toFixed(1); }, onInput: function (v) { S.muB = v; reset(); update(); } });
-  ui.slider({ label: "Desviación de los datos nuevos", min: 0.3, max: 3, step: 0.1, value: S.sdB, fmt: function (v) { return v.toFixed(1); }, onInput: function (v) { S.sdB = v; reset(); update(); } });
-  ui.slider({ label: "Tamaño del lote", min: 2, max: 64, step: 1, value: S.n, onInput: function (v) { S.n = v; reset(); update(); } });
+  api.legend(root, [[api.colors().terracota, "tus carátulas nuevas (lo real)"], [api.colors().cobalto, "lo que «recuerda» la BN como normal (running_mean, running_var)"]]);
+  ui.slider({ label: "Media de las carátulas nuevas", min: -3, max: 3, step: 0.5, value: S.muB, fmt: function (v) { return v.toFixed(1); }, onInput: function (v) { S.muB = v; reset(); update(); } });
+  ui.slider({ label: "Desviación de las carátulas nuevas", min: 0.3, max: 3, step: 0.1, value: S.sdB, fmt: function (v) { return v.toFixed(1); }, onInput: function (v) { S.sdB = v; reset(); update(); } });
+  ui.slider({ label: "Tamaño del lote (carátulas por sesión)", min: 2, max: 64, step: 1, value: S.n, onInput: function (v) { S.n = v; reset(); update(); } });
   ui.segmented({ label: "Modo de la BatchNorm", value: S.modo, options: [["train", "train()"], ["eval", "eval()"]], onChange: function (v) { S.modo = v; update(); } });
   ui.button("Procesar un lote", function () { lote(); update(); }, "primary");
   ui.button("Procesar 10 lotes", function () { for (var i = 0; i < 10; i++) lote(); update(); });

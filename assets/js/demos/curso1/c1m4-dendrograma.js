@@ -49,6 +49,12 @@ function frame(ctx, plot, C, grid) {
   ctx.globalAlpha = 1; ctx.strokeStyle = C.ink; ctx.lineWidth = 1.5; ctx.strokeRect(b.x, b.y, b.w, b.h);
   ctx.restore();
 }
+/* Rótulos de los ejes: cada punto es un usuario de la plataforma, situado según lo que le gusta. */
+function axisCaps(ctx, plot, C, xt, yt) {
+  var b = plot.box, D = api.d;
+  D.text(ctx, xt, b.x + b.w / 2, b.y + b.h + 13, { size: 10, align: "center", color: C.ink2 });
+  D.text(ctx, yt, b.x - 5, b.y + b.h / 2, { size: 10, align: "center", color: C.ink2, rotate: -Math.PI / 2 });
+}
 function sq2(a, b) { var dx = a[0] - b[0], dy = a[1] - b[1]; return dx * dx + dy * dy; }
 function dist2(a, b) { return Math.sqrt(sq2(a, b)); }
 
@@ -254,11 +260,11 @@ function gaps() {
 
 var row = api.el("div", { class: "lab-row" }), left = api.el("div"), right = api.el("div");
 row.appendChild(left); row.appendChild(right); root.appendChild(row);
-var view = api.view(left, { aspect: 1.6, minH: 200, maxH: 420, label: "Puntos coloreados según el corte del dendrograma" });
-var plot = api.plot(view, { xr: [0, 16], yr: [0, 10], pad: { l: 6, r: 6, t: 6, b: 6 } });
+var view = api.view(left, { aspect: 1.6, minH: 200, maxH: 420, label: "Usuarios numerados y coloreados según el corte del dendrograma" });
+var plot = api.plot(view, { xr: [0, 16], yr: [0, 10], pad: { l: 16, r: 6, t: 6, b: 20 } });
 var dview = api.view(right, { aspect: 1.45, minH: 220, maxH: 430, drag: true, label: "Dendrograma con una línea de corte horizontal que se puede arrastrar" });
 var ui = api.controls(root), out = api.readout(root);
-ui.segmented({ label: "Datos", options: [["blobs", "Tres grupos"], ["bridge", "Dos grupos con puente"]], value: data, onChange: function (v) { data = v; gen(); build(); cutSet = false; defaultCut(); update(); } });
+ui.segmented({ label: "Datos", options: [["blobs", "Tres grupos de usuarios"], ["bridge", "Dos grupos con usuarios puente"]], value: data, onChange: function (v) { data = v; gen(); build(); cutSet = false; defaultCut(); update(); } });
 ui.segmented({ label: "Enlace (linkage)", options: [["single", "single"], ["complete", "complete"], ["average", "average"], ["ward", "ward"]], value: link, onChange: function (v) { link = v; build(); cutSet = false; defaultCut(); update(); } });
 var cs = ui.slider({ label: "Altura de corte", min: 0, max: 1000, step: 1, value: 500, fmt: function (v) { return (v / 1000 * maxH * 1.05).toFixed(2); }, onInput: function (v) { cut = v / 1000 * maxH * 1.05; update(true); } });
 ui.button("Cortar en el mayor salto", function () { var g = gaps(); cut = (g.lo + g.hi) / 2; syncSlider(); update(true); }, "primary");
@@ -268,7 +274,7 @@ function defaultCut() { var g = gaps(); cut = (g.lo + g.hi) / 2; syncSlider(); }
 function fit() { var b = plot.box; plot.xr = [0, 10 * b.w / b.h]; }
 function draw(ctx, w, h, C) {
   var D = api.d, pal = palette(C), cl = clustersAt(cut), i;
-  fit(); frame(ctx, plot, C, false); ctx.save(); plot.clip(ctx);
+  fit(); frame(ctx, plot, C, false); axisCaps(ctx, plot, C, "gusto por la acción →", "gusto por la comedia →"); ctx.save(); plot.clip(ctx);
   for (i = 0; i < P.length; i++) shape(ctx, cl.lab[i], plot.x(P[i][0]), plot.y(P[i][1]), 5, pal[cl.lab[i] % 10], C.ink, 0.8);
   ctx.restore();
   for (i = 0; i < P.length; i++) D.text(ctx, String(i + 1), plot.x(P[i][0]) + 7, plot.y(P[i][1]) - 6, { size: 10.5, color: C.ink2, mono: true });

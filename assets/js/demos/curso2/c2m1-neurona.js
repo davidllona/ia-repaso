@@ -1,6 +1,9 @@
-/* Experimento: laboratorio de una neurona (entradas, pesos, bias, suma ponderada z y activación a = f(z)). */
+/* Experimento: laboratorio de una neurona (entradas, pesos, bias, suma ponderada z y activación a = f(z)).
+   Disfraz: decidir si ves una peli según el gusto por su género (x1) y lo larga que es (x2). */
 Lab.register("curso2/c2m1-neurona", function (root, api) {
   var M = api.math, D = api.d, C0 = api.colors();
+  // En pantallas táctiles el plano deja desplazar la página con el dedo (los sliders hacen lo mismo que el arrastre); un toque sigue colocando el punto.
+  var coarse = !!(window.matchMedia && window.matchMedia("(pointer: coarse)").matches);
   var S = { x1: 0.9, x2: 0.6, w1: 2, w2: -3, b: 0.5, act: "sigmoid" };
 
   var ACT = {
@@ -16,11 +19,11 @@ Lab.register("curso2/c2m1-neurona", function (root, api) {
   var colA = api.el("div"), colB = api.el("div");
   row.appendChild(colA); row.appendChild(colB); root.appendChild(row);
 
-  var view = api.view(colA, { aspect: 1.0, minH: 250, maxH: 440, drag: true, label: "Plano de las dos entradas de la neurona con la recta z = 0 y la zona donde se activa" });
-  var plot = api.plot(view, { xr: [-3, 3], yr: [-3, 3], xticks: 6, yticks: 6, xlabel: "entrada x₁", ylabel: "entrada x₂", pad: { l: 46, r: 12, t: 12, b: 36 },
+  var view = api.view(colA, { aspect: 1.0, minH: 250, maxH: 440, drag: !coarse, label: "Plano de las dos entradas de la neurona (gusto por el género y duración de la peli) con la recta z = 0 y la zona donde decide ver la peli" });
+  var plot = api.plot(view, { xr: [-3, 3], yr: [-3, 3], xticks: 6, yticks: 6, xlabel: "x₁ · gusto por el género", ylabel: "x₂ · duración", pad: { l: 46, r: 12, t: 12, b: 36 },
     xfmt: function (v) { return +v.toFixed(1); }, yfmt: function (v) { return +v.toFixed(1); } });
   var view2 = api.view(colB, { aspect: 1.0, minH: 250, maxH: 440, label: "Función de activación con el punto z actual" });
-  var po2 = { xr: [-6, 6], yr: [-0.25, 1.25], xticks: 6, yticks: 4, xlabel: "z (suma ponderada)", ylabel: "a = f(z)", pad: { l: 46, r: 12, t: 12, b: 36 },
+  var po2 = { xr: [-6, 6], yr: [-0.25, 1.25], xticks: 6, yticks: 4, xlabel: "z (suma ponderada)", ylabel: "a = f(z) · ganas", pad: { l: 46, r: 12, t: 12, b: 36 },
     xfmt: function (v) { return Math.round(v); } };
   var plot2 = api.plot(view2, po2);
 
@@ -28,14 +31,14 @@ Lab.register("curso2/c2m1-neurona", function (root, api) {
   var out = api.readout(root);
   var sl = {};
   function fmt1(v) { return v.toFixed(2); }
-  sl.x1 = ui.slider({ label: "Entrada x₁", min: -2, max: 2, step: 0.05, value: S.x1, fmt: fmt1, onInput: function (v) { S.x1 = v; update(); } });
-  sl.x2 = ui.slider({ label: "Entrada x₂", min: -2, max: 2, step: 0.05, value: S.x2, fmt: fmt1, onInput: function (v) { S.x2 = v; update(); } });
-  sl.w1 = ui.slider({ label: "Peso w₁", min: -4, max: 4, step: 0.1, value: S.w1, fmt: function (v) { return v.toFixed(1); }, onInput: function (v) { S.w1 = v; update(); } });
-  sl.w2 = ui.slider({ label: "Peso w₂", min: -4, max: 4, step: 0.1, value: S.w2, fmt: function (v) { return v.toFixed(1); }, onInput: function (v) { S.w2 = v; update(); } });
-  sl.b = ui.slider({ label: "Bias b", min: -4, max: 4, step: 0.1, value: S.b, fmt: function (v) { return v.toFixed(1); }, onInput: function (v) { S.b = v; update(); } });
+  sl.x1 = ui.slider({ label: "x₁ · gusto por el género", min: -2, max: 2, step: 0.05, value: S.x1, fmt: fmt1, onInput: function (v) { S.x1 = v; update(); } });
+  sl.x2 = ui.slider({ label: "x₂ · lo larga que es", min: -2, max: 2, step: 0.05, value: S.x2, fmt: fmt1, onInput: function (v) { S.x2 = v; update(); } });
+  sl.w1 = ui.slider({ label: "Peso w₁ (importancia del género)", min: -4, max: 4, step: 0.1, value: S.w1, fmt: function (v) { return v.toFixed(1); }, onInput: function (v) { S.w1 = v; update(); } });
+  sl.w2 = ui.slider({ label: "Peso w₂ (importancia de la duración)", min: -4, max: 4, step: 0.1, value: S.w2, fmt: function (v) { return v.toFixed(1); }, onInput: function (v) { S.w2 = v; update(); } });
+  sl.b = ui.slider({ label: "Bias b (ganas de base)", min: -4, max: 4, step: 0.1, value: S.b, fmt: function (v) { return v.toFixed(1); }, onInput: function (v) { S.b = v; update(); } });
   ui.select({ label: "Función de activación", value: S.act, options: Object.keys(ACT).map(function (k) { return [k, ACT[k].name]; }),
     onChange: function (v) { S.act = v; update(); } });
-  api.legend(root, [[C0.cobalto, "zona donde la neurona se activa (z > 0)"], [C0.terracota, "zona donde no se activa (z < 0)"]]);
+  api.legend(root, [[C0.cobalto, "zona «sí la pongo» (z > 0)"], [C0.terracota, "zona «paso» (z < 0)"]]);
 
   function zOf() { return S.w1 * S.x1 + S.w2 * S.x2 + S.b; }
 
@@ -99,7 +102,7 @@ Lab.register("curso2/c2m1-neurona", function (root, api) {
       "&nbsp;&nbsp;= " + sg(t1, 2) + " + " + sg(t2, 2) + " + " + sg(S.b, 1) + " = <b>" + z.toFixed(3) + "</b><br>" +
       "a = " + A.sym + "(" + z.toFixed(3) + ") = <b>" + a.toFixed(3) + "</b><br>" +
       (S.act === "linear" ? "Sin activación, la neurona devuelve z tal cual." :
-        "Decisión: <span class='" + (good ? "good" : "bad") + "'>" + (good ? "z &gt; 0 → se ACTIVA" : "z ≤ 0 → NO se activa") + "</span>") +
+        "Decisión: <span class='" + (good ? "good" : "bad") + "'>" + (good ? "z &gt; 0 → SÍ la pones" : "z ≤ 0 → NO la pones") + "</span>") +
       "<br>La recta z = 0 es la frontera; " + (nw > 1e-6 ? "b la desplaza (distancia al origen: " + (Math.abs(S.b) / nw).toFixed(2) + ")." : "con w = 0 no hay recta.")
     );
     view.redraw(); view2.redraw();

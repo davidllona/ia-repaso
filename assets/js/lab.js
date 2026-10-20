@@ -242,7 +242,7 @@
     opts = opts || {};
     var canvas = el("canvas", { class: "lab-canvas", role: "img", "aria-label": opts.label || "Gráfico interactivo" });
     canvas.style.touchAction = opts.drag ? "none" : "pan-y";
-    if (!opts.drag) canvas.classList.add("no-cursor");
+    if (!opts.drag) canvas.classList.add("no-cursor"); else canvas.classList.add("is-drag");
     parent.appendChild(canvas);
     var ctx = canvas.getContext("2d");
     var v = { canvas: canvas, ctx: ctx, w: 300, h: 200, _draw: null };

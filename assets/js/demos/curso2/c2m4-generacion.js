@@ -1,16 +1,16 @@
 /* Experimento: generar texto token a token. MODELO JUGUETE: no es un Transformer, es una tabla de conteos (n-gramas) de un corpus
-   de 30 frases propias. Lo que sí es real es el final del proceso: logits -> temperatura -> top-k -> top-p -> muestreo. */
+   de 30 líneas de subtítulos de una película de piratas. Lo que sí es real es el final del proceso: logits -> temperatura -> top-k -> top-p -> muestreo. */
 Lab.register("curso2/c2m4-generacion", function (root, api) {
   var D = api.d, C0 = api.colors();
   var CORPUS = [
-    "el gato duerme en el sofá .", "el gato bebe leche en la cocina .", "el perro duerme en el jardín .", "el perro corre por el parque .",
-    "el perro come carne en la cocina .", "la niña lee un libro en el sofá .", "la niña corre por el parque .", "el gato corre por el jardín .",
-    "la luna brilla sobre el mar .", "el sol brilla sobre el parque .", "el gato mira la luna .", "el perro mira al gato .",
-    "el gato mira al perro .", "la niña bebe leche en la cocina .", "el niño come pan en el jardín .", "el niño lee un libro en la cocina .",
-    "el perro bebe agua en el jardín .", "el gato come pescado en la cocina .", "la niña mira el mar .", "el sol brilla sobre el jardín .",
-    "el niño corre por el jardín .", "el gato duerme en la cocina .", "la niña duerme en el sofá .", "el perro mira la luna .",
-    "el niño bebe agua en la cocina .", "la luna brilla sobre el jardín .", "el gato corre por el parque .", "la niña come pan en el jardín .",
-    "el niño mira el mar .", "el perro duerme en el sofá ."
+    "el capitán duerme en el camarote .", "el capitán bebe ron en la cubierta .", "el loro duerme en el puerto .", "el loro corre por el barco .",
+    "el loro come carne en la cubierta .", "la sirena lee un mapa en el camarote .", "la sirena corre por el barco .", "el capitán corre por el puerto .",
+    "la luna brilla sobre el mar .", "el sol brilla sobre el barco .", "el capitán mira la luna .", "el loro mira al capitán .",
+    "el capitán mira al loro .", "la sirena bebe ron en la cubierta .", "el grumete come pan en el puerto .", "el grumete lee un mapa en la cubierta .",
+    "el loro bebe agua en el puerto .", "el capitán come pescado en la cubierta .", "la sirena mira el mar .", "el sol brilla sobre el puerto .",
+    "el grumete corre por el puerto .", "el capitán duerme en la cubierta .", "la sirena duerme en el camarote .", "el loro mira la luna .",
+    "el grumete bebe agua en la cubierta .", "la luna brilla sobre el puerto .", "el capitán corre por el barco .", "la sirena come pan en el puerto .",
+    "el grumete mira el mar .", "el loro duerme en el camarote ."
   ];
   var S = { order: 1, T: 1, k: 15, p: 1, ctx: ["el"], text: [], last: null, seed: 3 };
   var rng = api.rng(S.seed);
@@ -57,7 +57,7 @@ Lab.register("curso2/c2m4-generacion", function (root, api) {
   var view = api.view(root, { aspect: 2.3, minH: 270, maxH: 310, label: "Probabilidad de cada palabra candidata para el siguiente token, antes y después de aplicar temperatura, top-k y top-p" });
   var ui = api.controls(root), out = api.readout(root);
   out.el.style.fontSize = "clamp(.72rem, 2.7vw, .84rem)";
-  ui.select({ label: "Empezar con…", value: "el", options: [["el", "el"], ["el gato", "el gato"], ["el perro", "el perro"], ["la niña", "la niña"], ["la luna", "la luna"]], onChange: function (v) { reset(v); } });
+  ui.select({ label: "Empezar con…", value: "el", options: [["el", "el"], ["el capitán", "el capitán"], ["el loro", "el loro"], ["la sirena", "la sirena"], ["la luna", "la luna"]], onChange: function (v) { reset(v); } });
   ui.segmented({ label: "Contexto que mira el modelo", value: 1, options: [[1, "1 palabra"], [2, "2 palabras"]], onChange: function (v) { S.order = v; update(); } });
   ui.slider({ label: "Temperatura T", min: 0.1, max: 3, step: 0.05, value: S.T, fmt: function (v) { return n(v, 2); }, onInput: function (v) { S.T = v; update(); } });
   ui.slider({ label: "top-k (cuántas candidatas se quedan)", min: 1, max: 15, step: 1, value: S.k, fmt: function (v) { return v >= 15 ? "todas" : v; }, onInput: function (v) { S.k = v; update(); } });

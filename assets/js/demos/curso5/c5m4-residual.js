@@ -56,7 +56,7 @@ Lab.register("curso5/c5m4-residual", function (root, api) {
     var gp = r.gp[0], gr = r.gr[0];
     var s = "Gradiente que llega a la capa 1 (la más lejana de la salida), con <b>N = " + N + "</b> bloques:<br>sin atajo: <b>" + sci(gp) + "</b> · con atajo: <b>" + sci(gr) + "</b>";
     if (gp > 0) s += " · cociente con/sin: <b>" + (gr / gp > 1e6 ? sci(gr / gp) : (gr / gp).toFixed(1).replace(".", ",")) + "</b>";
-    if (gp < 1e-3 && gr > 1e-2 && gr < 1e2) s += "<br><span class='good'>El atajo mantiene el gradiente en torno a 1; sin atajo se ha apagado casi del todo (la capa 1 no aprende).</span>";
+    if (gp < 1e-3 && gr > 1e-2 && gr < 1e2) s += "<br><span class='good'>El atajo mantiene el gradiente en torno a 1; sin atajo se ha apagado casi del todo (la capa 1 no aprende: el recado no llega).</span>";
     else if (gr >= 1e2) s += "<br><span class='bad'>Con pesos tan grandes el atajo no basta: el gradiente crece y puede explotar. Los atajos ayudan, no hacen magia (por eso se combinan con BatchNorm y buena inicialización).</span>";
     else if (gp >= 1e-3) s += "<br>Con pocos bloques o pesos grandes, también sin atajo llega algo de gradiente: sube N.";
     out.set(s); view.redraw();

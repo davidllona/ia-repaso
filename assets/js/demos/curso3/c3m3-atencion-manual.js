@@ -1,7 +1,7 @@
 /* Experimento: atención softmax(Q K^T / raiz(d_k)) V con números editables (3 tokens, d_k = 2). Se puede escribir en las casillas o arrastrar
    las puntas de las flechas. Todo se recalcula: puntuaciones, escala, softmax y mezcla de valores. */
 Lab.register("curso3/c3m3-atencion-manual", function (root, api) {
-  var D = api.d, N = 3, DK = 2, TOK = ["token 1", "token 2", "token 3"];
+  var D = api.d, N = 3, DK = 2, TOK = ["Toy Story", "Titanic", "Shrek"];   // los 3 tokens son 3 títulos del historial (rasgos: animación, romance)
   var Q = [[1, 0], [0, 1], [1, 1]], K = [[2, 0], [0, 2], [1, 1]], V = [[1, 0], [0, 1], [1, 1]];
   var S = { q: 0, scale: true };
   var inputs = { Q: [], K: [], V: [] };
@@ -18,9 +18,9 @@ Lab.register("curso3/c3m3-atencion-manual", function (root, api) {
     R = { sc: sc, A: A, O: O, f: f };
   }
 
-  var view = api.view(root, { aspect: 1.9, minH: 210, maxH: 270, drag: true, label: "Plano con las claves K (azul) y la consulta elegida (naranja) como flechas que puedes arrastrar" });
+  var view = api.view(root, { aspect: 1.9, minH: 210, maxH: 270, drag: true, label: "Plano animación (horizontal) y romance (vertical) con las etiquetas K de Toy Story, Titanic y Shrek (azul) y lo que busca el título elegido (naranja) como flechas que puedes arrastrar" });
   var plot = api.plot(view, { xr: [-3, 3], yr: [-3, 3], xticks: 6, yticks: 6, pad: { l: 26, r: 10, t: 8, b: 22 }, xfmt: function (v) { return Math.round(v); }, yfmt: function (v) { return Math.round(v); } });
-  var view2 = api.view(root, { aspect: 2.7, minH: 150, maxH: 200, label: "Mapa de calor de los pesos de atención: filas = consultas, columnas = claves" });
+  var view2 = api.view(root, { aspect: 2.7, minH: 150, maxH: 200, label: "Mapa de calor de los pesos de atención: filas = título que consulta, columnas = título consultado" });
   var grid = api.el("div", { style: { display: "grid", gridTemplateColumns: "repeat(3, max-content)", justifyContent: "start", gap: ".4rem 1rem", margin: ".5rem 0", fontSize: ".82rem" } });
   root.appendChild(grid);
   ["Q", "K", "V"].forEach(function (nm) {
@@ -60,10 +60,11 @@ Lab.register("curso3/c3m3-atencion-manual", function (root, api) {
     plot.axes(ctx); var o = [plot.x(0), plot.y(0)], j; ctx.save(); plot.clip(ctx);
     for (j = 0; j < N; j++) {
       var t = tip(K, j); D.arrow(ctx, o[0], o[1], t[0], t[1], C.cobalto, 2.2); D.circle(ctx, t[0], t[1], 5, C.cobalto, C.paper, 1.5);
-      D.text(ctx, "k" + (j + 1), t[0] + 8, t[1] - 7, { size: 11, weight: 600, color: C.cobaltoInk });
+      var nearR = t[0] > view.w - 92;
+      D.text(ctx, "k" + (j + 1) + " " + TOK[j], t[0] + (nearR ? -8 : 8), t[1] - 7, { size: 11, weight: 600, color: C.cobaltoInk, align: nearR ? "right" : "left" });
     }
     var tq = tip(Q, S.q); D.arrow(ctx, o[0], o[1], tq[0], tq[1], C.terracota, 2.6); D.circle(ctx, tq[0], tq[1], 6, C.terracota, C.paper, 1.5);
-    D.text(ctx, "q" + (S.q + 1), tq[0] - 8, tq[1] + 16, { size: 11, weight: 700, color: C.terracotaInk, align: "right" });
+    D.text(ctx, "q" + (S.q + 1) + " " + TOK[S.q], tq[0] - 8, tq[1] + 16, { size: 11, weight: 700, color: C.terracotaInk, align: "right" });
     ctx.restore();
   }
   compute();
@@ -83,10 +84,10 @@ Lab.register("curso3/c3m3-atencion-manual", function (root, api) {
     up: function () { drag = null; }
   });
   view2.draw(function (ctx, w, h, C) {
-    var L = 54, T = 22, cw = Math.min((w - L - 6) / N, 74), ch = Math.min((h - T - 4) / N, 44), i, j;
-    for (j = 0; j < N; j++) D.text(ctx, "k" + (j + 1), L + cw * (j + 0.5), T - 7, { size: 11, align: "center", weight: 600 });
+    var L = 74, T = 22, cw = Math.min((w - L - 6) / N, 74), ch = Math.min((h - T - 4) / N, 44), i, j;
+    for (j = 0; j < N; j++) D.text(ctx, TOK[j], L + cw * (j + 0.5), T - 7, { size: 10.5, align: "center", weight: 600 });
     for (i = 0; i < N; i++) {
-      D.text(ctx, "q" + (i + 1), L - 8, T + ch * (i + 0.5) + 4, { size: 11, align: "right", weight: i === S.q ? 700 : 500, color: i === S.q ? C.terracotaInk : C.ink });
+      D.text(ctx, TOK[i], L - 8, T + ch * (i + 0.5) + 4, { size: 11, align: "right", weight: i === S.q ? 700 : 500, color: i === S.q ? C.terracotaInk : C.ink });
       for (j = 0; j < N; j++) {
         var v = R.A[i][j], x = L + cw * j, y = T + ch * i;
         D.rect(ctx, x, y, cw, ch, C.surface, C.line, 1);
@@ -111,11 +112,11 @@ Lab.register("curso3/c3m3-atencion-manual", function (root, api) {
     view.redraw(); view2.redraw();
     var i = S.q, j, best = 0, parts = [];
     for (j = 0; j < N; j++) { if (R.A[i][j] > R.A[i][best]) best = j; parts.push(n(R.A[i][j], 2) + "·" + vec(V[j])); }
-    out.set("<b>q" + (i + 1) + "</b> = " + vec(Q[i]) + "<br>" +
+    out.set("<b>q" + (i + 1) + " (" + TOK[i] + ")</b> = " + vec(Q[i]) + "<br>" +
       "puntuaciones q·kⱼ = <b>" + R.sc[i].map(function (v) { return n(v, 2); }).join(" ; ") + "</b>" + (S.scale ? " → ÷√2 = <b>" + R.sc[i].map(function (v) { return n(v * R.f, 2); }).join(" ; ") + "</b>" : " (sin dividir)") + "<br>" +
       "pesos (softmax) = <b>" + R.A[i].map(function (v) { return n(v, 3); }).join(" ; ") + "</b> (suman " + n(R.A[i][0] + R.A[i][1] + R.A[i][2], 3) + ")<br>" +
       "salida = " + parts.join(" + ") + " = <b>" + vec(R.O[i]) + "</b><br>" +
-      "Mira sobre todo a <b>k" + (best + 1) + "</b> (" + n(R.A[i][best] * 100, 1) + " %).");
+      "Mira sobre todo a <b>k" + (best + 1) + " (" + TOK[best] + ")</b> (" + n(R.A[i][best] * 100, 1) + " %).");
   }
   update(false);
 });

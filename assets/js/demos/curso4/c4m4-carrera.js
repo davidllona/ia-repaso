@@ -1,6 +1,6 @@
 /* Experimento: dos copias del mismo modelo p = sigmoide(w·x + b) con el mismo punto de partida.
    Una se entrena con MSE y otra con entropía cruzada (BCE), descenso del gradiente con todos los datos.
-   Mismos 14 alumnos y mismas cuentas que el fragmento 11. */
+   Mismos 14 usuarios (días sin abrir la app -> canceló) y mismas cuentas que el fragmento 11. */
 Lab.register("curso4/c4m4-carrera", function (root, api) {
   var M = api.math, D = api.d;
   var X = [0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5, 5.5, 6, 7, 8];
@@ -9,8 +9,8 @@ Lab.register("curso4/c4m4-carrera", function (root, api) {
   var S = { start: "malo", lr: 0.1, epoch: 0, max: 2000 };
   var A, B, hist, loop, ready = false;
 
-  var view = api.view(root, { aspect: 1.9, minH: 230, maxH: 360, label: "Los 14 alumnos y las dos curvas sigmoides, una entrenada con MSE y otra con entropía cruzada" });
-  var plot = api.plot(view, { xr: [0, 9], yr: [-0.2, 1.2], xticks: 9, yticks: 7, xlabel: "horas de estudio", ylabel: "p", pad: { l: 40, r: 10, t: 10, b: 36 }, yfmt: function (v) { return (+v.toFixed(1)).toString(); } });
+  var view = api.view(root, { aspect: 1.9, minH: 230, maxH: 360, label: "Los 14 usuarios y las dos curvas sigmoides, una entrenada con MSE y otra con entropía cruzada" });
+  var plot = api.plot(view, { xr: [0, 9], yr: [-0.2, 1.2], xticks: 9, yticks: 7, xlabel: "días sin abrir la app", ylabel: "p (cancelar)", pad: { l: 40, r: 10, t: 10, b: 36 }, yfmt: function (v) { return (+v.toFixed(1)).toString(); } });
   var view2 = api.view(root, { aspect: 3.4, minH: 150, maxH: 230, label: "Pérdida de entropía cruzada de cada modelo en cada época" });
   var plot2 = api.plot(view2, { xr: [0, S.max], yr: [0, 4], xticks: 4, yticks: 4, xlabel: "época", ylabel: "BCE medida", pad: { l: 46, r: 16, t: 10, b: 34 } });
   api.legend(root, [[api.colors().cobalto, "entrenado con BCE"], [api.colors().terracota, "entrenado con MSE"]]);

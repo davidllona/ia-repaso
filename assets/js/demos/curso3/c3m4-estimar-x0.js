@@ -54,7 +54,7 @@ Lab.register("curso3/c3m4-estimar-x0", function (root, api) {
       cache.xt.forEach(function (q) { D.circle(ctx, pl.x(q[0]), pl.y(q[1]), 1.8, C.muted); });
       ctx.globalAlpha = 0.9; cache.x0h.forEach(function (q) { D.circle(ctx, pl.x(q[0]), pl.y(q[1]), 2.6, C.terracota); });
       ctx.restore();
-      D.text(ctx, "gris = x_t (con ruido) · naranja = x̂₀ estimado · azul = lunas reales", pl.box.x + 6, pl.box.y + pl.box.h - 7, { size: 10, color: C.muted });
+      D.text(ctx, "gris = x_t (con nieve) · naranja = x̂₀ estimado · azul = pelis reales", pl.box.x + 6, pl.box.y + pl.box.h - 7, { size: 10, color: C.muted });
       D.text(ctx, "t = " + S.t, pl.box.x + 6, pl.box.y + 16, { size: 13, weight: 700, mono: true, color: C.ink });
     }
     function f(v, k) { return v.toFixed(k === undefined ? 3 : k).replace(".", ",").replace("-", "−"); }

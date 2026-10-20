@@ -28,10 +28,10 @@ Lab.register("curso4/c4m5-errores-forma", function (root, api) {
     lista: "<code>y = torch.tensor(lista)</code>: la pérdida solo acepta tensores."
   };
   var S = { lg: "normal", t: "ok" };
-  var view = api.view(root, { aspect: 2.3, minH: 215, maxH: 250, label: "Tensor de logits y tensor de etiquetas con su forma y tipo" });
+  var view = api.view(root, { aspect: 2.3, minH: 215, maxH: 250, label: "Tensor de logits (4 tráilers por 3 géneros) y tensor de etiquetas con su forma y tipo" });
   var ui = api.controls(root), out = api.readout(root);
   out.el.style.fontSize = "clamp(.68rem, 2.5vw, .8rem)";
-  ui.select({ label: "logits (lo que devuelve el modelo)", value: "normal", options: [["normal", "forma (4, 3)  = (N, K)"], ["transpuesto", "forma (3, 4)  = (K, N), transpuesto"]], onChange: function (v) { S.lg = v; update(); } });
+  ui.select({ label: "logits (lo que devuelve el modelo)", value: "normal", options: [["normal", "forma (4, 3)  = (N, K): 4 tráilers, 3 géneros"], ["transpuesto", "forma (3, 4)  = (K, N), transpuesto"]], onChange: function (v) { S.lg = v; update(); } });
   ui.select({ label: "etiquetas y", value: "ok", options: Object.keys(T).map(function (k) { return [k, T[k].n]; }), onChange: function (v) { S.t = v; update(); } });
   function res() { return ERR[S.lg + "|" + S.t]; }
   function ceLoss() {
@@ -49,7 +49,7 @@ Lab.register("curso4/c4m5-errores-forma", function (root, api) {
       D.text(ctx, v.toFixed(1).replace("-", "−"), x0 + j * cs + cs / 2, y0 + i * cs + cs / 2 + 4, { size: 10, mono: true, align: "center", color: C.ink2 });
     }
     D.rect(ctx, x0 - 1.5, y0 - 1.5, cols * cs + 3, rows * cs + 3, null, C.cobalto, 2);
-    D.text(ctx, tr ? "K filas × N columnas" : "N filas (muestras) × K columnas (clases)", x0, y0 + rows * cs + 18, { size: 10, color: C.muted });
+    D.text(ctx, tr ? "K filas × N columnas" : "N filas (tráilers) × K columnas (géneros)", x0, y0 + rows * cs + 18, { size: 10, color: C.muted });
     var x1 = x0 + cols * cs + Math.max(26, cs * 0.8);
     D.text(ctx, "etiquetas " + t.shape + " " + t.dt, x1, 18, { size: 11, weight: 700, color: C.ink2 });
     if (t.kind === "lista") {
@@ -76,7 +76,7 @@ Lab.register("curso4/c4m5-errores-forma", function (root, api) {
   function update() {
     var r = res(), good = r[0] === "ok", t = T[S.t];
     var line = "criterio(logits, y)  →  " + (good ? "<span class='good'>OK</span>, pérdida = <b>" + (S.lg === "normal" ? ceLoss().toFixed(4) : r[1]) + "</b>" : "<span class='bad'>" + r[1] + "</span>");
-    var fix = S.lg === "transpuesto" && !(S.t === "lista") ? "Los logits deben ser <code>(N, K)</code>: aquí N = 4 muestras y K = 3 clases. Mira <code>logits.shape</code> y cuál es la salida de tu última capa <code>nn.Linear</code>." : FIX[S.t];
+    var fix = S.lg === "transpuesto" && !(S.t === "lista") ? "Los logits deben ser <code>(N, K)</code>: aquí N = 4 tráilers y K = 3 géneros. Mira <code>logits.shape</code> y cuál es la salida de tu última capa <code>nn.Linear</code>." : FIX[S.t];
     out.set(line + "<br><span style='font-family:var(--font-sans)'>" + fix + "</span>");
     out.el.style.fontFamily = "";
     view.redraw();

@@ -12,7 +12,8 @@ Lab.register("curso1/c1m2-colinealidad", function (root, api) {
       draws.push(d);
     }
   }
-  // Ajusta y = θ0 + θ1·x1 + θ2·x2 a la muestra s (con N coches) para la correlación rho actual.
+  // Ajusta y = θ0 + θ1·x1 + θ2·x2 a la muestra s (con N películas) para la correlación rho actual.
+  // x1 y x2 = notas de dos críticos que opinan casi igual; y = horas vistas de la película.
   function fit(s, withData) {
     var d = draws[s], k, A = [[0, 0, 0], [0, 0, 0], [0, 0, 0]], b = [0, 0, 0], k2 = Math.sqrt(1 - rho * rho), pts = [];
     for (k = 0; k < N; k++) {
@@ -26,13 +27,13 @@ Lab.register("curso1/c1m2-colinealidad", function (root, api) {
 
   var row = api.el("div", { class: "lab-row" }); root.appendChild(row);
   var boxA = api.el("div"), boxB = api.el("div"); row.appendChild(boxA); row.appendChild(boxB);
-  var vA = api.view(boxA, { aspect: 1.15, minH: 230, label: "Las dos variables de una muestra de coches: cuanto más correlación, más pegadas a la diagonal" });
-  var pA = api.plot(vA, { xr: [-3, 3], yr: [-3, 3], xticks: 6, yticks: 6, xlabel: "variable 1 (estandarizada)", ylabel: "variable 2", pad: { l: 40, r: 10, t: 10, b: 38 } });
-  var vB = api.view(boxB, { aspect: 1.15, minH: 230, label: "Pesos θ1 y θ2 obtenidos en 60 muestras distintas de coches" });
-  var pB = api.plot(vB, { xr: [-4, 10], yr: [-4, 10], xticks: 7, yticks: 7, xlabel: "peso θ₁ de la variable 1", ylabel: "peso θ₂ de la variable 2", pad: { l: 40, r: 10, t: 10, b: 38 } });
+  var vA = api.view(boxA, { aspect: 1.15, minH: 230, label: "Las notas de dos críticos en una muestra de películas: cuanta más correlación, más pegadas a la diagonal" });
+  var pA = api.plot(vA, { xr: [-3, 3], yr: [-3, 3], xticks: 6, yticks: 6, xlabel: "nota del crítico A (estandarizada)", ylabel: "nota del crítico B", pad: { l: 40, r: 10, t: 10, b: 38 } });
+  var vB = api.view(boxB, { aspect: 1.15, minH: 230, label: "Pesos θ1 y θ2 (caso que se hace a cada crítico) obtenidos en 60 muestras distintas de películas" });
+  var pB = api.plot(vB, { xr: [-4, 10], yr: [-4, 10], xticks: 7, yticks: 7, xlabel: "peso θ₁ del crítico A", ylabel: "peso θ₂ del crítico B", pad: { l: 40, r: 10, t: 10, b: 38 } });
   var ui = api.controls(root), out = api.readout(root);
-  ui.slider({ label: "Correlación entre las dos variables (ρ)", min: 0, max: 0.995, step: 0.005, value: rho, fmt: function (v) { return v.toFixed(3); }, onInput: function (v) { rho = v; update(); } });
-  ui.slider({ label: "Coches por muestra", min: 20, max: 200, step: 10, value: N, onInput: function (v) { N = v; update(); } });
+  ui.slider({ label: "Correlación entre los dos críticos (ρ)", min: 0, max: 0.995, step: 0.005, value: rho, fmt: function (v) { return v.toFixed(3); }, onInput: function (v) { rho = v; update(); } });
+  ui.slider({ label: "Películas por muestra", min: 20, max: 200, step: 10, value: N, onInput: function (v) { N = v; update(); } });
   ui.button("Otras 60 muestras", function () { seed += 11; gen(); update(); }, "primary");
 
   function drawA(ctx, w, h, C) {
@@ -57,10 +58,10 @@ Lab.register("curso1/c1m2-colinealidad", function (root, api) {
     vA.redraw(); vB.redraw();
     var t1 = [], t2 = [], sm = [], s;
     for (s = 0; s < S; s++) { var th = fit(s); t1.push(th[1]); t2.push(th[2]); sm.push(th[1] + th[2]); }
-    out.set("Correlación ρ = <b>" + rho.toFixed(3) + "</b> con " + N + " coches por muestra<br>" +
+    out.set("Correlación ρ = <b>" + rho.toFixed(3) + "</b> con " + N + " películas por muestra<br>" +
       "Peso θ₁: media <b>" + M.mean(t1).toFixed(2) + "</b>, varía ± <b>" + M.std(t1).toFixed(2) + "</b> · Peso θ₂: media <b>" + M.mean(t2).toFixed(2) + "</b>, varía ± <b>" + M.std(t2).toFixed(2) + "</b><br>" +
       "Suma θ₁ + θ₂: media <b>" + M.mean(sm).toFixed(2) + "</b>, varía solo ± <b>" + M.std(sm).toFixed(2) + "</b>" +
-      (M.std(t1) > 1.2 ? "<br><span class='bad'>Los pesos individuales bailan de una muestra a otra, aunque la suma se mantiene estable.</span>" : "<br><span class='good'>Con variables poco relacionadas, cada peso se estima con estabilidad.</span>"));
+      (M.std(t1) > 1.2 ? "<br><span class='bad'>Los pesos individuales bailan de una muestra a otra, aunque la suma se mantiene estable.</span>" : "<br><span class='good'>Con críticos que opinan distinto, el peso de cada uno se estima con estabilidad.</span>"));
   }
   gen(); vA.draw(drawA); vB.draw(drawB); update();
 });

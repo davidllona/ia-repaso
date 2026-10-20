@@ -3,13 +3,13 @@ Lab.register("curso1/c1m1-semisupervisado", function (root, api) {
   var SEEDS = [2, 3, 5], si = 0, K = 2, PER = 8, P = [], lab = [], src = [], ultima = [], ronda = 0, base = 1, loop = null;
   var C0 = api.colors();
 
-  var view = api.view(root, { aspect: 1.75, minH: 270, maxH: 400, label: "Dos lunas de puntos; unos pocos puntos con etiqueta se van extendiendo a los vecinos más seguros" });
+  var view = api.view(root, { aspect: 1.75, minH: 270, maxH: 400, label: "Dos lunas de películas, comedias y terror; unas pocas con género anotado se van extendiendo a las vecinas más seguras" });
   var plot = api.plot(view, { xr: [-1.5, 2.5], yr: [-1, 1.5], xticks: 4, yticks: 5, pad: { l: 14, r: 14, t: 12, b: 12 }, grid: false });
-  api.legend(root, [[C0.terracota, "Clase A"], [C0.cobalto, "Clase B"], [C0.muted, "Sin etiqueta (aún)"]]);
+  api.legend(root, [[C0.terracota, "Comedia"], [C0.cobalto, "Terror"], [C0.muted, "Película sin género anotado (aún)"]]);
   root.appendChild(api.el("p", { style: { margin: "0", fontSize: "0.78rem", color: "var(--muted)", lineHeight: "1.45" },
-    html: "Círculo grande con borde = etiqueta real puesta por una persona · punto relleno claro = pseudo-etiqueta · cruz = pseudo-etiqueta equivocada (el programa lo sabe, el modelo no)." }));
+    html: "Cada punto es una película. Círculo grande con borde = género anotado por una persona · punto relleno claro = pseudo-etiqueta · cruz = pseudo-etiqueta equivocada (el programa lo sabe, el modelo no)." }));
   var ui = api.controls(root), out = api.readout(root);
-  ui.slider({ label: "Etiquetados por clase al empezar", min: 1, max: 5, step: 1, value: K, onInput: function (v) { K = v; reset(); } });
+  ui.slider({ label: "Películas con género anotado, por género, al empezar", min: 1, max: 5, step: 1, value: K, onInput: function (v) { K = v; reset(); } });
   ui.slider({ label: "Pseudo-etiquetas que añadimos por ronda", min: 2, max: 20, step: 1, value: PER, onInput: function (v) { PER = v; update(); } });
   var bRonda = ui.button("Ronda siguiente", function () { stop(); paso(); }, "primary");
   var bTodas = ui.button("Todas las rondas", function () { todas(); });
@@ -83,7 +83,7 @@ Lab.register("curso1/c1m1-semisupervisado", function (root, api) {
     var real = 0, pseudo = 0, mal = 0, sin = 0, i;
     for (i = 0; i < P.length; i++) { if (lab[i] < 0) sin++; else if (src[i] < 0) real++; else { pseudo++; if (lab[i] !== P[i].c) mal++; } }
     out.set("Ronda <b>" + ronda + "</b> · etiquetas reales: <b>" + real + "</b> · pseudo-etiquetas: <b>" + pseudo + "</b> · sin etiqueta: <b>" + sin + "</b><br>" +
-      "Si nos quedáramos solo con las <b>" + real + "</b> etiquetas reales (1-vecino más cercano) acertaríamos <b>" + (base * 100).toFixed(0) + " %</b> de los " + (P.length - real) + " puntos restantes<br>" +
+      "Si nos quedáramos solo con las <b>" + real + "</b> etiquetas reales (1-vecino más cercano) acertaríamos <b>" + (base * 100).toFixed(0) + " %</b> de las " + (P.length - real) + " películas restantes<br>" +
       (pseudo ? "Pseudo-etiquetas acertadas hasta ahora: <b>" + (pseudo - mal) + " de " + pseudo + "</b> (" + (100 * (pseudo - mal) / pseudo).toFixed(0) + " %)" + (mal ? " <span class='bad'>· " + mal + " equivocada" + (mal > 1 ? "s" : "") + ": un error se propaga a sus vecinos</span>" : " <span class='good'>· ninguna equivocada</span>") : "Pulsa «Ronda siguiente»: el modelo etiqueta los puntos de los que está más seguro (los más cercanos a uno etiquetado)."));
     bRonda.disabled = sin === 0; bTodas.disabled = sin === 0;
   }

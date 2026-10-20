@@ -18,7 +18,7 @@ Lab.register("curso3/c3m3-layernorm-ejes", function (root, api) {
     var va = v.reduce(function (a, x) { return a + (x - m) * (x - m); }, 0) / v.length;
     return { v: v, m: m, va: va, sd: Math.sqrt(va) };
   }
-  var view = api.view(root, { aspect: 2.1, minH: 200, maxH: 300, drag: false, label: "Tensor de 3 ejemplos, 4 tokens y 5 rasgos; las casillas resaltadas son las que entran en la media y la desviación" });
+  var view = api.view(root, { aspect: 2.1, minH: 200, maxH: 300, drag: false, label: "Tensor de 3 usuarios, 4 títulos vistos por cada uno y 5 números por título; las casillas resaltadas son las que entran en la media y la desviación" });
   var ui = api.controls(root), out = api.readout(root);
   out.el.style.fontSize = "clamp(.72rem, 2.7vw, .84rem)";
   ui.segmented({ label: "Normalización", value: "ln", options: [["ln", "LayerNorm (por token)"], ["bn", "BatchNorm (por rasgo)"]], onChange: function (v) { S.mode = v; update(); } });
@@ -27,7 +27,7 @@ Lab.register("curso3/c3m3-layernorm-ejes", function (root, api) {
     var g = geom(w, h), cells = set(), key = {}; cells.forEach(function (q) { key[q.join(",")] = 1; });
     for (b = 0; b < B; b++) {
       var gx = g.x0 + b * (g.gw + g.gap);
-      D.text(ctx, "ejemplo " + (b + 1), gx + g.gw / 2, 16, { size: 11, align: "center", weight: 600, color: C.ink2 });
+      D.text(ctx, "usuario " + (b + 1), gx + g.gw / 2, 16, { size: 11, align: "center", weight: 600, color: C.ink2 });
       for (t = 0; t < T; t++) for (f = 0; f < F; f++) {
         var x = gx + f * g.cell, y = g.y0 + t * g.cell, sel = key[[b, t, f].join(",")], me = (b === S.b && t === S.t && (S.mode === "ln" || f === S.f));
         D.rect(ctx, x, y, g.cell, g.cell, sel ? C.terracotaWash : C.surface, C.line, 1);
@@ -44,10 +44,10 @@ Lab.register("curso3/c3m3-layernorm-ejes", function (root, api) {
   function update() {
     view.redraw();
     var s = stats(), x = X[S.b][S.t][S.f], z = (x - s.m) / Math.sqrt(s.va + EPS);
-    out.set((S.mode === "ln" ? "<b>LayerNorm</b>: el token " + (S.t + 1) + " del ejemplo " + (S.b + 1) + " usa sus <b>" + F + "</b> números " : "<b>BatchNorm</b>: el rasgo " + (S.f + 1) + " usa sus <b>" + (B * T) + "</b> valores (" + B + " ejemplos × " + T + " tokens) ") + "[" + s.v.join(", ") + "]<br>" +
+    out.set((S.mode === "ln" ? "<b>LayerNorm</b>: el título " + (S.t + 1) + " del usuario " + (S.b + 1) + " usa sus <b>" + F + "</b> números " : "<b>BatchNorm</b>: el rasgo " + (S.f + 1) + " usa sus <b>" + (B * T) + "</b> valores (" + B + " usuarios × " + T + " títulos) ") + "[" + s.v.join(", ") + "]<br>" +
       "media μ = <b>" + n(s.m, 2) + "</b>, varianza = <b>" + n(s.va, 2) + "</b>, σ = <b>" + n(s.sd, 2) + "</b><br>" +
       "casilla marcada x = " + x + " → z = (x − μ)/√(σ² + ε) = (" + x + " − " + n(s.m, 2) + ")/√(" + n(s.va, 2) + " + 0,001) = <b>" + n(z, 3) + "</b><br>" +
-      (S.mode === "ln" ? "Cada token se normaliza <b>solo con sus propios números</b>: no depende de los demás tokens ni del tamaño del lote." : "BatchNorm mezcla tokens y ejemplos del lote: con lotes pequeños o secuencias de longitud variable sus estadísticas son inestables. Por eso los Transformers usan LayerNorm."));
+      (S.mode === "ln" ? "Cada token se normaliza <b>solo con sus propios números</b>: no depende de los demás títulos ni del tamaño del lote." : "BatchNorm mezcla títulos y usuarios del lote: con lotes pequeños o secuencias de longitud variable sus estadísticas son inestables. Por eso los Transformers usan LayerNorm."));
   }
   update();
 });

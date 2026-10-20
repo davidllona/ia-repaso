@@ -6,9 +6,9 @@ Lab.register("curso3/c3m4-kl-perdida", function (root, api) {
   var S = { x: 2, mu: 0.5, sg: 1.0, beta: 1 };
   var view = api.view(root, { aspect: 1.25, minH: 320, maxH: 460, label: "Densidad del posterior frente al prior y barras de reconstrucción, KL y pérdida total" });
   var ui = api.controls(root), out = api.readout(root);
-  var sx = ui.slider({ label: "Dato x que hay que reconstruir", min: -3, max: 3, step: 0.1, value: S.x, fmt: function (v) { return v.toFixed(1); }, onInput: function (v) { S.x = v; update(); } });
-  var sm = ui.slider({ label: "μ que da el codificador", min: -3, max: 3, step: 0.05, value: S.mu, fmt: function (v) { return v.toFixed(2); }, onInput: function (v) { S.mu = v; update(); } });
-  var ss = ui.slider({ label: "σ que da el codificador", min: 0.05, max: 2, step: 0.05, value: S.sg, fmt: function (v) { return v.toFixed(2); }, onInput: function (v) { S.sg = v; update(); } });
+  var sx = ui.slider({ label: "Dato x (dónde está de verdad la peli)", min: -3, max: 3, step: 0.1, value: S.x, fmt: function (v) { return v.toFixed(1); }, onInput: function (v) { S.x = v; update(); } });
+  var sm = ui.slider({ label: "μ (dónde la coloca el codificador)", min: -3, max: 3, step: 0.05, value: S.mu, fmt: function (v) { return v.toFixed(2); }, onInput: function (v) { S.mu = v; update(); } });
+  var ss = ui.slider({ label: "σ (cuánto duda el codificador)", min: 0.05, max: 2, step: 0.05, value: S.sg, fmt: function (v) { return v.toFixed(2); }, onInput: function (v) { S.sg = v; update(); } });
   var sb = ui.slider({ label: "Peso β del término KL", min: 0, max: 6, step: 0.1, value: S.beta, fmt: function (v) { return v.toFixed(1); }, onInput: function (v) { S.beta = v; update(); } });
   function opt() { return { mu: 2 * S.x / (2 + S.beta), sg: Math.max(0.05, Math.sqrt(S.beta / (2 + S.beta))) }; }
   ui.button("Ir al óptimo para este β", function () { var o = opt(); S.mu = o.mu; S.sg = o.sg; sm.set(S.mu, true); ss.set(S.sg, true); update(); }, "primary");

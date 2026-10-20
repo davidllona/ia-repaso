@@ -43,7 +43,7 @@
 <section>
 <h2 id="repaso">La regresión lineal, vista desde PyTorch</h2>
 
-<p class="pregunta">Conoces el tamaño de unas cuantas casas y lo que costaron. ¿Puedes descubrir cuánto suma, de media, cada metro cuadrado, y con eso predecir el precio de una casa que aún no se ha vendido?</p>
+<p class="pregunta">Netflix conoce el presupuesto de unas cuantas películas ya estrenadas y las horas que se vieron en su primera semana. ¿Puedes descubrir cuántas horas añade, de media, cada 10 millones de euros más de presupuesto, y con eso predecir las horas de una película que aún no se ha estrenado?</p>
 
 <div class="callout recuerda">
   <span class="lbl">Recuerda (Curso 1, módulo 2)</span>
@@ -64,23 +64,34 @@
 <p>Este módulo va despacio y en este orden: primero <strong>cada pieza a mano</strong> (para que se vea qué hace), luego la pieza <strong>de PyTorch</strong> que la sustituye, y por último juntamos todo con <code>DataLoader</code>, varias variables y validación.</p>
 
 <h3>Los datos y los símbolos</h3>
-<p>Para poder hacer <em>todas</em> las cuentas con la mano usaremos unos datos de juguete de tres puntos: \( x = 1, 2, 3 \) e \( y = 2, 5, 8 \). Fíjate en que cumplen exactamente \( y = 3x - 1 \): hay una recta perfecta escondida (pendiente 3, sesgo −1) y el modelo tiene que <em>descubrirla</em> sin que se la digamos. Más adelante usaremos datos más grandes (con ruido) generados por código, como en los laboratorios del curso original: no hace falta descargar nada.</p>
+<p>Para poder hacer <em>todas</em> las cuentas con la mano usaremos un ejemplo de juguete con tres películas que ya conoces del Curso 1. Lo que sabemos de cada una es su <strong>presupuesto</strong> \( x \) (en decenas de millones de euros) y lo que queremos predecir son sus <strong>horas vistas</strong> \( y \) en la primera semana en Netflix (en cientos de miles de horas). Son <em>cifras inventadas para el ejemplo</em>, más redondas que las del Curso 1:</p>
+
+<table>
+  <thead><tr><th>Película</th><th>Presupuesto \( x \)</th><th>Horas vistas \( y \)</th></tr></thead>
+  <tbody>
+    <tr><th scope="row">Shrek</th><td>1 (10 M€)</td><td>2 (200 mil horas)</td></tr>
+    <tr><th scope="row">Toy Story</th><td>2 (20 M€)</td><td>5 (500 mil horas)</td></tr>
+    <tr><th scope="row">El Rey León</th><td>3 (30 M€)</td><td>8 (800 mil horas)</td></tr>
+  </tbody>
+</table>
+
+<p>Es decir, \( x = 1, 2, 3 \) e \( y = 2, 5, 8 \). Fíjate en que cumplen exactamente \( y = 3x - 1 \): hay una recta perfecta escondida y el modelo tiene que <em>descubrirla</em> sin que se la digamos. Su pendiente es 3 (cada 10 M€ más de presupuesto suman 3 cientos de miles, o sea 300 mil horas más) y su sesgo −1. Un sesgo negativo no describe ninguna película real (una película con presupuesto 0 ni existe): es solo el <em>ancla matemática</em> que coloca la recta a su altura, igual que en el Curso 1. Más adelante usaremos datos más grandes (con ruido) generados por código, como en los laboratorios del curso original: no hace falta descargar nada. En el código del módulo, por cierto, son simplemente <code>x</code> e <code>y</code>, números sin etiqueta: el cine es el disfraz con el que te contamos las cuentas.</p>
 
 <table>
   <thead><tr><th>Símbolo</th><th>Qué es</th><th>En PyTorch</th></tr></thead>
   <tbody>
-    <tr><td>\( x \)</td><td>la <strong>entrada</strong> (<em>feature</em>): lo que conocemos</td><td>un tensor de forma <code>(N, 1)</code>: N muestras, 1 variable</td></tr>
-    <tr><td>\( y \)</td><td>el <strong>objetivo</strong> (<em>target</em>): lo que queremos predecir</td><td>un tensor <code>(N, 1)</code></td></tr>
+    <tr><td>\( x \)</td><td>la <strong>entrada</strong> (<em>feature</em>): lo que conocemos de antemano (el presupuesto de la película)</td><td>un tensor de forma <code>(N, 1)</code>: N muestras, 1 variable</td></tr>
+    <tr><td>\( y \)</td><td>el <strong>objetivo</strong> (<em>target</em>): lo que queremos predecir (las horas vistas)</td><td>un tensor <code>(N, 1)</code></td></tr>
     <tr><td>\( \hat{y} \)</td><td>la <strong>predicción</strong> del modelo («y con sombrero»)</td><td><code>yhat</code></td></tr>
     <tr><td>\( w,\ b \)</td><td>los <strong>parámetros</strong> que se aprenden</td><td><code>w</code>, <code>b</code> con <code>requires_grad=True</code>, o <code>model.weight</code>, <code>model.bias</code></td></tr>
-    <tr><td>\( n \) (o \( N \))</td><td>número de muestras</td><td><code>x.shape[0]</code></td></tr>
+    <tr><td>\( n \) (o \( N \))</td><td>número de muestras (aquí, películas)</td><td><code>x.shape[0]</code></td></tr>
     <tr><td>MSE</td><td>el <strong>coste</strong>: media de \( (\hat{y}-y)^2 \)</td><td><code>nn.MSELoss()</code></td></tr>
   </tbody>
 </table>
 
 <figure class="demo" data-demo="curso4/c4m3-prediccion" data-titulo="Una recta, tres puntos y un error">
-  <div class="haz">Mueve <strong>w</strong> y <strong>b</strong> hasta que los errores de la tabla se acerquen a 0; usa el botón «Poner w = 3 y b = −1» para ver la recta perfecta. Después mueve «x nueva» para ver qué predice el modelo en un punto que no estaba en los datos.</div>
-  <div class="observa">Cada <strong>segmento rojo</strong> es el error \( \hat{y} - y \) de un punto; la tabla los eleva al cuadrado y la última fila los promedia: ese es el MSE. Con w = 3 y b = −1 el error es exactamente 0. Predecir es <em>solo</em> evaluar la recta en un x nuevo: para x = 4 el modelo perfecto dice 11.</div>
+  <div class="haz">Mueve <strong>w</strong> (cuántas horas añade cada +10 M€) y <strong>b</strong> hasta que los errores de la tabla se acerquen a 0; usa el botón «Poner w = 3 y b = −1» para ver la recta perfecta. Después mueve «presupuesto de la peli nueva» para ver qué predice el modelo para una película que no estaba en los datos.</div>
+  <div class="observa">Cada <strong>segmento rojo</strong> es el error \( \hat{y} - y \) de una película (lo que Netflix se equivoca con ella); la tabla los eleva al cuadrado y la última fila los promedia: ese es el MSE. Con w = 3 y b = −1 el error es exactamente 0. Predecir es <em>solo</em> evaluar la recta en un presupuesto nuevo: para una película de 40 M€ (x = 4) el modelo perfecto dice 11, es decir, 1,1 millones de horas.</div>
 </figure>
 
 <div class="callout regla">
@@ -100,21 +111,21 @@
 
 <div class="callout ejemplo">
   <span class="lbl">Ejemplo numérico · predecir con \( w = 2 \) y \( b = 0{,}5 \)</span>
-  <p>Con \( x = (1, 2, 3) \) la predicción de cada muestra es \( \hat{y} = 2x + 0{,}5 \):</p>
+  <p>Supón que el modelo, sin entrenar, tiene \( w = 2 \) y \( b = 0{,}5 \). Con \( x = (1, 2, 3) \) (los presupuestos de Shrek, Toy Story y El Rey León) la predicción de cada película es \( \hat{y} = 2x + 0{,}5 \):</p>
   <table>
-    <thead><tr><th>\( x \)</th><th>\( \hat{y} = 2x + 0{,}5 \)</th><th>\( y \) real</th><th>error \( \hat{y} - y \)</th></tr></thead>
+    <thead><tr><th>Película (\( x \))</th><th>\( \hat{y} = 2x + 0{,}5 \)</th><th>\( y \) real</th><th>error \( \hat{y} - y \)</th></tr></thead>
     <tbody>
-      <tr><td>1</td><td>2·1 + 0,5 = 2,5</td><td>2</td><td>+0,5</td></tr>
-      <tr><td>2</td><td>2·2 + 0,5 = 4,5</td><td>5</td><td>−0,5</td></tr>
-      <tr><td>3</td><td>2·3 + 0,5 = 6,5</td><td>8</td><td>−1,5</td></tr>
+      <tr><td>Shrek (1)</td><td>2·1 + 0,5 = 2,5</td><td>2</td><td>+0,5</td></tr>
+      <tr><td>Toy Story (2)</td><td>2·2 + 0,5 = 4,5</td><td>5</td><td>−0,5</td></tr>
+      <tr><td>El Rey León (3)</td><td>2·3 + 0,5 = 6,5</td><td>8</td><td>−1,5</td></tr>
     </tbody>
   </table>
-  <p>Y para una muestra nueva, \( x = 10 \): \( \hat{y} = 2\cdot 10 + 0{,}5 = 20{,}5 \). El fragmento 1 lo hace en PyTorch.</p>
+  <p>Y para una película nueva con un presupuesto enorme, \( x = 10 \) (100 M€): \( \hat{y} = 2\cdot 10 + 0{,}5 = 20{,}5 \), unos 2 millones de horas. El fragmento 1 lo hace en PyTorch.</p>
 </div>
 
 <p>Dos detalles que despistan al principio:</p>
 <ul>
-  <li><strong>La forma de \( x \): una columna.</strong> En PyTorch, cada <em>fila</em> de un tensor de datos es una muestra y cada <em>columna</em> una variable. Por eso \( x \) tiene forma <code>(N, 1)</code> (N filas, 1 columna) y no <code>(N,)</code>. Si tienes un tensor plano, <code>x.view(-1, 1)</code> lo convierte en columna (el <code>-1</code> significa «calcula tú cuántas filas»).</li>
+  <li><strong>La forma de \( x \): una columna.</strong> En PyTorch, cada <em>fila</em> de un tensor de datos es una muestra y cada <em>columna</em> una variable (aquí, una fila = una película, y la única columna = su presupuesto). Por eso \( x \) tiene forma <code>(N, 1)</code> (N filas, 1 columna) y no <code>(N,)</code>. Si tienes un tensor plano, <code>x.view(-1, 1)</code> lo convierte en columna (el <code>-1</code> significa «calcula tú cuántas filas»).</li>
   <li><strong><code>w</code> es un escalar y <code>x</code> un tensor.</strong> ¿Cómo se multiplican? Con el <abbr class="t" data-def="Broadcasting: regla por la que PyTorch 'estira' un tensor más pequeño (por ejemplo un solo número) para que tenga la forma del otro y poder operar elemento a elemento.">broadcasting</abbr> del módulo 1: el número \( w \) se «estira» y multiplica a cada fila de \( x \); igual con la suma de \( b \).</li>
 </ul>
 
@@ -135,27 +146,28 @@
 <p>\( X \) tiene una fila por muestra y una columna por variable; \( W \) (el <code>weight</code>) tiene <strong>una fila por cada salida</strong> y una columna por cada variable de entrada, y se multiplica por su <em>traspuesta</em> \( W^\top \) (filas y columnas intercambiadas, <code>W.T</code>) para que las formas encajen; \( b \) se suma a cada fila. El resultado \( \hat{Y} \) tiene una fila por muestra y una columna por salida. El elemento \( \hat{Y}_{ij} \) (muestra \( i \), salida \( j \)) es la suma ponderada de las variables de la muestra \( i \) con la <em>fila \( j \) de \( W \)</em>, más \( b_j \).</p>
 
 <div class="callout ejemplo">
-  <span class="lbl">Ejemplo numérico · <code>nn.Linear(2, 2)</code> con tres muestras</span>
-  <p>Sea \( W = \begin{pmatrix} 1 & 2 \\ 3 & -1 \end{pmatrix} \) (fila 1 = salida 1, fila 2 = salida 2), \( b = (0{,}5,\; -1) \) y las muestras \( (1,2),\ (0,1),\ (3,1) \).</p>
+  <span class="lbl">Ejemplo numérico · <code>nn.Linear(2, 2)</code> con tres películas</span>
+  <p>Ahora cada película viene descrita por <strong>dos datos</strong> (por ejemplo su presupuesto y su duración, en unidades pequeñas) y queremos predecir <strong>dos cosas a la vez</strong>: las horas vistas (salida 1) y la nota de la crítica (salida 2). Los números son solo para practicar la cuenta, no una predicción realista.</p>
+  <p>Sea \( W = \begin{pmatrix} 1 & 2 \\ 3 & -1 \end{pmatrix} \) (fila 1 = salida 1, fila 2 = salida 2), \( b = (0{,}5,\; -1) \) y las tres películas \( (1,2),\ (0,1),\ (3,1) \).</p>
   <ol class="pasos">
-    <li><strong>Muestra 1, salida 1:</strong> \( 1\cdot 1 + 2\cdot 2 + 0{,}5 = 5{,}5 \). <strong>Salida 2:</strong> \( 1\cdot 3 + 2\cdot(-1) - 1 = 0 \).</li>
-    <li><strong>Muestra 2:</strong> \( 0\cdot 1 + 1\cdot 2 + 0{,}5 = 2{,}5 \) y \( 0\cdot 3 + 1\cdot(-1) - 1 = -2 \).</li>
-    <li><strong>Muestra 3:</strong> \( 3\cdot 1 + 1\cdot 2 + 0{,}5 = 5{,}5 \) y \( 3\cdot 3 + 1\cdot(-1) - 1 = 7 \).</li>
+    <li><strong>Película 1, salida 1:</strong> \( 1\cdot 1 + 2\cdot 2 + 0{,}5 = 5{,}5 \). <strong>Salida 2:</strong> \( 1\cdot 3 + 2\cdot(-1) - 1 = 0 \).</li>
+    <li><strong>Película 2:</strong> \( 0\cdot 1 + 1\cdot 2 + 0{,}5 = 2{,}5 \) y \( 0\cdot 3 + 1\cdot(-1) - 1 = -2 \).</li>
+    <li><strong>Película 3:</strong> \( 3\cdot 1 + 1\cdot 2 + 0{,}5 = 5{,}5 \) y \( 3\cdot 3 + 1\cdot(-1) - 1 = 7 \).</li>
   </ol>
   <table>
-    <thead><tr><th></th><th>salida 1</th><th>salida 2</th></tr></thead>
+    <thead><tr><th></th><th>salida 1 (horas)</th><th>salida 2 (nota)</th></tr></thead>
     <tbody>
-      <tr><th scope="row">muestra 1</th><td class="res">5,5</td><td class="res">0</td></tr>
-      <tr><th scope="row">muestra 2</th><td class="res">2,5</td><td class="res">−2</td></tr>
-      <tr><th scope="row">muestra 3</th><td class="res">5,5</td><td class="res">7</td></tr>
+      <tr><th scope="row">película 1</th><td class="res">5,5</td><td class="res">0</td></tr>
+      <tr><th scope="row">película 2</th><td class="res">2,5</td><td class="res">−2</td></tr>
+      <tr><th scope="row">película 3</th><td class="res">5,5</td><td class="res">7</td></tr>
     </tbody>
   </table>
-  <p>Cuenta de parámetros: \( W \) tiene \( 2\cdot 2 = 4 \) números y \( b \) tiene 2: <strong>6 parámetros</strong> (en general, \( \text{out}\cdot\text{in} + \text{out} \)). Fíjate en que el número de muestras \( N \) <em>no</em> cambia el número de parámetros: el mismo modelo sirve para 1 muestra o para un millón.</p>
+  <p>Cuenta de parámetros: \( W \) tiene \( 2\cdot 2 = 4 \) números y \( b \) tiene 2: <strong>6 parámetros</strong> (en general, \( \text{out}\cdot\text{in} + \text{out} \)). Fíjate en que el número de películas \( N \) <em>no</em> cambia el número de parámetros: el mismo modelo sirve para 1 película o para un millón.</p>
 </div>
 
 <figure class="demo" data-demo="curso4/c4m3-forma-linear" data-titulo="nn.Linear por dentro: formas y la cuenta X·Wᵀ + b">
-  <div class="haz">Deja los tres controles como están y haz clic en distintas celdas de la matriz ŷ (la de la derecha): verás qué fila de X y qué fila de W entran en esa suma. Después cambia <strong>in_features</strong>, <strong>out_features</strong> y el <strong>tamaño del lote</strong> y fíjate en cómo cambian las formas y el número de parámetros.</div>
-  <div class="observa">La salida tiene <strong>una fila por muestra</strong> (N) y <strong>una columna por salida</strong> (out). El número de parámetros solo depende de <em>in</em> y <em>out</em>: cambiar el lote (N) no los toca. Con in = 2 y out = 2 el primer elemento es 1·1 + 2·2 + 0,5 = 5,5, justo la cuenta del ejemplo.</div>
+  <div class="haz">Deja los tres controles como están y haz clic en distintas celdas de la matriz ŷ (la de la derecha): verás qué fila de X (una película) y qué fila de W (una de las cosas que se predicen) entran en esa suma. Después cambia <strong>in_features</strong> (datos de cada película), <strong>out_features</strong> (cosas que se predicen) y el <strong>tamaño del lote</strong> (cuántas películas) y fíjate en cómo cambian las formas y el número de parámetros.</div>
+  <div class="observa">La salida tiene <strong>una fila por película</strong> (N) y <strong>una columna por salida</strong> (out). El número de parámetros solo depende de <em>in</em> y <em>out</em>: cambiar el lote (N) no los toca. Con in = 2 y out = 2 el primer elemento es 1·1 + 2·2 + 0,5 = 5,5, justo la cuenta del ejemplo.</div>
 </figure>
 
 <div class="callout ojo">
@@ -182,7 +194,7 @@
 <section>
 <h2 id="coste">El coste: MSE a mano, <code>nn.MSELoss</code> y la superficie del coste</h2>
 
-<p class="pregunta">Con \( w = 2 \) y \( b = 0{,}5 \) la recta no es perfecta. ¿Cuánto se equivoca <em>en total</em>, con un único número, y cómo cambia ese número al mover \( w \) y \( b \)?</p>
+<p class="pregunta">Con \( w = 2 \) y \( b = 0{,}5 \) Netflix falla en las tres películas (por poco, pero falla). ¿Cuánto se equivoca <em>en total</em>, con un único número, y cómo cambia ese número al mover \( w \) y \( b \)?</p>
 
 <h3>El MSE, con las cuentas visibles</h3>
 <div class="formula">\[ \mathrm{MSE}(w,b) = \frac{1}{n}\sum_{i=1}^{n}\bigl(\hat{y}_i - y_i\bigr)^2 \qquad \hat{y}_i = w\,x_i + b \]</div>
@@ -191,11 +203,11 @@
 <div class="callout ejemplo">
   <span class="lbl">Ejemplo numérico · MSE de \( w = 2,\ b = 0{,}5 \)</span>
   <table>
-    <thead><tr><th>\( x \)</th><th>\( \hat{y} \)</th><th>\( y \)</th><th>\( \hat{y} - y \)</th><th>\( (\hat{y}-y)^2 \)</th></tr></thead>
+    <thead><tr><th>Película (\( x \))</th><th>\( \hat{y} \)</th><th>\( y \)</th><th>\( \hat{y} - y \)</th><th>\( (\hat{y}-y)^2 \)</th></tr></thead>
     <tbody>
-      <tr><td>1</td><td>2,5</td><td>2</td><td>0,5</td><td>0,25</td></tr>
-      <tr><td>2</td><td>4,5</td><td>5</td><td>−0,5</td><td>0,25</td></tr>
-      <tr><td>3</td><td>6,5</td><td>8</td><td>−1,5</td><td>2,25</td></tr>
+      <tr><td>Shrek (1)</td><td>2,5</td><td>2</td><td>0,5</td><td>0,25</td></tr>
+      <tr><td>Toy Story (2)</td><td>4,5</td><td>5</td><td>−0,5</td><td>0,25</td></tr>
+      <tr><td>El Rey León (3)</td><td>6,5</td><td>8</td><td>−1,5</td><td>2,25</td></tr>
       <tr><th scope="row" colspan="4">suma 2,75 → dividida entre 3</th><td class="res">0,9167</td></tr>
     </tbody>
   </table>
@@ -204,12 +216,12 @@
 
 <div class="callout ojo">
   <span class="lbl">Ojo: la trampa de las formas <code>(N, 1)</code> frente a <code>(N,)</code></span>
-  <p>Este es el error silencioso más famoso de la regresión en PyTorch. Si <code>yhat</code> tiene forma <code>(3, 1)</code> (la salida de <code>nn.Linear</code>) pero <code>y</code> tiene forma <code>(3,)</code>, la resta <code>yhat - y</code> <strong>no falla</strong>: por broadcasting se convierte en una matriz de <strong>3 × 3</strong> que compara <em>cada predicción con cada objetivo</em>, y el MSE promedia las 9 casillas. Con los datos del ejemplo da <strong>8,9167</strong> en lugar de 0,9167. Peor aún: con el modelo perfecto (w = 3, b = −1) el «MSE» no es 0, y si entrenas así el modelo aprende a predecir la <strong>media de y</strong> (5) para todo: con la <code>y</code> mal formada, el fragmento 17 acaba con \( w \approx 0 \) y \( b \approx 5 \). PyTorch solo avisa con un <code>UserWarning</code> («Using a target size … that is different to the input size …»). Pruébalo en el experimento y, en tu código, comprueba siempre <code>yhat.shape == y.shape</code> (o crea <code>y</code> con <code>.view(-1, 1)</code>).</p>
+  <p>Este es el error silencioso más famoso de la regresión en PyTorch. Si <code>yhat</code> tiene forma <code>(3, 1)</code> (la salida de <code>nn.Linear</code>) pero <code>y</code> tiene forma <code>(3,)</code>, la resta <code>yhat - y</code> <strong>no falla</strong>: por broadcasting se convierte en una matriz de <strong>3 × 3</strong> que compara <em>cada predicción con cada objetivo</em> (lo que predices para Shrek frente a las horas de Toy Story y de El Rey León, y así con todas), y el MSE promedia las 9 casillas. Con los datos del ejemplo da <strong>8,9167</strong> en lugar de 0,9167. Peor aún: con el modelo perfecto (w = 3, b = −1) el «MSE» no es 0, y si entrenas así el modelo aprende a predecir la <strong>media de y</strong> (5) para todo: con la <code>y</code> mal formada, el fragmento 17 acaba con \( w \approx 0 \) y \( b \approx 5 \). PyTorch solo avisa con un <code>UserWarning</code> («Using a target size … that is different to the input size …»). Pruébalo en el experimento y, en tu código, comprueba siempre <code>yhat.shape == y.shape</code> (o crea <code>y</code> con <code>.view(-1, 1)</code>).</p>
 </div>
 
 <figure class="demo" data-demo="curso4/c4m3-broadcast-mse" data-titulo="La trampa del broadcasting en el MSE">
-  <div class="haz">Con «y: (3, 1) ✔», fíjate en que hay 3 errores. Cambia a «y: (3,) ✘»: aparece una tabla de 3 × 3. Pulsa «Poner w = 3, b = −1» en los dos modos y compara el MSE que se obtiene.</div>
-  <div class="observa">En la forma correcta cada predicción se compara <strong>solo con su objetivo</strong> (3 casillas). En la incorrecta, PyTorch compara cada predicción con <strong>todos</strong> los objetivos (9 casillas): solo la diagonal (verde) son comparaciones de verdad; las otras 6 (rojas) mezclan muestras distintas. Por eso el modelo perfecto sigue teniendo «MSE» distinto de cero.</div>
+  <div class="haz">Con «y: (3, 1) ✔», fíjate en que hay 3 errores, uno por película. Cambia a «y: (3,) ✘»: aparece una tabla de 3 × 3. Pulsa «Poner w = 3, b = −1» en los dos modos y compara el MSE que se obtiene.</div>
+  <div class="observa">En la forma correcta la predicción de cada película se compara <strong>solo con sus propias horas vistas</strong> (3 casillas). En la incorrecta, PyTorch compara cada predicción con las horas de <strong>todas</strong> las películas (9 casillas): solo la diagonal (verde) son comparaciones de verdad; las otras 6 (rojas) mezclan películas distintas, como comparar lo que esperabas de Shrek con lo que vio El Rey León. Por eso el modelo perfecto sigue teniendo «MSE» distinto de cero.</div>
 </figure>
 
 <h3>La superficie del coste</h3>
@@ -219,10 +231,10 @@
 <div class="formula">\[ \mathrm{MSE}(w) = \frac{1}{3}\sum_i (w-3)^2 x_i^2 = (w-3)^2 \cdot \underbrace{\frac{1^2 + 2^2 + 3^2}{3}}_{\text{media de }x^2\,=\,4{,}667} \]</div>
 <p>Una <strong>parábola</strong> con el fondo en \( w = 3 \), donde vale 0. Lo comprobamos con unos valores: \( w = 0 \) da \( 9 \cdot 4{,}667 = 42 \); \( w = 1 \) da \( 4 \cdot 4{,}667 = 18{,}67 \); \( w = 2 \) da \( 4{,}67 \); \( w = 3 \) da 0; \( w = 4 \) da \( 4{,}67 \). Cuanto mayor es la media de \( x^2 \), más <em>estrecha y empinada</em> es la parábola. El fragmento 5 calcula la tabla completa con PyTorch.</p>
 
-<p><strong>Con dos parámetros</strong> el paisaje es una superficie en forma de <strong>cuenco</strong>, que se dibuja con <em>curvas de nivel</em> como un mapa topográfico: cada curva une los puntos \( (w, b) \) con el mismo coste. Este cuenco tiene una peculiaridad: es un <strong>valle largo y estrecho en diagonal</strong>. La razón es que \( x \) siempre es positivo (1, 2, 3): subir la pendiente \( w \) y bajar el sesgo \( b \) dan <em>casi la misma recta</em>, así que hay muchas parejas con coste parecido a lo largo de ese valle. Lo retomaremos cuando veamos por qué conviene centrar las variables.</p>
+<p><strong>Con dos parámetros</strong> el paisaje es una superficie en forma de <strong>cuenco</strong>, que se dibuja con <em>curvas de nivel</em> como un mapa topográfico: cada curva une los puntos \( (w, b) \) con el mismo coste. Este cuenco tiene una peculiaridad: es un <strong>valle largo y estrecho en diagonal</strong>. La razón es que los presupuestos \( x \) son siempre positivos (1, 2, 3): subir la pendiente \( w \) y bajar el sesgo \( b \) dan <em>casi la misma recta</em>, así que hay muchas parejas con coste parecido a lo largo de ese valle. Lo retomaremos cuando veamos por qué conviene centrar las variables.</p>
 
 <figure class="demo" data-demo="curso4/c4m3-superficie" data-titulo="El coste como paisaje: parábola y cuenco">
-  <div class="haz">Con «w y b», haz clic y arrastra por el mapa de la derecha y mira cómo cambian la recta (izquierda) y el MSE. Busca el punto amarillo (3, −1). Después elige «Solo w» y mueve la bola por la parábola.</div>
+  <div class="haz">Con «w y b», haz clic y arrastra por el mapa de la derecha y mira cómo cambian la recta de predicción (izquierda, con las tres películas) y el MSE. Busca el punto amarillo (3, −1). Después elige «Solo w» y mueve la bola por la parábola.</div>
   <div class="observa">En la parábola, la <strong>recta roja</strong> es la pendiente del paisaje en ese punto: negativa a la izquierda del fondo, positiva a la derecha y casi horizontal en el fondo. En el mapa, la <strong>flecha verde</strong> apunta hacia donde el coste baja más deprisa. Esa pendiente (el gradiente) es justo lo que calculamos en el apartado siguiente.</div>
 </figure>
 </section>
@@ -231,11 +243,11 @@
 <section>
 <h2 id="gradiente">La pendiente del paisaje: gradientes a mano y con autograd</h2>
 
-<p class="pregunta">Estás en un punto cualquiera del paisaje del coste, por ejemplo \( (w, b) = (0, 0) \). ¿Cómo sabes hacia dónde hay que mover cada parámetro para que el coste baje?</p>
+<p class="pregunta">Tu modelo empieza sin saber nada: \( (w, b) = (0, 0) \), así que predice 0 horas para cualquier película. ¿Cómo sabes hacia dónde hay que mover cada parámetro para que el coste baje?</p>
 
 <div class="callout analogia">
-  <span class="lbl">Analogía: los dos grifos de la ducha</span>
-  <p>Ajustas el agua con dos grifos, el caliente (\( w \)) y el frío (\( b \)), y lo que quieres es que la temperatura sea la ideal (el coste es «cuánto te alejas de la ideal»). Giras un poquito el grifo caliente y notas si el agua mejora o empeora, y cuánto: eso es la <strong>derivada parcial</strong> respecto a \( w \). Haces lo mismo con el frío: derivada parcial respecto a \( b \). Con las dos «sensaciones» sabes en qué sentido y con qué fuerza tocar cada grifo. Al conjunto de las dos se le llama <strong>gradiente</strong>.</p>
+  <span class="lbl">Analogía: adivinar la tarifa de una plataforma de streaming</span>
+  <p>Una plataforma cobra una <em>cuota fija</em> (\( b \)) más un <em>precio por cada película</em> (\( w \)), y tú no conoces ninguno de los dos: solo tienes tus facturas de los últimos meses (el coste es «cuánto se alejan tus cuentas de las facturas reales»). Subes un poquito el precio por película que supones y miras si tus cuentas se acercan a las facturas o se alejan, y cuánto: eso es la <strong>derivada parcial</strong> respecto a \( w \). Haces lo mismo con la cuota fija: derivada parcial respecto a \( b \). Con las dos «sensaciones» sabes en qué sentido y con qué fuerza tocar cada número. Al conjunto de las dos se le llama <strong>gradiente</strong>.</p>
 </div>
 
 <h3>Las fórmulas del gradiente del MSE</h3>
@@ -246,7 +258,7 @@
 <div class="callout ejemplo">
   <span class="lbl">Ejemplo numérico · un paso de descenso, con \( w = 0,\ b = 0,\ lr = 0{,}05 \)</span>
   <ol class="pasos">
-    <li><strong>Predicciones y errores.</strong> Con \( w = b = 0 \), \( \hat{y} = (0, 0, 0) \); los errores \( \hat{y} - y \) valen \( (-2,\,-5,\,-8) \). El MSE es \( (4 + 25 + 64)/3 = 31 \).</li>
+    <li><strong>Predicciones y errores.</strong> Con \( w = b = 0 \) el modelo predice 0 horas para Shrek, Toy Story y El Rey León, \( \hat{y} = (0, 0, 0) \); los errores \( \hat{y} - y \) valen \( (-2,\,-5,\,-8) \). El MSE es \( (4 + 25 + 64)/3 = 31 \).</li>
     <li><strong>Gradiente de \( w \).</strong> \( \frac{2}{3}\bigl[(-2)(1) + (-5)(2) + (-8)(3)\bigr] = \frac{2}{3}(-36) = -24 \).</li>
     <li><strong>Gradiente de \( b \).</strong> \( \frac{2}{3}\bigl[-2 - 5 - 8\bigr] = \frac{2}{3}(-15) = -10 \).</li>
     <li><strong>Actualización.</strong> Cada parámetro se mueve contra su gradiente: \( w \leftarrow 0 - 0{,}05\,(-24) = 1{,}2 \) y \( b \leftarrow 0 - 0{,}05\,(-10) = 0{,}5 \).</li>
@@ -287,7 +299,7 @@
 <p>Se repite hasta que el coste deja de bajar o se agota el número de épocas elegido. Con los datos de los laboratorios del curso (60 puntos de la recta \( y = -3x \) más un poco de ruido, partiendo de \( w = -10 \) y \( b = -20 \), muy lejos de la solución) el fragmento 7 hace exactamente eso: el coste cae de 533,56 a menos de 0,01 en 30 épocas y los parámetros llegan a \( w \approx -2{,}994 \) y \( b \approx -0{,}02 \), casi idénticos a la solución exacta de mínimos cuadrados (−2,9937 y 0,0056; el ruido de los datos impide que sea exactamente −3 y 0). Puedes comprobar el coste inicial a mano: con \( \hat{y} = -10x - 20 \) y \( y \approx -3x \), el error es \( -7x - 20 \), y el MSE es \( 49\cdot\overline{x^2} + 280\cdot\bar{x} + 400 = 49\cdot 3{,}0017 - 14 + 400 = 533{,}08 \); el ruido añade 0,48 hasta 533,56.</p>
 
 <h3>Por qué a veces el descenso es lentísimo: variables sin centrar</h3>
-<p>En el experimento, el descenso con los datos \( x = 1, 2, 3 \) tarda <strong>546 pasos</strong> en llegar al fondo (MSE por debajo de 0,000001), ¡para tres puntos! Y sin embargo con los datos de los laboratorios (\( x \) entre −3 y 3) bastan 30 épocas. ¿Por qué? Cerca del mínimo el paisaje se parece a un cuenco, y en cada «dirección» del cuenco la distancia al fondo se multiplica, en cada paso, por \( (1 - lr\cdot\lambda) \), donde \( \lambda \) es la <strong>curvatura</strong> de esa dirección (lo empinada que es la pared). Si \( |1 - lr\cdot\lambda| &lt; 1 \), esa dirección converge; si no, diverge.</p>
+<p>En el experimento, el descenso con los datos \( x = 1, 2, 3 \) tarda <strong>546 pasos</strong> en llegar al fondo (MSE por debajo de 0,000001), ¡para tres películas! Y sin embargo con los datos de los laboratorios (\( x \) entre −3 y 3) bastan 30 épocas. ¿Por qué? Cerca del mínimo el paisaje se parece a un cuenco, y en cada «dirección» del cuenco la distancia al fondo se multiplica, en cada paso, por \( (1 - lr\cdot\lambda) \), donde \( \lambda \) es la <strong>curvatura</strong> de esa dirección (lo empinada que es la pared). Si \( |1 - lr\cdot\lambda| &lt; 1 \), esa dirección converge; si no, diverge.</p>
 
 <div class="callout ejemplo">
   <span class="lbl">Ejemplo numérico · el mismo problema con \( x \) sin centrar y centrada</span>
@@ -295,10 +307,10 @@
     <thead><tr><th></th><th>curvaturas \( \lambda \) del cuenco</th><th>factor por paso con \( lr = 0{,}05 \)</th><th>\( lr \) máximo estable \( 2/\lambda_{\max} \)</th><th>pasos para acercarse un 99,9 %</th></tr></thead>
     <tbody>
       <tr><th scope="row">\( x = 1,2,3 \)</th><td>11,09 y 0,24</td><td>0,445 y <strong>0,988</strong></td><td>0,18</td><td>\( \ln 0{,}001/\ln 0{,}988 \approx \) <span class="res">570</span></td></tr>
-      <tr><th scope="row">\( x = -1,0,1 \) (centrada)</th><td>2 y 1,33</td><td>0,9 y 0,933</td><td>1</td><td>\( \ln 0{,}001/\ln 0{,}933 \approx \) <span class="res">100</span></td></tr>
+      <tr><th scope="row">\( x = -1,0,1 \) (centrada: presupuesto menos la media)</th><td>2 y 1,33</td><td>0,9 y 0,933</td><td>1</td><td>\( \ln 0{,}001/\ln 0{,}933 \approx \) <span class="res">100</span></td></tr>
     </tbody>
   </table>
-  <p>Con \( x \) sin centrar, el cuenco es un valle larguísimo (una pared muy empinada, \( \lambda = 11 \), y otra casi plana, \( \lambda = 0{,}24 \)): el \( lr \) está limitado por la pared empinada (0,18) pero la dirección plana, con factor 0,988, avanza solo un 1,2 % de lo que le falta en cada paso. Al restar la media de \( x \), el cuenco se vuelve casi redondo, las dos curvaturas se parecen y se puede usar un \( lr \) mucho mayor.</p>
+  <p>Con \( x \) sin centrar, el cuenco es un valle larguísimo (una pared muy empinada, \( \lambda = 11 \), y otra casi plana, \( \lambda = 0{,}24 \)): el \( lr \) está limitado por la pared empinada (0,18) pero la dirección plana, con factor 0,988, avanza solo un 1,2 % de lo que le falta en cada paso. Al restar la media de \( x \), el cuenco se vuelve casi redondo, las dos curvaturas se parecen y se puede usar un \( lr \) mucho mayor. Centrar es tan simple como esto: el presupuesto medio es 2 (20 M€), así que Shrek pasa a \( -1 \) («10 M€ por debajo de la media»), Toy Story a 0 («justo la media») y El Rey León a \( +1 \).</p>
 </div>
 
 <figure class="demo" data-demo="curso4/c4m3-gd-paso" data-titulo="Descenso del gradiente con dos parámetros, paso a paso">
@@ -370,7 +382,7 @@
 
 <div class="callout ejemplo">
   <span class="lbl">Ejemplo numérico · dos pasos con momentum, a mano</span>
-  <p>Minimizamos \( (p - 5)^2 \) (gradiente \( 2(p-5) \)), partiendo de \( p = 0 \), con \( lr = 0{,}1 \) y \( \mu = 0{,}9 \).</p>
+  <p>Imagina que el recomendador de Netflix tiene un único mando \( p \) («cuánto peso da al género de lo que ves») y que el mejor ajuste es \( p = 5 \). Su coste es \( (p - 5)^2 \) (gradiente \( 2(p-5) \)); partimos de \( p = 0 \), con \( lr = 0{,}1 \) y \( \mu = 0{,}9 \).</p>
   <ol class="pasos">
     <li><strong>Paso 1.</strong> \( g = 2(0 - 5) = -10 \); \( v = 0{,}9\cdot 0 + (-10) = -10 \); \( p = 0 - 0{,}1\cdot(-10) = 1 \).</li>
     <li><strong>Paso 2.</strong> \( g = 2(1 - 5) = -8 \); \( v = 0{,}9\cdot(-10) + (-8) = -17 \); \( p = 1 - 0{,}1\cdot(-17) = 2{,}7 \).</li>
@@ -390,11 +402,16 @@
 <section>
 <h2 id="lotes">Batch, mini-batch y SGD con <code>DataLoader</code></h2>
 
-<p class="pregunta">Hasta ahora cada paso usaba <em>todos</em> los datos. Con 5 millones de muestras, ¿hay que leerlas todas para dar un solo pasito?</p>
+<p class="pregunta">Hasta ahora cada paso usaba <em>todas</em> las películas. Con 5 millones de visionados registrados en Netflix, ¿hay que revisarlos todos para dar un solo pasito?</p>
 
 <div class="callout recuerda">
   <span class="lbl">Recuerda (módulo 2 y Curso 1)</span>
   <p>Un <code>Dataset</code> sabe dar la muestra número <code>i</code> (<code>__getitem__</code>) y cuántas hay (<code>__len__</code>); un <code>DataLoader</code> lo envuelve y entrega <strong>lotes</strong> de <code>batch_size</code> muestras, barajados si <code>shuffle=True</code>. En el Curso 1 viste <a href="../curso-1/modulo-2.html#entrenamiento">batch, SGD y mini-batch</a> con scikit-learn; aquí los programas con PyTorch.</p>
+</div>
+
+<div class="callout analogia">
+  <span class="lbl">Analogía: la encuesta de satisfacción</span>
+  <p>Netflix quiere saber si una serie gusta antes de cambiar su recomendación. Puede esperar a leer las opiniones de <em>todos</em> los espectadores y dar un único paso, muy fiable pero lentísimo (<strong>batch</strong>). Puede cambiar la recomendación tras leer <em>una sola</em> opinión, rapidísimo pero con el riesgo de que esa opinión sea un capricho (<strong>SGD</strong>). O puede leerlas de 32 en 32 y retocar cada vez (<strong>mini-batch</strong>): rápido y bastante fiable.</p>
 </div>
 
 <p>El gradiente del coste es un <strong>promedio</strong> sobre las muestras. Se puede calcular con cuántas quieras:</p>
@@ -408,19 +425,19 @@
 </table>
 
 <div class="callout ejemplo">
-  <span class="lbl">Ejemplo numérico · el gradiente del lote es el promedio de los gradientes de cada muestra</span>
-  <p>Con nuestros tres puntos y \( w = b = 0 \), el gradiente de <em>una sola</em> muestra \( i \) es \( \bigl(2(\hat{y}_i - y_i)\,x_i,\; 2(\hat{y}_i - y_i)\bigr) \):</p>
+  <span class="lbl">Ejemplo numérico · el gradiente del lote es el promedio de los gradientes de cada película</span>
+  <p>Con nuestras tres películas y \( w = b = 0 \), el gradiente de <em>una sola</em> película \( i \) es \( \bigl(2(\hat{y}_i - y_i)\,x_i,\; 2(\hat{y}_i - y_i)\bigr) \):</p>
   <table>
-    <thead><tr><th>muestra</th><th>error \( \hat{y}-y \)</th><th>\( dw = 2\cdot\text{error}\cdot x \)</th><th>\( db = 2\cdot\text{error} \)</th></tr></thead>
+    <thead><tr><th>película</th><th>error \( \hat{y}-y \)</th><th>\( dw = 2\cdot\text{error}\cdot x \)</th><th>\( db = 2\cdot\text{error} \)</th></tr></thead>
     <tbody>
-      <tr><td>1 (x = 1)</td><td>−2</td><td>−4</td><td>−4</td></tr>
-      <tr><td>2 (x = 2)</td><td>−5</td><td>−20</td><td>−10</td></tr>
-      <tr><td>3 (x = 3)</td><td>−8</td><td>−48</td><td>−16</td></tr>
+      <tr><td>Shrek (x = 1)</td><td>−2</td><td>−4</td><td>−4</td></tr>
+      <tr><td>Toy Story (x = 2)</td><td>−5</td><td>−20</td><td>−10</td></tr>
+      <tr><td>El Rey León (x = 3)</td><td>−8</td><td>−48</td><td>−16</td></tr>
       <tr><th scope="row">promedio de las 3 (batch)</th><td></td><td class="res">−24</td><td class="res">−10</td></tr>
-      <tr><th scope="row">mini-batch de 2 (muestras 1 y 3)</th><td></td><td>(−4−48)/2 = −26</td><td>(−4−16)/2 = −10</td></tr>
+      <tr><th scope="row">mini-batch de 2 (Shrek y El Rey León)</th><td></td><td>(−4−48)/2 = −26</td><td>(−4−16)/2 = −10</td></tr>
     </tbody>
   </table>
-  <p>El promedio da justo el gradiente completo (−24, −10) del apartado anterior. Una sola muestra da una <em>estimación ruidosa</em> (−4 o −48 para \( w \), según cuál toque) que apunta en la misma dirección general pero con un tamaño muy distinto; el mini-batch de 2 se acerca más (−26). Cuanto mayor es el lote, menos ruido tiene el gradiente.</p>
+  <p>El promedio da justo el gradiente completo (−24, −10) del apartado anterior. Una sola película da una <em>estimación ruidosa</em> (−4 o −48 para \( w \), según cuál toque) que apunta en la misma dirección general pero con un tamaño muy distinto; el mini-batch de 2 se acerca más (−26). Cuanto mayor es el lote, menos ruido tiene el gradiente.</p>
 </div>
 
 <p>Ventajas e inconvenientes: con lotes pequeños cada paso cuesta <strong>poco</strong> y se dan <strong>muchos más pasos por época</strong> (el modelo aprende antes, en tiempo de reloj), y el ruido ayuda a salir de zonas malas en problemas difíciles; pero el camino zigzaguea y, con learning rate fijo, nunca se asienta del todo en el fondo. Con el lote completo el camino es suave pero cada paso lee todos los datos y hay que dar muchos. El <strong>mini-batch</strong> (por ejemplo 32, 64 o 256 muestras) es el término medio y el estándar en deep learning, además de aprovechar mejor la GPU, que calcula muchas muestras a la vez.</p>
@@ -445,7 +462,7 @@
 
 <figure class="demo" data-demo="curso4/c4m3-lotes" data-titulo="Batch, mini-batch y SGD: lotes, camino y coste por época">
   <div class="haz">Con batch_size = 5 pulsa «Un lote» varias veces y mira el camino. Luego pulsa «10 épocas». Repite con batch_size = 30 (batch), 1 (SGD) y 7 con y sin <em>drop_last</em>. Quita <em>shuffle</em> y mira cómo cambian los lotes.</div>
-  <div class="observa">La franja de arriba muestra cómo reparte el <code>DataLoader</code> las 30 muestras en lotes (un color por lote). Con batch = 30 el camino es una línea suave pero con <em>1</em> actualización por época; con SGD (batch = 1) hay 30 pasos por época y el camino zigzaguea alrededor del fondo (el amarillo) sin llegar a asentarse. Con un lr alto y lotes pequeños el SGD puede divergir: el lote pequeño tiene más curvatura «local».</div>
+  <div class="observa">La franja de arriba muestra cómo reparte el <code>DataLoader</code> las 30 películas en lotes (un color por lote). Con batch = 30 el camino es una línea suave pero con <em>1</em> actualización por época; con SGD (batch = 1) hay 30 pasos por época y el camino zigzaguea alrededor del fondo (el amarillo) sin llegar a asentarse. Con un lr alto y lotes pequeños el SGD puede divergir: el lote pequeño tiene más curvatura «local».</div>
 </figure>
 
 <div class="callout ojo">
@@ -463,6 +480,11 @@
 <div class="callout recuerda">
   <span class="lbl">Recuerda (Curso 1)</span>
   <p>Un <strong>hiperparámetro</strong> es un ajuste que fijas tú antes de entrenar (el learning rate, las épocas, el tamaño del lote…), a diferencia de los <strong>parámetros</strong> (\( w \), \( b \)), que aprende el algoritmo. El learning rate pequeño avanza a paso de tortuga; el adecuado baja rápido; el demasiado grande rebota o <strong>diverge</strong>. Está explicado con una tabla en el <a href="../curso-1/modulo-2.html#entrenamiento">Curso 1</a>.</p>
+</div>
+
+<div class="callout analogia">
+  <span class="lbl">Analogía: buscar una escena con la barra de tiempo</span>
+  <p>Quieres llegar a tu escena favorita arrastrando la barra del reproductor. Si avanzas a saltos de 1 segundo, llegas, pero tardas una eternidad (<strong>learning rate pequeño</strong>). Si saltas de 10 minutos en 10 minutos, te pasas, vuelves, te pasas otra vez y cada vez estás más lejos de la escena (<strong>learning rate demasiado grande</strong>: diverge). El salto bueno es el más largo que todavía no se pasa de la escena.</p>
 </div>
 
 <h3>Por qué hay un límite: el factor \( (1 - lr\cdot\lambda) \)</h3>
@@ -494,7 +516,7 @@
     <tr><td><strong>Prueba</strong> (<em>test</em>)</td><td>medir el resultado final, <strong>una sola vez</strong>, al acabar</td><td>no</td></tr>
   </tbody>
 </table>
-<p>En PyTorch se parten con <code>torch.utils.data.random_split(dataset, [40, 20])</code> (o con <code>torch.randperm</code> y los índices): devuelve subconjuntos barajados con los tamaños que pidas (y puedes pasarle un <code>generator</code> con semilla para que sea reproducible). El procedimiento: para cada learning rate candidato (en potencias de 10: 0,001, 0,01, 0,1…) entrenas con <em>train</em>, mides el coste en <em>validation</em> y te quedas con el que da menor coste de validación; el <em>test</em> ni se toca. En el fragmento 11 el ganador es \( lr = 0{,}2 \) con un MSE de validación de 0,0951, que además es casi el nivel del ruido de los datos (\( 0{,}3^2 = 0{,}09 \)): no se puede bajar de ahí.</p>
+<p>Imagina 60 películas con sus horas vistas: 40 sirven para entrenar, 20 se apartan para validar y, si hubiera conjunto de prueba, serían los estrenos que ni miras hasta el final. En PyTorch se parten con <code>torch.utils.data.random_split(dataset, [40, 20])</code> (o con <code>torch.randperm</code> y los índices): devuelve subconjuntos barajados con los tamaños que pidas (y puedes pasarle un <code>generator</code> con semilla para que sea reproducible). El procedimiento: para cada learning rate candidato (en potencias de 10: 0,001, 0,01, 0,1…) entrenas con <em>train</em>, mides el coste en <em>validation</em> y te quedas con el que da menor coste de validación; el <em>test</em> ni se toca. En el fragmento 11 el ganador es \( lr = 0{,}2 \) con un MSE de validación de 0,0951, que además es casi el nivel del ruido de los datos (\( 0{,}3^2 = 0{,}09 \)): no se puede bajar de ahí.</p>
 
 <figure class="demo" data-demo="curso4/c4m3-lr" data-titulo="Curvas de entrenamiento y validación, y barrido del learning rate">
   <div class="haz">Mueve el slider del <strong>learning rate</strong> de izquierda a derecha y mira la curva de la izquierda: ¿cuándo baja despacio? ¿cuándo oscila? ¿cuándo se dispara? Después cambia las <strong>épocas</strong> (10, 15, 40) y mira cómo se desplaza el mejor lr (punto amarillo) en el gráfico de la derecha.</div>
@@ -516,7 +538,7 @@
 <section>
 <h2 id="multiple">Regresión múltiple y varias salidas</h2>
 
-<p class="pregunta">El precio de una casa no depende solo de los metros: también de las habitaciones, la distancia al centro, la antigüedad… ¿Cómo cambia el modelo y el código cuando hay más de una variable de entrada?</p>
+<p class="pregunta">Las horas vistas de una película no dependen solo del presupuesto: también de la duración, de las críticas, de cuántos estrenos compiten esa misma semana… ¿Cómo cambia el modelo y el código cuando hay más de una variable de entrada?</p>
 
 <h3>Varias variables, el mismo código</h3>
 <p>La <strong>regresión lineal múltiple</strong> suma una contribución por variable:</p>
@@ -525,13 +547,13 @@
 
 <div class="callout ejemplo">
   <span class="lbl">Ejemplo numérico · una predicción con dos variables</span>
-  <p>Con \( w = (2,\,-3) \) y \( b = 1 \), la muestra \( (x_1, x_2) = (1, -1) \) da \( \hat{y} = 2\cdot 1 + (-3)\cdot(-1) + 1 = 2 + 3 + 1 = 6 \). Son justo los coeficientes con los que generamos los datos del fragmento 13 (\( y = 1 + 2x_1 - 3x_2 \) más ruido), así que el modelo, si aprende bien, debe acercarse a 6 en esta muestra.</p>
+  <p>Imagina que \( x_1 \) es el presupuesto y \( x_2 \) cuántos estrenos rivales hay esa semana (a más competencia, menos horas), los dos ya centrados en su media. Con \( w = (2,\,-3) \) y \( b = 1 \), una película con \( (x_1, x_2) = (1, -1) \) (presupuesto por encima de la media y poca competencia) da \( \hat{y} = 2\cdot 1 + (-3)\cdot(-1) + 1 = 2 + 3 + 1 = 6 \). Son justo los coeficientes con los que generamos los datos del fragmento 13 (\( y = 1 + 2x_1 - 3x_2 \) más ruido), así que el modelo, si aprende bien, debe acercarse a 6 en esta muestra.</p>
 </div>
 
 <p>El <code>Dataset</code> del módulo 2 se adapta cambiando la forma de <code>x</code>: <code>self.x = torch.randn(n, 2)</code> y <code>__getitem__</code> devuelve <code>self.x[i]</code> (de forma <code>(2,)</code>) y <code>self.y[i]</code> (de forma <code>(1,)</code>); el <code>DataLoader</code> apila 20 muestras en un lote <code>x</code> de forma <code>(20, 2)</code> e <code>y</code> de forma <code>(20, 1)</code>. Con 100 muestras y <code>batch_size=20</code> hay 5 actualizaciones por época. El resultado tras 30 épocas (fragmento 13): \( w \approx (2{,}007;\,-2{,}987) \), \( b \approx 0{,}998 \), predicción para \( (1,-1) \) de 5,992 y scikit-learn, que usa la fórmula exacta, da \( (2{,}008;\,-2{,}987) \) y 1,002: casi iguales (la pequeña diferencia viene del ruido del mini-batch y de parar tras 30 épocas).</p>
 
 <h3>Variables en escalas distintas: estandarizar</h3>
-<p>Ya vimos que el descenso va tan lento como la dirección más «plana» y que el lr lo limita la más «empinada». Con varias variables eso se agrava si una tiene valores enormes y otra pequeños. En el fragmento 14, \( x_1 \) va de 0 a 1 y \( x_2 \) de 0 a 100 (y \( y = 1 + 2x_1 + 0{,}05\,x_2 \) más ruido): la curvatura en la dirección de \( x_2 \) es \( \approx 2\cdot\overline{x_2^2} \approx 6.700 \) (lr máximo \( \approx 0{,}0003 \)), y en la de \( x_1 \) solo \( \approx 0{,}67 \):</p>
+<p>Ya vimos que el descenso va tan lento como la dirección más «plana» y que el lr lo limita la más «empinada». Con varias variables eso se agrava si una tiene valores enormes y otra pequeños. Imagina que en el fragmento 14 \( x_1 \) es el presupuesto (en cientos de millones de euros) y \( x_2 \) la duración en minutos: dos variables en unidades muy distintas, como mezclar euros y minutos en la misma cuenta. Aquí \( x_1 \) va de 0 a 1 y \( x_2 \) de 0 a 100 (y \( y = 1 + 2x_1 + 0{,}05\,x_2 \) más ruido): la curvatura en la dirección de \( x_2 \) es \( \approx 2\cdot\overline{x_2^2} \approx 6.700 \) (lr máximo \( \approx 0{,}0003 \)), y en la de \( x_1 \) solo \( \approx 0{,}67 \):</p>
 <ul>
   <li><code>lr = 0.001</code>: supera el límite de \( x_2 \) y <strong>explota</strong>: el coste pasa de 534 (época 1) a 5,4·10¹⁶ (época 10) y a <code>nan</code> (época 100).</li>
   <li><code>lr = 0.0001</code>: es estable, pero la dirección de \( x_1 \) avanza con un factor \( 1 - 0{,}0001\cdot 0{,}67 \approx 0{,}99993 \): <strong>casi no se mueve</strong>; tras 100 épocas el coste sigue en 1,09.</li>
@@ -540,26 +562,26 @@
 
 <div class="callout ejemplo">
   <span class="lbl">Ejemplo numérico · deshacer el escalado para leer los pesos en unidades originales</span>
-  <p>Un peso entrenado con variables estandarizadas se refiere a \( z \), no a \( x \). Supón que \( x_2 \) tiene \( \mu = 50 \) y \( \sigma = 20 \), y que el modelo aprendió \( w = 1 \) sobre \( z_2 \). Entonces su contribución es \( 1\cdot\dfrac{x_2 - 50}{20} = 0{,}05\,x_2 - 2{,}5 \): el peso <strong>en la escala original</strong> es \( w/\sigma = 1/20 = 0{,}05 \) y el sesgo se desplaza en \( -w\,\mu/\sigma = -2{,}5 \). En general:</p>
+  <p>Un peso entrenado con variables estandarizadas se refiere a \( z \), no a \( x \). Supón que \( x_2 \) es la duración en minutos, con media \( \mu = 50 \) y desviación \( \sigma = 20 \), y que el modelo aprendió \( w = 1 \) sobre \( z_2 \). Entonces su contribución es \( 1\cdot\dfrac{x_2 - 50}{20} = 0{,}05\,x_2 - 2{,}5 \): el peso <strong>en la escala original</strong> es \( w/\sigma = 1/20 = 0{,}05 \) (0,05 por cada minuto, en lugar de «1 por cada 20 minutos») y el sesgo se desplaza en \( -w\,\mu/\sigma = -2{,}5 \). En general:</p>
   <div class="formula">\[ w_j^{\text{orig}} = \frac{w_j}{\sigma_j} \qquad\quad b^{\text{orig}} = b - \sum_j \frac{w_j\,\mu_j}{\sigma_j} \]</div>
   <p>En el fragmento 14 eso devuelve \( (1{,}9972;\ 0{,}0502) \) y \( b = 0{,}999 \), frente a los valores verdaderos \( (2;\ 0{,}05) \) y 1.</p>
 </div>
 
 <figure class="demo" data-demo="curso4/c4m3-multiple" data-titulo="Regresión múltiple en vivo: la escala de las variables importa">
-  <div class="haz">Con «x₁, x₂ misma escala» y lr = 0,1, pulsa «Entrenar»: los tres parámetros (barras azules) suben hacia las rayas amarillas. Cambia a «x₂ ×10 sin escalar» y vuelve a entrenar (verás la divergencia). Baja el lr hasta que sea estable (por debajo del límite que indica el cuadro) y mira la lentitud. Por último, elige «x₂ ×10 estandarizadas» con lr = 0,1.</div>
+  <div class="haz">Piensa en x₁ como el presupuesto y en x₂ como los estrenos rivales de esa semana. Con «x₁, x₂ misma escala» y lr = 0,1, pulsa «Entrenar»: los tres parámetros (barras azules) suben hacia las rayas amarillas. Cambia a «x₂ ×10 sin escalar» y vuelve a entrenar (verás la divergencia). Baja el lr hasta que sea estable (por debajo del límite que indica el cuadro) y mira la lentitud. Por último, elige «x₂ ×10 estandarizadas» con lr = 0,1.</div>
   <div class="observa">El cuadro de lectura te da el <strong>límite del learning rate</strong> (2/λ) calculado a partir de los datos: sin escalar es ≈ 0,0096 (por eso lr = 0,1 diverge), con la misma escala ≈ 0,69 y con las variables estandarizadas 1,0. Con lr = 0,1 las dos últimas convergen en 26 y 29 pasos. La dirección «lenta» del valle es la que pone el techo a la velocidad: el coste se atasca arriba de la línea verde hasta que los pesos pequeños terminan de ajustarse.</div>
 </figure>
 
 <h3>Varias salidas: <code>nn.Linear(k, m)</code></h3>
-<p>A veces hay que predecir <strong>varios números a la vez</strong> (por ejemplo, el peso <em>y</em> la altura de una persona a partir de su edad y su sexo). El objetivo \( y \) pasa a ser una matriz <code>(N, m)</code> y el modelo <code>nn.Linear(k, m)</code>. Su <code>weight</code> tiene forma <code>(m, k)</code>: <strong>una fila por salida</strong>, y su <code>bias</code> forma <code>(m,)</code>. Cada salida es una regresión lineal independiente que comparte las entradas: la fila \( j \) de \( W \) y \( b_j \) solo influyen en la salida \( j \). El coste, <code>nn.MSELoss</code>, promedia el error cuadrático sobre <em>todos</em> los \( N \cdot m \) números, así que es la media de los MSE de cada salida.</p>
-<p>En el fragmento 15, con \( y_1 = 1 + 2x_1 - 3x_2 \) e \( y_2 = -1 + 0{,}5x_1 + 4x_2 \) (más ruido), el modelo <code>nn.Linear(2, 2)</code> (6 parámetros) aprende <code>weight</code> \( \approx \begin{pmatrix}1{,}99 & -2{,}99\\ 0{,}49 & 3{,}99\end{pmatrix} \) y <code>bias</code> \( \approx (1{,}00;\,-1{,}01) \): las dos regresiones a la vez. Y <strong>predecir con varias salidas</strong> es llamar al modelo con un lote: <code>model(nuevos)</code> con <code>nuevos</code> de forma <code>(2, 2)</code> devuelve una matriz <code>(2, 2)</code> con una fila por muestra y una columna por salida (la muestra \( (1,-1) \) da \( (5{,}98;\,-4{,}51) \); la verdad sin ruido es \( 6 \) y \( -4{,}5 \)).</p>
+<p>A veces hay que predecir <strong>varios números a la vez</strong> (por ejemplo, las horas vistas <em>y</em> la nota media de una película, a partir de su presupuesto y su duración). El objetivo \( y \) pasa a ser una matriz <code>(N, m)</code> y el modelo <code>nn.Linear(k, m)</code>. Su <code>weight</code> tiene forma <code>(m, k)</code>: <strong>una fila por salida</strong>, y su <code>bias</code> forma <code>(m,)</code>. Cada salida es una regresión lineal independiente que comparte las entradas: la fila \( j \) de \( W \) y \( b_j \) solo influyen en la salida \( j \). El coste, <code>nn.MSELoss</code>, promedia el error cuadrático sobre <em>todos</em> los \( N \cdot m \) números, así que es la media de los MSE de cada salida.</p>
+<p>En el fragmento 15 (piensa en \( y_1 \) como las horas vistas y en \( y_2 \) como la nota media; las fórmulas están inventadas), con \( y_1 = 1 + 2x_1 - 3x_2 \) e \( y_2 = -1 + 0{,}5x_1 + 4x_2 \) (más ruido), el modelo <code>nn.Linear(2, 2)</code> (6 parámetros) aprende <code>weight</code> \( \approx \begin{pmatrix}1{,}99 & -2{,}99\\ 0{,}49 & 3{,}99\end{pmatrix} \) y <code>bias</code> \( \approx (1{,}00;\,-1{,}01) \): las dos regresiones a la vez. Y <strong>predecir con varias salidas</strong> es llamar al modelo con un lote: <code>model(nuevos)</code> con <code>nuevos</code> de forma <code>(2, 2)</code> devuelve una matriz <code>(2, 2)</code> con una fila por muestra y una columna por salida (la muestra \( (1,-1) \) da \( (5{,}98;\,-4{,}51) \); la verdad sin ruido es \( 6 \) y \( -4{,}5 \)).</p>
 </section>
 
 <!-- =============================================================== -->
 <section>
 <h2 id="guardar">Evaluar con datos nuevos y guardar el modelo</h2>
 
-<p class="pregunta">Has entrenado un modelo que va bien. ¿Cómo mides lo bien que lo hará con datos que nunca ha visto, cómo te quedas con la mejor versión y cómo lo guardas para usarlo mañana?</p>
+<p class="pregunta">Has entrenado un modelo que predice bien las horas de las películas que conoce. ¿Cómo mides lo bien que lo hará con los estrenos de mañana, que nunca ha visto, cómo te quedas con la mejor versión y cómo lo guardas para usarlo mañana?</p>
 
 <h3>Train, validación y test en el mismo bucle</h3>
 <p>En cada época se ajusta con <em>train</em> y se mide en <em>validation</em> (sin mover los parámetros). Para esa medida:</p>
@@ -569,7 +591,7 @@
 </ul>
 <p>Como métrica extra se usa a menudo el <strong>\( R^2 \)</strong> (coeficiente de determinación), que compara el error del modelo con el de «predecir siempre la media»:</p>
 <div class="formula">\[ R^2 = 1 - \frac{\sum_i (\hat{y}_i - y_i)^2}{\sum_i (y_i - \bar{y})^2} \]</div>
-<p>donde \( \bar{y} \) es la media de los valores reales. Con \( y = (2, 5, 8) \) y \( \hat{y} = (2{,}5;\ 4{,}5;\ 6{,}5) \): el numerador es \( 0{,}25 + 0{,}25 + 2{,}25 = 2{,}75 \); la media es 5 y el denominador \( 9 + 0 + 9 = 18 \); así \( R^2 = 1 - 2{,}75/18 = 0{,}8472 \). Vale 1 si no hay error y 0 si el modelo no mejora a la media (<a href="../curso-1/modulo-2.html#metricas">Curso 1</a>).</p>
+<p>donde \( \bar{y} \) es la media de los valores reales. Con las horas reales de nuestras tres películas, \( y = (2, 5, 8) \), y \( \hat{y} = (2{,}5;\ 4{,}5;\ 6{,}5) \): el numerador es \( 0{,}25 + 0{,}25 + 2{,}25 = 2{,}75 \); la media es 5 y el denominador \( 9 + 0 + 9 = 18 \); así \( R^2 = 1 - 2{,}75/18 = 0{,}8472 \). Vale 1 si no hay error y 0 si el modelo no mejora a la media (<a href="../curso-1/modulo-2.html#metricas">Curso 1</a>).</p>
 
 <h3>Quedarte con el mejor modelo (checkpoint) y parar a tiempo</h3>
 <p>Un <strong><em>checkpoint</em></strong> es una copia de los parámetros guardada en un buen momento. La receta: en cada época calcula el coste de validación; si es el mejor visto hasta ahora, guarda <strong>una copia</strong> de los parámetros. Al final, restaura esa copia, no el estado de la última época. La <strong>parada temprana</strong> (<em>early stopping</em>) añade una regla: si el coste de validación no mejora durante \( p \) épocas seguidas (la <em>paciencia</em>), se detiene el entrenamiento.</p>
@@ -577,7 +599,7 @@
 
 <div class="callout ojo">
   <span class="lbl">Ojo: <code>state_dict()</code> no copia, <em>apunta</em></span>
-  <p><code>model.state_dict()</code> devuelve un diccionario cuyos tensores son <strong>los mismos objetos</strong> que los parámetros vivos del modelo. Si guardas <code>mejor = model.state_dict()</code> y sigues entrenando, <code>mejor</code> <em>cambia con el modelo</em> y acabas «restaurando» la última época, no la mejor. El fragmento 16 lo demuestra: sumamos 1 al sesgo y el «guardado» pasa de 0,515 a 1,515. Usa <code>copy.deepcopy(model.state_dict())</code> (o guarda a disco enseguida con <code>torch.save</code>).</p>
+  <p><code>model.state_dict()</code> devuelve un diccionario cuyos tensores son <strong>los mismos objetos</strong> que los parámetros vivos del modelo. Si guardas <code>mejor = model.state_dict()</code> y sigues entrenando, <code>mejor</code> <em>cambia con el modelo</em> y acabas «restaurando» la última época, no la mejor. El fragmento 16 lo demuestra: sumamos 1 al sesgo y el «guardado» pasa de 0,515 a 1,515. Usa <code>copy.deepcopy(model.state_dict())</code> (o guarda a disco enseguida con <code>torch.save</code>). Es como guardar el <em>enlace</em> a una película en la plataforma y no la película: si el estudio cambia el montaje, tu enlace enseña la versión nueva; <code>deepcopy</code> es descargarla para verla sin conexión.</p>
 </div>
 
 <h3>Guardar y cargar con <code>state_dict</code></h3>
@@ -630,7 +652,7 @@
 <section id="codigo">
 <h2>Código del módulo</h2>
 <p>Aquí están, juntos, los 17 fragmentos que se han ido citando en el módulo. <strong>Cada uno se ha ejecutado de verdad, dos veces y con la misma salida</strong>, con Python 3.13, PyTorch 2.14.1, NumPy 2.5.3 y scikit-learn 1.9.1, y lo que ves en «Salida esperada» es la salida real, copiada tal cual. Cada fragmento es <strong>independiente</strong>: no hace falta ejecutar los anteriores. Pasa el ratón por una fila de la tabla «Línea por línea» para ver sus líneas resaltadas en el código.</p>
-<p>Dos aclaraciones. Primero, <strong>todos los datos son sintéticos</strong> (rectas más ruido generados con semilla), así no hace falta descargar nada; son los mismos con los que se hacen las cuentas a mano en el texto. Segundo, las cifras que dependen de números aleatorios (por ejemplo los pesos iniciales de <code>nn.Linear</code> o el ruido) son reproducibles gracias a <code>torch.manual_seed</code>, pero <strong>cambiarían</strong> con otra semilla o con otra versión de PyTorch; las que no dependen del azar (los ejemplos de <code>[1, 2, 3]</code>) saldrán iguales siempre. El fragmento 16 crea el archivo <code>modelo_lineal.pt</code> en la carpeta desde la que lo ejecutes.</p>
+<p>Dos aclaraciones. Primero, <strong>todos los datos son sintéticos</strong> (rectas más ruido generados con semilla), así no hace falta descargar nada; son los mismos con los que se hacen las cuentas a mano en el texto. En el código son simplemente <code>x</code> e <code>y</code>; en el texto los hemos vestido de películas (presupuesto → horas vistas). Segundo, las cifras que dependen de números aleatorios (por ejemplo los pesos iniciales de <code>nn.Linear</code> o el ruido) son reproducibles gracias a <code>torch.manual_seed</code>, pero <strong>cambiarían</strong> con otra semilla o con otra versión de PyTorch; las que no dependen del azar (los ejemplos de <code>[1, 2, 3]</code>) saldrán iguales siempre. El fragmento 16 crea el archivo <code>modelo_lineal.pt</code> en la carpeta desde la que lo ejecutes.</p>
 <article class="snippet" data-lang="python" id="frag-1">
   <header>
     <h3>1 · Predicción a mano: <code>w</code> y <code>b</code> como tensores</h3>
@@ -2006,7 +2028,7 @@ print("7. y de forma (3,) frente a yhat de forma (3, 1): w =", round(modelo.weig
    "porque": "<code>weight</code> tiene <strong>una fila por salida</strong> y una columna por entrada: <code>(out_features, in_features) = (2, 3)</code>, y la cuenta es <code>X @ weight.T + bias</code> (por eso hay una traspuesta). <code>bias</code> tiene un valor por salida: <code>(2,)</code>. Los parámetros son 2·3 + 2 = 8."
   },
   {
-   "q": "Los valores reales son <code>y = [2, 5, 8]</code> y el modelo predice <code>ŷ = [2.5, 4.5, 6.5]</code>. ¿Cuánto vale el MSE?",
+   "q": "Las horas vistas reales de tres películas son <code>y = [2, 5, 8]</code> y el modelo predice <code>ŷ = [2.5, 4.5, 6.5]</code>. ¿Cuánto vale el MSE?",
    "opciones": [
     "0,9167",
     "0,8333",
@@ -2028,7 +2050,7 @@ print("7. y de forma (3,) frente a yhat de forma (3, 1): w =", round(modelo.weig
    "porque": "Por <em>broadcasting</em>, <code>(3, 1)</code> y <code>(3,)</code> se combinan en una matriz <code>(3, 3)</code> y se promedian las 9 casillas. No hay excepción; solo un <code>UserWarning</code>. En el ejemplo del texto sale 8,9167 en vez de 0,9167, y entrenando así el modelo acaba aprendiendo la media de <code>y</code>."
   },
   {
-   "q": "Datos <code>x = [1, 2, 3]</code>, <code>y = [2, 5, 8]</code>; empiezas con <code>w = 0</code> y <code>b = 0</code>. El gradiente del MSE respecto a <code>b</code> es −10. ¿Cuánto vale <code>b</code> tras un paso con <code>lr = 0.1</code>?",
+   "q": "Presupuestos <code>x = [1, 2, 3]</code> y horas vistas <code>y = [2, 5, 8]</code> de tres películas; empiezas con <code>w = 0</code> y <code>b = 0</code>. El gradiente del MSE respecto a <code>b</code> es −10. ¿Cuánto vale <code>b</code> tras un paso con <code>lr = 0.1</code>?",
    "opciones": [
     "0,1",
     "1,0",
@@ -2072,7 +2094,7 @@ print("7. y de forma (3,) frente a yhat de forma (3, 1): w =", round(modelo.weig
    "porque": "Paso 1: g = 2(0 − 5) = −10; v = −10; p = 0 − 0,1·(−10) = 1,0. Paso 2: g = 2(1 − 5) = −8; v = 0,9·(−10) + (−8) = −17; p = 1 + 1,7 = <strong>2,7</strong>. Sin momentum sería 1,8 (v = g = −8): el momentum recuerda la dirección anterior y avanza más."
   },
   {
-   "q": "Tienes 60 muestras y entrenas 5 épocas con <code>DataLoader(batch_size=10)</code>. ¿Cuántas veces se ejecuta <code>optimizer.step()</code>?",
+   "q": "Tienes 60 películas de entrenamiento y entrenas 5 épocas con <code>DataLoader(batch_size=10)</code>. ¿Cuántas veces se ejecuta <code>optimizer.step()</code>?",
    "opciones": [
     "30",
     "5",
@@ -2083,7 +2105,7 @@ print("7. y de forma (3,) frente a yhat de forma (3, 1): w =", round(modelo.weig
    "porque": "60 / 10 = 6 lotes por época, y 6 · 5 = <strong>30</strong> actualizaciones. Con <code>batch_size=60</code> serían 5 (batch); con <code>batch_size=1</code>, 300 (SGD)."
   },
   {
-   "q": "Tienes 50 muestras y usas <code>DataLoader(dataset, batch_size=8)</code> (sin <code>drop_last</code>). ¿Cuántos lotes da cada época?",
+   "q": "Tienes 50 películas y usas <code>DataLoader(dataset, batch_size=8)</code> (sin <code>drop_last</code>). ¿Cuántos lotes da cada época?",
    "opciones": [
     "6",
     "8",
@@ -2105,7 +2127,7 @@ print("7. y de forma (3,) frente a yhat de forma (3, 1): w =", round(modelo.weig
    "porque": "El paso es <code>u ← (1 − 0.3·10)·u = −2·u</code>: la distancia al mínimo se <strong>duplica</strong> en cada paso (y cambia de signo), así que diverge. Converge solo si |1 − lr·λ| &lt; 1, es decir, lr &lt; 2/λ = 0,2. Con lr = 0,1 el factor sería 0 (un solo paso) y con lr = 0,15, −0,5 (converge oscilando)."
   },
   {
-   "q": "Entrenas con una variable estandarizada <code>z = (x − 50) / 20</code> y obtienes el peso <code>w = 1</code> para <code>z</code>. ¿Qué peso corresponde a <code>x</code> en las unidades originales?",
+   "q": "Entrenas con la duración de las películas (en minutos) estandarizada, <code>z = (x − 50) / 20</code>, y obtienes el peso <code>w = 1</code> para <code>z</code>. ¿Qué peso corresponde a <code>x</code> en las unidades originales?",
    "opciones": [
     "0,05",
     "20",
@@ -2113,7 +2135,7 @@ print("7. y de forma (3,) frente a yhat de forma (3, 1): w =", round(modelo.weig
     "50"
    ],
    "correcta": 0,
-   "porque": "Como <code>z = (x − 50)/20</code>, el término <code>w·z = (w/20)·x − w·50/20</code>: el peso original es <strong>w / σ = 1 / 20 = 0,05</strong> (y el sesgo se corrige restando <code>w·μ/σ</code>). Multiplicar por 20 o dejarlo en 1 serían errores de escala; 50 es la media, que solo interviene en el sesgo."
+   "porque": "Como <code>z = (x − 50)/20</code>, el término <code>w·z = (w/20)·x − w·50/20</code>: el peso original es <strong>w / σ = 1 / 20 = 0,05</strong> por minuto (y el sesgo se corrige restando <code>w·μ/σ</code>). Multiplicar por 20 o dejarlo en 1 serían errores de escala; 50 es la media, que solo interviene en el sesgo."
   },
   {
    "q": "Guardas el mejor modelo con <code>mejor = model.state_dict()</code> (sin copiar) y sigues entrenando. ¿Qué problema tienes?",
@@ -2136,7 +2158,7 @@ print("7. y de forma (3,) frente a yhat de forma (3, 1): w =", round(modelo.weig
 <h2 class="sin-num sin-toc">Resumen del módulo</h2>
 <ul>
   <li><strong>Predicción.</strong> La regresión lineal es \( \hat{y} = w\,x + b \); con varias variables, \( \hat{y} = X\,W^{T} + b \). <code>nn.Linear(in, out)</code> guarda <code>weight</code> de forma <code>(out, in)</code> y <code>bias</code> de forma <code>(out,)</code>; <code>model(x)</code> llama a <code>forward</code>. Los datos son <code>float32</code> y de forma <code>(N, in)</code>: una fila por muestra. Una clase propia hereda de <code>nn.Module</code>, llama a <code>super().__init__()</code> y define <code>forward</code>.</li>
-  <li><strong>Coste.</strong> MSE \( = \tfrac{1}{N}\sum(\hat{y}-y)^2 \): con <code>y = [2, 5, 8]</code> y <code>ŷ = [2.5, 4.5, 6.5]</code> vale 0,9167, igual a mano que con <code>nn.MSELoss</code>. Trampa: <code>yhat</code> <code>(N, 1)</code> con <code>y</code> <code>(N,)</code> no da error, da otro número (8,9167) y el modelo aprende la media. Con un parámetro el coste es una parábola; con dos, un cuenco.</li>
+  <li><strong>Coste.</strong> MSE \( = \tfrac{1}{N}\sum(\hat{y}-y)^2 \): con las horas vistas <code>y = [2, 5, 8]</code> de Shrek, Toy Story y El Rey León y <code>ŷ = [2.5, 4.5, 6.5]</code> vale 0,9167, igual a mano que con <code>nn.MSELoss</code>. Trampa: <code>yhat</code> <code>(N, 1)</code> con <code>y</code> <code>(N,)</code> no da error, da otro número (8,9167) y el modelo aprende la media. Con un parámetro el coste es una parábola; con dos, un cuenco.</li>
   <li><strong>Gradientes.</strong> \( \partial \text{MSE}/\partial w = 2\,\overline{e\,x} \) y \( \partial \text{MSE}/\partial b = 2\,\overline{e} \); <code>loss.backward()</code> da lo mismo (−24 y −10 en el ejemplo) y <code>w -= lr * w.grad</code> dentro de <code>torch.no_grad()</code> es un paso (w = 1,2; b = 0,5; MSE 31 → 6,57).</li>
   <li><strong>El bucle.</strong> Forward, coste, <code>optimizer.zero_grad()</code>, <code>loss.backward()</code>, <code>optimizer.step()</code>. <code>backward()</code> <em>acumula</em>, por eso hay que vaciar; en PyTorch 2.x <code>zero_grad()</code> deja <code>None</code>. <code>nn.Linear + nn.MSELoss + optim.SGD</code> da exactamente lo mismo que el bucle a mano.</li>
   <li><strong>Momentum.</strong> \( v \leftarrow \mu v + g,\; p \leftarrow p - lr\,v \): con \( \mu = 0{,}9 \) acelera en los valles largos (<code>p</code> pasa de 1,0 a 2,7 en el ejemplo) pero puede pasarse de largo al principio.</li>

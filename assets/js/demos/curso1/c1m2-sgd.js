@@ -4,7 +4,7 @@ Lab.register("curso1/c1m2-sgd", function (root, api) {
   for (i = 0; i < N; i++) { var x = rd.normal(1, 1); X.push(x); Y.push(2 + 3 * x + rd.normal(0, 1.5)); }
   var opt = M.linreg(X, Y);                                   // el mínimo exacto (θ0, θ1)
   var START = [-1.5, 6.0], lr = 0.06, B = 8, decay = false, spd = 3, seed = 1, t, algs, rs, loop;
-  var NAMES = ["GD (los 60 datos)", "Mini-batch", "SGD (1 dato)"];
+  var NAMES = ["GD (las 60 películas)", "Mini-batch", "SGD (1 película)"];
   function rgba(hex, a) { var s = hex.replace("#", ""); if (s.length === 3) s = s.split("").map(function (c) { return c + c; }).join(""); var n = parseInt(s, 16); return "rgba(" + (n >> 16 & 255) + "," + (n >> 8 & 255) + "," + (n & 255) + "," + a + ")"; }
   function J(a, b) { var s = 0; for (var q = 0; q < N; q++) { var e = a + b * X[q] - Y[q]; s += e * e; } return s / N; }
   function init() {
@@ -40,7 +40,7 @@ Lab.register("curso1/c1m2-sgd", function (root, api) {
   ui.slider({ label: "Velocidad (actualizaciones por paso de animación)", min: 1, max: 10, step: 1, value: spd, onInput: function (v) { spd = v; } });
   ui.toggle({ label: "Learning rate decreciente", value: false, onChange: function (v) { decay = v; init(); redraw(); } });
   var bPlay = ui.button("Ejecutar", function () { if (loop.running) loop.stop(); else { if (api.reduceMotion) { for (var q = 0; q < 150; q++) tick(); redraw(); } else loop.start(); } }, "primary");
-  ui.button("Nuevo sorteo de datos", function () { seed += 7; init(); redraw(); });
+  ui.button("Nuevo sorteo de películas", function () { seed += 7; init(); redraw(); });
   loop = api.loop(function () { for (var q = 0; q < spd; q++) tick(); redraw(); return t < 400; }, { fps: 15, onState: function (on) { bPlay.textContent = on ? "Pausa" : "Ejecutar"; } });
 
   var grid = null, gridKey = "";
@@ -72,7 +72,7 @@ Lab.register("curso1/c1m2-sgd", function (root, api) {
     [0, 1, 2].forEach(function (k) { var base = t + 1 - algs[k].loss.length; D.path(ctx, algs[k].loss.map(function (v, q) { return [plot2.x(base + q), plot2.y(v)]; }), cols[k], k === 0 ? 3 : 1.5); });
     D.line(ctx, plot2.box.x, plot2.y(1.5), plot2.box.x + plot2.box.w, plot2.y(1.5), C.muted, 1.2, [4, 4]);
     ctx.restore();
-    D.text(ctx, "ruido de los datos (1,5)", plot2.box.x + plot2.box.w - 6, plot2.y(1.5) - 5, { size: 10, color: C.muted, align: "right" });
+    D.text(ctx, "ruido de las notas (1,5)", plot2.box.x + plot2.box.w - 6, plot2.y(1.5) - 5, { size: 10, color: C.muted, align: "right" });
   }
   function redraw() {
     view.redraw(); view2.redraw();
@@ -80,7 +80,7 @@ Lab.register("curso1/c1m2-sgd", function (root, api) {
     function f(k) { var p = algs[k].th, d = Math.hypot(p[0] - opt.b, p[1] - opt.m); return "(" + p[0].toFixed(2) + ", " + p[1].toFixed(2) + ") · distancia al mínimo <b>" + d.toFixed(2) + "</b> · RMSE <b>" + algs[k].loss[algs[k].loss.length - 1].toFixed(2) + "</b>"; }
     out.set("Actualizaciones: <b>" + t + "</b> · learning rate actual = <b>" + a.toFixed(3) + "</b> · mínimo exacto (" + opt.b.toFixed(2) + ", " + opt.m.toFixed(2) + ")<br>" +
       "GD: " + f(0) + "<br>Mini-batch (" + B + "): " + f(1) + "<br>SGD: " + f(2) + "<br>" +
-      "Datos leídos hasta ahora → GD: <b>" + (t * N) + "</b> · mini-batch: <b>" + (t * B) + "</b> · SGD: <b>" + t + "</b>");
+      "Películas leídas hasta ahora → GD: <b>" + (t * N) + "</b> · mini-batch: <b>" + (t * B) + "</b> · SGD: <b>" + t + "</b>");
   }
   init(); view.draw(draw); view2.draw(draw2); redraw();
   return { destroy: function () { loop.stop(); } };

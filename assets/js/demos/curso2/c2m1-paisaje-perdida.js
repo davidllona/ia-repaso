@@ -1,5 +1,6 @@
 /* Experimento: el paisaje de la pérdida de UN peso y gradient descent con distintos learning rates.
-   Modelo: ŷ = w·x con los datos (1, 2) y (2, 4). Pérdida MSE: L(w) = 2,5·(w − 2)². Gradiente: dL/dw = 5·(w − 2). */
+   Modelo: ŷ = w·x con los datos (1, 2) y (2, 4). Pérdida MSE: L(w) = 2,5·(w − 2)². Gradiente: dL/dw = 5·(w − 2).
+   Disfraz: x = nota de la crítica, y = nota que tú le das (siempre el doble; escala inventada). */
 Lab.register("curso2/c2m1-paisaje-perdida", function (root, api) {
   var M = api.math, D = api.d;
   var DATA = [[1, 2], [2, 4]];
@@ -13,8 +14,8 @@ Lab.register("curso2/c2m1-paisaje-perdida", function (root, api) {
   row.appendChild(colA); row.appendChild(colB); root.appendChild(row);
   var v1 = api.view(colA, { aspect: 1.1, minH: 250, maxH: 420, label: "Curva de la pérdida L(w) con el recorrido de gradient descent" });
   var p1 = api.plot(v1, { xr: [-2, 6], yr: [0, 45], xticks: 8, yticks: 5, xlabel: "valor del peso w", ylabel: "pérdida L(w)", pad: { l: 46, r: 12, t: 14, b: 36 }, xfmt: function (v) { return Math.round(v); }, yfmt: function (v) { return Math.round(v); } });
-  var v2 = api.view(colB, { aspect: 1.1, minH: 250, maxH: 420, label: "Datos y recta ŷ = w·x con el valor actual de w" });
-  var p2 = api.plot(v2, { xr: [0, 3], yr: [0, 8], xticks: 3, yticks: 4, xlabel: "x", ylabel: "y", pad: { l: 40, r: 12, t: 14, b: 36 } });
+  var v2 = api.view(colB, { aspect: 1.1, minH: 250, maxH: 420, label: "Dos películas (nota de la crítica, tu nota) y recta ŷ = w·x con el valor actual de w" });
+  var p2 = api.plot(v2, { xr: [0, 3], yr: [0, 8], xticks: 3, yticks: 4, xlabel: "x · nota de la crítica", ylabel: "y · tu nota", pad: { l: 40, r: 12, t: 14, b: 36 } });
 
   var ui = api.controls(root), out = api.readout(root);
   out.el.style.fontSize = "clamp(.72rem, 2.7vw, .84rem)";
@@ -77,8 +78,8 @@ Lab.register("curso2/c2m1-paisaje-perdida", function (root, api) {
     }
     ctx.restore();
     DATA.forEach(function (d) { D.circle(ctx, p2.x(d[0]), p2.y(d[1]), 7, C.cobalto, C.ink, 2); });
-    D.text(ctx, "recta verdadera (w = 2)", p2.box.x + 6, p2.box.y + 16, { size: 11, color: C.olivaInk, weight: 600 });
-    D.text(ctx, "recta del modelo ŷ = w·x", p2.box.x + 6, p2.box.y + 32, { size: 11, color: C.terracotaInk, weight: 600 });
+    D.text(ctx, "tu criterio real (w = 2)", p2.box.x + 6, p2.box.y + 16, { size: 11, color: C.olivaInk, weight: 600 });
+    D.text(ctx, "lo que predice el modelo ŷ = w·x", p2.box.x + 6, p2.box.y + 32, { size: 11, color: C.terracotaInk, weight: 600 });
   }
 
   function update() {

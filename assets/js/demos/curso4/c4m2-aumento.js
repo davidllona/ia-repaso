@@ -26,10 +26,10 @@ Lab.register("curso4/c4m2-aumento", function (root, api) {
     function g(yy, xx) { return (yy < 0 || xx < 0 || yy > 7 || xx > 7) ? 0 : img[yy][xx]; }
     return (g(y0, x0) * (1 - tx) + g(y0, x0 + 1) * tx) * (1 - ty) + (g(y0 + 1, x0) * (1 - tx) + g(y0 + 1, x0 + 1) * tx) * ty;
   }
-  var view = api.view(root, { aspect: 4.0, minH: 150, maxH: 190, label: "El dígito original y sus versiones aumentadas, una por época" });
+  var view = api.view(root, { aspect: 4.0, minH: 150, maxH: 190, label: "La imagen original (como un póster pequeño) y sus versiones aumentadas, una por época" });
   var ui = api.controls(root), out = api.readout(root);
   var R = api.rng(S.seed);
-  ui.select({ label: "Dígito guardado", options: [["3", "un 3"], ["7", "un 7"], ["9", "un 9"]], value: S.dig, onChange: function (v) { S.dig = v; reset(); } });
+  ui.select({ label: "Imagen guardada (un dígito 8×8)", options: [["3", "un 3"], ["7", "un 7"], ["9", "un 9"]], value: S.dig, onChange: function (v) { S.dig = v; reset(); } });
   ui.slider({ label: "RandomHorizontalFlip p", min: 0, max: 1, step: 0.05, value: S.p, fmt: function (v) { return v.toFixed(2); }, onInput: function (v) { S.p = v; reset(); } });
   ui.slider({ label: "RandomRotation (± grados)", min: 0, max: 45, step: 1, value: S.rot, onInput: function (v) { S.rot = v; reset(); } });
   ui.slider({ label: "desplazamiento máx. (píxeles)", min: 0, max: 2, step: 1, value: S.pad, onInput: function (v) { S.pad = v; reset(); } });
@@ -51,7 +51,7 @@ Lab.register("curso4/c4m2-aumento", function (root, api) {
     var n = S.list.length, cols = Math.min(n, w < 520 ? 6 : 12), rows = Math.ceil(n / cols) || 1, gap = 6;
     var ow = Math.min(h * 0.55, w * 0.2), bw = (w - ow - 24 - gap * cols) / Math.max(cols, 1);
     var sz = Math.min(bw, (h - 30 - gap * (rows - 1)) / rows);
-    D.text(ctx, "guardado", 10 + ow / 2, 12, { size: 10.5, color: C.muted, align: "center" });
+    D.text(ctx, "guardada", 10 + ow / 2, 12, { size: 10.5, color: C.muted, align: "center" });
     paint(ctx, DIG[S.dig], 10, 20, ow, C, 16);
     D.text(ctx, "ds[0] pedido en cada época →", 10 + ow + 14, 12, { size: 10.5, color: C.muted });
     S.list.forEach(function (it, k) {

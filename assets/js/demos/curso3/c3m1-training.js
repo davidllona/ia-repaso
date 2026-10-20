@@ -28,7 +28,7 @@ Lab.register("curso3/c3m1-training", function (root, api) {
   function draw(ctx, w, h, C) {
     if (S.layer === "drop") {
       var m = mask(), n = 10, pad = 30, bw = (w - pad - 12) / n, y0 = h - 40, sc = (h - 90) / 2.6, i;
-      D.text(ctx, w < 480 ? "gris: entrada · color: salida · training=" + (S.train ? "True" : "False") : "entrada (gris) y salida (color) de Dropout(" + S.p.toFixed(2) + ") con training=" + (S.train ? "True" : "False"), w / 2, 16, { align: "center", size: w < 480 ? 10.5 : 11.5, weight: 600, color: C.ink2 });
+      D.text(ctx, w < 480 ? "gris: voto · color: tras Dropout · training=" + (S.train ? "True" : "False") : "voto de cada crítico (gris) y tras Dropout(" + S.p.toFixed(2) + ") con training=" + (S.train ? "True" : "False"), w / 2, 16, { align: "center", size: w < 480 ? 10.5 : 11.5, weight: 600, color: C.ink2 });
       D.line(ctx, pad, y0, w - 8, y0, C.ink, 1.4);
       for (i = 0; i < n; i++) {
         var x = pad + i * bw, hv = HVAL[i], ov = S.train ? (m[i] ? hv / (1 - S.p) : 0) : hv;
@@ -38,12 +38,12 @@ Lab.register("curso3/c3m1-training", function (root, api) {
         D.text(ctx, String(i + 1), x + bw / 2, y0 + 14, { align: "center", size: 10, color: C.muted, mono: true });
         if (ov > 0 && S.train && bw > 24) D.text(ctx, ov.toFixed(1), x + bw * 0.67, y0 - Math.min(ov, 2.6) * sc - 4, { align: "center", size: 9.5, mono: true, color: C.ink2 });
       }
-      D.text(ctx, "unidad →", w - 8, y0 + 28, { align: "right", size: 10, color: C.muted });
+      D.text(ctx, "crítico →", w - 8, y0 + 28, { align: "right", size: 10, color: C.muted });
     } else {
       if (!S.outBN) { apply(); }
       var b = S.batch, o = S.outBN, lo = -3, hi = 10, px = 30, pw = w - px - 14;
       function X(v) { return px + (M.clamp(v, lo, hi) - lo) / (hi - lo) * pw; }
-      D.text(ctx, (w < 480 ? "entrada (arriba) y salida (abajo) · training=" : "6 valores de una neurona: entrada (arriba) y salida de BatchNorm (abajo), training=") + (S.train ? "True" : "False"), w / 2, 16, { align: "center", size: w < 480 ? 10.5 : 11.5, weight: 600, color: C.ink2 });
+      D.text(ctx, (w < 480 ? "capítulos vistos (arriba) y salida (abajo) · training=" : "6 usuarios: capítulos vistos (arriba) y salida de BatchNorm (abajo), training=") + (S.train ? "True" : "False"), w / 2, 16, { align: "center", size: w < 480 ? 10.5 : 11.5, weight: 600, color: C.ink2 });
       var ya = h * 0.36, yb = h * 0.74;
       [[ya, "entrada"], [yb, "salida"]].forEach(function (r) { D.line(ctx, px, r[0], px + pw, r[0], C.ink, 1.2); });
       var k; for (k = lo; k <= hi; k += 1) { var tx = X(k); D.line(ctx, tx, ya - 3, tx, ya + 3, C.muted, 1); D.line(ctx, tx, yb - 3, tx, yb + 3, C.muted, 1); if (k % 2 === 0) { D.text(ctx, String(k), tx, ya + 16, { align: "center", size: 9.5, color: C.muted, mono: true }); D.text(ctx, String(k), tx, yb + 16, { align: "center", size: 9.5, color: C.muted, mono: true }); } }
@@ -61,7 +61,7 @@ Lab.register("curso3/c3m1-training", function (root, api) {
       var avg = 0, N = 2000, r = api.rng(1234);
       for (var q = 0; q < N; q++) { var t = 0; for (i = 0; i < 10; i++) if (r.next() >= S.p) t += HVAL[i] / (1 - S.p); avg += t / N; }
       for (i = 0; i < 10; i++) sumOut += S.train ? (m[i] ? HVAL[i] / (1 - S.p) : 0) : HVAL[i];
-      s = S.train ? "<b>training=True</b>: se apagan " + (10 - kept) + " de 10 unidades y las que quedan se multiplican por 1/(1 − p) = " + (1 / (1 - S.p)).toFixed(2) + "<br>Suma de la entrada: " + f2(sumIn) + " · de la salida con esta máscara: <b>" + f2(sumOut) + "</b> · media de la salida con 2000 máscaras distintas: <b>" + f2(avg) + "</b> (≈ la suma de entrada: por eso se reescala)" :
+      s = S.train ? "<b>training=True</b>: se apagan " + (10 - kept) + " de 10 unidades (críticos) y las que quedan se multiplican por 1/(1 − p) = " + (1 / (1 - S.p)).toFixed(2) + "<br>Suma de la entrada: " + f2(sumIn) + " · de la salida con esta máscara: <b>" + f2(sumOut) + "</b> · media de la salida con 2000 máscaras distintas: <b>" + f2(avg) + "</b> (≈ la suma de entrada: por eso se reescala)" :
         "<b>training=False</b>: Dropout no hace nada, la salida es idéntica a la entrada (suma " + f2(sumIn) + "). Así <code>predict</code> es determinista.";
     } else {
       if (!S.outBN) apply();

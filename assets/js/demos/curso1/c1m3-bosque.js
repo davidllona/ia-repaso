@@ -64,8 +64,8 @@ Lab.register("curso1/c1m3-bosque", function (root, api) {
     return cnt ? ok / cnt : null;
   }
 
-  var view = api.view(root, { aspect: 1.7, minH: 250, label: "Frontera del bosque: el color del fondo mezcla los votos de todos los árboles" });
-  var plot = api.plot(view, { xr: XR, yr: YR, xticks: 6, yticks: 3, pad: { l: 34, r: 10, t: 10, b: 24 }, xfmt: function (v) { return v.toFixed(1); }, yfmt: function (v) { return v.toFixed(1); } });
+  var view = api.view(root, { aspect: 1.7, minH: 250, label: "Películas infantiles y thrillers según su violencia y su suspense; el color del fondo mezcla los votos de todos los árboles del bosque" });
+  var plot = api.plot(view, { xr: XR, yr: YR, xticks: 6, yticks: 3, xlabel: "nivel de violencia →", ylabel: "nivel de suspense →", pad: { l: 26, r: 10, t: 10, b: 36 }, xfmt: function () { return ""; }, yfmt: function () { return ""; } });
   var view2 = api.view(root, { aspect: 2.2, minH: 150, label: "Frontera de los primeros seis árboles del bosque, cada uno entrenado con una muestra distinta" });
   var ui = api.controls(root), out = api.readout(root);
   ui.slider({ label: "Número de árboles (n_estimators)", min: 1, max: MAXT, step: 1, value: B, onInput: function (v) { B = v; update(); } });
@@ -73,7 +73,7 @@ Lab.register("curso1/c1m3-bosque", function (root, api) {
   ui.toggle({ label: "Muestras bootstrap", value: useBoot, onChange: function (v) { useBoot = v; build(); update(); } });
   ui.toggle({ label: "Una variable al azar por pregunta (max_features)", value: useFeat, onChange: function (v) { useFeat = v; build(); update(); } });
   ui.button("Generar otros datos", function () { seed += 4; build(); update(); });
-  api.legend(root, [[api.colors().cobalto, "clase A"], [api.colors().terracota, "clase B"]]);
+  api.legend(root, [[api.colors().cobalto, "infantiles"], [api.colors().terracota, "thrillers"]]);
 
   function draw(ctx, w, h, C) {
     plot.axes(ctx);
@@ -108,7 +108,7 @@ Lab.register("curso1/c1m3-bosque", function (root, api) {
     var fo = accForest(test), o = oob(), mean = M.mean(accs);
     out.set("Árboles individuales (test): media <b>" + (mean * 100).toFixed(1) + " %</b> (de " + (Math.min.apply(null, accs) * 100).toFixed(1) + " % a " + (Math.max.apply(null, accs) * 100).toFixed(1) + " %)<br>" +
       "Bosque de <b>" + B + "</b> " + (B === 1 ? "árbol" : "árboles") + " votando (test): <b>" + (fo * 100).toFixed(1) + " %</b>" + (fo > mean ? " <span class='good'>(+" + ((fo - mean) * 100).toFixed(1) + " puntos sobre el árbol medio)</span>" : "") + "<br>" +
-      (o === null ? "Sin bootstrap no hay muestras «fuera de bolsa»: no se puede calcular el OOB." : "Acierto OOB (cada punto de train lo votan solo los árboles que no lo vieron): <b>" + (o * 100).toFixed(1) + " %</b>") +
+      (o === null ? "Sin bootstrap no hay muestras «fuera de bolsa»: no se puede calcular el OOB." : "Acierto OOB (cada película de train la votan solo los árboles que no la vieron): <b>" + (o * 100).toFixed(1) + " %</b>") +
       (!useBoot && !useFeat ? "<br><span class='bad'>Sin bootstrap ni variables al azar los " + B + " árboles son idénticos: votar no aporta nada.</span>" : ""));
   }
   build(); view.draw(draw); view2.draw(draw2); update();

@@ -7,7 +7,7 @@ Lab.register("curso4/c4m1-slicing", function (root, api) {
   var A = [], i, j;
   for (i = 0; i < R; i++) { A.push([]); for (j = 0; j < Cn; j++) A[i].push(i * Cn + j + 1); }
   var st = { mode: [0, 0], a: [0, 0], b: [R, Cn], s: [1, 1] };
-  var view = api.view(root, { aspect: 2.0, minH: 230, maxH: 320, label: "Matriz 5 por 6 con las celdas elegidas por el slicing resaltadas" });
+  var view = api.view(root, { aspect: 2.0, minH: 230, maxH: 320, label: "Tabla de 5 usuarios por 6 películas con las celdas elegidas por el slicing resaltadas" });
   var ui = api.controls(root), out = api.readout(root);
   var sl = [];
   function axisControls(ax, name, n) {
@@ -18,8 +18,8 @@ Lab.register("curso4/c4m1-slicing", function (root, api) {
       s: ui.slider({ label: name + ": paso", min: 1, max: 3, step: 1, value: 1, onInput: function (v) { st.s[ax] = v; update(); } })
     };
   }
-  axisControls(0, "Filas (eje 0)", R);
-  axisControls(1, "Columnas (eje 1)", Cn);
+  axisControls(0, "Usuarios (eje 0, filas)", R);
+  axisControls(1, "Películas (eje 1, columnas)", Cn);
   function sync() { [0, 1].forEach(function (ax) { var dis = st.mode[ax] === 1; [sl[ax].b, sl[ax].s].forEach(function (c) { c.input.disabled = dis; c.input.parentNode.style.opacity = dis ? 0.35 : 1; }); }); }
   function preset(m0, a0, b0, s0, m1, a1, b1, s1) {
     st.mode = [m0, m1]; st.a = [a0, a1]; st.b = [b0, b1]; st.s = [s0, s1];
@@ -59,6 +59,7 @@ Lab.register("curso4/c4m1-slicing", function (root, api) {
         D.text(ctx, String(A[r][c]), ox + c * cs + cs / 2, oy + r * cs + cs / 2 + 4, { align: "center", size: cs < 28 ? 10 : 12.5, mono: true, color: sel ? C.terracotaInk : C.muted, weight: sel ? 700 : 400 });
       }
     }
+    D.text(ctx, "filas = usuarios · columnas = películas", w / 2 + 8, h - 5, { align: "center", size: 10, color: C.muted });
   }
   function update() {
     var pr = pick(0, R), pc = pick(1, Cn), vals = [], shape = [];
@@ -74,7 +75,7 @@ Lab.register("curso4/c4m1-slicing", function (root, api) {
     else show = "tensor([" + vals.map(function (r2) { return "[" + r2.join(", ") + "]"; }).join(",<br>        ") + "])";
     var shp = shape.length === 0 ? "()" : shape.length === 1 ? "(" + shape[0] + ",)" : "(" + shape.join(", ") + ")";
     out.set("<b>" + expr + "</b> → forma <b>" + shp + "</b> · " + (pr.idx.length * pc.idx.length) + " elementos<br>" + show +
-      "<br>Filas elegidas: [" + pr.idx.join(", ") + "] · columnas elegidas: [" + pc.idx.join(", ") + "]" +
+      "<br>Usuarios (filas) elegidos: [" + pr.idx.join(", ") + "] · películas (columnas) elegidas: [" + pc.idx.join(", ") + "]" +
       (!pr.keep || !pc.keep ? "<br>Un <b>entero</b> en un eje hace desaparecer ese eje; un trozo lo mantiene." : ""));
     view.redraw();
   }

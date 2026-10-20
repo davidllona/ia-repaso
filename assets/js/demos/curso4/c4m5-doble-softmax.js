@@ -5,15 +5,15 @@ Lab.register("curso4/c4m5-doble-softmax", function (root, api) {
   var S = { z0: 5, K: 10 };
   var row = api.el("div", { class: "lab-row" }), colA = api.el("div"), colB = api.el("div");
   row.appendChild(colA); row.appendChild(colB); root.appendChild(row);
-  var vA = api.view(colA, { aspect: 1.45, minH: 190, maxH: 300, label: "Pérdida de la clase correcta según su logit, bien y con doble softmax" });
-  var optA = { xr: [0, 20], yr: [0, 2.6], xticks: 4, yticks: 4, xlabel: "z0 (logit de la clase correcta)", pad: { l: 40, r: 10, t: 22, b: 36 } };
+  var vA = api.view(colA, { aspect: 1.45, minH: 190, maxH: 300, label: "Pérdida según el logit del género correcto, bien y con doble softmax" });
+  var optA = { xr: [0, 20], yr: [0, 2.6], xticks: 4, yticks: 4, xlabel: "z0 (logit del género correcto)", pad: { l: 40, r: 10, t: 22, b: 36 } };
   var pA = api.plot(vA, optA);
   var vB = api.view(colB, { aspect: 1.45, minH: 190, maxH: 300, label: "Gradiente respecto a z0, bien y con doble softmax" });
-  var pB = api.plot(vB, { xr: [0, 20], yr: [-1, 0], xticks: 4, yticks: 4, xlabel: "z0 (logit de la clase correcta)", pad: { l: 44, r: 10, t: 22, b: 36 } });
+  var pB = api.plot(vB, { xr: [0, 20], yr: [-1, 0], xticks: 4, yticks: 4, xlabel: "z0 (logit del género correcto)", pad: { l: 44, r: 10, t: 22, b: 36 } });
   var ui = api.controls(root), out = api.readout(root);
   out.el.style.fontSize = "clamp(.68rem, 2.5vw, .8rem)";
-  ui.slider({ label: "z0: logit de la clase correcta (las demás valen 0)", min: 0, max: 20, step: 0.1, value: S.z0, fmt: function (v) { return v.toFixed(1); }, onInput: function (v) { S.z0 = v; update(); } });
-  ui.slider({ label: "K: número de clases", min: 2, max: 20, step: 1, value: S.K, fmt: function (v) { return v; }, onInput: function (v) { S.K = v; update(); } });
+  ui.slider({ label: "z0: logit del género correcto (los demás valen 0)", min: 0, max: 20, step: 0.1, value: S.z0, fmt: function (v) { return v.toFixed(1); }, onInput: function (v) { S.z0 = v; update(); } });
+  ui.slider({ label: "K: número de géneros (clases)", min: 2, max: 20, step: 1, value: S.K, fmt: function (v) { return v; }, onInput: function (v) { S.K = v; update(); } });
   function calc(z0, K) {
     var e0 = Math.exp(z0), p0 = e0 / (e0 + K - 1), po = (1 - p0) / (K - 1);
     var L1 = -Math.log(p0), g1 = p0 - 1;
@@ -49,7 +49,7 @@ Lab.register("curso4/c4m5-doble-softmax", function (root, api) {
   });
   function update() {
     var r = calc(S.z0, S.K);
-    out.set("K = <b>" + S.K + "</b> · z0 = <b>" + S.z0.toFixed(1) + "</b> · la red dice p0 = <b>" + (r.p0 * 100).toFixed(2) + "%</b> a la clase correcta<br>" +
+    out.set("K = <b>" + S.K + "</b> · z0 = <b>" + S.z0.toFixed(1) + "</b> · la red dice p0 = <b>" + (r.p0 * 100).toFixed(2) + "%</b> al género correcto<br>" +
       "<span class='good'>bien</span>: pérdida <b>" + r.L1.toFixed(4) + "</b>, gradiente <b>" + (r.g1 >= 0 ? "+" : "") + r.g1.toFixed(5) + "</b><br>" +
       "<span class='bad'>doble softmax</span>: pérdida <b>" + r.L2.toFixed(4) + "</b>, gradiente <b>" + (r.g2 >= 0 ? "+" : "") + r.g2.toFixed(5) + "</b> · suelo ln(1 + (K−1)/e) = " + Math.log(1 + (S.K - 1) / Math.E).toFixed(4));
     vA.redraw(); vB.redraw();

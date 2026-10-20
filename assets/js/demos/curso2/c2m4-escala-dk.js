@@ -32,7 +32,7 @@ Lab.register("curso2/c2m4-escala-dk", function (root, api) {
   }
 
   var view = api.view(root, { aspect: 2.6, minH: 170, maxH: 260, label: "Histograma de los productos escalares q·k" });
-  var view2 = api.view(root, { aspect: 3.0, minH: 150, maxH: 230, label: "Pesos de atención (softmax) sobre 8 claves con esos puntajes" });
+  var view2 = api.view(root, { aspect: 3.0, minH: 150, maxH: 230, label: "Pesos de atención (softmax) de un título sobre 8 títulos de su historial con esos puntajes" });
   var ui = api.controls(root), out = api.readout(root);
   out.el.style.fontSize = "clamp(.72rem, 2.7vw, .84rem)";
   ui.slider({ label: "Dimensión de las claves d_k", min: 0, max: 8, step: 1, value: S.e, fmt: function (v) { return Math.pow(2, v); }, onInput: function (v) { S.e = v; update(); } });
@@ -55,7 +55,7 @@ Lab.register("curso2/c2m4-escala-dk", function (root, api) {
   }
   function draw2(ctx, w, h, C) {
     var L = 74, Rr = 44, T = 22, bw = w - L - Rr, rowH = (h - T - 6) / GR;
-    D.text(ctx, "Pesos de atención de una consulta sobre 8 claves", 8, 14, { size: 11.5, color: C.ink2, weight: 500 });
+    D.text(ctx, "Atención de un título sobre 8 títulos de su historial", 8, 14, { size: 11.5, color: C.ink2, weight: 500 });
     R.first.forEach(function (p, k) {
       var y = T + k * rowH;
       D.text(ctx, "k" + (k + 1) + ": " + n(R.scores0[k], 1), L - 6, y + rowH * 0.72, { size: Math.min(10.5, rowH * 0.8), mono: true, align: "right", color: C.muted });

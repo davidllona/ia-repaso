@@ -1,4 +1,4 @@
-/* Experimento: ventanas deslizantes sobre una serie temporal sintética (tendencia + dos senos + ruido, semilla fija).
+/* Experimento: ventanas deslizantes sobre una serie temporal sintética (disfraz: audiencia diaria de una plataforma, cifras inventadas) (tendencia + dos senos + ruido, semilla fija).
    Se ve qué es X (la ventana), qué es y (el valor 'horizonte' pasos después), cuántos ejemplos salen y por qué las ventanas
    que cruzan la frontera train/val/test no existen cuando se corta la serie ANTES de hacer ventanas. */
 Lab.register("curso3/c3m3-ventanas", function (root, api) {
@@ -15,7 +15,7 @@ Lab.register("curso3/c3m3-ventanas", function (root, api) {
   function n(v, k) { return v.toFixed(k === undefined ? 2 : k).replace(".", ",").replace("-", "−"); }
   function segOf(i) { return i < cuts[0] ? 0 : (i < cuts[1] ? 1 : 2); }
 
-  var view = api.view(root, { aspect: 2.1, minH: 230, maxH: 330, label: "Serie temporal con una ventana de entrada marcada en azul y su valor objetivo marcado en naranja" });
+  var view = api.view(root, { aspect: 2.1, minH: 230, maxH: 330, label: "Audiencia inventada de una plataforma a lo largo del tiempo, con una ventana de entrada marcada en azul y su valor objetivo marcado en naranja" });
   var ui = api.controls(root), out = api.readout(root);
   out.el.style.fontSize = "clamp(.72rem, 2.7vw, .84rem)";
   var sw = ui.slider({ label: "Tamaño de la ventana (sequence_length)", min: 4, max: 40, step: 1, value: S.w, onInput: function (v) { S.w = v; fix(); } });
@@ -48,6 +48,7 @@ Lab.register("curso3/c3m3-ventanas", function (root, api) {
       D.circle(ctx, plot.x(ty), plot.y(serie[ty]), 6, C.terracota, C.ink, 2);
     }
     ctx.restore();
+    D.text(ctx, "audiencia (inventada)", b.x + 4, b.y + 12, { size: 10, color: C.muted });
     segs.forEach(function (sg) { D.text(ctx, sg[2], (plot.x(sg[0]) + plot.x(sg[1])) / 2, b.y - 7, { size: 11, align: "center", weight: 600, color: C.ink2 }); });
   }
   function update() {

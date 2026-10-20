@@ -22,11 +22,11 @@ Lab.register("curso5/c5m1-paso-entrenamiento", function (root, api) {
   }
   function stat() { var c = calc(); return { p: c.p, L: c.L }; }
 
-  var view = api.view(root, { aspect: 2.6, minH: 150, maxH: 230, label: "Probabilidad de la clase correcta y pérdida en cada paso" });
+  var view = api.view(root, { aspect: 2.6, minH: 150, maxH: 230, label: "Probabilidad de que el usuario termine la serie y pérdida en cada paso" });
   var plot = api.plot(view, { xr: [0, 20], yr: [0, 1.2], xticks: 4, yticks: 4, xlabel: "pasos de descenso del gradiente", pad: { l: 40, r: 10, t: 18, b: 34 }, xfmt: function (v) { return Math.round(v); } });
   var ui = api.controls(root), tb = api.table(root, ["cantidad", "valor"]), out = api.readout(root);
   ui.slider({ label: "learning rate (η)", min: 0.1, max: 4, step: 0.1, value: S.lr, fmt: function (v) { return v.toFixed(1); }, onInput: function (v) { S.lr = v; update(); } });
-  ui.segmented({ label: "Etiqueta real y", value: 1, options: [[1, "y = 1"], [0, "y = 0"]], onChange: function (v) { S.y = v; reset(); update(); } });
+  ui.segmented({ label: "Etiqueta real y", value: 1, options: [[1, "y = 1 (la terminó)"], [0, "y = 0 (la abandonó)"]], onChange: function (v) { S.y = v; reset(); update(); } });
   function stepOnce() {
     var c = calc(), j, i;
     for (j = 0; j < 2; j++) { for (i = 0; i < 2; i++) S.W1[j][i] -= S.lr * c.dW1[j][i]; S.b1[j] -= S.lr * c.dz1[j]; S.W2[j] -= S.lr * c.dW2[j]; }
@@ -45,7 +45,7 @@ Lab.register("curso5/c5m1-paso-entrenamiento", function (root, api) {
     D.path(ctx, H.map(function (q, i) { return [plot.x(i), plot.y(Math.min(q.L, 1.2))]; }), C.terracota, 2.4);
     D.path(ctx, H.map(function (q, i) { return [plot.x(i), plot.y(q.p)]; }), C.cobalto, 2.4);
     ctx.restore();
-    D.line(ctx, plot.box.x, 10, plot.box.x + 20, 10, C.cobalto, 2.4); D.text(ctx, S.y ? "p (prob. de la clase 1)" : "p (prob. de la clase 1; objetivo 0)", plot.box.x + 25, 14, { size: 10.5, color: C.cobaltoInk, weight: 600 });
+    D.line(ctx, plot.box.x, 10, plot.box.x + 20, 10, C.cobalto, 2.4); D.text(ctx, S.y ? "p (prob. de que termine)" : "p (prob. de terminarla; objetivo 0)", plot.box.x + 25, 14, { size: 10.5, color: C.cobaltoInk, weight: 600 });
     var lx = plot.box.x + plot.box.w * 0.7;
     D.line(ctx, lx, 10, lx + 20, 10, C.terracota, 2.4); D.text(ctx, "pérdida", lx + 25, 14, { size: 10.5, color: C.terracotaInk, weight: 600 });
   });

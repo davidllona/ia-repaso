@@ -1,4 +1,4 @@
-/* Experimento: la escala de las variables. Dos variables, una de 0 a 10 (horas) y otra de 0 a 1000 (nota previa).
+/* Experimento: la escala de las variables. Dos variables, una de 0 a 10 (días sin abrir la app) y otra de 0 a 1000 (segundos de buffering).
    El mismo modelo, el mismo learning rate y 300 épocas con las variables tal cual y con las variables estandarizadas. */
 Lab.register("curso4/c4m4-escala", function (root, api) {
   var M = api.math, D = api.d, EP = 300;
@@ -10,7 +10,7 @@ Lab.register("curso4/c4m4-escala", function (root, api) {
   api.legend(root, [[api.colors().terracota, "variables sin escalar"], [api.colors().cobalto, "variables estandarizadas"]]);
   var ui = api.controls(root), out = api.readout(root);
   ui.slider({ label: "Learning rate (escala logarítmica)", min: -5, max: 0.5, step: 0.25, value: S.le, fmt: function (v) { return Math.pow(10, v).toPrecision(2); }, onInput: function (v) { S.le = v; run(); } });
-  ui.segmented({ label: "Rango de la 2.ª variable", options: [[10, "0 a 10"], [100, "0 a 100"], [1000, "0 a 1000"]], value: S.big, onChange: function (v) { S.big = v; gen(); } });
+  ui.segmented({ label: "Rango de la 2.ª variable (buffering)", options: [[10, "0 a 10"], [100, "0 a 100"], [1000, "0 a 1000"]], value: S.big, onChange: function (v) { S.big = v; gen(); } });
   ui.button("Datos nuevos", function () { seedN += 1; gen(); });
   var seedN = 5, R;
 

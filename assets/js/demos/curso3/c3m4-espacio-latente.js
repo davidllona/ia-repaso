@@ -86,7 +86,7 @@ Lab.register("curso3/c3m4-espacio-latente", function (root, api) {
       ctx.restore();
       var px = pl.x(S.z[0]), py = pl.y(S.z[1]);
       D.circle(ctx, px, py, 8, null, C.paper, 4.5); D.circle(ctx, px, py, 8, null, C.ink, 2.2); D.circle(ctx, px, py, 2.2, C.ink);
-      D.text(ctx, "cada cifra = un dígito codificado · zona rosada = hueco", bx.x + 4, bx.y + bx.h - 6, { size: 10, color: C.muted });
+      D.text(ctx, "cada cifra = un título del catálogo · zona rosada = hueco", bx.x + 4, bx.y + bx.h - 6, { size: 10, color: C.muted });
     }
     function drawImgView(ctx, w, h, C) { drawImg(ctx, decode(S.z, S.model), 4, 4, Math.min(w, h) - 8, C); }
     function drawStrip(ctx, w, h, C) {
@@ -104,8 +104,8 @@ Lab.register("curso3/c3m4-espacio-latente", function (root, api) {
       var hole = rel > HOLE;
       var ns = S.samples.map(function (s) { return nearest(s, S.model).d / SP[S.model]; });
       var nh = ns.filter(function (v) { return v > HOLE; }).length;
-      out.set("<b>z = (" + f(S.z[0]) + ", " + f(S.z[1]) + ")</b> · dígito codificado más cercano: un <b>" + n.label + "</b> a " + rel.toFixed(2) + " desviaciones " +
-        (hole ? "<span class='bad'>(estás en un hueco: el decodificador nunca vio nada parecido)</span>" : "<span class='good'>(zona poblada)</span>") + "<br>" +
+      out.set("<b>z = (" + f(S.z[0]) + ", " + f(S.z[1]) + ")</b> · título más cercano: un <b>" + n.label + "</b> a " + rel.toFixed(2) + " desviaciones " +
+        (hole ? "<span class='bad'>(estás en un hueco del mapa: el decodificador nunca vio ningún título parecido)</span>" : "<span class='good'>(zona poblada)</span>") + "<br>" +
         "<b>Los 10 puntos al azar</b> (círculos): " + (S.model === "vae" ? "sacados de N(0, I), la distribución que el VAE aprendió a respetar" : "sacados uniformes en la caja del gráfico, porque el autoencoder no dice dónde cae su código") +
         " → <b>" + nh + " de 10</b> caen en un hueco.<br>Rango de z₁: " + f(DATA[S.model].pts.reduce(function (a, p) { return Math.min(a, p[0]); }, 1e9)) + " a " + f(DATA[S.model].pts.reduce(function (a, p) { return Math.max(a, p[0]); }, -1e9)) + ".");
       view.redraw(); viewImg.redraw(); strip.redraw();

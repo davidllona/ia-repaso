@@ -8,10 +8,10 @@ Lab.register("curso3/c3m1-cinta", function (root, api) {
   function sl(label, key, mn, mx, st) {
     return ui.slider({ label: label, min: mn, max: mx, step: st, value: S[key], fmt: function (v) { return v.toFixed(1); }, onInput: function (v) { S[key] = v; update(); } });
   }
-  var sx = sl("x (constante, el dato)", "x", -3, 3, 0.1);
+  var sx = sl("x (constante: capítulos de la semana pasada)", "x", -3, 3, 0.1);
   var sw = sl("w (tf.Variable)", "w", -4, 4, 0.1);
   var sb = sl("b (tf.Variable)", "b", -4, 4, 0.1);
-  var st = sl("t (objetivo)", "t", -5, 15, 0.1);
+  var st = sl("t (objetivo: capítulos de esta semana)", "t", -5, 15, 0.1);
   ui.button("◀ Atrás", function () { if (S.ph > 0) S.ph--; update(); });
   ui.button("Paso ▶", function () { if (S.ph < 8) S.ph++; update(); }, "primary");
   ui.button("Ver todo", function () { S.ph = 8; update(); });
@@ -72,8 +72,8 @@ Lab.register("curso3/c3m1-cinta", function (root, api) {
     s += "<b>" + titles[ph] + "</b><br>";
     if (ph === 0) s += "w = " + n2(S.w) + ", x = " + n2(S.x) + ", b = " + n2(S.b) + ", t = " + n2(S.t) + ". Pulsa «Paso» para grabar y luego rebobinar.";
     if (ph === 1) s += "m = " + n2(S.w) + " · " + n2(S.x) + " = <b>" + n2(f.m) + "</b>";
-    if (ph === 2) s += "z = " + n2(f.m) + " + " + n2(S.b) + " = <b>" + n2(f.z) + "</b>";
-    if (ph === 3) s += "e = " + n2(f.z) + " − " + n2(S.t) + " = <b>" + n2(f.e) + "</b>";
+    if (ph === 2) s += "z = " + n2(f.m) + " + " + n2(S.b) + " = <b>" + n2(f.z) + "</b> (lo que predice el modelo)";
+    if (ph === 3) s += "e = " + n2(f.z) + " − " + n2(S.t) + " = <b>" + n2(f.e) + "</b> (lo que se queda corto, o se pasa, la predicción)";
     if (ph === 4) s += "L = (" + n2(f.e) + ")² = <b>" + n2(f.L) + "</b>. La cinta guarda las 4 operaciones y sus valores intermedios.";
     if (ph === 5) s += "∂L/∂e = 2·e = 2 · " + n2(f.e) + " = <b>" + n2(g.e) + "</b> (derivada local de «elevar al cuadrado»)";
     if (ph === 6) s += "∂L/∂z = ∂L/∂e · ∂e/∂z = " + n2(g.e) + " · 1 = <b>" + n2(g.z) + "</b> (restar t no cambia la pendiente respecto a z)";

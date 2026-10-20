@@ -26,8 +26,8 @@ Lab.register("curso3/c3m2-congelar-capas", function (root, api) {
   var view = api.view(root, { aspect: 1.3, minH: 420, maxH: 470, label: "Lista de capas del cuerpo VGG16 con las congeladas y las entrenables" });
   var ui = api.controls(root), out = api.readout(root);
   var sl = ui.slider({ label: "Capas convolucionales descongeladas (las últimas)", min: 0, max: 13, step: 1, value: 0, onInput: function (v) { st.N = v; update(); } });
-  ui.select({ label: "Datos propios", options: [["few", "pocos (cientos de imágenes)"], ["many", "muchos (decenas de miles)"]], value: "few", onChange: function (v) { st.data = v; update(); } });
-  ui.select({ label: "Parecido con ImageNet", options: [["high", "alto (animales, objetos, coches…)"], ["low", "bajo (rayos X, satélite, microscopio)"]], value: "high", onChange: function (v) { st.sim = v; update(); } });
+  ui.select({ label: "Datos propios", options: [["few", "pocos (cientos de pósters)"], ["many", "muchos (decenas de miles de pósters)"]], value: "few", onChange: function (v) { st.data = v; update(); } });
+  ui.select({ label: "Parecido con ImageNet", options: [["high", "alto (animales, objetos, escenas…)"], ["low", "bajo (rayos X, satélite, microscopio)"]], value: "high", onChange: function (v) { st.sim = v; update(); } });
   ui.button("Aplicar la recomendación", function () { var r = reco(); st.N = r.N; sl.set(r.N, true); update(); }, "primary");
   ui.button("Congelar todo el cuerpo", function () { st.N = 0; sl.set(0, true); update(); });
   ui.button("Descongelarlo todo", function () { st.N = 13; sl.set(13, true); update(); });

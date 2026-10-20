@@ -1,5 +1,6 @@
 /* Experimento: una red neuronal entrenándose EN VIVO en tu navegador (forward + backpropagation + SGD o Adam reales).
-   Clasificación binaria en 2D: capa de salida sigmoide + entropía cruzada binaria. */
+   Clasificación binaria en 2D: capa de salida sigmoide + entropía cruzada binaria.
+   Disfraz: cada punto es un usuario (x = gusto por la acción, y = gusto por el romance); su color dice si le gustó una película concreta. */
 Lab.register("curso2/c2m1-mini-red", function (root, api) {
   var M = api.math, D = api.d, C0 = api.colors();
   var S = { data: "circles", layers: 2, width: 6, act: "tanh", opt: "adam", lrExp: -1.8, seed: 1, dseed: 4, step: 0, hist: [], run: false };
@@ -102,8 +103,8 @@ Lab.register("curso2/c2m1-mini-red", function (root, api) {
   /* ---------- interfaz ---------- */
   var row = api.el("div", { class: "lab-row" }), colA = api.el("div"), colB = api.el("div");
   row.appendChild(colA); row.appendChild(colB); root.appendChild(row);
-  var view = api.view(colA, { aspect: 1.0, minH: 260, maxH: 440, label: "Frontera de decisión de la red sobre los puntos de entrenamiento y de test" });
-  var plot = api.plot(view, { xr: [-HM, HM], yr: [-HM, HM], xticks: 4, yticks: 4, pad: { l: 30, r: 8, t: 8, b: 22 }, xfmt: function (v) { return +v.toFixed(1); }, yfmt: function (v) { return +v.toFixed(1); } });
+  var view = api.view(colA, { aspect: 1.0, minH: 260, maxH: 440, label: "Frontera de decisión de la red sobre los usuarios de entrenamiento y de test" });
+  var plot = api.plot(view, { xr: [-HM, HM], yr: [-HM, HM], xticks: 4, yticks: 4, xlabel: "gusto por la acción", ylabel: "gusto por el romance", pad: { l: 38, r: 8, t: 8, b: 34 }, xfmt: function (v) { return +v.toFixed(1); }, yfmt: function (v) { return +v.toFixed(1); } });
   var viewN = api.view(colB, { aspect: 1.5, minH: 170, maxH: 280, label: "Esquema de la red con el color de cada conexión según el signo del peso" });
   var viewL = api.view(colB, { aspect: 2.3, minH: 130, maxH: 200, label: "Pérdida de entrenamiento y de test durante el entrenamiento" });
   var plotL = api.plot(viewL, { xr: [0, 100], yr: [0, 1], xticks: 4, yticks: 2, xlabel: "pasos de entrenamiento", pad: { l: 40, r: 10, t: 22, b: 32 }, xfmt: function (v) { return Math.round(v); } });
@@ -124,7 +125,7 @@ Lab.register("curso2/c2m1-mini-red", function (root, api) {
   ui.button("Dar 100 pasos", function () { stop(); for (var i = 0; i < 100; i++) trainStep(); update(); });
   ui.button("Reiniciar pesos", function () { S.seed++; rebuild(); });
   ui.button("Otros datos", function () { S.dseed++; genData(); rebuild(); });
-  api.legend(root, [[C0.cobalto, "clase 1"], [C0.terracota, "clase 0"], [C0.muted, "punto lleno = entrenamiento · aro = test (la red no lo ve)"]]);
+  api.legend(root, [[C0.cobalto, "le gusta la peli (clase 1)"], [C0.terracota, "no le gusta (clase 0)"], [C0.muted, "punto lleno = usuario de entrenamiento · aro = usuario de test (la red no lo ve)"]]);
   var loop = api.loop(function () { for (var i = 0; i < STEPS_PER_FRAME; i++) trainStep(); update(); if (S.step > 40000) { stop(); return false; } }, { fps: 30 });
   function stop() { S.run = false; if (loop) loop.stop(); btn.textContent = "▶ Entrenar"; }
 

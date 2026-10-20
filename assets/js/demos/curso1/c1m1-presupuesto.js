@@ -1,13 +1,13 @@
-/* Experimento: optimización de decisiones. Repartir 100.000 € de publicidad entre canales con rendimientos decrecientes. */
+/* Experimento: optimización de decisiones. Repartir 100.000 € para anunciar el estreno de una película entre canales con rendimientos decrecientes. */
 Lab.register("curso1/c1m1-presupuesto", function (root, api) {
-  var CAN = [["Google", 2], ["Instagram", Math.sqrt(3)], ["TikTok", Math.sqrt(2)], ["Email", 1]], TOTAL = 100, S = 3;
+  var CAN = [["YouTube", 2], ["Instagram", Math.sqrt(3)], ["TikTok", Math.sqrt(2)], ["Email", 1]], TOTAL = 100, S = 3;
   var w = [25, 25, 25, 25], sl = [];
   var ui = api.controls(root);
   CAN.forEach(function (c, i) {
     sl.push(ui.slider({ label: c[0] + " (peso)", min: 0, max: 100, step: 5, value: w[i], onInput: function (v) { w[i] = v; update(); } }));
   });
   ui.button("Reparto igual", function () { set([25, 25, 25, 25]); });
-  ui.button("Todo en Google", function () { set([100, 0, 0, 0]); });
+  ui.button("Todo en YouTube", function () { set([100, 0, 0, 0]); });
   ui.button("Reparto óptimo", function () { set(CAN.map(function (c) { return c[1] * c[1] * 10; })); }, "primary");
   var tabla = api.table(root, ["Canal", "Inv. k€", "Ventas k€", "Último €"]);
   (function () { var st = document.createElement("style"); st.textContent = ".lab-table.c1m1-tb td,.lab-table.c1m1-tb th{padding:.3rem .28rem!important}@media (max-width:560px){.lab-table.c1m1-tb{font-size:.7rem!important}.lab-table.c1m1-tb th{font-size:.6rem!important}}"; root.appendChild(st); tabla.el.firstChild.classList.add("c1m1-tb"); })();

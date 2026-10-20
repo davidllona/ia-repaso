@@ -57,7 +57,7 @@ Lab.register("curso3/c3m2-contador-arquitecturas", function (root, api) {
   var ui = api.controls(root), out = api.readout(root);
   ui.select({ label: "Arquitectura", options: [["lenet", "LeNet-5"], ["alex", "AlexNet"], ["vgg", "VGG16"]], value: st.arch, onChange: function (v) { st.arch = v; st.side = ARCH[v].side; setSlider(); update(); } });
   ui.segmented({ label: "Cabeza clasificadora", options: [["flat", "Flatten + capas densas"], ["gap", "GlobalAveragePooling + una densa"]], value: "flat", onChange: function (v) { st.head = v; update(); } });
-  var sl = ui.slider({ label: "Lado de la imagen de entrada (px)", min: 64, max: 320, step: 32, value: 224, onInput: function (v) { st.side = v; update(); } });
+  var sl = ui.slider({ label: "Lado del póster de entrada (px)", min: 64, max: 320, step: 32, value: 224, onInput: function (v) { st.side = v; update(); } });
   function setSlider() { var A = ARCH[st.arch]; sl.input.min = A.smin; sl.input.max = A.smax; sl.input.step = A.sstep; sl.set(A.side, true); }
   setSlider();
 

@@ -51,7 +51,7 @@ Lab.register("curso2/c2m3-que-aprende", function (root, api) {
   function mixc(c1, c2, t) { var a = hex(c1), b = hex(c2); t = Math.max(0, Math.min(1, t)); return "rgb(" + Math.round(a[0] + (b[0] - a[0]) * t) + "," + Math.round(a[1] + (b[1] - a[1]) * t) + "," + Math.round(a[2] + (b[2] - a[2]) * t) + ")"; }
 
   /* ---------- vistas ---------- */
-  var v1 = api.view(root, { aspect: 2.2, minH: 175, maxH: 250, drag: true, label: "Imagen de entrada de 16 por 16 píxeles, editable, y probabilidad de cada figura" });
+  var v1 = api.view(root, { aspect: 2.2, minH: 175, maxH: 250, drag: true, label: "Icono de entrada de 16 por 16 píxeles, editable, y probabilidad de cada figura" });
   var v2 = api.view(root, { aspect: 2.2, minH: 150, maxH: 215, label: "Cuatro mapas de características de la primera capa convolucional con sus filtros" });
   var v3 = api.view(root, { aspect: 1.6, minH: 190, maxH: 290, label: "Ocho mapas de características de la segunda capa convolucional" });
   var ui = api.controls(root), out = api.readout(root);
@@ -79,11 +79,11 @@ Lab.register("curso2/c2m3-que-aprende", function (root, api) {
   cur = zeros(); res = forward(cur);
   v1.draw(function (ctx, w, h, C) {
     var D = api.d, g = g1(), i, j;
-    D.text(ctx, "Entrada 16×16 · dibuja", 8, 13, { size: 11, weight: 600, color: C.ink2 });
+    D.text(ctx, "Icono 16×16 · dibuja", 8, 13, { size: 11, weight: 600, color: C.ink2 });
     for (i = 0; i < S; i++) for (j = 0; j < S; j++) { ctx.fillStyle = mixc(C.paper, C.ink, cur[i][j]); ctx.fillRect(g.x0 + j * g.s, g.y0 + i * g.s, Math.ceil(g.s), Math.ceil(g.s)); }
     D.rect(ctx, g.x0, g.y0, g.size, g.size, null, C.ink, 1.5);
     var px = g.x0 + g.size + 22, pw = w - px - 10;
-    D.text(ctx, "¿Qué figura es?", px, 13, { size: 11, weight: 600, color: C.ink2 });
+    D.text(ctx, "¿Qué icono es?", px, 13, { size: 11, weight: 600, color: C.ink2 });
     if (!res) return;
     var best = res.probs.indexOf(Math.max.apply(null, res.probs)), rowH = (h - 30) / 3;
     for (i = 0; i < 3; i++) {

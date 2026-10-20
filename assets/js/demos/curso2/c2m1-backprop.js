@@ -1,5 +1,6 @@
 /* Experimento: backpropagation en la red 2-2-1: el error viaja hacia atrás, cada peso recibe su gradiente (regla de la cadena)
-   y se actualiza w ← w − η·g. La pérdida es la entropía cruzada binaria; la salida, una sigmoide. */
+   y se actualiza w ← w − η·g. La pérdida es la entropía cruzada binaria; la salida, una sigmoide.
+   Disfraz: x1 = encaje del género, x2 = duración, y = 1 si el usuario termina la peli. */
 Lab.register("curso2/c2m1-backprop", function (root, api) {
   var M = api.math, D = api.d;
   var P0 = { w11: 0.4, w12: -0.6, b1: 0.1, w21: 0.7, w22: 0.2, b2: -0.3, v1: 0.5, v2: -0.8, c: 0.2 };
@@ -44,15 +45,15 @@ Lab.register("curso2/c2m1-backprop", function (root, api) {
   function resetAll() { S.P = Object.assign({}, P0); S.phase = 0; S.iter = 0; S.before = null; S.hist = [fwd(S.P).L]; }
   S.hist = [fwd(S.P).L];
 
-  var view = api.view(root, { aspect: 2.0, minH: 290, maxH: 400, label: "Red 2-2-1 con los gradientes que viajan hacia atrás" });
+  var view = api.view(root, { aspect: 2.0, minH: 290, maxH: 400, label: "Red 2-2-1 que predice si un usuario terminará una película, con los gradientes que viajan hacia atrás" });
   var view2 = api.view(root, { aspect: 4.2, minH: 120, maxH: 170, label: "Pérdida en cada iteración" });
   var plot2 = api.plot(view2, { xr: [0, 20], yr: [0, 1], xticks: 5, yticks: 2, xlabel: "iteraciones (actualizaciones de pesos)", ylabel: "pérdida", pad: { l: 46, r: 12, t: 10, b: 34 }, xfmt: function (v) { return Math.round(v); } });
   var ui = api.controls(root), out = api.readout(root);
   out.el.style.fontSize = "clamp(.72rem, 2.7vw, .84rem)";
   function reset2() { S.phase = 0; S.before = null; S.iter = 0; S.hist = [fwd(S.P).L]; }
   ui.slider({ label: "Learning rate η", min: 0.05, max: 3, step: 0.05, value: S.eta, fmt: function (v) { return v.toFixed(2); }, onInput: function (v) { S.eta = v; update(); } });
-  ui.slider({ label: "Entrada x₁", min: -2, max: 2, step: 0.1, value: S.x1, fmt: function (v) { return v.toFixed(1); }, onInput: function (v) { S.x1 = v; reset2(); update(); } });
-  ui.slider({ label: "Entrada x₂", min: -2, max: 2, step: 0.1, value: S.x2, fmt: function (v) { return v.toFixed(1); }, onInput: function (v) { S.x2 = v; reset2(); update(); } });
+  ui.slider({ label: "x₁ · encaje del género", min: -2, max: 2, step: 0.1, value: S.x1, fmt: function (v) { return v.toFixed(1); }, onInput: function (v) { S.x1 = v; reset2(); update(); } });
+  ui.slider({ label: "x₂ · duración de la peli", min: -2, max: 2, step: 0.1, value: S.x2, fmt: function (v) { return v.toFixed(1); }, onInput: function (v) { S.x2 = v; reset2(); update(); } });
   ui.select({ label: "Activación de la capa oculta", value: "sigmoid", options: [["sigmoid", "Sigmoide"], ["tanh", "tanh"], ["relu", "ReLU"]], onChange: function (v) { S.act = v; reset2(); update(); } });
   ui.button("◀ Paso anterior", function () { goBack(); }, null);
   ui.button("Paso siguiente ▶", function () { goNext(); }, "primary");
@@ -126,7 +127,7 @@ Lab.register("curso2/c2m1-backprop", function (root, api) {
 
   function update() {
     var R = fwd(S.P), ph = S.phase, G = (ph >= 1 && ph <= 4) ? bwd(S.P, R) : null, s = "", A = ACT[S.act], P = S.P;
-    var titles = ["Fase 0 · Forward hecho: ya conocemos la predicción y la pérdida", "Fase 1 · El error en la salida", "Fase 2 · Gradientes de la capa de salida (v₁, v₂, c)",
+    var titles = ["Fase 0 · Forward hecho: ya conocemos la predicción (¿la termina?) y la pérdida", "Fase 1 · El error en la salida", "Fase 2 · Gradientes de la capa de salida (v₁, v₂, c)",
       "Fase 3 · El error viaja hacia atrás hasta las neuronas ocultas", "Fase 4 · Gradientes de la capa oculta (w y b)", "Fase 5 · Actualizar: w ← w − η·g"];
     s += "<b>" + titles[ph] + "</b> · iteración " + S.iter + "<br>";
     if (ph === 0) s += "ŷ = " + nk(R.yh, 4) + " · y = " + S.y + " → L = <b>" + nk(R.L, 4) + "</b>. Ahora hay que repartir la «culpa» de ese error entre los 9 parámetros. Pulsa «Paso siguiente».";

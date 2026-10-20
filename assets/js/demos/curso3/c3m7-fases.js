@@ -45,7 +45,7 @@ Lab.register("curso3/c3m7-fases", function (root, api) {
 
   v1.draw(function (ctx, w, h, C) {
     var c = counts(), x0 = 10, bw = Math.min(w - 20 - 78, 330), bh = (h - 20) / 5 - 8, y = 8, items = [
-      { name: "imagen 32×32×3", sub: "→ aumento (solo al entrenar) → Rescaling", st: null, p: 0 }
+      { name: "carátula 32×32×3", sub: "→ aumento (solo al entrenar) → Rescaling", st: null, p: 0 }
     ].concat(BLOCKS.map(function (b, i) { return { name: b.name, sub: b.sub, st: c.st[i], p: b.conv + b.bnT + b.bnN }; })).concat([{ name: "cabeza nueva", sub: "Flatten + Dropout + Dense(5)", st: true, p: HEAD }]);
     items.forEach(function (it, i) {
       var col = it.st === null ? C.muted : it.st ? C.terracota : C.cobalto;

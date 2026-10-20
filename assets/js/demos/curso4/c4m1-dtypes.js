@@ -26,7 +26,7 @@ Lab.register("curso4/c4m1-dtypes", function (root, api) {
   ui.select({ label: "dtype del tensor A", value: st.a, options: opts, onChange: function (v) { st.a = v; update(); } });
   ui.select({ label: "dtype del tensor B", value: st.b, options: opts, onChange: function (v) { st.b = v; update(); } });
   ui.segmented({ label: "Operación", value: "+", options: [["+", "A + B  (o A * B)"], ["/", "A / B"]], onChange: function (v) { st.op = v; update(); } });
-  ui.select({ label: "Elementos del tensor", value: 1000000, options: [[1000, "mil"], [1000000, "un millón"], [47040000, "47 millones (MNIST: 60 000 × 28 × 28)"]], onChange: function (v) { st.n = +v; update(); } });
+  ui.select({ label: "Elementos del tensor", value: 1000000, options: [[1000, "mil"], [1000000, "un millón"], [47040000, "47 millones (60 000 carátulas de 28 × 28)"]], onChange: function (v) { st.n = +v; update(); } });
   ui.button("int64 + float32", function () { setT("int64", "float32", "+"); }, "primary");
   ui.button("int64 / int64", function () { setT("int64", "int64", "/"); });
   ui.button("int64 + float16", function () { setT("int64", "float16", "+"); });

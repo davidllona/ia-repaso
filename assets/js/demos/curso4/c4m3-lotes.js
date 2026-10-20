@@ -42,7 +42,7 @@ Lab.register("curso4/c4m3-lotes", function (root, api) {
 
   function mse(w, b) { var s = 0, i; for (i = 0; i < N; i++) { var e = w * X[i] + b - Y[i]; s += e * e; } return s / N; }
   var A = [[0, 0], [0, 0]];
-  var vS = api.view(root, { aspect: 9, minH: 52, maxH: 70, label: "Cómo reparte el DataLoader las 30 muestras en lotes" });
+  var vS = api.view(root, { aspect: 9, minH: 52, maxH: 70, label: "Cómo reparte el DataLoader las 30 películas en lotes" });
   var row = api.el("div", { class: "lab-row" }); root.appendChild(row);
   var p1 = api.el("div", { style: { minWidth: 0 } }), p2 = api.el("div", { style: { minWidth: 0 } }); row.appendChild(p1); row.appendChild(p2);
   var vB = api.view(p1, { aspect: 1.1, minH: 250, label: "Camino de (w, b) sobre el mapa del coste" });
@@ -91,7 +91,7 @@ Lab.register("curso4/c4m3-lotes", function (root, api) {
       x += gap;
     }
     plan.dropped.forEach(function (q) { D.rect(ctx, x, 14, cw - 1, H - 28, null, C.muted, 1); if (cw >= 17) D.text(ctx, String(q + 1), x + (cw - 1) / 2, H / 2 + 4, { size: 10, color: C.muted, align: "center" }); x += cw; });
-    D.text(ctx, "próxima época: un color = un lote; el número es la muestra", pad, 10, { size: 10.5, color: C.ink2 });
+    D.text(ctx, "próxima época: un color = un lote; el número es la película", pad, 10, { size: 10.5, color: C.ink2 });
   }
   function drawB(ctx, W, H, C) {
     var D = api.d, i, bx = pB.box;
@@ -115,8 +115,8 @@ Lab.register("curso4/c4m3-lotes", function (root, api) {
     vS.redraw(); vB.redraw(); vC.redraw();
     var nb = plan.batches.length, sizes = plan.batches.map(function (a) { return a.length; }), m = mse(w, b);
     var szTxt = sizes.length > 8 ? sizes.slice(0, 4).join(", ") + ", …, " + sizes[sizes.length - 1] : sizes.join(", ");
-    out.set("batch_size = <b>" + bs + "</b> → " + (dropLast ? "⌊30/" + bs + "⌋" : "⌈30/" + bs + "⌉") + " = <b>" + nb + "</b> actualizaciones por época (lotes de " + szTxt + ")" + (plan.dropped.length ? " · se tiran <b>" + plan.dropped.length + "</b> muestras" : "") + "<br>" +
-      "época <b>" + epoch + "</b> · actualizaciones <b>" + updates + "</b> · muestras leídas <b>" + (epoch * N + (ptr ? plan.batches.slice(0, ptr).reduce(function (s, a) { return s + a.length; }, 0) : 0)) + "</b><br>" +
+    out.set("batch_size = <b>" + bs + "</b> → " + (dropLast ? "⌊30/" + bs + "⌋" : "⌈30/" + bs + "⌉") + " = <b>" + nb + "</b> actualizaciones por época (lotes de " + szTxt + ")" + (plan.dropped.length ? " · se tiran <b>" + plan.dropped.length + "</b> películas" : "") + "<br>" +
+      "época <b>" + epoch + "</b> · actualizaciones <b>" + updates + "</b> · películas leídas <b>" + (epoch * N + (ptr ? plan.batches.slice(0, ptr).reduce(function (s, a) { return s + a.length; }, 0) : 0)) + "</b><br>" +
       "w = <b>" + (isFinite(w) ? w.toFixed(3) : "∞") + "</b> · b = <b>" + (isFinite(b) ? b.toFixed(3) : "∞") + "</b> · MSE total = <b>" + (m > 1e6 || !isFinite(m) ? "enorme (diverge)" : m.toFixed(3)) + "</b>" + (m > 1e4 || !isFinite(m) ? "<br><span class='bad'>lr demasiado grande para este tamaño de lote</span>" : ""));
   }
   reset();

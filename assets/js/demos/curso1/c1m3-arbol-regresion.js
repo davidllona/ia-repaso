@@ -35,15 +35,15 @@ Lab.register("curso1/c1m3-arbol-regresion", function (root, api) {
   function leaves(nd, cap) { return (nd.left && nd.depth < cap) ? leaves(nd.left, cap) + leaves(nd.right, cap) : 1; }
   function cuts(nd, cap, arr) { if (nd.left && nd.depth < cap) { arr.push(nd.t); cuts(nd.left, cap, arr); cuts(nd.right, cap, arr); } return arr; }
 
-  var view = api.view(root, { aspect: 1.8, minH: 250, label: "Datos y predicción escalonada de un árbol de regresión" });
-  var plot = api.plot(view, { xr: [0, 10], yr: [-1, 9], xticks: 5, yticks: 5, grid: false, xlabel: "x (variable de entrada)", ylabel: "y (valor a predecir)", pad: { l: 40, r: 10, t: 10, b: 36 }, xfmt: function (v) { return v; }, yfmt: function (v) { return Math.round(v); } });
+  var view = api.view(root, { aspect: 1.8, minH: 250, label: "Tensión de las escenas de una película según el minuto, y predicción escalonada de un árbol de regresión" });
+  var plot = api.plot(view, { xr: [0, 10], yr: [-1, 9], xticks: 5, yticks: 5, grid: false, xlabel: "minuto de la película", ylabel: "nivel de tensión de la escena", pad: { l: 40, r: 10, t: 10, b: 36 }, xfmt: function (v) { return v * 10; }, yfmt: function (v) { return ""; } });
   var ui = api.controls(root), out = api.readout(root);
   ui.slider({ label: "Profundidad máxima (max_depth)", min: 1, max: MAXD, step: 1, value: depth, onInput: function (v) { depth = v; update(); } });
   ui.slider({ label: "Mínimo de datos por hoja (min_samples_leaf)", min: 1, max: 10, step: 1, value: minLeaf, onInput: function (v) { minLeaf = v; gen(); update(); } });
   ui.slider({ label: "Ruido de los datos", min: 0.2, max: 1.6, step: 0.2, value: noise, fmt: function (v) { return v.toFixed(1); }, onInput: function (v) { noise = v; gen(); update(); } });
   ui.toggle({ label: "Comparar con una recta (regresión lineal)", value: false, onChange: function (v) { showLine = v; update(); } });
   ui.button("Generar otros datos", function () { seed += 3; gen(); update(); });
-  api.legend(root, [[api.colors().cobalto, "datos de entrenamiento"], [api.colors().terracota, "predicción del árbol"], [api.colors().muted, "función real (desconocida)"]]);
+  api.legend(root, [[api.colors().cobalto, "escenas medidas (entrenamiento)"], [api.colors().terracota, "predicción del árbol"], [api.colors().muted, "tensión real (desconocida)"]]);
 
   function draw(ctx, w, h, C) {
     plot.axes(ctx); ctx.save(); plot.clip(ctx);

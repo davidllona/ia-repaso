@@ -2,7 +2,7 @@
 Lab.register("curso1/c1m3-adaboost", function (root, api) {
   var D = api.d, M = api.math;
   var T = 3, MAXT = 12, pts = [], rounds = [], seed = 3, w0;
-  var NAMES = ["x", "y"];
+  var NAMES = ["acción", "humor"];
 
   function gen() {
     var r = api.rng(seed), i, n = 34; pts = [];
@@ -42,13 +42,13 @@ Lab.register("curso1/c1m3-adaboost", function (root, api) {
   function score(p, k) { var s = 0; for (var i = 0; i < k; i++) s += rounds[i].a * hs(rounds[i].st, p); return s; }
   function accEns(k) { var ok = 0; pts.forEach(function (p) { if ((score(p, k) > 0 ? 1 : -1) === p[2]) ok++; }); return ok / pts.length; }
 
-  var view = api.view(root, { aspect: 1.45, minH: 290, label: "Puntos de dos clases; su tamaño es su peso; el fondo es la decisión del conjunto de stumps" });
-  var plot = api.plot(view, { xr: [0, 10], yr: [0, 10], xticks: 5, yticks: 5, grid: false, pad: { l: 30, r: 10, t: 10, b: 24 }, xfmt: function (v) { return v; }, yfmt: function (v) { return v; } });
-  var ui = api.controls(root), out = api.readout(root), tb = api.table(root, ["Ronda", "Stump (si no, lo contrario)", "ε", "α"]), sT;
+  var view = api.view(root, { aspect: 1.45, minH: 290, label: "Películas según su nivel de acción y de humor: las que le gustan a Ana y las que no; el tamaño del punto es su peso y el fondo es la decisión del conjunto de stumps" });
+  var plot = api.plot(view, { xr: [0, 10], yr: [0, 10], xticks: 5, yticks: 5, grid: false, xlabel: "nivel de acción →", ylabel: "nivel de humor →", pad: { l: 26, r: 10, t: 10, b: 36 }, xfmt: function () { return ""; }, yfmt: function () { return ""; } });
+  var ui = api.controls(root), out = api.readout(root), tb = api.table(root, ["Nº", "Stump", "ε", "α"]), sT;
   sT = ui.slider({ label: "Rondas de AdaBoost (n_estimators)", min: 0, max: MAXT, step: 1, value: T, onInput: function (v) { T = v; update(); } });
   ui.button("Siguiente ronda", function () { T = Math.min(MAXT, T + 1); sT.set(T, true); update(); }, "primary");
   ui.button("Generar otros datos", function () { seed += 4; gen(); update(); });
-  api.legend(root, [[api.colors().cobalto, "clase −1"], [api.colors().terracota, "clase +1"], [api.colors().ink, "tamaño = peso; línea = último stump; aro = fallado por ese stump"]]);
+  api.legend(root, [[api.colors().cobalto, "no le gusta a Ana (−1)"], [api.colors().terracota, "le gusta a Ana (+1)"], [api.colors().ink, "tamaño = peso; línea = último stump; aro = fallada por ese stump"]]);
 
   function draw(ctx, w, h, C) {
     plot.axes(ctx);
@@ -74,12 +74,12 @@ Lab.register("curso1/c1m3-adaboost", function (root, api) {
     var rows = []; for (var t = 0; t < T; t++) { var r = rounds[t], st = r.st; rows.push([t + 1, NAMES[st.f] + " ≤ " + st.t.toFixed(2) + " ⇒ " + (st.s > 0 ? "+1" : "−1"), fmt(r.e), fmt(r.a)]); }
     tb.set(rows);
     var n = pts.length, txt;
-    if (T === 0) txt = "Ronda 0: ningún stump todavía. Los " + n + " puntos pesan lo mismo: 1/" + n + " = <b>" + (1 / n).toFixed(3) + "</b>.";
+    if (T === 0) txt = "Ronda 0: ningún stump todavía. Las " + n + " películas pesan lo mismo: 1/" + n + " = <b>" + (1 / n).toFixed(3) + "</b>.";
     else {
       var r2 = rounds[T - 1], wt = r2.w, mx = Math.max.apply(null, wt), mn = Math.min.apply(null, wt);
-      txt = "Ronda <b>" + T + "</b>: el stump falla con peso ε = <b>" + fmt(r2.e) + "</b> → α = ½·ln((1 − ε)/ε) = <b>" + fmt(r2.a) + "</b>. Tras reponderar, los puntos que falló suman <b>" + r2.wrongAfter.toFixed(3) + "</b> del peso total (siempre 0.5).<br>" +
-        "Pesos ahora: el mayor es <b>" + (mx * n).toFixed(1) + "</b> veces el peso inicial y el menor <b>" + (mn * n).toFixed(2) + "</b>.<br>" +
-        "Acierto del conjunto de " + T + " stumps sobre estos puntos: <b>" + (accEns(T) * 100).toFixed(1) + " %</b>";
+      txt = "Ronda <b>" + T + "</b>: el stump falla con peso ε = <b>" + fmt(r2.e) + "</b> → α = ½·ln((1 − ε)/ε) = <b>" + fmt(r2.a) + "</b>. Tras reponderar, las películas que falló suman <b>" + r2.wrongAfter.toFixed(3) + "</b> del peso total (siempre 0.5).<br>" +
+        "Pesos ahora: el mayor es <b>" + (mx * n).toFixed(1) + "</b> veces el peso inicial (la película más difícil) y el menor <b>" + (mn * n).toFixed(2) + "</b>.<br>" +
+        "Acierto del conjunto de " + T + " stumps sobre estas películas: <b>" + (accEns(T) * 100).toFixed(1) + " %</b>";
     }
     out.set(txt);
   }

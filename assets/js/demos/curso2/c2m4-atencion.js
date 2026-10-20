@@ -1,8 +1,8 @@
-/* Experimento: mapa de self-attention de una frase de 6 tokens. Q, K, V se calculan de verdad con matrices pequeñas
+/* Experimento: mapa de self-attention de un subtítulo de 6 tokens («El detective astuto persigue al ladrón»). Q, K, V se calculan de verdad con matrices pequeñas
    ELEGIDAS A MANO (no entrenadas) para que el mecanismo se vea. Cada token es un vector [sustantivo, verbo, modificador, cos(pos), sin(pos)]. */
 Lab.register("curso2/c2m4-atencion", function (root, api) {
   var D = api.d, C0 = api.colors();
-  var TOK = ["El", "gato", "negro", "bebe", "la", "leche"];
+  var TOK = ["El", "detective", "astuto", "persigue", "al", "ladrón"];
   var ROLE = [[0, 0, 1], [1, 0, 0], [0, 0, 1], [0, 1, 0], [0, 0, 1], [1, 0, 0]];   // [N, V, M]
   var OMEGA = 0.5, N = TOK.length, DK = 3;
   var S = { head: 0, q: 3, T: 1, causal: false, pos: true };
@@ -53,16 +53,17 @@ Lab.register("curso2/c2m4-atencion", function (root, api) {
   var tab = api.table(root, ["token", "clave k", "q·k", "÷ √3", "peso"]);
 
   function geom(w, h) {
-    var L = 50, T = 40, cell = Math.min((w - L - 8) / N, (h - T - 8) / N, 84);
+    var L = Math.min(76, Math.max(50, 12 + 6.4 * 9 * (w < 460 ? 0.9 : 1))), T = 40, cell = Math.min((w - L - 8) / N, (h - T - 8) / N, 84);
     return { L: L + Math.max(0, (w - L - 8 - cell * N) / 2), T: T, cell: cell };
   }
   function draw(ctx, w, h, C) {
     var g = geom(w, h), i, j;
     D.text(ctx, "claves K →", g.L, 14, { size: 10.5, color: C.muted });
     D.text(ctx, "consulta Q ↓", 4, 14 + 14, { size: 10.5, color: C.muted });
-    for (j = 0; j < N; j++) D.text(ctx, TOK[j], g.L + g.cell * (j + 0.5), g.T - 8, { size: 11.5, align: "center", weight: 600, color: C.ink });
+    var fs = g.cell < 60 ? 10 : 11.5;
+    for (j = 0; j < N; j++) D.text(ctx, TOK[j], g.L + g.cell * (j + 0.5), g.T - 8, { size: fs, align: "center", weight: 600, color: C.ink });
     for (i = 0; i < N; i++) {
-      D.text(ctx, TOK[i], g.L - 6, g.T + g.cell * (i + 0.5) + 4, { size: 11.5, align: "right", weight: i === S.q ? 700 : 500, color: i === S.q ? C.terracotaInk : C.ink });
+      D.text(ctx, TOK[i], g.L - 6, g.T + g.cell * (i + 0.5) + 4, { size: fs, align: "right", weight: i === S.q ? 700 : 500, color: i === S.q ? C.terracotaInk : C.ink });
       for (j = 0; j < N; j++) {
         var x = g.L + g.cell * j, y = g.T + g.cell * i, masked = S.causal && j > i, v = R.A[i][j];
         D.rect(ctx, x, y, g.cell, g.cell, C.surface, C.line, 1);
@@ -98,7 +99,7 @@ Lab.register("curso2/c2m4-atencion", function (root, api) {
     out.set(HEADS[S.head].name + "<br>" +
       "q(" + TOK[i] + ") = (" + R.Q[i].map(function (v) { return n(v, 2); }).join("; ") + ")  →  mira sobre todo a <b>" + TOK[best] + "</b> (peso <b>" + n(R.A[i][best], 3) + "</b>)<br>" +
       "salida = Σ peso·V = [sustantivo <b>" + n(o[0], 2) + "</b>, verbo <b>" + n(o[1], 2) + "</b>, modificador <b>" + n(o[2], 2) + "</b>]" +
-      (!S.pos ? "<br><span class='bad'>Sin posición, «El» no distingue entre «gato» y «leche»: ve las mismas palabras en cualquier orden.</span>" : "") +
+      (!S.pos ? "<br><span class='bad'>Sin posición, «El» no distingue entre «detective» y «ladrón»: ve las mismas palabras en cualquier orden.</span>" : "") +
       (S.T < 0.5 ? "<br>T baja: el reparto se concentra en un solo token." : S.T > 1.8 ? "<br>T alta: el reparto se aplana hacia lo uniforme." : ""));
   }
   update();

@@ -5,11 +5,12 @@ Lab.register("curso5/c5m1-una-neurona", function (root, api) {
   var D = api.d, M = api.math;
   var PTS = [[0, 0], [0, 1], [1, 0], [1, 1]];
   var TARGETS = { and: [0, 0, 0, 1], or: [0, 1, 1, 1], xor: [0, 1, 1, 0] };
-  var NAMES = { and: "AND (1 solo si las dos son 1)", or: "OR (1 si alguna es 1)", xor: "XOR (1 solo si son distintas)" };
+  var NAMES = { and: "AND: avisar si has visto las dos", or: "OR: avisar si has visto alguna", xor: "XOR: avisar si has visto solo una" };
+  var WHO = ["ninguna", "solo Shrek", "solo Toy Story", "las dos"];
   var S = { data: "xor", w1: 1, w2: 1, b: -1.5, steps: 0 };
 
-  var view = api.view(root, { aspect: 1.25, minH: 270, maxH: 420, label: "Plano de las cuatro entradas posibles, la recta de la neurona y su zona de clase 1" });
-  var plot = api.plot(view, { xr: [-0.45, 1.45], yr: [-0.45, 1.45], xticks: 4, yticks: 4, xlabel: "x1", ylabel: "x2", pad: { l: 40, r: 12, t: 10, b: 36 }, xfmt: function (v) { return +v.toFixed(1); }, yfmt: function (v) { return +v.toFixed(1); } });
+  var view = api.view(root, { aspect: 1.25, minH: 270, maxH: 420, label: "Plano de los cuatro tipos de usuario según hayan visto Toy Story y Shrek, la recta de la neurona y su zona de aviso" });
+  var plot = api.plot(view, { xr: [-0.45, 1.45], yr: [-0.45, 1.45], xticks: 4, yticks: 4, xlabel: "x1 · ¿has visto Toy Story?", ylabel: "x2 · ¿Shrek?", pad: { l: 40, r: 12, t: 10, b: 36 }, xfmt: function (v) { return +v.toFixed(1); }, yfmt: function (v) { return +v.toFixed(1); } });
   var ui = api.controls(root), out = api.readout(root);
 
   function p(i) { return M.sigmoid(S.w1 * PTS[i][0] + S.w2 * PTS[i][1] + S.b); }
@@ -88,6 +89,7 @@ Lab.register("curso5/c5m1-una-neurona", function (root, api) {
       D.circle(ctx, cx, cy, 11, t[i] ? C.cobalto : C.terracota, good ? C.paper : C.ink, good ? 2 : 3);
       D.text(ctx, String(t[i]), cx, cy + 4, { size: 12, align: "center", weight: 700, color: C.paper });
       if (!good) D.text(ctx, "✗", cx + (PTS[i][0] ? -20 : 20), cy - 12, { size: 14, align: "center", weight: 700, color: C.terracotaInk });
+      D.text(ctx, WHO[i], cx, cy + 27, { size: 10.5, align: "center", weight: 600, color: C.ink2 });
     }
   });
 
@@ -95,10 +97,10 @@ Lab.register("curso5/c5m1-una-neurona", function (root, api) {
     var s = stats(), t = TARGETS[S.data], i, lines = "";
     for (i = 0; i < 4; i++) {
       var z = S.w1 * PTS[i][0] + S.w2 * PTS[i][1] + S.b, q = M.sigmoid(z), good = (q > 0.5) === (t[i] === 1);
-      lines += "(" + PTS[i][0] + "," + PTS[i][1] + ") z=" + (z < 0 ? "−" : "") + Math.abs(z).toFixed(2) + " p=" + q.toFixed(2) + " (debe ser " + t[i] + ") " + (good ? "<span class='good'>✓</span>" : "<span class='bad'>✗</span>") + "<br>";
+      lines += "(" + PTS[i][0] + "," + PTS[i][1] + ") " + WHO[i] + ": z=" + (z < 0 ? "−" : "") + Math.abs(z).toFixed(2) + " p=" + q.toFixed(2) + " (aviso: debe ser " + t[i] + ") " + (good ? "<span class='good'>✓</span>" : "<span class='bad'>✗</span>") + "<br>";
     }
     var verdict = s.ok === 4 ? "<span class='good'>¡Una recta basta para esta función!</span>"
-      : (S.data === "xor" ? "Con XOR nunca pasarás de <b>3 de 4</b>: ninguna recta separa las dos esquinas." : "Todavía fallan puntos: mueve la recta o pulsa «Buscar».");
+      : (S.data === "xor" ? "Con XOR nunca pasarás de <b>3 de 4</b>: ninguna recta separa a quien ha visto una sola de quien no ha visto ninguna o ha visto las dos." : "Todavía fallan usuarios: mueve la recta o pulsa «Buscar».");
     out.set(lines + "Aciertos: <b>" + s.ok + " de 4</b> · pérdida media (BCE) = <b>" + s.loss.toFixed(3) + "</b>" + (S.steps ? " · pasos entrenados: <b>" + S.steps + "</b>" : "") + "<br>" + verdict);
     view.redraw();
   }

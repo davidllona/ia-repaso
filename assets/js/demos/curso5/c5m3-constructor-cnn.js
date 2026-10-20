@@ -5,9 +5,9 @@
     d8: [1, 8, 8, "1×8×8 (dígitos de scikit-learn)"],
     d16: [1, 16, 16, "1×16×16 (dígitos de la CNN del laboratorio)"],
     m28: [1, 28, 28, "1×28×28 (MNIST)"],
-    c32: [3, 32, 32, "3×32×32 (color pequeño)"],
-    p100: [3, 100, 100, "3×100×100 (foto de papel)"],
-    i224: [3, 224, 224, "3×224×224 (ImageNet)"]
+    c32: [3, 32, 32, "3×32×32 (miniatura de póster en color)"],
+    p100: [3, 100, 100, "3×100×100 (póster de papel)"],
+    i224: [3, 224, 224, "3×224×224 (fotograma, ImageNet)"]
   };
 
   function outSize(n, k, s, p) { return Math.floor((n + 2 * p - k) / s) + 1; }
@@ -93,7 +93,7 @@
     var tb = api.table(root, ["#", "<span style='display:block;text-align:left'>capa</span>", "forma", "param.", "mult."]);
     if (window.matchMedia && window.matchMedia("(max-width:520px)").matches) tb.el.querySelector("table").style.fontSize = ".64rem";
     var ui = api.controls(root), out = api.readout(root);
-    var selIn = ui.select({ label: "Imagen de entrada (N, C, H, W)", value: S.inp, options: Object.keys(INPUTS).map(function (k) { return [k, INPUTS[k][3]]; }), onChange: function (v) { S.inp = v; update(); } });
+    var selIn = ui.select({ label: "Miniatura de entrada (N, C, H, W)", value: S.inp, options: Object.keys(INPUTS).map(function (k) { return [k, INPUTS[k][3]]; }), onChange: function (v) { S.inp = v; update(); } });
     var selT = ui.select({ label: "Capa a añadir", value: "conv", options: [["conv", "nn.Conv2d"], ["pool", "nn.MaxPool2d"], ["bn", "nn.BatchNorm (2d o 1d)"], ["relu", "nn.ReLU"], ["drop", "nn.Dropout"], ["gap", "nn.AdaptiveAvgPool2d(1)"], ["flat", "nn.Flatten"], ["lin", "nn.Linear"]] });
     var selO = ui.select({ label: "Conv2d: out_channels", value: 16, options: [[4, "4"], [8, "8"], [16, "16"], [32, "32"], [64, "64"]] });
     var selK = ui.select({ label: "Conv2d / MaxPool2d: kernel", value: 3, options: [[1, "1"], [2, "2"], [3, "3"], [5, "5"], [7, "7"]] });
@@ -113,7 +113,7 @@
     ui.button("Vaciar", function () { S.layers = []; update(); });
     ui.button("CNN del laboratorio", function () { load("lab"); });
     ui.button("CNN dígitos 8×8", function () { load("dig"); });
-    ui.button("Red de papel 100×100×3", function () { load("papel"); });
+    ui.button("Red de papel: póster 100×100×3", function () { load("papel"); });
     ui.button("Laboratorio + BatchNorm", function () { load("bn"); });
     function load(k) { S.inp = PRESETS[k].inp; selIn.set(S.inp); S.layers = clone(PRESETS[k].layers); update(); }
 
