@@ -1,0 +1,1902 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Módulo 3 · Transformers en Keras · Curso 3 · Cuaderno de IA</title>
+<meta name="description" content="Construir un Transformer pieza a pieza en Keras: ventanas de series temporales, atención con matemáticas y código, multi-cabeza, posición, bloque encoder, series temporales y generación de texto.">
+<script>try{var t=localStorage.getItem('cuaderno-ia:tema');if(t)document.documentElement.setAttribute('data-theme',t)}catch(e){}</script>
+<link rel="stylesheet" href="../assets/css/style.css">
+<script src="../assets/js/curriculum.js"></script>
+<script src="../assets/js/lab.js"></script>
+<script src="../assets/js/app.js" defer></script>
+</head>
+<body data-root="../" data-course="3" data-module="3">
+<main>
+<div class="page">
+
+<header class="hero">
+  <div class="hero-grid">
+    <div>
+      <p class="eyebrow">Curso 3 · Módulo 3</p>
+      <h1>Transformers en Keras</h1>
+      <p class="lead">En el <a href="../curso-2/modulo-4.html">módulo 4 del Curso 2</a> entendiste la idea: cada token mira a los demás y decide a cuáles atender. Ahora toca construirlo pieza a pieza, con las cuentas a la vista y con código que se ejecuta: preparar series temporales, escribir la atención a mano, comprobar que coincide con <code>MultiHeadAttention</code>, montar un bloque Transformer como capa propia y usarlo para predecir una serie y para generar texto.</p>
+    </div>
+    <div class="hero-tile" aria-hidden="true"></div>
+  </div>
+  <div class="goals">
+    <h2 class="sin-num sin-toc">Al terminar este módulo sabrás</h2>
+    <ul>
+      <li>Convertir una serie temporal en ejemplos con <strong>ventanas deslizantes</strong> (forma <code>(ejemplos, pasos, rasgos)</code>), normalizarla y separarla en el tiempo <strong>sin fugas</strong>.</li>
+      <li>Calcular a mano <strong>softmax(QKᵀ/√d)V</strong>, explicar por qué se divide entre √d y cómo funciona la <strong>máscara causal</strong>.</li>
+      <li>Explicar la <strong>atención multi-cabeza</strong>, contar sus parámetros y reconstruir la salida de <code>MultiHeadAttention</code> con NumPy.</li>
+      <li>Calcular la <strong>codificación posicional</strong> sinusoidal y decidir entre ella y las posiciones aprendidas.</li>
+      <li>Describir y programar un <strong>bloque Transformer</strong> (LayerNormalization, conexiones residuales, red feed-forward) como <code>keras.layers.Layer</code>, guardable y recargable.</li>
+      <li>Entrenar un Transformer para <strong>regresión y clasificación de series</strong> y un <strong>mini-GPT</strong> para generar texto con <strong>temperatura</strong> y <strong>top-k</strong>.</li>
+    </ul>
+  </div>
+</header>
+
+<!-- =============================================================== -->
+<section>
+<h2 id="secuencias">Datos secuenciales y series temporales: de la serie a las ventanas</h2>
+
+<p class="pregunta">Tienes 2.000 medidas de un sensor, una detrás de otra. Una red de Keras espera ejemplos de forma fija, cada uno con su respuesta. ¿Cómo conviertes <em>una</em> fila larga de números en <em>miles</em> de ejemplos de entrenamiento?</p>
+
+<p>Una <strong>secuencia</strong> es una lista de datos donde el orden importa: las palabras de una frase, las muestras de audio, el precio de una acción día a día. Una <strong>serie temporal</strong> es el caso en que cada dato es una medida tomada en un instante, a intervalos regulares. Lo que ya sabes de redes densas y CNN no se aplica directamente porque esas capas ven la entrada «de golpe» y con tamaño fijo; con una serie queremos que el modelo vea <em>un trozo del pasado</em> y prediga <em>lo que viene</em>. (Qué hacían las RNN y las LSTM con eso lo viste en el <a href="../curso-2/modulo-4.html">módulo 4 del Curso 2</a>; aquí usaremos Transformers.)</p>
+
+<h3>La serie que usaremos en todo el módulo</h3>
+<p>No hay internet en este entorno de trabajo y, además, conviene <em>conocer la verdad</em> de los datos para juzgar al modelo. Por eso fabricamos una serie sintética con tres ingredientes típicos de una serie real:</p>
+<ul>
+  <li><strong>Tendencia:</strong> una subida lenta, \(0{,}0008\,t\).</li>
+  <li><strong>Estacionalidad:</strong> patrones que se repiten: un seno de periodo 50 pasos y otro, más pequeño, de periodo 12.</li>
+  <li><strong>Ruido:</strong> variaciones aleatorias que ningún modelo puede predecir (desviación 0,15).</li>
+</ul>
+<p>Todo con semilla fija, así que tú y yo vemos exactamente los mismos números. Con esta serie, el <em>mejor error posible</em> está limitado por el ruido: un modelo perfecto se equivocaría, de media, unos 0,12 en unidades originales (la media del valor absoluto de un ruido normal de desviación 0,15).</p>
+
+<h3>Ventanas deslizantes: el truco que crea los ejemplos</h3>
+<p>La idea es la misma que viste en el Curso 2, pero ahora con dos números que hay que distinguir bien:</p>
+<ul>
+  <li>La <strong>ventana</strong> (<em>window</em>, <code>sequence_length</code>) \(w\): cuántos valores pasados ve el modelo en cada ejemplo.</li>
+  <li>El <strong>horizonte</strong> (<em>horizon</em>) \(h\): cuántos pasos por delante está lo que quiere predecir. Con \(h = 1\) predice el valor justo siguiente; con \(h = 10\), el que está diez pasos después del último que ve.</li>
+</ul>
+
+<div class="callout ejemplo">
+  <span class="lbl">Ejemplo numérico</span>
+  <p>Serie de 10 valores: <code>10, 12, 14, 13, 15, 17, 16, 18, 20, 19</code>. Ventana \(w = 4\), horizonte \(h = 2\). Cada ejemplo es «cuatro valores seguidos → el valor que está dos pasos después del último».</p>
+  <table>
+    <thead><tr><th>Ejemplo</th><th>Entrada X (4 valores)</th><th>Respuesta y</th><th>Cómo se elige y</th></tr></thead>
+    <tbody>
+      <tr><td>1</td><td>10, 12, 14, 13</td><td class="res">17</td><td>el último de X es el 4.º valor; dos pasos después está el 6.º (17)</td></tr>
+      <tr><td>2</td><td>12, 14, 13, 15</td><td class="res">16</td><td>el 7.º valor</td></tr>
+      <tr><td>3</td><td>14, 13, 15, 17</td><td class="res">18</td><td>el 8.º valor</td></tr>
+      <tr><td>4</td><td>13, 15, 17, 16</td><td class="res">20</td><td>el 9.º valor</td></tr>
+      <tr><td>5</td><td>15, 17, 16, 18</td><td class="res">19</td><td>el 10.º valor</td></tr>
+    </tbody>
+  </table>
+  <ol class="pasos">
+    <li>La primera ventana empieza en el instante 0 y la última tiene que dejar sitio al objetivo: su último valor X llega como mucho al instante \(n - h - 1\) (contando desde 0).</li>
+    <li>Número de ejemplos: \(n - w - h + 1 = 10 - 4 - 2 + 1 = 5\). Salen 5 ventanas y las has visto las 5.</li>
+    <li>Con 1 medida por instante el tensor de entrada es <strong>(5, 4, 1)</strong>: <code>(ejemplos, pasos, rasgos)</code>. Si midieras también la humedad serían 2 rasgos: <code>(5, 4, 2)</code>.</li>
+  </ol>
+</div>
+
+<div class="formula">\[ N_{\text{ventanas}} = \left\lfloor \frac{n - w - h}{s} \right\rfloor + 1 \]</div>
+<p>donde \(n\) es la longitud de la serie, \(w\) la ventana, \(h\) el horizonte y \(s\) el <em>paso</em> entre ventanas (<code>sequence_stride</code>): con \(s = 1\) cada ventana empieza un instante después que la anterior; con \(s = 5\) empiezan cada 5 instantes y hay unas cinco veces menos (y casi sin repetición). Hay además <code>sampling_rate</code>, que hace que dentro de la ventana se tome un valor de cada \(r\): útil para series muy densas.</p>
+
+<figure class="demo" data-demo="curso3/c3m3-ventanas" data-titulo="Ventanas deslizantes sobre una serie sintética">
+  <div class="haz">Mueve «Ventana nº» y mira cómo la banda azul avanza y el punto naranja (el objetivo) la sigue. Luego sube el horizonte a 20 y el tamaño de ventana a 40, y por último pon el paso en 10.</div>
+  <div class="observa">El objetivo siempre está <em>horizonte</em> pasos después del último valor azul. Subir la ventana o el horizonte reduce el número de ejemplos; subir el paso lo reduce todavía más. Cuando la ventana se acerca a una frontera (train/val/test), aparece el aviso: cortar la serie <em>antes</em> de hacer ventanas hace que esas ventanas no existan, y así nunca mezclas pasado y futuro.</div>
+</figure>
+
+<h3>Separar en el tiempo, no al azar</h3>
+<p>En un problema normal barajas los ejemplos y repartes el 80 % para entrenar. Con una serie eso es trampa: si el test contiene el instante 501 y el entrenamiento el 500 y el 502, el modelo «conoce» el futuro. La regla es <strong>entrenar con el pasado y evaluar con el futuro</strong>: primero cortas la serie en tres trozos seguidos (aquí 70 % train, 15 % validación, 15 % test) y <em>después</em> haces las ventanas dentro de cada trozo. Barajar las ventanas <em>dentro del entrenamiento</em> sí es correcto: cada ventana ya lleva su pasado dentro.</p>
+
+<div class="callout ojo">
+  <span class="lbl">Ojo</span>
+  <p>El orden de las operaciones es lo que evita la fuga temporal: <strong>1)</strong> cortar la serie en train/val/test, <strong>2)</strong> calcular la media y la desviación <em>solo con train</em>, <strong>3)</strong> normalizar los tres trozos con esos números, <strong>4)</strong> hacer ventanas. Si haces ventanas con toda la serie y luego repartes al azar, mezclas futuro y pasado; si normalizas con la media de toda la serie, el entrenamiento «sabe» cuánto subirá la tendencia.</p>
+</div>
+
+<h3>Normalizar: z-score con las estadísticas de entrenamiento</h3>
+<p>Las redes aprenden mejor si los números de entrada son pequeños y están centrados (como en el módulo de preparación de datos del Curso 1, con <code>StandardScaler</code>). La fórmula es la misma: \(z = (x - \mu)/\sigma\), con \(\mu\) y \(\sigma\) calculadas <strong>con el trozo de entrenamiento</strong>.</p>
+<div class="callout ejemplo">
+  <span class="lbl">Ejemplo numérico</span>
+  <p>Con los 7 primeros valores de la serie de arriba como «train» (<code>10, 12, 14, 13, 15, 17, 16</code>) y los 3 últimos como «test» (<code>18, 20, 19</code>):</p>
+  <ol class="pasos">
+    <li>Media de train: \(\mu = 97/7 = 13{,}857\). Desviación: \(\sigma = 2{,}231\).</li>
+    <li>Test normalizado <em>con las cifras de train</em>: \((18 - 13{,}857)/2{,}231 = 1{,}857\); \((20 - 13{,}857)/2{,}231 = 2{,}753\); \((19 - 13{,}857)/2{,}231 = 2{,}305\). Los tres son mayores que todo lo que vio el modelo (la serie sube): <strong>es lo normal y es lo honesto</strong>.</li>
+    <li>Si normalizaras el test con <em>sus propias</em> cifras saldría \((-1{,}225;\ 1{,}225;\ 0)\): habrías borrado justo la información de que el nivel subió.</li>
+  </ol>
+</div>
+<p>Una consecuencia práctica: una serie con tendencia fuerte se sale del rango de entrenamiento y los modelos de red neuronal extrapolan mal. Dos remedios habituales son predecir <em>diferencias</em> (cuánto cambia, no cuánto vale) o normalizar <em>cada ventana</em> con su propia media y desviación y deshacerlo al final. Nuestra tendencia es suave y no hace falta.</p>
+
+<h3><code>timeseries_dataset_from_array</code> y <code>tf.data</code></h3>
+<p>Hacer ventanas con un bucle de Python (fragmento 1) sirve para entender, pero en la práctica se usa la utilidad de Keras, que genera lotes sin copiar la serie entera en memoria. Sus argumentos principales:</p>
+<table>
+  <thead><tr><th>Argumento</th><th>Qué hace</th></tr></thead>
+  <tbody>
+    <tr><td><code>data</code></td><td>La serie, como matriz <code>(instantes, rasgos)</code>. Cada ventana saldrá de aquí.</td></tr>
+    <tr><td><code>targets</code></td><td>Lo que se quiere predecir. El objetivo de la ventana \(i\) es <code>targets[i]</code>; por eso se le pasa la serie <em>recortada por delante</em>: <code>serie[w + h - 1:]</code>. (Con <code>None</code> no hay objetivos: se usa para el texto del final.)</td></tr>
+    <tr><td><code>sequence_length</code></td><td>La ventana \(w\).</td></tr>
+    <tr><td><code>sequence_stride</code>, <code>sampling_rate</code></td><td>Paso entre ventanas y submuestreo dentro de la ventana.</td></tr>
+    <tr><td><code>batch_size</code>, <code>shuffle</code>, <code>seed</code></td><td>Tamaño del lote; si se barajan las <em>ventanas</em> (no la serie); semilla del barajado.</td></tr>
+    <tr><td><code>start_index</code>, <code>end_index</code></td><td>Usar solo un trozo de <code>data</code> (otra forma de separar train/val/test sin cortar el array).</td></tr>
+  </tbody>
+</table>
+<p>La alternativa «de TensorFlow» es construir las ventanas con <code>tf.data</code>: <code>window</code> corta, <code>flat_map</code> convierte cada ventana en un tensor y <code>map</code> separa entrada y respuesta. Es más largo, pero te deja encadenar <code>shuffle</code>, <code>batch</code> y <code>prefetch</code> y es la base de cualquier canalización de datos a medida (fragmento 3).</p>
+
+<h3>Una línea base antes del modelo</h3>
+<p>Antes de entrenar nada, calcula lo que logra un método tonto. La <strong>persistencia</strong> predice «lo que viene es igual al último valor». Si tu Transformer no la supera claramente, no ha aprendido nada útil. En series estacionales hay otra línea base fuerte y barata: una <strong>regresión lineal sobre la ventana</strong> (cada valor futuro como combinación lineal de los \(w\) pasados). Los fragmentos 2 y 12 las calculan.</p>
+</section>
+
+<!-- =============================================================== -->
+<section>
+<h2 id="limites-rnn">Por qué las RNN y las LSTM se quedan cortas</h2>
+<p class="pregunta">Si una LSTM ya sabe leer secuencias, ¿para qué inventar otra cosa?</p>
+<p>Ya viste el detalle en el <a href="../curso-2/modulo-4.html">Curso 2, módulo 4</a>. Aquí lo que nos interesa son las tres limitaciones <em>de ingeniería</em> que empujaron a cambiar de arquitectura:</p>
+<ol>
+  <li><strong>No se puede paralelizar en el tiempo.</strong> El estado del paso \(t\) necesita el estado del paso \(t-1\). Para una secuencia de 1.000 pasos hay 1.000 cálculos <em>en fila</em>, aunque tengas miles de núcleos de GPU esperando.</li>
+  <li><strong>Los datos lejanos están lejos.</strong> Para que el paso 1.000 use algo del paso 1, la información pasa por 999 transformaciones y el gradiente por 999 multiplicaciones. Si cada una lo encoge un 10 % (factor 0,9), llega \(0{,}9^{100} \approx 0{,}00003\) tras solo 100 pasos.</li>
+  <li><strong>Cuello de botella.</strong> Todo el pasado cabe en un único vector de estado (por ejemplo 64 números). La atención, en cambio, deja <em>todos</em> los vectores del pasado disponibles y cada token elige lo que necesita.</li>
+</ol>
+<table>
+  <thead><tr><th></th><th>RNN / LSTM</th><th>Self-attention</th></tr></thead>
+  <tbody>
+    <tr><td>Pasos que no se pueden hacer a la vez (n = 1.000)</td><td>1.000</td><td>1</td></tr>
+    <tr><td>Camino máximo entre dos posiciones</td><td>1.000 pasos</td><td>1 paso</td></tr>
+    <tr><td>Operaciones por capa (n = 1.000, d = 64)</td><td>\(n\,d^2 = 4{,}1\) millones</td><td>\(n^2 d = 64\) millones</td></tr>
+    <tr><td>Memoria de las puntuaciones</td><td>no hay matriz n × n</td><td>\(n^2 = 1\) millón por cabeza</td></tr>
+  </tbody>
+</table>
+<div class="callout regla">
+  <span class="lbl">Regla fácil</span>
+  <p>La atención cambia <strong>tiempo en serie por memoria y cálculo en paralelo</strong>: cada capa es mucho más cara cuando \(n\) es grande (crece con \(n^2\)), pero todo se calcula a la vez y dos posiciones cualesquiera están a un paso. Por eso un Transformer entrena mucho más rápido en GPU y por eso, para secuencias larguísimas, se investigan variantes de atención más baratas.</p>
+</div>
+</section>
+<!-- =============================================================== -->
+<section>
+<h2 id="atencion">La atención escalada, pieza a pieza</h2>
+<p class="pregunta">Cada token tiene que decidir a cuáles de los demás mira y cuánto. ¿Qué cuentas hace falta escribir para que eso ocurra, y por qué precisamente esas?</p>
+
+<h3>Q, K y V son tres proyecciones aprendidas</h3>
+<p>Los tokens llegan como una matriz \(X\) de forma \((n, d_{model})\): una fila por token (\(n\) tokens, cada uno con \(d_{model}\) números). Se multiplica \(X\) por tres matrices de pesos que se <strong>aprenden</strong> durante el entrenamiento:</p>
+<div class="formula">\[ Q = X\,W_Q, \qquad K = X\,W_K, \qquad V = X\,W_V \qquad (W_Q, W_K \in \mathbb{R}^{d_{model}\times d_k},\; W_V \in \mathbb{R}^{d_{model}\times d_v}) \]</div>
+<p>Cada fila de \(Q\) es la «pregunta» de un token, cada fila de \(K\) es la «etiqueta» con la que se ofrece y cada fila de \(V\) es el «contenido» que aportará si alguien lo elige. Que sean matrices <em>aprendidas</em> es la clave: la red decide por sí misma qué significa «preguntar» y «ofrecerse». En Keras son capas <code>Dense</code> sin activación (el fragmento 8 las abre).</p>
+
+<h3>La fórmula, con sus formas</h3>
+<div class="formula">\[ \operatorname{Attention}(Q,K,V) = \operatorname{softmax}\!\left(\frac{Q\,K^{\top}}{\sqrt{d_k}}\right) V \]</div>
+<ol class="pasos">
+  <li>\(Q K^{\top}\) tiene forma \((n, d_k)\cdot(d_k, n) = (n, n)\): la entrada \((i, j)\) es el producto escalar de la pregunta del token \(i\) con la etiqueta del token \(j\). <strong>Cuanto más se parecen, más grande.</strong></li>
+  <li>Se divide entre \(\sqrt{d_k}\) (en un momento verás por qué).</li>
+  <li>El <abbr class="t" data-def="Convierte una lista de números cualesquiera en una lista de probabilidades: todas positivas y que suman 1. softmax(z)ᵢ = e^zᵢ / Σ e^zⱼ.">softmax</abbr> se aplica a <strong>cada fila</strong>: cada token obtiene un reparto de atención que suma 1. Es la matriz de pesos \(A\), de forma \((n, n)\).</li>
+  <li>\(A\,V\) tiene forma \((n, n)\cdot(n, d_v) = (n, d_v)\): cada token recibe la <strong>media ponderada</strong> de los valores de todos, con los pesos de su fila.</li>
+</ol>
+
+<div class="callout ejemplo">
+  <span class="lbl">Ejemplo numérico</span>
+  <p>Tres tokens y \(d_k = d_v = 2\). Para centrarnos en la fórmula damos \(Q\), \(K\) y \(V\) ya calculadas:</p>
+  <div class="formula">\[ Q = \begin{bmatrix} 1 & 0 \\ 0 & 1 \\ 1 & 1 \end{bmatrix},\quad
+  K = \begin{bmatrix} 2 & 0 \\ 0 & 2 \\ 1 & 1 \end{bmatrix},\quad
+  V = \begin{bmatrix} 1 & 0 \\ 0 & 1 \\ 1 & 1 \end{bmatrix} \]</div>
+  <ol class="pasos">
+    <li><strong>Puntuaciones.</strong> Entrada \((i,j)\) = fila \(i\) de \(Q\) por fila \(j\) de \(K\). Por ejemplo, \(q_1\cdot k_1 = 1\cdot 2 + 0\cdot 0 = 2\) y \(q_1 \cdot k_3 = 1\cdot 1 + 0 \cdot 1 = 1\):
+      <div class="formula">\[ Q K^{\top} = \begin{bmatrix} 2 & 0 & 1 \\ 0 & 2 & 1 \\ 2 & 2 & 2 \end{bmatrix} \]</div></li>
+    <li><strong>Escalar.</strong> \(\sqrt{d_k} = \sqrt{2} = 1{,}4142\): dividimos todo entre 1,4142:
+      <div class="formula">\[ \frac{Q K^{\top}}{\sqrt 2} = \begin{bmatrix} 1{,}414 & 0 & 0{,}707 \\ 0 & 1{,}414 & 0{,}707 \\ 1{,}414 & 1{,}414 & 1{,}414 \end{bmatrix} \]</div></li>
+    <li><strong>Softmax por filas.</strong> Fila 1: \(e^{1{,}414} = 4{,}113\), \(e^{0} = 1\), \(e^{0{,}707} = 2{,}028\). Suma \(= 7{,}141\). Pesos: \(4{,}113/7{,}141 = 0{,}576\); \(1/7{,}141 = 0{,}140\); \(2{,}028/7{,}141 = 0{,}284\). La fila 2 es la simétrica y la fila 3, con tres puntuaciones iguales, reparte por igual:
+      <div class="formula">\[ A = \begin{bmatrix} 0{,}576 & 0{,}140 & 0{,}284 \\ 0{,}140 & 0{,}576 & 0{,}284 \\ 0{,}333 & 0{,}333 & 0{,}333 \end{bmatrix} \]</div></li>
+    <li><strong>Mezcla de valores.</strong> Fila 1: \(0{,}576\,(1,0) + 0{,}140\,(0,1) + 0{,}284\,(1,1) = (0{,}576 + 0{,}284;\ 0{,}140 + 0{,}284) = (0{,}860;\ 0{,}424)\):
+      <div class="formula">\[ A\,V = \begin{bmatrix} 0{,}860 & 0{,}424 \\ 0{,}424 & 0{,}860 \\ 0{,}667 & 0{,}667 \end{bmatrix} \]</div></li>
+  </ol>
+  <p>Lectura: el token 1 preguntó «algo parecido a (1, 0)», encontró casi igual a la clave 1 (la más alineada) y por eso su salida se parece sobre todo al valor 1. El token 3 preguntó algo «equidistante» y obtuvo la media de los tres. Los fragmentos 4 y 6 repiten estas cuentas con NumPy.</p>
+</div>
+
+<figure class="demo" data-demo="curso3/c3m3-atencion-manual" data-titulo="Atención con tus propios números">
+  <div class="haz">Arrastra la punta de la flecha naranja (la consulta) hacia una flecha azul (una clave) y mira cómo cambia la fila del mapa de calor. Después escribe tú números en las casillas de V y comprueba la salida. Por último pulsa «Números al azar» y desactiva «Dividir entre √d_k».</div>
+  <div class="observa">El peso es alto cuando la consulta apunta en la misma dirección que la clave <em>y</em> es larga (el producto escalar mide las dos cosas). Los pesos de cada fila suman siempre 1 y la salida es una mezcla de las filas de V. Cambiar V no cambia los pesos; cambiar Q o K, sí.</div>
+</figure>
+
+<h3>Por qué se divide entre \(\sqrt{d_k}\)</h3>
+<p>Parece un detalle, pero sin él los Transformers grandes no entrenan. El razonamiento tiene dos mitades.</p>
+<p><strong>1. El tamaño de las puntuaciones crece con \(d_k\).</strong> Supón que cada número de \(q\) y de \(k\) es aleatorio con media 0 y varianza 1 (aproximadamente lo que ocurre al inicializar). El producto escalar es una suma de \(d_k\) términos \(q_i k_i\), cada uno con varianza \(1\cdot 1 = 1\) e independientes, así que la varianza de la suma es \(d_k\) y su desviación es \(\sqrt{d_k}\):</p>
+<div class="formula">\[ \operatorname{Var}(q\cdot k) = \sum_{i=1}^{d_k} \operatorname{Var}(q_i k_i) = d_k \quad\Rightarrow\quad \sigma(q\cdot k) = \sqrt{d_k}\quad\Rightarrow\quad \sigma\!\left(\frac{q\cdot k}{\sqrt{d_k}}\right) = 1 \]</div>
+<p>Con \(d_k = 4\) las puntuaciones oscilan unos ±2; con \(d_k = 512\), unos ±23. Dividir entre \(\sqrt{d_k}\) las deja siempre en torno a ±1, sea cual sea el tamaño de la cabeza (el fragmento 5 lo mide).</p>
+<p><strong>2. Puntuaciones grandes saturan el softmax.</strong> Con diferencias de 20 o 30 entre puntuaciones, \(e^{30}\) aplasta a todo lo demás: un peso vale casi 1 y el resto casi 0. Y en ese estado el softmax apenas reacciona a cambios pequeños. Su derivada es \(\partial p_i/\partial z_j = p_i(\delta_{ij} - p_j)\); si \(p_1 = 0{,}999\), la derivada de \(p_1\) respecto de su propia puntuación vale \(0{,}999\cdot 0{,}001 \approx 0{,}001\). Gradientes diminutos significan que la red casi no puede aprender a cambiar de opinión.</p>
+
+<figure class="demo" data-demo="curso3/c3m3-raiz-d" data-titulo="Qué le pasa al softmax si no dividimos">
+  <div class="haz">Con «Dividir entre √d_k» apagado, sube el tamaño de 2^1 a 2^10 y mira las barras de arriba. Después activa la división y repite. Pulsa «Otra consulta» varias veces.</div>
+  <div class="observa">Sin dividir, a partir de d_k = 64 casi toda la atención cae en una sola clave (peso máximo medio ≈ 0,9) y el gradiente medio se desploma. Dividiendo, el peso máximo medio se queda quieto en torno a 0,36 con cualquier d_k: el reparto tiene siempre el mismo «carácter». Por eso la división es parte de la fórmula, no una opción.</div>
+</figure>
+
+<h3>Máscaras: qué posiciones pueden mirarse</h3>
+<p>A veces un token <strong>no debe</strong> poder mirar a otro. La solución es sumar \(-\infty\) a esa puntuación antes del softmax: \(e^{-\infty} = 0\), así que el peso es exactamente 0 y los demás pesos se reparten el 100 %. Dos máscaras te encontrarás siempre:</p>
+<ul>
+  <li><strong>Máscara causal</strong> (<em>causal mask</em>): el token \(i\) solo puede mirar a los tokens \(j \le i\). Se usa en los <em>decoders</em> (GPT) y al predecir series para que, mientras entrenas con la frase entera, ningún token lea la respuesta que está a su derecha. La matriz de permisos es triangular inferior.</li>
+  <li><strong>Máscara de relleno</strong> (<em>padding mask</em>): al juntar frases de distinta longitud en un lote se rellena con ceros; esas posiciones vacías no deben recibir atención.</li>
+</ul>
+<div class="callout ejemplo">
+  <span class="lbl">Ejemplo numérico</span>
+  <p>Con las puntuaciones escaladas del ejemplo anterior y máscara causal (3 tokens):</p>
+  <ol class="pasos">
+    <li>Fila 1 (solo se ve a sí mismo): \((1{,}414;\,-\infty;\,-\infty)\) → pesos \((1; 0; 0)\).</li>
+    <li>Fila 2 (ve los tokens 1 y 2): \((0;\ 1{,}414;\,-\infty)\) → \(e^0 = 1\) y \(e^{1{,}414} = 4{,}113\), suma \(5{,}113\) → pesos \((0{,}196;\ 0{,}804;\ 0)\).</li>
+    <li>Fila 3 (ve a los tres): no cambia, \((0{,}333;\ 0{,}333;\ 0{,}333)\).</li>
+    <li>Salidas: fila 2 \(= 0{,}196\,(1,0) + 0{,}804\,(0,1) = (0{,}196;\ 0{,}804)\). Antes, sin máscara, la fila 2 daba \((0{,}424;\ 0{,}860)\): ya no recibe nada del token 3, que está en su futuro.</li>
+  </ol>
+</div>
+<figure class="demo" data-demo="curso3/c3m3-mascara-causal" data-titulo="Tocar el futuro: con y sin máscara causal">
+  <div class="haz">Elige «bebe» como token que se toca y sube «Cuánto sumas» a +5. Mira qué barras de la derecha se mueven. Apaga la máscara y repite.</div>
+  <div class="observa">Con máscara, el cambio solo llega al token tocado y a los que vienen después: el pasado no puede enterarse del futuro. Sin máscara, cambian las salidas de todos, incluso las de los tokens anteriores. Esa «fuga hacia atrás» es exactamente la trampa que la máscara impide.</div>
+</figure>
+<div class="callout ojo">
+  <span class="lbl">Ojo</span>
+  <p>En Keras la máscara causal se pide con <code>use_causal_mask=True</code> al <em>llamar</em> a <code>MultiHeadAttention</code>; no es un argumento del constructor. Y recuerda: sin máscara, un decoder entrena «de maravilla» (la pérdida cae a casi cero porque copia la respuesta) y luego, al generar, no sabe hacer nada.</p>
+</div>
+
+<h3>Self-attention y cross-attention; el precio</h3>
+<p>Si \(Q\), \(K\) y \(V\) salen de la <em>misma</em> secuencia hablamos de <strong>self-attention</strong>. Si \(Q\) viene de una secuencia y \(K, V\) de otra (el decoder consultando al encoder en una traducción), es <strong>cross-attention</strong>; la fórmula no cambia. En ambos casos la matriz de pesos es \(n \times m\), con lo que el coste crece con el producto de las dos longitudes: con 4.096 tokens y 12 cabezas, solo las puntuaciones de una capa ocupan unos 800 MB en <code>float32</code> por ejemplo del lote.</p>
+</section>
+<!-- =============================================================== -->
+<section>
+<h2 id="multicabeza">Atención multi-cabeza y <code>MultiHeadAttention</code></h2>
+<p class="pregunta">Una sola atención produce <em>un</em> reparto de pesos por token. Pero en «la niña pequeña lee un libro» la palabra «pequeña» necesita mirar a «niña» (¿a quién describo?) y la palabra «lee» necesita mirar a «niña» (¿quién lee?) y a «libro» (¿qué se lee?). ¿Cómo pedirle varias cosas a la vez?</p>
+
+<p>La respuesta es repetir la atención varias veces en paralelo, cada una con sus propias matrices \(W_Q\), \(W_K\), \(W_V\). Cada repetición es una <strong>cabeza</strong> (<em>head</em>). El procedimiento con \(h\) cabezas:</p>
+<ol class="pasos">
+  <li>Cada cabeza \(i\) calcula su propia atención con matrices de tamaño \(d_{model} \to d_k\): \(\text{cabeza}_i = \operatorname{Attention}(XW_Q^{(i)},\, XW_K^{(i)},\, XW_V^{(i)})\), con forma \((n, d_k)\).</li>
+  <li>Se <strong>concatenan</strong> las \(h\) salidas: forma \((n, h\cdot d_k)\).</li>
+  <li>Una última matriz \(W_O\) de forma \((h\,d_k,\ d_{model})\) mezcla el resultado y devuelve la forma original \((n, d_{model})\).</li>
+</ol>
+<div class="formula">\[ \operatorname{MultiHead}(X) = \operatorname{Concat}(\text{cabeza}_1,\dots,\text{cabeza}_h)\,W_O \]</div>
+<p>Lo habitual es repartir el ancho del modelo: \(d_k = d_{model}/h\). Así, 8 cabezas de tamaño 8 cuestan lo mismo que 1 cabeza de tamaño 64: es <strong>«gratis» en parámetros y en cálculo</strong>, y a cambio la capa puede estar mirando a varias cosas distintas a la vez.</p>
+
+<div class="callout analogia">
+  <span class="lbl">Analogía</span>
+  <p>Leer una frase con varios rotuladores: uno subraya «quién hace la acción», otro «qué adjetivo describe a cada nombre», otro «qué palabra va justo antes». Al final juntas los subrayados en una sola nota (la concatenación y \(W_O\)). Nadie programa qué subraya cada uno: lo descubre el entrenamiento.</p>
+</div>
+
+<div class="callout ejemplo">
+  <span class="lbl">Ejemplo numérico: contar parámetros</span>
+  <p>\(d_{model} = 32\), \(h = 4\), \(d_k = 8\) (es la capa del fragmento 7).</p>
+  <ol class="pasos">
+    <li>Una proyección de Q: matriz \(32 \times 32\) (4 cabezas × 8) más 32 sesgos = \(32\cdot 32 + 32 = 1056\). Igual para K y para V: \(3 \times 1056 = 3168\).</li>
+    <li>La proyección de salida \(W_O\): \(32 \times 32 + 32 = 1056\).</li>
+    <li>Total \(= 3168 + 1056 = \mathbf{4224} = 4\cdot 32^2 + 4\cdot 32\).</li>
+    <li>Con \(h = 2\) cabezas de \(d_k = 16\) o con \(h = 8\) de \(d_k = 4\): el mismo \(4224\). <strong>Las cabezas no cambian el número de parámetros.</strong></li>
+  </ol>
+</div>
+
+<figure class="demo" data-demo="curso3/c3m3-multicabeza" data-titulo="Cabezas que miran a cosas distintas">
+  <div class="haz">Con 4 cabezas, elige el token «pequeña» y mira la fila marcada en cada mapa. Luego elige «niña» y después «libro». Baja el número de cabezas a 1 y 2.</div>
+  <div class="observa">Cada cabeza reparte la atención con su propia regla: una mira a la posición anterior, otra busca el sustantivo, otra el verbo, otra mira a todo por igual. Con una sola cabeza solo hay <em>un</em> reparto por token. Fíjate también en el parámetro de abajo: el número de parámetros de la capa no depende de h. (Aquí las matrices están elegidas a mano para que se vea el mecanismo; en un modelo real las cabezas las descubre el entrenamiento y rara vez son tan limpias.)</div>
+</figure>
+
+<h3>La capa de Keras</h3>
+<p><code>keras.layers.MultiHeadAttention</code> hace todo lo anterior (las proyecciones, el reparto en cabezas, el softmax, la concatenación y \(W_O\)). Sus argumentos más importantes:</p>
+<table>
+  <thead><tr><th>Argumento</th><th>Significado</th></tr></thead>
+  <tbody>
+    <tr><td><code>num_heads</code></td><td>Número de cabezas \(h\).</td></tr>
+    <tr><td><code>key_dim</code></td><td>Tamaño \(d_k\) <strong>de cada cabeza</strong> para Q y K (no el total).</td></tr>
+    <tr><td><code>value_dim</code></td><td>Tamaño \(d_v\) de cada cabeza para V; si es <code>None</code> usa <code>key_dim</code>.</td></tr>
+    <tr><td><code>dropout</code>, <code>use_bias</code></td><td>Dropout sobre los pesos de atención; si las proyecciones llevan sesgo.</td></tr>
+    <tr><td><code>output_shape</code>, <code>attention_axes</code></td><td>Tamaño de la última dimensión de salida (por defecto, la de la entrada) y sobre qué ejes se atiende (por defecto, el de los tokens).</td></tr>
+  </tbody>
+</table>
+<p>Y se <em>llama</em> con <code>capa(query, value, key=None, attention_mask=None, return_attention_scores=False, use_causal_mask=False, ...)</code>. En self-attention se pasa la misma entrada como <code>query</code> y como <code>value</code>: <code>mha(x, x)</code>; si no das <code>key</code>, usa <code>value</code>. Con <code>return_attention_scores=True</code> devuelve además los pesos, de forma <code>(lote, cabezas, n_consulta, n_clave)</code>. (Keras 3.15, la versión de este módulo, añade además argumentos como <code>query_mask</code>/<code>value_mask</code> y <code>sliding_window</code>; aquí usamos solo los de siempre.)</p>
+
+<div class="callout ojo">
+  <span class="lbl">Ojo</span>
+  <p><code>key_dim</code> es el tamaño <strong>por cabeza</strong>. Muchos tutoriales ponen <code>key_dim=embed_dim</code> y funciona, pero con 4 cabezas y \(d_{model}=32\) la capa pasa de 4.224 a <strong>16.800 parámetros</strong> (casi 4 veces más), porque cada cabeza proyecta a 32 en lugar de a 8. La regla segura es <code>key_dim = d_model // num_heads</code>, y que <code>d_model</code> sea múltiplo de <code>num_heads</code> (si no, la división se redondea y la concatenación ya no devuelve exactamente \(d_{model}\) números).</p>
+</div>
+<p>En el fragmento 8 verás la prueba definitiva de que la capa no tiene magia: se sacan sus pesos, se rehacen las cuentas con NumPy y la salida coincide.</p>
+</section>
+
+<!-- =============================================================== -->
+<section>
+<h2 id="posicion">Codificación posicional</h2>
+<p class="pregunta">La atención compara tokens con tokens, pero en ninguna parte de la fórmula aparece <em>dónde</em> está cada uno. ¿«El perro muerde al hombre» y «el hombre muerde al perro» son lo mismo para ella?</p>
+<p>Casi. La self-attention es <strong>equivariante a permutaciones</strong>: si mezclas el orden de los tokens de entrada, las salidas salen mezcladas del mismo modo, con exactamente los mismos números. Para la capa, la frase es un <em>conjunto</em>, no una secuencia. El fragmento 9 lo comprueba: al barajar los tokens, la salida es la salida original barajada igual. La solución es <strong>inyectar la posición en los propios vectores</strong>: a cada token se le suma un vector que depende de en qué lugar está.</p>
+
+<h3>Codificación sinusoidal</h3>
+<p>La del artículo original usa senos y cosenos de distintas frecuencias. Para la posición \(pos\) y las dimensiones \(2i\) y \(2i+1\) del vector:</p>
+<div class="formula">\[ PE(pos,\,2i) = \sin\!\left(\frac{pos}{10000^{2i/d_{model}}}\right), \qquad PE(pos,\,2i+1) = \cos\!\left(\frac{pos}{10000^{2i/d_{model}}}\right) \]</div>
+<p>\(pos\) es la posición del token (0, 1, 2…), \(i\) numera las parejas de dimensiones (0, 1, …, \(d_{model}/2 - 1\)) y \(d_{model}\) es el tamaño del vector. Cada pareja \((\sin, \cos)\) es como una <strong>manecilla de reloj</strong> que gira más despacio cuanto mayor es \(i\): la primera pareja da una vuelta cada \(2\pi \approx 6{,}3\) posiciones y la última, una vuelta cada \(2\pi\cdot 10000 \approx 62.800\).</p>
+
+<div class="callout ejemplo">
+  <span class="lbl">Ejemplo numérico</span>
+  <p>\(d_{model} = 4\): dos parejas. Para \(i=0\) el divisor es \(10000^0 = 1\); para \(i = 1\) es \(10000^{2/4} = 100\).</p>
+  <table>
+    <thead><tr><th>pos</th><th>dim 0: sen(pos)</th><th>dim 1: cos(pos)</th><th>dim 2: sen(pos/100)</th><th>dim 3: cos(pos/100)</th></tr></thead>
+    <tbody>
+      <tr><td>0</td><td>0</td><td>1</td><td>0</td><td>1</td></tr>
+      <tr><td>1</td><td>0,841</td><td>0,540</td><td>0,010</td><td>1,000</td></tr>
+      <tr><td>2</td><td>0,909</td><td>−0,416</td><td>0,020</td><td>1,000</td></tr>
+      <tr><td>3</td><td>0,141</td><td>−0,990</td><td>0,030</td><td>1,000</td></tr>
+    </tbody>
+  </table>
+  <p>Las dos primeras dimensiones cambian rápido (distinguen posiciones vecinas); las dos últimas, muy despacio (distinguen «principio» de «final» de una secuencia larga). Es como un contador con una cifra de unidades que gira rápido y una de centenas que gira despacio, pero con ondas suaves en lugar de dígitos.</p>
+</div>
+
+<h3>Por qué senos y cosenos</h3>
+<ul>
+  <li><strong>No hay nada que aprender</strong> y funciona con cualquier longitud (incluso mayor que las vistas en el entrenamiento).</li>
+  <li><strong>La distancia queda codificada.</strong> Como \(\sin a\,\sin b + \cos a\,\cos b = \cos(a - b)\), el producto escalar de dos posiciones es \(PE(p)\cdot PE(p+k) = \sum_i \cos(\omega_i k)\): depende <em>solo de la distancia \(k\)</em>, no de dónde estén. El fragmento 9 lo comprueba con números (5.543 a distancia 3 en las posiciones 5, 20 y 40) y el experimento de abajo lo dibuja.</li>
+  <li>Moverse \(k\) posiciones equivale a <strong>girar</strong> cada manecilla un ángulo fijo, y una rotación es una operación lineal: la red puede aprender a «mirar k posiciones atrás» con una matriz.</li>
+</ul>
+
+<figure class="demo" data-demo="curso3/c3m3-posicional" data-titulo="Relojes de posición y la similitud entre posiciones">
+  <div class="haz">Mueve «Posición p» y mira cómo giran las manecillas azules (la naranja es otra posición p'). Después mueve p' y compara las dos curvas de abajo.</div>
+  <div class="observa">La primera pareja gira muy deprisa y la última casi no se mueve: juntas identifican cada posición, como las agujas de un reloj. Y las dos curvas de similitud (para p y p') son <em>la misma</em>: la «cercanía» entre dos posiciones depende solo de su distancia. Prueba también con d_model = 4: solo hay dos manecillas, la rápida se repite cada 6,3 posiciones y la lenta casi no se mueve; con 16 hay ocho y la identificación es mucho más fina.</div>
+</figure>
+
+<h3>Posiciones aprendidas</h3>
+<p>La alternativa, usada por BERT y por GPT-2, es una tabla <code>Embedding(max_posiciones, d_model)</code>: cada posición tiene su vector, que se entrena como cualquier otro peso (es lo que hace el <code>TokenAndPositionEmbedding</code> del fragmento 15 y del Curso 2). Rinde igual de bien en la práctica, pero está limitada a la longitud máxima que reservaste y añade <code>max_posiciones × d_model</code> parámetros (800 en el fragmento 9). Hoy muchos modelos usan variantes que codifican posiciones <em>relativas</em> (RoPE, ALiBi) directamente dentro de la atención; la idea de fondo es la misma.</p>
+<div class="callout ojo">
+  <span class="lbl">Ojo</span>
+  <p>La posición se <strong>suma</strong> al embedding del token (no se concatena): así el tamaño del vector no cambia y la red puede separar «qué» de «dónde» con sus propias matrices. Por eso el vector de posición debe tener exactamente \(d_{model}\) números. Y también hace falta en series temporales: el Transformer no sabe que el valor de la posición 47 es «el último» si no se lo dices.</p>
+</div>
+</section>
+<!-- =============================================================== -->
+<section>
+<h2 id="bloque">El bloque Transformer encoder, pieza a pieza</h2>
+<p class="pregunta">La atención mezcla tokens, pero sola no es un Transformer. ¿Qué más lleva un bloque, para qué sirve cada pieza y qué pasaría si la quitaras?</p>
+
+<p>Un bloque tiene dos sub-bloques (atención y red feed-forward), cada uno rodeado de una <em>conexión residual</em> y una <em>normalización</em>. La entrada y la salida tienen la misma forma \((n, d_{model})\), así que se pueden apilar tantos bloques como quieras. Es el <code>TransformerBlock</code> que ya usaste en el proyecto del Curso 2; ahora vemos qué hace cada línea.</p>
+<pre class="ascii">x ──┬──────────────► (+) ─► LayerNorm ──┬────────────► (+) ─► LayerNorm ─► salida
+    │                  ▲                  │               ▲
+    └─ MultiHeadAttention (x, x) ─────────┘               │
+                                          └─ Dense(ff) ─► ReLU ─► Dense(d_model)
+
+Versión «post-LN» (la del artículo original y la de nuestro código): suma y luego normaliza.</pre>
+
+<h3>1 · LayerNormalization</h3>
+<p>Mantiene los números en una escala razonable a medida que atraviesan muchas capas (si no, tras 12 o 96 bloques los valores se disparan o se apagan y el entrenamiento se vuelve inestable). Normaliza <strong>cada token por separado</strong>: calcula la media \(\mu\) y la varianza \(\sigma^2\) de sus \(d_{model}\) números y los reescala:</p>
+<div class="formula">\[ \operatorname{LN}(x)_j = \gamma_j\,\frac{x_j - \mu}{\sqrt{\sigma^2 + \varepsilon}} + \beta_j \]</div>
+<p>\(\gamma\) y \(\beta\) son dos vectores de \(d_{model}\) números que <strong>se aprenden</strong> (empiezan en 1 y 0) para que la red pueda «deshacer» la normalización si le conviene; \(\varepsilon\) es un número minúsculo para no dividir entre 0 (en <code>LayerNormalization</code> vale <code>0.001</code> por defecto; nuestro bloque usa <code>1e-6</code>).</p>
+<div class="callout ejemplo">
+  <span class="lbl">Ejemplo numérico</span>
+  <p>Un token con \(d = 4\): \(x = (1, 2, 3, 10)\).</p>
+  <ol class="pasos">
+    <li>Media: \(\mu = (1+2+3+10)/4 = 4\).</li>
+    <li>Varianza: \(((1-4)^2 + (2-4)^2 + (3-4)^2 + (10-4)^2)/4 = (9 + 4 + 1 + 36)/4 = 12{,}5\). Desviación: \(\sqrt{12{,}5} = 3{,}536\).</li>
+    <li>Normalizado (con \(\gamma = 1\), \(\beta = 0\) y \(\varepsilon\) despreciable): \((-3,\,-2,\,-1,\,6)/3{,}536 = (-0{,}849;\ -0{,}566;\ -0{,}283;\ 1{,}697)\). Media 0 y desviación 1.</li>
+  </ol>
+</div>
+<p><strong>¿Por qué LayerNorm y no BatchNorm?</strong> BatchNorm calcula las estadísticas <em>a lo largo del lote</em> (una media por rasgo, mezclando ejemplos y tokens). Con secuencias de longitud variable, rellenos y lotes pequeños esas estadísticas son inestables, y en generación (un ejemplo cada vez) ni siquiera existen. LayerNorm usa solo los números del propio token: da igual el lote y la longitud.</p>
+<figure class="demo" data-demo="curso3/c3m3-layernorm-ejes" data-titulo="¿Sobre qué números se calcula la media?">
+  <div class="haz">Pulsa una casilla cualquiera con «LayerNorm (por token)»: se iluminan los 5 números de ese token. Cambia a «BatchNorm (por rasgo)» y pulsa otra casilla.</div>
+  <div class="observa">LayerNorm mira solo una fila (un token, todos sus rasgos). BatchNorm mira una columna entera atravesando todos los ejemplos y todos los tokens: 12 valores que no tienen nada que ver entre sí. Fíjate en la fórmula del texto: el valor de z que se muestra es la cuenta que acabamos de hacer a mano.</div>
+</figure>
+
+<h3>2 · Conexión residual</h3>
+<p>En lugar de devolver solo lo que calcula el sub-bloque, se devuelve <strong>entrada + lo que calcula</strong>: \(y = x + F(x)\). Dos razones:</p>
+<ul>
+  <li><strong>El camino directo.</strong> La derivada es \(\partial y/\partial x = 1 + F'(x)\): aunque \(F'\) sea casi 0, el gradiente pasa con valor 1. En 12 bloques con \(F' = 0{,}01\), el gradiente conserva \(1{,}01^{12} \approx 1{,}13\) en lugar de \(0{,}01^{12} = 10^{-24}\). Es el mismo truco que las ResNet y lo que permite apilar decenas de capas.</li>
+  <li><strong>Lo que había se conserva.</strong> El sub-bloque solo tiene que aprender la <em>corrección</em> a la entrada, no reconstruirla entera.</li>
+</ul>
+<div class="callout ojo">
+  <span class="lbl">Ojo</span>
+  <p>La suma exige que \(x\) y \(F(x)\) tengan <strong>la misma forma</strong>. Por eso la atención devuelve \(d_{model}\) números (gracias a \(W_O\)) y por eso la red feed-forward termina en <code>Dense(d_model)</code>. Si cambias una de esas dimensiones, Keras protesta con un error de formas incompatibles al sumar.</p>
+</div>
+
+<h3>3 · Red feed-forward por posición</h3>
+<p>Dos capas <code>Dense</code> con una ReLU en medio: \(\operatorname{FFN}(x) = W_2\,\max(0,\,W_1 x + b_1) + b_2\), que sube de \(d_{model}\) a \(d_{ff}\) (habitualmente \(4\,d_{model}\)) y vuelve a bajar. Se aplica a <strong>cada token por separado y con los mismos pesos</strong> (<em>position-wise</em>): la atención mezcla información <em>entre</em> tokens y la FFN <em>procesa</em> lo que cada token ha recogido. Equivale a dos convoluciones <code>Conv1D</code> de tamaño de kernel 1; algunos ejemplos de Keras la escriben así. Es donde vive la mayor parte de los parámetros del bloque (el 66 % cuando \(d_{ff} = 4d_{model}\)).</p>
+
+<h3>Post-LN y pre-LN</h3>
+<p>Dónde se coloca la normalización cambia el comportamiento. <strong>Post-LN</strong> (artículo original): <code>x = LN(x + Sub(x))</code>. <strong>Pre-LN</strong> (GPT-2 en adelante): <code>x = x + Sub(LN(x))</code>, que deja el «carril» residual sin tocar y entrena de forma más estable con modelos muy profundos (en pre-LN se añade una LayerNorm final después del último bloque). Nuestro código usa post-LN por ser el de los tutoriales de Keras.</p>
+
+<figure class="demo" data-demo="curso3/c3m3-bloque-numeros" data-titulo="Un bloque Transformer con números reales">
+  <div class="haz">Pulsa «Siguiente» desde el paso 0 hasta el 6 y observa cómo cambian la matriz y las medias/desviaciones de cada token. Luego quita las conexiones residuales y repite. Por último prueba pre-LN.</div>
+  <div class="observa">Tras cada LayerNorm todas las filas tienen media 0 y desviación 1, incluida la del token 3, que entró con números triples. La atención y la FFN no cambian la forma (4 × 4). Al final, la «semejanza» entre la entrada y la salida es mayor con residuales que sin ellas: sin la suma, el bloque olvida lo que le llegó. Los mapas inferiores son los pesos de atención de las dos cabezas de este bloque.</div>
+</figure>
+
+<h3>Cuántos parámetros tiene un bloque</h3>
+<p>Con \(d = d_{model}\) y \(d_{ff}\): atención \(4d^2 + 4d\); FFN \(2\,d\,d_{ff} + d_{ff} + d\); dos LayerNorm \(4d\) (sus \(\gamma\) y \(\beta\)). Para \(d = 32\) y \(d_{ff} = 64\): \(4224 + 4192 + 128 = 8544\), justo lo que verás en el fragmento 11. Para BERT-base (\(d = 768\), \(d_{ff} = 3072\)) salen 7.087.872 por bloque y unos 85 millones los 12 bloques (el resto de sus ~110 millones son los embeddings de unas 30.000 piezas de vocabulario).</p>
+<figure class="demo" data-demo="curso3/c3m3-contador-params" data-titulo="Contador de parámetros de un Transformer">
+  <div class="haz">Parte de la configuración por defecto (la del fragmento 15) y cambia el número de cabezas con el selector. Luego sube d_model a 128 y el vocabulario a 5.000. Por último activa «Error típico: key_dim = d_model».</div>
+  <div class="observa">Las cabezas no mueven el total. Doblar d_model multiplica por 4 los parámetros de atención y de FFN (crecen con d²), mientras que el vocabulario solo pesa en las capas de entrada y de salida. Con key_dim = d_model la atención se infla h veces. Las cifras de la configuración por defecto coinciden con las de <code>model.summary()</code> de los fragmentos 12 y 15.</div>
+</figure>
+
+<h3>Encoder, decoder y la familia: BERT, GPT y compañía</h3>
+<p>Con este bloque se construyen las tres arquitecturas famosas, que solo se diferencian en la máscara y en cómo se entrenan:</p>
+<table>
+  <thead><tr><th></th><th>Máscara</th><th>Se entrena para…</th><th>Sirve para</th></tr></thead>
+  <tbody>
+    <tr><td><strong>Encoder</strong> (BERT)</td><td>Ninguna: cada token ve a los de ambos lados</td><td>Rellenar palabras tapadas («masked language model»): «el gato [MASK] leche» → «bebe»</td><td>Entender texto: clasificar, extraer, buscar, medir similitud. También es lo que usaremos con series.</td></tr>
+    <tr><td><strong>Decoder</strong> (GPT)</td><td>Causal: cada token solo ve hacia atrás</td><td>Predecir el token siguiente</td><td>Generar texto, código, etc. Es el que construiremos al final.</td></tr>
+    <tr><td><strong>Encoder + decoder</strong> (Transformer original, T5)</td><td>Encoder libre; decoder causal con cross-attention al encoder</td><td>Secuencia → secuencia (traducir, resumir)</td><td>Cuando la entrada y la salida son textos distintos.</td></tr>
+  </tbody>
+</table>
+<p>«Entender» frente a «generar» es solo cuestión de la máscara: con la causal el modelo puede entrenarse con la frase entera de una vez y aun así no hacer trampa. Otros usos del mismo bloque: Vision Transformers (el «texto» son trozos de imagen), audio y, como verás ahora, series temporales.</p>
+
+<h3>El bloque como capa propia de Keras</h3>
+<p>Como viste en el <a href="modulo-1.html">módulo 1 de este curso</a>, una capa propia hereda de <code>keras.layers.Layer</code>. En el constructor (<code>__init__</code>) creas las sub-capas; <code>call</code> dice cómo fluyen los datos; <code>get_config</code> devuelve los argumentos del constructor para poder guardar y recargar el modelo. Dos detalles propios de Keras 3 que verás en el fragmento 11:</p>
+<ul>
+  <li><code>@keras.saving.register_keras_serializable()</code> da un nombre a la clase para que <code>load_model</code> pueda reconstruirla.</li>
+  <li>El argumento <code>training</code> de <code>call</code> activa o desactiva el <code>Dropout</code> (se apaga en <code>predict</code> y <code>evaluate</code>).</li>
+</ul>
+</section>
+<!-- =============================================================== -->
+<section>
+<h2 id="series">Un Transformer para series temporales</h2>
+<p class="pregunta">Un Transformer se inventó para palabras. ¿Qué cambia cuando los «tokens» son simples números de un sensor?</p>
+
+<h3>Del token discreto al valor continuo</h3>
+<p>En texto, el primer paso es una tabla de búsqueda <code>Embedding</code> que convierte un id entero en un vector. Un valor de una serie ya es un número, no un id: no hay nada que buscar. El equivalente es una capa <code>Dense(d_model)</code> que lleva el valor (o los \(F\) rasgos de ese instante) a un vector de \(d_{model}\) números. Es una <strong>proyección lineal</strong>, la misma para todos los instantes. El resto es idéntico: se le suma la codificación posicional, pasa por los bloques y se lee la salida.</p>
+<pre class="ascii">entrada (lote, 48, 1)
+  → Dense(32)                   (lote, 48, 32)   cada valor pasa a ser un vector
+  → + codificación posicional   (lote, 48, 32)
+  → TransformerBlock × 2        (lote, 48, 32)   los instantes se miran entre sí
+  → GlobalAveragePooling1D      (lote, 32)       resume los 48 instantes
+  → Dense(1)                    (lote, 1)        la predicción</pre>
+
+<h3>Regresión: predecir un valor</h3>
+<p>Para predecir el valor \(h = 10\) pasos adelante, la cabeza final es una <code>Dense(1)</code> <strong>sin activación</strong> (la salida puede ser cualquier número real) y la pérdida es el error cuadrático medio (<code>"mse"</code>); la métrica legible es el MAE, que está en las mismas unidades que la serie. Falta decidir cómo pasar de los 48 vectores a uno solo, y hay tres opciones habituales:</p>
+<ul>
+  <li><code>GlobalAveragePooling1D</code>: la media de los 48 vectores (la que usamos; robusta y sin parámetros).</li>
+  <li>Quedarse con <strong>el último instante</strong> (<code>x[:, -1]</code>): el que más sabe del final de la ventana, que es lo que de verdad importa al predecir; con una máscara causal es lo más natural.</li>
+  <li><code>Flatten</code> + <code>Dense</code>: conserva la posición de cada instante, pero añade \(48\cdot 32\) entradas a la capa final.</li>
+</ul>
+<p>El fragmento 12 entrena el modelo de arriba (17.185 parámetros) durante 20 épocas con la serie del módulo y compara tres cosas en el <em>test</em>, el trozo final de la serie que nunca vio. El resultado es instructivo:</p>
+<ul>
+  <li>«Repetir el último valor» da un MAE de <strong>0,928</strong> (en unidades normalizadas): a 10 pasos de distancia, la serie ha cambiado mucho.</li>
+  <li>El Transformer baja a <strong>0,172</strong>: ha aprendido las dos ondas.</li>
+  <li>Pero una simple <strong>regresión lineal sobre la ventana</strong> llega a <strong>0,158</strong>, algo mejor. El mínimo posible por el ruido ronda 0,14 (el ruido de desviación 0,15 equivale a ≈ 0,12 en unidades originales; dividido entre la desviación de train, 0,861, son ≈ 0,14 normalizados).</li>
+</ul>
+<div class="callout regla">
+  <span class="lbl">Regla fácil</span>
+  <p>Una suma de senos con ruido es <em>exactamente</em> lo que una regresión lineal sobre la ventana predice bien; no hay nada «no lineal» que descubrir. Un Transformer brilla cuando hay interacciones complejas, muchas variables o dependencias muy largas y mucho dato. <strong>Prueba siempre primero las líneas base</strong>: si no las superas, no necesitas un modelo grande.</p>
+</div>
+<div class="callout ojo">
+  <span class="lbl">Ojo: el primer intento falla</span>
+  <p>Si escribes la capa de posición «a la manera de NumPy», <code>return x + self.pe[: ops.shape(x)[1]]</code> con <code>self.pe</code> un array de NumPy, la construcción del modelo funciona (en ese momento el tamaño es 48), pero al llamar a <code>fit</code> falla con <code>TypeError: slice indices must be integers or None or have an __index__ method</code>. El motivo: durante el entrenamiento, TensorFlow traza la función con una longitud de ventana <em>desconocida</em> (<code>None</code>), así que <code>ops.shape(x)[1]</code> es un tensor y NumPy no sabe cortar con un tensor. La solución es convertir la tabla en tensor antes de cortar: <code>pe = ops.convert_to_tensor(self.pe)</code> y <code>x + pe[: ops.shape(x)[1]]</code>, que es lo que hace el fragmento 11.</p>
+</div>
+
+<h3>Clasificación: decir de qué tipo es una señal</h3>
+<p>Si en vez de un número queremos una <strong>categoría</strong> (¿qué tipo de señal es?), cambia solo el final: <code>Dense(n_clases, activation="softmax")</code> y la pérdida <code>sparse_categorical_crossentropy</code> (las etiquetas son enteros 0, 1, 2). El fragmento 13 fabrica 2.000 señales de 64 puntos de tres tipos —seno lento, seno rápido y un pico en una posición aleatoria— todas con ruido de desviación 0,5 (comparable a la amplitud, así que no es trivial). Con un solo bloque Transformer el acierto en test es de <strong>99,5 %</strong>, con los tres tipos en torno al 99–100 %. El pico es un buen ejemplo de por qué sirve la atención: aparece en cualquier posición y un solo token puede «encender» a los demás.</p>
+<div class="callout analogia">
+  <span class="lbl">Variantes que conviene conocer</span>
+  <p><strong>Varias variables</strong> (temperatura, humedad, presión): la entrada pasa a ser <code>(lote, pasos, 3)</code> y no cambia nada más. <strong>Predecir varios pasos a la vez</strong>: <code>Dense(h)</code> al final y un objetivo de \(h\) valores. <strong>Series muy largas</strong>: troceas en parches (como los Vision Transformers) para que \(n^2\) no se dispare.</p>
+</div>
+</section>
+<!-- =============================================================== -->
+<section>
+<h2 id="texto">Generación de texto con un Transformer decoder</h2>
+<p class="pregunta">Un GPT se entrena con una sola tarea: «dado lo anterior, adivina la siguiente palabra». ¿Cómo se monta eso en Keras de principio a fin, y cómo se elige la palabra cuando el modelo solo da probabilidades?</p>
+
+<h3>Los datos: una gramática propia, para saber la respuesta correcta</h3>
+<p>Sin internet no podemos bajar un corpus, y un texto sintético tiene una ventaja: podemos calcular <em>exactamente</em> cuánto vale un modelo perfecto. Escribimos una gramática pequeña de frases como «la niña pequeña lee un libro .» o «el gato negro duerme en el sofá .»: un sujeto (6 sustantivos, con su artículo <em>el/la</em>), un adjetivo opcional que <strong>concuerda en género</strong> (negro/negra, pequeño/pequeña) y un verbo con su complemento (<em>duerme en…</em>, <em>bebe…</em>, <em>lee…</em>, <em>corre por…</em>). Salen 144 frases distintas y generamos 1.500 al azar (10.115 palabras). Aprender esa gramática exige memoria de lo anterior: para escribir «negra» hay que acordarse de que el sustantivo era «gata».</p>
+
+<h3>Tokenización con <code>TextVectorization</code></h3>
+<p>Un modelo solo ve números, así que cada palabra se cambia por un id. <code>keras.layers.TextVectorization</code> hace todo el trayecto: <code>standardize</code> (qué limpieza aplicar: aquí solo pasar a minúsculas; la opción por defecto también borraría los signos de puntuación, incluido nuestro «.» que marca el final de frase), <code>split</code> (por espacios), y construye el <strong>vocabulario</strong> con <code>adapt</code>. El vocabulario reserva el id 0 para el relleno (cadena vacía) y el id 1 para las palabras desconocidas (<code>[UNK]</code>); aquí tiene 31 entradas: esas 2 más 29 palabras. Las palabras de verdad empiezan en el id 2 y están ordenadas de más a menos frecuentes.</p>
+
+<h3>El texto es una serie de ids: las mismas ventanas</h3>
+<p>Una vez convertido en números, el texto <em>es</em> una secuencia de enteros y cabe en las herramientas de la primera sección. Cortamos ventanas de 16 ids y para cada posición el objetivo es <strong>el id siguiente</strong>: las entradas son <code>ids[:-1]</code> y los objetivos <code>ids[1:]</code>, desplazados un lugar. Una ventana de 16 palabras proporciona así 16 ejercicios a la vez («dada la 1.ª, la 2.ª», «dadas las 2 primeras, la 3.ª»…), y la <strong>máscara causal</strong> impide que cada posición mire a la palabra que tiene que adivinar.</p>
+<div class="callout ejemplo">
+  <span class="lbl">Ejemplo numérico</span>
+  <p>Ventana de entrada: <code>la niña pequeña duerme en el</code>. Objetivos desplazados: <code>niña pequeña duerme en el sofá</code>.</p>
+  <ol class="pasos">
+    <li>Posición 1: ve «la» → debe decir «niña».</li>
+    <li>Posición 2: ve «la niña» → debe decir «pequeña».</li>
+    <li>Posición 6: ve «la niña pequeña duerme en el» → debe decir «sofá» (o «cama»: ¡dos opciones válidas!).</li>
+  </ol>
+  <p>Seis ejercicios en una sola pasada, cada uno con su respuesta. Sin la máscara causal, la posición 1 podría «ver» la palabra «niña» de la posición 2 y copiarla.</p>
+</div>
+
+<h3>El modelo: embedding con posición + bloques causales + una capa de salida</h3>
+<ol class="pasos">
+  <li><strong><code>TokenAndPositionEmbedding</code></strong> (capa propia): suma el embedding de la palabra y el embedding de su posición (los dos aprendidos).</li>
+  <li><strong>2 × <code>TransformerBlock(causal=True)</code></strong>: el mismo bloque de antes, pero con <code>use_causal_mask=True</code> en la atención.</li>
+  <li><strong><code>Dense(31)</code> sin activación</strong>: devuelve 31 números por posición, uno por palabra del vocabulario, llamados <strong>logits</strong> (puntuaciones sin normalizar). El softmax lo aplica la pérdida.</li>
+</ol>
+<p>La pérdida es <code>SparseCategoricalCrossentropy(from_logits=True)</code>: para cada posición toma \(-\ln p(\text{palabra correcta})\) y la promedia. Con <code>from_logits=True</code> se le dan los logits y ella hace el softmax de forma numéricamente estable (si la capa final ya tuviera <code>softmax</code>, se pondría <code>from_logits=False</code>; mezclar las dos cosas es un error clásico).</p>
+
+<h3>La pérdida, la perplejidad y el «suelo» de la gramática</h3>
+<p>La <strong>perplejidad</strong> es \(e^{\text{pérdida}}\): el número de opciones igualmente probables entre las que el modelo «duda» de media. Un modelo que reparte al azar entre las 31 palabras tendría pérdida \(\ln 31 = 3{,}43\) y perplejidad 31. Nuestra gramática, en cambio, deja decidir poco: tras «el gato» hay que decidir si lleva adjetivo (y cuál de 2) y luego elegir uno de 4 verbos, y tras «bebe» solo queda elegir entre 2 complementos; el resto está determinado (género, preposiciones, el punto final). Sumando la entropía de las elecciones libres, la frase media tiene 4,911 nats de incertidumbre repartidos en 6,75 palabras: el <strong>suelo teórico</strong> es 4,911 / 6,75 = <strong>0,728 nats por palabra</strong>, es decir, perplejidad 2,07. Ningún modelo puede bajar de ahí (salvo memorizando la muestra).</p>
+<p>El fragmento 15 entrena el mini-GPT (19.615 parámetros) durante 12 épocas, unos 30 segundos de CPU. La pérdida baja de 1,155 en la primera época a 0,751 en la tercera y a <strong>0,729</strong> al final: perplejidad <strong>2,07</strong>, pegada al suelo. El modelo ha aprendido la gramática, incluida la concordancia de género, a partir de ejemplos y sin que nadie se la explicase.</p>
+
+<h3>Del logit a la palabra: temperatura y top-k</h3>
+<p>El modelo no escribe la palabra: da <strong>una probabilidad por cada palabra posible</strong>. Quedarse siempre con la más probable (<em>decodificación voraz</em>, <em>greedy</em>) produce textos repetitivos; elegir al azar según las probabilidades da variedad. Dos mandos controlan ese azar:</p>
+<ul>
+  <li><strong>Temperatura \(T\):</strong> se dividen los logits entre \(T\) antes del softmax, \(p_i = \dfrac{e^{z_i/T}}{\sum_j e^{z_j/T}}\). \(T<1\) afila el reparto (más seguro, más repetitivo); \(T>1\) lo aplana (más variado, más disparates); \(T \to 0\) equivale al voraz.</li>
+  <li><strong>top-k:</strong> se descartan todas las palabras salvo las \(k\) con más puntuación y se renormaliza. Corta de raíz las rarezas, aunque \(T\) sea alta. (Una variante, <em>top-p</em> o <em>nucleus</em>, deja las palabras necesarias para sumar una probabilidad \(p\).)</li>
+</ul>
+<div class="callout ejemplo">
+  <span class="lbl">Ejemplo numérico</span>
+  <p>Cuatro palabras con logits \(z = (2,\ 1,\ 0,\ -1)\).</p>
+  <table>
+    <thead><tr><th></th><th>palabra 1</th><th>palabra 2</th><th>palabra 3</th><th>palabra 4</th></tr></thead>
+    <tbody>
+      <tr><td>\(T=1\): \(e^{z}\) = 7,389 · 2,718 · 1 · 0,368 (suma 11,475)</td><td class="res">0,644</td><td>0,237</td><td>0,087</td><td>0,032</td></tr>
+      <tr><td>\(T=0{,}5\): \(z/T = (4, 2, 0, -2)\)</td><td class="res">0,865</td><td>0,117</td><td>0,016</td><td>0,002</td></tr>
+      <tr><td>\(T=2\): \(z/T = (1, 0{,}5, 0, -0{,}5)\)</td><td class="res">0,455</td><td>0,276</td><td>0,167</td><td>0,102</td></tr>
+      <tr><td>\(T=1\) con top-\(k=2\): quedan 7,389 y 2,718 (suma 10,107)</td><td class="res">0,731</td><td>0,269</td><td>0</td><td>0</td></tr>
+    </tbody>
+  </table>
+  <p>Con \(T=0{,}5\) la palabra favorita pasa de 64,4 % a 86,5 %; con \(T=2\) baja a 45,5 % y la última sube del 3,2 % al 10,2 %. El top-2 ni siquiera deja que las palabras 3 y 4 entren en el sorteo.</p>
+</div>
+
+<figure class="demo" data-demo="curso3/c3m3-generacion" data-titulo="El mini-GPT del módulo, funcionando en tu navegador">
+  <div class="haz">Empieza con «el gato» y pulsa «Siguiente token» varias veces; después «Completar la frase». Luego sube la temperatura a 2,5 y repite. Por último deja la temperatura alta y pon top-k = 3.</div>
+  <div class="observa">Este modelo es de verdad el del fragmento 15: sus 19.615 pesos están en este archivo y el cálculo (embedding, dos bloques causales, capa de salida) se hace aquí con JavaScript; los logits coinciden con los de Keras salvo diferencias de redondeo (menos de 0,003). Con T baja salen frases correctas pero repetidas; con T alta salen mezclas sin sentido («bebe lee la gata…»); y el top-k las evita. Las barras muestran el reparto que se sortea; la marca vertical es lo que daría el modelo sin tocar nada.</div>
+</figure>
+
+<p>El fragmento 16 lo mide: para cada ajuste genera 240 palabras (unas 35 frases) y comprueba cuántas pertenecen a la gramática. El porcentaje de frases que pertenecen a la gramática es del 100 % con \(T=0{,}7\) y \(T=1\), baja al 86 % con \(T=1{,}5\), se hunde al 35 % con \(T=2\) y se recupera al 97 % si a \(T=1{,}5\) le añades top-\(k=3\). La «creatividad» cuesta corrección, y los mandos permiten elegir el compromiso.</p>
+<div class="callout ojo">
+  <span class="lbl">Ojo</span>
+  <p>Es raro que las probabilidades del modelo sean exactamente las de la gramática: tras «… el gato negro» los cuatro verbos son igual de probables (25 % cada uno), y el modelo reparte 43 %, 21 %, 18 % y 18 % (fragmento 16). Es un modelo pequeño entrenado 12 épocas con 1.500 frases: la pérdida media está en el suelo, pero en contextos concretos puede inclinarse. Las probabilidades de un modelo no son verdades: son su opinión.</p>
+</div>
+<div class="callout ojo">
+  <span class="lbl">Ojo: código del curso que falla en Keras 3</span>
+  <p>Muchos tutoriales antiguos importan <code>tf.keras.layers.experimental.preprocessing.TextVectorization</code>. En Keras 3 ya no existe: da <code>AttributeError: module 'keras._tf_keras.keras.layers' has no attribute 'experimental'</code>. Ahora es <code>keras.layers.TextVectorization</code> (y <code>keras.utils.pad_sequences</code> en lugar de <code>keras.preprocessing.sequence.pad_sequences</code>).</p>
+</div>
+
+<h3>Guardar y recargar un modelo con capas propias</h3>
+<p>Un modelo con capas propias se guarda igual que cualquier otro (<code>modelo.save("x.keras")</code>), pero para recargarlo Keras tiene que poder <strong>reconstruir tus clases</strong>: de ahí el decorador <code>@keras.saving.register_keras_serializable()</code> y el método <code>get_config</code>, que devuelve los argumentos del constructor (el archivo guarda la configuración y los pesos). Sin ellos, <code>load_model</code> falla con «Unknown layer». El fragmento 17 guarda el mini-GPT (345 KB), lo recarga y comprueba que da exactamente las mismas predicciones.</p>
+<div class="callout recuerda">
+  <span class="lbl">De juguete a GPT de verdad</span>
+  <p>Lo que has construido es, en miniatura, la receta de un GPT: embedding con posición → bloques con atención causal → logits sobre el vocabulario → entrenamiento «adivina la siguiente» → muestreo con temperatura y top-k. Las diferencias son de escala (bloques por docenas, \(d_{model}\) de miles, vocabulario de decenas de miles de piezas de subpalabra, billones de palabras de entrenamiento) y de refinamiento posterior (ajuste con instrucciones, alineación). En el <a href="../curso-2/modulo-4.html">módulo 4 del Curso 2</a> tienes esa historia.</p>
+</div>
+</section>
+<!-- =============================================================== -->
+<section>
+<h2 id="codigo">Código del módulo</h2>
+<p class="codigo-intro">Todo el código de este módulo se ha ejecutado de verdad (Python 3.13, TensorFlow 2.21, Keras 3.15, CPU) y las salidas son las que salieron, idénticas en dos ejecuciones seguidas. Cada fragmento trae su tabla <strong>línea por línea</strong>: pasa el ratón (o toca) una fila y se iluminan las líneas del código. Los fragmentos <strong>comparten variables</strong> y están pensados para ejecutarse <strong>en orden</strong> dentro del mismo cuaderno (Jupyter o Colab): cada uno avisa de lo que usa de los anteriores. Necesitas <code>numpy</code>, <code>keras</code>, <code>tensorflow</code> y <code>scikit-learn</code>.</p>
+<p class="codigo-intro">Dos avisos de honestidad: no hay descarga de datos (la serie, las señales y el texto son sintéticos, con semilla fija, para que el módulo funcione sin internet), y los modelos son diminutos a propósito. Las cifras de entrenamiento coinciden entre ejecuciones en esta máquina; en otra CPU o con otra versión pueden variar en los últimos decimales.</p>
+
+<!-- ---------- Fragmento 1 ---------- -->
+<article class="snippet" data-lang="python">
+  <header>
+    <h3>1 · Una serie sintética y sus ventanas, hechas a mano</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Fabricar la serie del módulo (tendencia + dos senos + ruido) y convertirla en ejemplos <code>(X, y)</code> con un bucle de Python, para ver con claridad qué es una ventana, qué es el horizonte y por qué salen 1.943 ejemplos.</p>
+  </header>
+  <pre class="code"><code>import numpy as np
+
+def crear_serie(n=2000, semilla=0):
+    rng = np.random.default_rng(semilla)
+    t = np.arange(n)
+    tendencia = 0.0008 * t
+    estacion = 1.0 * np.sin(2 * np.pi * t / 50) + 0.5 * np.sin(2 * np.pi * t / 12)
+    ruido = rng.normal(0, 0.15, n)
+    return (tendencia + estacion + ruido).astype("float32")
+
+serie = crear_serie()
+print("serie:", serie.shape, serie[:4].round(3))
+
+VENTANA, HORIZONTE = 48, 10
+
+def hacer_ventanas(serie, ventana, horizonte):
+    X, y = [], []
+    for i in range(len(serie) - ventana - horizonte + 1):
+        X.append(serie[i : i + ventana])
+        y.append(serie[i + ventana + horizonte - 1])
+    return np.array(X)[..., None], np.array(y)
+
+X, y = hacer_ventanas(serie, VENTANA, HORIZONTE)
+print("X:", X.shape, " y:", y.shape)
+print("ventanas esperadas:", len(serie) - VENTANA - HORIZONTE + 1)
+print("X[0] acaba en el instante", VENTANA - 1, "-&gt; y[0] es el instante", VENTANA + HORIZONTE - 1)
+print("comprobación:", y[0] == serie[VENTANA + HORIZONTE - 1])</code></pre>
+  <details class="linea-a-linea" open>
+    <summary>Línea por línea</summary>
+    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+      <tbody>
+        <tr data-lines="1"><td><code>import numpy as np</code></td><td>Importa NumPy, la librería de cálculo con arrays, con el apodo <code>np</code>.</td></tr>
+        <tr data-lines="3-4"><td><code>def crear_serie(n=2000, semilla=0): rng = ...</code></td><td>Define una función que fabrica una serie de <code>n</code> instantes. <code>np.random.default_rng(semilla)</code> crea un generador de números aleatorios <strong>con semilla</strong>: misma semilla, mismos números en cualquier ordenador.</td></tr>
+        <tr data-lines="5"><td><code>t = np.arange(n)</code></td><td>El eje del tiempo: el array <code>[0, 1, 2, …, n-1]</code>.</td></tr>
+        <tr data-lines="6"><td><code>tendencia = 0.0008 * t</code></td><td>Una subida lenta y constante: 0,0008 por instante (1,6 en total).</td></tr>
+        <tr data-lines="7"><td><code>estacion = ...</code></td><td>Dos ondas que se repiten: un seno de amplitud 1 y periodo 50 instantes y otro de amplitud 0,5 y periodo 12. <code>np.sin(2 * np.pi * t / 50)</code> da una vuelta completa cada 50 pasos.</td></tr>
+        <tr data-lines="8"><td><code>ruido = rng.normal(0, 0.15, n)</code></td><td>Ruido aleatorio: <code>n</code> números de una distribución normal con media 0 y desviación 0,15. Es lo que ningún modelo puede predecir.</td></tr>
+        <tr data-lines="9"><td><code>return (...).astype("float32")</code></td><td>Suma los tres ingredientes y la devuelve en <code>float32</code> (decimales de 32 bits, el tipo habitual en redes neuronales).</td></tr>
+        <tr data-lines="11"><td><code>serie = crear_serie()</code></td><td>Llama a la función con los valores por defecto: 2.000 instantes.</td></tr>
+        <tr data-lines="12"><td><code>print("serie:", serie.shape, serie[:4].round(3))</code></td><td><code>.shape</code> es el tamaño del array; <code>serie[:4]</code> son los 4 primeros valores, redondeados a 3 decimales.</td></tr>
+        <tr data-lines="14"><td><code>VENTANA, HORIZONTE = 48, 10</code></td><td>Las dos constantes del problema: el modelo verá 48 instantes y predecirá el valor que está 10 pasos después del último. Se escriben en mayúsculas por convención (no cambian).</td></tr>
+        <tr data-lines="16-17"><td><code>def hacer_ventanas(...): X, y = [], []</code></td><td>Función que recorre la serie. <code>X</code> e <code>y</code> empiezan como listas vacías.</td></tr>
+        <tr data-lines="18"><td><code>for i in range(len(serie) - ventana - horizonte + 1):</code></td><td>\(i\) es el instante donde empieza cada ventana. Hay <code>n - w - h + 1</code> posiciones posibles: la fórmula del texto.</td></tr>
+        <tr data-lines="19"><td><code>X.append(serie[i : i + ventana])</code></td><td>Guarda la ventana: los <code>ventana</code> valores seguidos desde <code>i</code> (el corte <code>a : b</code> incluye <code>a</code> y excluye <code>b</code>).</td></tr>
+        <tr data-lines="20"><td><code>y.append(serie[i + ventana + horizonte - 1])</code></td><td>Guarda el objetivo: el valor que está <code>horizonte</code> pasos después del último de la ventana (el último es <code>i + ventana - 1</code>).</td></tr>
+        <tr data-lines="21"><td><code>return np.array(X)[..., None], np.array(y)</code></td><td>Convierte las listas en arrays. <code>[..., None]</code> añade una dimensión final de tamaño 1 (el número de rasgos), para obtener la forma <code>(ejemplos, pasos, rasgos)</code> que esperan Keras y los Transformers.</td></tr>
+        <tr data-lines="23"><td><code>X, y = hacer_ventanas(serie, VENTANA, HORIZONTE)</code></td><td>Aplica la función a nuestra serie.</td></tr>
+        <tr data-lines="24"><td><code>print("X:", X.shape, " y:", y.shape)</code></td><td>Formas resultantes de entrada y objetivo.</td></tr>
+        <tr data-lines="25"><td><code>print("ventanas esperadas:", ...)</code></td><td>La cuenta del texto, \(n - w - h + 1\), para compararla con la forma obtenida.</td></tr>
+        <tr data-lines="26"><td><code>print("X[0] acaba en el instante", ...)</code></td><td>Dónde acaba la primera ventana (el instante 47, porque empieza en el 0) y de qué instante es su objetivo.</td></tr>
+        <tr data-lines="27"><td><code>print("comprobación:", y[0] == serie[...])</code></td><td>Comprueba que el primer objetivo es realmente el valor de la serie en el instante 57.</td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>serie: (2000,) [0.019 0.356 0.779 0.886]
+X: (1943, 48, 1)  y: (1943,)
+ventanas esperadas: 1943
+X[0] acaba en el instante 47 -&gt; y[0] es el instante 57
+comprobación: True</pre>
+    <p>La serie tiene 2.000 valores y de ella salen <strong>1.943</strong> ejemplos, exactamente \(2000 - 48 - 10 + 1\). Cada ejemplo es una matriz de 48 instantes con 1 rasgo (<code>X</code> tiene forma <code>(1943, 48, 1)</code>) y un solo número como respuesta. La primera ventana cubre los instantes 0 a 47 y su objetivo es el instante 57, diez pasos después del 47.</p>
+  </div>
+</article>
+
+<!-- ---------- Fragmento 2 ---------- -->
+<article class="snippet" data-lang="python">
+  <header>
+    <h3>2 · Separar en el tiempo, normalizar y <code>timeseries_dataset_from_array</code></h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Hacerlo bien: cortar la serie en train/val/test <em>antes</em> de hacer ventanas, normalizar con las estadísticas de train, generar lotes con la utilidad de Keras y calcular la línea base «repetir el último valor». Usa <code>serie</code>, <code>VENTANA</code> y <code>HORIZONTE</code> del fragmento 1.</p>
+  </header>
+  <pre class="code"><code>import keras
+
+n = len(serie)
+n_train, n_val = int(0.70 * n), int(0.15 * n)
+media, desv = serie[:n_train].mean(), serie[:n_train].std()
+serie_n = (serie - media) / desv
+print("media y desv. de TRAIN:", round(float(media), 3), round(float(desv), 3))
+
+trozos = {
+    "train": serie_n[:n_train],
+    "val": serie_n[n_train : n_train + n_val],
+    "test": serie_n[n_train + n_val :],
+}
+
+def a_dataset(trozo, barajar=False):
+    return keras.utils.timeseries_dataset_from_array(
+        data=trozo[:, None],
+        targets=trozo[VENTANA + HORIZONTE - 1 :],
+        sequence_length=VENTANA,
+        batch_size=64,
+        shuffle=barajar,
+        seed=0,
+    )
+
+ds_train = a_dataset(trozos["train"], barajar=True)
+ds_val = a_dataset(trozos["val"])
+ds_test = a_dataset(trozos["test"])
+
+for xb, yb in ds_train.take(1):
+    print("lote:", xb.shape, yb.shape)
+print("lotes train/val/test:", len(ds_train), len(ds_val), len(ds_test))
+
+x_val = np.concatenate([xb.numpy() for xb, _ in ds_val])
+y_val = np.concatenate([yb.numpy() for _, yb in ds_val])
+pred = x_val[:, -1, 0]
+print("ventanas en val:", len(y_val))
+print("MAE de 'repetir el último valor':", round(float(np.abs(pred - y_val).mean()), 3), "(unidades normalizadas)")
+print("                                  =", round(float(np.abs(pred - y_val).mean() * desv), 3), "(unidades originales)")</code></pre>
+  <details class="linea-a-linea" open>
+    <summary>Línea por línea</summary>
+    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+      <tbody>
+        <tr data-lines="1"><td><code>import keras</code></td><td>Importa Keras 3. (También valdría <code>from tensorflow import keras</code>; en TensorFlow 2.21 es el mismo Keras.)</td></tr>
+        <tr data-lines="3"><td><code>n = len(serie)</code></td><td>Longitud de la serie: 2.000.</td></tr>
+        <tr data-lines="4"><td><code>n_train, n_val = int(0.70 * n), int(0.15 * n)</code></td><td>Tamaños: 1.400 instantes de entrenamiento y 300 de validación. Quedan 300 para test.</td></tr>
+        <tr data-lines="5"><td><code>media, desv = serie[:n_train].mean(), serie[:n_train].std()</code></td><td>Media y desviación calculadas <strong>solo con los 1.400 primeros</strong> instantes (train). Esta es la regla anti-fuga.</td></tr>
+        <tr data-lines="6"><td><code>serie_n = (serie - media) / desv</code></td><td>El z-score aplicado a toda la serie con esas dos cifras.</td></tr>
+        <tr data-lines="7"><td><code>print("media y desv. de TRAIN:", ...)</code></td><td>Muestra los dos números aprendidos (<code>float(...)</code> evita que NumPy imprima el tipo).</td></tr>
+        <tr data-lines="9-13"><td><code>trozos = {...}</code></td><td>Un diccionario con los tres trozos <strong>consecutivos</strong>: train es el principio, val lo que sigue y test el final. <code>serie_n[n_train + n_val :]</code> significa «desde ahí hasta el final».</td></tr>
+        <tr data-lines="15"><td><code>def a_dataset(trozo, barajar=False):</code></td><td>Función que convierte un trozo en un <code>tf.data.Dataset</code> de lotes.</td></tr>
+        <tr data-lines="16"><td><code>return keras.utils.timeseries_dataset_from_array(</code></td><td>La utilidad de Keras que crea las ventanas sin copiar los datos.</td></tr>
+        <tr data-lines="17"><td><code>data=trozo[:, None],</code></td><td>Los datos como matriz <code>(instantes, rasgos)</code>; <code>[:, None]</code> añade la columna de rasgos (1 rasgo).</td></tr>
+        <tr data-lines="18"><td><code>targets=trozo[VENTANA + HORIZONTE - 1 :],</code></td><td>Los objetivos. La ventana \(i\) usa <code>targets[i]</code>; para que sea el valor «diez pasos después» hay que empezar a contar en <code>w + h - 1</code>. Es el truco más importante de la función.</td></tr>
+        <tr data-lines="19"><td><code>sequence_length=VENTANA,</code></td><td>Tamaño de la ventana: 48.</td></tr>
+        <tr data-lines="20"><td><code>batch_size=64,</code></td><td>Cuántas ventanas por lote.</td></tr>
+        <tr data-lines="21"><td><code>shuffle=barajar,</code></td><td>Si se barajan las <strong>ventanas</strong> (solo en train). Barajar ventanas es correcto; lo incorrecto es barajar antes de separar.</td></tr>
+        <tr data-lines="22-23"><td><code>seed=0, )</code></td><td>Semilla del barajado para que sea reproducible; el paréntesis cierra la llamada.</td></tr>
+        <tr data-lines="25"><td><code>ds_train = a_dataset(trozos["train"], barajar=True)</code></td><td>Dataset de entrenamiento, con ventanas barajadas.</td></tr>
+        <tr data-lines="26-27"><td><code>ds_val = ...; ds_test = ...</code></td><td>Validación y test, sin barajar (da igual el orden al evaluar).</td></tr>
+        <tr data-lines="29-30"><td><code>for xb, yb in ds_train.take(1): print("lote:", ...)</code></td><td><code>.take(1)</code> coge un único lote. <code>xb</code> es la entrada del lote e <code>yb</code> sus objetivos; imprimimos sus formas.</td></tr>
+        <tr data-lines="31"><td><code>print("lotes train/val/test:", len(ds_train), ...)</code></td><td>Cuántos lotes tiene cada dataset.</td></tr>
+        <tr data-lines="33-34"><td><code>x_val = np.concatenate([...]); y_val = ...</code></td><td>Recorre el dataset de validación y junta todos los lotes en dos arrays grandes (<code>.numpy()</code> pasa de tensor de TensorFlow a array de NumPy). El <code>_</code> es un nombre de variable que no vamos a usar.</td></tr>
+        <tr data-lines="35"><td><code>pred = x_val[:, -1, 0]</code></td><td>La predicción «de persistencia»: de cada ventana, su último valor (<code>-1</code> = último instante, <code>0</code> = el único rasgo).</td></tr>
+        <tr data-lines="36"><td><code>print("ventanas en val:", len(y_val))</code></td><td>Número de ejemplos de validación.</td></tr>
+        <tr data-lines="37"><td><code>print("MAE de 'repetir el último valor':", ...)</code></td><td>MAE = media del valor absoluto del error, <code>np.abs(pred - y_val).mean()</code>, en unidades normalizadas.</td></tr>
+        <tr data-lines="38"><td><code>print("   =", ... * desv, ...)</code></td><td>El mismo error en unidades originales (multiplicando por la desviación): así se interpreta mejor.</td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>media y desv. de TRAIN: 0.558 0.861
+lote: (64, 48, 1) (64,)
+lotes train/val/test: 21 4 4
+ventanas en val: 243
+MAE de 'repetir el último valor': 0.911 (unidades normalizadas)
+                                  = 0.785 (unidades originales)</pre>
+    <p>La media de train es 0,558 y su desviación 0,861. Un lote tiene forma <code>(64, 48, 1)</code> (64 ventanas, 48 instantes, 1 rasgo) con 64 objetivos. Hay 21 lotes de entrenamiento (1.343 ventanas) y 4 de validación (243). Repetir el último valor se equivoca de media en <strong>0,911</strong> unidades normalizadas (0,785 en originales): esta es la cifra que el Transformer tendrá que mejorar.</p>
+  </div>
+</article>
+
+<!-- ---------- Fragmento 3 ---------- -->
+<article class="snippet" data-lang="python">
+  <header>
+    <h3>3 · Las mismas ventanas con <code>tf.data</code>: window, flat_map y map</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Construir las ventanas con las herramientas de TensorFlow para series (el estilo de «TensorFlow for Sequential Data») y comprobar que obtienes exactamente lo mismo que con <code>timeseries_dataset_from_array</code>. Usa <code>trozos</code>, <code>a_dataset</code>, <code>VENTANA</code> y <code>HORIZONTE</code> del fragmento 2.</p>
+  </header>
+  <pre class="code"><code>import tensorflow as tf
+
+paso1 = tf.data.Dataset.from_tensor_slices(trozos["train"])
+paso2 = paso1.window(VENTANA + HORIZONTE, shift=1, drop_remainder=True)
+paso3 = paso2.flat_map(lambda w: w.batch(VENTANA + HORIZONTE, drop_remainder=True))
+paso4 = paso3.map(lambda w: (w[:VENTANA, None], w[-1]))
+
+print("elemento:", paso4.element_spec)
+x_tf = np.stack([x.numpy() for x, _ in paso4])
+y_tf = np.array([y.numpy() for _, y in paso4])
+print("ventanas con tf.data:", x_tf.shape)
+
+x_kr = np.concatenate([xb.numpy() for xb, _ in a_dataset(trozos["train"])])
+y_kr = np.concatenate([yb.numpy() for _, yb in a_dataset(trozos["train"])])
+print("igual que timeseries_dataset_from_array:", np.allclose(x_tf, x_kr) and np.allclose(y_tf, y_kr))</code></pre>
+  <details class="linea-a-linea" open>
+    <summary>Línea por línea</summary>
+    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+      <tbody>
+        <tr data-lines="1"><td><code>import tensorflow as tf</code></td><td>Importa TensorFlow con el apodo <code>tf</code>.</td></tr>
+        <tr data-lines="3"><td><code>paso1 = tf.data.Dataset.from_tensor_slices(trozos["train"])</code></td><td>Crea un <code>Dataset</code> cuyos elementos son los valores sueltos de la serie de entrenamiento, uno por uno.</td></tr>
+        <tr data-lines="4"><td><code>paso2 = paso1.window(VENTANA + HORIZONTE, shift=1, drop_remainder=True)</code></td><td><code>window</code> corta trozos de longitud <code>w + h</code> (la entrada y el objetivo juntos), desplazándose <code>shift=1</code> instante cada vez. <code>drop_remainder=True</code> descarta los trozos finales incompletos. Cada elemento resultante es <em>otro Dataset</em>.</td></tr>
+        <tr data-lines="5"><td><code>paso3 = paso2.flat_map(lambda w: w.batch(VENTANA + HORIZONTE, drop_remainder=True))</code></td><td>Cada ventana (un dataset) se junta en un único tensor de 58 números con <code>.batch</code>; <code>flat_map</code> aplica esto a todas y las «aplana» en un dataset normal. <code>lambda w: ...</code> es una función mini sin nombre.</td></tr>
+        <tr data-lines="6"><td><code>paso4 = paso3.map(lambda w: (w[:VENTANA, None], w[-1]))</code></td><td>Separa cada tensor de 58 en (entrada, respuesta): los 48 primeros valores como columna (<code>w[:48, None]</code>, forma <code>(48, 1)</code>) y el último (<code>w[-1]</code>), que está 10 pasos después del 48.º.</td></tr>
+        <tr data-lines="8"><td><code>print("elemento:", paso4.element_spec)</code></td><td><code>element_spec</code> describe la forma y el tipo de cada elemento del dataset.</td></tr>
+        <tr data-lines="9"><td><code>x_tf = np.stack([x.numpy() for x, _ in paso4])</code></td><td>Recorre el dataset, pasa cada entrada a NumPy y las apila en un array de ventanas.</td></tr>
+        <tr data-lines="10"><td><code>y_tf = np.array([y.numpy() for _, y in paso4])</code></td><td>Lo mismo con los objetivos.</td></tr>
+        <tr data-lines="11"><td><code>print("ventanas con tf.data:", x_tf.shape)</code></td><td>Forma del array de ventanas.</td></tr>
+        <tr data-lines="13-14"><td><code>x_kr = ...; y_kr = ...</code></td><td>Obtiene lo mismo con la función del fragmento 2 (sin barajar) y lo junta en arrays.</td></tr>
+        <tr data-lines="15"><td><code>print("igual que ...", np.allclose(...) and np.allclose(...))</code></td><td><code>np.allclose</code> compara dos arrays con una tolerancia minúscula; <code>and</code> exige que coincidan entradas y objetivos.</td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>elemento: (TensorSpec(shape=(48, 1), dtype=tf.float32, name=None), TensorSpec(shape=(), dtype=tf.float32, name=None))
+ventanas con tf.data: (1343, 48, 1)
+igual que timeseries_dataset_from_array: True</pre>
+    <p>Cada elemento es un par <code>(entrada de forma (48, 1), objetivo escalar)</code>. Salen 1.343 ventanas (\(1400 - 48 - 10 + 1\)) y son idénticas a las de Keras: dos caminos al mismo sitio. Con <code>tf.data</code> puedes seguir encadenando <code>.shuffle(...)</code>, <code>.batch(...)</code> y <code>.prefetch(...)</code> (preparar el siguiente lote mientras la red procesa el actual).</p>
+  </div>
+</article>
+
+<!-- ---------- Fragmento 4 ---------- -->
+<article class="snippet" data-lang="python">
+  <header>
+    <h3>4 · La atención con NumPy: softmax(QKᵀ/√d)V</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Escribir la fórmula de la atención en 7 líneas y reproducir con ella el ejemplo resuelto a mano del texto. Es la función <code>atencion</code> que usarán los fragmentos 5, 6 y 8.</p>
+  </header>
+  <pre class="code"><code>import numpy as np
+
+def softmax(z):
+    z = z - z.max(axis=-1, keepdims=True)
+    e = np.exp(z)
+    return e / e.sum(axis=-1, keepdims=True)
+
+def atencion(Q, K, V, mascara=None):
+    dk = Q.shape[-1]
+    puntos = Q @ K.T / np.sqrt(dk)
+    if mascara is not None:
+        puntos = np.where(mascara, puntos, -np.inf)
+    pesos = softmax(puntos)
+    return pesos @ V, pesos
+
+Q = np.array([[1., 0.], [0., 1.], [1., 1.]])
+K = np.array([[2., 0.], [0., 2.], [1., 1.]])
+V = np.array([[1., 0.], [0., 1.], [1., 1.]])
+
+print("Q K^T:\n", Q @ K.T)
+print("Q K^T / raiz(2):\n", (Q @ K.T / np.sqrt(2)).round(3))
+salida, pesos = atencion(Q, K, V)
+print("pesos A:\n", pesos.round(3))
+print("suma de cada fila:", pesos.sum(axis=1))
+print("salida A V:\n", salida.round(3))</code></pre>
+  <details class="linea-a-linea" open>
+    <summary>Línea por línea</summary>
+    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+      <tbody>
+        <tr data-lines="1"><td><code>import numpy as np</code></td><td>Importa NumPy.</td></tr>
+        <tr data-lines="3-6"><td><code>def softmax(z): ...</code></td><td>Softmax por filas. Primero <code>z - z.max(...)</code>: restar el máximo no cambia el resultado (el factor se simplifica arriba y abajo) pero evita que <code>np.exp</code> desborde con números grandes. <code>axis=-1</code> = a lo largo de la última dimensión (cada fila) y <code>keepdims=True</code> conserva la dimensión para poder dividir. Se eleva a <code>e</code> y se divide por la suma de la fila.</td></tr>
+        <tr data-lines="8-9"><td><code>def atencion(Q, K, V, mascara=None): dk = ...</code></td><td>La función. <code>Q.shape[-1]</code> es \(d_k\), el número de columnas de Q.</td></tr>
+        <tr data-lines="10"><td><code>puntos = Q @ K.T / np.sqrt(dk)</code></td><td>\(Q K^\top / \sqrt{d_k}\). El operador <code>@</code> es el producto de matrices y <code>K.T</code> la traspuesta. Resultado: una matriz <code>(n, n)</code> de puntuaciones escaladas.</td></tr>
+        <tr data-lines="11-12"><td><code>if mascara is not None: puntos = np.where(mascara, puntos, -np.inf)</code></td><td>Si hay máscara, <code>np.where</code> deja la puntuación donde la máscara vale <code>True</code> y pone <code>-inf</code> (menos infinito) donde vale <code>False</code>. Sin máscara se salta.</td></tr>
+        <tr data-lines="13"><td><code>pesos = softmax(puntos)</code></td><td>La matriz de pesos \(A\): cada fila suma 1 (<code>e^-inf = 0</code>, por eso los huecos valen exactamente 0).</td></tr>
+        <tr data-lines="14"><td><code>return pesos @ V, pesos</code></td><td>Devuelve la salida \(A V\) y también los pesos, para poder mirarlos.</td></tr>
+        <tr data-lines="16-18"><td><code>Q = ...; K = ...; V = ...</code></td><td>Las matrices \(3\times 2\) del ejemplo del texto (se escriben con punto decimal, <code>1.</code>, para que sean decimales).</td></tr>
+        <tr data-lines="20"><td><code>print("Q K^T:\n", Q @ K.T)</code></td><td>Las puntuaciones sin escalar. <code>\n</code> es un salto de línea para que la matriz salga debajo.</td></tr>
+        <tr data-lines="21"><td><code>print("Q K^T / raiz(2):\n", ...)</code></td><td>Las puntuaciones escaladas, redondeadas a 3 decimales.</td></tr>
+        <tr data-lines="22"><td><code>salida, pesos = atencion(Q, K, V)</code></td><td>Aplica la función completa.</td></tr>
+        <tr data-lines="23"><td><code>print("pesos A:\n", pesos.round(3))</code></td><td>La matriz de pesos.</td></tr>
+        <tr data-lines="24"><td><code>print("suma de cada fila:", pesos.sum(axis=1))</code></td><td>Comprueba que cada fila suma 1 (<code>axis=1</code> suma a lo largo de las columnas).</td></tr>
+        <tr data-lines="25"><td><code>print("salida A V:\n", salida.round(3))</code></td><td>La salida de la atención.</td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>Q K^T:
+ [[2. 0. 1.]
+ [0. 2. 1.]
+ [2. 2. 2.]]
+Q K^T / raiz(2):
+ [[1.414 0.    0.707]
+ [0.    1.414 0.707]
+ [1.414 1.414 1.414]]
+pesos A:
+ [[0.576 0.14  0.284]
+ [0.14  0.576 0.284]
+ [0.333 0.333 0.333]]
+suma de cada fila: [1. 1. 1.]
+salida A V:
+ [[0.86  0.424]
+ [0.424 0.86 ]
+ [0.667 0.667]]</pre>
+    <p>Son exactamente las matrices del ejemplo del texto: pesos \((0{,}576;\ 0{,}140;\ 0{,}284)\) en la primera fila, reparto uniforme en la tercera y salida \((0{,}86;\ 0{,}424)\) para el primer token. Cada fila de pesos suma 1.</p>
+  </div>
+</article>
+
+<!-- ---------- Fragmento 5 ---------- -->
+<article class="snippet" data-lang="python">
+  <header>
+    <h3>5 · Medir por qué se divide entre √d</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Comprobar con números que la desviación de \(q\cdot k\) es \(\sqrt{d_k}\) y que sin dividir el softmax se satura. Usa <code>softmax</code> del fragmento 4.</p>
+  </header>
+  <pre class="code"><code>rng = np.random.default_rng(0)
+
+for dk in (4, 64, 512):
+    q = rng.normal(size=(5000, dk))
+    k = rng.normal(size=(5000, dk))
+    puntos = (q * k).sum(axis=1)
+    print(f"d_k={dk:3d}  desv. de q·k = {puntos.std():6.2f}   (raiz de d_k = {np.sqrt(dk):5.2f})   tras dividir: {(puntos / np.sqrt(dk)).std():.2f}")
+
+print()
+for dk in (4, 64, 512):
+    q = rng.normal(size=(2000, 1, dk))
+    k = rng.normal(size=(2000, 8, dk))
+    puntos = (q * k).sum(axis=-1)
+    sin = softmax(puntos).max(axis=1).mean()
+    con = softmax(puntos / np.sqrt(dk)).max(axis=1).mean()
+    print(f"d_k={dk:3d}  peso máximo medio entre 8 claves:  sin escalar {sin:.2f}   escalado {con:.2f}")</code></pre>
+  <details class="linea-a-linea" open>
+    <summary>Línea por línea</summary>
+    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+      <tbody>
+        <tr data-lines="1"><td><code>rng = np.random.default_rng(0)</code></td><td>Generador de números aleatorios con semilla 0.</td></tr>
+        <tr data-lines="3"><td><code>for dk in (4, 64, 512):</code></td><td>Repite el experimento con tres tamaños de cabeza.</td></tr>
+        <tr data-lines="4-5"><td><code>q = rng.normal(size=(5000, dk)); k = ...</code></td><td>5.000 vectores \(q\) y 5.000 vectores \(k\) con números normales de media 0 y varianza 1 (aproximadamente cómo empiezan en una red).</td></tr>
+        <tr data-lines="6"><td><code>puntos = (q * k).sum(axis=1)</code></td><td>El producto escalar de cada pareja: multiplica componente a componente y suma a lo largo de las \(d_k\) componentes. Quedan 5.000 puntuaciones.</td></tr>
+        <tr data-lines="7"><td><code>print(f"d_k={dk:3d} ...")</code></td><td>Una f-string (los <code>{}</code> insertan valores; <code>:3d</code> un entero en 3 espacios; <code>:6.2f</code> un decimal con 2 cifras). Compara la desviación de las puntuaciones con \(\sqrt{d_k}\) y con la de las puntuaciones divididas entre \(\sqrt{d_k}\).</td></tr>
+        <tr data-lines="9"><td><code>print()</code></td><td>Una línea en blanco para separar las dos tablas.</td></tr>
+        <tr data-lines="10"><td><code>for dk in (4, 64, 512):</code></td><td>Segundo experimento, con los mismos tamaños.</td></tr>
+        <tr data-lines="11"><td><code>q = rng.normal(size=(2000, 1, dk))</code></td><td>2.000 consultas, cada una con un solo vector \(q\) (la dimensión de tamaño 1 permite comparar con muchas claves a la vez).</td></tr>
+        <tr data-lines="12"><td><code>k = rng.normal(size=(2000, 8, dk))</code></td><td>Para cada consulta, 8 claves candidatas.</td></tr>
+        <tr data-lines="13"><td><code>puntos = (q * k).sum(axis=-1)</code></td><td>Puntuaciones <code>(2000, 8)</code>: cada consulta contra sus 8 claves (NumPy «difunde» el vector \(q\) sobre las 8 filas).</td></tr>
+        <tr data-lines="14"><td><code>sin = softmax(puntos).max(axis=1).mean()</code></td><td>Softmax sobre las 8 claves, se toma el peso mayor de cada consulta (<code>max(axis=1)</code>) y se promedia. Si fuera 1/8 = 0,125, el reparto sería uniforme; si es 1, es «el ganador se lo lleva todo».</td></tr>
+        <tr data-lines="15"><td><code>con = softmax(puntos / np.sqrt(dk)).max(axis=1).mean()</code></td><td>Lo mismo, pero con las puntuaciones divididas entre \(\sqrt{d_k}\).</td></tr>
+        <tr data-lines="16"><td><code>print(f"d_k={dk:3d} peso máximo medio ...")</code></td><td>Imprime los dos pesos máximos medios.</td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>d_k=  4  desv. de q·k =   2.00   (raiz de d_k =  2.00)   tras dividir: 1.00
+d_k= 64  desv. de q·k =   8.03   (raiz de d_k =  8.00)   tras dividir: 1.00
+d_k=512  desv. de q·k =  22.98   (raiz de d_k = 22.63)   tras dividir: 1.02
+
+d_k=  4  peso máximo medio entre 8 claves:  sin escalar 0.53   escalado 0.35
+d_k= 64  peso máximo medio entre 8 claves:  sin escalar 0.87   escalado 0.36
+d_k=512  peso máximo medio entre 8 claves:  sin escalar 0.96   escalado 0.36</pre>
+    <p>Primera tabla: la desviación de \(q\cdot k\) es casi exactamente \(\sqrt{d_k}\) (2,00 · 8,03 · 22,98 frente a 2 · 8 · 22,63) y al dividir queda en 1, sea cual sea \(d_k\). Segunda tabla: sin escalar, el peso máximo medio entre 8 claves pasa de 0,53 (\(d_k=4\)) a 0,87 (64) y 0,96 (512): el softmax se vuelve un «ganador único» y su gradiente casi desaparece. Con la división se queda en 0,35–0,36 siempre.</p>
+  </div>
+</article>
+
+<!-- ---------- Fragmento 6 ---------- -->
+<article class="snippet" data-lang="python">
+  <header>
+    <h3>6 · La máscara causal, y comprobar que el pasado no ve el futuro</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Construir la matriz triangular de permisos, ver cómo cambia el reparto de atención y demostrar con un experimento que, con máscara, cambiar un token solo afecta a ese token y a los siguientes. Usa <code>atencion</code> del fragmento 4.</p>
+  </header>
+  <pre class="code"><code>n = 4
+mascara = np.tril(np.ones((n, n), dtype=bool))
+print("máscara (True = se puede mirar):\n", mascara.astype(int))
+
+rng = np.random.default_rng(1)
+Q, K, V = (rng.normal(size=(n, 3)) for _ in range(3))
+_, sin_mascara = atencion(Q, K, V)
+_, con_mascara = atencion(Q, K, V, mascara)
+print("pesos sin máscara:\n", sin_mascara.round(2))
+print("pesos con máscara:\n", con_mascara.round(2))
+
+V2 = V.copy()
+V2[3] += 10.0
+for nombre, m in (("sin máscara", None), ("con máscara", mascara)):
+    cambio = np.abs(atencion(Q, K, V2, m)[0] - atencion(Q, K, V, m)[0]).max(axis=1)
+    print(f"{nombre}: cuánto cambia la salida de cada token al tocar el token 4 -&gt;", cambio.round(2))</code></pre>
+  <details class="linea-a-linea" open>
+    <summary>Línea por línea</summary>
+    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+      <tbody>
+        <tr data-lines="1"><td><code>n = 4</code></td><td>Cuatro tokens.</td></tr>
+        <tr data-lines="2"><td><code>mascara = np.tril(np.ones((n, n), dtype=bool))</code></td><td><code>np.ones</code> crea una matriz 4×4 de unos (<code>dtype=bool</code> = verdadero/falso) y <code>np.tril</code> conserva solo el triángulo <strong>inferior</strong> (la diagonal y lo de debajo). <code>True</code> significa «puede mirar».</td></tr>
+        <tr data-lines="3"><td><code>print("máscara ...", mascara.astype(int))</code></td><td>La imprime como 1 y 0: la fila \(i\) tiene unos hasta la columna \(i\).</td></tr>
+        <tr data-lines="5"><td><code>rng = np.random.default_rng(1)</code></td><td>Semilla para los datos de prueba.</td></tr>
+        <tr data-lines="6"><td><code>Q, K, V = (rng.normal(size=(n, 3)) for _ in range(3))</code></td><td>Tres matrices aleatorias de 4 tokens × 3 números, creadas de una vez con un generador.</td></tr>
+        <tr data-lines="7-8"><td><code>_, sin_mascara = atencion(...); _, con_mascara = atencion(..., mascara)</code></td><td>Calcula los pesos sin y con máscara (solo nos interesan los pesos, que es el segundo valor devuelto).</td></tr>
+        <tr data-lines="9-10"><td><code>print("pesos sin máscara:\n", ...)</code></td><td>Imprime los dos mapas de atención, redondeados a 2 decimales.</td></tr>
+        <tr data-lines="12-13"><td><code>V2 = V.copy(); V2[3] += 10.0</code></td><td>Copia V y le suma 10 al <strong>valor del cuarto token</strong> (el índice 3). Es el «tocar el futuro» del experimento.</td></tr>
+        <tr data-lines="14"><td><code>for nombre, m in (("sin máscara", None), ("con máscara", mascara)):</code></td><td>Hace la prueba dos veces: sin máscara y con ella.</td></tr>
+        <tr data-lines="15"><td><code>cambio = np.abs(atencion(Q, K, V2, m)[0] - atencion(Q, K, V, m)[0]).max(axis=1)</code></td><td>Calcula la salida con el V original y con el V tocado, resta, toma el valor absoluto y el máximo por fila: cuánto cambia la salida de cada token.</td></tr>
+        <tr data-lines="16"><td><code>print(f"{nombre}: cuánto cambia ...", cambio.round(2))</code></td><td>Muestra el cambio de cada uno de los 4 tokens.</td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>máscara (True = se puede mirar):
+ [[1 0 0 0]
+ [1 1 0 0]
+ [1 1 1 0]
+ [1 1 1 1]]
+pesos sin máscara:
+ [[0.16 0.23 0.16 0.45]
+ [0.21 0.09 0.23 0.47]
+ [0.21 0.15 0.23 0.41]
+ [0.19 0.25 0.22 0.34]]
+pesos con máscara:
+ [[1.   0.   0.   0.  ]
+ [0.7  0.3  0.   0.  ]
+ [0.35 0.26 0.39 0.  ]
+ [0.19 0.25 0.22 0.34]]
+sin máscara: cuánto cambia la salida de cada token al tocar el token 4 -&gt; [4.52 4.66 4.06 3.37]
+con máscara: cuánto cambia la salida de cada token al tocar el token 4 -&gt; [0.   0.   0.   3.37]</pre>
+    <p>La máscara es triangular. Sin máscara, el token 1 reparte atención entre los cuatro (0,16 · 0,23 · 0,16 · 0,45); con ella, todo su peso (1,0) va a sí mismo, y el token 2 reparte 0,70 y 0,30 entre los dos primeros. En el experimento, sumar 10 al valor del token 4 cambia las salidas de <strong>todos</strong> los tokens sin máscara (4,52 · 4,66 · 4,06 · 3,37), pero con máscara las salidas de los tokens 1, 2 y 3 no se mueven (0) y solo cambia la del propio token 4.</p>
+  </div>
+</article>
+
+<!-- ---------- Fragmento 7 ---------- -->
+<article class="snippet" data-lang="python">
+  <header>
+    <h3>7 · La capa <code>MultiHeadAttention</code> de Keras: formas, pesos y parámetros</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Usar la capa real: ver qué forma tienen la entrada, la salida y los pesos de atención, contar sus parámetros con la fórmula y comprobar el efecto de <code>use_causal_mask=True</code>.</p>
+  </header>
+  <pre class="code"><code>import keras
+from keras import layers
+
+keras.utils.set_random_seed(0)
+x = np.random.default_rng(0).normal(size=(2, 6, 32)).astype("float32")
+
+mha = layers.MultiHeadAttention(num_heads=4, key_dim=8)
+salida, pesos = mha(x, x, return_attention_scores=True)
+print("entrada :", x.shape, "(lote, tokens, d_model)")
+print("salida  :", salida.shape)
+print("pesos   :", pesos.shape, "(lote, cabezas, tokens, tokens)")
+print("suma de una fila de pesos:", float(pesos[0, 0, 0].numpy().sum()))
+print("parámetros:", mha.count_params(), "= 4*(32*32+32) =", 4 * (32 * 32 + 32))
+print("kernel de query:", mha.query_dense.kernel.shape, " kernel de salida:", mha.output_dense.kernel.shape)
+
+_, pesos_c = mha(x, x, return_attention_scores=True, use_causal_mask=True)
+print("cabeza 0, ejemplo 0, con máscara causal:\n", pesos_c[0, 0].numpy().round(2))</code></pre>
+  <details class="linea-a-linea" open>
+    <summary>Línea por línea</summary>
+    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+      <tbody>
+        <tr data-lines="1-2"><td><code>import keras; from keras import layers</code></td><td>Importa Keras y su módulo de capas (<code>layers.Dense</code>, <code>layers.MultiHeadAttention</code>…).</td></tr>
+        <tr data-lines="4"><td><code>keras.utils.set_random_seed(0)</code></td><td>Fija a la vez las semillas de Python, NumPy y del backend de Keras: la capa empezará siempre con los mismos pesos.</td></tr>
+        <tr data-lines="5"><td><code>x = np.random.default_rng(0).normal(size=(2, 6, 32)).astype("float32")</code></td><td>Una entrada inventada: 2 ejemplos, 6 tokens por ejemplo, 32 números por token. Es la forma <code>(lote, tokens, d_model)</code>.</td></tr>
+        <tr data-lines="7"><td><code>mha = layers.MultiHeadAttention(num_heads=4, key_dim=8)</code></td><td>Crea la capa con 4 cabezas de tamaño 8 (4 × 8 = 32 = \(d_{model}\)). Todavía no tiene pesos: se crean al llamarla por primera vez.</td></tr>
+        <tr data-lines="8"><td><code>salida, pesos = mha(x, x, return_attention_scores=True)</code></td><td>Llama a la capa como una función con <code>query=x</code> y <code>value=x</code> (self-attention). <code>return_attention_scores=True</code> hace que devuelva además los pesos de atención.</td></tr>
+        <tr data-lines="9-10"><td><code>print("entrada :", ...); print("salida  :", ...)</code></td><td>La salida tiene la misma forma que la entrada.</td></tr>
+        <tr data-lines="11"><td><code>print("pesos   :", pesos.shape, ...)</code></td><td>Los pesos son <code>(lote, cabezas, tokens, tokens)</code>: un mapa 6×6 por cabeza y por ejemplo.</td></tr>
+        <tr data-lines="12"><td><code>print("suma de una fila de pesos:", ...)</code></td><td>Toma la fila 0 de la cabeza 0 del ejemplo 0 y comprueba que suma 1.</td></tr>
+        <tr data-lines="13"><td><code>print("parámetros:", mha.count_params(), ...)</code></td><td><code>count_params()</code> cuenta todos los números entrenables; se compara con la fórmula \(4d^2 + 4d\) del texto.</td></tr>
+        <tr data-lines="14"><td><code>print("kernel de query:", mha.query_dense.kernel.shape, ...)</code></td><td>La capa por dentro: <code>query_dense</code> es la proyección de Q. Su <code>kernel</code> (matriz de pesos) tiene forma <code>(32, 4, 8)</code>: de 32 números a 4 cabezas × 8. La de salida es <code>(4, 8, 32)</code>.</td></tr>
+        <tr data-lines="16"><td><code>_, pesos_c = mha(x, x, return_attention_scores=True, use_causal_mask=True)</code></td><td>La misma llamada, pidiendo la máscara causal. El guion bajo <code>_</code> descarta la salida, que ahora no nos interesa.</td></tr>
+        <tr data-lines="17"><td><code>print("cabeza 0, ejemplo 0, con máscara causal:\n", ...)</code></td><td>Muestra el mapa de atención 6×6 de la cabeza 0.</td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>entrada : (2, 6, 32) (lote, tokens, d_model)
+salida  : (2, 6, 32)
+pesos   : (2, 4, 6, 6) (lote, cabezas, tokens, tokens)
+suma de una fila de pesos: 1.0
+parámetros: 4224 = 4*(32*32+32) = 4224
+kernel de query: (32, 4, 8)  kernel de salida: (4, 8, 32)
+cabeza 0, ejemplo 0, con máscara causal:
+ [[1.   0.   0.   0.   0.   0.  ]
+ [0.7  0.3  0.   0.   0.   0.  ]
+ [0.19 0.35 0.47 0.   0.   0.  ]
+ [0.32 0.53 0.04 0.12 0.   0.  ]
+ [0.05 0.06 0.19 0.34 0.35 0.  ]
+ [0.12 0.05 0.05 0.23 0.11 0.44]]</pre>
+    <p>La salida conserva la forma <code>(2, 6, 32)</code>, y los pesos son <code>(2, 4, 6, 6)</code>. Los parámetros son 4.224, justo \(4\cdot(32\cdot 32 + 32)\); y los <em>kernels</em> son <code>(32, 4, 8)</code> y <code>(4, 8, 32)</code>. Con máscara causal el mapa es triangular: la primera fila es <code>[1, 0, 0, …]</code> (solo se mira a sí mismo) y la última tiene pesos en las seis posiciones.</p>
+  </div>
+</article>
+
+<!-- ---------- Fragmento 8 ---------- -->
+<article class="snippet" data-lang="python">
+  <header>
+    <h3>8 · Rehacer <code>MultiHeadAttention</code> a mano con sus propios pesos</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Demostrar que la capa no hace magia: sacar sus matrices, calcular cabeza por cabeza con la función <code>atencion</code>, concatenar, aplicar \(W_O\) y comprobar que el resultado coincide. Usa <code>mha</code>, <code>x</code> y <code>salida</code> del fragmento 7 y <code>atencion</code> del 4.</p>
+  </header>
+  <pre class="code"><code>Wq, bq = mha.query_dense.kernel.numpy(), mha.query_dense.bias.numpy()
+Wk, bk = mha.key_dense.kernel.numpy(), mha.key_dense.bias.numpy()
+Wv, bv = mha.value_dense.kernel.numpy(), mha.value_dense.bias.numpy()
+Wo, bo = mha.output_dense.kernel.numpy(), mha.output_dense.bias.numpy()
+
+xe = x[0]
+cabezas = []
+for h in range(4):
+    Qh = xe @ Wq[:, h, :] + bq[h]
+    Kh = xe @ Wk[:, h, :] + bk[h]
+    Vh = xe @ Wv[:, h, :] + bv[h]
+    Oh, _ = atencion(Qh, Kh, Vh)
+    cabezas.append(Oh)
+
+concat = np.concatenate(cabezas, axis=-1)
+manual = concat @ Wo.reshape(32, 32) + bo
+print("cada cabeza:", cabezas[0].shape, " concatenadas:", concat.shape)
+print("¿coincide con la capa de Keras?", np.allclose(manual, salida[0].numpy(), atol=1e-5))</code></pre>
+  <details class="linea-a-linea" open>
+    <summary>Línea por línea</summary>
+    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+      <tbody>
+        <tr data-lines="1-3"><td><code>Wq, bq = mha.query_dense.kernel.numpy(), ...bias.numpy()</code> (y K, V)</td><td>Extrae de cada proyección su matriz de pesos (<code>kernel</code>) y su vector de sesgos (<code>bias</code>) como arrays de NumPy. Q, K y V tienen kernel de forma <code>(32, 4, 8)</code> y sesgo <code>(4, 8)</code>.</td></tr>
+        <tr data-lines="4"><td><code>Wo, bo = mha.output_dense.kernel.numpy(), ...</code></td><td>La proyección de salida \(W_O\), de forma <code>(4, 8, 32)</code>, y su sesgo <code>(32,)</code>.</td></tr>
+        <tr data-lines="6"><td><code>xe = x[0]</code></td><td>Trabajamos con el primer ejemplo: una matriz de 6 tokens × 32.</td></tr>
+        <tr data-lines="7"><td><code>cabezas = []</code></td><td>Aquí se guardarán las 4 salidas.</td></tr>
+        <tr data-lines="8"><td><code>for h in range(4):</code></td><td>Un bucle por cabeza.</td></tr>
+        <tr data-lines="9"><td><code>Qh = xe @ Wq[:, h, :] + bq[h]</code></td><td>\(Q_h = X W_Q^{(h)} + b\): se toma de <code>Wq</code> la porción de la cabeza <code>h</code> (todas las filas, la cabeza h, todas las columnas = matriz 32×8), se multiplica y se suma el sesgo. Resultado 6×8.</td></tr>
+        <tr data-lines="10-11"><td><code>Kh = ...; Vh = ...</code></td><td>Lo mismo para las claves y los valores.</td></tr>
+        <tr data-lines="12"><td><code>Oh, _ = atencion(Qh, Kh, Vh)</code></td><td>La atención de esta cabeza, con nuestra función del fragmento 4 (con \(d_k = 8\), así que divide entre \(\sqrt{8}\)).</td></tr>
+        <tr data-lines="13"><td><code>cabezas.append(Oh)</code></td><td>Guarda la salida (6×8).</td></tr>
+        <tr data-lines="15"><td><code>concat = np.concatenate(cabezas, axis=-1)</code></td><td>Pega las 4 salidas una al lado de otra: 6 × (4·8) = 6 × 32.</td></tr>
+        <tr data-lines="16"><td><code>manual = concat @ Wo.reshape(32, 32) + bo</code></td><td>Aplica \(W_O\): <code>reshape(32, 32)</code> aplana el kernel <code>(4, 8, 32)</code> en una matriz 32×32 (las 4 cabezas apiladas) y se multiplica por la concatenación.</td></tr>
+        <tr data-lines="17"><td><code>print("cada cabeza:", ..., " concatenadas:", ...)</code></td><td>Formas intermedias: <code>(6, 8)</code> por cabeza y <code>(6, 32)</code> juntas.</td></tr>
+        <tr data-lines="18"><td><code>print("¿coincide con la capa de Keras?", np.allclose(...))</code></td><td>Compara nuestro resultado con la salida de la capa para el primer ejemplo, con tolerancia de 0,00001.</td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>cada cabeza: (6, 8)  concatenadas: (6, 32)
+¿coincide con la capa de Keras? True</pre>
+    <p>Cada cabeza produce una matriz de 6 tokens × 8 números y al concatenar las cuatro salen 6 × 32. Y la comprobación da <code>True</code>: lo que hace <code>MultiHeadAttention</code> es exactamente esto, una proyección por cabeza, la atención escalada, la concatenación y \(W_O\).</p>
+  </div>
+</article>
+
+<!-- ---------- Fragmento 9 ---------- -->
+<article class="snippet" data-lang="python">
+  <header>
+    <h3>9 · Codificación posicional: la fórmula, su propiedad y el problema del orden</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Programar la codificación sinusoidal, comprobar que el producto escalar entre dos posiciones solo depende de su distancia y demostrar que sin posición la atención no distingue el orden de los tokens. Usa <code>mha</code> y <code>x</code> del fragmento 7.</p>
+  </header>
+  <pre class="code"><code>def codificacion_posicional(n, d):
+    pos = np.arange(n)[:, None]
+    i = np.arange(d // 2)[None, :]
+    ang = pos / 10000 ** (2 * i / d)
+    pe = np.zeros((n, d))
+    pe[:, 0::2], pe[:, 1::2] = np.sin(ang), np.cos(ang)
+    return pe
+
+pe = codificacion_posicional(50, 16)
+print("PE[0, :6] =", pe[0, :6].round(3))
+print("PE[1, :6] =", pe[1, :6].round(3))
+for a, b in ((5, 8), (20, 23), (40, 43), (5, 15)):
+    print(f"PE[{a}]·PE[{b}] = {pe[a] @ pe[b]:.3f}   (distancia {b - a})")
+
+perm = np.array([3, 0, 5, 1, 4, 2])
+y1 = mha(x, x).numpy()
+y2 = mha(x[:, perm], x[:, perm]).numpy()
+print("sin posición: salida(desordenado) == salida(ordenado)[perm] -&gt;", np.allclose(y2, y1[:, perm], atol=1e-5))
+
+pe6 = codificacion_posicional(6, 32)
+y1 = mha(x + pe6, x + pe6).numpy()
+y2 = mha(x[:, perm] + pe6, x[:, perm] + pe6).numpy()
+print("con posición: salida(desordenado) == salida(ordenado)[perm] -&gt;", np.allclose(y2, y1[:, perm], atol=1e-5))
+
+tabla = layers.Embedding(input_dim=50, output_dim=16)
+tabla.build((None,))
+print("posiciones aprendidas, parámetros:", tabla.count_params(), "= 50 * 16")</code></pre>
+  <details class="linea-a-linea" open>
+    <summary>Línea por línea</summary>
+    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+      <tbody>
+        <tr data-lines="1"><td><code>def codificacion_posicional(n, d):</code></td><td>Función que devuelve la tabla \(PE\) de <code>n</code> posiciones y <code>d</code> dimensiones.</td></tr>
+        <tr data-lines="2"><td><code>pos = np.arange(n)[:, None]</code></td><td>Las posiciones 0…n-1 como columna (forma <code>(n, 1)</code>).</td></tr>
+        <tr data-lines="3"><td><code>i = np.arange(d // 2)[None, :]</code></td><td>El índice \(i\) de cada pareja, como fila (forma <code>(1, d/2)</code>). <code>//</code> es la división entera.</td></tr>
+        <tr data-lines="4"><td><code>ang = pos / 10000 ** (2 * i / d)</code></td><td>El ángulo \(pos/10000^{2i/d}\) para cada posición y cada pareja. Una columna dividida por una fila da una matriz <code>(n, d/2)</code> (el «broadcasting» de NumPy).</td></tr>
+        <tr data-lines="5"><td><code>pe = np.zeros((n, d))</code></td><td>Tabla vacía (de ceros) donde escribir.</td></tr>
+        <tr data-lines="6"><td><code>pe[:, 0::2], pe[:, 1::2] = np.sin(ang), np.cos(ang)</code></td><td>Escribe el seno en las columnas pares (<code>0::2</code> = 0, 2, 4…) y el coseno en las impares (<code>1::2</code>).</td></tr>
+        <tr data-lines="7"><td><code>return pe</code></td><td>Devuelve la tabla.</td></tr>
+        <tr data-lines="9"><td><code>pe = codificacion_posicional(50, 16)</code></td><td>50 posiciones, vectores de 16 números.</td></tr>
+        <tr data-lines="10-11"><td><code>print("PE[0, :6] =", ...); print("PE[1, :6] =", ...)</code></td><td>Los 6 primeros números de las posiciones 0 y 1: la posición 0 es siempre (0, 1, 0, 1, …) y la 1 ya es distinta.</td></tr>
+        <tr data-lines="12-13"><td><code>for a, b in (...): print(f"PE[{a}]·PE[{b}] = ...")</code></td><td>Para cuatro parejas de posiciones, calcula el producto escalar <code>pe[a] @ pe[b]</code> y la distancia entre ellas.</td></tr>
+        <tr data-lines="15"><td><code>perm = np.array([3, 0, 5, 1, 4, 2])</code></td><td>Una permutación: el nuevo orden de los 6 tokens.</td></tr>
+        <tr data-lines="16"><td><code>y1 = mha(x, x).numpy()</code></td><td>Salida de la atención con los tokens en su orden original (sin ninguna información de posición).</td></tr>
+        <tr data-lines="17"><td><code>y2 = mha(x[:, perm], x[:, perm]).numpy()</code></td><td>Salida al barajar los tokens de entrada con <code>perm</code> (<code>x[:, perm]</code> reordena la dimensión de los tokens).</td></tr>
+        <tr data-lines="18"><td><code>print("sin posición: ...", np.allclose(y2, y1[:, perm], atol=1e-5))</code></td><td>¿Es <code>y2</code> la salida original reordenada igual? Si sí, la capa es «ciega» al orden.</td></tr>
+        <tr data-lines="20"><td><code>pe6 = codificacion_posicional(6, 32)</code></td><td>La tabla de posiciones para 6 tokens y 32 dimensiones (el tamaño de nuestros vectores).</td></tr>
+        <tr data-lines="21"><td><code>y1 = mha(x + pe6, x + pe6).numpy()</code></td><td>Atención con la posición sumada, en orden original.</td></tr>
+        <tr data-lines="22"><td><code>y2 = mha(x[:, perm] + pe6, x[:, perm] + pe6).numpy()</code></td><td>Primero se baraja y <em>después</em> se suma la posición: los tokens reordenados reciben la posición del lugar donde han caído.</td></tr>
+        <tr data-lines="23"><td><code>print("con posición: ...", np.allclose(...))</code></td><td>Misma comprobación que antes.</td></tr>
+        <tr data-lines="25"><td><code>tabla = layers.Embedding(input_dim=50, output_dim=16)</code></td><td>La alternativa aprendida: una tabla de 50 posiciones con 16 números cada una.</td></tr>
+        <tr data-lines="26"><td><code>tabla.build((None,))</code></td><td>Crea sus pesos sin darle datos (<code>None</code> = tamaño de lote cualquiera).</td></tr>
+        <tr data-lines="27"><td><code>print("posiciones aprendidas, parámetros:", ...)</code></td><td>Cuenta sus parámetros: 50 × 16.</td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>PE[0, :6] = [0. 1. 0. 1. 0. 1.]
+PE[1, :6] = [0.841 0.54  0.311 0.95  0.1   0.995]
+PE[5]·PE[8] = 5.543   (distancia 3)
+PE[20]·PE[23] = 5.543   (distancia 3)
+PE[40]·PE[43] = 5.543   (distancia 3)
+PE[5]·PE[15] = 3.646   (distancia 10)
+sin posición: salida(desordenado) == salida(ordenado)[perm] -&gt; True
+con posición: salida(desordenado) == salida(ordenado)[perm] -&gt; False
+posiciones aprendidas, parámetros: 800 = 50 * 16</pre>
+    <p>Los productos escalares a distancia 3 valen <strong>5,543</strong> en las posiciones 5, 20 y 40 (siempre lo mismo), y a distancia 10 valen 3,646: la similitud depende solo de la distancia. Sin posición, desordenar los tokens solo desordena la salida igual (<code>True</code>): la capa no sabe qué orden tenían. Con posición sumada, al cambiar el orden la salida ya no es la original reordenada (<code>False</code>): ahora el orden importa. La tabla aprendida cuesta 800 parámetros.</p>
+  </div>
+</article>
+
+<!-- ---------- Fragmento 10 ---------- -->
+<article class="snippet" data-lang="python">
+  <header>
+    <h3>10 · LayerNormalization: a mano, con Keras y comparada con BatchNormalization</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Comprobar que <code>LayerNormalization</code> hace la cuenta \((x-\mu)/\sqrt{\sigma^2+\varepsilon}\) token a token, y ver con números qué diferencia a <code>BatchNormalization</code>. Usa <code>layers</code> del fragmento 7.</p>
+  </header>
+  <pre class="code"><code>v = np.array([[2., 4., 6., 8.], [10., 20., 30., 40.]], dtype="float32")
+
+mu = v.mean(axis=-1, keepdims=True)
+var = v.var(axis=-1, keepdims=True)
+manual = (v - mu) / np.sqrt(var + 1e-3)
+
+ln = layers.LayerNormalization(epsilon=1e-3)
+print("LayerNorm a mano :\n", manual.round(3))
+print("LayerNorm Keras  :\n", ln(v).numpy().round(3))
+print("media y desv. de cada fila tras normalizar:", ln(v).numpy().mean(axis=-1).round(3), ln(v).numpy().std(axis=-1).round(3))
+
+bn = layers.BatchNormalization(epsilon=1e-3)
+sal = bn(v, training=True).numpy()
+print("BatchNorm (por columna):\n", sal.round(3))
+print("parámetros LayerNorm:", ln.count_params(), "(gamma y beta, uno por número del token)")</code></pre>
+  <details class="linea-a-linea" open>
+    <summary>Línea por línea</summary>
+    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+      <tbody>
+        <tr data-lines="1"><td><code>v = np.array([[2., 4., 6., 8.], [10., 20., 30., 40.]], dtype="float32")</code></td><td>Dos «tokens» de 4 números cada uno, a escalas muy distintas (la segunda fila es 5 veces mayor).</td></tr>
+        <tr data-lines="3"><td><code>mu = v.mean(axis=-1, keepdims=True)</code></td><td>La media de cada fila (<code>axis=-1</code> = a lo largo de los rasgos). <code>keepdims=True</code> deja la forma <code>(2, 1)</code> para poder restar después.</td></tr>
+        <tr data-lines="4"><td><code>var = v.var(axis=-1, keepdims=True)</code></td><td>La varianza de cada fila.</td></tr>
+        <tr data-lines="5"><td><code>manual = (v - mu) / np.sqrt(var + 1e-3)</code></td><td>La fórmula con \(\varepsilon = 0{,}001\) (el valor por defecto de la capa de Keras).</td></tr>
+        <tr data-lines="7"><td><code>ln = layers.LayerNormalization(epsilon=1e-3)</code></td><td>La capa de Keras. Por defecto normaliza sobre el último eje, el de los rasgos.</td></tr>
+        <tr data-lines="8-9"><td><code>print("LayerNorm a mano :\n", ...); print("LayerNorm Keras  :\n", ln(v)...)</code></td><td>Imprime los dos resultados para compararlos.</td></tr>
+        <tr data-lines="10"><td><code>print("media y desv. de cada fila tras normalizar:", ...)</code></td><td>Comprueba que cada fila queda con media 0 y desviación 1.</td></tr>
+        <tr data-lines="12"><td><code>bn = layers.BatchNormalization(epsilon=1e-3)</code></td><td>La normalización por lotes, para comparar.</td></tr>
+        <tr data-lines="13"><td><code>sal = bn(v, training=True).numpy()</code></td><td>La aplica en modo entrenamiento (<code>training=True</code>), que usa las estadísticas del propio lote.</td></tr>
+        <tr data-lines="14"><td><code>print("BatchNorm (por columna):\n", ...)</code></td><td>Su resultado.</td></tr>
+        <tr data-lines="15"><td><code>print("parámetros LayerNorm:", ln.count_params(), ...)</code></td><td>Los parámetros entrenables: \(\gamma\) y \(\beta\), cada uno con 4 números (uno por rasgo).</td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>LayerNorm a mano :
+ [[-1.342 -0.447  0.447  1.342]
+ [-1.342 -0.447  0.447  1.342]]
+LayerNorm Keras  :
+ [[-1.342 -0.447  0.447  1.342]
+ [-1.342 -0.447  0.447  1.342]]
+media y desv. de cada fila tras normalizar: [-0.  0.] [1. 1.]
+BatchNorm (por columna):
+ [[-1. -1. -1. -1.]
+ [ 1.  1.  1.  1.]]
+parámetros LayerNorm: 8 (gamma y beta, uno por número del token)</pre>
+    <p>La cuenta a mano y la capa coinciden, y las dos filas (aunque una es 5 veces mayor) acaban idénticas: <code>(-1,342; -0,447; 0,447; 1,342)</code> con media 0 y desviación 1. BatchNorm, en cambio, normaliza <em>cada columna</em> con las dos filas del lote: con solo dos ejemplos cada columna queda en −1 y +1, algo muy dependiente de qué ejemplos haya en el lote. Y LayerNorm tiene 8 parámetros: \(\gamma\) y \(\beta\) de 4 números.</p>
+  </div>
+</article>
+
+<!-- ---------- Fragmento 11 ---------- -->
+<article class="snippet" data-lang="python">
+  <header>
+    <h3>11 · Capas propias: <code>PositionalEncoding</code> y <code>TransformerBlock</code></h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Crear las dos capas que usaremos en el resto del módulo con <code>keras.layers.Layer</code>: la suma de la codificación sinusoidal y el bloque Transformer (atención + LayerNorm + FFN + residuales), y comprobar sus formas y parámetros. Usa <code>np</code> de los anteriores.</p>
+  </header>
+  <pre class="code"><code>import keras
+from keras import layers, ops
+
+@keras.saving.register_keras_serializable(package="c3m3")
+class PositionalEncoding(layers.Layer):
+    def __init__(self, max_pasos, d_model, **kwargs):
+        super().__init__(**kwargs)
+        self.max_pasos, self.d_model = max_pasos, d_model
+        pos = np.arange(max_pasos)[:, None]
+        i = np.arange(d_model // 2)[None, :]
+        angulos = pos / 10000 ** (2 * i / d_model)
+        pe = np.zeros((max_pasos, d_model), dtype="float32")
+        pe[:, 0::2], pe[:, 1::2] = np.sin(angulos), np.cos(angulos)
+        self.pe = pe
+
+    def call(self, x):
+        pe = ops.convert_to_tensor(self.pe)
+        return x + pe[: ops.shape(x)[1]]
+
+    def get_config(self):
+        return {**super().get_config(), "max_pasos": self.max_pasos, "d_model": self.d_model}
+
+@keras.saving.register_keras_serializable(package="c3m3")
+class TransformerBlock(layers.Layer):
+    def __init__(self, d_model, num_heads, ff_dim, dropout=0.1, causal=False, **kwargs):
+        super().__init__(**kwargs)
+        self.d_model, self.num_heads, self.ff_dim = d_model, num_heads, ff_dim
+        self.dropout, self.causal = dropout, causal
+        self.att = layers.MultiHeadAttention(num_heads=num_heads, key_dim=d_model // num_heads)
+        self.ffn = keras.Sequential([layers.Dense(ff_dim, activation="relu"), layers.Dense(d_model)])
+        self.norm1 = layers.LayerNormalization(epsilon=1e-6)
+        self.norm2 = layers.LayerNormalization(epsilon=1e-6)
+        self.drop = layers.Dropout(dropout)
+
+    def call(self, x, training=False):
+        a = self.att(x, x, use_causal_mask=self.causal)
+        x = self.norm1(x + self.drop(a, training=training))
+        f = self.ffn(x)
+        return self.norm2(x + self.drop(f, training=training))
+
+    def get_config(self):
+        return {**super().get_config(), "d_model": self.d_model, "num_heads": self.num_heads,
+                "ff_dim": self.ff_dim, "dropout": self.dropout, "causal": self.causal}
+
+bloque = TransformerBlock(d_model=32, num_heads=4, ff_dim=64)
+entrada = np.random.default_rng(0).normal(size=(2, 48, 32)).astype("float32")
+salida = bloque(entrada)
+print("entrada:", entrada.shape, "-&gt; salida:", salida.shape)
+print("parámetros del bloque:", bloque.count_params())
+for capa in (bloque.att, bloque.ffn, bloque.norm1, bloque.norm2):
+    print(f"  {type(capa).__name__:&lt;22} {capa.count_params():&gt;6}")</code></pre>
+  <details class="linea-a-linea" open>
+    <summary>Línea por línea</summary>
+    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+      <tbody>
+        <tr data-lines="1-2"><td><code>import keras; from keras import layers, ops</code></td><td>Además de las capas, importa <code>ops</code>: las operaciones de tensores de Keras 3 (<code>ops.shape</code>, <code>ops.arange</code>, <code>ops.convert_to_tensor</code>…), que valen para cualquier backend.</td></tr>
+        <tr data-lines="4"><td><code>@keras.saving.register_keras_serializable(package="c3m3")</code></td><td>Un <em>decorador</em>: da a la clase de debajo un nombre registrado (<code>c3m3&gt;PositionalEncoding</code>) para que Keras pueda reconstruirla al cargar un modelo guardado.</td></tr>
+        <tr data-lines="5"><td><code>class PositionalEncoding(layers.Layer):</code></td><td>Una capa propia: una clase que <em>hereda</em> de <code>layers.Layer</code> (como viste en el <a href="modulo-1.html">módulo 1</a>).</td></tr>
+        <tr data-lines="6-8"><td><code>def __init__(self, max_pasos, d_model, **kwargs): ...</code></td><td>El constructor. Recibe la longitud máxima y el tamaño del vector, pasa los demás argumentos a la clase base (<code>**kwargs</code>: nombre, tipo de dato…) y guarda los dos números para <code>get_config</code>.</td></tr>
+        <tr data-lines="9-13"><td><code>pos = ...; i = ...; angulos = ...; pe = ...; pe[:, 0::2], ... = ...</code></td><td>La misma fórmula del fragmento 9, calculada una vez al crear la capa, en <code>float32</code>.</td></tr>
+        <tr data-lines="14"><td><code>self.pe = pe</code></td><td>Guarda la tabla como atributo. Es una constante: no se entrena ni cuenta como parámetro.</td></tr>
+        <tr data-lines="16"><td><code>def call(self, x):</code></td><td>Lo que hace la capa al recibir datos: aquí <code>x</code> es <code>(lote, pasos, d_model)</code>.</td></tr>
+        <tr data-lines="17"><td><code>pe = ops.convert_to_tensor(self.pe)</code></td><td>Convierte la tabla de NumPy en un tensor. Es imprescindible: durante <code>fit</code> la longitud de la ventana es desconocida para TensorFlow y NumPy no sabe cortar con un tensor (el error del recuadro «Ojo»).</td></tr>
+        <tr data-lines="18"><td><code>return x + pe[: ops.shape(x)[1]]</code></td><td>Corta la tabla a las primeras <code>pasos</code> posiciones y la suma a cada ejemplo del lote (NumPy y Keras «difunden» una tabla <code>(pasos, d)</code> sobre el lote <code>(lote, pasos, d)</code>).</td></tr>
+        <tr data-lines="20-21"><td><code>def get_config(self): return {**super().get_config(), ...}</code></td><td>Devuelve un diccionario con los argumentos del constructor (más los de la clase base, con <code>**super().get_config()</code>) para poder guardar y recargar.</td></tr>
+        <tr data-lines="23-24"><td><code>@...register_keras_serializable(...) class TransformerBlock(layers.Layer):</code></td><td>Registra y define el bloque.</td></tr>
+        <tr data-lines="25"><td><code>def __init__(self, d_model, num_heads, ff_dim, dropout=0.1, causal=False, **kwargs):</code></td><td>Argumentos: tamaño del modelo, cabezas, ancho de la FFN, tasa de dropout y si la atención es causal (decoder) o libre (encoder).</td></tr>
+        <tr data-lines="26-28"><td><code>super().__init__(**kwargs); self.d_model, ... = ...</code></td><td>Inicializa la clase base y guarda los argumentos (para <code>get_config</code>).</td></tr>
+        <tr data-lines="29"><td><code>self.att = layers.MultiHeadAttention(num_heads=num_heads, key_dim=d_model // num_heads)</code></td><td>La atención, con <code>key_dim = d_model // num_heads</code> (la regla segura). <code>//</code> es la división entera.</td></tr>
+        <tr data-lines="30"><td><code>self.ffn = keras.Sequential([Dense(ff_dim, activation="relu"), Dense(d_model)])</code></td><td>La red feed-forward: sube a <code>ff_dim</code> con ReLU y vuelve a <code>d_model</code> (la forma debe coincidir con la entrada para poder sumar).</td></tr>
+        <tr data-lines="31-32"><td><code>self.norm1 = ...; self.norm2 = ...</code></td><td>Dos capas <code>LayerNormalization</code> (cada una con sus propios \(\gamma\) y \(\beta\)).</td></tr>
+        <tr data-lines="33"><td><code>self.drop = layers.Dropout(dropout)</code></td><td>Dropout: apaga al azar una fracción de los números mientras se entrena, para reducir el sobreajuste.</td></tr>
+        <tr data-lines="35"><td><code>def call(self, x, training=False):</code></td><td>El flujo de datos. <code>training</code> indica si se está entrenando (Keras lo rellena solo).</td></tr>
+        <tr data-lines="36"><td><code>a = self.att(x, x, use_causal_mask=self.causal)</code></td><td>Self-attention (<code>query=x</code>, <code>value=x</code>); con máscara causal si es un decoder.</td></tr>
+        <tr data-lines="37"><td><code>x = self.norm1(x + self.drop(a, training=training))</code></td><td>Residual + LayerNorm (post-LN): suma la entrada a la atención (con dropout) y normaliza.</td></tr>
+        <tr data-lines="38"><td><code>f = self.ffn(x)</code></td><td>La red feed-forward, aplicada a cada token.</td></tr>
+        <tr data-lines="39"><td><code>return self.norm2(x + self.drop(f, training=training))</code></td><td>Segunda residual + LayerNorm; la salida tiene la forma de la entrada.</td></tr>
+        <tr data-lines="41-43"><td><code>def get_config(self): ...</code></td><td>Los argumentos del bloque, para guardarlo y recargarlo.</td></tr>
+        <tr data-lines="45"><td><code>bloque = TransformerBlock(d_model=32, num_heads=4, ff_dim=64)</code></td><td>Crea un bloque de ejemplo.</td></tr>
+        <tr data-lines="46"><td><code>entrada = np.random.default_rng(0).normal(...)</code></td><td>Entrada inventada: 2 ejemplos, 48 pasos, 32 números.</td></tr>
+        <tr data-lines="47"><td><code>salida = bloque(entrada)</code></td><td>Llama al bloque (aquí se crean los pesos).</td></tr>
+        <tr data-lines="48"><td><code>print("entrada:", ..., "-> salida:", ...)</code></td><td>Las formas de entrada y salida.</td></tr>
+        <tr data-lines="49"><td><code>print("parámetros del bloque:", bloque.count_params())</code></td><td>Total de parámetros.</td></tr>
+        <tr data-lines="50-51"><td><code>for capa in (...): print(f"  {type(capa).__name__:<22} ...")</code></td><td>Desglose por sub-capa: nombre de su clase (<code>:&lt;22</code> la alinea a la izquierda en 22 espacios) y sus parámetros.</td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>entrada: (2, 48, 32) -&gt; salida: (2, 48, 32)
+parámetros del bloque: 8544
+  MultiHeadAttention       4224
+  Sequential               4192
+  LayerNormalization         64
+  LayerNormalization         64</pre>
+    <p>La forma no cambia: <code>(2, 48, 32)</code> entra y <code>(2, 48, 32)</code> sale, por eso se pueden apilar bloques. Parámetros: 4.224 de la atención + 4.192 de la FFN (\(32\cdot 64 + 64 + 64\cdot 32 + 32\)) + 64 + 64 de las dos LayerNorm = <strong>8.544</strong>, justo la fórmula de la sección del bloque.</p>
+  </div>
+</article>
+
+<!-- ---------- Fragmento 12 ---------- -->
+<article class="snippet" data-lang="python">
+  <header>
+    <h3>12 · Transformer para predecir una serie temporal (regresión)</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Construir con la API funcional un modelo <code>Dense → posición → 2 bloques → pooling → Dense(1)</code>, entrenarlo con los lotes de la serie y compararlo con las líneas base «repetir el último valor» y «regresión lineal». Usa <code>VENTANA</code>, <code>ds_train</code>, <code>ds_val</code>, <code>ds_test</code>, <code>trozos</code>, <code>a_dataset</code> (fragmento 2) y las capas del 11.</p>
+  </header>
+  <pre class="code"><code>from sklearn.linear_model import Ridge
+
+keras.utils.set_random_seed(0)
+D_MODEL, CABEZAS, FF = 32, 4, 64
+
+entradas = keras.Input(shape=(VENTANA, 1))
+x = layers.Dense(D_MODEL)(entradas)
+x = PositionalEncoding(VENTANA, D_MODEL)(x)
+for _ in range(2):
+    x = TransformerBlock(D_MODEL, CABEZAS, FF)(x)
+x = layers.GlobalAveragePooling1D()(x)
+salidas = layers.Dense(1)(x)
+modelo = keras.Model(entradas, salidas)
+modelo.compile(optimizer=keras.optimizers.Adam(1e-3), loss="mse", metrics=["mae"])
+print("parámetros:", modelo.count_params())
+
+hist = modelo.fit(ds_train, validation_data=ds_val, epochs=20, verbose=0)
+for e in (0, 4, 9, 19):
+    print(f"época {e + 1:2d}  loss={hist.history['loss'][e]:.3f}  val_mae={hist.history['val_mae'][e]:.3f}")
+
+def juntar(ds):
+    return (np.concatenate([xb.numpy() for xb, _ in ds]), np.concatenate([yb.numpy() for _, yb in ds]))
+
+x_tr, y_tr = juntar(a_dataset(trozos["train"]))
+x_te, y_te = juntar(ds_test)
+lineal = Ridge(alpha=1.0).fit(x_tr[:, :, 0], y_tr)
+
+print("MAE en test (unidades normalizadas):")
+print("  repetir el último valor :", round(float(np.abs(x_te[:, -1, 0] - y_te).mean()), 3))
+print("  regresión lineal (Ridge):", round(float(np.abs(lineal.predict(x_te[:, :, 0]) - y_te).mean()), 3))
+print("  Transformer             :", round(float(np.abs(modelo.predict(x_te, verbose=0)[:, 0] - y_te).mean()), 3))</code></pre>
+  <details class="linea-a-linea" open>
+    <summary>Línea por línea</summary>
+    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+      <tbody>
+        <tr data-lines="1"><td><code>from sklearn.linear_model import Ridge</code></td><td>Importa la regresión lineal con regularización de Scikit-learn (Curso 1), que usaremos como línea base.</td></tr>
+        <tr data-lines="3"><td><code>keras.utils.set_random_seed(0)</code></td><td>Semillas fijas para que el entrenamiento sea reproducible.</td></tr>
+        <tr data-lines="4"><td><code>D_MODEL, CABEZAS, FF = 32, 4, 64</code></td><td>Hiperparámetros del modelo: tamaño de los vectores, cabezas y ancho de la FFN.</td></tr>
+        <tr data-lines="6"><td><code>entradas = keras.Input(shape=(VENTANA, 1))</code></td><td>La entrada de la API funcional: ventanas de 48 pasos con 1 rasgo (el tamaño de lote se deja sin fijar).</td></tr>
+        <tr data-lines="7"><td><code>x = layers.Dense(D_MODEL)(entradas)</code></td><td>Proyección lineal de cada valor a un vector de 32 números (sustituye al <code>Embedding</code> del texto). Se aplica a cada instante por separado: salida <code>(lote, 48, 32)</code>.</td></tr>
+        <tr data-lines="8"><td><code>x = PositionalEncoding(VENTANA, D_MODEL)(x)</code></td><td>Suma la codificación posicional.</td></tr>
+        <tr data-lines="9-10"><td><code>for _ in range(2): x = TransformerBlock(D_MODEL, CABEZAS, FF)(x)</code></td><td>Apila dos bloques (cada uno con sus propios pesos); la forma no cambia.</td></tr>
+        <tr data-lines="11"><td><code>x = layers.GlobalAveragePooling1D()(x)</code></td><td>Hace la media de los 48 vectores y deja uno solo por ejemplo: <code>(lote, 32)</code>.</td></tr>
+        <tr data-lines="12"><td><code>salidas = layers.Dense(1)(x)</code></td><td>Capa final con una neurona <strong>sin activación</strong>: es regresión, la salida puede ser cualquier número.</td></tr>
+        <tr data-lines="13"><td><code>modelo = keras.Model(entradas, salidas)</code></td><td>Une entrada y salida en un modelo.</td></tr>
+        <tr data-lines="14"><td><code>modelo.compile(optimizer=keras.optimizers.Adam(1e-3), loss="mse", metrics=["mae"])</code></td><td>Optimizador Adam con tasa de aprendizaje 0,001; error cuadrático medio como pérdida y MAE como métrica legible.</td></tr>
+        <tr data-lines="15"><td><code>print("parámetros:", modelo.count_params())</code></td><td>Total de parámetros del modelo.</td></tr>
+        <tr data-lines="17"><td><code>hist = modelo.fit(ds_train, validation_data=ds_val, epochs=20, verbose=0)</code></td><td>Entrena 20 épocas (pasadas completas por los datos) con el dataset de lotes y evalúa cada época en validación. <code>verbose=0</code> no imprime el progreso. Devuelve el historial. (Keras avisa de que <code>shuffle</code> se ignora con un <code>Dataset</code>: ya barajamos las ventanas al crearlo.)</td></tr>
+        <tr data-lines="18-19"><td><code>for e in (0, 4, 9, 19): print(f"época ...")</code></td><td>Imprime la pérdida de entrenamiento y el MAE de validación en las épocas 1, 5, 10 y 20 (los índices empiezan en 0).</td></tr>
+        <tr data-lines="21-22"><td><code>def juntar(ds): return (...)</code></td><td>Función que recorre un dataset de lotes y devuelve dos arrays: todas las entradas y todos los objetivos.</td></tr>
+        <tr data-lines="24"><td><code>x_tr, y_tr = juntar(a_dataset(trozos["train"]))</code></td><td>Las ventanas de entrenamiento como arrays (sin barajar), para ajustar el modelo lineal.</td></tr>
+        <tr data-lines="25"><td><code>x_te, y_te = juntar(ds_test)</code></td><td>Las ventanas de test.</td></tr>
+        <tr data-lines="26"><td><code>lineal = Ridge(alpha=1.0).fit(x_tr[:, :, 0], y_tr)</code></td><td>Ajusta una regresión lineal con las 48 columnas de cada ventana como features (<code>[:, :, 0]</code> quita el eje del rasgo) y el objetivo como target.</td></tr>
+        <tr data-lines="28"><td><code>print("MAE en test (unidades normalizadas):")</code></td><td>Cabecera de la comparación.</td></tr>
+        <tr data-lines="29"><td><code>print("  repetir el último valor :", ...)</code></td><td>MAE de la persistencia en test.</td></tr>
+        <tr data-lines="30"><td><code>print("  regresión lineal (Ridge):", ...)</code></td><td>MAE del modelo lineal (<code>predict</code> da sus predicciones).</td></tr>
+        <tr data-lines="31"><td><code>print("  Transformer             :", ...)</code></td><td>MAE del Transformer: <code>modelo.predict(x_te)</code> devuelve una columna <code>(ejemplos, 1)</code>; <code>[:, 0]</code> la pasa a vector.</td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>parámetros: 17185
+época  1  loss=0.579  val_mae=0.455
+época  5  loss=0.062  val_mae=0.162
+época 10  loss=0.050  val_mae=0.177
+época 20  loss=0.042  val_mae=0.172
+MAE en test (unidades normalizadas):
+  repetir el último valor : 0.928
+  regresión lineal (Ridge): 0.158
+  Transformer             : 0.172</pre>
+    <p>El modelo tiene 17.185 parámetros. La pérdida cae de 0,579 a 0,042 y el MAE de validación baja de 0,455 a 0,162 en 5 épocas y luego oscila (0,177 · 0,172): ya no mejora, está en el suelo de ruido. En test: repetir el último valor da 0,928; el Transformer, <strong>0,172</strong>; la regresión lineal, <strong>0,158</strong>. El Transformer aprende lo esencial, pero en una serie hecha de senos y ruido no supera a una línea recta en el espacio de las ventanas. El mínimo teórico por el ruido ronda 0,14.</p>
+  </div>
+</article>
+
+<!-- ---------- Fragmento 13 ---------- -->
+<article class="snippet" data-lang="python">
+  <header>
+    <h3>13 · Transformer para clasificar señales</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Cambiar solo la cabeza final (<code>softmax</code>) y la pérdida para clasificar series en tres tipos: seno lento, seno rápido y pico en posición aleatoria. Usa las capas del fragmento 11.</p>
+  </header>
+  <pre class="code"><code>def crear_senales(n, largo=64, semilla=0):
+    rng = np.random.default_rng(semilla)
+    t = np.linspace(0, 1, largo)
+    etiquetas = rng.integers(0, 3, n)
+    X = np.zeros((n, largo), dtype="float32")
+    for i, c in enumerate(etiquetas):
+        if c == 0:
+            X[i] = np.sin(2 * np.pi * 2 * t + rng.uniform(0, 6.28))
+        elif c == 1:
+            X[i] = np.sin(2 * np.pi * 5 * t + rng.uniform(0, 6.28))
+        else:
+            X[i] = 1.5 * np.exp(-((t - rng.uniform(0.15, 0.85)) ** 2) / (2 * 0.04 ** 2))
+        X[i] += rng.normal(0, 0.5, largo)
+    return X[..., None], etiquetas
+
+Xs_tr, ys_tr = crear_senales(2000, semilla=1)
+Xs_te, ys_te = crear_senales(600, semilla=2)
+print("señales:", Xs_tr.shape, " clases:", np.bincount(ys_tr))
+
+keras.utils.set_random_seed(0)
+entradas = keras.Input(shape=(64, 1))
+h = layers.Dense(32)(entradas)
+h = PositionalEncoding(64, 32)(h)
+h = TransformerBlock(32, 4, 64)(h)
+h = layers.GlobalAveragePooling1D()(h)
+salidas = layers.Dense(3, activation="softmax")(h)
+clasificador = keras.Model(entradas, salidas)
+clasificador.compile(optimizer=keras.optimizers.Adam(1e-3), loss="sparse_categorical_crossentropy", metrics=["accuracy"])
+clasificador.fit(Xs_tr, ys_tr, epochs=30, batch_size=64, validation_split=0.15, verbose=0)
+
+pred = clasificador.predict(Xs_te, verbose=0).argmax(axis=1)
+print("precisión en test:", round(float((pred == ys_te).mean()), 3))
+for c, nombre in enumerate(["seno lento", "seno rápido", "pico"]):
+    print(f"  {nombre:&lt;12} acierto {(pred[ys_te == c] == c).mean():.2f}")</code></pre>
+  <details class="linea-a-linea" open>
+    <summary>Línea por línea</summary>
+    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+      <tbody>
+        <tr data-lines="1-3"><td><code>def crear_senales(n, largo=64, semilla=0): rng = ...; t = ...</code></td><td>Función que fabrica <code>n</code> señales de <code>largo</code> puntos. <code>np.linspace(0, 1, largo)</code> es el eje del tiempo de 0 a 1.</td></tr>
+        <tr data-lines="4"><td><code>etiquetas = rng.integers(0, 3, n)</code></td><td>Una clase al azar (0, 1 o 2) para cada señal.</td></tr>
+        <tr data-lines="5"><td><code>X = np.zeros((n, largo), dtype="float32")</code></td><td>Matriz vacía donde guardar las señales.</td></tr>
+        <tr data-lines="6"><td><code>for i, c in enumerate(etiquetas):</code></td><td>Recorre las señales; <code>enumerate</code> da el índice <code>i</code> y la clase <code>c</code>.</td></tr>
+        <tr data-lines="7-8"><td><code>if c == 0: X[i] = np.sin(2 * np.pi * 2 * t + fase)</code></td><td>Clase 0: un seno con 2 ciclos en la ventana y una <strong>fase</strong> (punto de partida) aleatoria.</td></tr>
+        <tr data-lines="9-10"><td><code>elif c == 1: ...</code></td><td>Clase 1: un seno con 5 ciclos.</td></tr>
+        <tr data-lines="11-12"><td><code>else: X[i] = 1.5 * np.exp(-(...))</code></td><td>Clase 2: un pico (una campana de Gauss de altura 1,5 y anchura 0,04) en una posición aleatoria entre 0,15 y 0,85.</td></tr>
+        <tr data-lines="13"><td><code>X[i] += rng.normal(0, 0.5, largo)</code></td><td>Ruido de desviación 0,5 sumado a todas las señales (comparable a su amplitud).</td></tr>
+        <tr data-lines="14"><td><code>return X[..., None], etiquetas</code></td><td>Devuelve las señales con el eje de rasgos añadido y las etiquetas.</td></tr>
+        <tr data-lines="16-17"><td><code>Xs_tr, ys_tr = crear_senales(2000, semilla=1); Xs_te, ... (600, semilla=2)</code></td><td>2.000 señales para entrenar y 600 para probar, con semillas distintas.</td></tr>
+        <tr data-lines="18"><td><code>print("señales:", Xs_tr.shape, " clases:", np.bincount(ys_tr))</code></td><td><code>np.bincount</code> cuenta cuántas señales hay de cada clase (para ver que no hay desequilibrio).</td></tr>
+        <tr data-lines="20"><td><code>keras.utils.set_random_seed(0)</code></td><td>Semilla fija.</td></tr>
+        <tr data-lines="21-24"><td><code>entradas = keras.Input(...); h = Dense(32)(...); h = PositionalEncoding(...)(h); h = TransformerBlock(...)(h)</code></td><td>Igual que en el fragmento 12 pero con ventana de 64 y un solo bloque.</td></tr>
+        <tr data-lines="25"><td><code>h = layers.GlobalAveragePooling1D()(h)</code></td><td>Resume los 64 instantes en un vector de 32 números.</td></tr>
+        <tr data-lines="26"><td><code>salidas = layers.Dense(3, activation="softmax")(h)</code></td><td>Tres neuronas con <strong>softmax</strong>: una probabilidad por clase (suman 1).</td></tr>
+        <tr data-lines="27"><td><code>clasificador = keras.Model(entradas, salidas)</code></td><td>Crea el modelo.</td></tr>
+        <tr data-lines="28"><td><code>clasificador.compile(..., loss="sparse_categorical_crossentropy", metrics=["accuracy"])</code></td><td>Pérdida de entropía cruzada para etiquetas enteras (<em>sparse</em> = 0, 1, 2 en lugar de one-hot) y el acierto como métrica.</td></tr>
+        <tr data-lines="29"><td><code>clasificador.fit(Xs_tr, ys_tr, epochs=30, batch_size=64, validation_split=0.15, verbose=0)</code></td><td>Entrena 30 épocas con lotes de 64 y reserva el último 15 % de los datos para validar. Aquí los datos son independientes entre sí (no es una serie continua), así que no hay problema con barajar.</td></tr>
+        <tr data-lines="31"><td><code>pred = clasificador.predict(Xs_te, verbose=0).argmax(axis=1)</code></td><td><code>predict</code> da 3 probabilidades por señal; <code>argmax(axis=1)</code> elige la clase más probable.</td></tr>
+        <tr data-lines="32"><td><code>print("precisión en test:", ...)</code></td><td>La proporción de aciertos (<code>pred == ys_te</code> da verdadero/falso y <code>.mean()</code> su proporción).</td></tr>
+        <tr data-lines="33-34"><td><code>for c, nombre in enumerate([...]): print(f"  {nombre:<12} acierto ...")</code></td><td>Acierto por clase: de las señales de esa clase, qué proporción se clasificó bien.</td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>señales: (2000, 64, 1)  clases: [648 652 700]
+precisión en test: 0.995
+  seno lento   acierto 0.99
+  seno rápido  acierto 0.99
+  pico         acierto 1.00</pre>
+    <p>Las clases están equilibradas (648, 652 y 700). Con un solo bloque Transformer el acierto en test es de <strong>99,5 %</strong> y las tres clases quedan en torno al 99–100 %. Es un ejemplo de juguete (el ruido no es tan grande como para confundirlas), pero muestra que el esqueleto sirve igual para regresión o clasificación: solo cambian la última capa y la pérdida.</p>
+  </div>
+</article>
+
+<!-- ---------- Fragmento 14 ---------- -->
+<article class="snippet" data-lang="python">
+  <header>
+    <h3>14 · Un texto sintético, su entropía y <code>TextVectorization</code></h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Generar el texto de entrenamiento con una gramática pequeña, calcular exactamente cuánto vale un modelo perfecto, y convertir las palabras en ids con <code>TextVectorization</code>. Usa <code>np</code>, <code>layers</code> y <code>softmax</code> de los anteriores.</p>
+  </header>
+  <pre class="code"><code>import itertools, random
+
+SUJETOS = [("el", "gato"), ("el", "perro"), ("el", "niño"), ("la", "gata"), ("la", "niña"), ("la", "abuela")]
+ADJETIVOS = {"el": ["negro", "pequeño"], "la": ["negra", "pequeña"]}
+PREDICADOS = [["duerme", "en", "el", "sofá"], ["duerme", "en", "la", "cama"],
+              ["bebe", "leche"], ["bebe", "agua"],
+              ["lee", "un", "libro"], ["lee", "una", "carta"],
+              ["corre", "por", "el", "parque"], ["corre", "por", "la", "calle"]]
+
+todas = []
+for (det, nombre), pred in itertools.product(SUJETOS, PREDICADOS):
+    todas.append((1 / 6 / 8 / 2, [det, nombre] + pred + ["."]))
+    for adj in ADJETIVOS[det]:
+        todas.append((1 / 6 / 8 / 4, [det, nombre, adj] + pred + ["."]))
+
+H = -sum(p * np.log(p) for p, _ in todas)
+largo_medio = sum(p * len(f) for p, f in todas)
+print("frases distintas:", len(todas), " prob. total:", round(sum(p for p, _ in todas), 3))
+print("entropía por frase:", round(H, 3), "nats;  tokens por frase:", round(largo_medio, 3))
+print("suelo teórico de la pérdida:", round(H / largo_medio, 3), "nats por token  (perplejidad", round(float(np.exp(H / largo_medio)), 2), ")")
+
+random.seed(0)
+probs = [p for p, _ in todas]
+frases = [" ".join(f) for f in random.choices([f for _, f in todas], weights=probs, k=1500)]
+print(frases[0]); print(frases[1]); print(frases[2])
+
+texto = " ".join(frases)
+vec = layers.TextVectorization(standardize="lower", split="whitespace", output_mode="int")
+vec.adapt(frases)
+vocab = [str(w) for w in vec.get_vocabulary()]
+print("tamaño del vocabulario:", len(vocab))
+print(vocab[:8], "...")
+ids = vec([texto]).numpy()[0]
+print("tokens en el texto:", len(ids), " primeros ids:", ids[:9])
+print("vuelta a texto:", " ".join(vocab[i] for i in ids[:9]))</code></pre>
+  <details class="linea-a-linea" open>
+    <summary>Línea por línea</summary>
+    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+      <tbody>
+        <tr data-lines="1"><td><code>import itertools, random</code></td><td>Módulos estándar de Python: combinaciones (<code>itertools</code>) y azar (<code>random</code>).</td></tr>
+        <tr data-lines="3"><td><code>SUJETOS = [("el", "gato"), ...]</code></td><td>Seis sujetos, cada uno como pareja (artículo, sustantivo).</td></tr>
+        <tr data-lines="4"><td><code>ADJETIVOS = {"el": [...], "la": [...]}</code></td><td>Un diccionario: los adjetivos válidos para cada artículo. Esto impone la <strong>concordancia de género</strong>.</td></tr>
+        <tr data-lines="5-8"><td><code>PREDICADOS = [[...], ...]</code></td><td>Ocho predicados (verbo + complemento), cada uno como lista de palabras.</td></tr>
+        <tr data-lines="10"><td><code>todas = []</code></td><td>Aquí se guardarán todas las frases posibles con su probabilidad.</td></tr>
+        <tr data-lines="11"><td><code>for (det, nombre), pred in itertools.product(SUJETOS, PREDICADOS):</code></td><td><code>product</code> recorre todas las combinaciones sujeto × predicado (6 × 8 = 48).</td></tr>
+        <tr data-lines="12"><td><code>todas.append((1 / 6 / 8 / 2, [det, nombre] + pred + ["."]))</code></td><td>La frase sin adjetivo. Su probabilidad: 1/6 (sujeto) × 1/8 (predicado) × 1/2 (sin adjetivo). Se le añade el «.» final.</td></tr>
+        <tr data-lines="13-14"><td><code>for adj in ADJETIVOS[det]: todas.append((1 / 6 / 8 / 4, ...))</code></td><td>Las dos frases con adjetivo, cada una con probabilidad 1/6 × 1/8 × 1/4 (1/2 de llevar adjetivo × 1/2 de cuál).</td></tr>
+        <tr data-lines="16"><td><code>H = -sum(p * np.log(p) for p, _ in todas)</code></td><td>La <strong>entropía</strong> de una frase: \(-\sum p \ln p\), en nats (logaritmo natural).</td></tr>
+        <tr data-lines="17"><td><code>largo_medio = sum(p * len(f) for p, f in todas)</code></td><td>Número medio de palabras (con el punto) por frase.</td></tr>
+        <tr data-lines="18"><td><code>print("frases distintas:", ...)</code></td><td>Cuántas frases hay y que sus probabilidades suman 1.</td></tr>
+        <tr data-lines="19"><td><code>print("entropía por frase:", ...)</code></td><td>Entropía y longitud media.</td></tr>
+        <tr data-lines="20"><td><code>print("suelo teórico de la pérdida:", ...)</code></td><td>Entropía dividida entre palabras por frase = mejor pérdida posible por palabra, y su exponencial = perplejidad mínima.</td></tr>
+        <tr data-lines="22"><td><code>random.seed(0)</code></td><td>Semilla del azar.</td></tr>
+        <tr data-lines="23"><td><code>probs = [p for p, _ in todas]</code></td><td>Lista de probabilidades, en el mismo orden que las frases.</td></tr>
+        <tr data-lines="24"><td><code>frases = [" ".join(f) for f in random.choices([...], weights=probs, k=1500)]</code></td><td>Elige 1.500 frases al azar con esas probabilidades y une las palabras de cada una con espacios.</td></tr>
+        <tr data-lines="25"><td><code>print(frases[0]); print(frases[1]); print(frases[2])</code></td><td>Tres frases de muestra.</td></tr>
+        <tr data-lines="27"><td><code>texto = " ".join(frases)</code></td><td>Todo el corpus como un único texto largo.</td></tr>
+        <tr data-lines="28"><td><code>vec = layers.TextVectorization(standardize="lower", split="whitespace", output_mode="int")</code></td><td>La capa de tokenización: pasa a minúsculas (<code>standardize="lower"</code>; la opción por defecto también quitaría el «.»), parte por espacios y devuelve ids enteros.</td></tr>
+        <tr data-lines="29"><td><code>vec.adapt(frases)</code></td><td>«Lee» las frases y construye el vocabulario ordenado por frecuencia.</td></tr>
+        <tr data-lines="30"><td><code>vocab = [str(w) for w in vec.get_vocabulary()]</code></td><td>La lista de palabras: posición = id. Se convierte a <code>str</code> normales para imprimirlas limpias.</td></tr>
+        <tr data-lines="31"><td><code>print("tamaño del vocabulario:", len(vocab))</code></td><td>Número de entradas.</td></tr>
+        <tr data-lines="32"><td><code>print(vocab[:8], "...")</code></td><td>Las primeras: el id 0 es la cadena vacía (relleno) y el 1 es <code>[UNK]</code> (palabra desconocida).</td></tr>
+        <tr data-lines="33"><td><code>ids = vec([texto]).numpy()[0]</code></td><td>Tokeniza el texto entero (una lista con un único texto) y se queda con la primera fila: un array de ids.</td></tr>
+        <tr data-lines="34"><td><code>print("tokens en el texto:", len(ids), ...)</code></td><td>Cuántas palabras hay y los primeros ids.</td></tr>
+        <tr data-lines="35"><td><code>print("vuelta a texto:", " ".join(vocab[i] for i in ids[:9]))</code></td><td>Comprobación: traduce los ids a palabras con el vocabulario.</td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>frases distintas: 144  prob. total: 1.0
+entropía por frase: 4.911 nats;  tokens por frase: 6.75
+suelo teórico de la pérdida: 0.728 nats por token  (perplejidad 2.07 )
+la abuela negra duerme en el sofá .
+la niña lee un libro .
+el niño lee un libro .
+tamaño del vocabulario: 31
+['', '[UNK]', '.', 'el', 'la', 'en', 'duerme', 'bebe'] ...
+tokens en el texto: 10115  primeros ids: [ 4 14 28  6  5  3 19  2  4]
+vuelta a texto: la abuela negra duerme en el sofá . la</pre>
+    <p>Hay 144 frases posibles; cada una aporta 4,911 nats de incertidumbre en 6,75 palabras, así que el <strong>suelo es 0,728 nats por palabra (perplejidad 2,07)</strong>. El vocabulario tiene 31 entradas (relleno, <code>[UNK]</code>, el punto y las 28 palabras restantes, ordenadas por frecuencia). El corpus son 10.115 palabras; los ids <code>[4, 14, 28, 6, 5, 3, 19, 2, 4]</code> son «la abuela negra duerme en el sofá . la» (el id 2 es el punto).</p>
+  </div>
+</article>
+
+<!-- ---------- Fragmento 15 ---------- -->
+<article class="snippet" data-lang="python">
+  <header>
+    <h3>15 · Un mini-GPT: ventanas desplazadas, decoder causal y perplejidad</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Preparar los pares (entrada, siguiente palabra) con las mismas herramientas que las series, construir un Transformer decoder pequeño con una capa propia <code>TokenAndPositionEmbedding</code>, entrenarlo y comparar su pérdida con el suelo teórico. Usa <code>ids</code> y <code>vocab</code> (fragmento 14) y <code>TransformerBlock</code> (11).</p>
+  </header>
+  <pre class="code"><code>import tensorflow as tf
+
+LARGO = 16
+x_ds = keras.utils.timeseries_dataset_from_array(ids[:-1], None, sequence_length=LARGO, sequence_stride=2, batch_size=None)
+y_ds = keras.utils.timeseries_dataset_from_array(ids[1:], None, sequence_length=LARGO, sequence_stride=2, batch_size=None)
+ds_texto = tf.data.Dataset.zip((x_ds, y_ds)).shuffle(4000, seed=0).batch(64)
+for xb, yb in ds_texto.take(1):
+    print("lote:", xb.shape, yb.shape)
+    print("entrada:", [vocab[i] for i in xb[0][:6].numpy()])
+    print("objetivo:", [vocab[i] for i in yb[0][:6].numpy()])
+
+@keras.saving.register_keras_serializable(package="c3m3")
+class TokenAndPositionEmbedding(layers.Layer):
+    def __init__(self, maxlen, vocab_size, d_model, **kwargs):
+        super().__init__(**kwargs)
+        self.maxlen, self.vocab_size, self.d_model = maxlen, vocab_size, d_model
+        self.tok = layers.Embedding(vocab_size, d_model)
+        self.pos = layers.Embedding(maxlen, d_model)
+
+    def call(self, ids):
+        posiciones = ops.arange(ops.shape(ids)[1])
+        return self.tok(ids) + self.pos(posiciones)
+
+    def get_config(self):
+        return {**super().get_config(), "maxlen": self.maxlen, "vocab_size": self.vocab_size, "d_model": self.d_model}
+
+keras.utils.set_random_seed(0)
+entradas = keras.Input(shape=(None,), dtype="int32")
+h = TokenAndPositionEmbedding(LARGO, len(vocab), 32)(entradas)
+for _ in range(2):
+    h = TransformerBlock(32, 2, 64, dropout=0.0, causal=True)(h)
+logits = layers.Dense(len(vocab))(h)
+gpt = keras.Model(entradas, logits)
+gpt.compile(optimizer=keras.optimizers.Adam(3e-3), loss=keras.losses.SparseCategoricalCrossentropy(from_logits=True))
+print("parámetros:", gpt.count_params())
+hist = gpt.fit(ds_texto, epochs=12, verbose=0)
+for e in (0, 2, 5, 11):
+    print(f"época {e + 1:2d}  pérdida = {hist.history['loss'][e]:.3f}")
+print("perplejidad final:", round(float(np.exp(hist.history["loss"][-1])), 2))</code></pre>
+  <details class="linea-a-linea" open>
+    <summary>Línea por línea</summary>
+    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+      <tbody>
+        <tr data-lines="1"><td><code>import tensorflow as tf</code></td><td>Para usar <code>tf.data.Dataset.zip</code>.</td></tr>
+        <tr data-lines="3"><td><code>LARGO = 16</code></td><td>Longitud de contexto: el modelo ve ventanas de 16 palabras.</td></tr>
+        <tr data-lines="4"><td><code>x_ds = keras.utils.timeseries_dataset_from_array(ids[:-1], None, sequence_length=LARGO, sequence_stride=2, batch_size=None)</code></td><td>Ventanas de 16 ids de <code>ids[:-1]</code> (todas menos la última palabra). Sin objetivos (<code>None</code>); un paso de 2 para no repetir tanto; <code>batch_size=None</code> deja el dataset sin agrupar en lotes.</td></tr>
+        <tr data-lines="5"><td><code>y_ds = ...(ids[1:], None, ...)</code></td><td>Las mismas ventanas pero de <code>ids[1:]</code>: cada posición contiene <strong>la palabra siguiente</strong> a la de <code>x_ds</code>.</td></tr>
+        <tr data-lines="6"><td><code>ds_texto = tf.data.Dataset.zip((x_ds, y_ds)).shuffle(4000, seed=0).batch(64)</code></td><td><code>zip</code> junta ambos en pares (entrada, objetivo), <code>shuffle(4000)</code> baraja las ventanas con un buffer de 4.000 y <code>batch(64)</code> forma lotes de 64.</td></tr>
+        <tr data-lines="7-10"><td><code>for xb, yb in ds_texto.take(1): print(...)</code></td><td>Mira un lote: sus formas y las 6 primeras palabras de entrada y de objetivo del primer ejemplo, ya traducidas.</td></tr>
+        <tr data-lines="12-13"><td><code>@...register_keras_serializable(...) class TokenAndPositionEmbedding(layers.Layer):</code></td><td>Una capa propia registrada para poder guardarla.</td></tr>
+        <tr data-lines="14-16"><td><code>def __init__(self, maxlen, vocab_size, d_model, **kwargs): ...</code></td><td>Constructor: guarda los argumentos.</td></tr>
+        <tr data-lines="17"><td><code>self.tok = layers.Embedding(vocab_size, d_model)</code></td><td>La tabla de embeddings de palabras: un vector de 32 números por id.</td></tr>
+        <tr data-lines="18"><td><code>self.pos = layers.Embedding(maxlen, d_model)</code></td><td>La tabla de embeddings de <strong>posiciones</strong> (aprendida): un vector por posición 0…15.</td></tr>
+        <tr data-lines="20"><td><code>def call(self, ids):</code></td><td>Recibe ids enteros de forma <code>(lote, pasos)</code>.</td></tr>
+        <tr data-lines="21"><td><code>posiciones = ops.arange(ops.shape(ids)[1])</code></td><td>Los números 0, 1, …, pasos-1.</td></tr>
+        <tr data-lines="22"><td><code>return self.tok(ids) + self.pos(posiciones)</code></td><td>Embedding de la palabra + embedding de su posición. Salida <code>(lote, pasos, 32)</code>.</td></tr>
+        <tr data-lines="24-25"><td><code>def get_config(self): ...</code></td><td>Argumentos para guardar y recargar.</td></tr>
+        <tr data-lines="27"><td><code>keras.utils.set_random_seed(0)</code></td><td>Semilla fija.</td></tr>
+        <tr data-lines="28"><td><code>entradas = keras.Input(shape=(None,), dtype="int32")</code></td><td>Entrada de ids de <strong>cualquier longitud</strong> (<code>None</code>): así podemos generar con prompts cortos.</td></tr>
+        <tr data-lines="29"><td><code>h = TokenAndPositionEmbedding(LARGO, len(vocab), 32)(entradas)</code></td><td>Palabras + posiciones → vectores de 32.</td></tr>
+        <tr data-lines="30-31"><td><code>for _ in range(2): h = TransformerBlock(32, 2, 64, dropout=0.0, causal=True)(h)</code></td><td>Dos bloques <strong>causales</strong> de 2 cabezas, sin dropout (el modelo es pequeño y los datos abundantes).</td></tr>
+        <tr data-lines="32"><td><code>logits = layers.Dense(len(vocab))(h)</code></td><td>Una puntuación (logit) por cada palabra del vocabulario y por cada posición. Sin activación.</td></tr>
+        <tr data-lines="33"><td><code>gpt = keras.Model(entradas, logits)</code></td><td>Crea el modelo.</td></tr>
+        <tr data-lines="34"><td><code>gpt.compile(optimizer=keras.optimizers.Adam(3e-3), loss=keras.losses.SparseCategoricalCrossentropy(from_logits=True))</code></td><td>Adam con tasa 0,003 y entropía cruzada que recibe <strong>logits</strong> (<code>from_logits=True</code>: ella aplica el softmax por dentro).</td></tr>
+        <tr data-lines="35"><td><code>print("parámetros:", gpt.count_params())</code></td><td>Total de parámetros.</td></tr>
+        <tr data-lines="36"><td><code>hist = gpt.fit(ds_texto, epochs=12, verbose=0)</code></td><td>Entrena 12 épocas.</td></tr>
+        <tr data-lines="37-38"><td><code>for e in (0, 2, 5, 11): print(f"época ... pérdida = ...")</code></td><td>Pérdida en las épocas 1, 3, 6 y 12.</td></tr>
+        <tr data-lines="39"><td><code>print("perplejidad final:", round(float(np.exp(hist.history["loss"][-1])), 2))</code></td><td>La perplejidad, \(e^{\text{pérdida}}\), de la última época (<code>[-1]</code> = último elemento).</td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>lote: (64, 16) (64, 16)
+entrada: ['la', 'niña', 'pequeña', 'duerme', 'en', 'el']
+objetivo: ['niña', 'pequeña', 'duerme', 'en', 'el', 'sofá']
+parámetros: 19615
+época  1  pérdida = 1.155
+época  3  pérdida = 0.751
+época  6  pérdida = 0.742
+época 12  pérdida = 0.729
+perplejidad final: 2.07</pre>
+    <p>Un lote son 64 ventanas de 16 palabras en la entrada y otras 64 en el objetivo, desplazadas un lugar: a «la, niña, pequeña, duerme, en, el» le corresponde «niña, pequeña, duerme, en, el, sofá». El modelo tiene 19.615 parámetros. La pérdida baja de 1,155 a <strong>0,729</strong>, perplejidad <strong>2,07</strong>: exactamente el suelo que calculamos en el fragmento 14 (0,728). El modelo ha aprendido la gramática. La pérdida está medida sobre los propios datos de entrenamiento; con una gramática tan pequeña es lo esperado, pero con un corpus real se vigila también una pérdida de validación.</p>
+  </div>
+</article>
+
+<!-- ---------- Fragmento 16 ---------- -->
+<article class="snippet" data-lang="python">
+  <header>
+    <h3>16 · Generar texto: temperatura, top-k y cuántas frases salen válidas</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Escribir el bucle de generación (predecir, muestrear, añadir la palabra y repetir), mirar cómo la temperatura cambia el reparto de probabilidades del modelo real y medir qué porcentaje de frases generadas son gramaticalmente válidas. Usa <code>gpt</code>, <code>vec</code>, <code>vocab</code>, <code>LARGO</code>, <code>todas</code> y <code>softmax</code> de fragmentos anteriores.</p>
+  </header>
+  <pre class="code"><code>def siguiente_token(logits, temperatura=1.0, top_k=None, rng=None):
+    z = logits / temperatura
+    if top_k is not None:
+        corte = np.sort(z)[-top_k]
+        z = np.where(z &gt;= corte, z, -np.inf)
+    p = softmax(z)
+    return int(rng.choice(len(p), p=p)), p
+
+def generar(prompt, n=14, **kw):
+    seq = list(vec([prompt]).numpy()[0])
+    rng = np.random.default_rng(0)
+    for _ in range(n):
+        ventana = np.array(seq[-LARGO:])[None]
+        logits = gpt(ventana, training=False).numpy()[0, -1]
+        t, _ = siguiente_token(logits, rng=rng, **kw)
+        seq.append(t)
+    return " ".join(vocab[i] for i in seq)
+
+logits = gpt(vec(["la niña pequeña lee un libro . el gato negro"]).numpy(), training=False).numpy()[0, -1]
+orden = np.argsort(logits)[::-1][:5]
+print("tras «… el gato negro»:")
+for T in (1.0, 0.5, 2.0):
+    p = softmax(logits / T)
+    print(f"  T={T}: " + "  ".join(f"{vocab[i]} {p[i]:.2f}" for i in orden))
+
+print()
+print("T=0.01 :", generar("el gato", temperatura=0.01))
+print("T=1.0  :", generar("el gato", temperatura=1.0))
+print("T=2.0  :", generar("el gato", temperatura=2.0))
+print("T=1,k=3:", generar("el gato", temperatura=1.0, top_k=3))
+
+validas = {" ".join(f) for _, f in todas}
+def porcentaje_validas(**kw):
+    texto_generado = generar(". el", n=240, **kw)
+    frases_g = [f.strip() for f in texto_generado.split(".")[1:-1]]
+    return 100 * np.mean([(f + " .") in validas for f in frases_g]), len(frases_g)
+
+print()
+for nombre, kw in (("T=0.7", dict(temperatura=0.7)), ("T=1.0", dict(temperatura=1.0)), ("T=1.5", dict(temperatura=1.5)), ("T=2.0", dict(temperatura=2.0)), ("T=1.5, k=3", dict(temperatura=1.5, top_k=3))):
+    pct, n_f = porcentaje_validas(**kw)
+    print(f"{nombre:&lt;11} frases generadas: {n_f:2d}   gramaticalmente válidas: {pct:5.1f} %")</code></pre>
+  <details class="linea-a-linea" open>
+    <summary>Línea por línea</summary>
+    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+      <tbody>
+        <tr data-lines="1"><td><code>def siguiente_token(logits, temperatura=1.0, top_k=None, rng=None):</code></td><td>Función que elige la siguiente palabra a partir de los logits del modelo.</td></tr>
+        <tr data-lines="2"><td><code>z = logits / temperatura</code></td><td>Divide los logits entre la temperatura.</td></tr>
+        <tr data-lines="3-5"><td><code>if top_k is not None: corte = np.sort(z)[-top_k]; z = np.where(z >= corte, z, -np.inf)</code></td><td>Si hay top-k: <code>np.sort(z)[-top_k]</code> es la puntuación del <em>k</em>-ésimo mejor; todo lo que quede por debajo se pone a <code>-inf</code> (probabilidad 0).</td></tr>
+        <tr data-lines="6"><td><code>p = softmax(z)</code></td><td>Las probabilidades finales (suman 1).</td></tr>
+        <tr data-lines="7"><td><code>return int(rng.choice(len(p), p=p)), p</code></td><td>Sortea un id respetando las probabilidades (<code>rng.choice</code> con <code>p=</code>) y lo devuelve junto con el reparto.</td></tr>
+        <tr data-lines="9"><td><code>def generar(prompt, n=14, **kw):</code></td><td>Genera <code>n</code> palabras a partir de un texto inicial; <code>**kw</code> reenvía temperatura y top-k.</td></tr>
+        <tr data-lines="10"><td><code>seq = list(vec([prompt]).numpy()[0])</code></td><td>Convierte el prompt en una lista de ids.</td></tr>
+        <tr data-lines="11"><td><code>rng = np.random.default_rng(0)</code></td><td>Azar con semilla: así cada llamada es reproducible.</td></tr>
+        <tr data-lines="12"><td><code>for _ in range(n):</code></td><td>Repite <code>n</code> veces: el bucle autorregresivo.</td></tr>
+        <tr data-lines="13"><td><code>ventana = np.array(seq[-LARGO:])[None]</code></td><td>Las últimas 16 palabras (el contexto máximo) como un lote de un ejemplo (<code>[None]</code> añade el eje del lote).</td></tr>
+        <tr data-lines="14"><td><code>logits = gpt(ventana, training=False).numpy()[0, -1]</code></td><td>Llama al modelo y se queda con los logits de la <strong>última posición</strong> (<code>[0, -1]</code>): son los de la palabra que viene.</td></tr>
+        <tr data-lines="15"><td><code>t, _ = siguiente_token(logits, rng=rng, **kw)</code></td><td>Elige la palabra.</td></tr>
+        <tr data-lines="16"><td><code>seq.append(t)</code></td><td>La añade al texto; en la vuelta siguiente el modelo la verá.</td></tr>
+        <tr data-lines="17"><td><code>return " ".join(vocab[i] for i in seq)</code></td><td>Traduce los ids a texto.</td></tr>
+        <tr data-lines="19"><td><code>logits = gpt(vec([...]).numpy(), training=False).numpy()[0, -1]</code></td><td>Logits tras el contexto «la niña pequeña lee un libro . el gato negro». El contexto es una frase completa seguida del comienzo de otra, «el gato negro»: lo que toca ahora es un verbo.</td></tr>
+        <tr data-lines="20"><td><code>orden = np.argsort(logits)[::-1][:5]</code></td><td>Los ids de las 5 palabras con mayor logit (<code>argsort</code> ordena de menor a mayor; <code>[::-1]</code> lo invierte).</td></tr>
+        <tr data-lines="21"><td><code>print("tras «… el gato negro»:")</code></td><td>Cabecera.</td></tr>
+        <tr data-lines="22-24"><td><code>for T in (1.0, 0.5, 2.0): p = softmax(logits / T); print(...)</code></td><td>Para tres temperaturas, imprime la probabilidad de esas 5 palabras.</td></tr>
+        <tr data-lines="26"><td><code>print()</code></td><td>Línea en blanco.</td></tr>
+        <tr data-lines="27-30"><td><code>print("T=0.01 :", generar("el gato", temperatura=0.01)) ...</code></td><td>Genera texto con cuatro ajustes: casi voraz (T=0,01), T=1, T=2 y T=1 con top-3.</td></tr>
+        <tr data-lines="32"><td><code>validas = {" ".join(f) for _, f in todas}</code></td><td>El conjunto de las 144 frases válidas de la gramática (como textos).</td></tr>
+        <tr data-lines="33"><td><code>def porcentaje_validas(**kw):</code></td><td>Mide qué proporción de frases generadas es válida.</td></tr>
+        <tr data-lines="34"><td><code>texto_generado = generar(". el", n=240, **kw)</code></td><td>Genera 240 palabras empezando tras un punto.</td></tr>
+        <tr data-lines="35"><td><code>frases_g = [f.strip() for f in texto_generado.split(".")[1:-1]]</code></td><td>Parte el texto por los puntos, descarta el primer y el último trozo (incompletos) y limpia espacios.</td></tr>
+        <tr data-lines="36"><td><code>return 100 * np.mean([(f + " .") in validas for f in frases_g]), len(frases_g)</code></td><td>Comprueba si cada frase (con su punto) está en el conjunto válido y devuelve el porcentaje y el número de frases.</td></tr>
+        <tr data-lines="38"><td><code>print()</code></td><td>Línea en blanco.</td></tr>
+        <tr data-lines="39"><td><code>for nombre, kw in ((...), ...):</code></td><td>Recorre cinco ajustes (T=0,7; 1; 1,5; 2 y T=1,5 con top-3). <code>dict(temperatura=...)</code> crea el diccionario de argumentos.</td></tr>
+        <tr data-lines="40"><td><code>pct, n_f = porcentaje_validas(**kw)</code></td><td>Mide con ese ajuste (<code>**kw</code> reparte el diccionario en argumentos).</td></tr>
+        <tr data-lines="41"><td><code>print(f"{nombre:<11} frases generadas: ...")</code></td><td>Imprime el resultado.</td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>tras «… el gato negro»:
+  T=1.0: bebe 0.43  corre 0.21  lee 0.18  duerme 0.18  negra 0.00
+  T=0.5: bebe 0.63  corre 0.15  lee 0.11  duerme 0.11  negra 0.00
+  T=2.0: bebe 0.30  corre 0.21  lee 0.20  duerme 0.20  negra 0.02
+
+T=0.01 : el gato pequeño bebe leche . la gata pequeña bebe leche . el niño pequeño bebe
+T=1.0  : el gato pequeño bebe agua . la gata negra lee una carta . el perro duerme
+T=2.0  : el gato pequeño bebe lee la gata pequeña lee un libro corre por  negra duerme
+T=1,k=3: el gato pequeño bebe agua . la gata negra bebe leche . la niña pequeña duerme
+
+T=0.7       frases generadas: 34   gramaticalmente válidas: 100.0 %
+T=1.0       frases generadas: 37   gramaticalmente válidas: 100.0 %
+T=1.5       frases generadas: 36   gramaticalmente válidas:  86.1 %
+T=2.0       frases generadas: 37   gramaticalmente válidas:  35.1 %
+T=1.5, k=3  frases generadas: 35   gramaticalmente válidas:  97.1 %</pre>
+    <p>Tras «… el gato negro» el modelo pone un 43 % en «bebe» con T=1; con T=0,5 sube al 63 % y con T=2 baja al 30 %: la temperatura afila o aplana el reparto, y las palabras que casi no tenían probabilidad (como «negra», que no concuerda) siguen en 0,00–0,02. A T=0,01 el texto es repetitivo; a T=1 es variado y correcto; a T=2 aparece «el gato pequeño bebe lee la gata…», un disparate. Midiendo 240 palabras por ajuste: 100 % de frases válidas con T=0,7 y T=1, 86 % con 1,5, solo 35 % con T=2 y 97 % si a T=1,5 se le añade top-3. Resultados con semilla fija: cambian si cambias la semilla.</p>
+  </div>
+</article>
+
+<!-- ---------- Fragmento 17 ---------- -->
+<article class="snippet" data-lang="python">
+  <header>
+    <h3>17 · Guardar y recargar un modelo con capas propias</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Guardar el mini-GPT en un archivo <code>.keras</code>, recargarlo en un objeto nuevo y comprobar que las predicciones son idénticas: así se comprueba que <code>get_config</code> y el registro de las clases funcionan. Usa <code>gpt</code>, <code>vec</code> y las capas de los fragmentos anteriores.</p>
+  </header>
+  <pre class="code"><code>import os, tempfile
+
+ruta = os.path.join(tempfile.mkdtemp(), "gpt_mini.keras")
+gpt.save(ruta)
+recuperado = keras.models.load_model(ruta)
+
+prueba = vec(["la niña pequeña lee"]).numpy()
+a = gpt(prueba, training=False).numpy()
+b = recuperado(prueba, training=False).numpy()
+print("archivo:", os.path.basename(ruta), " tamaño:", os.path.getsize(ruta) // 1024, "KB")
+print("mismas predicciones tras cargar:", np.allclose(a, b, atol=1e-5))
+print("capas recuperadas:", [type(c).__name__ for c in recuperado.layers])
+config = TransformerBlock(32, 2, 64).get_config()
+print({k: config[k] for k in ("d_model", "num_heads", "ff_dim", "dropout", "causal")})</code></pre>
+  <details class="linea-a-linea" open>
+    <summary>Línea por línea</summary>
+    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+      <tbody>
+        <tr data-lines="1"><td><code>import os, tempfile</code></td><td>Módulos estándar: sistema de archivos y carpetas temporales.</td></tr>
+        <tr data-lines="3"><td><code>ruta = os.path.join(tempfile.mkdtemp(), "gpt_mini.keras")</code></td><td>Una ruta de archivo dentro de una carpeta temporal nueva (para no ensuciar tu disco). La extensión <code>.keras</code> es el formato de guardado de Keras 3.</td></tr>
+        <tr data-lines="4"><td><code>gpt.save(ruta)</code></td><td>Guarda en un único archivo la arquitectura (con la <code>config</code> de cada capa), los pesos y el estado del optimizador.</td></tr>
+        <tr data-lines="5"><td><code>recuperado = keras.models.load_model(ruta)</code></td><td>Lo carga. Keras reconstruye cada capa propia llamando a su clase con lo que devolvió <code>get_config</code>, gracias al decorador de registro.</td></tr>
+        <tr data-lines="7"><td><code>prueba = vec(["la niña pequeña lee"]).numpy()</code></td><td>Un prompt de prueba como ids.</td></tr>
+        <tr data-lines="8-9"><td><code>a = gpt(prueba, training=False).numpy(); b = recuperado(prueba, ...)</code></td><td>Los logits del modelo original y del recuperado.</td></tr>
+        <tr data-lines="10"><td><code>print("archivo:", ..., " tamaño:", ... // 1024, "KB")</code></td><td>Nombre y tamaño en kilobytes (<code>os.path.getsize</code> da bytes; <code>// 1024</code> los pasa a KB).</td></tr>
+        <tr data-lines="11"><td><code>print("mismas predicciones tras cargar:", np.allclose(a, b, atol=1e-5))</code></td><td>¿Coinciden los logits?</td></tr>
+        <tr data-lines="12"><td><code>print("capas recuperadas:", [type(c).__name__ for c in recuperado.layers])</code></td><td>Los nombres de las clases de las capas del modelo recuperado: las propias han vuelto a ser <code>TokenAndPositionEmbedding</code> y <code>TransformerBlock</code>.</td></tr>
+        <tr data-lines="13-14"><td><code>config = TransformerBlock(32, 2, 64).get_config(); print({...})</code></td><td>Muestra algunas claves de lo que devuelve <code>get_config</code>: los argumentos del constructor, que es todo lo que hace falta para reconstruir la capa.</td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>archivo: gpt_mini.keras  tamaño: 345 KB
+mismas predicciones tras cargar: True
+capas recuperadas: ['InputLayer', 'TokenAndPositionEmbedding', 'TransformerBlock', 'TransformerBlock', 'Dense']
+{'d_model': 32, 'num_heads': 2, 'ff_dim': 64, 'dropout': 0.1, 'causal': False}</pre>
+    <p>El archivo pesa unos 345 KB y el modelo recuperado da las mismas predicciones (<code>True</code>), con sus capas propias intactas. Las últimas cifras impresas (<code>dropout 0.1</code>, <code>causal False</code>) son los valores por defecto de un bloque nuevo, no del modelo cargado: sirven para ver qué claves guarda <code>get_config</code>. Si hubieras olvidado el decorador o <code>get_config</code>, <code>load_model</code> fallaría con un error de «Unknown layer» (o habría que pasar <code>custom_objects={...}</code>).</p>
+  </div>
+</article>
+</section>
+
+<!-- =============================================================== -->
+<section>
+<h2 id="quiz">Comprueba lo aprendido</h2>
+<div class="quiz">
+<script type="application/json" class="quiz-data">
+{"titulo":"Cuestionario del módulo 3",
+ "preguntas":[
+  {"q":"Tienes una serie de 100 valores y usas ventanas de 10 pasos, horizonte 3 y <code>sequence_stride=1</code>. ¿Cuántos ejemplos salen?",
+   "opciones":["87","90","88","97"],
+   "correcta":2,
+   "porque":"N = ⌊(n − w − h)/s⌋ + 1 = ⌊(100 − 10 − 3)/1⌋ + 1 = 88. El «+1» cuenta la primera ventana; 87 es olvidarlo. Con ventana 10 y horizonte 3, las últimas posiciones de la serie no pueden ser inicio de ventana porque su objetivo caería fuera."},
+  {"q":"¿Por qué se corta la serie en entrenamiento / validación / test <em>antes</em> de crear las ventanas, y se calcula la media y la desviación solo con el trozo de entrenamiento?",
+   "opciones":["Para que ninguna ventana ni ninguna estadística de entrenamiento contenga información del futuro que luego se evalúa","Para tener más ventanas en total","Porque Keras no permite barajar series","Para que la desviación típica sea exactamente 1 en test"],
+   "correcta":0,
+   "porque":"Si primero haces ventanas y luego repartes, una ventana puede tener la entrada en entrenamiento y el objetivo en test (o al revés), y si normalizas con toda la serie la media ya «sabe» del futuro. Cortar antes pierde algunas ventanas en las fronteras, pero la evaluación es honesta. Y en test la desviación no será exactamente 1: eso es lo normal."},
+  {"q":"Los componentes de <code>q</code> y <code>k</code> son independientes, con media 0 y varianza 1, y <code>d_k = 16</code>. ¿Qué desviación típica tiene el producto escalar <code>q·k</code> antes y después de dividir entre √d_k?",
+   "opciones":["1 antes y 1/4 después","16 antes y 4 después","8 antes y 2 después","4 antes y 1 después"],
+   "correcta":3,
+   "porque":"La varianza de q·k es la suma de d_k términos de varianza 1, es decir, d_k = 16; su desviación es √16 = 4. Al dividir entre √d_k = 4 queda 1. Sin esa división, con d_k grande la softmax se satura (un peso ≈ 1) y el gradiente casi desaparece."},
+  {"q":"Una consulta tiene puntuaciones (2, 0) con dos claves. ¿Qué pesos de atención da la softmax?",
+   "opciones":["50 % y 50 %","88 % y 12 %","99 % y 1 %","67 % y 33 %"],
+   "correcta":1,
+   "porque":"e² ≈ 7,389 y e⁰ = 1; la suma es 8,389. Los pesos son 7,389/8,389 ≈ 0,881 y 1/8,389 ≈ 0,119. Una diferencia de 2 puntos de puntuación ya se traduce en un reparto 88/12."},
+  {"q":"En una frase de 5 tokens con máscara causal, ¿cuántas de las 25 puntuaciones se sustituyen por −∞?",
+   "opciones":["5","20","10","25"],
+   "correcta":2,
+   "porque":"Se enmascara todo lo que queda por encima de la diagonal: 4 + 3 + 2 + 1 = 10 puntuaciones (n(n−1)/2). La diagonal sí se queda: un token puede mirarse a sí mismo. Después de la softmax, esas 10 posiciones valen exactamente 0."},
+  {"q":"Con <code>d_model = 64</code>, 8 cabezas y <code>key_dim = 8</code>, ¿cuántos parámetros tiene <code>MultiHeadAttention</code> (con sesgos)?",
+   "opciones":["16.640","16.384","4.160","33.280"],
+   "correcta":0,
+   "porque":"Hay cuatro proyecciones (Q, K, V y la de salida), cada una con 64·64 pesos y 64 sesgos: 4·64² + 4·64 = 16.384 + 256 = 16.640. 16.384 es olvidar los sesgos; 4.160 es una sola proyección. Y el número de cabezas no cambia el total mientras key_dim · cabezas = d_model."},
+  {"q":"Lees <code>layers.MultiHeadAttention(num_heads=4, key_dim=32)</code> en un modelo con <code>d_model = 32</code>. ¿Qué tiene de raro?",
+   "opciones":["Da un error de forma","Nada: key_dim es el tamaño total de la clave","Keras ignora tres de las cuatro cabezas","<code>key_dim</code> es por cabeza: cada una trabajaría con 32 y la capa tendría 16.800 parámetros en vez de 4.224; lo habitual es <code>d_model // num_heads</code> = 8"],
+   "correcta":3,
+   "porque":"En Keras <code>key_dim</code> es el tamaño de Q y K <em>de cada cabeza</em>, no el total. Con 4 cabezas de 32 se proyecta a 128 números y luego se vuelve a 32: funciona, pero con casi cuatro veces más parámetros (16.800 frente a 4.224) y sin que cada cabeza sea «una porción» de d_model."},
+  {"q":"Un modelo con atención pero sin codificación posicional recibe «el perro muerde al hombre» y «el hombre muerde al perro», con los mismos embeddings. ¿Qué pasa?",
+   "opciones":["Da salidas totalmente distintas porque ve el orden","No distingue el orden: la salida de cada token es la misma, solo permutada, así que las dos frases son indistinguibles para el modelo","Falla con un error de forma","Solo distingue el orden si usa varias cabezas"],
+   "correcta":1,
+   "porque":"La atención compara tokens por su contenido; permutar la entrada permuta la salida de la misma forma (equivarianza a permutaciones). Sin una señal de posición, que se suma al embedding, el conjunto de vectores es el mismo en ambas frases. Las cabezas adicionales no arreglan eso."},
+  {"q":"La entrada de una <code>LayerNormalization</code> tiene forma <code>(lote, pasos, rasgos)</code>. ¿Sobre qué calcula la media y la desviación?",
+   "opciones":["Sobre los rasgos de cada token por separado, sin mezclar ejemplos ni tokens","Sobre el lote entero, rasgo a rasgo","Sobre todos los números del tensor a la vez","Sobre los pasos de cada ejemplo, rasgo a rasgo"],
+   "correcta":0,
+   "porque":"LayerNorm normaliza cada vector de rasgos con sus propios números (media 0, desviación 1) y luego aplica γ y β. Por eso no depende del tamaño del lote ni de la longitud de la secuencia. BatchNormalization, en cambio, calcula sus estadísticas sobre el lote (y los pasos) para cada rasgo."},
+  {"q":"Los logits de tres palabras son (2, 1, 0). Al dividir entre una temperatura T = 0,5 y aplicar softmax, ¿qué probabilidades salen?",
+   "opciones":["(0,665; 0,245; 0,090)","(0,333; 0,333; 0,333)","(0,867; 0,117; 0,016)","(0,500; 0,300; 0,200)"],
+   "correcta":2,
+   "porque":"Los logits pasan a (4, 2, 0): e⁴ ≈ 54,6, e² ≈ 7,39 y e⁰ = 1, con suma 62,99; las probabilidades son 0,867; 0,117 y 0,016. Con T = 1 serían (0,665; 0,245; 0,090): una temperatura baja afila el reparto y una alta lo aplana."},
+  {"q":"Un modelo de lenguaje alcanza una pérdida media de 0,693 nats por palabra. ¿Qué perplejidad tiene y cómo se interpreta?",
+   "opciones":["0,693: es la probabilidad media de acertar","0,5: acierta la mitad de las veces","1: predice siempre la palabra correcta","≈ 2: es como dudar entre 2 palabras igual de probables en cada paso"],
+   "correcta":3,
+   "porque":"La perplejidad es e^pérdida: e^0,693 ≈ 2. Una pérdida de ln 2 equivale a repartir la probabilidad a partes iguales entre 2 candidatas. Una perplejidad de 1 sería el modelo perfecto (pérdida 0). Nuestro mini-GPT llega a 2,07 porque la gramática sintética deja esa incertidumbre irreducible."},
+  {"q":"Pasas de un Transformer que predice el siguiente valor de una serie (regresión) a otro que clasifica señales en 3 tipos. ¿Qué cambias en el código?",
+   "opciones":["Los bloques Transformer y el número de cabezas","Solo la cabeza final y la pérdida: <code>Dense(1)</code> sin activación con <code>mse</code> pasa a <code>Dense(3, activation='softmax')</code> con entropía cruzada","La codificación posicional, que no sirve para clasificar","El tamaño de d_model, que debe ser igual al número de clases"],
+   "correcta":1,
+   "porque":"El tronco (embedding, posición, bloques, pooling) es el mismo; lo que cambia es qué se pide al final. En regresión la salida es un número sin acotar (una neurona sin activación, MSE); en clasificación son probabilidades que suman 1 (softmax) con entropía cruzada. d_model no tiene relación con el número de clases."}
+ ]}
+</script>
+</div>
+</section>
+
+<section class="resumen">
+<h2 class="sin-num sin-toc">Resumen del módulo</h2>
+<ul>
+  <li><strong>Series en ventanas</strong>: <code>timeseries_dataset_from_array(data, targets, sequence_length, sequence_stride, sampling_rate, batch_size, shuffle)</code> produce \(N=\lfloor (n-w-h)/s\rfloor+1\) ejemplos de forma <code>(w, rasgos)</code>; el objetivo es <code>serie[w+h-1:]</code>. Se corta en el tiempo <em>antes</em> de crear ventanas, se normaliza con la media y desviación del entrenamiento y se compara siempre con líneas base (repetir el último valor, regresión lineal).</li>
+  <li><strong>Atención</strong>: \(\operatorname{softmax}(QK^{\top}/\sqrt{d_k})\,V\). Dividir entre \(\sqrt{d_k}\) mantiene la varianza de las puntuaciones en 1 y evita la saturación. La máscara causal pone \(-\infty\) sobre la diagonal y deja pesos exactamente 0 hacia el futuro. Coste \(n^2\).</li>
+  <li><strong>Multi-cabeza</strong>: <code>MultiHeadAttention(num_heads, key_dim)</code>, con <code>key_dim = d_model // num_heads</code> (es por cabeza). Parámetros \(4d^2+4d\), independientes del número de cabezas. Argumentos de llamada: <code>use_causal_mask</code>, <code>attention_mask</code>, <code>return_attention_scores</code>.</li>
+  <li><strong>Posición</strong>: la atención es equivariante a permutaciones, así que se suma una codificación posicional (sinusoidal fija o <code>Embedding</code> aprendido). Cada elección tiene su caso de uso.</li>
+  <li><strong>Bloque Transformer</strong>: atención + residual + <code>LayerNormalization</code>, y FFN (\(d \to d_{ff} \to d\)) + residual + LayerNorm. Se programa como <code>keras.layers.Layer</code> con <code>call(x, training=False)</code> y <code>get_config</code>, y se registra con <code>register_keras_serializable</code> para guardarlo en <code>.keras</code>. Encoder (BERT), decoder (GPT) o ambos (T5) solo difieren en la máscara y en el cruce.</li>
+  <li><strong>Serie con Transformer</strong>: <code>Dense(d_model)</code> como embedding, posición, bloques, <code>GlobalAveragePooling1D</code> y una cabeza (<code>Dense(1)</code> o softmax). En nuestra serie casi periódica, la regresión lineal ganó al Transformer: no hay que usar el modelo más grande por defecto.</li>
+  <li><strong>Texto</strong>: <code>TextVectorization</code> → ids → ventanas desplazadas (entrada y siguiente palabra) → decoder causal → logits y <code>SparseCategoricalCrossentropy(from_logits=True)</code>. La perplejidad es \(e^{\text{pérdida}}\). Al generar, la temperatura afila o aplana el reparto y top-k recorta las candidatas.</li>
+</ul>
+<p>Siguiente paso: en el <a href="modulo-4.html">módulo 4</a> pasamos de modelos que predicen a modelos que <em>generan</em> datos nuevos (autoencoders variacionales, difusión y GANs); el bucle «predecir, muestrear, repetir» de este módulo es un primer anticipo. Si te falta base, repasa la intuición del <a href="../curso-2/modulo-4.html">módulo 4 del Curso 2</a> (RNN, LSTM y atención) o las capas propias del <a href="modulo-1.html">módulo 1</a>.</p>
+</section>
+
+</div>
+</main>
+</body>
+</html>

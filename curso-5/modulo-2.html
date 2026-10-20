@@ -1,0 +1,2233 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Módulo 2 · Redes profundas y técnicas de entrenamiento · Curso 5 · Cuaderno de IA</title>
+<meta name="description" content="Backpropagation a mano, gradientes que se desvanecen, inicialización, dropout, momentum, batch normalization y Adam en PyTorch, con medición real de los gradientes por capa.">
+<script>try{var t=localStorage.getItem('cuaderno-ia:tema');if(t)document.documentElement.setAttribute('data-theme',t)}catch(e){}</script>
+<link rel="stylesheet" href="../assets/css/style.css">
+<script src="../assets/js/curriculum.js"></script>
+<script src="../assets/js/lab.js"></script>
+<script src="../assets/js/app.js" defer></script>
+</head>
+<body data-root="../" data-course="5" data-module="2">
+<main>
+<div class="page">
+
+<header class="hero">
+  <div class="hero-grid">
+    <div>
+      <p class="eyebrow">Curso 5 · Módulo 2</p>
+      <h1>Redes profundas y técnicas de entrenamiento</h1>
+      <p class="lead">En el módulo anterior una red tenía una capa oculta y entrenarla era fácil. Cuando apilas muchas capas aparecen problemas nuevos: los gradientes se apagan (o explotan), la red memoriza y el entrenamiento se atasca. Aquí aprendes a <strong>ver</strong> esos problemas midiendo los gradientes capa por capa en PyTorch, y las seis herramientas que los resuelven: inicialización, dropout, momentum, batch normalization y optimizadores como Adam.</p>
+    </div>
+    <div class="hero-tile" aria-hidden="true"></div>
+  </div>
+  <div class="goals">
+    <h2 class="sin-num sin-toc">Al terminar este módulo sabrás</h2>
+    <ul>
+      <li>Construir una red de cualquier profundidad con <code>nn.ModuleList</code> y contar sus parámetros a mano.</li>
+      <li>Calcular los gradientes de una red 2-2-1 con la regla de la cadena, a mano, y comprobarlos con <code>autograd</code>.</li>
+      <li>Medir la norma del gradiente de cada capa y diagnosticar un gradiente que se desvanece.</li>
+      <li>Elegir una inicialización (Xavier o He) con la cuenta de la varianza en la mano.</li>
+      <li>Usar <code>nn.Dropout</code>, <code>nn.BatchNorm1d</code>, <code>model.train()</code> y <code>model.eval()</code> sin caer en sus trampas.</li>
+      <li>Escribir a mano las reglas de SGD con momentum, Nesterov, RMSprop y Adam y elegir entre ellas.</li>
+      <li>Montar una receta completa y medir, con una ablación, qué aporta cada pieza.</li>
+    </ul>
+  </div>
+</header>
+
+<!-- =============================================================== -->
+<section>
+<h2 id="profundas">Redes profundas: más capas, un solo bloque de código</h2>
+
+<p class="pregunta">¿Qué significa «profunda» y cómo escribo una red de 3, de 8 o de 20 capas sin copiar y pegar el mismo código?</p>
+
+<p>Una <strong>red profunda</strong> (<abbr class="t" data-def="Deep neural network: red con varias capas ocultas entre la entrada y la salida. No hay una frontera oficial; a partir de dos o tres capas ocultas ya se habla de profunda.">deep network</abbr>) es una red con <strong>varias capas ocultas</strong> apiladas. Cada capa toma la salida de la anterior, la mezcla con sus pesos y le aplica una activación. La primera capa detecta cosas sencillas de la entrada; las siguientes combinan esas cosas en otras más complejas. Con imágenes: bordes → esquinas → ojos → caras.</p>
+
+<div class="callout recuerda">
+  <span class="lbl">Recuerda (<a href="../curso-2/modulo-1.html">Curso 2 · módulo 1</a> y <a href="modulo-1.html">módulo anterior</a>)</span>
+  <p>Una capa densa calcula \( h=f(Wx+b) \): multiplica por los pesos \( W \), suma el sesgo \( b \) y aplica la activación \( f \). En el módulo anterior construiste esa capa con <code>nn.Linear</code> y la activación ReLU o sigmoide, y viste cómo una capa oculta resuelve el XOR. Una red profunda es lo mismo repetido: \( h_1=f(W_1x+b_1) \), \( h_2=f(W_2h_1+b_2) \), … y una última capa lineal que da la salida.</p>
+</div>
+
+<div class="callout analogia">
+  <span class="lbl">Analogía</span>
+  <p>Una cadena de montaje con varias estaciones: la primera corta las piezas, la segunda las lija, la tercera las ensambla. Con una sola estación gigante tendrías que hacerlo todo a la vez; con varias, cada una hace una tarea simple sobre el resultado de la anterior. Pero ojo: si una estación falla, todas las siguientes trabajan con material estropeado. De eso va casi todo el módulo.</p>
+</div>
+
+<h3>Cuántos parámetros tiene: la cuenta a mano</h3>
+
+<p>Una capa <code>nn.Linear(entradas, salidas)</code> tiene una matriz de pesos de forma <code>(salidas, entradas)</code> (<strong>una fila por neurona</strong>) y un vector de sesgos con <code>salidas</code> elementos. Por tanto:</p>
+
+<div class="formula">\[ \text{parámetros de una capa} = \underbrace{n_{\text{ent}}\cdot n_{\text{sal}}}_{\text{pesos}} + \underbrace{n_{\text{sal}}}_{\text{sesgos}} \]</div>
+
+<div class="callout ejemplo">
+  <span class="lbl">Ejemplo numérico</span>
+  <p>Una red para los dígitos de 8×8 píxeles (64 entradas) con tres capas ocultas de 32 neuronas y 10 clases de salida: <code>[64, 32, 32, 32, 10]</code>.</p>
+  <table>
+    <thead><tr><th>Capa</th><th>Cuenta</th><th>Parámetros</th></tr></thead>
+    <tbody>
+      <tr><td>64 → 32</td><td>64 · 32 + 32</td><td class="res">2.080</td></tr>
+      <tr><td>32 → 32</td><td>32 · 32 + 32</td><td class="res">1.056</td></tr>
+      <tr><td>32 → 32</td><td>32 · 32 + 32</td><td class="res">1.056</td></tr>
+      <tr><td>32 → 10</td><td>32 · 10 + 10</td><td class="res">330</td></tr>
+      <tr><td><strong>Total</strong></td><td></td><td class="res">4.522</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<figure class="demo" data-demo="curso5/c5m2-capas-parametros" data-titulo="cuántos parámetros tiene una red profunda">
+  <div class="haz">Mueve «Capas ocultas» y «Neuronas por capa» y mira cómo crece la tabla de parámetros capa a capa. Compara la barra de la red profunda con la de <em>una sola capa ancha</em> con las mismas neuronas en total. Después cambia «Dónde guardas las capas» a «lista de Python».</div>
+  <div class="observa">El total sale de la fórmula de arriba, capa por capa. Con la lista de Python, PyTorch «ve» 0 parámetros y el optimizador falla. Activa BatchNorm: cada capa añade \( 2n \) parámetros entrenables (γ y β).</div>
+</figure>
+
+<h3>Cómo se escribe: <code>nn.ModuleList</code></h3>
+
+<p>Para no escribir cada capa a mano, se guardan en un <strong><abbr class="t" data-def="nn.ModuleList: contenedor de PyTorch que guarda una lista de módulos y los REGISTRA como parte de la red, de modo que sus parámetros aparecen en model.parameters(), se mueven a la GPU con model.to(...) y se guardan con state_dict().">nn.ModuleList</abbr></strong>. Es como una lista de Python, pero con un superpoder: avisa a la red de que esas capas son suyas. El <a href="#codigo">fragmento 1</a> construye <code>RedProfunda([64, 32, 32, 32, 10])</code> con un bucle y su método <code>forward</code> recorre la lista; también muestra la alternativa corta con <code>nn.Sequential</code>.</p>
+
+<div class="callout regla">
+  <span class="lbl">Regla fácil</span>
+  <p>Si guardas capas dentro de un <code>nn.Module</code>, que sea en <code>nn.ModuleList</code> (o <code>nn.Sequential</code>, o <code>nn.ModuleDict</code>), nunca en una lista o diccionario normal de Python.</p>
+</div>
+
+<div class="callout ojo">
+  <span class="lbl">Ojo</span>
+  <p>Con una lista de Python <strong>no hay error al construir ni al hacer el forward</strong>: la red parece funcionar. El fallo aparece al crear el optimizador (<code>ValueError: optimizer got an empty parameter list</code>) o, peor, si el modelo tiene además alguna capa registrada, la red entrena <em>solo esas</em> capas y las demás se quedan con sus pesos aleatorios. El fragmento 1 lo provoca a propósito.</p>
+</div>
+
+<div class="callout recuerda">
+  <span class="lbl">Recuerda (Keras)</span>
+  <p>En Keras escribías <code>Sequential([Dense(32, activation="relu"), …])</code> y el número de entradas de cada capa se deducía solo. En PyTorch <code>nn.Linear(64, 32)</code> pide las dos cifras, y la activación es un paso aparte (<code>torch.relu(...)</code> o <code>nn.ReLU()</code>). Los pesos por defecto también cambian, como verás en la sección de inicialización.</p>
+</div>
+</section>
+
+<!-- =============================================================== -->
+<section>
+<h2 id="backprop">Backpropagation a mano con la regla de la cadena</h2>
+
+<p class="pregunta">Entrenar es mover cada peso en la dirección que reduce el error. Pero una red tiene miles de pesos, y el error solo se mide al final. ¿Cómo sabe un peso de la primera capa cuánto ha contribuido al error?</p>
+
+<div class="callout recuerda">
+  <span class="lbl">Recuerda (<a href="../curso-2/modulo-1.html#backprop">Curso 2 · módulo 1</a>)</span>
+  <p>Ya viste que el gradiente \( \partial L/\partial w \) dice cuánto cambia la pérdida \( L \) si subes un poco el peso \( w \), y que se calcula <strong>hacia atrás</strong>, de la salida a la entrada, reutilizando cuentas. Aquí hacemos esa cuenta con una red pequeña, número a número, para que lo que hace <code>loss.backward()</code> deje de ser magia.</p>
+</div>
+
+<div class="callout analogia">
+  <span class="lbl">Analogía</span>
+  <p>Una fábrica donde el control de calidad final dice: «Sobran 2 unidades». Esa queja se pasa hacia atrás: la última estación pregunta «¿cuánto de eso es culpa mía?» y le pasa a la anterior la parte que le toca; ésta hace lo mismo con la suya. Cada estación solo necesita saber <em>(a)</em> la queja que le llega y <em>(b)</em> cuánto afecta su propia entrada a su propia salida. Eso es la regla de la cadena.</p>
+</div>
+
+<h3>La red de ejemplo: 2 entradas, 2 neuronas ocultas, 1 salida</h3>
+
+<pre class="ascii">
+  entrada      capa oculta (ReLU)        salida (lineal)
+
+   x1 = 1 ──┬──▶ ( z1 = w11 x1 + w12 x2 + b1 ) ──▶ h1 ──┐
+            │                                           ├──▶ ŷ = v1 h1 + v2 h2 + c ──▶ L = (ŷ − y)²
+   x2 = 2 ──┴──▶ ( z2 = w21 x1 + w22 x2 + b2 ) ──▶ h2 ──┘
+
+   pesos:  W1 = [[ 1, 0.5], [−1, 1]]   b = [−1, 0.5]   v = [2, −1]   c = 0.5      valor real y = 2
+</pre>
+
+<p><strong>Paso 1 · hacia delante</strong> (se calcula y se <em>guarda</em> todo lo intermedio):</p>
+<ul>
+  <li>\( z_1 = 1\cdot1+0.5\cdot2-1 = 1 \) y \( z_2 = -1\cdot1+1\cdot2+0.5=1.5 \).</li>
+  <li>ReLU: \( h_1=\max(0,1)=1 \) y \( h_2=\max(0,1.5)=1.5 \).</li>
+  <li>Salida: \( \hat y = 2\cdot1+(-1)\cdot1.5+0.5 = 1 \).</li>
+  <li>Pérdida: \( L=(\hat y-y)^2=(1-2)^2=1 \).</li>
+</ul>
+
+<p><strong>Paso 2 · hacia atrás</strong> (de la salida a la entrada; cada línea reutiliza la anterior):</p>
+
+<div class="formula">\[ \frac{\partial L}{\partial \hat y}=2(\hat y-y) \qquad \frac{\partial L}{\partial v_j}=\frac{\partial L}{\partial \hat y}\,h_j \qquad \frac{\partial L}{\partial h_j}=\frac{\partial L}{\partial \hat y}\,v_j \]</div>
+<div class="formula">\[ \delta_j=\frac{\partial L}{\partial z_j}=\frac{\partial L}{\partial h_j}\cdot\underbrace{\mathbb{1}[z_j>0]}_{\text{derivada de ReLU}} \qquad \frac{\partial L}{\partial w_{jk}}=\delta_j\,x_k \qquad \frac{\partial L}{\partial b_j}=\delta_j \]</div>
+
+<p>Qué significa cada símbolo: \( \partial L/\partial \hat y \) es «cuánto cambia el error si cambia la salida»; \( h_j \) es la salida de la neurona oculta \( j \); \( v_j \) el peso que la conecta con la salida; \( \delta_j \) («delta») es el gradiente que llega a la entrada <em>antes</em> de la activación de la neurona \( j \); \( \mathbb{1}[z_j>0] \) vale 1 si la neurona estaba activa y 0 si no; \( x_k \) es la entrada \( k \). La idea: <strong>gradiente que llega × derivada local</strong>.</p>
+
+<div class="callout ejemplo">
+  <span class="lbl">Ejemplo numérico</span>
+  <p>Con los números del paso 1, de atrás hacia delante:</p>
+  <table>
+    <thead><tr><th>Cantidad</th><th>Cuenta</th><th>Valor</th></tr></thead>
+    <tbody>
+      <tr><td>\( \partial L/\partial\hat y \)</td><td>2 · (1 − 2)</td><td class="res">−2</td></tr>
+      <tr><td>\( \partial L/\partial v \)</td><td>−2 · (1 ; 1,5)</td><td class="res">(−2 ; −3)</td></tr>
+      <tr><td>\( \partial L/\partial c \)</td><td>−2 · 1</td><td class="res">−2</td></tr>
+      <tr><td>\( \partial L/\partial h \)</td><td>−2 · (2 ; −1)</td><td class="res">(−4 ; 2)</td></tr>
+      <tr><td>\( \delta \)</td><td>(−4 ; 2) · (1 ; 1) porque \( z_1,z_2>0 \)</td><td class="res">(−4 ; 2)</td></tr>
+      <tr><td>\( \partial L/\partial W_1 \)</td><td>\( \delta_j\,x_k \): (−4·1, −4·2 ; 2·1, 2·2)</td><td class="res">[[−4, −8], [2, 4]]</td></tr>
+      <tr><td>\( \partial L/\partial b \)</td><td>\( \delta \)</td><td class="res">(−4 ; 2)</td></tr>
+    </tbody>
+  </table>
+  <p><strong>Paso 3 · actualizar.</strong> Con \( lr=0.01 \): \( w\leftarrow w-lr\cdot\partial L/\partial w \). Los pesos pasan a \( W_1=\begin{pmatrix}1.04&0.58\\-1.02&0.96\end{pmatrix} \), \( b=(-0.96,\,0.48) \), \( v=(2.02,\,-0.97) \), \( c=0.52 \). Repite el forward: \( z=(1.24,\,1.38) \), \( \hat y=1.6862 \) y \( L=0.0985 \). La pérdida ha bajado de 1 a 0,098 con un solo paso.</p>
+</div>
+
+<figure class="demo" data-demo="curso5/c5m2-backprop-mano" data-titulo="backpropagation paso a paso en la red 2-2-1">
+  <div class="haz">Pulsa «Paso siguiente» y recorre las fases: primero el forward, luego los gradientes de la salida hacia la entrada, con el cálculo en la tabla. Cambia \( x_1 \), \( x_2 \) o la respuesta correcta y vuelve a recorrer. Después pulsa «Aplicar la actualización y repetir» varias veces. Por último baja el bias de la neurona oculta 2 por debajo de −1.</div>
+  <div class="observa">Los números de la tabla coinciden con los de arriba. Cada paso aplicado reduce la pérdida. Cuando bajas el bias de la neurona 2 hasta que \( z_2<0 \), su ReLU vale 0 y <strong>sus gradientes (\( \delta_2 \), su fila de \( W_1 \), su bias) se vuelven 0</strong>: esa neurona deja de aprender. Es la «neurona muerta».</div>
+</figure>
+
+<div class="callout regla">
+  <span class="lbl">Regla fácil</span>
+  <p>Backpropagation = <strong>«gradiente que llega» × «derivada local»</strong>, repetido de la salida a la entrada. Hacia delante se guarda lo que hace falta; hacia atrás se multiplica. Por eso un paso hacia atrás cuesta aproximadamente lo mismo que uno hacia delante.</p>
+</div>
+
+<div class="callout ojo">
+  <span class="lbl">Ojo</span>
+  <p>El gradiente de una capa depende del de <strong>todas las capas que tiene por delante</strong> (cada una añade un factor a la multiplicación). Si esos factores son sistemáticamente menores que 1, el gradiente que llega a las primeras capas es minúsculo; si son mayores que 1, explota. Es el tema de la sección «Gradientes que se desvanecen».</p>
+</div>
+
+<p>En una red con capas de matrices, lo mismo se escribe con vectores: el \( \delta \) de una capa se obtiene del de la siguiente con \( \delta_l=(W_{l+1}^{\top}\delta_{l+1})\odot f'(z_l) \) y el gradiente de sus pesos es \( \partial L/\partial W_l=\delta_l\,h_{l-1}^{\top} \) (el <code>torch.outer</code> del fragmento 2). \( \odot \) significa multiplicar elemento a elemento. Fíjate en que \( \delta_{l+1} \) se multiplica por \( W_{l+1}^{\top} \): <strong>cada capa multiplica el gradiente por sus pesos y por la derivada de su activación</strong>.</p>
+
+<p>El <a href="#codigo">fragmento 2</a> calcula esta misma red con <code>loss.backward()</code>, a mano con las fórmulas y con una derivada numérica (diferencias centrales), y comprueba que las tres coinciden.</p>
+</section>
+
+<!-- =============================================================== -->
+<section>
+<h2 id="autograd">Cómo lo hace PyTorch: el grafo de autograd</h2>
+
+<p class="pregunta">¿Cómo sabe <code>loss.backward()</code> qué derivadas aplicar si no le has dicho nada de la red?</p>
+
+<p>Cada vez que haces una operación con un tensor que tiene <code>requires_grad=True</code>, PyTorch apunta en el resultado <strong>qué operación lo creó</strong> (<code>grad_fn</code>) y de qué tensores venía. Esas notas forman el <abbr class="t" data-def="Grafo computacional: red de nodos (operaciones) y aristas (tensores) que PyTorch construye durante el forward. El backward lo recorre al revés aplicando la regla de la cadena en cada nodo.">grafo computacional</abbr>, que se construye <em>sobre la marcha</em> en cada forward. <code>backward()</code> lo recorre al revés y, en cada nodo, aplica la derivada local que ese nodo conoce (<code>ReluBackward0</code> sabe que la derivada de ReLU es 1 o 0, <code>MvBackward0</code> sabe derivar un producto matriz-vector, etc.).</p>
+
+<div class="callout analogia">
+  <span class="lbl">Analogía</span>
+  <p>Es como grabar una receta mientras cocinas, apuntando cada paso («mezclé», «horneé»). Cuando el plato sale mal, rebobinas la grabación hacia atrás y cada paso te dice cuánto influyó. Si no grabaste (<code>torch.no_grad()</code>), no puedes rebobinar, pero tampoco gastas memoria.</p>
+</div>
+
+<p>El <a href="#codigo">fragmento 3</a> imprime ese grafo para la red 2-2-1: <code>PowBackward0</code> (la pérdida) ← <code>SubBackward0</code> ← <code>DotBackward0</code> ← <code>ReluBackward0</code> ← <code>MvBackward0</code>, con los <code>AccumulateGrad</code> en las hojas (los pesos), que es donde acaban los gradientes. Lo mismo, sin los nombres, es lo que viste con <code>tf.GradientTape</code> en el <a href="../curso-3/modulo-5.html#gradientes">Curso 3</a>.</p>
+
+<h3>Tres detalles que importan al entrenar</h3>
+
+<ul>
+  <li><strong>Los gradientes se acumulan.</strong> <code>backward()</code> <em>suma</em> el nuevo gradiente a lo que ya hubiera en <code>.grad</code>. Por eso el bucle de entrenamiento empieza cada paso con <code>optimizer.zero_grad()</code>: sin él, cada paso usaría el gradiente de todos los lotes anteriores sumados. En el fragmento 3, \( \partial(w^2)/\partial w=4 \) sale 4, 8, 12 si no lo pones a cero.</li>
+  <li><strong>La neurona muerta.</strong> Si \( z<0 \) la derivada de ReLU es 0 y no pasa ningún gradiente: ni a los pesos de esa neurona ni a lo que hay detrás de ella. Con \( z_2=-2 \), el fragmento 3 da <code>W1.grad = [[2, 4], [0, 0]]</code>: la segunda fila (la neurona 2) no aprende nada para este dato. Si una neurona queda en \( z<0 \) para <em>todos</em> los datos, está muerta para siempre.</li>
+  <li><strong>Evaluar sin grafo.</strong> Para medir (no entrenar) se usa <code>with torch.no_grad():</code>, que no construye el grafo y ahorra memoria.</li>
+</ul>
+
+<div class="callout ojo">
+  <span class="lbl">Ojo</span>
+  <p>Orden del bucle de entrenamiento en PyTorch: <code>optimizer.zero_grad()</code> → forward → pérdida → <code>loss.backward()</code> → <code>optimizer.step()</code>. Si olvidas el <code>zero_grad()</code> el modelo no da error: simplemente entrena mal, con gradientes acumulados. En Keras todo eso lo hacía <code>fit</code> por dentro (<a href="../curso-2/modulo-1.html#bucle">bucle de entrenamiento</a>).</p>
+</div>
+</section>
+
+<!-- =============================================================== -->
+<section>
+<h2 id="desvanece">Gradientes que se desvanecen (y que explotan): medirlos capa por capa</h2>
+
+<p class="pregunta">Mi red de 8 capas tiene una pérdida que se queda en 0,693 y no se mueve. ¿Está rota o simplemente no le llega señal a las primeras capas?</p>
+
+<div class="callout recuerda">
+  <span class="lbl">Recuerda (<a href="../curso-2/modulo-1.html#desvanece">Curso 2 · módulo 1</a>)</span>
+  <p>Viste que con muchas capas sigmoides el gradiente se hace pequeñísimo al retroceder y las primeras capas casi no aprenden, y que ReLU lo alivia. Aquí lo <strong>medimos</strong>: tomamos la norma del gradiente de los pesos de cada capa y miramos cómo cambia de la salida a la entrada.</p>
+</div>
+
+<div class="callout analogia">
+  <span class="lbl">Analogía</span>
+  <p>El juego del teléfono estropeado: un mensaje pasa por 8 personas y cada una lo repite a un cuarto del volumen. La última lo oye perfectamente; la primera de la cadena no oye nada de lo que dice el último. En una red, el «mensaje» es el gradiente que viaja hacia atrás, y quien tiene que aprender de él es la capa que está junto a la entrada.</p>
+</div>
+
+<h3>Por qué ocurre: una multiplicación larga</h3>
+
+<p>En la sección de backpropagation viste que cada capa multiplica el gradiente por sus pesos y por la derivada de su activación. Para llegar a la capa 1 desde la salida hay que multiplicar por <strong>un factor por cada capa</strong>:</p>
+
+<div class="formula">\[ \frac{\partial L}{\partial W_1}\;\propto\;\prod_{l=2}^{L}\Big(W_l^{\top}\,\mathrm{diag}\big(f'(z_{l-1})\big)\Big)\;\cdots \]</div>
+
+<p>Aquí \( f' \) es la derivada de la activación y \( \mathrm{diag}(\cdot) \) indica que se multiplica elemento a elemento. La derivada de la <strong>sigmoide</strong> es \( \sigma'(z)=\sigma(z)\,(1-\sigma(z)) \): vale <strong>como máximo 0,25</strong> (en \( z=0 \)) y baja deprisa al alejarte (0,197 en \( z=1 \); 0,105 en \( z=2 \); 0,0066 en \( z=5 \)).</p>
+
+<div class="callout ejemplo">
+  <span class="lbl">Ejemplo numérico</span>
+  <p>Si los pesos fueran de tamaño 1 y todas las sigmoides estuvieran en su mejor caso (\( z=0 \), derivada 0,25), el gradiente se multiplica por 0,25 en cada capa que retrocede:</p>
+  <table>
+    <thead><tr><th>Capas que retrocede</th><th>Factor</th></tr></thead>
+    <tbody>
+      <tr><td>1</td><td class="res">0,25</td></tr>
+      <tr><td>4</td><td class="res">0,25⁴ = 0,0039</td></tr>
+      <tr><td>8</td><td class="res">0,25⁸ = 0,000015 (1,5·10⁻⁵)</td></tr>
+    </tbody>
+  </table>
+  <p>Y eso en el <em>mejor</em> caso. Con pesos pequeños o neuronas saturadas es mucho peor. Con <strong>ReLU</strong> la derivada es 1 para las neuronas activas, así que no hay ese factor de 0,25 encogiendo cada capa. La <strong>tanh</strong> tiene derivada máxima 1 (en \( z=0 \)).</p>
+</div>
+
+<figure class="demo" data-demo="curso5/c5m2-grad-capas" data-titulo="la norma del gradiente de cada capa, midiéndola de verdad">
+  <div class="haz">Con sigmoide, inicialización «por defecto» y 8 capas, pulsa «Entrenar». Mira las barras (escala logarítmica: cada marca es ×100) y los círculos huecos (el valor en el paso 1). Luego cambia a ReLU + inicialización He y a tanh + Xavier, y vuelve a entrenar. Prueba también a subir las capas ocultas.</div>
+  <div class="observa">Con sigmoide, la capa 1 recibe un gradiente millones de veces menor que la última, y la pérdida se queda en 0,693 (el valor de lanzar una moneda). Con ReLU + He las barras tienen alturas parecidas y la pérdida baja. Esta demo entrena de verdad una mini red de 10 neuronas por capa con backpropagation en tu navegador.</div>
+</figure>
+
+<h3>Medirlo en PyTorch</h3>
+
+<p>La técnica es sencilla: haz un <code>backward()</code> y mira <code>p.grad.norm()</code> de cada capa. El <a href="#codigo">fragmento 4</a> la aplica a 5 combinaciones de activación e inicialización, con una red de 8 capas ocultas de 32 neuronas sobre los dígitos. Una regla práctica para leer el cociente «capa 1 / última capa»: cerca de 1, bien; por debajo de \( 10^{-3} \), el gradiente se está desvaneciendo; por encima de 100, está explotando.</p>
+
+<div class="callout regla">
+  <span class="lbl">Regla fácil</span>
+  <p>Antes de ajustar hiperparámetros a ciegas, <strong>imprime la norma del gradiente de cada capa</strong>. Si la primera es millones de veces menor que la última, no es un problema de learning rate: es un problema de activación, inicialización o profundidad.</p>
+</div>
+
+<h3>El problema contrario: gradientes que explotan</h3>
+
+<p>Si los factores son mayores que 1, el gradiente crece capa a capa y un solo paso puede lanzar los pesos muy lejos (la pérdida salta o aparece <code>nan</code>). El remedio habitual es <strong>recortar la norma del gradiente</strong> (<abbr class="t" data-def="Gradient clipping: si la norma total del gradiente supera un máximo, se reescala el gradiente entero para que la norma sea justo ese máximo. Cambia su tamaño, no su dirección.">gradient clipping</abbr>) con <code>torch.nn.utils.clip_grad_norm_(parametros, max_norm)</code>, que se llama <em>después</em> de <code>backward()</code> y <em>antes</em> de <code>step()</code>.</p>
+
+<div class="formula">\[ g\;\leftarrow\; g\cdot\min\!\Big(1,\ \frac{\text{max\_norm}}{\lVert g\rVert}\Big) \]</div>
+
+<div class="callout ejemplo">
+  <span class="lbl">Ejemplo numérico</span>
+  <p>Un gradiente de dos pesos \( g=(6,\,8) \) tiene norma \( \sqrt{36+64}=10 \). Con <code>max_norm=5</code> se multiplica por \( 5/10=0{,}5 \) y queda \( (3,\,4) \): la misma dirección, la mitad de tamaño. Si la norma ya fuera menor que 5, no se toca. La función <strong>devuelve la norma original</strong> (10), que es una buena cifra para vigilar durante el entrenamiento (el fragmento 15 la usa).</p>
+</div>
+
+<div class="callout ojo">
+  <span class="lbl">Ojo</span>
+  <p>El gradient clipping arregla gradientes <em>demasiado grandes</em>, no demasiado pequeños: no cura el desvanecimiento. Para eso están las activaciones tipo ReLU, la inicialización correcta y la normalización por lotes, que veremos enseguida.</p>
+</div>
+</section>
+
+<!-- =============================================================== -->
+<section>
+<h2 id="inicializacion">Inicialización de pesos: que la señal no se apague ni se sature</h2>
+
+<p class="pregunta">Antes de entrenar, los pesos hay que rellenarlos con algo. ¿Da igual con qué? ¿Y por qué no con ceros?</p>
+
+<div class="callout analogia">
+  <span class="lbl">Analogía</span>
+  <p>Una fila de amplificadores de audio: cada capa multiplica el volumen por un factor (su «ganancia»). Si la ganancia es 0,5 de media, tras 10 amplificadores no se oye nada; si es 2, el sonido se satura y distorsiona. Necesitas una ganancia de aproximadamente <strong>1</strong> en cada etapa, y los pesos iniciales son el mando de esa ganancia.</p>
+</div>
+
+<p><strong>¿Por qué no ceros?</strong> Si todos los pesos de una capa valen lo mismo (cero o cualquier constante), todas sus neuronas calculan exactamente lo mismo, reciben exactamente el mismo gradiente y siguen siendo idénticas para siempre: la capa se comporta como una sola neurona. Los pesos iniciales deben ser <em>aleatorios</em> para romper esa simetría. (Los sesgos sí pueden empezar en cero.)</p>
+
+<h3>La cuenta de la varianza</h3>
+
+<p>Una neurona calcula \( z=\sum_{i=1}^{n} w_i x_i \) con \( n \) entradas (el <abbr class="t" data-def="fan_in: número de entradas de una neurona. En nn.Linear(100, 50), fan_in = 100 y fan_out (número de salidas de la capa) = 50. En PyTorch weight tiene forma (fan_out, fan_in).">fan_in</abbr>). Si los pesos y las entradas son independientes y de media cero, la <strong>varianza</strong> (el cuadrado de la desviación típica) de la salida es:</p>
+
+<div class="formula">\[ \mathrm{Var}(z)\;=\;n\cdot\mathrm{Var}(w)\cdot\mathrm{Var}(x) \]</div>
+
+<p>Para que la señal mantenga su tamaño de una capa a la siguiente necesitamos \( n\cdot\mathrm{Var}(w)\approx 1 \), es decir, \( \mathrm{Var}(w)\approx 1/n \).</p>
+
+<div class="callout ejemplo">
+  <span class="lbl">Ejemplo numérico</span>
+  <p>Capas de \( n=100 \) entradas y entrada con varianza 1:</p>
+  <table>
+    <thead><tr><th>Desviación σ de los pesos</th><th>\( n\,\sigma^2 \) (factor de varianza)</th><th>Desviación de la señal por capa</th><th>Tras 10 capas</th></tr></thead>
+    <tbody>
+      <tr><td>0,01</td><td>100 · 0,0001 = 0,01</td><td>× 0,1</td><td class="res">10⁻¹⁰ (se apaga)</td></tr>
+      <tr><td>0,1</td><td>100 · 0,01 = 1</td><td>× 1</td><td class="res">1 (estable)</td></tr>
+      <tr><td>1</td><td>100 · 1 = 100</td><td>× 10</td><td class="res">10¹⁰ (explota o satura)</td></tr>
+    </tbody>
+  </table>
+  <p>En el <a href="#codigo">fragmento 6</a>, con tanh y pesos \( N(0;0{,}01) \), la señal mide 0,099 en la capa 1, \( 10^{-5} \) en la 5 y \( 10^{-10} \) en la 10, justo lo previsto. Con \( N(0;1) \) y tanh la señal no explota (tanh no pasa de ±1) pero el <strong>78 %</strong> de las neuronas queda pegado a ±1, donde la derivada es casi 0: el gradiente se desvanece por otra vía.</p>
+</div>
+
+<h3>Xavier y He</h3>
+
+<p>Dos reglas que dan la \( \mathrm{Var}(w) \) adecuada:</p>
+
+<ul>
+  <li><strong>Xavier / Glorot</strong> (para tanh y sigmoide): \( \mathrm{Var}(w)=\dfrac{2}{n_{\text{ent}}+n_{\text{sal}}} \). Promedia las entradas y las salidas porque busca mantener la señal en el forward y el gradiente en el backward. En versión uniforme, los pesos salen de \( U(-a,a) \) con \( a=\sqrt{6/(n_{\text{ent}}+n_{\text{sal}})} \) (la varianza de \( U(-a,a) \) es \( a^2/3 \)).</li>
+  <li><strong>He / Kaiming</strong> (para ReLU y variantes): \( \mathrm{Var}(w)=\dfrac{2}{n_{\text{ent}}} \). La ReLU pone a cero la mitad de las salidas, y por eso hace falta un 2 extra para compensar.</li>
+</ul>
+
+<div class="callout ejemplo">
+  <span class="lbl">Ejemplo numérico</span>
+  <p>Una capa <code>nn.Linear(100, 50)</code> (\( n_{\text{ent}}=100 \), \( n_{\text{sal}}=50 \)):</p>
+  <table>
+    <thead><tr><th>Regla</th><th>Cuenta</th><th>Desviación</th><th>Máximo del peso</th></tr></thead>
+    <tbody>
+      <tr><td>Xavier uniforme</td><td>\( a=\sqrt{6/150} \)</td><td class="res">\( \sqrt{2/150}=0{,}1155 \)</td><td>0,2</td></tr>
+      <tr><td>He normal</td><td>\( \sqrt{2/100} \)</td><td class="res">0,1414</td><td>sin tope</td></tr>
+      <tr><td>Por defecto de <code>nn.Linear</code></td><td>\( U(\pm1/\sqrt{100}) \)</td><td class="res">\( 1/\sqrt{300}=0{,}0577 \)</td><td>0,1</td></tr>
+    </tbody>
+  </table>
+  <p>El fragmento 5 comprueba cada una con 5000 pesos reales: 0,1146, 0,1413 y 0,0574 medidos.</p>
+</div>
+
+<p>Con el valor por defecto de <code>nn.Linear</code>, la señal se multiplica por \( \sqrt{100/300}=0{,}58 \) en cada capa: se encoge poco a poco (en el fragmento 6, tanh por defecto da 0,46 → 0,048 → 0,0032). Con ReLU encoge más, porque ReLU quita otra mitad. Con <strong>He + ReLU</strong> el tamaño casi se mantiene (0,83 → 0,65 → 0,60).</p>
+
+<figure class="demo" data-demo="curso5/c5m2-init-varianza" data-titulo="cómo viaja la señal por las capas según la inicialización">
+  <div class="haz">Elige tanh y pulsa el botón de pesos pequeños N(0; 0,01): mira la curva de la desviación de la señal por capa. Luego prueba N(0; 1) y fíjate en los histogramas. Después pulsa Xavier. Cambia a ReLU y compara Xavier con He. Mueve el deslizador de σ para encontrar a mano el valor «estable».</div>
+  <div class="observa">Con σ pequeña la señal se apaga capa a capa; con σ grande se satura (tanh) o crece (ReLU); con Xavier (tanh) y He (ReLU) se mantiene. El valor estable de σ para 100 neuronas está cerca de 0,1 (la cuenta de arriba: \( n\sigma^2=1 \)). Los histogramas muestran cómo se reparten las activaciones en tres capas.</div>
+</figure>
+
+<h3>Cómo se escribe en PyTorch: <code>nn.init</code></h3>
+
+<ul>
+  <li><code>nn.init.xavier_uniform_(w)</code> y <code>xavier_normal_(w)</code>; <code>nn.init.kaiming_uniform_(w, nonlinearity="relu")</code> y <code>kaiming_normal_(w, nonlinearity="relu")</code>. También <code>uniform_</code>, <code>normal_</code>, <code>zeros_</code>, <code>ones_</code>, <code>constant_</code>.</li>
+  <li>El guion bajo final significa que <strong>modifican el tensor en el sitio</strong> y no devuelven uno nuevo.</li>
+  <li><code>nn.init.calculate_gain("tanh")</code> da la ganancia recomendada de cada activación (1 para lineal y sigmoide, 5/3 para tanh, √2 para ReLU); se pasa como <code>gain=</code> a Xavier.</li>
+  <li>Para toda una red: <code>modelo.apply(funcion)</code>, que llama a <code>funcion</code> con cada submódulo (fragmento 5).</li>
+  <li><code>kaiming_*</code> usa por defecto <code>mode="fan_in"</code> (conserva la señal hacia delante); <code>mode="fan_out"</code> conserva el gradiente hacia atrás.</li>
+</ul>
+
+<div class="callout recuerda">
+  <span class="lbl">Recuerda (Keras)</span>
+  <p>El valor por defecto de <code>Dense</code> en Keras es <code>glorot_uniform</code> (Xavier) con sesgo cero. El de <code>nn.Linear</code> en PyTorch <strong>no es Xavier</strong>: es una uniforme en \( \pm1/\sqrt{n_{\text{ent}}} \) (internamente <code>kaiming_uniform_</code> con <code>a=√5</code>), más pequeña. Por eso una red PyTorch con ReLU y muchas capas puede entrenar peor «de fábrica» que la equivalente en Keras, y por eso conviene llamar a <code>kaiming_normal_</code> a propósito.</p>
+</div>
+
+<div class="callout regla">
+  <span class="lbl">Regla fácil</span>
+  <p>Activación sigmoide o tanh → <strong>Xavier</strong>. Activación ReLU (o variantes) → <strong>He</strong>. Sesgos a cero. Y si la red es muy profunda, mide la señal por capa como en el fragmento 6.</p>
+</div>
+
+<div class="callout ojo">
+  <span class="lbl">Ojo</span>
+  <p>La inicialización solo fija el punto de partida: ayuda a que el <em>primer</em> paso sea razonable. No impide que la señal se degrade más tarde si el learning rate es demasiado alto, ni sustituye a la normalización por lotes (próxima sección), que además la hace mucho menos importante.</p>
+</div>
+</section>
+
+<!-- =============================================================== -->
+<section>
+<h2 id="dropout">Dropout: apagar neuronas al azar para que no memoricen</h2>
+
+<p class="pregunta">Mi red acierta el 99 % en entrenamiento y solo el 84 % con datos nuevos. ¿Cómo la obligo a aprender patrones generales en vez de memorizar?</p>
+
+<div class="callout recuerda">
+  <span class="lbl">Recuerda (<a href="../curso-3/modulo-5.html#regularizacion">Curso 3 · módulo 5</a>)</span>
+  <p>El sobreajuste es memorizar el ruido de los datos de entrenamiento; la regularización (L2, <code>Dropout</code>, parada temprana) lo frena. En Keras ponías <code>Dropout(0.5)</code> entre capas y el argumento <code>training</code> decidía si actuaba. En PyTorch es <code>nn.Dropout(p=0.5)</code> y lo decide <code>model.train()</code> frente a <code>model.eval()</code>.</p>
+</div>
+
+<div class="callout analogia">
+  <span class="lbl">Analogía</span>
+  <p>Un equipo donde cada día faltan al azar la mitad de las personas. Nadie puede dejar todo el trabajo a un especialista: todos tienen que aprender a aportar algo útil por sí solos y a trabajar con compañeros distintos cada día. Un equipo así es más robusto que uno donde cada tarea depende de una única persona. Las neuronas hacen lo mismo: dejan de depender de que otra neurona concreta esté presente (la «co-adaptación»).</p>
+</div>
+
+<h3>Cómo funciona, con 8 números</h3>
+
+<p>En cada paso de entrenamiento, <code>nn.Dropout(p)</code> apaga cada activación con probabilidad \( p \) (la pone a 0) y <strong>multiplica las que sobreviven por \( 1/(1-p) \)</strong>:</p>
+
+<div class="formula">\[ \tilde h_i=\frac{m_i}{1-p}\,h_i,\qquad m_i\sim\text{Bernoulli}(1-p)\quad(m_i=1\text{ con probabilidad }1-p,\ \text{si no }0) \]</div>
+
+<div class="callout ejemplo">
+  <span class="lbl">Ejemplo numérico</span>
+  <p>\( p=0{,}5 \), así que lo que sobrevive se multiplica por \( 1/(1-0{,}5)=2 \). Activaciones \( h=(0{,}8;\,0{,}5;\,0{,}9;\,0{,}3;\,0{,}6;\,0{,}2;\,0{,}7;\,0{,}4) \). Una máscara posible apaga las posiciones 1, 2, 4, 5 y 6 y deja vivas la 3, la 7 y la 8:</p>
+  <table>
+    <thead><tr><th>Posición</th><th>1</th><th>2</th><th>3</th><th>4</th><th>5</th><th>6</th><th>7</th><th>8</th></tr></thead>
+    <tbody>
+      <tr><td>\( h \)</td><td>0,8</td><td>0,5</td><td>0,9</td><td>0,3</td><td>0,6</td><td>0,2</td><td>0,7</td><td>0,4</td></tr>
+      <tr><td>\( \tilde h \)</td><td class="res">0</td><td class="res">0</td><td class="res">1,8</td><td class="res">0</td><td class="res">0</td><td class="res">0</td><td class="res">1,4</td><td class="res">0,8</td></tr>
+    </tbody>
+  </table>
+  <p>Esa es justo la primera salida del fragmento 7. <strong>¿Por qué multiplicar por 2?</strong> Porque cada activación sobrevive la mitad de las veces: su valor medio es \( 0{,}5\cdot 2h=h \). El reescalado mantiene el <em>valor esperado</em>, de modo que en evaluación (sin dropout) las neuronas siguientes ven la misma escala que vieron al entrenar. Esta versión se llama <abbr class="t" data-def="Inverted dropout: se reescala durante el entrenamiento (÷(1−p)), de modo que en evaluación no hay que tocar nada. Es lo que hacen nn.Dropout y Keras.">inverted dropout</abbr>.</p>
+</div>
+
+<figure class="demo" data-demo="curso5/c5m2-dropout-mascara" data-titulo="la máscara de dropout y el reescalado">
+  <div class="haz">Pulsa «Sortear otra máscara» varias veces: cada vez se apagan neuronas distintas. Cambia \( p \). Luego pulsa «Sortear 2000 máscaras» con el reescalado activado y mira el histograma de la salida \( z \) de la neurona siguiente. Desactiva el reescalado y repite.</div>
+  <div class="observa">Con el reescalado, la media de \( z \) en las 2000 máscaras queda en 1,62, el valor de la red <em>sin</em> dropout (que es lo que se calcula en <code>eval</code>). Sin reescalado, la media baja a \( (1-p)\cdot1{,}62 \): en evaluación la red recibiría señales más grandes que durante el entrenamiento. Con \( p \) alto, el histograma se ensancha: el dropout mete ruido.</div>
+</figure>
+
+<h3><code>model.train()</code> frente a <code>model.eval()</code></h3>
+
+<ul>
+  <li><strong>Entrenar:</strong> <code>model.train()</code> → dropout activo, una máscara distinta en cada llamada.</li>
+  <li><strong>Evaluar / predecir:</strong> <code>model.eval()</code> → dropout apagado, la salida es determinista.</li>
+  <li>Ambas funciones recorren <em>todos</em> los submódulos y cambian su atributo <code>training</code> (el fragmento 7 lo imprime). No cambian nada más: no desactivan el cálculo del gradiente. Para eso se usa <code>torch.no_grad()</code>.</li>
+  <li>El dropout no tiene parámetros que aprender; durante el backward, las neuronas apagadas dejan pasar gradiente 0.</li>
+</ul>
+
+<div class="callout ojo">
+  <span class="lbl">Ojo · la trampa de <code>F.dropout</code></span>
+  <p>La versión funcional <code>torch.nn.functional.dropout(x, p)</code> tiene <code>training=True</code> <strong>por defecto</strong> y no mira el modo del modelo. Si la usas dentro de <code>forward</code> sin escribir <code>training=self.training</code>, el dropout sigue activo en <code>eval()</code>: las predicciones salen distintas cada vez (el fragmento 7 muestra −0,1736 y −0,1031 para la misma entrada). Con <code>nn.Dropout</code> como capa no hay este problema. Y otro error clásico: <strong>olvidar llamar a <code>model.eval()</code> antes de validar</strong>, con lo que la validación se mide con neuronas apagadas.</p>
+</div>
+
+<h3>¿Funciona? Medido con 10 semillas</h3>
+
+<p>El <a href="#codigo">fragmento 8</a> entrena la misma red grande con solo 60 puntos y mucho ruido, con \( p=0 \), \( 0{,}2 \) y \( 0{,}5 \), promediando 10 semillas. Sin dropout, la red memoriza (99,3 % en entrenamiento) y acierta el 83,7 % en datos nuevos; con \( p=0{,}5 \) baja en entrenamiento (90,5 %) pero acierta el 85,8 % en test, y la pérdida de test cae de 0,967 a 0,423. Es la señal típica de que una regularización funciona: <strong>peor en entrenamiento, mejor con datos nuevos</strong>. La ganancia en acierto es modesta; en la pérdida, grande.</p>
+
+<div class="callout regla">
+  <span class="lbl">Regla fácil</span>
+  <p>Dropout: \( p \) entre 0,1 y 0,5 en las capas ocultas, nunca en la salida. <code>train()</code> para entrenar, <code>eval()</code> para medir. Si tu red no sobreajusta, no lo uses: solo añadiría ruido.</p>
+</div>
+</section>
+
+<!-- =============================================================== -->
+<section>
+<h2 id="momentum">Momentum y Nesterov: darle memoria al descenso</h2>
+
+<p class="pregunta">El descenso por gradiente simple zigzaguea en los valles estrechos y avanza despacio en las zonas planas. ¿Cómo hacemos que «recuerde» hacia dónde venía?</p>
+
+<div class="callout recuerda">
+  <span class="lbl">Recuerda (<a href="../curso-2/modulo-1.html#optimizadores">Curso 2</a> y <a href="../curso-3/modulo-5.html#optimizadores">Curso 3</a>)</span>
+  <p>SGD actualiza con \( w\leftarrow w-lr\cdot g \). Con momentum, el paso no depende solo del gradiente de hoy sino de una velocidad que acumula los de los pasos anteriores. En Keras era el argumento <code>momentum</code> de <code>SGD</code>; en PyTorch es <code>torch.optim.SGD(..., momentum=0.9)</code>.</p>
+</div>
+
+<div class="callout analogia">
+  <span class="lbl">Analogía</span>
+  <p>Una bola pesada rodando por la ladera de un valle. No hace caso solo de la pendiente justo donde está: lleva <em>inercia</em>. En un tramo largo y suave acelera; en un valle estrecho, las sacudidas laterales (que cambian de signo) se cancelan entre sí, mientras que el avance a lo largo del valle (que siempre apunta igual) se acumula.</p>
+</div>
+
+<h3>La regla (la versión de PyTorch)</h3>
+
+<div class="formula">\[ v_t=\mu\,v_{t-1}+g_t \qquad\qquad w_t=w_{t-1}-lr\cdot v_t \]</div>
+
+<p>\( g_t \) es el gradiente de este paso, \( v_t \) la <strong>velocidad</strong> (en PyTorch se llama <em>momentum buffer</em>), \( \mu \) (casi siempre 0,9) es cuánto se conserva de la velocidad anterior y \( lr \) es el learning rate. Con \( \mu=0 \) es SGD simple.</p>
+
+<div class="callout ejemplo">
+  <span class="lbl">Ejemplo numérico</span>
+  <p>Un peso \( w=1 \), gradiente constante \( g=0{,}5 \), \( lr=0{,}1 \), \( \mu=0{,}9 \):</p>
+  <table>
+    <thead><tr><th>Paso</th><th>\( v_t=0{,}9\,v_{t-1}+0{,}5 \)</th><th>Paso dado \( lr\cdot v_t \)</th><th>\( w \) con momentum</th><th>\( w \) con SGD</th></tr></thead>
+    <tbody>
+      <tr><td>1</td><td>0 + 0,5 = 0,5</td><td>0,05</td><td class="res">0,95</td><td>0,95</td></tr>
+      <tr><td>2</td><td>0,45 + 0,5 = 0,95</td><td>0,095</td><td class="res">0,855</td><td>0,90</td></tr>
+      <tr><td>3</td><td>0,855 + 0,5 = 1,355</td><td>0,1355</td><td class="res">0,7195</td><td>0,85</td></tr>
+    </tbody>
+  </table>
+  <p>Los pasos crecen: 0,05 → 0,095 → 0,1355. Si el gradiente fuera constante para siempre, \( v \) tendería a \( g/(1-\mu)=0{,}5/0{,}1=5 \): un paso de 0,5, diez veces el de SGD. Con \( \mu=0{,}9 \), <strong>el learning rate efectivo es hasta 10 veces mayor</strong>.</p>
+</div>
+
+<h3>Nesterov: mirar antes de saltar</h3>
+
+<p>El <strong><abbr class="t" data-def="Nesterov momentum (NAG): variante del momentum que corrige la velocidad con el gradiente de donde vas a estar, no de donde estás. Frena antes de pasarse del mínimo.">momentum de Nesterov</abbr></strong> corrige el paso con la velocidad que ya llevas. En PyTorch (<code>nesterov=True</code>) se aplica \( w_t=w_{t-1}-lr\,(g_t+\mu\,v_t) \): el paso usa el gradiente <em>más</em> la velocidad ya actualizada y multiplicada otra vez por \( \mu \). Con los números de antes, en el paso 1: \( v_1=0{,}5 \) y el paso es \( 0{,}1\,(0{,}5+0{,}9\cdot0{,}5)=0{,}095 \), de modo que \( w=0{,}905 \) (frente a 0,95 del momentum clásico). Anticipa hacia dónde va a moverse la bola y frena antes de pasarse.</p>
+
+<figure class="demo" data-demo="curso5/c5m2-momentum-valle" data-titulo="SGD con y sin momentum en un valle estrecho">
+  <div class="haz">Arrastra el punto amarillo para elegir la salida. Pulsa «Dar 1 paso» varias veces y mira las dos flechas: la terracota es \( -lr\cdot g \) (el gradiente de hoy) y la verde es la inercia \( -lr\cdot\mu\cdot v \). Después pulsa «Dar 50 pasos» y compara el camino de SGD (gris) con el del momentum (azul). Activa Nesterov. Sube \( \mu \) a 0,99 y estrecha el valle (k grande).</div>
+  <div class="observa">SGD (gris) rebota de lado a lado y avanza despacio por el eje largo; el momentum (azul) amortigua el rebote y avanza más rápido. Con \( \mu \) muy alto (0,99) la inercia lo hace pasarse y oscilar. SGD simple solo es estable mientras \( lr\cdot k<2 \) (lo dice el cuadro de lectura): con un valle estrecho te obliga a un learning rate pequeño.</div>
+</figure>
+
+<p>El <a href="#codigo">fragmento 9</a> reproduce estos números con <code>torch.optim.SGD</code> (buffer final 1,355; pesos 0,95 → 0,855 → 0,7195; con Nesterov 0,905 → 0,7695 → 0,5975) y compara los tres optimizadores en el valle \( f=\tfrac12(w_1^2+30w_2^2) \): tras 100 pasos el coste es \( 10^{-2} \) con SGD, \( 3\cdot10^{-5} \) con momentum y \( 3\cdot10^{-6} \) con Nesterov. Ojo: en <em>ese</em> valle y con ese \( lr \) Nesterov gana, pero cuál es mejor depende del problema; no es una ley.</p>
+
+<div class="callout ojo">
+  <span class="lbl">Ojo · PyTorch y Keras no hacen lo mismo</span>
+  <p>En Keras la velocidad acumula el <em>paso</em> (\( v=\mu v-lr\,g \), \( w\mathrel{+}=v \)); en PyTorch acumula el <em>gradiente</em> y el \( lr \) multiplica al final. Con \( lr \) constante son equivalentes. Si <strong>cambias el learning rate durante el entrenamiento</strong> (un scheduler), no: en el fragmento 9, al bajar el \( lr \) de 0,1 a 0,01 en el paso 4, PyTorch frena de golpe (0,7023) y Keras sigue con la inercia ya acumulada (0,5926).</p>
+</div>
+</section>
+
+<!-- =============================================================== -->
+<section>
+<h2 id="batchnorm">Batch normalization: normalizar lo que ve cada capa</h2>
+
+<p class="pregunta">Cada capa oculta recibe como entrada la salida de la anterior, que cambia en cada paso mientras se entrena. ¿Podemos darle a cada capa entradas de un tamaño estable?</p>
+
+<div class="callout recuerda">
+  <span class="lbl">Recuerda (<a href="../curso-3/modulo-5.html">Curso 3 · módulo 5</a>)</span>
+  <p>En Keras, <code>BatchNormalization</code> iba entre la capa y su activación, y su comportamiento dependía del argumento <code>training</code>. Aquí es <code>nn.BatchNorm1d</code> y depende de <code>model.train()</code> frente a <code>model.eval()</code>, igual que el dropout.</p>
+</div>
+
+<div class="callout analogia">
+  <span class="lbl">Analogía</span>
+  <p>Un profesor que recibe exámenes corregidos por 4 profesores distintos, cada uno con su propia escala (uno puntúa sobre 10, otro sobre 100). Antes de comparar, los pasa a una escala común: resta la media del grupo y divide por la dispersión. Después deja que cada curso decida su escala final con dos mandos propios (γ y β). Esa «escala común» es lo que hace BatchNorm con cada neurona y cada lote.</p>
+</div>
+
+<h3>Qué hace: normalizar con el lote y reescalar</h3>
+
+<p>Para cada característica, con los \( N \) valores del lote:</p>
+
+<div class="formula">\[ \mu_B=\frac1N\sum_{i}x_i,\qquad \sigma_B^2=\frac1N\sum_i(x_i-\mu_B)^2,\qquad \hat x_i=\frac{x_i-\mu_B}{\sqrt{\sigma_B^2+\varepsilon}},\qquad y_i=\gamma\,\hat x_i+\beta \]</div>
+
+<p>\( \mu_B \) y \( \sigma_B^2 \) son la media y la varianza <strong>del lote</strong>; \( \varepsilon \) (en PyTorch \( 10^{-5} \)) evita dividir entre cero; \( \hat x \) es el valor normalizado (media 0, desviación 1) y \( \gamma \), \( \beta \) son <strong>dos parámetros que la red aprende</strong> (en PyTorch se llaman <code>weight</code> y <code>bias</code>) para deshacer la normalización si le conviene.</p>
+
+<div class="callout ejemplo">
+  <span class="lbl">Ejemplo numérico</span>
+  <p>Un lote de 4 muestras; la primera característica vale \( 2,\,4,\,6,\,8 \) y la segunda \( 10,\,20,\,30,\,40 \).</p>
+  <table>
+    <thead><tr><th>Característica</th><th>\( \mu_B \)</th><th>\( \sigma_B^2 \)</th><th>Normalizada \( \hat x \)</th></tr></thead>
+    <tbody>
+      <tr><td>1ª: 2, 4, 6, 8</td><td>5</td><td>(9+1+1+9)/4 = 5</td><td class="res">(−3, −1, 1, 3)/√5 = −1,3416 ; −0,4472 ; 0,4472 ; 1,3416</td></tr>
+      <tr><td>2ª: 10, 20, 30, 40</td><td>25</td><td>125</td><td class="res">las mismas cifras</td></tr>
+    </tbody>
+  </table>
+  <p>Las dos características tenían escalas muy distintas (la segunda era cinco veces mayor), pero tras BatchNorm tienen <strong>exactamente la misma</strong>: media 0 y desviación 1.</p>
+</div>
+
+<h3>Entrenar frente a evaluar: las medias móviles</h3>
+
+<p>Al <em>entrenar</em>, BatchNorm normaliza con las estadísticas del lote. Pero al <em>predecir</em> puedes tener una sola muestra (¿qué media usas?), y además el resultado de una muestra no debe depender de con quién llegue en el lote. Por eso durante el entrenamiento la capa va apuntando unas <strong>medias móviles</strong> de la media y la varianza, y en <code>eval()</code> usa esas:</p>
+
+<div class="formula">\[ \text{running}\leftarrow(1-m)\cdot\text{running}+m\cdot\text{estadística del lote}\qquad(m=0{,}1\text{ por defecto en PyTorch}) \]</div>
+
+<div class="callout ejemplo">
+  <span class="lbl">Ejemplo numérico</span>
+  <p>Tras el primer lote de arriba, partiendo de <code>running_mean = 0</code> y <code>running_var = 1</code> (los valores iniciales):</p>
+  <ul>
+    <li><code>running_mean</code> \( =0{,}9\cdot0+0{,}1\cdot5=0{,}5 \) (y \( 2{,}5 \) para la 2ª característica).</li>
+    <li><code>running_var</code> \( =0{,}9\cdot1+0{,}1\cdot\tfrac{20}{3}=1{,}5667 \). Fíjate: se actualiza con la varianza <em>insesgada</em> (\( 20/3=6{,}67 \), dividiendo entre \( N-1 \)), mientras que la normalización de entrenamiento usa la sesgada (5, entre \( N \)).</li>
+    <li>En <code>eval()</code>, el primer valor (2) sale \( (2-0{,}5)/\sqrt{1{,}5667}=1{,}1984 \), muy distinto de los \( -1{,}3416 \) de entrenamiento: las medias móviles aún están lejos de la realidad. Tras 100 lotes se acercan a la media y la varianza verdaderas (en el fragmento 10: 2,95 y −1,96 frente a 3 y −2).</li>
+  </ul>
+</div>
+
+<figure class="demo" data-demo="curso5/c5m2-batchnorm-batch" data-titulo="BatchNorm con estadísticas del lote y con medias móviles">
+  <div class="haz">Compara las dos gráficas: a la izquierda las dos características del lote antes de BatchNorm; a la derecha, después (puntos azules = modo entrenamiento, aros terracota = modo evaluación). Pulsa «Procesar un lote nuevo» y luego «Procesar 20 lotes» varias veces. Reduce el tamaño del lote N a 2 o 3. Mueve γ y β.</div>
+  <div class="observa">Los puntos azules siempre salen con media β y desviación γ, valga lo que valga la escala de entrada. Los aros terracota (evaluación) al principio están desplazados, porque las medias móviles parten de 0 y 1 y tardan unos 30 lotes en acercarse. Con lotes minúsculos, las estadísticas de cada lote son ruidosas y la normalización cambia mucho de un lote a otro.</div>
+</figure>
+
+<h3>Para qué sirve (y qué mide el fragmento 11)</h3>
+
+<ul>
+  <li><strong>Estabiliza los gradientes.</strong> Al reescalar cada capa, la señal y el gradiente no se encogen capa a capa. En el <a href="#codigo">fragmento 11</a>, una red de 10 capas sigmoides sin BatchNorm tiene un cociente de gradientes de \( 9\cdot10^{-9} \) y no aprende (pérdida 2,30 constante); con BatchNorm el cociente es 1,2 y la pérdida baja a 0,36 en 300 pasos.</li>
+  <li><strong>Permite learning rates mayores</strong> y hace menos crítica la inicialización.</li>
+  <li><strong>Regulariza un poco:</strong> como cada muestra se normaliza con las de su lote, mete un ruido parecido (más suave) al del dropout.</li>
+</ul>
+
+<h3>Cómo se escribe en PyTorch</h3>
+
+<ul>
+  <li><code>nn.BatchNorm1d(n)</code> para entradas de forma <code>(lote, n)</code> (redes densas); <code>BatchNorm2d(canales)</code> para imágenes (próximo módulo).</li>
+  <li>Se coloca entre la capa lineal y la activación: <code>Linear → BatchNorm1d → ReLU</code>. Como \( \beta \) ya hace de sesgo, el <code>Linear</code> anterior puede llevar <code>bias=False</code> (el fragmento 15 lo hace).</li>
+  <li>Tiene <strong>parámetros</strong> (<code>weight</code> = γ, <code>bias</code> = β) y <strong>buffers</strong> (<code>running_mean</code>, <code>running_var</code>, <code>num_batches_tracked</code>): los buffers no se entrenan pero sí se guardan en el <code>state_dict</code>.</li>
+</ul>
+
+<div class="callout ojo">
+  <span class="lbl">Ojo · tres trampas</span>
+  <p><strong>1)</strong> Un lote de <strong>una sola muestra</strong> en modo entrenamiento da <code>ValueError: Expected more than 1 value per channel when training</code>, y un último lote muy pequeño (con 1347 muestras y lotes de 64, el último tiene 3) produce estadísticas ruidosas que estropean las medias móviles: usa <code>drop_last=True</code> en el <code>DataLoader</code>. <strong>2)</strong> Si olvidas <code>model.eval()</code>, la predicción de una muestra depende de las demás del lote. <strong>3)</strong> El «momentum» tiene el convenio inverso al de Keras: en PyTorch <code>momentum=0.1</code> es la parte que entra de la estadística nueva (<code>running = 0.9·running + 0.1·lote</code>); en Keras <code>momentum=0.99</code> es la parte que se conserva de la vieja. Valores equivalentes: 0,1 en PyTorch ↔ 0,9 en Keras (y el 0,99 de Keras ↔ 0,01 en PyTorch).</p>
+</div>
+
+<div class="callout regla">
+  <span class="lbl">Regla fácil</span>
+  <p>BatchNorm en entrenamiento: estadísticas <em>del lote</em>. BatchNorm en evaluación: estadísticas <em>acumuladas</em>. Lotes de tamaño 1 o muy pequeños: no.</p>
+</div>
+</section>
+
+<!-- =============================================================== -->
+<section>
+<h2 id="optimizadores">Optimizadores adaptativos: RMSprop, Adam y planificadores del learning rate</h2>
+
+<p class="pregunta">Con SGD, un peso con gradientes enormes da pasos gigantes y otro con gradientes diminutos casi no se mueve, y el mismo learning rate tiene que servir para los dos. ¿Podemos adaptar el paso a cada peso?</p>
+
+<div class="callout recuerda">
+  <span class="lbl">Recuerda (<a href="../curso-2/modulo-1.html#optimizadores">Curso 2</a> y <a href="../curso-3/modulo-5.html#optimizadores">Curso 3</a>)</span>
+  <p>Ya viste que RMSprop y Adam llevan una media móvil del gradiente al cuadrado para escalar el paso de cada parámetro, y que Adam añade el momentum. Aquí escribimos sus fórmulas con números y vemos las cifras exactas que usa PyTorch por defecto.</p>
+</div>
+
+<h3>RMSprop: dividir por el tamaño típico del gradiente</h3>
+
+<div class="formula">\[ s_t=\alpha\,s_{t-1}+(1-\alpha)\,g_t^2 \qquad\qquad w_t=w_{t-1}-\frac{lr\cdot g_t}{\sqrt{s_t}+\varepsilon} \]</div>
+
+<p>\( s_t \) es una media móvil de \( g^2 \) (el «tamaño típico» del gradiente al cuadrado); \( \alpha \) (0,99 por defecto en PyTorch) dice cuánta memoria tiene; \( \varepsilon=10^{-8} \) evita dividir entre cero. Dividir por \( \sqrt{s_t} \) hace que <strong>todos los pesos se muevan a un ritmo parecido a \( lr \)</strong>, sea grande o pequeño su gradiente.</p>
+
+<div class="callout ejemplo">
+  <span class="lbl">Ejemplo numérico</span>
+  <p>Gradiente constante \( g=0{,}5 \), \( lr=0{,}01 \), \( \alpha=0{,}99 \), \( s_0=0 \):</p>
+  <ul>
+    <li>Paso 1: \( s_1=0{,}01\cdot0{,}25=0{,}0025 \), \( \sqrt{s_1}=0{,}05 \); paso \( =0{,}01\cdot0{,}5/0{,}05=0{,}1 \). Diez veces el \( lr \), porque \( s \) arranca en 0 y subestima el tamaño del gradiente.</li>
+    <li>Paso 2: \( s_2=0{,}99\cdot0{,}0025+0{,}0025=0{,}004975 \), \( \sqrt{s_2}=0{,}0705 \); paso \( =0{,}005/0{,}0705=0{,}0709 \).</li>
+    <li>Con el tiempo \( s\to g^2 \) y el paso tiende a \( lr\cdot g/|g|=0{,}01 \).</li>
+  </ul>
+</div>
+
+<h3>Adam: momentum + RMSprop + corrección de sesgo</h3>
+
+<div class="formula">\[ m_t=\beta_1 m_{t-1}+(1-\beta_1)g_t,\quad s_t=\beta_2 s_{t-1}+(1-\beta_2)g_t^2,\quad \hat m_t=\frac{m_t}{1-\beta_1^{\,t}},\quad \hat s_t=\frac{s_t}{1-\beta_2^{\,t}},\quad w_t=w_{t-1}-lr\,\frac{\hat m_t}{\sqrt{\hat s_t}+\varepsilon} \]</div>
+
+<p>\( m \) es la media móvil del gradiente (el momentum), \( s \) la media móvil de su cuadrado (la escala), \( \beta_1=0{,}9 \) y \( \beta_2=0{,}999 \) son sus memorias, y \( lr=10^{-3} \) por defecto. Como \( m \) y \( s \) empiezan en 0, al principio salen demasiado pequeñas; dividir entre \( 1-\beta^t \) (la <strong>corrección de sesgo</strong>) lo arregla.</p>
+
+<div class="callout ejemplo">
+  <span class="lbl">Ejemplo numérico</span>
+  <p>\( lr=0{,}01 \), \( w=1 \). Gradientes \( 0{,}5 \) y después \( 0{,}2 \):</p>
+  <ul>
+    <li><strong>Paso 1</strong> (\( g=0{,}5 \)): \( m_1=0{,}1\cdot0{,}5=0{,}05 \), \( \hat m_1=0{,}05/(1-0{,}9)=0{,}5 \). \( s_1=0{,}001\cdot0{,}25=0{,}00025 \), \( \hat s_1=0{,}25 \), \( \sqrt{\hat s_1}=0{,}5 \). Paso \( =0{,}01\cdot0{,}5/0{,}5=0{,}01 \) → \( w=0{,}99 \).</li>
+    <li><strong>Paso 2</strong> (\( g=0{,}2 \)): \( m_2=0{,}9\cdot0{,}05+0{,}1\cdot0{,}2=0{,}065 \), \( \hat m_2=0{,}065/0{,}19=0{,}3421 \). \( s_2=0{,}999\cdot0{,}00025+0{,}001\cdot0{,}04=0{,}00028975 \), \( \hat s_2=0{,}14495 \), \( \sqrt{\hat s_2}=0{,}3807 \). Paso \( =0{,}01\cdot0{,}3421/0{,}3807=0{,}00899 \) → \( w=0{,}98101 \).</li>
+  </ul>
+  <p>Fíjate: el primer paso vale exactamente \( lr \) <strong>sea el gradiente 0,5 o 50</strong>: Adam es insensible a la escala del gradiente. El fragmento 12 lo comprueba (con <code>torch.optim.Adam</code> y con una versión a mano que dan 0,99; 0,98101; 0,97806; 0,97286).</p>
+</div>
+
+<figure class="demo" data-demo="curso5/c5m2-reglas-paso" data-titulo="el paso que da cada regla con los mismos gradientes">
+  <div class="haz">Deja «Gradientes: constante» y mira cómo evolucionan los cuatro pasos. Luego pon la escala en ×100: ¿cuáles cambian? Elige «Alterna +1, −1» y después «Ruidoso». Cambia \( \mu \) del momentum, \( \alpha \) de RMSprop y \( \beta_2 \) de Adam.</div>
+  <div class="observa">SGD da pasos proporcionales al gradiente (constante → paso constante). El momentum acumula hasta 10 veces más con \( \mu=0{,}9 \) si el gradiente es constante y se queda en la mitad (\( 1/(1+\mu) \)) si alterna de signo. RMSprop empieza con un paso grande (\( lr/\sqrt{1-\alpha} \)) y se asienta. Adam da pasos del tamaño de \( lr \) <strong>aunque multipliques el gradiente por 100</strong>, y con gradientes que alternan de signo los reduce a una veinteava parte (promedian casi 0).</div>
+</figure>
+
+<h3>AdamW y el weight decay</h3>
+
+<p>El <em>weight decay</em> (decaimiento de pesos, equivalente a la regularización L2 que viste en el Curso 3) empuja los pesos hacia 0. En <code>Adam(weight_decay=wd)</code> se suma \( wd\cdot w \) al gradiente <em>antes</em> de las divisiones, de modo que la penalización también se normaliza y su efecto se distorsiona. <strong><code>AdamW</code></strong> lo aplica aparte (\( w\leftarrow w-lr\cdot wd\cdot w \)), sin pasar por la normalización. Fragmento 12, con \( g=0 \), \( lr=0{,}1 \), \( wd=0{,}1 \): <code>Adam</code> da un paso de \( -0{,}1 \) (la penalización 0,1 se normaliza a «tamaño lr») y <code>AdamW</code> da \( -0{,}01=lr\cdot wd\cdot w \). Hoy se recomienda <code>AdamW</code> si quieres weight decay con Adam. Nota: el <code>weight_decay</code> por defecto de <code>AdamW</code> es 0,01, el de <code>Adam</code> es 0.</p>
+
+<h3>Planificadores del learning rate</h3>
+
+<p>Un \( lr \) grande al principio avanza rápido; uno pequeño al final afina. Los <abbr class="t" data-def="lr_scheduler: objetos de torch.optim.lr_scheduler que cambian el learning rate del optimizador según la época o según una métrica.">planificadores</abbr> lo cambian durante el entrenamiento:</p>
+
+<ul>
+  <li><code>StepLR(step_size, gamma)</code>: multiplica el \( lr \) por \( \gamma \) cada <code>step_size</code> épocas (0,1 → 0,05 → 0,025…).</li>
+  <li><code>ExponentialLR(gamma)</code>: multiplica por \( \gamma \) cada época.</li>
+  <li><code>CosineAnnealingLR(T_max)</code>: baja siguiendo media onda de coseno (suave al principio y al final).</li>
+  <li><code>LinearLR(start_factor, total_iters)</code>: sube linealmente (<em>warm-up</em>); sirve para empezar con pasos pequeños.</li>
+  <li><code>ReduceLROnPlateau(mode, factor, patience)</code>: baja el \( lr \) cuando una métrica (<code>scheduler.step(val_loss)</code>) deja de mejorar.</li>
+</ul>
+
+<p>El <a href="#codigo">fragmento 14</a> imprime los valores de cada uno. El orden importa: <code>optimizer.step()</code> primero y <code>scheduler.step()</code> después (una vez por época). Ya viste las versiones de Keras en el <a href="../curso-3/modulo-5.html#schedules">Curso 3</a>.</p>
+
+<h3>La comparación empírica</h3>
+
+<p>El <a href="#codigo">fragmento 13</a> entrena la misma red de 6 capas (ReLU + He) sobre los dígitos con seis optimizadores y 3 semillas. A las 30 épocas: SGD con \( lr=0{,}01 \) todavía tiene una pérdida de 0,247 (90,5 % de acierto en test); momentum y Nesterov bajan a 0,004 y 0,003 (96,5 % y 96,6 %); RMSprop 0,001 (96,7 %) y Adam 0,002 (96,9 %). Adam con \( lr=10^{-2} \) baja más rápido al principio (0,424 en la primera época frente a 1,8 con \( 10^{-3} \)) pero acaba peor en entrenamiento (0,048): es demasiado ruidoso. Lo que enseña esto no es «Adam gana», sino <strong>cuánto depende el resultado del learning rate</strong>: SGD con 0,01 va despacísimo, y con un \( lr \) bien elegido (o con momentum) alcanza a los demás.</p>
+
+<figure class="demo" data-demo="curso5/c5m2-carrera-red" data-titulo="carrera de optimizadores sobre la misma red">
+  <div class="haz">Elige «Espiral» y pulsa «▶ Carrera»: cuatro redes idénticas (mismos pesos iniciales, mismos datos) entrenan a la vez con SGD, momentum, RMSprop y Adam. Mira las curvas (escala log) y la frontera de decisión de Adam. Cambia «Frontera de» a SGD. Después mueve el multiplicador del learning rate a ×0,3 y a ×3 y reinicia.</div>
+  <div class="observa">Con los learning rates por defecto de la demo, Adam y RMSprop bajan la pérdida de entrenamiento mucho antes que SGD y momentum. Fíjate también en la pérdida de test de la tabla: bajar el entrenamiento a \( 10^{-3} \) no mejora el test, porque con 100 puntos la red sobreajusta. Con un multiplicador ×10, SGD se queda clavado en 0,693 (las ReLU «mueren») y la pérdida de RMSprop sube y baja: cada optimizador tiene su propio rango de learning rates.</div>
+</figure>
+
+<div class="callout regla">
+  <span class="lbl">Regla fácil</span>
+  <p>Primer intento: <strong>Adam con \( lr=10^{-3} \)</strong>. Alternativa muy usada: <strong>SGD con momentum 0,9</strong> y un planificador, con el learning rate ajustado a mano. Si la pérdida va a saltos, baja el \( lr \); si va lentísimo, sube el \( lr \) o añade momentum.</p>
+</div>
+
+<div class="callout ojo">
+  <span class="lbl">Ojo</span>
+  <p>Cada optimizador tiene su escala natural de learning rate: <code>Adam</code> usa \( 10^{-3} \) por defecto, <code>RMSprop</code> \( 10^{-2} \) (¡diez veces más!) y <code>SGD</code> no tiene valor por defecto razonable. Copiar un \( lr \) de uno a otro suele fallar. Y recuerda que cambiar de optimizador no arregla un gradiente que se desvanece por culpa de la activación o la inicialización.</p>
+</div>
+</section>
+
+<!-- =============================================================== -->
+<section>
+<h2 id="receta">La receta completa: qué aporta cada pieza</h2>
+
+<p class="pregunta">Ya conozco las piezas. ¿En qué orden las uso y cuánto aporta cada una de verdad?</p>
+
+<p>El <a href="#codigo">fragmento 15</a> monta una red profunda configurable (6 capas ocultas de 64 neuronas, <code>nn.ModuleList</code> de bloques <code>Linear → BatchNorm → ReLU → Dropout</code>) y la entrena sobre los dígitos con seis recetas que añaden una pieza cada vez (media de 3 semillas, 30 épocas). Es una <strong>ablación</strong>: quitar o añadir una pieza y medir.</p>
+
+<table>
+  <thead><tr><th>Receta</th><th>Pérdida test</th><th>Acierto test</th><th>Gradiente máx.</th></tr></thead>
+  <tbody>
+    <tr><td>1 · Sigmoide, init por defecto, SGD</td><td>2,305</td><td>10,1 %</td><td>0,88</td></tr>
+    <tr><td>2 · ReLU, init por defecto, SGD</td><td>2,292</td><td>16,4 %</td><td>0,25</td></tr>
+    <tr><td>3 · ReLU + He, SGD</td><td>0,099</td><td class="res">97,0 %</td><td>10,24</td></tr>
+    <tr><td>4 · + BatchNorm</td><td>0,104</td><td class="res">97,1 %</td><td>3,89</td></tr>
+    <tr><td>5 · + Dropout 0,2</td><td>0,090</td><td class="res">97,3 %</td><td>3,59</td></tr>
+    <tr><td>6 · + Adam (lr 10⁻³)</td><td>0,122</td><td class="res">96,7 %</td><td>3,68</td></tr>
+  </tbody>
+</table>
+
+<p><strong>La lectura honesta:</strong> el gran salto (de 16 % a 97 %) lo da la combinación <strong>ReLU + inicialización He</strong>. Las recetas 1 y 2 no han aprendido nada en 30 épocas: sus gradientes son diminutos y la pérdida sigue en 2,30 (\( \ln10 \), elegir al azar entre 10 clases). A partir de ahí, BatchNorm, dropout y Adam son <em>refinamientos</em>: BatchNorm reduce el gradiente máximo de 10,2 a 3,9 (entrenamiento más estable) y el dropout baja un poco la pérdida de test, pero las diferencias de acierto (97,0, 97,1, 97,3, 96,7 %) están dentro del ruido de 3 semillas. En este problema pequeño, Adam no mejora a SGD con \( lr=0{,}1 \). Cuando la red es mucho más profunda, los datos más difíciles o los lotes más grandes, estas piezas pesan más. <strong>No hay receta universal: mide.</strong></p>
+
+<figure class="demo" data-demo="curso5/c5m2-laboratorio" data-titulo="Laboratorio final: diseña tu propia red profunda">
+  <div class="haz">Pulsa «Receta mala» y luego «Entrenar» (o «Dar 100 pasos» cinco veces): sigmoide, pesos por defecto y SGD. Mira que la pérdida se queda en 0,693. Pulsa «Receta buena» (ReLU + He + BatchNorm + dropout 0,2 + Adam) y entrena: compara. Después juega: cambia una sola cosa cada vez (la activación, la inicialización, el optimizador, el learning rate, las capas) y repite en «Espiral».</div>
+  <div class="observa">La receta mala deja la pérdida en 0,693 y los gradientes de las primeras capas son minúsculos (del orden de \( 10^{-6} \)); la buena baja la pérdida y acierta más del 90 % en puntos nuevos. La pérdida de entrenamiento con dropout o BatchNorm sale más ruidosa porque se mide en modo entrenamiento. Prueba también «Receta mala» + el botón BatchNorm (sin tocar nada más): BatchNorm rescata a la red de sigmoides.</div>
+</figure>
+
+<div class="callout ejemplo">
+  <span class="lbl">Receta de partida para una red densa profunda en PyTorch</span>
+  <ol class="pasos">
+    <li><strong>Activación ReLU</strong> (o una variante) y <strong>inicialización He</strong> con <code>nn.init.kaiming_normal_</code>; sesgos a cero.</li>
+    <li><strong>BatchNorm1d</strong> entre cada <code>Linear</code> y su activación si la red es profunda (y <code>drop_last=True</code> en el <code>DataLoader</code>).</li>
+    <li><strong>Optimizador:</strong> Adam (\( lr=10^{-3} \)) o SGD con momentum 0,9, más un planificador si el entrenamiento se estanca.</li>
+    <li>Mide el <strong>gradiente por capa</strong> y la norma total (<code>clip_grad_norm_</code> la devuelve); añade clipping si ves picos.</li>
+    <li>Si hay <strong>sobreajuste</strong> (train ≫ test): dropout 0,1–0,5, <code>AdamW</code> con weight decay, más datos, parada temprana.</li>
+    <li>Entrena en <code>model.train()</code>, evalúa en <code>model.eval()</code> con <code>torch.no_grad()</code>.</li>
+  </ol>
+</div>
+</section>
+
+<!-- =============================================================== -->
+<section>
+<h2 id="chuleta">Chuleta: síntoma, causa probable y remedio</h2>
+
+<table>
+  <thead><tr><th>Síntoma</th><th>Causa probable</th><th>Qué mirar</th><th>Remedio</th></tr></thead>
+  <tbody>
+    <tr><td>La pérdida se queda en \( \ln(\text{clases}) \) (0,693 con 2 clases, 2,30 con 10) desde el principio</td><td>Gradientes que se desvanecen; inicialización pequeña; learning rate diminuto</td><td>Norma del gradiente por capa (cociente capa 1 / última)</td><td>ReLU + He, BatchNorm, menos capas; subir el \( lr \)</td></tr>
+    <tr><td>La pérdida salta a <code>inf</code> o <code>nan</code></td><td>Gradientes que explotan; \( lr \) demasiado alto</td><td>La norma que devuelve <code>clip_grad_norm_</code></td><td>Bajar el \( lr \); clipping; normalizar las entradas</td></tr>
+    <tr><td>Acierto muy alto en train, mucho menor en test</td><td>Sobreajuste</td><td>La brecha entre ambas pérdidas</td><td>Dropout, weight decay (<code>AdamW</code>), más datos, parada temprana</td></tr>
+    <tr><td>Mal acierto en train y en test</td><td>Infraajuste: red pequeña, \( lr \) mal ajustado, demasiado dropout</td><td>Pérdida de entrenamiento</td><td>Más neuronas o capas, ajustar el \( lr \), quitar dropout</td></tr>
+    <tr><td>La métrica de validación cambia en cada ejecución con los mismos datos</td><td>Dropout activo en evaluación (<code>model.eval()</code> olvidado o <code>F.dropout</code> sin <code>training</code>)</td><td><code>model.training</code> y el código de <code>forward</code></td><td><code>model.eval()</code>; usar <code>nn.Dropout</code></td></tr>
+    <tr><td><code>ValueError: Expected more than 1 value per channel when training</code></td><td>Lote de una sola muestra con BatchNorm en modo entrenamiento</td><td>Tamaño del último lote</td><td><code>drop_last=True</code>; lotes mayores</td></tr>
+    <tr><td><code>ValueError: optimizer got an empty parameter list</code></td><td>Capas guardadas en una lista de Python</td><td><code>len(list(model.parameters()))</code></td><td><code>nn.ModuleList</code> o <code>nn.Sequential</code></td></tr>
+    <tr><td>Va bien al principio y luego se estanca</td><td>\( lr \) demasiado grande para afinar</td><td>Curva de validación</td><td>Planificador (<code>ReduceLROnPlateau</code>, coseno)</td></tr>
+  </tbody>
+</table>
+</section>
+
+<!-- =============================================================== -->
+<section id="codigo">
+<h2>Código del módulo</h2>
+<p class="codigo-intro">Quince fragmentos, en el orden en que aparecen en el módulo. Necesitas <code>torch</code> (probado con PyTorch 2.14), <code>scikit-learn</code> (los dígitos de <code>load_digits</code> y <code>make_moons</code> vienen incluidos: <strong>no hace falta internet</strong>) y <code>numpy</code>. Los cursos originales usan MNIST, que se descarga de internet; aquí se usan los dígitos de 8×8 de scikit-learn, que son el mismo problema en pequeño. Cada «Salida esperada» es la salida real de ejecutar el fragmento (dos veces, con el mismo resultado) con las semillas que se ven en el código. Los fragmentos 8, 13 y 15 entrenan varias redes y tardan de decenas de segundos a un par de minutos en una CPU modesta; si los ejecutas en otra máquina, las cifras de los últimos decimales pueden variar.</p>
+
+<article class="snippet" data-lang="python">
+  <header>
+    <h3>1 · Red profunda con <code>nn.ModuleList</code> (y por qué no vale una lista normal)</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Construir una red de cualquier número de capas a partir de una lista de tamaños, contar sus parámetros y ver qué pasa si guardas las capas en una lista de Python en lugar de en <code>nn.ModuleList</code>.</p>
+  </header>
+  <pre class="code"><code>import torch
+import torch.nn as nn
+
+
+class RedProfunda(nn.Module):
+    def __init__(self, tamanos):
+        super().__init__()
+        self.capas = nn.ModuleList(
+            [nn.Linear(tamanos[i], tamanos[i + 1]) for i in range(len(tamanos) - 1)]
+        )
+
+    def forward(self, x):
+        for capa in self.capas[:-1]:
+            x = torch.relu(capa(x))
+        return self.capas[-1](x)
+
+
+torch.manual_seed(0)
+modelo = RedProfunda([64, 32, 32, 32, 10])
+print(modelo)
+
+total = 0
+for nombre, p in modelo.named_parameters():
+    print(f"{nombre:16s} {str(tuple(p.shape)):10s} {p.numel():5d}")
+    total += p.numel()
+print("parámetros totales:", total)
+print("salida para un lote de 5:", tuple(modelo(torch.randn(5, 64)).shape))
+
+
+def construir_mlp(tamanos):
+    capas = []
+    for i in range(len(tamanos) - 1):
+        capas.append(nn.Linear(tamanos[i], tamanos[i + 1]))
+        if i &lt; len(tamanos) - 2:
+            capas.append(nn.ReLU())
+    return nn.Sequential(*capas)
+
+
+otro = construir_mlp([64, 32, 32, 32, 10])
+print("con Sequential:", sum(p.numel() for p in otro.parameters()), "parámetros")
+
+
+class RedMala(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.capas = [nn.Linear(4, 4), nn.Linear(4, 1)]   # lista normal de Python
+
+    def forward(self, x):
+        return self.capas[1](torch.relu(self.capas[0](x)))
+
+
+mala = RedMala()
+print("parámetros que ve RedMala:", len(list(mala.parameters())))
+try:
+    torch.optim.SGD(mala.parameters(), lr=0.1)
+except ValueError as e:
+    print("ValueError:", e)</code></pre>
+  <details class="linea-a-linea" open>
+    <summary>Línea por línea</summary>
+    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+      <tbody>
+        <tr data-lines="1-2"><td><code>import torch …</code></td><td>Importamos <code>torch</code> y <code>torch.nn</code> con el alias <code>nn</code>, donde viven las capas (<code>nn.Linear</code>, <code>nn.ModuleList</code>…).</td></tr>
+        <tr data-lines="5"><td><code>class RedProfunda(nn.Module):</code></td><td>Una red en PyTorch es una clase que hereda de <code>nn.Module</code>: así PyTorch sabe encontrar sus parámetros, pasarla a modo entrenamiento o evaluación, guardarla…</td></tr>
+        <tr data-lines="6-7"><td><code>def __init__(self, tamanos): …</code></td><td>El constructor recibe la lista de tamaños, por ejemplo <code>[64, 32, 32, 32, 10]</code> (entrada, tres capas ocultas, salida). <code>super().__init__()</code> es obligatorio: prepara la maquinaria interna de <code>nn.Module</code> antes de que guardes nada.</td></tr>
+        <tr data-lines="8-10"><td><code>self.capas = nn.ModuleList( …</code></td><td>Crea una <code>nn.ModuleList</code> con una <code>nn.Linear(entrada, salida)</code> por cada par de tamaños consecutivos: <code>range(len(tamanos) - 1)</code> da 4 capas para 5 tamaños. Al guardarlas en una <code>ModuleList</code>, PyTorch las <strong>registra</strong>: sus pesos pasan a ser parámetros de la red.</td></tr>
+        <tr data-lines="12-15"><td><code>def forward(self, x): …</code></td><td><code>forward</code> describe el viaje de los datos. Para todas las capas menos la última (<code>self.capas[:-1]</code>) aplica la capa y luego <code>torch.relu</code>; la última capa no lleva activación porque devuelve las puntuaciones (<em>logits</em>) que usará la pérdida.</td></tr>
+        <tr data-lines="18-20"><td><code>torch.manual_seed(0) …</code></td><td>Fijamos la semilla (para que los pesos iniciales sean siempre los mismos), creamos la red y la imprimimos: <code>print(modelo)</code> muestra su estructura, con <code>1-2 x Linear</code> como forma compacta de decir que las capas 1 y 2 son iguales.</td></tr>
+        <tr data-lines="22-26"><td><code>total = 0 …</code></td><td>Recorre <code>modelo.named_parameters()</code>, que entrega cada parámetro con su nombre (<code>capas.0.weight</code>…). Imprime su nombre, su forma (<code>p.shape</code>) y cuántos números contiene (<code>p.numel()</code>), y los suma en <code>total</code>.</td></tr>
+        <tr data-lines="27"><td><code>print("salida para un lote de 5:", tuple(modelo(torch.randn(5, 64)).shape))</code></td><td>Pasa un lote de 5 vectores aleatorios (<code>torch.randn(5, 64)</code>) por la red y muestra la forma de la salida: 5 filas (una por muestra) y 10 columnas (una por clase).</td></tr>
+        <tr data-lines="30-31"><td><code>def construir_mlp(tamanos): …</code></td><td>Segunda forma de construir lo mismo, más corta: una función que empieza con una lista vacía de capas.</td></tr>
+        <tr data-lines="32-33"><td><code>for i in range(len(tamanos) - 1): …</code></td><td>Para cada par de tamaños añade una <code>nn.Linear</code>.</td></tr>
+        <tr data-lines="34-35"><td><code>if i &lt; len(tamanos) - 2: …</code></td><td>Si no es la última capa (<code>i &lt; len(tamanos) - 2</code>), añade detrás un <code>nn.ReLU()</code> como capa más. En la última no hay ReLU.</td></tr>
+        <tr data-lines="36"><td><code>return nn.Sequential(*capas)</code></td><td><code>nn.Sequential(*capas)</code> encadena todas las capas en orden (el <code>*</code> desempaqueta la lista en argumentos sueltos). No hace falta escribir <code>forward</code>.</td></tr>
+        <tr data-lines="39-40"><td><code>otro = construir_mlp([64, 32, 32, 32, 10]) …</code></td><td>Construye la versión <code>Sequential</code> y suma los elementos de todos sus parámetros con <code>sum(p.numel() for p in otro.parameters())</code>: debe dar lo mismo que antes.</td></tr>
+        <tr data-lines="43-46"><td><code>class RedMala(nn.Module): …</code></td><td>Una red «mala» a propósito: guarda sus capas en una <strong>lista normal de Python</strong> (<code>[ ... ]</code>) en lugar de una <code>ModuleList</code>. Lo marcado como comentario es la clave del fallo.</td></tr>
+        <tr data-lines="48-49"><td><code>def forward(self, x): …</code></td><td>Su <code>forward</code> funciona perfectamente: aplica la primera capa, ReLU y la segunda. El error no se ve al ejecutar la red, sino al entrenarla.</td></tr>
+        <tr data-lines="52-53"><td><code>mala = RedMala() …</code></td><td>Crea la red y cuenta cuántos parámetros ve PyTorch: <code>len(list(mala.parameters()))</code>.</td></tr>
+        <tr data-lines="54-57"><td><code>try: …</code></td><td>Intenta crear un optimizador SGD con esos parámetros. Como no hay ninguno, lanza <code>ValueError</code>; el <code>try/except</code> lo captura y lo imprime para que lo veas sin que el programa se rompa.</td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>RedProfunda(
+  (capas): ModuleList(
+    (0): Linear(in_features=64, out_features=32, bias=True)
+    (1-2): 2 x Linear(in_features=32, out_features=32, bias=True)
+    (3): Linear(in_features=32, out_features=10, bias=True)
+  )
+)
+capas.0.weight   (32, 64)    2048
+capas.0.bias     (32,)         32
+capas.1.weight   (32, 32)    1024
+capas.1.bias     (32,)         32
+capas.2.weight   (32, 32)    1024
+capas.2.bias     (32,)         32
+capas.3.weight   (10, 32)     320
+capas.3.bias     (10,)         10
+parámetros totales: 4522
+salida para un lote de 5: (5, 10)
+con Sequential: 4522 parámetros
+parámetros que ve RedMala: 0
+ValueError: optimizer got an empty parameter list</pre>
+    <p>La estructura muestra las cuatro <code>Linear</code>. La tabla cuadra con la cuenta a mano: \(64\cdot 32+32=2080\); \(2\times(32\cdot32+32)=2112\); \(32\cdot10+10=330\); total \(2080+2112+330=4522\). Recuerda que <code>weight</code> tiene forma <code>(salida, entrada)</code>. <code>Sequential</code> da el mismo total. Con la lista normal, <code>RedMala</code> tiene <strong>0 parámetros</strong>: sin <code>ModuleList</code>, PyTorch no ve las capas y el optimizador se queja.</p>
+  </div>
+</article>
+
+<article class="snippet" data-lang="python">
+  <header>
+    <h3>2 · Backpropagation a mano frente a autograd (red 2-2-1)</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Calcular los gradientes de la red 2-2-1 del texto con la regla de la cadena, a mano en código, y comprobar que coinciden con los de <code>loss.backward()</code> y con una derivada numérica.</p>
+  </header>
+  <pre class="code"><code>import torch
+
+# La red 2-2-1 del texto: 2 entradas, 2 neuronas ocultas con ReLU, 1 salida lineal
+x = torch.tensor([1.0, 2.0])
+y = torch.tensor(2.0)
+W1 = torch.tensor([[1.0, 0.5], [-1.0, 1.0]], requires_grad=True)
+b1 = torch.tensor([-1.0, 0.5], requires_grad=True)
+v = torch.tensor([2.0, -1.0], requires_grad=True)
+c = torch.tensor(0.5, requires_grad=True)
+
+z1 = W1 @ x + b1
+h = torch.relu(z1)
+y_hat = v @ h + c
+loss = (y_hat - y) ** 2
+print("z1 =", z1.tolist(), " h =", h.tolist())
+print("y_hat =", y_hat.item(), " loss =", loss.item())
+
+# 1) Gradientes con autograd
+loss.backward()
+print("autograd  v.grad  =", v.grad.tolist(), " c.grad =", c.grad.item())
+print("autograd  W1.grad =", W1.grad.tolist(), " b1.grad =", b1.grad.tolist())
+
+# 2) Los mismos gradientes con la regla de la cadena, a mano
+with torch.no_grad():
+    d_yhat = 2 * (y_hat - y)          # dL/dy_hat
+    g_v = d_yhat * h                  # dL/dv
+    g_c = d_yhat                      # dL/dc
+    d_h = d_yhat * v                  # dL/dh
+    d_z1 = d_h * (z1 &gt; 0).float()     # dL/dz1: la derivada de ReLU es 1 o 0
+    g_W1 = torch.outer(d_z1, x)       # dL/dW1
+    g_b1 = d_z1                       # dL/db1
+    print("a mano    d_yhat =", d_yhat.item(), " d_h =", d_h.tolist(), " d_z1 =", d_z1.tolist())
+    ok = (torch.allclose(g_v, v.grad) and torch.allclose(g_c, c.grad)
+          and torch.allclose(g_W1, W1.grad) and torch.allclose(g_b1, b1.grad))
+    print("¿coinciden a mano y autograd?", ok)
+
+
+# 3) Un tercer testigo: derivada numérica de un peso (diferencias centrales, en doble precisión)
+def perdida_con(delta):
+    W = W1.detach().double().clone()
+    W[0, 0] += delta
+    h_ = torch.relu(W @ x.double() + b1.detach().double())
+    return ((v.detach().double() @ h_ + c.detach().double() - y.double()) ** 2).item()
+
+
+eps = 1e-6
+numerica = (perdida_con(eps) - perdida_con(-eps)) / (2 * eps)
+print("dL/dW1[0,0]: numérica =", round(numerica, 6), " autograd =", W1.grad[0, 0].item())</code></pre>
+  <details class="linea-a-linea" open>
+    <summary>Línea por línea</summary>
+    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+      <tbody>
+        <tr data-lines="1"><td><code>import torch</code></td><td>Importamos <code>torch</code>.</td></tr>
+        <tr data-lines="3-5"><td><code># La red 2-2-1 del texto: 2 entradas, 2 neuronas ocultas con ReLU, 1 salida lineal …</code></td><td>Los datos del ejemplo: entrada <code>x = (1, 2)</code> y valor real <code>y = 2</code>. Son tensores sin <code>requires_grad</code> porque no los vamos a entrenar.</td></tr>
+        <tr data-lines="6-7"><td><code>W1 = torch.tensor([[1.0, 0.5], [-1.0, 1.0]], requires_grad=True) …</code></td><td>Capa oculta: <code>W1</code> (2×2, una fila por neurona) y <code>b1</code>. Con <code>requires_grad=True</code> pedimos a PyTorch que apunte las operaciones donde intervienen, para poder derivar después.</td></tr>
+        <tr data-lines="8-9"><td><code>v = torch.tensor([2.0, -1.0], requires_grad=True) …</code></td><td>Capa de salida: pesos <code>v</code> y sesgo <code>c</code>, también entrenables.</td></tr>
+        <tr data-lines="11-12"><td><code>z1 = W1 @ x + b1 …</code></td><td>Pasada hacia delante de la capa oculta: <code>z1 = W1 @ x + b1</code> (<code>@</code> es el producto matriz-vector) y <code>h = relu(z1)</code>.</td></tr>
+        <tr data-lines="13-14"><td><code>y_hat = v @ h + c …</code></td><td>Salida lineal <code>y_hat = v @ h + c</code> y pérdida cuadrática <code>(y_hat - y) ** 2</code>.</td></tr>
+        <tr data-lines="15-16"><td><code>print("z1 =", z1.tolist(), " h =", h.tolist()) …</code></td><td>Imprime los números intermedios; deben coincidir con los del texto (<code>z1 = [1, 1.5]</code>, <code>y_hat = 1</code>, pérdida 1).</td></tr>
+        <tr data-lines="18-19"><td><code># 1) Gradientes con autograd …</code></td><td><code>loss.backward()</code> recorre el grafo hacia atrás aplicando la regla de la cadena y deja los gradientes en el atributo <code>.grad</code> de cada tensor con <code>requires_grad</code>.</td></tr>
+        <tr data-lines="20-21"><td><code>print("autograd  v.grad  =", v.grad.tolist(), " c.grad =", c.grad.item()) …</code></td><td>Imprime los gradientes calculados por autograd: <code>v.grad</code>, <code>c.grad</code>, <code>W1.grad</code>, <code>b1.grad</code>.</td></tr>
+        <tr data-lines="23-24"><td><code># 2) Los mismos gradientes con la regla de la cadena, a mano …</code></td><td><code>torch.no_grad()</code>: a partir de aquí hacemos cuentas normales, sin que PyTorch apunte nada para derivar.</td></tr>
+        <tr data-lines="25"><td><code>d_yhat = 2 * (y_hat - y)          # dL/dy_hat</code></td><td>\(\partial L/\partial \hat y = 2(\hat y - y)\): la derivada de un cuadrado.</td></tr>
+        <tr data-lines="26-27"><td><code>g_v = d_yhat * h                  # dL/dv …</code></td><td>Capa de salida: \(\partial L/\partial v_j = \partial L/\partial\hat y\cdot h_j\) (el gradiente que llega por la salida, multiplicado por lo que entró) y \(\partial L/\partial c=\partial L/\partial\hat y\) (la derivada de una suma es 1).</td></tr>
+        <tr data-lines="28"><td><code>d_h = d_yhat * v                  # dL/dh</code></td><td>Retroceder una capa: \(\partial L/\partial h_j = \partial L/\partial\hat y\cdot v_j\).</td></tr>
+        <tr data-lines="29"><td><code>d_z1 = d_h * (z1 &gt; 0).float()     # dL/dz1: la derivada de ReLU es 1 o 0</code></td><td>Cruzar la ReLU: se multiplica por su derivada, que vale 1 donde <code>z1 &gt; 0</code> y 0 donde no. <code>(z1 &gt; 0).float()</code> convierte los booleanos en 1.0 y 0.0.</td></tr>
+        <tr data-lines="30-31"><td><code>g_W1 = torch.outer(d_z1, x)       # dL/dW1 …</code></td><td>Capa oculta: <code>torch.outer(d_z1, x)</code> (producto exterior) da \(\partial L/\partial w_{jk}=\delta_j x_k\) para todos los pesos a la vez; el gradiente del sesgo es el propio \(\delta\).</td></tr>
+        <tr data-lines="32"><td><code>print("a mano    d_yhat =", d_yhat.item(), " d_h =", d_h.tolist(), " d_z1 =", d_z1.tolist())</code></td><td>Imprime los números del camino hacia atrás (<code>d_yhat</code>, <code>d_h</code>, <code>d_z1</code>), los mismos del cálculo escrito en el texto.</td></tr>
+        <tr data-lines="33-35"><td><code>ok = (torch.allclose(g_v, v.grad) and torch.allclose(g_c, c.grad) …</code></td><td><code>torch.allclose</code> comprueba que dos tensores son iguales salvo errores de redondeo; las cuatro comparaciones se encadenan con <code>and</code>.</td></tr>
+        <tr data-lines="38-44"><td><code># 3) Un tercer testigo: derivada numérica de un peso (diferencias centrales, en doble precisión) …</code></td><td>Tercer testigo: <code>perdida_con(delta)</code> calcula la pérdida entera sumando <code>delta</code> al peso <code>W1[0, 0]</code>. Se pasa a doble precisión (<code>.double()</code>) para que la resta de dos pérdidas casi iguales no pierda cifras, y <code>detach()</code> corta la conexión con el grafo.</td></tr>
+        <tr data-lines="46-47"><td><code>eps = 1e-6 …</code></td><td>Derivada numérica por diferencias centrales: \((L(w+\varepsilon)-L(w-\varepsilon))/(2\varepsilon)\) con \(\varepsilon=10^{-6}\). No usa la regla de la cadena: sirve de comprobación independiente.</td></tr>
+        <tr data-lines="48"><td><code>print("dL/dW1[0,0]: numérica =", round(numerica, 6), " autograd =", W1.grad[0, 0].item())</code></td><td>Imprime la derivada numérica junto a la de autograd.</td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>z1 = [1.0, 1.5]  h = [1.0, 1.5]
+y_hat = 1.0  loss = 1.0
+autograd  v.grad  = [-2.0, -3.0]  c.grad = -2.0
+autograd  W1.grad = [[-4.0, -8.0], [2.0, 4.0]]  b1.grad = [-4.0, 2.0]
+a mano    d_yhat = -2.0  d_h = [-4.0, 2.0]  d_z1 = [-4.0, 2.0]
+¿coinciden a mano y autograd? True
+dL/dW1[0,0]: numérica = -4.0  autograd = -4.0</pre>
+    <p>Primera línea: \(z_1=(1,1.5)\), \(\hat y=1\), pérdida \((1-2)^2=1\). Autograd da \(\partial L/\partial v=(-2,-3)\), \(\partial L/\partial c=-2\), \(\partial L/\partial W_1=\begin{pmatrix}-4&-8\\2&4\end{pmatrix}\) y \(\partial L/\partial b_1=(-4,2)\): exactamente los números que calculamos a mano en la sección de backpropagation. <code>True</code> confirma que la cuenta a mano y autograd coinciden, y la derivada numérica de \(w_{11}\) (−4.0) es el tercer testigo.</p>
+  </div>
+</article>
+
+<article class="snippet" data-lang="python">
+  <header>
+    <h3>3 · El grafo de autograd, la neurona muerta y la acumulación de gradientes</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Ver el grafo que PyTorch construye al hacer el forward, comprobar que una neurona con ReLU en la zona plana no recibe gradiente y entender por qué hay que llamar a <code>zero_grad()</code>.</p>
+  </header>
+  <pre class="code"><code>import torch
+
+# 1) El grafo que PyTorch construye durante el forward
+x = torch.tensor([1.0, 2.0])
+W1 = torch.tensor([[1.0, 0.5], [-1.0, 1.0]], requires_grad=True)
+v = torch.tensor([2.0, -1.0], requires_grad=True)
+loss = ((v @ torch.relu(W1 @ x) - 2.0) ** 2)
+
+
+def cadena(fn, nivel=0):
+    print("  " * nivel + fn.name())
+    for siguiente, _ in fn.next_functions:
+        if siguiente is not None:
+            cadena(siguiente, nivel + 1)
+
+
+cadena(loss.grad_fn)
+
+# 2) Neurona muerta: con z &lt; 0 la ReLU corta el gradiente de su fila de pesos
+b1 = torch.tensor([-1.0, -3.0], requires_grad=True)     # la segunda neurona queda en z = -2
+W1.grad = None
+h = torch.relu(W1 @ x + b1)
+((v @ h + 0.5 - 2.0) ** 2).backward()
+print("z1 =", (W1 @ x + b1).tolist(), " h =", h.tolist())
+print("W1.grad =", W1.grad.tolist(), " b1.grad =", b1.grad.tolist())
+
+# 3) Los gradientes se acumulan: por eso existe zero_grad()
+w = torch.tensor(2.0, requires_grad=True)
+for i in range(3):
+    (w ** 2).backward()
+    print("tras el backward", i + 1, "-&gt; w.grad =", w.grad.item())
+w.grad.zero_()
+(w ** 2).backward()
+print("tras zero_() y otro backward -&gt; w.grad =", w.grad.item())</code></pre>
+  <details class="linea-a-linea" open>
+    <summary>Línea por línea</summary>
+    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+      <tbody>
+        <tr data-lines="1"><td><code>import torch</code></td><td>Importamos <code>torch</code>.</td></tr>
+        <tr data-lines="3-6"><td><code># 1) El grafo que PyTorch construye durante el forward …</code></td><td>Los mismos datos y pesos del fragmento anterior (<code>x</code>, <code>W1</code>, <code>v</code>), con gradiente activado en los pesos.</td></tr>
+        <tr data-lines="7"><td><code>loss = ((v @ torch.relu(W1 @ x) - 2.0) ** 2)</code></td><td>Calcula la pérdida de una sola vez: \((v\cdot \mathrm{relu}(W_1x)-2)^2\). Al hacerlo, cada operación deja una nota en el grafo.</td></tr>
+        <tr data-lines="10-14"><td><code>def cadena(fn, nivel=0): …</code></td><td><code>cadena</code> recorre el grafo hacia atrás: imprime el nombre de cada nodo (<code>fn.name()</code>) con sangría según su profundidad y baja por <code>fn.next_functions</code> (los nodos que alimentan a éste), saltando los vacíos (<code>None</code>).</td></tr>
+        <tr data-lines="17"><td><code>cadena(loss.grad_fn)</code></td><td>Empieza por <code>loss.grad_fn</code>, el nodo que produjo la pérdida: el último paso del forward.</td></tr>
+        <tr data-lines="19-20"><td><code># 2) Neurona muerta: con z &lt; 0 la ReLU corta el gradiente de su fila de pesos …</code></td><td>Nuevo sesgo <code>b1</code> con segundo valor muy negativo: la segunda neurona tendrá \(z=-1\cdot1+1\cdot2-3=-2\), por debajo de cero.</td></tr>
+        <tr data-lines="21"><td><code>W1.grad = None</code></td><td><code>W1.grad = None</code> borra los gradientes anteriores de <code>W1</code>.</td></tr>
+        <tr data-lines="22-23"><td><code>h = torch.relu(W1 @ x + b1) …</code></td><td>Forward con los nuevos sesgos y <code>backward()</code> en la misma línea; el 0.5 y el −2.0 de la pérdida son <code>c</code> e <code>y</code> del ejemplo.</td></tr>
+        <tr data-lines="24-25"><td><code>print("z1 =", (W1 @ x + b1).tolist(), " h =", h.tolist()) …</code></td><td>Imprime <code>z1</code>, <code>h</code> y los gradientes: la segunda fila de <code>W1.grad</code> y el segundo valor de <code>b1.grad</code> saldrán 0.</td></tr>
+        <tr data-lines="27-28"><td><code># 3) Los gradientes se acumulan: por eso existe zero_grad() …</code></td><td>Un peso suelto <code>w = 2</code> para ver cómo se acumulan los gradientes.</td></tr>
+        <tr data-lines="29-31"><td><code>for i in range(3): …</code></td><td>Tres veces seguidas: calcula \(w^2\), llama a <code>backward()</code> e imprime <code>w.grad</code>. La derivada de \(w^2\) en 2 es 4, pero PyTorch <strong>suma</strong> cada nuevo gradiente al anterior.</td></tr>
+        <tr data-lines="32-34"><td><code>w.grad.zero_() …</code></td><td><code>w.grad.zero_()</code> pone el gradiente a cero (el guion bajo final significa «modifica en el sitio»); un nuevo <code>backward()</code> vuelve a dar 4.</td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>PowBackward0
+  SubBackward0
+    DotBackward0
+      torch::autograd::AccumulateGrad
+      ReluBackward0
+        MvBackward0
+          torch::autograd::AccumulateGrad
+z1 = [1.0, -2.0]  h = [1.0, 0.0]
+W1.grad = [[2.0, 4.0], [0.0, 0.0]]  b1.grad = [2.0, 0.0]
+tras el backward 1 -&gt; w.grad = 4.0
+tras el backward 2 -&gt; w.grad = 8.0
+tras el backward 3 -&gt; w.grad = 12.0
+tras zero_() y otro backward -&gt; w.grad = 4.0</pre>
+    <p>El grafo se lee de arriba abajo: <code>PowBackward0</code> (el cuadrado) ← <code>SubBackward0</code> (la resta) ← <code>DotBackward0</code> (el producto <code>v @ h</code>), que se alimenta de <code>AccumulateGrad</code> (el peso <code>v</code>) y de <code>ReluBackward0</code> ← <code>MvBackward0</code> (<code>W1 @ x</code>) ← <code>AccumulateGrad</code> (<code>W1</code>). Con \(z=(1,-2)\), \(h=(1,0)\): la segunda neurona está «muerta» y su fila de <code>W1.grad</code> y su <code>b1.grad</code> valen 0. Y el gradiente de \(w^2\) sale 4, 8, 12 si no lo pones a cero: <strong>se acumula</strong>.</p>
+  </div>
+</article>
+
+<article class="snippet" data-lang="python">
+  <header>
+    <h3>4 · Medir el gradiente de cada capa (sigmoide frente a ReLU)</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Medir <em>de verdad</em> cuánto gradiente llega a cada capa de una red de 8 capas ocultas con distintas activaciones e inicializaciones, para ver el problema del gradiente que se desvanece con números.</p>
+  </header>
+  <pre class="code"><code>import torch
+import torch.nn as nn
+from sklearn.datasets import load_digits
+
+X, y = load_digits(return_X_y=True)          # 1797 dígitos de 8x8 = 64 píxeles
+X = torch.tensor(X / 16.0, dtype=torch.float32)
+y = torch.tensor(y)
+xb, yb = X[:256], y[:256]
+perdida = nn.CrossEntropyLoss()
+
+
+def construir(activacion, init, capas_ocultas=8, ancho=32):
+    torch.manual_seed(0)
+    tamanos = [64] + [ancho] * capas_ocultas + [10]
+    modulos = []
+    for i in range(len(tamanos) - 1):
+        lineal = nn.Linear(tamanos[i], tamanos[i + 1])
+        if init == "xavier":
+            nn.init.xavier_uniform_(lineal.weight)
+        elif init == "he":
+            nn.init.kaiming_normal_(lineal.weight, nonlinearity="relu")
+        modulos.append(lineal)
+        if i &lt; len(tamanos) - 2:
+            modulos.append(activacion())
+    return nn.Sequential(*modulos)
+
+
+def normas_gradiente(modelo):
+    modelo.zero_grad()
+    perdida(modelo(xb), yb).backward()
+    return [m.weight.grad.norm().item() for m in modelo if isinstance(m, nn.Linear)]
+
+
+n = normas_gradiente(construir(nn.Sigmoid, "defecto"))
+print("Sigmoide, normas por capa (1 = junto a la entrada):")
+print("  ", ["%.0e" % v for v in n])
+
+casos = [("Sigmoide + defecto", nn.Sigmoid, "defecto"), ("Sigmoide + Xavier", nn.Sigmoid, "xavier"),
+         ("Tanh + Xavier", nn.Tanh, "xavier"), ("ReLU + defecto", nn.ReLU, "defecto"),
+         ("ReLU + He", nn.ReLU, "he")]
+for nombre, act, init in casos:
+    n = normas_gradiente(construir(act, init))
+    print(f"{nombre:19s} capa 1 = {n[0]:.1e}  capa 9 = {n[-1]:.1e}  cociente = {n[0] / n[-1]:.1e}")</code></pre>
+  <details class="linea-a-linea" open>
+    <summary>Línea por línea</summary>
+    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+      <tbody>
+        <tr data-lines="1-3"><td><code>import torch …</code></td><td>Importamos <code>torch</code>, <code>nn</code> y <code>load_digits</code> de scikit-learn (1797 imágenes de 8×8 píxeles; no necesita internet).</td></tr>
+        <tr data-lines="5-8"><td><code>X, y = load_digits(return_X_y=True)          # 1797 dígitos de 8x8 = 64 píxeles …</code></td><td>Cargamos los dígitos, escalamos los píxeles de 0-16 a 0-1 (<code>/ 16.0</code>), los convertimos a tensores y nos quedamos con un lote de 256 muestras (<code>xb</code>, <code>yb</code>).</td></tr>
+        <tr data-lines="9"><td><code>perdida = nn.CrossEntropyLoss()</code></td><td>Pérdida de clasificación multiclase <code>CrossEntropyLoss</code> (recibe logits y etiquetas enteras).</td></tr>
+        <tr data-lines="12-14"><td><code>def construir(activacion, init, capas_ocultas=8, ancho=32): …</code></td><td><code>construir</code> crea una red con <code>capas_ocultas</code> capas de <code>ancho</code> neuronas; <code>torch.manual_seed(0)</code> hace que todas las variantes partan de los mismos números aleatorios. <code>tamanos</code> es <code>[64, 32, …, 32, 10]</code>.</td></tr>
+        <tr data-lines="15-17"><td><code>modulos = [] …</code></td><td>Lista de módulos vacía y, para cada par de tamaños, una <code>nn.Linear</code>.</td></tr>
+        <tr data-lines="18-21"><td><code>if init == "xavier": …</code></td><td>Según <code>init</code>: <code>xavier_uniform_</code> para Xavier, <code>kaiming_normal_</code> (con <code>nonlinearity="relu"</code>) para He, y si es «defecto» no se toca (PyTorch ya inicializó la capa al crearla).</td></tr>
+        <tr data-lines="22"><td><code>modulos.append(lineal)</code></td><td>Añade la capa a la lista (con los pesos ya inicializados).</td></tr>
+        <tr data-lines="23-24"><td><code>if i &lt; len(tamanos) - 2: …</code></td><td>Si no es la última, añade una instancia de la activación elegida (<code>activacion()</code>: <code>nn.Sigmoid()</code>, <code>nn.ReLU()</code>…).</td></tr>
+        <tr data-lines="25"><td><code>return nn.Sequential(*modulos)</code></td><td>Empaqueta todo en un <code>nn.Sequential</code>.</td></tr>
+        <tr data-lines="28-31"><td><code>def normas_gradiente(modelo): …</code></td><td><code>normas_gradiente</code>: pone a cero los gradientes, calcula la pérdida del lote, hace <code>backward()</code> y devuelve la <strong>norma</strong> (tamaño) del gradiente del peso de cada capa lineal. <code>isinstance(m, nn.Linear)</code> se salta las activaciones, que no tienen pesos.</td></tr>
+        <tr data-lines="34-36"><td><code>n = normas_gradiente(construir(nn.Sigmoid, "defecto")) …</code></td><td>Primer caso: sigmoide con inicialización por defecto, e imprime las 9 normas de la capa 1 (junto a la entrada) a la 9 (la salida) en notación científica.</td></tr>
+        <tr data-lines="38-40"><td><code>casos = [("Sigmoide + defecto", nn.Sigmoid, "defecto"), ("Sigmoide + Xavier", nn.Sigmoid, "xavier"), …</code></td><td>Lista de los cinco casos que se comparan: nombre, activación e inicialización.</td></tr>
+        <tr data-lines="41-43"><td><code>for nombre, act, init in casos: …</code></td><td>Para cada caso, mide las normas e imprime la de la capa 1, la de la capa 9 y su cociente (primera entre última): si es ≪ 1, el gradiente se desvanece hacia la entrada.</td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>Sigmoide, normas por capa (1 = junto a la entrada):
+   ['1e-07', '3e-07', '2e-06', '1e-05', '9e-05', '7e-04', '5e-03', '3e-02', '2e-01']
+Sigmoide + defecto  capa 1 = 1.1e-07  capa 9 = 2.3e-01  cociente = 4.5e-07
+Sigmoide + Xavier   capa 1 = 7.9e-06  capa 9 = 4.9e-01  cociente = 1.6e-05
+Tanh + Xavier       capa 1 = 3.1e-01  capa 9 = 1.7e-01  cociente = 1.7e+00
+ReLU + defecto      capa 1 = 4.9e-04  capa 9 = 1.3e-02  cociente = 3.7e-02
+ReLU + He           capa 1 = 1.9e+00  capa 9 = 9.5e-01  cociente = 2.0e+00</pre>
+    <p>Con sigmoide y los pesos por defecto, la norma baja capa a capa desde \(0.2\) en la salida hasta \(10^{-7}\) en la entrada: la primera capa recibe una millonésima del gradiente de la última (cociente \(4.5\cdot10^{-7}\)). Xavier lo mejora a \(1.6\cdot10^{-5}\), pero la sigmoide sigue ahogando la señal. <code>tanh + Xavier</code> (1.7) y <code>ReLU + He</code> (2.0) mantienen gradientes del mismo orden en todas las capas. <code>ReLU + defecto</code> (0.037) queda en medio.</p>
+  </div>
+</article>
+
+<article class="snippet" data-lang="python">
+  <header>
+    <h3>5 · <code>nn.init</code>: pesos con la varianza adecuada (y <code>.apply</code>)</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Comprobar con números que las funciones de <code>nn.init</code> producen la desviación típica que predice la teoría, ver la «ganancia» de cada activación e inicializar toda una red de golpe con <code>.apply</code>.</p>
+  </header>
+  <pre class="code"><code>import math
+import torch
+import torch.nn as nn
+
+torch.manual_seed(0)
+capa = nn.Linear(100, 50)
+print("forma de weight:", tuple(capa.weight.shape), "-&gt; fan_in =", capa.weight.shape[1], ", fan_out =", capa.weight.shape[0])
+
+pruebas = [
+    ("defecto de nn.Linear", None, 1 / math.sqrt(3 * 100)),
+    ("uniform_(-0.1, 0.1)", lambda w: nn.init.uniform_(w, -0.1, 0.1), 0.2 / math.sqrt(12)),
+    ("normal_(0, 0.1)", lambda w: nn.init.normal_(w, 0.0, 0.1), 0.1),
+    ("xavier_uniform_", nn.init.xavier_uniform_, math.sqrt(2 / (100 + 50))),
+    ("xavier_normal_", nn.init.xavier_normal_, math.sqrt(2 / (100 + 50))),
+    ("kaiming_uniform_ (relu)", lambda w: nn.init.kaiming_uniform_(w, nonlinearity="relu"), math.sqrt(2 / 100)),
+    ("kaiming_normal_ (relu)", lambda w: nn.init.kaiming_normal_(w, nonlinearity="relu"), math.sqrt(2 / 100)),
+]
+print(f"{'inicialización':25s} {'std medida':&gt;10s} {'std teórica':&gt;12s} {'|w| máximo':&gt;11s}")
+for nombre, f, teorica in pruebas:
+    if f is not None:
+        f(capa.weight)
+    w = capa.weight.detach()
+    print(f"{nombre:25s} {w.std().item():10.4f} {teorica:12.4f} {w.abs().max().item():11.4f}")
+
+print("ganancias:", {k: round(nn.init.calculate_gain(k), 4) for k in ["linear", "sigmoid", "tanh", "relu"]})
+
+
+def inicializar(modulo):
+    if isinstance(modulo, nn.Linear):
+        nn.init.kaiming_normal_(modulo.weight, nonlinearity="relu")
+        nn.init.zeros_(modulo.bias)
+
+
+modelo = nn.Sequential(nn.Linear(64, 32), nn.ReLU(), nn.Linear(32, 10))
+modelo.apply(inicializar)
+print("bias tras apply:", modelo[0].bias.abs().sum().item(), " std de la primera capa:", round(modelo[0].weight.std().item(), 4), "(teórica", round(math.sqrt(2 / 64), 4), ")")</code></pre>
+  <details class="linea-a-linea" open>
+    <summary>Línea por línea</summary>
+    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+      <tbody>
+        <tr data-lines="1-3"><td><code>import math …</code></td><td>Importamos <code>math</code> (para las raíces), <code>torch</code> y <code>nn</code>.</td></tr>
+        <tr data-lines="5-7"><td><code>torch.manual_seed(0) …</code></td><td>Una capa <code>nn.Linear(100, 50)</code>. Su <code>weight</code> tiene forma <code>(50, 100)</code>: <code>fan_in</code> (entradas por neurona) = 100 y <code>fan_out</code> (salidas) = 50, y así se imprimen.</td></tr>
+        <tr data-lines="9-17"><td><code>pruebas = [ …</code></td><td>Lista de pruebas: nombre, función que inicializa el peso (o <code>None</code> para dejar el valor por defecto) y la desviación típica <strong>teórica</strong>: \(1/\sqrt{3\cdot100}\) del defecto, \(0.2/\sqrt{12}\) de una uniforme en \([-0.1,0.1]\), \(\sqrt{2/(100+50)}\) de Xavier y \(\sqrt{2/100}\) de He.</td></tr>
+        <tr data-lines="18"><td><code>print(f"{'inicialización':25s} {'std medida':&gt;10s} {'std teórica':&gt;12s} {'|w| máximo':&gt;11s}")</code></td><td>Cabecera de la tabla con anchos fijos (<code>:25s</code>, <code>:&gt;10s</code>) para que las columnas queden alineadas.</td></tr>
+        <tr data-lines="19-21"><td><code>for nombre, f, teorica in pruebas: …</code></td><td>Recorre las pruebas y, si hay función, <strong>la aplica al peso en el sitio</strong> (todas las funciones de <code>nn.init</code> terminan en <code>_</code> porque modifican el tensor).</td></tr>
+        <tr data-lines="22-23"><td><code>w = capa.weight.detach() …</code></td><td><code>detach()</code> saca el peso del grafo; mide su desviación típica (<code>std</code>) y su valor absoluto máximo, y lo imprime junto a la teórica.</td></tr>
+        <tr data-lines="25"><td><code>print("ganancias:", {k: round(nn.init.calculate_gain(k), 4) for k in ["linear", "sigmoid", "tanh", "relu"]})</code></td><td><code>nn.init.calculate_gain</code> devuelve el factor por el que cada activación encoge o agranda la señal (1 para lineal y sigmoide, 5/3 para tanh, √2 para ReLU).</td></tr>
+        <tr data-lines="28-31"><td><code>def inicializar(modulo): …</code></td><td>Función de inicialización para una red entera: si el módulo es una <code>nn.Linear</code>, pone He (<code>kaiming_normal_</code>) en el peso y ceros en el sesgo (<code>nn.init.zeros_</code>).</td></tr>
+        <tr data-lines="34-35"><td><code>modelo = nn.Sequential(nn.Linear(64, 32), nn.ReLU(), nn.Linear(32, 10)) …</code></td><td>Red pequeña y <code>modelo.apply(inicializar)</code>: <code>apply</code> llama a la función con cada submódulo, recursivamente.</td></tr>
+        <tr data-lines="36"><td><code>print("bias tras apply:", modelo[0].bias.abs().sum().item(), " std de la primera capa:", round(modelo[0].weight.std().item(), 4), "(teórica", round(math.sqrt(2 / 64), 4), ")")</code></td><td>Comprueba el resultado: la suma de |sesgos| es 0 y la desviación del primer peso se parece a \(\sqrt{2/64}\).</td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>forma de weight: (50, 100) -&gt; fan_in = 100 , fan_out = 50
+inicialización            std medida  std teórica  |w| máximo
+defecto de nn.Linear          0.0574       0.0577      0.1000
+uniform_(-0.1, 0.1)           0.0577       0.0577      0.1000
+normal_(0, 0.1)               0.1014       0.1000      0.3810
+xavier_uniform_               0.1146       0.1155      0.2000
+xavier_normal_                0.1147       0.1155      0.4348
+kaiming_uniform_ (relu)       0.1399       0.1414      0.2448
+kaiming_normal_ (relu)        0.1413       0.1414      0.5372
+ganancias: {'linear': 1, 'sigmoid': 1, 'tanh': 1.6667, 'relu': 1.4142}
+bias tras apply: 0.0  std de la primera capa: 0.1785 (teórica 0.1768 )</pre>
+    <p>Las desviaciones medidas se parecen mucho a las teóricas (con 5000 pesos el azar mueve la tercera cifra). Fíjate en el máximo: Xavier uniforme nunca pasa de \(0.2=\sqrt{6/150}\); la normal puede dar valores más grandes (0.43, 0.54). El defecto de PyTorch (0.057) es más pequeño que Xavier (0.115) y He (0.141). Las ganancias: 1, 1, 1.6667 y 1.4142. Tras <code>apply</code> los sesgos suman 0.0 y la primera capa tiene std 0.1785 (teórica 0.1768).</p>
+  </div>
+</article>
+
+<article class="snippet" data-lang="python">
+  <header>
+    <h3>6 · Cómo viaja la señal por 10 capas según la inicialización</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Pasar datos por 10 capas de 100 neuronas y medir qué tamaño tiene la señal en la capa 1, la 5 y la 10: si se apaga, se estabiliza o se satura.</p>
+  </header>
+  <pre class="code"><code>import torch
+import torch.nn as nn
+
+
+def propagar(activacion, init, capas=10, ancho=100):
+    torch.manual_seed(0)
+    h = torch.randn(1000, ancho)                  # entradas con media 0 y desviación 1
+    stds = []
+    for _ in range(capas):
+        lineal = nn.Linear(ancho, ancho)
+        if init == "N(0, 0.01)":
+            nn.init.normal_(lineal.weight, 0.0, 0.01)
+        elif init == "N(0, 1)":
+            nn.init.normal_(lineal.weight, 0.0, 1.0)
+        elif init == "Xavier":
+            nn.init.xavier_uniform_(lineal.weight)
+        elif init == "He":
+            nn.init.kaiming_normal_(lineal.weight, nonlinearity="relu")
+        nn.init.zeros_(lineal.bias)
+        h = activacion(lineal(h))
+        stds.append(h.std().item())
+    saturadas = (h.abs() &gt; 0.99).float().mean().item()      # solo tiene sentido con tanh
+    return stds, saturadas
+
+
+print(f"{'activación':10s} {'inicialización':16s} {'capa 1':&gt;9s} {'capa 5':&gt;9s} {'capa 10':&gt;9s} {'|h|&gt;0.99':&gt;9s}")
+for nombre, act, inits in [("tanh", torch.tanh, ["N(0, 0.01)", "N(0, 1)", "defecto", "Xavier"]),
+                           ("ReLU", torch.relu, ["N(0, 0.01)", "defecto", "Xavier", "He"])]:
+    for init in inits:
+        s, sat = propagar(act, init)
+        sat_txt = f"{sat:9.2f}" if nombre == "tanh" else f"{'-':&gt;9s}"
+        print(f"{nombre:10s} {init:16s} {s[0]:9.2e} {s[4]:9.2e} {s[9]:9.2e} {sat_txt}")</code></pre>
+  <details class="linea-a-linea" open>
+    <summary>Línea por línea</summary>
+    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+      <tbody>
+        <tr data-lines="1-2"><td><code>import torch …</code></td><td>Importamos <code>torch</code> y <code>nn</code>.</td></tr>
+        <tr data-lines="5"><td><code>def propagar(activacion, init, capas=10, ancho=100):</code></td><td><code>propagar</code> recibe una función de activación, un tipo de inicialización, el número de capas y la anchura.</td></tr>
+        <tr data-lines="6-7"><td><code>torch.manual_seed(0) …</code></td><td>Semilla fija y 1000 entradas aleatorias de media 0 y desviación 1 (<code>torch.randn</code>), con 100 características cada una.</td></tr>
+        <tr data-lines="8-9"><td><code>stds = [] …</code></td><td>Lista donde guardar la desviación típica de cada capa y bucle sobre las capas (el <code>_</code> indica que no usamos el contador).</td></tr>
+        <tr data-lines="10"><td><code>lineal = nn.Linear(ancho, ancho)</code></td><td>Crea una capa lineal 100→100 nueva.</td></tr>
+        <tr data-lines="11-14"><td><code>if init == "N(0, 0.01)": …</code></td><td>Si la inicialización es normal con desviación 0.01 o con desviación 1, sobrescribe el peso con <code>nn.init.normal_</code>.</td></tr>
+        <tr data-lines="15-18"><td><code>elif init == "Xavier": …</code></td><td>Xavier uniforme o He normal para ReLU.</td></tr>
+        <tr data-lines="19"><td><code>nn.init.zeros_(lineal.bias)</code></td><td>Sesgo a cero, para medir solo el efecto de los pesos.</td></tr>
+        <tr data-lines="20-21"><td><code>h = activacion(lineal(h)) …</code></td><td>Aplica la capa y la activación y guarda la desviación típica de la salida: la «altura» de la señal.</td></tr>
+        <tr data-lines="22"><td><code>saturadas = (h.abs() &gt; 0.99).float().mean().item()      # solo tiene sentido con tanh</code></td><td>Al final, la fracción de neuronas saturadas: las que tienen \(|h|&gt;0.99\) (cerca de ±1, donde la derivada de tanh es casi 0).</td></tr>
+        <tr data-lines="23"><td><code>return stds, saturadas</code></td><td>Devuelve las desviaciones por capa y la fracción de saturadas.</td></tr>
+        <tr data-lines="26"><td><code>print(f"{'activación':10s} {'inicialización':16s} {'capa 1':&gt;9s} {'capa 5':&gt;9s} {'capa 10':&gt;9s} {'|h|&gt;0.99':&gt;9s}")</code></td><td>Cabecera de la tabla.</td></tr>
+        <tr data-lines="27-28"><td><code>for nombre, act, inits in [("tanh", torch.tanh, ["N(0, 0.01)", "N(0, 1)", "defecto", "Xavier"]), …</code></td><td>Dos bloques: tanh con cuatro inicializaciones y ReLU con otras cuatro.</td></tr>
+        <tr data-lines="29-30"><td><code>for init in inits: …</code></td><td>Para cada inicialización, ejecuta <code>propagar</code>.</td></tr>
+        <tr data-lines="31"><td><code>sat_txt = f"{sat:9.2f}" if nombre == "tanh" else f"{'-':&gt;9s}"</code></td><td>Solo con tanh tiene sentido hablar de saturación; con ReLU se imprime un guion.</td></tr>
+        <tr data-lines="32"><td><code>print(f"{nombre:10s} {init:16s} {s[0]:9.2e} {s[4]:9.2e} {s[9]:9.2e} {sat_txt}")</code></td><td>Imprime la desviación en las capas 1, 5 y 10 (<code>s[0]</code>, <code>s[4]</code>, <code>s[9]</code>) y la saturación.</td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>activación inicialización      capa 1    capa 5   capa 10  |h|&gt;0.99
+tanh       N(0, 0.01)        9.93e-02  9.94e-06  9.63e-11      0.00
+tanh       N(0, 1)           9.60e-01  9.57e-01  9.58e-01      0.78
+tanh       defecto           4.61e-01  4.84e-02  3.18e-03      0.00
+tanh       Xavier            6.29e-01  3.22e-01  2.35e-01      0.00
+ReLU       N(0, 0.01)        5.86e-02  1.15e-06  1.86e-12         -
+ReLU       defecto           3.38e-01  9.01e-03  1.32e-04         -
+ReLU       Xavier            5.88e-01  1.68e-01  2.99e-02         -
+ReLU       He                8.28e-01  6.50e-01  5.95e-01         -</pre>
+    <p>Con pesos \(N(0;0.01)\) la señal se apaga: \(0.099\to10^{-5}\to10^{-10}\) (cada capa la multiplica por \(\sqrt{100\cdot0.01^2}=0.1\)). Con \(N(0;1)\) y tanh, la señal se mantiene en 0.96 pero el 78 % de las neuronas está saturado. El defecto la encoge capa a capa (0.46 → 0.0032). Xavier con tanh y, sobre todo, He con ReLU (0.83 → 0.65 → 0.60) la conservan.</p>
+  </div>
+</article>
+
+<article class="snippet" data-lang="python">
+  <header>
+    <h3>7 · Dropout: la máscara, <code>train</code> frente a <code>eval</code> y la trampa de <code>F.dropout</code></h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Ver con 8 números cómo <code>nn.Dropout</code> apaga neuronas al azar y reescala el resto, que en evaluación no hace nada, y cómo un <code>F.dropout</code> mal escrito sigue apagando neuronas cuando creías estar en evaluación.</p>
+  </header>
+  <pre class="code"><code>import torch
+import torch.nn as nn
+import torch.nn.functional as F
+
+
+def r(t):
+    return [round(v, 2) for v in t.flatten().tolist()]
+
+
+torch.manual_seed(0)
+drop = nn.Dropout(p=0.5)
+h = torch.tensor([[0.8, 0.5, 0.9, 0.3, 0.6, 0.2, 0.7, 0.4]])
+print("entrada          :", r(h))
+print("train, 1ª llamada:", r(drop(h)))
+print("train, 2ª llamada:", r(drop(h)))
+
+drop.eval()
+print("eval             :", r(drop(h)))
+
+drop.train()
+muchas = torch.stack([drop(h) for _ in range(20000)])
+print("media de 20000 máscaras:", r(muchas.mean(0)))
+print("fracción de ceros      :", round((muchas == 0).float().mean().item(), 3))
+
+# El mismo modelo, dos modos
+modelo = nn.Sequential(nn.Linear(8, 16), nn.ReLU(), nn.Dropout(0.5), nn.Linear(16, 1))
+x = torch.randn(1, 8)
+modelo.train()
+print("train:", round(modelo(x).item(), 4), round(modelo(x).item(), 4), " training =", modelo.training, modelo[2].training)
+modelo.eval()
+print("eval :", round(modelo(x).item(), 4), round(modelo(x).item(), 4), " training =", modelo.training, modelo[2].training)
+
+
+class Trampa(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.lineal = nn.Linear(8, 1)
+
+    def forward(self, x):
+        return self.lineal(F.dropout(x, p=0.5))      # se olvida training=self.training
+
+
+trampa = Trampa().eval()
+print("F.dropout olvidado en eval:", round(trampa(x).item(), 4), round(trampa(x).item(), 4))</code></pre>
+  <details class="linea-a-linea" open>
+    <summary>Línea por línea</summary>
+    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+      <tbody>
+        <tr data-lines="1-3"><td><code>import torch …</code></td><td>Importamos <code>torch</code>, <code>nn</code> y <code>torch.nn.functional as F</code> (la versión «función» de las capas).</td></tr>
+        <tr data-lines="6-7"><td><code>def r(t): …</code></td><td>Ayudante <code>r</code> que convierte un tensor en una lista de números con dos decimales, para imprimir cómodo.</td></tr>
+        <tr data-lines="10-12"><td><code>torch.manual_seed(0) …</code></td><td>Semilla, una capa <code>nn.Dropout(p=0.5)</code> (probabilidad de <strong>apagar</strong> cada neurona) y 8 activaciones inventadas <code>h</code> en forma de fila (una muestra).</td></tr>
+        <tr data-lines="13-15"><td><code>print("entrada          :", r(h)) …</code></td><td>Imprime la entrada y dos aplicaciones seguidas en modo entrenamiento: cada llamada saca una máscara distinta. Las neuronas que sobreviven se multiplican por \(1/(1-p)=2\).</td></tr>
+        <tr data-lines="17-18"><td><code>drop.eval() …</code></td><td><code>drop.eval()</code> pasa la capa a modo evaluación: ahora devuelve la entrada sin tocarla.</td></tr>
+        <tr data-lines="20-23"><td><code>drop.train() …</code></td><td>Vuelve a modo entrenamiento, aplica el dropout 20 000 veces (<code>torch.stack</code> apila los resultados) y calcula la media por neurona y la fracción de ceros.</td></tr>
+        <tr data-lines="25-27"><td><code># El mismo modelo, dos modos …</code></td><td>Un modelo completo con <code>Linear → ReLU → Dropout → Linear</code> y una muestra de entrada <code>x</code>.</td></tr>
+        <tr data-lines="28-29"><td><code>modelo.train() …</code></td><td>En modo entrenamiento (<code>modelo.train()</code>) dos llamadas con la misma entrada dan resultados diferentes; también imprime el atributo <code>training</code> del modelo y de la capa de dropout.</td></tr>
+        <tr data-lines="30-31"><td><code>modelo.eval() …</code></td><td><code>modelo.eval()</code> cambia el modo de <strong>todas</strong> las capas hijas: las dos salidas son iguales y <code>training</code> vale <code>False</code> en ambos niveles.</td></tr>
+        <tr data-lines="34-37"><td><code>class Trampa(nn.Module): …</code></td><td>Clase con la trampa: guarda una capa lineal.</td></tr>
+        <tr data-lines="39-40"><td><code>def forward(self, x): …</code></td><td>En su <code>forward</code> usa <code>F.dropout(x, p=0.5)</code> sin pasarle <code>training=self.training</code>. Esa función funcional tiene <code>training=True</code> por defecto, así que ignora el modo del modelo.</td></tr>
+        <tr data-lines="43-44"><td><code>trampa = Trampa().eval() …</code></td><td>La ponemos en <code>eval()</code> y la llamamos dos veces con la misma entrada: debería dar el mismo resultado.</td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>entrada          : [0.8, 0.5, 0.9, 0.3, 0.6, 0.2, 0.7, 0.4]
+train, 1ª llamada: [0.0, 0.0, 1.8, 0.0, 0.0, 0.0, 1.4, 0.8]
+train, 2ª llamada: [0.0, 1.0, 1.8, 0.6, 1.2, 0.0, 1.4, 0.8]
+eval             : [0.8, 0.5, 0.9, 0.3, 0.6, 0.2, 0.7, 0.4]
+media de 20000 máscaras: [0.79, 0.5, 0.9, 0.3, 0.61, 0.2, 0.7, 0.4]
+fracción de ceros      : 0.5
+train: 0.331 0.1135  training = True True
+eval : 0.1441 0.1441  training = False False
+F.dropout olvidado en eval: -0.1736 -0.1031</pre>
+    <p>Las dos llamadas en entrenamiento dan máscaras distintas, y los supervivientes valen el doble (0.9→1.8, 0.7→1.4, 0.4→0.8). En <code>eval</code> la salida es la entrada. La media de 20 000 máscaras se parece mucho a la entrada original (0.79, 0.5, 0.9…), y la mitad de los valores son ceros: el reescalado mantiene el valor esperado. En el modelo, <code>train</code> da dos resultados distintos (0.331, 0.1135) y <code>eval</code> el mismo (0.1441). La trampa: <code>F.dropout</code> sin <code>training</code> da −0.1736 y −0.1031 incluso en <code>eval()</code>.</p>
+  </div>
+</article>
+
+<article class="snippet" data-lang="python">
+  <header>
+    <h3>8 · Dropout contra el sobreajuste (60 puntos, 10 semillas)</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Entrenar la misma red con y sin dropout sobre muy pocos datos y medir si el acierto en datos nuevos mejora de verdad, promediando 10 semillas para que el resultado no sea cuestión de suerte.</p>
+  </header>
+  <pre class="code"><code>import numpy as np
+import torch
+import torch.nn as nn
+from sklearn.datasets import make_moons
+
+torch.set_num_threads(1)
+perdida = nn.CrossEntropyLoss()
+
+
+def experimento(p, semilla):
+    Xtr, ytr = make_moons(60, noise=0.35, random_state=semilla)           # solo 60 puntos de entrenamiento
+    Xte, yte = make_moons(2000, noise=0.35, random_state=100 + semilla)   # 2000 que la red nunca ve
+    Xtr, Xte = torch.tensor(Xtr, dtype=torch.float32), torch.tensor(Xte, dtype=torch.float32)
+    ytr, yte = torch.tensor(ytr), torch.tensor(yte)
+    torch.manual_seed(semilla)
+    modelo = nn.Sequential(nn.Linear(2, 128), nn.ReLU(), nn.Dropout(p),
+                           nn.Linear(128, 128), nn.ReLU(), nn.Dropout(p),
+                           nn.Linear(128, 2))
+    optimizador = torch.optim.Adam(modelo.parameters(), lr=1e-3)
+    for epoca in range(500):
+        modelo.train()                                   # dropout activo
+        optimizador.zero_grad()
+        perdida(modelo(Xtr), ytr).backward()
+        optimizador.step()
+    modelo.eval()                                        # dropout apagado para medir
+    with torch.no_grad():
+        return [(modelo(Xtr).argmax(1) == ytr).float().mean().item(),
+                (modelo(Xte).argmax(1) == yte).float().mean().item(),
+                perdida(modelo(Xte), yte).item()]
+
+
+print(f"{'p':&gt;4s} {'acierto train':&gt;14s} {'acierto test':&gt;13s} {'pérdida test':&gt;13s}")
+for p in [0.0, 0.2, 0.5]:
+    r = np.array([experimento(p, s) for s in range(10)]).mean(axis=0)
+    print(f"{p:4.1f} {r[0]:14.3f} {r[1]:13.3f} {r[2]:13.3f}")</code></pre>
+  <details class="linea-a-linea" open>
+    <summary>Línea por línea</summary>
+    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+      <tbody>
+        <tr data-lines="1-4"><td><code>import numpy as np …</code></td><td>Importamos NumPy (para promediar), <code>torch</code>, <code>nn</code> y <code>make_moons</code> (dos lunas con ruido, un problema de juguete).</td></tr>
+        <tr data-lines="6-7"><td><code>torch.set_num_threads(1) …</code></td><td>Un solo hilo de CPU y la pérdida de entropía cruzada.</td></tr>
+        <tr data-lines="10-14"><td><code>def experimento(p, semilla): …</code></td><td><code>experimento(p, semilla)</code>: genera <strong>60</strong> puntos de entrenamiento y 2000 de test con otra semilla (la red no los ve nunca), con mucho ruido (0.35), y los convierte a tensores.</td></tr>
+        <tr data-lines="15-18"><td><code>torch.manual_seed(semilla) …</code></td><td>Semilla de PyTorch y un modelo grande para tan pocos datos: dos capas ocultas de 128 con ReLU y <code>Dropout(p)</code> detrás de cada una. Con <code>p = 0.0</code> el dropout no hace nada.</td></tr>
+        <tr data-lines="19"><td><code>optimizador = torch.optim.Adam(modelo.parameters(), lr=1e-3)</code></td><td>Optimizador Adam con learning rate \(10^{-3}\).</td></tr>
+        <tr data-lines="20-24"><td><code>for epoca in range(500): …</code></td><td>500 épocas; en cada una: <code>modelo.train()</code> (dropout activo), puesta a cero de gradientes, <code>backward</code> de la pérdida sobre los 60 puntos y <code>step()</code>.</td></tr>
+        <tr data-lines="25-29"><td><code>modelo.eval()                                        # dropout apagado para medir …</code></td><td>Para medir: <code>modelo.eval()</code> apaga el dropout, <code>torch.no_grad()</code> evita construir grafo y se devuelven el acierto en entrenamiento, el acierto en test (con <code>argmax(1)</code> eligiendo la clase de mayor puntuación) y la pérdida en test.</td></tr>
+        <tr data-lines="32"><td><code>print(f"{'p':&gt;4s} {'acierto train':&gt;14s} {'acierto test':&gt;13s} {'pérdida test':&gt;13s}")</code></td><td>Cabecera de la tabla.</td></tr>
+        <tr data-lines="33-35"><td><code>for p in [0.0, 0.2, 0.5]: …</code></td><td>Para cada valor de <code>p</code>, repite el experimento con 10 semillas, promedia con <code>.mean(axis=0)</code> e imprime.</td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>   p  acierto train  acierto test  pérdida test
+ 0.0          0.993         0.837         0.967
+ 0.2          0.933         0.847         0.554
+ 0.5          0.905         0.858         0.423</pre>
+    <p>Sin dropout la red memoriza: 99.3 % en entrenamiento pero 83.7 % en test, con una pérdida de test de 0.967 (muy segura de sí misma y a menudo equivocada). Con \(p=0.5\): peor en entrenamiento (90.5 %), pero mejor en test (85.8 %) y con pérdida 0.423, menos de la mitad. La ganancia en acierto es modesta (+2 puntos); la mejora en la pérdida es la más visible.</p>
+  </div>
+</article>
+
+<article class="snippet" data-lang="python">
+  <header>
+    <h3>9 · Momentum y Nesterov en <code>torch.optim.SGD</code> (y la diferencia con Keras)</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Ver paso a paso qué hace el momentum con un gradiente inventado, comprobar la fórmula a mano, ver en qué se diferencia PyTorch de Keras cuando baja el learning rate y comparar SGD, momentum y Nesterov en un valle estrecho.</p>
+  </header>
+  <pre class="code"><code>import torch
+
+
+def pasos(n=3, **kw):
+    w = torch.tensor([1.0], requires_grad=True)
+    opt = torch.optim.SGD([w], lr=0.1, **kw)
+    traza = []
+    for _ in range(n):
+        w.grad = torch.tensor([0.5])          # gradiente constante, inventado para ver la regla
+        opt.step()
+        traza.append(round(w.item(), 4))
+    buf = opt.state[w].get("momentum_buffer")
+    return traza, None if buf is None else round(buf.item(), 4)
+
+
+print("SGD simple          :", pasos())
+print("momentum=0.9        :", pasos(momentum=0.9))
+print("momentum + Nesterov :", pasos(momentum=0.9, nesterov=True))
+
+
+def a_mano(estilo, lrs, mu=0.9, g=0.5):
+    w, v, traza = 1.0, 0.0, []
+    for lr in lrs:
+        if estilo == "pytorch":        # v acumula gradientes y lr multiplica al final
+            v = mu * v + g
+            w = w - lr * v
+        else:                          # estilo Keras: v acumula lr * gradiente
+            v = mu * v - lr * g
+            w = w + v
+        traza.append(round(w, 4))
+    return traza
+
+
+lrs = [0.1, 0.1, 0.1, 0.01, 0.01]      # el learning rate baja 10 veces en el paso 4
+print("estilo PyTorch      :", a_mano("pytorch", lrs))
+print("estilo Keras        :", a_mano("keras", lrs))
+
+# Un valle largo y estrecho: f(w) = 0.5 * (1 * w1^2 + 30 * w2^2)
+def coste(w):
+    return 0.5 * (w[0] ** 2 + 30 * w[1] ** 2)
+
+
+for nombre, kw in [("SGD", {}), ("momentum 0.9", {"momentum": 0.9}), ("Nesterov 0.9", {"momentum": 0.9, "nesterov": True})]:
+    w = torch.tensor([3.0, 1.0], requires_grad=True)
+    opt = torch.optim.SGD([w], lr=0.03, **kw)
+    salida = []
+    for paso in range(1, 101):
+        opt.zero_grad()
+        coste(w).backward()
+        opt.step()
+        if paso in (10, 30, 100):
+            salida.append(f"{coste(w).item():.2e}")
+    print(f"{nombre:13s} coste tras 10, 30 y 100 pasos:", salida)</code></pre>
+  <details class="linea-a-linea" open>
+    <summary>Línea por línea</summary>
+    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+      <tbody>
+        <tr data-lines="1"><td><code>import torch</code></td><td>Importamos <code>torch</code>.</td></tr>
+        <tr data-lines="4-6"><td><code>def pasos(n=3, **kw): …</code></td><td><code>pasos</code> da <code>n</code> pasos de SGD sobre un único peso <code>w = 1</code> con <code>lr = 0.1</code>. <code>**kw</code> pasa tal cual los argumentos extra (<code>momentum</code>, <code>nesterov</code>) al optimizador.</td></tr>
+        <tr data-lines="7-11"><td><code>traza = [] …</code></td><td>En cada paso asignamos nosotros un gradiente falso y constante de 0.5 (<code>w.grad = ...</code>), llamamos a <code>opt.step()</code> y apuntamos el nuevo valor de <code>w</code> redondeado.</td></tr>
+        <tr data-lines="12-13"><td><code>buf = opt.state[w].get("momentum_buffer") …</code></td><td>El «buffer de momentum» (la velocidad <code>v</code>) vive en <code>opt.state[w]</code>; si no hay momentum, no existe y devuelve <code>None</code>.</td></tr>
+        <tr data-lines="16-18"><td><code>print("SGD simple          :", pasos()) …</code></td><td>Tres reglas con el mismo gradiente: SGD simple, momentum 0.9 y momentum 0.9 con Nesterov.</td></tr>
+        <tr data-lines="21-22"><td><code>def a_mano(estilo, lrs, mu=0.9, g=0.5): …</code></td><td><code>a_mano</code> reproduce las reglas con números normales: parte de <code>w = 1</code> y velocidad 0, y recorre una lista de learning rates (uno por paso).</td></tr>
+        <tr data-lines="23-26"><td><code>for lr in lrs: …</code></td><td>Estilo PyTorch: la velocidad acumula <strong>gradientes</strong> (<code>v = mu * v + g</code>) y el learning rate multiplica al final (<code>w = w - lr * v</code>).</td></tr>
+        <tr data-lines="27-29"><td><code>else:                          # estilo Keras: v acumula lr * gradiente …</code></td><td>Estilo Keras: la velocidad acumula el <strong>paso</strong> (<code>v = mu * v - lr * g</code>) y se suma al peso.</td></tr>
+        <tr data-lines="30-31"><td><code>traza.append(round(w, 4)) …</code></td><td>Guarda el peso tras cada paso y devuelve la lista.</td></tr>
+        <tr data-lines="34-36"><td><code>lrs = [0.1, 0.1, 0.1, 0.01, 0.01]      # el learning rate baja 10 veces en el paso 4 …</code></td><td>Ponemos un learning rate de 0.1 durante tres pasos y 0.01 después, y comparamos las dos convenciones.</td></tr>
+        <tr data-lines="38-40"><td><code># Un valle largo y estrecho: f(w) = 0.5 * (1 * w1^2 + 30 * w2^2) …</code></td><td>Función de coste de un valle estrecho: \(f=\tfrac12(w_1^2+30\,w_2^2)\): muy empinada en \(w_2\) y casi plana en \(w_1\).</td></tr>
+        <tr data-lines="43-46"><td><code>for nombre, kw in [("SGD", {}), ("momentum 0.9", {"momentum": 0.9}), ("Nesterov 0.9", {"momentum": 0.9, "nesterov": True})]: …</code></td><td>Para cada variante (SGD, momentum, Nesterov) parte de \(w=(3,1)\) con <code>lr = 0.03</code>.</td></tr>
+        <tr data-lines="47-50"><td><code>for paso in range(1, 101): …</code></td><td>100 pasos: <code>zero_grad</code>, <code>backward</code> del coste y <code>step</code>.</td></tr>
+        <tr data-lines="51-53"><td><code>if paso in (10, 30, 100): …</code></td><td>Guarda el coste tras 10, 30 y 100 pasos e imprímelo.</td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>SGD simple          : ([0.95, 0.9, 0.85], None)
+momentum=0.9        : ([0.95, 0.855, 0.7195], 1.355)
+momentum + Nesterov : ([0.905, 0.7695, 0.5975], 1.355)
+estilo PyTorch      : [0.95, 0.855, 0.7195, 0.7023, 0.6818]
+estilo Keras        : [0.95, 0.855, 0.7195, 0.5926, 0.4733]
+SGD           coste tras 10, 30 y 100 pasos: ['2.45e+00', '7.24e-01', '1.02e-02']
+momentum 0.9  coste tras 10, 30 y 100 pasos: ['9.01e-01', '6.26e-01', '3.03e-05']
+Nesterov 0.9  coste tras 10, 30 y 100 pasos: ['2.84e-03', '1.30e-03', '3.08e-06']</pre>
+    <p>Con gradiente 0.5 constante y \(lr=0.1\): SGD baja siempre 0.05 (1→0.95→0.9→0.85). Con momentum, \(v_1=0.5\), \(v_2=0.9\cdot0.5+0.5=0.95\), \(v_3=1.355\): los pasos crecen (0.05, 0.095, 0.1355) y el peso va 0.95→0.855→0.7195; el buffer final es 1.355. Nesterov da pasos aún mayores (0.905, 0.7695, 0.5975). Al bajar el lr, PyTorch frena de golpe (0.7023) y Keras sigue con la inercia acumulada (0.5926): son <strong>distintos</strong>. En el valle, Nesterov es el más rápido (\(3\cdot10^{-6}\) a los 100 pasos); el momentum simple a los 30 pasos aún oscila (0.63) pero acaba en \(3\cdot10^{-5}\), frente a \(10^{-2}\) de SGD.</p>
+  </div>
+</article>
+
+<article class="snippet" data-lang="python">
+  <header>
+    <h3>10 · <code>nn.BatchNorm1d</code>: estadísticas del lote, medias móviles y <code>eval</code></h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Abrir una capa de BatchNorm: comprobar a mano la normalización, ver qué son sus parámetros y sus <em>buffers</em>, cómo se actualizan las medias móviles y qué cambia entre <code>train()</code> y <code>eval()</code>.</p>
+  </header>
+  <pre class="code"><code>import torch
+import torch.nn as nn
+
+x = torch.tensor([[2.0, 10.0], [4.0, 20.0], [6.0, 30.0], [8.0, 40.0]])   # 4 muestras, 2 características
+bn = nn.BatchNorm1d(2)
+print("parámetros:", [n for n, _ in bn.named_parameters()], " buffers:", [n for n, _ in bn.named_buffers()])
+
+# Modo entrenamiento: estadísticas del propio lote
+y_train = bn(x)
+mu = x.mean(dim=0)
+var = x.var(dim=0, unbiased=False)                   # varianza del lote, dividiendo entre N
+a_mano = (x - mu) / torch.sqrt(var + bn.eps)
+print("media del lote:", mu.tolist(), " varianza del lote:", var.tolist())
+print("salida (columna 1):", [round(v, 4) for v in y_train[:, 0].tolist()])
+print("¿coincide con la cuenta a mano?", torch.allclose(y_train, a_mano, atol=1e-6))
+print("running_mean:", bn.running_mean.tolist(), " running_var:", [round(v, 4) for v in bn.running_var.tolist()])
+
+# Modo evaluación: usa las medias móviles, no el lote
+bn.eval()
+print("eval (columna 1):", [round(v, 4) for v in bn(x)[:, 0].tolist()])
+
+# Con muchos lotes, las medias móviles convergen a las estadísticas de los datos
+torch.manual_seed(0)
+bn2 = nn.BatchNorm1d(2)
+for _ in range(100):
+    lote = torch.randn(32, 2) * torch.tensor([1.0, 5.0]) + torch.tensor([3.0, -2.0])
+    bn2(lote)
+print("tras 100 lotes: running_mean =", [round(v, 2) for v in bn2.running_mean.tolist()],
+      " running_var =", [round(v, 2) for v in bn2.running_var.tolist()])
+print("num_batches_tracked:", bn2.num_batches_tracked.item(), " claves del state_dict:", list(bn2.state_dict().keys()))
+
+# Un lote de una sola muestra no tiene varianza
+bn2.train()
+try:
+    bn2(torch.randn(1, 2))
+except ValueError as e:
+    print("ValueError:", e)</code></pre>
+  <details class="linea-a-linea" open>
+    <summary>Línea por línea</summary>
+    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+      <tbody>
+        <tr data-lines="1-2"><td><code>import torch …</code></td><td>Importamos <code>torch</code> y <code>nn</code>.</td></tr>
+        <tr data-lines="4"><td><code>x = torch.tensor([[2.0, 10.0], [4.0, 20.0], [6.0, 30.0], [8.0, 40.0]])   # 4 muestras, 2 características</code></td><td>Un lote de 4 muestras con 2 características (cada fila es una muestra): la segunda característica es 5 veces mayor que la primera.</td></tr>
+        <tr data-lines="5"><td><code>bn = nn.BatchNorm1d(2)</code></td><td>Una capa <code>nn.BatchNorm1d(2)</code>, para 2 características.</td></tr>
+        <tr data-lines="6"><td><code>print("parámetros:", [n for n, _ in bn.named_parameters()], " buffers:", [n for n, _ in bn.named_buffers()])</code></td><td>Lista los <strong>parámetros</strong> (<code>weight</code> = γ y <code>bias</code> = β, se entrenan) y los <strong>buffers</strong> (<code>running_mean</code>, <code>running_var</code>, <code>num_batches_tracked</code>, se guardan en el modelo pero no se entrenan).</td></tr>
+        <tr data-lines="8-9"><td><code># Modo entrenamiento: estadísticas del propio lote …</code></td><td>Una llamada <code>bn(x)</code> en modo entrenamiento (el modo por defecto): normaliza con la media y la varianza <strong>del propio lote</strong>.</td></tr>
+        <tr data-lines="10-12"><td><code>mu = x.mean(dim=0) …</code></td><td>La misma cuenta a mano: media por columna (<code>dim=0</code>), varianza dividiendo entre N (<code>unbiased=False</code>) y \((x-\mu)/\sqrt{\sigma^2+\varepsilon}\) con el <code>eps</code> de la capa (\(10^{-5}\)).</td></tr>
+        <tr data-lines="13-15"><td><code>print("media del lote:", mu.tolist(), " varianza del lote:", var.tolist()) …</code></td><td>Imprime las estadísticas del lote, la primera columna ya normalizada y una comprobación de que coincide con la cuenta a mano. Como γ = 1 y β = 0 al principio, la salida es justo \(\hat x\).</td></tr>
+        <tr data-lines="16"><td><code>print("running_mean:", bn.running_mean.tolist(), " running_var:", [round(v, 4) for v in bn.running_var.tolist()])</code></td><td>Las medias móviles se han actualizado con ese único lote.</td></tr>
+        <tr data-lines="18-20"><td><code># Modo evaluación: usa las medias móviles, no el lote …</code></td><td><code>bn.eval()</code> pasa a modo evaluación: ahora normaliza con <code>running_mean</code> y <code>running_var</code>, no con el lote.</td></tr>
+        <tr data-lines="22-24"><td><code># Con muchos lotes, las medias móviles convergen a las estadísticas de los datos …</code></td><td>Segunda capa para ver la convergencia de las medias móviles: semilla y <code>BatchNorm1d(2)</code>.</td></tr>
+        <tr data-lines="25-27"><td><code>for _ in range(100): …</code></td><td>100 lotes de 32 muestras aleatorias con media (3, −2) y desviación (1, 5); la capa los procesa en modo entrenamiento y va actualizando sus medias móviles.</td></tr>
+        <tr data-lines="28-29"><td><code>print("tras 100 lotes: running_mean =", [round(v, 2) for v in bn2.running_mean.tolist()], …</code></td><td>Imprime las medias móviles tras los 100 lotes.</td></tr>
+        <tr data-lines="30"><td><code>print("num_batches_tracked:", bn2.num_batches_tracked.item(), " claves del state_dict:", list(bn2.state_dict().keys()))</code></td><td>Muestra <code>num_batches_tracked</code> y las claves del <code>state_dict</code>: por eso los buffers se guardan con <code>torch.save</code>.</td></tr>
+        <tr data-lines="32-37"><td><code># Un lote de una sola muestra no tiene varianza …</code></td><td>Vuelve a modo entrenamiento e intenta procesar un lote de una sola muestra: no se puede calcular una varianza, y PyTorch lanza <code>ValueError</code> (capturado para imprimirlo).</td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>parámetros: ['weight', 'bias']  buffers: ['running_mean', 'running_var', 'num_batches_tracked']
+media del lote: [5.0, 25.0]  varianza del lote: [5.0, 125.0]
+salida (columna 1): [-1.3416, -0.4472, 0.4472, 1.3416]
+¿coincide con la cuenta a mano? True
+running_mean: [0.5, 2.5]  running_var: [1.5667, 17.5667]
+eval (columna 1): [1.1984, 2.7963, 4.3941, 5.992]
+tras 100 lotes: running_mean = [2.95, -1.96]  running_var = [1.04, 26.42]
+num_batches_tracked: 100  claves del state_dict: ['weight', 'bias', 'running_mean', 'running_var', 'num_batches_tracked']
+ValueError: Expected more than 1 value per channel when training, got input size torch.Size([1, 2])</pre>
+    <p>La media del lote es (5, 25) y la varianza (5, 125); la primera columna normalizada queda \((-1.3416,-0.4472,0.4472,1.3416)\), que coincide con la cuenta a mano \((2-5)/\sqrt5=-1.3416\). Tras un lote, <code>running_mean</code> \(=0.9\cdot0+0.1\cdot(5,25)=(0.5,2.5)\) y <code>running_var</code> \(=0.9\cdot1+0.1\cdot(20/3)=1.5667\) (usa la varianza <em>insesgada</em>, entre N−1). En <code>eval</code>, la salida es otra: \((2-0.5)/\sqrt{1.5667}=1.1984\), porque usa las medias móviles, aún lejos de la realidad. Tras 100 lotes convergen a (2.95, −1.96) y (1.04, 26.42), cerca de los valores reales (3, −2) y (1, 25).</p>
+  </div>
+</article>
+
+<article class="snippet" data-lang="python">
+  <header>
+    <h3>11 · BatchNorm en una red de 10 capas sigmoides</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Medir el efecto de BatchNorm sobre los gradientes por capa y sobre el entrenamiento en una red con sigmoides, el peor caso para el gradiente que se desvanece.</p>
+  </header>
+  <pre class="code"><code>import torch
+import torch.nn as nn
+from sklearn.datasets import load_digits
+
+X, y = load_digits(return_X_y=True)
+X = torch.tensor(X / 16.0, dtype=torch.float32)
+y = torch.tensor(y)
+perdida = nn.CrossEntropyLoss()
+
+
+def construir(con_bn, capas_ocultas=10, ancho=32):
+    torch.manual_seed(0)
+    modulos, entrada = [], 64
+    for _ in range(capas_ocultas):
+        modulos.append(nn.Linear(entrada, ancho))
+        if con_bn:
+            modulos.append(nn.BatchNorm1d(ancho))
+        modulos.append(nn.Sigmoid())
+        entrada = ancho
+    modulos.append(nn.Linear(entrada, 10))
+    return nn.Sequential(*modulos)
+
+
+for con_bn in [False, True]:
+    modelo = construir(con_bn)
+    perdida(modelo(X[:256]), y[:256]).backward()
+    normas = [m.weight.grad.norm().item() for m in modelo if isinstance(m, nn.Linear)]
+    print(f"{'con' if con_bn else 'sin'} BatchNorm: capa 1 = {normas[0]:.1e}, capa 11 = {normas[-1]:.1e}, cociente = {normas[0] / normas[-1]:.1e}")
+
+    modelo = construir(con_bn)
+    optimizador = torch.optim.SGD(modelo.parameters(), lr=0.1)
+    g = torch.Generator().manual_seed(0)
+    historial = []
+    for paso in range(1, 301):
+        idx = torch.randint(0, 1500, (64,), generator=g)
+        optimizador.zero_grad()
+        l = perdida(modelo(X[idx]), y[idx])
+        l.backward()
+        optimizador.step()
+        if paso in (1, 50, 100, 200, 300):
+            historial.append(round(l.item(), 3))
+    print("   pérdida en los pasos 1, 50, 100, 200, 300:", historial)</code></pre>
+  <details class="linea-a-linea" open>
+    <summary>Línea por línea</summary>
+    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+      <tbody>
+        <tr data-lines="1-3"><td><code>import torch …</code></td><td>Importamos <code>torch</code>, <code>nn</code> y los dígitos de scikit-learn.</td></tr>
+        <tr data-lines="5-8"><td><code>X, y = load_digits(return_X_y=True) …</code></td><td>Datos escalados a 0-1, convertidos a tensores, y la pérdida de entropía cruzada.</td></tr>
+        <tr data-lines="11-12"><td><code>def construir(con_bn, capas_ocultas=10, ancho=32): …</code></td><td><code>construir</code> crea una red con 10 capas ocultas de 32 neuronas; <code>con_bn</code> decide si se añade BatchNorm.</td></tr>
+        <tr data-lines="13-14"><td><code>modulos, entrada = [], 64 …</code></td><td>Semilla fija y lista de módulos; <code>entrada</code> empieza en 64 (los píxeles).</td></tr>
+        <tr data-lines="15"><td><code>modulos.append(nn.Linear(entrada, ancho))</code></td><td>Capa lineal.</td></tr>
+        <tr data-lines="16-17"><td><code>if con_bn: …</code></td><td>Si se pide, una <code>BatchNorm1d(ancho)</code> <strong>antes</strong> de la activación.</td></tr>
+        <tr data-lines="18-19"><td><code>modulos.append(nn.Sigmoid()) …</code></td><td>Activación sigmoide, y la salida de esta capa es la entrada de la siguiente.</td></tr>
+        <tr data-lines="20-21"><td><code>modulos.append(nn.Linear(entrada, 10)) …</code></td><td>Capa de salida (sin activación) y empaquetado en <code>Sequential</code>.</td></tr>
+        <tr data-lines="24-25"><td><code>for con_bn in [False, True]: …</code></td><td>Bucle sobre las dos versiones: construye la red (en modo entrenamiento, el modo por defecto).</td></tr>
+        <tr data-lines="26-28"><td><code>perdida(modelo(X[:256]), y[:256]).backward() …</code></td><td>Una pasada con 256 muestras, <code>backward</code> y las normas de los gradientes de las 11 capas lineales; imprime la primera, la última y el cociente.</td></tr>
+        <tr data-lines="30-31"><td><code>modelo = construir(con_bn) …</code></td><td>Vuelve a construir (pesos iguales de nuevo) y prepara un optimizador SGD con \(lr=0.1\).</td></tr>
+        <tr data-lines="32-35"><td><code>g = torch.Generator().manual_seed(0) …</code></td><td>Generador de números aleatorios con semilla para elegir lotes de 64 muestras al azar entre las primeras 1500 (<code>torch.randint</code>).</td></tr>
+        <tr data-lines="36-39"><td><code>optimizador.zero_grad() …</code></td><td>Entrenamiento: pone a cero gradientes, calcula la pérdida del lote, <code>backward</code> y <code>step</code>.</td></tr>
+        <tr data-lines="40-42"><td><code>if paso in (1, 50, 100, 200, 300): …</code></td><td>Guarda la pérdida en los pasos 1, 50, 100, 200 y 300 y la imprime.</td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>sin BatchNorm: capa 1 = 2.1e-09, capa 11 = 2.3e-01, cociente = 9.0e-09
+   pérdida en los pasos 1, 50, 100, 200, 300: [2.302, 2.302, 2.307, 2.303, 2.315]
+con BatchNorm: capa 1 = 4.0e-01, capa 11 = 3.3e-01, cociente = 1.2e+00
+   pérdida en los pasos 1, 50, 100, 200, 300: [2.299, 1.498, 1.153, 0.554, 0.359]</pre>
+    <p>Sin BatchNorm, la capa 1 recibe \(2\cdot10^{-9}\) frente a 0.23 de la última (cociente \(9\cdot10^{-9}\)) y la pérdida se queda en 2.30 (\(\ln10\), elegir al azar entre 10 clases): la red no aprende nada. Con BatchNorm, las dos capas reciben 0.40 y 0.33 (cociente 1.2) y la pérdida baja de 2.30 a 0.36 en 300 pasos.</p>
+  </div>
+</article>
+
+<article class="snippet" data-lang="python">
+  <header>
+    <h3>12 · RMSprop y Adam: pasos a mano y <code>weight_decay</code></h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Ver los valores por defecto, el tamaño de los primeros pasos de RMSprop y Adam con un gradiente inventado, comprobar la fórmula de Adam con una implementación a mano y descubrir la diferencia entre <code>Adam(weight_decay)</code> y <code>AdamW</code>.</p>
+  </header>
+  <pre class="code"><code>import torch
+
+
+def trazar(crear, grads):
+    w = torch.tensor([1.0], requires_grad=True)
+    opt = crear([w])
+    pasos = []
+    for g in grads:
+        antes = w.item()
+        w.grad = torch.tensor([g])
+        opt.step()
+        pasos.append(round(w.item() - antes, 5))
+    return pasos
+
+
+print("Defectos de PyTorch:")
+print("  RMSprop:", {k: v for k, v in torch.optim.RMSprop([torch.zeros(1)]).defaults.items() if k in ("lr", "alpha", "eps")})
+print("  Adam   :", {k: v for k, v in torch.optim.Adam([torch.zeros(1)]).defaults.items() if k in ("lr", "betas", "eps")})
+
+constante = [0.5] * 4
+print("RMSprop(lr=0.01), g=0.5 :", trazar(lambda p: torch.optim.RMSprop(p, lr=0.01), constante))
+print("RMSprop(0.01,alpha=0.9) :", trazar(lambda p: torch.optim.RMSprop(p, lr=0.01, alpha=0.9), constante))
+print("Adam(lr=0.01), g=0.5    :", trazar(lambda p: torch.optim.Adam(p, lr=0.01), constante))
+print("Adam(lr=0.01), g=50     :", trazar(lambda p: torch.optim.Adam(p, lr=0.01), [50.0] * 4))
+
+
+def adam_a_mano(grads, lr=0.01, b1=0.9, b2=0.999, eps=1e-8):
+    w, m, s, ws = 1.0, 0.0, 0.0, []
+    for t, g in enumerate(grads, start=1):
+        m = b1 * m + (1 - b1) * g
+        s = b2 * s + (1 - b2) * g * g
+        m_hat = m / (1 - b1 ** t)
+        s_hat = s / (1 - b2 ** t)
+        w = w - lr * m_hat / (s_hat ** 0.5 + eps)
+        ws.append(round(w, 5))
+    return ws
+
+
+grads = [0.5, 0.2, -0.3, 0.4]
+w = torch.tensor([1.0], requires_grad=True)
+opt = torch.optim.Adam([w], lr=0.01)
+con_torch = []
+for g in grads:
+    w.grad = torch.tensor([g])
+    opt.step()
+    con_torch.append(round(w.item(), 5))
+print("Adam con torch.optim:", con_torch)
+print("Adam a mano         :", adam_a_mano(grads))
+
+# weight_decay: acoplado (Adam) frente a desacoplado (AdamW) con gradiente cero
+for nombre, crear in [("Adam(weight_decay=0.1)", lambda p: torch.optim.Adam(p, lr=0.1, weight_decay=0.1)),
+                      ("AdamW(weight_decay=0.1)", lambda p: torch.optim.AdamW(p, lr=0.1, weight_decay=0.1))]:
+    print(f"{nombre:24s} con g = 0:", trazar(crear, [0.0, 0.0]))</code></pre>
+  <details class="linea-a-linea" open>
+    <summary>Línea por línea</summary>
+    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+      <tbody>
+        <tr data-lines="1"><td><code>import torch</code></td><td>Importamos <code>torch</code>.</td></tr>
+        <tr data-lines="4-6"><td><code>def trazar(crear, grads): …</code></td><td><code>trazar</code> recibe una función que crea un optimizador y una lista de gradientes; empieza con un peso <code>w = 1</code>.</td></tr>
+        <tr data-lines="7-8"><td><code>pasos = [] …</code></td><td>Crea el optimizador y una lista para guardar los pasos.</td></tr>
+        <tr data-lines="9-12"><td><code>antes = w.item() …</code></td><td>Para cada gradiente: apunta <code>w</code> antes, asigna el gradiente a mano, llama a <code>step()</code> y guarda la diferencia: <strong>el paso que da el optimizador</strong>.</td></tr>
+        <tr data-lines="13"><td><code>return pasos</code></td><td>Devuelve los pasos.</td></tr>
+        <tr data-lines="16-18"><td><code>print("Defectos de PyTorch:") …</code></td><td>Imprime los valores por defecto de RMSprop y de Adam leyendo el atributo <code>defaults</code> de cada optimizador.</td></tr>
+        <tr data-lines="20"><td><code>constante = [0.5] * 4</code></td><td>Gradiente constante de 0.5 durante 4 pasos.</td></tr>
+        <tr data-lines="21-22"><td><code>print("RMSprop(lr=0.01), g=0.5 :", trazar(lambda p: torch.optim.RMSprop(p, lr=0.01), constante)) …</code></td><td>RMSprop con <code>lr = 0.01</code> y con <code>alpha = 0.9</code> (menos memoria).</td></tr>
+        <tr data-lines="23-24"><td><code>print("Adam(lr=0.01), g=0.5    :", trazar(lambda p: torch.optim.Adam(p, lr=0.01), constante)) …</code></td><td>Adam con \(lr=0.01\), con gradiente 0.5 y con gradiente 50: cien veces mayor.</td></tr>
+        <tr data-lines="27-28"><td><code>def adam_a_mano(grads, lr=0.01, b1=0.9, b2=0.999, eps=1e-8): …</code></td><td><code>adam_a_mano</code>: Adam escrito con la fórmula del texto; <code>m</code> es la media móvil del gradiente, <code>s</code> la del gradiente al cuadrado.</td></tr>
+        <tr data-lines="29-31"><td><code>for t, g in enumerate(grads, start=1): …</code></td><td>En cada paso <code>t</code> (que empieza en 1): actualiza <code>m</code> con \(\beta_1\) y <code>s</code> con \(\beta_2\).</td></tr>
+        <tr data-lines="32-33"><td><code>m_hat = m / (1 - b1 ** t) …</code></td><td>Corrección de sesgo: divide entre \(1-\beta^t\), porque al empezar en 0 las medias móviles salen demasiado pequeñas.</td></tr>
+        <tr data-lines="34-36"><td><code>w = w - lr * m_hat / (s_hat ** 0.5 + eps) …</code></td><td>Actualiza el peso con \(w-lr\,\hat m/(\sqrt{\hat s}+\varepsilon)\) y guarda el resultado.</td></tr>
+        <tr data-lines="39"><td><code>grads = [0.5, 0.2, -0.3, 0.4]</code></td><td>Una secuencia de cuatro gradientes que cambian de signo.</td></tr>
+        <tr data-lines="40-41"><td><code>w = torch.tensor([1.0], requires_grad=True) …</code></td><td>Mismo peso inicial y un <code>torch.optim.Adam</code> con <code>lr = 0.01</code>.</td></tr>
+        <tr data-lines="42-46"><td><code>con_torch = [] …</code></td><td>Aplica los cuatro gradientes y apunta el peso tras cada paso.</td></tr>
+        <tr data-lines="47-48"><td><code>print("Adam con torch.optim:", con_torch) …</code></td><td>Compara la versión de PyTorch con la hecha a mano.</td></tr>
+        <tr data-lines="50-53"><td><code># weight_decay: acoplado (Adam) frente a desacoplado (AdamW) con gradiente cero …</code></td><td><code>weight_decay = 0.1</code> con gradiente 0: en <code>Adam</code> la penalización se suma al gradiente (acoplada) y en <code>AdamW</code> se resta aparte (desacoplada). Imprime los pasos de ambos.</td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>Defectos de PyTorch:
+  RMSprop: {'lr': 0.01, 'alpha': 0.99, 'eps': 1e-08}
+  Adam   : {'lr': 0.001, 'betas': (0.9, 0.999), 'eps': 1e-08}
+RMSprop(lr=0.01), g=0.5 : [-0.1, -0.07089, -0.05802, -0.05038]
+RMSprop(0.01,alpha=0.9) : [-0.03162, -0.02294, -0.01921, -0.01705]
+Adam(lr=0.01), g=0.5    : [-0.01, -0.01, -0.01, -0.01]
+Adam(lr=0.01), g=50     : [-0.01, -0.01, -0.01, -0.01]
+Adam con torch.optim: [0.99, 0.98101, 0.97806, 0.97286]
+Adam a mano         : [0.99, 0.98101, 0.97806, 0.97286]
+Adam(weight_decay=0.1)   con g = 0: [-0.1, -0.09959]
+AdamW(weight_decay=0.1)  con g = 0: [-0.01, -0.0099]</pre>
+    <p>Con \(g=0.5\) y \(lr=0.01\), el primer paso de RMSprop es \(0.1\) (diez veces el lr: \(\hat s\) arranca con \(0.01g^2\)) y se asienta hacia 0.01 en los siguientes (0.0709, 0.058, 0.0504). Con <code>alpha = 0.9</code> es 0.0316 y baja hacia 0.01. <strong>Adam siempre da 0.01, valga el gradiente 0.5 o 50</strong>: su paso no depende de la escala del gradiente. La implementación a mano coincide con PyTorch: 0.99, 0.98101, 0.97806, 0.97286. Con \(g=0\), Adam (acoplado) sigue dando pasos de tamaño \(lr\) (−0.1) y AdamW solo reduce el peso un \(lr\cdot wd\) (−0.01).</p>
+  </div>
+</article>
+
+<article class="snippet" data-lang="python">
+  <header>
+    <h3>13 · Carrera de optimizadores en una red de 6 capas</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Entrenar la misma red profunda de 6 capas (ReLU + He) con seis optimizadores sobre los dígitos y medir cuánto bajan la pérdida y el acierto en test, promediando 3 semillas.</p>
+  </header>
+  <pre class="code"><code>import numpy as np
+import torch
+import torch.nn as nn
+from sklearn.datasets import load_digits
+from sklearn.model_selection import train_test_split
+from torch.utils.data import DataLoader, TensorDataset
+
+torch.set_num_threads(1)
+X, y = load_digits(return_X_y=True)
+Xtr, Xte, ytr, yte = train_test_split(X / 16.0, y, test_size=0.25, random_state=0, stratify=y)
+Xtr, Xte = torch.tensor(Xtr, dtype=torch.float32), torch.tensor(Xte, dtype=torch.float32)
+ytr, yte = torch.tensor(ytr), torch.tensor(yte)
+perdida = nn.CrossEntropyLoss()
+
+
+def construir(semilla):
+    torch.manual_seed(semilla)
+    modulos, entrada = [], 64
+    for _ in range(6):
+        lineal = nn.Linear(entrada, 64)
+        nn.init.kaiming_normal_(lineal.weight, nonlinearity="relu")
+        nn.init.zeros_(lineal.bias)
+        modulos += [lineal, nn.ReLU()]
+        entrada = 64
+    modulos.append(nn.Linear(64, 10))
+    return nn.Sequential(*modulos)
+
+
+def entrenar(crear_opt, semilla, epocas=30):
+    modelo = construir(semilla)
+    opt = crear_opt(modelo.parameters())
+    datos = DataLoader(TensorDataset(Xtr, ytr), batch_size=64, shuffle=True, drop_last=True,
+                       generator=torch.Generator().manual_seed(semilla))
+    curva = []
+    for _ in range(epocas):
+        modelo.train()
+        for xb, yb in datos:
+            opt.zero_grad()
+            perdida(modelo(xb), yb).backward()
+            opt.step()
+        modelo.eval()
+        with torch.no_grad():
+            curva.append(perdida(modelo(Xtr), ytr).item())
+    with torch.no_grad():
+        acc = (modelo(Xte).argmax(1) == yte).float().mean().item()
+    return curva, acc
+
+
+opts = {
+    "SGD lr=0.01": lambda p: torch.optim.SGD(p, lr=0.01),
+    "SGD + momentum 0.9": lambda p: torch.optim.SGD(p, lr=0.01, momentum=0.9),
+    "SGD + Nesterov": lambda p: torch.optim.SGD(p, lr=0.01, momentum=0.9, nesterov=True),
+    "RMSprop lr=1e-3": lambda p: torch.optim.RMSprop(p, lr=1e-3),
+    "Adam lr=1e-3": lambda p: torch.optim.Adam(p, lr=1e-3),
+    "Adam lr=1e-2": lambda p: torch.optim.Adam(p, lr=1e-2),
+}
+print(f"{'optimizador':20s} {'ép.1':&gt;7s} {'ép.5':&gt;7s} {'ép.10':&gt;7s} {'ép.30':&gt;7s} {'acierto test':&gt;13s}")
+for nombre, crear in opts.items():
+    r = [entrenar(crear, s) for s in range(3)]
+    curva = np.mean([c for c, _ in r], axis=0)
+    acc = np.mean([a for _, a in r])
+    print(f"{nombre:20s} {curva[0]:7.3f} {curva[4]:7.3f} {curva[9]:7.3f} {curva[29]:7.3f} {acc:13.3f}")</code></pre>
+  <details class="linea-a-linea" open>
+    <summary>Línea por línea</summary>
+    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+      <tbody>
+        <tr data-lines="1-6"><td><code>import numpy as np …</code></td><td>Importamos NumPy, <code>torch</code>, <code>nn</code>, los dígitos, <code>train_test_split</code> y las herramientas de lotes <code>DataLoader</code> y <code>TensorDataset</code>.</td></tr>
+        <tr data-lines="8-10"><td><code>torch.set_num_threads(1) …</code></td><td>Un hilo de CPU, carga de los dígitos y reparto 75 % entrenamiento / 25 % test (<code>stratify=y</code> mantiene la proporción de cada clase).</td></tr>
+        <tr data-lines="11-13"><td><code>Xtr, Xte = torch.tensor(Xtr, dtype=torch.float32), torch.tensor(Xte, dtype=torch.float32) …</code></td><td>Tensores de PyTorch y la pérdida de entropía cruzada.</td></tr>
+        <tr data-lines="16-17"><td><code>def construir(semilla): …</code></td><td><code>construir</code>: la misma red y los mismos pesos iniciales para cada optimizador de una misma semilla.</td></tr>
+        <tr data-lines="18-24"><td><code>modulos, entrada = [], 64 …</code></td><td>Seis capas lineales de 64 neuronas con ReLU; cada una con inicialización He (<code>kaiming_normal_</code>) y sesgo cero.</td></tr>
+        <tr data-lines="25-26"><td><code>modulos.append(nn.Linear(64, 10)) …</code></td><td>La capa de salida de 10 clases y el <code>Sequential</code>.</td></tr>
+        <tr data-lines="29-31"><td><code>def entrenar(crear_opt, semilla, epocas=30): …</code></td><td><code>entrenar</code> recibe una función que crea el optimizador (se le pasa <code>modelo.parameters()</code> una vez construido el modelo), la semilla y las épocas.</td></tr>
+        <tr data-lines="32-33"><td><code>datos = DataLoader(TensorDataset(Xtr, ytr), batch_size=64, shuffle=True, drop_last=True, …</code></td><td><code>DataLoader</code> reparte el entrenamiento en lotes de 64 en orden aleatorio. <code>drop_last=True</code> descarta el último lote incompleto y el <code>generator</code> fija el orden.</td></tr>
+        <tr data-lines="34"><td><code>curva = []</code></td><td>Lista para la curva de pérdida.</td></tr>
+        <tr data-lines="35-36"><td><code>for _ in range(epocas): …</code></td><td>Cada época empieza con <code>modelo.train()</code>.</td></tr>
+        <tr data-lines="37-40"><td><code>for xb, yb in datos: …</code></td><td>Para cada lote: gradientes a cero, <code>backward</code> de la pérdida y <code>step()</code> del optimizador.</td></tr>
+        <tr data-lines="41-43"><td><code>modelo.eval() …</code></td><td>Al final de la época, pasa a <code>eval()</code> y mide la pérdida sobre todo el entrenamiento sin grafo (<code>no_grad</code>).</td></tr>
+        <tr data-lines="44-46"><td><code>with torch.no_grad(): …</code></td><td>Acierto en test tras la última época; devuelve la curva y el acierto.</td></tr>
+        <tr data-lines="49-56"><td><code>opts = { …</code></td><td>Los seis optimizadores: SGD, SGD con momentum, Nesterov, RMSprop (\(10^{-3}\)), Adam (\(10^{-3}\)) y Adam (\(10^{-2}\)).</td></tr>
+        <tr data-lines="57"><td><code>print(f"{'optimizador':20s} {'ép.1':&gt;7s} {'ép.5':&gt;7s} {'ép.10':&gt;7s} {'ép.30':&gt;7s} {'acierto test':&gt;13s}")</code></td><td>Cabecera de la tabla.</td></tr>
+        <tr data-lines="58-59"><td><code>for nombre, crear in opts.items(): …</code></td><td>Entrena cada uno con 3 semillas.</td></tr>
+        <tr data-lines="60-61"><td><code>curva = np.mean([c for c, _ in r], axis=0) …</code></td><td>Promedia las curvas y el acierto de las 3 semillas.</td></tr>
+        <tr data-lines="62"><td><code>print(f"{nombre:20s} {curva[0]:7.3f} {curva[4]:7.3f} {curva[9]:7.3f} {curva[29]:7.3f} {acc:13.3f}")</code></td><td>Imprime la pérdida en las épocas 1, 5, 10 y 30 y el acierto en test.</td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>optimizador             ép.1    ép.5   ép.10   ép.30  acierto test
+SGD lr=0.01            2.274   2.044   1.316   0.247         0.905
+SGD + momentum 0.9     2.077   0.315   0.077   0.004         0.965
+SGD + Nesterov         2.043   0.204   0.055   0.003         0.966
+RMSprop lr=1e-3        0.818   0.173   0.035   0.001         0.967
+Adam lr=1e-3           1.800   0.178   0.054   0.002         0.969
+Adam lr=1e-2           0.424   0.155   0.152   0.048         0.967</pre>
+    <p>Con \(lr=0.01\), SGD simple va lentísimo: tras 30 épocas la pérdida sigue en 0.247 y acierta 90.5 %. El momentum 0.9 equivale a un lr efectivo hasta 10 veces mayor: pérdida 0.004 y 96.5 %. Nesterov (96.6 %), RMSprop (96.7 %) y Adam (96.9 %) llegan igual de lejos. <strong>Adam con lr \(10^{-2}\)</strong> baja muy rápido al principio (0.424 en la época 1) pero acaba peor en entrenamiento (0.048) por su ruido. Moraleja: casi todo se arregla con un lr adecuado; lo que aporta Adam es que acierta con menos ajuste.</p>
+  </div>
+</article>
+
+<article class="snippet" data-lang="python">
+  <header>
+    <h3>14 · Planificadores de learning rate (<code>lr_scheduler</code>)</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Ver, número a número, cómo cambian el learning rate <code>StepLR</code>, <code>ExponentialLR</code>, <code>CosineAnnealingLR</code>, <code>LinearLR</code> (warm-up) y <code>ReduceLROnPlateau</code>.</p>
+  </header>
+  <pre class="code"><code>import torch
+from torch.optim import SGD, lr_scheduler
+
+
+def lrs_de(crear, epocas=10):
+    w = torch.nn.Parameter(torch.zeros(1))
+    opt = SGD([w], lr=0.1)
+    sch = crear(opt)
+    trazas = []
+    for _ in range(epocas):
+        trazas.append(round(opt.param_groups[0]["lr"], 4))
+        opt.step()          # primero el optimizador...
+        sch.step()          # ...y después el planificador (una vez por época)
+    return trazas
+
+
+print("StepLR(step=3, gamma=0.5) :", lrs_de(lambda o: lr_scheduler.StepLR(o, step_size=3, gamma=0.5)))
+print("ExponentialLR(gamma=0.8)  :", lrs_de(lambda o: lr_scheduler.ExponentialLR(o, gamma=0.8)))
+print("CosineAnnealingLR(T=10)   :", lrs_de(lambda o: lr_scheduler.CosineAnnealingLR(o, T_max=10, eta_min=0.001)))
+print("LinearLR (warmup, 4 ép.)  :", lrs_de(lambda o: lr_scheduler.LinearLR(o, start_factor=0.1, total_iters=4)))
+
+# ReduceLROnPlateau reacciona a la pérdida de validación (aquí inventada, para ver la regla)
+w = torch.nn.Parameter(torch.zeros(1))
+opt = SGD([w], lr=0.1)
+sch = lr_scheduler.ReduceLROnPlateau(opt, mode="min", factor=0.5, patience=2)
+val = [1.00, 0.80, 0.70, 0.71, 0.72, 0.73, 0.69, 0.70, 0.70, 0.71]
+for epoca, v in enumerate(val, start=1):
+    sch.step(v)
+    print(f"época {epoca:2d}  val_loss = {v:.2f}  lr = {opt.param_groups[0]['lr']}")</code></pre>
+  <details class="linea-a-linea" open>
+    <summary>Línea por línea</summary>
+    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+      <tbody>
+        <tr data-lines="1-2"><td><code>import torch …</code></td><td>Importamos <code>torch</code>, el optimizador <code>SGD</code> y el módulo <code>lr_scheduler</code>.</td></tr>
+        <tr data-lines="5-8"><td><code>def lrs_de(crear, epocas=10): …</code></td><td><code>lrs_de</code> crea un optimizador SGD con \(lr=0.1\) sobre un parámetro de juguete y el planificador que le pasemos mediante <code>crear(opt)</code>.</td></tr>
+        <tr data-lines="9-11"><td><code>trazas = [] …</code></td><td>En cada época, apunta el learning rate actual (<code>opt.param_groups[0]["lr"]</code>).</td></tr>
+        <tr data-lines="12-13"><td><code>opt.step()          # primero el optimizador... …</code></td><td>Primero se llama a <code>opt.step()</code> (el entrenamiento de la época) y <strong>después</strong> a <code>sch.step()</code>: el orden contrario genera un aviso en PyTorch.</td></tr>
+        <tr data-lines="14"><td><code>return trazas</code></td><td>Devuelve los 10 learning rates.</td></tr>
+        <tr data-lines="17-18"><td><code>print("StepLR(step=3, gamma=0.5) :", lrs_de(lambda o: lr_scheduler.StepLR(o, step_size=3, gamma=0.5))) …</code></td><td><code>StepLR(step_size=3, gamma=0.5)</code> multiplica por 0.5 cada 3 épocas y <code>ExponentialLR(gamma=0.8)</code> multiplica por 0.8 cada época.</td></tr>
+        <tr data-lines="19-20"><td><code>print("CosineAnnealingLR(T=10)   :", lrs_de(lambda o: lr_scheduler.CosineAnnealingLR(o, T_max=10, eta_min=0.001))) …</code></td><td><code>CosineAnnealingLR</code> baja siguiendo media onda de coseno hasta <code>eta_min</code>; <code>LinearLR</code> con <code>start_factor=0.1</code> sube linealmente desde el 10 % del lr durante 4 épocas (calentamiento o <em>warm-up</em>).</td></tr>
+        <tr data-lines="22-25"><td><code># ReduceLROnPlateau reacciona a la pérdida de validación (aquí inventada, para ver la regla) …</code></td><td><code>ReduceLROnPlateau</code>: modo <code>"min"</code> (queremos que la métrica baje), divide el lr entre 2 (<code>factor=0.5</code>) si la métrica no mejora durante más de 2 épocas (<code>patience=2</code>).</td></tr>
+        <tr data-lines="26"><td><code>val = [1.00, 0.80, 0.70, 0.71, 0.72, 0.73, 0.69, 0.70, 0.70, 0.71]</code></td><td>Una pérdida de validación inventada, que mejora y se estanca.</td></tr>
+        <tr data-lines="27-29"><td><code>for epoca, v in enumerate(val, start=1): …</code></td><td>Para cada época, le pasamos la métrica (<code>sch.step(v)</code>, a diferencia de los otros planificadores) e imprimimos el lr resultante.</td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>StepLR(step=3, gamma=0.5) : [0.1, 0.1, 0.1, 0.05, 0.05, 0.05, 0.025, 0.025, 0.025, 0.0125]
+ExponentialLR(gamma=0.8)  : [0.1, 0.08, 0.064, 0.0512, 0.041, 0.0328, 0.0262, 0.021, 0.0168, 0.0134]
+CosineAnnealingLR(T=10)   : [0.1, 0.0976, 0.0905, 0.0796, 0.0658, 0.0505, 0.0352, 0.0214, 0.0105, 0.0034]
+LinearLR (warmup, 4 ép.)  : [0.01, 0.0325, 0.055, 0.0775, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1]
+época  1  val_loss = 1.00  lr = 0.1
+época  2  val_loss = 0.80  lr = 0.1
+época  3  val_loss = 0.70  lr = 0.1
+época  4  val_loss = 0.71  lr = 0.1
+época  5  val_loss = 0.72  lr = 0.1
+época  6  val_loss = 0.73  lr = 0.05
+época  7  val_loss = 0.69  lr = 0.05
+época  8  val_loss = 0.70  lr = 0.05
+época  9  val_loss = 0.70  lr = 0.05
+época 10  val_loss = 0.71  lr = 0.025</pre>
+    <p>StepLR: 0.1 durante 3 épocas, 0.05 durante 3, 0.025… ExponentialLR: \(0.1\cdot0.8^t\) (0.08, 0.064…). Coseno: baja suave al principio y al final y más rápido en medio, hasta 0.0034. LinearLR: sube 0.01, 0.0325, 0.055, 0.0775 y se queda en 0.1. <code>ReduceLROnPlateau</code>: la mejor pérdida es 0.70 (época 3); las épocas 4, 5 y 6 no la mejoran y, al pasar de 2 épocas sin mejora (<code>patience=2</code>), en la 6 el lr baja a 0.05. En la época 7 mejora (0.69) y el contador se reinicia; las épocas 8, 9 y 10 no mejoran y el lr baja a 0.025.</p>
+  </div>
+</article>
+
+<article class="snippet" data-lang="python">
+  <header>
+    <h3>15 · Receta completa: ablación con <code>clip_grad_norm_</code></h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Construir una red profunda configurable y añadir una a una las técnicas del módulo (ReLU, He, BatchNorm, dropout, Adam) para medir qué aporta cada una; mide además el mayor gradiente visto para introducir <code>clip_grad_norm_</code>.</p>
+  </header>
+  <pre class="code"><code>import numpy as np
+import torch
+import torch.nn as nn
+from sklearn.datasets import load_digits
+from sklearn.model_selection import train_test_split
+from torch.utils.data import DataLoader, TensorDataset
+
+torch.set_num_threads(1)
+X, y = load_digits(return_X_y=True)
+Xtr, Xte, ytr, yte = train_test_split(X / 16.0, y, test_size=0.25, random_state=0, stratify=y)
+Xtr, Xte = torch.tensor(Xtr, dtype=torch.float32), torch.tensor(Xte, dtype=torch.float32)
+ytr, yte = torch.tensor(ytr), torch.tensor(yte)
+perdida = nn.CrossEntropyLoss()
+
+
+class RedProfunda(nn.Module):
+    def __init__(self, bloques=6, ancho=64, act=nn.ReLU, bn=False, p=0.0, he=False):
+        super().__init__()
+        self.bloques = nn.ModuleList()
+        for i in range(bloques):
+            capas = [nn.Linear(64 if i == 0 else ancho, ancho, bias=not bn)]
+            if bn:
+                capas.append(nn.BatchNorm1d(ancho))
+            capas.append(act())
+            if p &gt; 0:
+                capas.append(nn.Dropout(p))
+            self.bloques.append(nn.Sequential(*capas))
+        self.salida = nn.Linear(ancho, 10)
+        if he:
+            for m in self.modules():
+                if isinstance(m, nn.Linear):
+                    nn.init.kaiming_normal_(m.weight, nonlinearity="relu")
+                    if m.bias is not None:
+                        nn.init.zeros_(m.bias)
+
+    def forward(self, x):
+        for bloque in self.bloques:
+            x = bloque(x)
+        return self.salida(x)
+
+
+def entrenar(config, crear_opt, semilla, epocas=30):
+    torch.manual_seed(semilla)
+    modelo = RedProfunda(**config)
+    opt = crear_opt(modelo.parameters())
+    datos = DataLoader(TensorDataset(Xtr, ytr), batch_size=64, shuffle=True, drop_last=True,
+                       generator=torch.Generator().manual_seed(semilla))
+    norma_max = 0.0
+    for _ in range(epocas):
+        modelo.train()                                    # activa dropout y BatchNorm de entrenamiento
+        for xb, yb in datos:
+            opt.zero_grad()
+            perdida(modelo(xb), yb).backward()
+            norma = nn.utils.clip_grad_norm_(modelo.parameters(), max_norm=5.0)
+            norma_max = max(norma_max, norma.item())
+            opt.step()
+    modelo.eval()                                         # dropout apagado, BatchNorm con medias móviles
+    with torch.no_grad():
+        return [perdida(modelo(Xtr), ytr).item(), (modelo(Xtr).argmax(1) == ytr).float().mean().item(),
+                perdida(modelo(Xte), yte).item(), (modelo(Xte).argmax(1) == yte).float().mean().item(), norma_max]
+
+
+sgd = lambda p: torch.optim.SGD(p, lr=0.1)
+adam = lambda p: torch.optim.Adam(p, lr=1e-3)
+recetas = [
+    ("1. Sigmoide, init defecto, SGD", dict(act=nn.Sigmoid), sgd),
+    ("2. ReLU, init defecto, SGD", dict(), sgd),
+    ("3. ReLU + He, SGD", dict(he=True), sgd),
+    ("4. + BatchNorm", dict(he=True, bn=True), sgd),
+    ("5. + Dropout 0.2", dict(he=True, bn=True, p=0.2), sgd),
+    ("6. + Adam (lr 1e-3)", dict(he=True, bn=True, p=0.2), adam),
+]
+print(f"{'receta':32s} {'pérd.train':&gt;10s} {'acc.train':&gt;9s} {'pérd.test':&gt;9s} {'acc.test':&gt;8s} {'‖g‖ máx':&gt;8s}")
+for nombre, config, crear_opt in recetas:
+    r = np.mean([entrenar(config, crear_opt, s) for s in range(3)], axis=0)
+    print(f"{nombre:32s} {r[0]:10.3f} {r[1]:9.3f} {r[2]:9.3f} {r[3]:8.3f} {r[4]:8.2f}")</code></pre>
+  <details class="linea-a-linea" open>
+    <summary>Línea por línea</summary>
+    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+      <tbody>
+        <tr data-lines="1-6"><td><code>import numpy as np …</code></td><td>Importamos NumPy, <code>torch</code>, <code>nn</code>, los dígitos, la partición entrenamiento/test y las herramientas de lotes.</td></tr>
+        <tr data-lines="8-13"><td><code>torch.set_num_threads(1) …</code></td><td>Mismos datos y pérdida que el fragmento anterior (75 % / 25 %, estratificado).</td></tr>
+        <tr data-lines="16-19"><td><code>class RedProfunda(nn.Module): …</code></td><td>Red profunda configurable: <code>bloques</code> capas ocultas de <code>ancho</code> neuronas, con la activación <code>act</code>, BatchNorm (<code>bn</code>), dropout (<code>p</code>) e inicialización He (<code>he</code>) opcionales.</td></tr>
+        <tr data-lines="20"><td><code>for i in range(bloques):</code></td><td>Se guardan en una <code>nn.ModuleList</code> (lo visto en el primer fragmento) un bloque por capa oculta.</td></tr>
+        <tr data-lines="21"><td><code>capas = [nn.Linear(64 if i == 0 else ancho, ancho, bias=not bn)]</code></td><td>Cada bloque empieza con una <code>nn.Linear</code>; la primera recibe 64 entradas y las demás <code>ancho</code>. Con BatchNorm, el sesgo sobra (<code>bias=not bn</code>) porque β ya hace de sesgo.</td></tr>
+        <tr data-lines="22-24"><td><code>if bn: …</code></td><td>Si <code>bn</code>, una <code>BatchNorm1d</code> detrás de la lineal; luego la activación.</td></tr>
+        <tr data-lines="25-27"><td><code>if p &gt; 0: …</code></td><td>Si <code>p &gt; 0</code>, un <code>Dropout(p)</code>; el bloque se envuelve en un <code>nn.Sequential</code> y se añade a la lista.</td></tr>
+        <tr data-lines="28"><td><code>self.salida = nn.Linear(ancho, 10)</code></td><td>La capa de salida con 10 clases, sin activación.</td></tr>
+        <tr data-lines="29-34"><td><code>if he: …</code></td><td>Con <code>he=True</code>, recorre <code>self.modules()</code> (todos los submódulos): He en cada <code>Linear</code> y sesgo cero si lo tiene.</td></tr>
+        <tr data-lines="36-39"><td><code>def forward(self, x): …</code></td><td><code>forward</code>: pasa por los bloques en orden y termina en la capa de salida.</td></tr>
+        <tr data-lines="42-45"><td><code>def entrenar(config, crear_opt, semilla, epocas=30): …</code></td><td><code>entrenar</code>: semilla, modelo con la configuración dada y optimizador.</td></tr>
+        <tr data-lines="46-47"><td><code>datos = DataLoader(TensorDataset(Xtr, ytr), batch_size=64, shuffle=True, drop_last=True, …</code></td><td><code>DataLoader</code> con lotes de 64, orden aleatorio reproducible y <code>drop_last</code> (importante con BatchNorm).</td></tr>
+        <tr data-lines="48"><td><code>norma_max = 0.0</code></td><td>Variable para registrar el mayor gradiente visto.</td></tr>
+        <tr data-lines="49-50"><td><code>for _ in range(epocas): …</code></td><td>Cada época: <code>modelo.train()</code> activa dropout y BatchNorm de entrenamiento.</td></tr>
+        <tr data-lines="51-53"><td><code>for xb, yb in datos: …</code></td><td>Lote, gradientes a cero y <code>backward</code>.</td></tr>
+        <tr data-lines="54"><td><code>norma = nn.utils.clip_grad_norm_(modelo.parameters(), max_norm=5.0)</code></td><td><code>clip_grad_norm_</code> limita la norma total del gradiente a 5.0 (si es mayor, lo reduce) y <strong>devuelve la norma que había antes</strong> de recortar.</td></tr>
+        <tr data-lines="55-56"><td><code>norma_max = max(norma_max, norma.item()) …</code></td><td>Guarda la norma máxima y da el paso del optimizador.</td></tr>
+        <tr data-lines="57-60"><td><code>modelo.eval()                                         # dropout apagado, BatchNorm con medias móviles …</code></td><td>Al final, modo <code>eval()</code> (dropout apagado, BatchNorm con medias móviles) y medición de pérdida y acierto en entrenamiento y en test, más la norma máxima.</td></tr>
+        <tr data-lines="63-64"><td><code>sgd = lambda p: torch.optim.SGD(p, lr=0.1) …</code></td><td>Dos optimizadores: SGD con \(lr=0.1\) y Adam con \(10^{-3}\).</td></tr>
+        <tr data-lines="65-72"><td><code>recetas = [ …</code></td><td>Las seis recetas, de peor a mejor, con los cambios acumulados.</td></tr>
+        <tr data-lines="73"><td><code>print(f"{'receta':32s} {'pérd.train':&gt;10s} {'acc.train':&gt;9s} {'pérd.test':&gt;9s} {'acc.test':&gt;8s} {'‖g‖ máx':&gt;8s}")</code></td><td>Cabecera de la tabla.</td></tr>
+        <tr data-lines="74-75"><td><code>for nombre, config, crear_opt in recetas: …</code></td><td>Para cada receta, 3 semillas y media.</td></tr>
+        <tr data-lines="76"><td><code>print(f"{nombre:32s} {r[0]:10.3f} {r[1]:9.3f} {r[2]:9.3f} {r[3]:8.3f} {r[4]:8.2f}")</code></td><td>Imprime pérdida y acierto en entrenamiento y test y la norma de gradiente máxima.</td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>receta                           pérd.train acc.train pérd.test acc.test  ‖g‖ máx
+1. Sigmoide, init defecto, SGD        2.305     0.101     2.305    0.101     0.88
+2. ReLU, init defecto, SGD            2.292     0.163     2.292    0.164     0.25
+3. ReLU + He, SGD                     0.003     1.000     0.099    0.970    10.24
+4. + BatchNorm                        0.003     1.000     0.104    0.971     3.89
+5. + Dropout 0.2                      0.028     0.994     0.090    0.973     3.59
+6. + Adam (lr 1e-3)                   0.061     0.986     0.122    0.967     3.68</pre>
+    <p>Las recetas 1 y 2 no aprenden en 30 épocas (pérdida 2.30, ≈ 10-16 % de acierto: azar). Cambiar a He (receta 3) lo arregla de golpe: 97.0 % en test. BatchNorm (4) deja el acierto igual (97.1 %) y baja el gradiente máximo de 10.2 a 3.9. El dropout (5) reduce un poco la pérdida de test (0.104 → 0.090) y el acierto sube a 97.3 %. Adam (6) no mejora aquí (96.7 %). Con 3 semillas, diferencias de 0.2 puntos son ruido: en este problema pequeño lo que importa es la activación y la inicialización.</p>
+  </div>
+</article>
+</section>
+
+<section>
+<h2 id="quiz">Comprueba lo aprendido</h2>
+<div class="quiz">
+<script type="application/json" class="quiz-data">
+{
+ "titulo": "Cuestionario del módulo 2: redes profundas y técnicas de entrenamiento",
+ "preguntas": [
+  {
+   "q": "¿Cuántos parámetros entrenables tiene <code>nn.Linear(100, 50)</code>?",
+   "opciones": [
+    "5.000 (solo los pesos)",
+    "5.050 (100·50 pesos + 50 sesgos)",
+    "5.150 (100·51 + 50)",
+    "150 (100 + 50)"
+   ],
+   "correcta": 1,
+   "porque": "<code>weight</code> tiene forma (50, 100) = 5000 números y <code>bias</code> tiene 50: 5000 + 50 = 5050. La primera opción olvida los sesgos; las otras no corresponden a ninguna cuenta de la capa."
+  },
+  {
+   "q": "Guardas las capas de tu <code>nn.Module</code> en una lista normal de Python (<code>self.capas = [nn.Linear(4, 4), nn.Linear(4, 1)]</code>) y creas <code>torch.optim.SGD(model.parameters(), lr=0.1)</code>. ¿Qué ocurre?",
+   "opciones": [
+    "Nada: funciona igual",
+    "Python convierte la lista en una ModuleList automáticamente",
+    "<code>ValueError: optimizer got an empty parameter list</code>: PyTorch no ve ninguna capa",
+    "Los pesos se entrenan, pero más despacio"
+   ],
+   "correcta": 2,
+   "porque": "Solo los módulos guardados en <code>nn.ModuleList</code>, <code>nn.Sequential</code> o como atributos directos se registran. Una lista de Python es invisible para <code>parameters()</code>; el <code>forward</code> sí funciona, y por eso el fallo no aparece hasta crear el optimizador."
+  },
+  {
+   "q": "En la red 2-2-1 del texto, \\( \\delta_1=-4 \\) y la entrada es \\( x_2=2 \\). ¿Cuánto vale \\( \\partial L/\\partial w_{12}=\\delta_1\\,x_2 \\)?",
+   "opciones": [
+    "−8",
+    "−2",
+    "8",
+    "−4"
+   ],
+   "correcta": 0,
+   "porque": "El gradiente de un peso es el \\( \\delta \\) de su neurona por la entrada que multiplica: \\( -4\\cdot2=-8 \\). −4 sería \\( \\partial L/\\partial b_1 \\) (el propio \\( \\delta \\)); −2 y 8 mezclan signos o cifras."
+  },
+  {
+   "q": "Una neurona ReLU tiene \\( z=-2 \\) para un dato concreto. ¿Qué gradiente reciben sus pesos para ese dato?",
+   "opciones": [
+    "Uno positivo y pequeño",
+    "Uno negativo",
+    "El mismo que si \\( z \\) valiera 2",
+    "Cero: la derivada de ReLU es 0 cuando \\( z<0 \\), y no pasa gradiente"
+   ],
+   "correcta": 3,
+   "porque": "\\( \\delta=\\partial L/\\partial h\\cdot\\mathbb{1}[z>0] \\) y aquí el indicador vale 0. Es lo que muestra el fragmento 3 (<code>W1.grad</code> con la segunda fila a ceros). Si una neurona está en \\( z<0 \\) para todos los datos, deja de aprender: «neurona muerta»."
+  },
+  {
+   "q": "Olvidas <code>optimizer.zero_grad()</code> en tu bucle de entrenamiento. ¿Qué pasa?",
+   "opciones": [
+    "PyTorch lanza un error en el segundo paso",
+    "Los gradientes de cada lote se suman a los anteriores y el entrenamiento va mal, sin dar ningún error",
+    "Nada: <code>backward()</code> sobrescribe <code>.grad</code> cada vez",
+    "El learning rate se duplica en cada paso"
+   ],
+   "correcta": 1,
+   "porque": "<code>backward()</code> <strong>suma</strong> el gradiente nuevo al que hubiera en <code>.grad</code> (en el fragmento 3, \\( \\partial(w^2)/\\partial w \\) sale 4, 8, 12). No hay error: simplemente cada paso usa un gradiente que mezcla todos los lotes anteriores."
+  },
+  {
+   "q": "La derivada de la sigmoide vale como máximo 0,25. En el mejor de los casos, ¿por cuánto se multiplica el gradiente al retroceder por 8 capas sigmoides (ignorando los pesos)?",
+   "opciones": [
+    "\\( 8\\cdot0{,}25=2 \\)",
+    "\\( 0{,}25\\cdot0{,}25=0{,}0625 \\)",
+    "\\( 0{,}25^8\\approx1{,}5\\cdot10^{-5} \\)",
+    "0,25"
+   ],
+   "correcta": 2,
+   "porque": "Cada capa añade un factor ≤ 0,25 y los factores <strong>se multiplican</strong>: \\( 0{,}25^8=1{,}5\\cdot10^{-5} \\). Sumar (opción 1) o multiplicar solo dos veces (opción 2) no corresponde a una cadena de 8 capas. Por eso la sigmoide en redes profundas hace que las primeras capas apenas reciban gradiente."
+  },
+  {
+   "q": "Una capa tiene 100 entradas y sus pesos se inicializan con \\( N(0;\\,0{,}01^2) \\) (desviación 0,01). Aproximadamente, ¿por qué factor se multiplica la desviación de la señal al pasar por la capa?",
+   "opciones": [
+    "0,01",
+    "1",
+    "10",
+    "0,1"
+   ],
+   "correcta": 3,
+   "porque": "\\( \\mathrm{Var}(z)=n\\,\\mathrm{Var}(w)\\,\\mathrm{Var}(x)=100\\cdot0{,}0001\\cdot\\mathrm{Var}(x)=0{,}01\\,\\mathrm{Var}(x) \\). La varianza se multiplica por 0,01, luego la <strong>desviación</strong> por \\( \\sqrt{0{,}01}=0{,}1 \\). Tras 10 capas, \\( 10^{-10} \\): la señal se apaga."
+  },
+  {
+   "q": "<code>nn.Dropout(p=0.2)</code> en modo entrenamiento: ¿por qué factor se multiplican las activaciones que sobreviven?",
+   "opciones": [
+    "\\( 1/(1-0{,}2)=1{,}25 \\)",
+    "0,8",
+    "1,2",
+    "5"
+   ],
+   "correcta": 0,
+   "porque": "Cada activación sobrevive con probabilidad 0,8; multiplicar por 1,25 hace que su valor esperado sea \\( 0{,}8\\cdot1{,}25\\,h=h \\). Así, en <code>eval()</code> (sin dropout) las capas siguientes ven la misma escala que durante el entrenamiento (<em>inverted dropout</em>)."
+  },
+  {
+   "q": "Tu <code>forward</code> contiene <code>return self.lineal(F.dropout(x, p=0.5))</code> y haces <code>model.eval()</code>. Las predicciones con la misma entrada siguen cambiando en cada llamada. ¿Por qué?",
+   "opciones": [
+    "<code>eval()</code> solo afecta a las capas de BatchNorm",
+    "El generador aleatorio no tiene semilla",
+    "<code>F.dropout</code> tiene <code>training=True</code> por defecto y no mira el modo del modelo; hay que escribir <code>training=self.training</code> (o usar <code>nn.Dropout</code>)",
+    "Hay que llamar también a <code>torch.no_grad()</code> para apagar el dropout"
+   ],
+   "correcta": 2,
+   "porque": "La versión funcional no conoce el modo del modelo. El fragmento 7 da −0,1736 y −0,1031 para la misma entrada en <code>eval()</code>. <code>nn.Dropout</code> como capa sí hereda el modo. <code>no_grad</code> desactiva el cálculo de gradientes, no el dropout."
+  },
+  {
+   "q": "Una capa <code>BatchNorm1d</code> tiene <code>running_mean = 0</code>, <code>momentum = 0.1</code> y recibe un lote cuya media es 5. ¿Cuánto vale <code>running_mean</code> después?",
+   "opciones": [
+    "5",
+    "0,5",
+    "4,5",
+    "0,05"
+   ],
+   "correcta": 1,
+   "porque": "<code>running = (1 − 0,1)·running + 0,1·media_lote = 0,9·0 + 0,1·5 = 0,5</code> (el fragmento 10 da exactamente 0,5). En PyTorch el momentum es la parte que entra de la estadística nueva; en Keras es la que se conserva de la vieja."
+  },
+  {
+   "q": "Un peso \\( w=1 \\) recibe un gradiente constante \\( g=0{,}5 \\) con <code>SGD(lr=0.1, momentum=0.9)</code> de PyTorch. ¿Cuánto vale \\( w \\) tras dos pasos?",
+   "opciones": [
+    "0,855",
+    "0,9",
+    "0,8",
+    "0,95"
+   ],
+   "correcta": 0,
+   "porque": "Paso 1: \\( v=0{,}5 \\), \\( w=1-0{,}1\\cdot0{,}5=0{,}95 \\). Paso 2: \\( v=0{,}9\\cdot0{,}5+0{,}5=0{,}95 \\), \\( w=0{,}95-0{,}1\\cdot0{,}95=0{,}855 \\). SGD simple daría 0,9 (dos pasos de 0,05); 0,95 es solo el primer paso del momentum."
+  },
+  {
+   "q": "Con <code>Adam(lr=0.01)</code>, ¿cuánto se mueve un peso en su <strong>primer</strong> paso si su gradiente es 0,5? ¿Y si es 50?",
+   "opciones": [
+    "Proporcional al gradiente: 0,005 con g = 0,5 y 0,5 con g = 50",
+    "0,001 en ambos casos",
+    "0,1 en ambos casos",
+    "0,01 en ambos casos: el primer paso de Adam vale \\( lr \\) sea cual sea la escala del gradiente"
+   ],
+   "correcta": 3,
+   "porque": "En el primer paso \\( \\hat m=g \\) y \\( \\sqrt{\\hat s}=|g| \\), así que el paso es \\( lr\\cdot g/|g|=lr \\). El fragmento 12 muestra <code>[-0.01, -0.01, -0.01, -0.01]</code> tanto con g = 0,5 como con g = 50. SGD sí sería proporcional al gradiente."
+  }
+ ]
+}
+</script>
+</div>
+</section>
+
+<section class="resumen">
+<h2 class="sin-num sin-toc">Resumen del módulo</h2>
+<ul>
+  <li>Una red profunda se escribe con un bucle y <code>nn.ModuleList</code> (o <code>nn.Sequential</code>); una lista de Python no registra las capas y deja al optimizador sin parámetros. Cada <code>nn.Linear(n_ent, n_sal)</code> tiene \( n_{\text{ent}}\,n_{\text{sal}}+n_{\text{sal}} \) parámetros.</li>
+  <li><strong>Backpropagation</strong> = «gradiente que llega × derivada local», de la salida a la entrada. En la red 2-2-1: \( \partial L/\partial\hat y=-2 \), \( \delta=(-4,2) \), \( \partial L/\partial W_1=[[-4,-8],[2,4]] \), y autograd da lo mismo. Los gradientes se acumulan: <code>zero_grad()</code> en cada paso; una neurona ReLU con \( z<0 \) no recibe gradiente.</li>
+  <li><strong>Gradiente que se desvanece:</strong> cada capa añade un factor (≤ 0,25 en la sigmoide), así que las primeras capas reciben una millonésima del gradiente. Se mide con <code>p.grad.norm()</code> por capa. Con ReLU + He el cociente capa 1 / última es ≈ 2; con sigmoide + defecto, \( 4{,}5\cdot10^{-7} \). Si explota: <code>clip_grad_norm_</code>.</li>
+  <li><strong>Inicialización:</strong> \( \mathrm{Var}(z)=n\,\mathrm{Var}(w)\,\mathrm{Var}(x) \); hay que mantener \( n\,\mathrm{Var}(w)\approx1 \). Xavier (\( 2/(n_{\text{ent}}+n_{\text{sal}}) \)) para tanh y sigmoide, He (\( 2/n_{\text{ent}} \)) para ReLU; <code>nn.init.*_</code> e <code>.apply()</code>. El valor por defecto de <code>nn.Linear</code> no es Xavier.</li>
+  <li><strong>Dropout:</strong> apaga con probabilidad \( p \) y reescala por \( 1/(1-p) \) para conservar el valor esperado; <code>model.train()</code> lo activa y <code>model.eval()</code> lo apaga. Trampa: <code>F.dropout</code> sin <code>training=self.training</code>. Mejora la pérdida de test (0,967 → 0,423) más que el acierto (83,7 → 85,8 %).</li>
+  <li><strong>Momentum:</strong> \( v=\mu v+g \), \( w\mathrel{-}=lr\,v \) (PyTorch; Keras acumula \( lr\cdot g \) y difiere si el \( lr \) cambia). Nesterov usa \( g+\mu v \). Con \( \mu=0{,}9 \), hasta 10 veces el paso de SGD.</li>
+  <li><strong>BatchNorm:</strong> normaliza con la media y varianza del lote y reescala con γ y β; en <code>eval()</code> usa <code>running_mean</code> y <code>running_var</code> (momentum 0,1 en PyTorch, inverso al de Keras). No admite lotes de una muestra: <code>drop_last=True</code>. Rescata una red de 10 sigmoides (pérdida 2,30 → 0,36).</li>
+  <li><strong>Optimizadores:</strong> RMSprop divide por \( \sqrt{s} \); Adam combina momentum y RMSprop con corrección de sesgo y su primer paso vale \( lr \) sea cual sea el gradiente; <code>AdamW</code> desacopla el weight decay; los <code>lr_scheduler</code> bajan el \( lr \) (primero <code>optimizer.step()</code>, luego <code>scheduler.step()</code>).</li>
+  <li><strong>Receta y honestidad:</strong> en los dígitos, el salto de 16 % a 97 % lo dan ReLU + He; BatchNorm, dropout y Adam afinan. Mide siempre: no hay receta universal.</li>
+</ul>
+<p>Siguiente paso: en el <a href="modulo-3.html">módulo 3</a> pasas de las redes densas a las <strong>redes convolucionales</strong> con <code>nn.Conv2d</code>, canales y pooling, donde todo lo de este módulo (inicialización, BatchNorm2d, dropout, optimizadores) se sigue usando.</p>
+</section>
+
+</div>
+</main>
+</body>
+</html>

@@ -1,0 +1,2228 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Módulo 3 · Redes convolucionales con PyTorch · Curso 5 · Cuaderno de IA</title>
+<meta name="description" content="Conv2d, canales, stride, padding, pooling, Flatten, BatchNorm2d y DataLoader en PyTorch: formato NCHW, cuentas de formas capa a capa y una CNN completa entrenada con dígitos.">
+<script>try{var t=localStorage.getItem('cuaderno-ia:tema');if(t)document.documentElement.setAttribute('data-theme',t)}catch(e){}</script>
+<link rel="stylesheet" href="../assets/css/style.css">
+<script src="../assets/js/curriculum.js"></script>
+<script src="../assets/js/lab.js"></script>
+<script src="../assets/js/app.js" defer></script>
+</head>
+<body data-root="../" data-course="5" data-module="3">
+<main>
+<div class="page">
+
+<header class="hero">
+  <div class="hero-grid">
+    <div>
+      <p class="eyebrow">Curso 5 · Módulo 3</p>
+      <h1>Redes convolucionales con PyTorch</h1>
+      <p class="lead">Ya sabes qué es una convolución, un stride, un padding y un pooling (los viste en Keras). Aquí los llevas a PyTorch: <code>nn.Conv2d</code> con su tensor de pesos, el formato <strong>NCHW</strong> (que no es el de Keras), <code>nn.MaxPool2d</code>, <code>nn.Flatten</code>, <code>nn.BatchNorm2d</code>, el <code>DataLoader</code> y, sobre todo, <strong>la cuenta de las formas capa a capa</strong>, que es donde se rompe el 90 % de las CNN que escribes por primera vez.</p>
+    </div>
+    <div class="hero-tile" aria-hidden="true"></div>
+  </div>
+  <div class="goals">
+    <h2 class="sin-num sin-toc">Al terminar este módulo sabrás</h2>
+    <ul>
+      <li>Preparar imágenes como tensores (N, C, H, W), pasar de NHWC a NCHW y entender qué es la memoria <em>channels_last</em>.</li>
+      <li>Calcular a mano una convolución con varios canales de entrada y de salida, y contar los parámetros de un <code>nn.Conv2d</code>.</li>
+      <li>Predecir el tamaño de salida con <code>kernel_size</code>, <code>stride</code>, <code>padding</code> (incluido <code>'same'</code>) y <code>dilation</code>.</li>
+      <li>Usar <code>nn.MaxPool2d</code>, <code>nn.AvgPool2d</code> y <code>nn.AdaptiveAvgPool2d</code>, con sus argumentos y sus trampas (<code>ceil_mode</code>, stride por defecto).</li>
+      <li>Escribir una CNN completa como <code>nn.Module</code>, calcular el <code>in_features</code> de su capa lineal y comprobar formas y parámetros con un «resumen» hecho a mano con <em>hooks</em>.</li>
+      <li>Entrenar la CNN por lotes con <code>DataLoader</code>, con y sin <code>nn.BatchNorm2d</code>, y medir qué aporta cada cosa.</li>
+      <li>Comparar una CNN con una red densa en parámetros, en cálculo y ante imágenes desplazadas, y leer los errores de forma más frecuentes.</li>
+    </ul>
+  </div>
+</header>
+
+<!-- =============================================================== -->
+<section>
+<h2 id="por-que">Por qué una CNN, y qué cambia al pasar de Keras a PyTorch</h2>
+
+<p class="pregunta">Una red densa (módulos 1 y 2) mira cada píxel como un número suelto. ¿Qué se pierde con eso, y qué parte de lo que ya sabes de convoluciones sirve tal cual en PyTorch?</p>
+
+<div class="callout recuerda">
+  <span class="lbl">Recuerda (<a href="../curso-2/modulo-3.html#por-que-no-denso">Curso 2 · módulo 3</a>)</span>
+  <p>Una capa densa conectada a una imagen necesita un peso por cada par (píxel, neurona): una foto de 100×100 en color tiene 30.000 valores y solo 100 neuronas ya piden 3.000.100 parámetros. Además, al aplanar la imagen se pierde la vecindad (el píxel de arriba y el de abajo son «columnas lejanas» del vector) y un trazo desplazado un píxel es, para la red, <em>otra entrada distinta</em>. La <strong>convolución</strong> lo arregla con dos ideas: <strong>conexiones locales</strong> (cada neurona mira una ventana pequeña) y <strong>pesos compartidos</strong> (la misma ventana, con los mismos pesos, se desliza por toda la imagen). Con 16 filtros 3×3 sobre esa foto: 448 parámetros, unas 6.700 veces menos.</p>
+</div>
+
+<p>Todo eso sigue valiendo. Lo que cambia es <strong>cómo se escribe</strong>. La tabla resume las diferencias que más tropiezos causan; cada una se explica con detalle en su sección.</p>
+
+<table>
+  <thead><tr><th>Concepto</th><th>Keras (Cursos 2 y 3)</th><th>PyTorch (este módulo)</th></tr></thead>
+  <tbody>
+    <tr><th scope="row">Forma de un lote de imágenes</th><td>(N, H, W, C) → «NHWC»</td><td>(N, C, H, W) → «NCHW»</td></tr>
+    <tr><th scope="row">Convolución</th><td><code>Conv2D(16, (3, 3), padding="same", activation="relu")</code></td><td><code>nn.Conv2d(in_channels, 16, kernel_size=3, padding=1)</code> y la activación aparte (<code>nn.ReLU()</code>)</td></tr>
+    <tr><th scope="row">Canales de entrada</th><td>Se deducen solos al ver la primera imagen</td><td>Los escribes tú (<code>in_channels</code>); si no coinciden, error</td></tr>
+    <tr><th scope="row">Padding por defecto / <code>"same"</code></th><td><code>"valid"</code> (0); <code>"same"</code> admite stride &gt; 1</td><td><code>padding=0</code>; <code>padding='same'</code> solo con stride 1</td></tr>
+    <tr><th scope="row">Stride de <code>MaxPooling2D</code> / <code>MaxPool2d</code></th><td>Por defecto igual al tamaño de la ventana</td><td>Por defecto igual a <code>kernel_size</code> (¡pero el de <code>Conv2d</code> es 1!)</td></tr>
+    <tr><th scope="row">De mapas a vector</th><td><code>Flatten()</code> y <code>Dense</code> deduce su entrada</td><td><code>nn.Flatten()</code> y <code>nn.Linear(in_features, out)</code> con <code>in_features</code> calculado por ti</td></tr>
+    <tr><th scope="row">Normalización por lotes</th><td><code>BatchNormalization()</code> (<code>momentum=0.99</code>, <code>epsilon=0.001</code>)</td><td><code>nn.BatchNorm2d(C)</code> (<code>momentum=0.1</code>, <code>eps=1e-5</code>): el momentum significa lo contrario</td></tr>
+    <tr><th scope="row">Pesos iniciales de la convolución</th><td>Glorot uniforme y sesgo 0</td><td>Uniforme en \( \pm 1/\sqrt{\text{fan\_in}} \) (más pequeña) y sesgo uniforme también</td></tr>
+    <tr><th scope="row">Entrenar</th><td><code>compile</code> + <code>fit</code></td><td>Bucle escrito por ti con <code>DataLoader</code> (<code>zero_grad</code>, <code>backward</code>, <code>step</code>)</td></tr>
+    <tr><th scope="row">Pérdida multiclase</th><td><code>sparse_categorical_crossentropy</code> tras un <code>softmax</code> (o <code>from_logits=True</code>)</td><td><code>nn.CrossEntropyLoss</code>: recibe <strong>logits</strong>, sin softmax, y etiquetas enteras <code>Long</code></td></tr>
+  </tbody>
+</table>
+
+<p>Los valores por defecto de Keras salen de comprobarlos en Keras 3 (<code>BatchNormalization().momentum</code> da 0,99 y <code>.epsilon</code> 0,001; <code>Conv2D(4, 3).padding</code> da <code>"valid"</code>); los de PyTorch, de su documentación y de ejecutarlos en este módulo (versión 2.14).</p>
+
+<h3>Los números que justifican el esfuerzo: parámetros y cálculo</h3>
+
+<p>Antes de las cuentas finas, una foto general. El experimento compara dos redes sobre la misma imagen: una <strong>densa</strong> (<code>Flatten → Linear(n²·c, H) → ReLU → Linear(H, 10)</code>) y una <strong>CNN</strong> de dos convoluciones (<code>Conv → pool → Conv → pool</code>), con dos formas de pasar a vector: <code>Flatten</code> y <code>AdaptiveAvgPool2d(1)</code> (que verás en la sección de pooling). Se mide en <strong>parámetros</strong> y en <strong>multiplicaciones por imagen</strong> (<abbr class="t" data-def="MAC (multiply-accumulate): una multiplicación más una suma. Es la unidad con la que se mide cuánto cálculo cuesta una capa; una GPU hace miles de millones por segundo.">MAC</abbr>).</p>
+
+<figure class="demo" data-demo="curso5/c5m3-conv-vs-densa" data-titulo="red densa frente a CNN: parámetros y multiplicaciones">
+  <div class="haz">Deja 28×28 en gris con 128 neuronas y 16 filtros: anota los parámetros y las multiplicaciones. Sube la imagen a 128×128 y luego a 224×224 con 3 canales. Cambia las neuronas de la densa a 512 y los filtros a 32.</div>
+  <div class="observa">Los parámetros de la CNN con <code>AdaptiveAvgPool2d(1)</code> son siempre 5.130 con 16 filtros, sea cual sea la imagen; los de la densa crecen con el número de píxeles. Pero mira las <strong>multiplicaciones</strong>: con 28×28 la CNN hace unas 10 veces más cálculo que la densa (1.031.744 frente a 101.632). La convolución ahorra <em>parámetros</em> (memoria y sobreajuste), no operaciones: por eso las CNN se entrenan en GPU.</div>
+</figure>
+
+<p>Cómo salen esos números, por si quieres comprobarlos a mano. Una capa <code>nn.Conv2d(c_in, c_out, k)</code> con salida de \( H_{out}\times W_{out} \) hace \( c_{out}\,H_{out}W_{out}\,(k^2 c_{in}) \) multiplicaciones: cada uno de los \( c_{out}\,H_{out}W_{out} \) números de salida es un producto escalar de \( k^2 c_{in} \) pares. Con la CNN de 28×28 y 16 filtros: la primera convolución (1→16, con padding) da \( 16\cdot28\cdot28\cdot9=112.896 \) y la segunda (16→32, sobre 14×14) \( 32\cdot14\cdot14\cdot144=903.168 \); sumadas a las 15.680 de la capa lineal final dan 1.031.744.</p>
+</section>
+
+<!-- =============================================================== -->
+<section>
+<h2 id="nchw">El formato de las imágenes: NCHW frente a NHWC</h2>
+
+<p class="pregunta">Cargo una foto con NumPy y la meto en <code>nn.Conv2d</code>: «expected input[…] to have 3 channels, but got 224 channels instead». ¿Qué orden de dimensiones espera PyTorch y cómo se lo doy?</p>
+
+<p>Un <strong>lote de imágenes</strong> es un tensor de 4 dimensiones. Las convenciones son dos:</p>
+
+<ul>
+  <li><strong>NHWC</strong> = (<em>N</em>úmero de imágenes, <em>H</em>eight alto, <em>W</em>idth ancho, <em>C</em>anales). Es la de NumPy, PIL, matplotlib y Keras/TensorFlow: una imagen es una cuadrícula de píxeles y cada píxel guarda sus canales (R, G, B).</li>
+  <li><strong>NCHW</strong> = (N, C, H, W). Es la de PyTorch: una imagen son varios «planos» (uno por canal), cada plano es una matriz alto×ancho.</li>
+</ul>
+
+<div class="callout analogia">
+  <span class="lbl">Analogía</span>
+  <p>Una pila de transparencias. En NCHW tienes una transparencia entera para el rojo, otra para el verde y otra para el azul, apiladas; para ver un píxel, miras los tres planos en la misma posición. En NHWC, en cambio, cada «casilla» del papel lleva escritos sus tres valores seguidos (rojo, verde, azul), como una tabla con tres columnas. Es la <em>misma información</em> ordenada de dos maneras.</p>
+</div>
+
+<h3>La dimensión de canal: lo que se le olvida a todo el mundo</h3>
+
+<p>Una imagen en gris de 8×8 (los dígitos de scikit-learn) llega como una matriz (8, 8): <strong>no tiene eje de canal</strong>. <code>nn.Conv2d</code> lo necesita, así que hay que añadirlo con <code>x.unsqueeze(1)</code>, que convierte (N, 8, 8) en (N, 1, 8, 8). Y los valores: los dígitos van de 0 a 16, así que se dividen entre 16 para dejarlos en [0, 1] (el <a href="#codigo">fragmento 1</a> lo hace paso a paso).</p>
+
+<p>Si partes de una imagen «de las de NumPy/PIL» (alto, ancho, canales) y de enteros 0–255, <code>transforms.ToTensor()</code> hace tres cosas a la vez: <strong>reordena</strong> (H, W, C) → (C, H, W), <strong>convierte</strong> a <code>float32</code> y <strong>divide</strong> entre 255. Para un lote ya apilado en NHWC, el reordenamiento es <code>x.permute(0, 3, 1, 2)</code>.</p>
+
+<div class="callout ojo">
+  <span class="lbl">Ojo</span>
+  <p><code>ToTensor</code> solo divide entre 255 si la entrada es <code>uint8</code> (o una imagen PIL). Con un array <code>float</code> de NumPy lo reordena pero <em>no</em> lo escala (y un <code>float64</code> se queda en <code>float64</code>, que luego no encaja con los pesos <code>float32</code>). Las versiones recientes de torchvision ofrecen la API <code>transforms.v2</code> (<code>v2.ToImage()</code> seguido de <code>v2.ToDtype(torch.float32, scale=True)</code>), que da los mismos valores (se ha comprobado en torchvision 0.29); <code>ToTensor</code> sigue funcionando en la versión instalada y es la que usa el curso original.</p>
+</div>
+
+<h3>Dónde viven los números: memoria y <em>strides</em></h3>
+
+<p>Un tensor es, por debajo, una lista plana de números en memoria. Los <abbr class="t" data-def="stride (de un tensor): cuántas posiciones de la memoria hay que saltar para avanzar una unidad en cada dimensión. Es un concepto distinto del stride de una convolución, aunque se llamen igual.">strides</abbr> (¡otra vez la palabra, pero aquí no tiene que ver con la convolución!) dicen cuánto hay que saltar en esa lista para avanzar una unidad en cada dimensión. Para un tensor contiguo de forma (N, C, H, W) los strides son \( (CHW,\; HW,\; W,\; 1) \): dentro de un canal las filas están seguidas, y para cambiar de canal hay que saltar \( H\cdot W \) casillas. En NHWC son \( (HWC,\; WC,\; C,\; 1) \).</p>
+
+<figure class="demo" data-demo="curso5/c5m3-nchw-memoria" data-titulo="dónde vive cada número en memoria">
+  <div class="haz">Toca una casilla de los planos (o de la fila de memoria) y mira su posición. Pulsa «NHWC» y vuelve a tocarla. Luego pulsa «NCHW + channels_last» y compara los strides con los de NHWC. Cambia C, H y W.</div>
+  <div class="observa">En NCHW los números de un canal están seguidos (0, 1, 2…); en NHWC los canales de un píxel están seguidos y los de un mismo canal quedan separados por C casillas. El tercer botón es lo que obtienes con <code>permute</code>: la forma <em>lógica</em> es NCHW pero la memoria sigue siendo NHWC, y por eso <code>is_contiguous()</code> da <code>False</code>.</div>
+</figure>
+
+<p>Esto explica el comportamiento de <code>permute</code>: <strong>no copia nada</strong>, solo cambia la forma y los strides (el fragmento 1 comprueba que comparte memoria con el original). El resultado de <code>x_nhwc.permute(0, 3, 1, 2)</code> es un tensor con forma NCHW pero con memoria <em>channels_last</em>; las capas de PyTorch lo aceptan sin problema, pero <code>.view()</code> falla («view size is not compatible with input tensor's size and stride») porque ya no es contiguo. La salida es <code>.reshape()</code> (que copia si hace falta) o <code>.contiguous()</code>. Es justo el mismo error que viste en el Curso 4 al aplanar tensores transpuestos.</p>
+
+<div class="callout regla">
+  <span class="lbl">Regla fácil</span>
+  <p>En PyTorch, antes de una <code>nn.Conv2d</code> el tensor debe ser <strong>(N, C, H, W)</strong>, de tipo <code>float32</code> y con valores escalados (0–1 o normalizados). Si vienes de NumPy/Keras: <code>permute(0, 3, 1, 2)</code>. Si es gris sin canal: <code>unsqueeze(1)</code>.</p>
+</div>
+</section>
+
+<!-- =============================================================== -->
+<section>
+<h2 id="conv-mano">La convolución a mano y con <code>F.conv2d</code></h2>
+
+<p class="pregunta">Si el filtro es solo una matriz de 3×3, ¿cuál es el código mínimo que calcula una convolución, y cómo se comprueba que <code>nn.Conv2d</code> hace exactamente eso?</p>
+
+<div class="callout recuerda">
+  <span class="lbl">Recuerda (<a href="../curso-2/modulo-3.html#convolucion">Curso 2 · módulo 3</a>)</span>
+  <p>Se coloca el filtro sobre una ventana de la imagen, se multiplica elemento a elemento, se suman los productos y se guarda un solo número; luego la ventana se desliza. Con la imagen 5×5 del Curso 2 (a la izquierda valores 1–2 y a la derecha 8–9) y el filtro de borde vertical \( [-1,0,1] \) por fila, el mapa 3×3 que sale es <code>[[0, 21, 22], [0, 22, 22], [0, 21, 22]]</code>. Y llamábamos «convolución» a lo que en rigor es una <em>correlación cruzada</em>: el filtro no se gira.</p>
+</div>
+
+<p>En PyTorch hay dos formas de llamar a la operación:</p>
+<ul>
+  <li><code>nn.Conv2d</code>: una <strong>capa</strong> con sus pesos guardados dentro (<code>conv.weight</code>, <code>conv.bias</code>) y entrenables. Es lo que se usa al construir redes.</li>
+  <li><code>torch.nn.functional.conv2d(x, w)</code> (se importa como <code>F.conv2d</code>): una <strong>función</strong> a la que le pasas tú los pesos. No guarda nada. Es útil para experimentos como este.</li>
+</ul>
+
+<p>La función espera la entrada como (N, C_in, H, W) y el filtro como <strong>(C_out, C_in, kH, kW)</strong>. Para nuestro ejemplo de una imagen, un canal y un filtro: <code>x.reshape(1, 1, 5, 5)</code> y <code>w.reshape(1, 1, 3, 3)</code>. El <a href="#codigo">fragmento 2</a> escribe la convolución con dos bucles (ventana, producto, suma), la compara con <code>F.conv2d</code> (coinciden en los 9 valores) y comprueba lo de la correlación: con el filtro girado 180° (<code>torch.flip(w, dims=[2, 3])</code>) el mapa cambia de signo, <code>[[0, −21, −22], …]</code>, como debe ser.</p>
+
+<h3>Poner los pesos a mano: el filtro de Sobel</h3>
+
+<p>Una <code>nn.Conv2d</code> nace con pesos aleatorios. Para ver la operación pura se pueden sobrescribir dentro de <code>with torch.no_grad():</code> (así PyTorch no intenta derivar la asignación): <code>conv.weight[0, 0] = sobel</code> y <code>conv.bias.zero_()</code>. El filtro de Sobel vertical \( \begin{pmatrix}1&0&-1\\2&0&-2\\1&0&-1\end{pmatrix} \) resta lo que hay a la derecha de lo que hay a la izquierda (con más peso a la fila central). Sobre una imagen 6×6 con la mitad izquierda a 0 y la derecha a 1, las ventanas que ven el salto dan \( -(1+2+1)=-4 \) y las que no, 0: la salida 4×4 tiene las columnas centrales a −4 y las laterales a 0 (fragmento 2).</p>
+
+<div class="callout ojo">
+  <span class="lbl">Ojo</span>
+  <p>La salida de una capa con pesos entrenables lleva <code>grad_fn=&lt;ConvolutionBackward0&gt;</code> (PyTorch está apuntando el grafo para el <code>backward</code>). Para imprimirla o pasarla a NumPy hay que hacer <code>.detach()</code>, o evaluar dentro de <code>torch.no_grad()</code>. Si no, <code>.numpy()</code> falla con «Can't call numpy() on Tensor that requires grad».</p>
+</div>
+</section>
+
+<!-- =============================================================== -->
+<section>
+<h2 id="conv2d"><code>nn.Conv2d</code>: sus argumentos, su tensor de pesos y varios canales</h2>
+
+<p class="pregunta">Mi imagen tiene 3 canales y quiero 16 mapas de salida. ¿Qué forma tiene el tensor de pesos, cuántos parámetros son y qué hace la capa con los canales?</p>
+
+<p>La firma completa de la capa es:</p>
+
+<pre class="ascii">nn.Conv2d(in_channels, out_channels, kernel_size, stride=1, padding=0,
+          dilation=1, groups=1, bias=True, padding_mode='zeros')</pre>
+
+<p>Los tres primeros son obligatorios: <code>in_channels</code> (canales que entran), <code>out_channels</code> (cuántos filtros, es decir, cuántos mapas salen) y <code>kernel_size</code> (un entero <code>3</code> significa 3×3; también vale una tupla <code>(3, 5)</code>). Los demás tienen valor por defecto: <code>stride</code>, <code>padding</code> y <code>dilation</code> se explican en la siguiente sección; <code>groups</code> y <code>padding_mode</code>, más abajo.</p>
+
+<h3>Cómo trata los canales: una suma sobre todos los canales de entrada</h3>
+
+<p>Cuando la entrada tiene varios canales (RGB, o los 16 mapas que dejó la capa anterior), <strong>cada filtro de salida tiene un kernel por cada canal de entrada</strong>. Para calcular un número de salida: (1) en cada canal de entrada se multiplica la ventana por <em>su</em> kernel y se suma; (2) se <strong>suman las aportaciones de todos los canales</strong>; (3) se añade el sesgo (uno por filtro). Un filtro de salida produce un solo mapa, aunque la entrada tenga muchos canales.</p>
+
+<div class="callout analogia">
+  <span class="lbl">Analogía</span>
+  <p>Un tribunal con tres jueces (los canales de entrada). Cada juez puntúa lo que ve con <em>su</em> baremo (su kernel). El veredicto de un filtro es la suma de las puntuaciones de los tres, más un ajuste propio del filtro (el sesgo). Con 16 filtros tienes 16 tribunales distintos, cada uno con sus tres baremos, y salen 16 veredictos por cada posición de la ventana.</p>
+</div>
+
+<div class="callout ejemplo">
+  <span class="lbl">Ejemplo numérico: <code>nn.Conv2d(2, 2, kernel_size=2)</code> sobre una imagen 3×3 de dos canales</span>
+  <p>Canal 0: <code>[[1,2,0],[0,1,3],[2,1,0]]</code>. Canal 1: <code>[[0,1,1],[2,0,1],[1,3,0]]</code>. Para el <strong>filtro 0</strong>: kernel del canal 0 = <code>[[1,0],[0,−1]]</code>, kernel del canal 1 = <code>[[0,1],[1,0]]</code>, sesgo 0,5. Calculamos la salida en la posición (0,0):</p>
+  <ol class="pasos">
+    <li><strong>Canal 0.</strong> Ventana <code>[[1,2],[0,1]]</code> × kernel <code>[[1,0],[0,−1]]</code>: 1·1 + 2·0 + 0·0 + 1·(−1) = <span class="res">0</span>.</li>
+    <li><strong>Canal 1.</strong> Ventana <code>[[0,1],[2,0]]</code> × kernel <code>[[0,1],[1,0]]</code>: 0·0 + 1·1 + 2·1 + 0·0 = <span class="res">3</span>.</li>
+    <li><strong>Suma de canales y sesgo.</strong> 0 + 3 + 0,5 = <span class="res">3,5</span>.</li>
+  </ol>
+  <p>Repitiendo en las cuatro posiciones, el mapa del filtro 0 es <code>[[3,5; 0,5], [0,5; 5,5]]</code> (el demo de abajo lo calcula con todos los pasos). Parámetros de la capa: pesos \( 2\cdot2\cdot2\cdot2=16 \) (2 filtros × 2 canales × 2×2) más 2 sesgos = <strong>18</strong>.</p>
+</div>
+
+<figure class="demo" data-demo="curso5/c5m3-conv-canales" data-titulo="una Conv2d de 2 canales de entrada y 2 de salida, paso a paso">
+  <div class="haz">Elige «filtro 0» y pulsa «Siguiente posición» cuatro veces: comprueba que la posición 1 da 3,5. Cambia a «filtro 1». Apaga el canal de entrada 1 con el botón y mira cómo cambian todas las salidas. Mueve el sesgo.</div>
+  <div class="observa">Cada número de salida es la <strong>suma de las aportaciones de los dos canales</strong> más el sesgo. Al apagar un canal de entrada, esa aportación desaparece de todas las salidas. El sesgo sube o baja <em>todos</em> los números de un mismo filtro por igual. Los dos filtros ven los mismos canales de entrada, pero con kernels distintos y por eso sacan mapas distintos.</div>
+</figure>
+
+<h3>El tensor de pesos y la cuenta de parámetros</h3>
+
+<p>Eso se refleja directamente en la forma de <code>conv.weight</code>:</p>
+
+<div class="formula">\[ \texttt{weight}\ :\ (C_{out},\ C_{in},\ k_H,\ k_W) \qquad \texttt{bias}\ :\ (C_{out}) \qquad \text{parámetros}=C_{out}\,(C_{in}\,k_H\,k_W+1) \]</div>
+
+<p>\( C_{out} \) es el número de filtros, \( C_{in} \) los canales que entran, \( k_H\times k_W \) el tamaño del kernel y el «+1» el sesgo de cada filtro. <strong>No aparece el tamaño de la imagen</strong>: por eso una misma capa funciona con imágenes de cualquier tamaño. En el fragmento 3, <code>nn.Conv2d(3, 4, 3)</code> tiene <code>weight</code> de forma (4, 3, 3, 3) y <code>bias</code> de (4,): \( 4\,(27+1)=112 \) parámetros; el valor de una posición calculado a mano (suma por canales + sesgo) coincide con el de la capa hasta el quinto decimal.</p>
+
+<div class="callout ejemplo">
+  <span class="lbl">Ejemplo numérico: parámetros de las capas de esta página</span>
+  <table>
+    <thead><tr><th>Capa</th><th>Cuenta</th><th>Parámetros</th></tr></thead>
+    <tbody>
+      <tr><td><code>nn.Conv2d(1, 16, 5)</code></td><td>16 · (1·5·5 + 1) = 16 · 26</td><td class="res">416</td></tr>
+      <tr><td><code>nn.Conv2d(16, 32, 5)</code></td><td>32 · (16·25 + 1) = 32 · 401</td><td class="res">12.832</td></tr>
+      <tr><td><code>nn.Conv2d(3, 16, 3)</code></td><td>16 · (3·9 + 1) = 16 · 28</td><td class="res">448</td></tr>
+      <tr><td><code>nn.Conv2d(16, 32, 3)</code></td><td>32 · (16·9 + 1) = 32 · 145</td><td class="res">4.640</td></tr>
+      <tr><td><code>nn.Conv2d(3, 4, 3, bias=False)</code></td><td>4 · (3·9) = 4 · 27</td><td class="res">108</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<h3>Dos argumentos que no verás a menudo pero conviene conocer</h3>
+
+<ul>
+  <li><code>bias=False</code> elimina los sesgos (<code>conv.bias</code> pasa a ser <code>None</code>). Se usa cuando justo después viene una normalización por lotes, que ya resta la media de cada canal y hace inútil el sesgo (lo verás en la sección de <code>BatchNorm2d</code>).</li>
+  <li><code>groups</code> divide los canales en grupos que no se mezclan. Con <code>groups=1</code> (por defecto) cada filtro ve <em>todos</em> los canales de entrada. Con <code>groups=C_in</code> cada canal tiene sus propios filtros: es la convolución <em>en profundidad</em> (<em>depthwise</em>) de MobileNet (<a href="../curso-3/modulo-2.html">Curso 3 · módulo 2</a>). El peso pasa a tener forma \( (C_{out},\,C_{in}/\text{groups},\,k,\,k) \): con <code>nn.Conv2d(4, 8, 3, groups=4)</code> es (8, 1, 3, 3) y hay 80 parámetros en lugar de 296.</li>
+</ul>
+
+<div class="callout recuerda">
+  <span class="lbl">Recuerda (<a href="modulo-2.html#inicializacion">módulo anterior</a>)</span>
+  <p>Los pesos de <code>nn.Conv2d</code> también nacen con la inicialización por defecto de PyTorch: una uniforme en \( \pm 1/\sqrt{\text{fan\_in}} \), donde aquí \( \text{fan\_in}=C_{in}\,k_H\,k_W \) (27 para <code>nn.Conv2d(3, 4, 3)</code>: \( \pm0{,}19 \)). Es más pequeña que Xavier o He. En redes con muchas capas conviene inicializar con <code>nn.init.kaiming_normal_(conv.weight, nonlinearity="relu")</code>, como ya hiciste con las capas lineales.</p>
+</div>
+</section>
+
+<!-- =============================================================== -->
+<section>
+<h2 id="tamano">Stride, padding, dilation y el tamaño de la salida</h2>
+
+<p class="pregunta">Mi imagen mide 28×28 y mi filtro es de 5×5. ¿De qué tamaño sale el mapa? ¿Y si cambio el stride, añado padding o dilato el filtro? Esta cuenta decide el <code>in_features</code> de tu capa final.</p>
+
+<div class="callout recuerda">
+  <span class="lbl">Recuerda (<a href="../curso-2/modulo-3.html#stride-padding">Curso 2 · módulo 3</a>)</span>
+  <p>El <strong>stride</strong> es lo que salta la ventana entre una posición y la siguiente; el <strong>padding</strong> añade un marco de ceros que evita que la imagen se encoja y que los bordes pesen menos. Sin padding, un filtro de \( k \) píxeles quita \( k-1 \) píxeles por lado. En Keras escribías <code>padding="valid"</code> o <code>"same"</code>; aquí el padding es un número de píxeles por cada lado (<code>padding=2</code>) o una de las dos palabras.</p>
+</div>
+
+<h3>La fórmula de PyTorch (con dilatación)</h3>
+
+<p>La <strong>dilatación</strong> (<code>dilation</code>, que ya viste en el <a href="../curso-3/modulo-2.html#repaso">Curso 3</a>) separa los puntos del filtro: con <code>dilation=2</code> un kernel 3×3 toca píxeles alternos y cubre una zona de 5×5 con los mismos 9 pesos. Su «tamaño efectivo» es \( d(k-1)+1 \). Con eso, la fórmula de la documentación de PyTorch (para cada dimensión) queda así:</p>
+
+<div class="formula">\[ n_{\text{out}}=\left\lfloor \frac{n_{\text{in}}+2p-d\,(k-1)-1}{s}\right\rfloor+1 \]</div>
+
+<p>\( n_{\text{in}} \) es el lado de entrada, \( p \) el padding por cada lado (de ahí el \( 2p \)), \( d \) la dilatación, \( k \) el kernel, \( s \) el stride, y los corchetes \( \lfloor\cdot\rfloor \) significan «redondear hacia abajo». Con \( d=1 \) es la fórmula de siempre, \( \lfloor (n+2p-k)/s\rfloor+1 \). Por qué sale: con el marco, la fila mide \( n+2p \); la primera ventana ocupa \( d(k-1)+1 \) casillas; quedan \( n+2p-d(k-1)-1 \) por recorrer, a saltos de \( s \); y se suma 1 por la ventana inicial.</p>
+
+<div class="callout ejemplo">
+  <span class="lbl">Ejemplo numérico (los mismos casos que ejecuta el fragmento 4 con <code>nn.Conv2d</code> de verdad)</span>
+  <table>
+    <thead><tr><th>n</th><th>k</th><th>s</th><th>p</th><th>d</th><th>Cuenta</th><th>Salida</th></tr></thead>
+    <tbody>
+      <tr><td>28</td><td>5</td><td>1</td><td>0</td><td>1</td><td>⌊(28 + 0 − 4 − 1)/1⌋ + 1 = 23 + 1</td><td class="res">24</td></tr>
+      <tr><td>28</td><td>5</td><td>1</td><td>2</td><td>1</td><td>⌊(28 + 4 − 4 − 1)/1⌋ + 1 = 27 + 1</td><td class="res">28</td></tr>
+      <tr><td>28</td><td>3</td><td>2</td><td>0</td><td>1</td><td>⌊(28 − 2 − 1)/2⌋ + 1 = ⌊12,5⌋ + 1</td><td class="res">13</td></tr>
+      <tr><td>8</td><td>3</td><td>2</td><td>0</td><td>1</td><td>⌊(8 − 2 − 1)/2⌋ + 1 = ⌊2,5⌋ + 1</td><td class="res">3</td></tr>
+      <tr><td>224</td><td>7</td><td>2</td><td>3</td><td>1</td><td>⌊(224 + 6 − 6 − 1)/2⌋ + 1 = ⌊111,5⌋ + 1</td><td class="res">112</td></tr>
+      <tr><td>15</td><td>3</td><td>1</td><td>0</td><td>2</td><td>⌊(15 − 4 − 1)/1⌋ + 1 = 10 + 1</td><td class="res">11</td></tr>
+      <tr><td>15</td><td>3</td><td>1</td><td>2</td><td>2</td><td>⌊(15 + 4 − 4 − 1)/1⌋ + 1 = 14 + 1</td><td class="res">15</td></tr>
+    </tbody>
+  </table>
+  <p>La fila 224/7/2/3 es la primera capa de ResNet (la que usarás en el módulo siguiente). La fila 8/3/2 tiene un detalle: \( 8-3 \) no es múltiplo de 2, así que <strong>la última fila y la última columna no las mira ninguna ventana</strong> (las ventanas empiezan en 0, 2 y 4 y llegan hasta la columna 6; la 7 queda fuera).</p>
+</div>
+
+<figure class="demo" data-demo="curso5/c5m3-tamano-salida" data-titulo="el tamaño de la salida con todos los argumentos de Conv2d">
+  <div class="haz">Pulsa «Caso n=8, k=3, stride 2» y mueve «Ventana a resaltar»: fíjate en las casillas con una ×. Después sube padding a 1, activa <code>padding='same'</code> con k=5 y luego pon dilation=2 con k=3. Por último sube k hasta que no quepa ninguna ventana.</div>
+  <div class="observa">La salida coincide con la cuenta de arriba para cualquier combinación (se ha comprobado contra <code>nn.Conv2d</code> real). Con dilation=2 las casillas que toca una ventana quedan alternas, pero la zona que cubre es de 5×5. Con <code>'same'</code> la salida mide lo mismo que la entrada. Cuando el filtro (con su dilatación) es mayor que la imagen con marco, no cabe ninguna ventana y PyTorch lanza un error.</div>
+</figure>
+
+<h3><code>padding='valid'</code>, <code>padding='same'</code> y los números</h3>
+
+<ul>
+  <li><code>padding='valid'</code> equivale a <code>padding=0</code> (y es el valor por defecto numérico).</li>
+  <li><code>padding='same'</code> añade el relleno necesario para que, con <strong>stride 1</strong>, la salida mida lo mismo que la entrada: en total \( d(k-1) \) casillas. Con un kernel impar sale un reparto simétrico (\( (k-1)/2 \) por lado: <code>padding=1</code> para 3×3, <code>padding=2</code> para 5×5, <code>padding=3</code> para 7×7). Con un kernel par el total es impar y PyTorch reparte el sobrante hacia la derecha y abajo. Con <code>stride &gt; 1</code> da un <code>ValueError</code> (<em>padding='same' is not supported for strided convolutions</em>), a diferencia de Keras, donde <code>"same"</code> con stride 2 deja \( \lceil n/2\rceil \).</li>
+  <li>Un número (<code>padding=2</code>) es el relleno <em>por cada lado</em>; una tupla <code>(1, 2)</code> da alto y ancho distintos.</li>
+</ul>
+
+<h3><code>padding_mode</code>: con qué se rellena el marco</h3>
+
+<p>Por defecto el marco es de ceros (<code>'zeros'</code>). Hay otros tres: <code>'reflect'</code> (refleja los píxeles del borde hacia fuera), <code>'replicate'</code> (repite el píxel del borde) y <code>'circular'</code> (la imagen «se da la vuelta»). Con la imagen <code>[[1,2,3],[4,5,6],[7,8,9]]</code>, un filtro de unos 3×3 y <code>padding=1</code>, la ventana de la esquina superior izquierda suma:</p>
+
+<table>
+  <thead><tr><th><code>padding_mode</code></th><th>Ventana que ve la esquina (filas −1 a 1, columnas −1 a 1)</th><th>Suma</th></tr></thead>
+  <tbody>
+    <tr><td><code>'zeros'</code></td><td>[[0,0,0],[0,1,2],[0,4,5]]</td><td class="res">12</td></tr>
+    <tr><td><code>'reflect'</code></td><td>[[5,4,5],[2,1,2],[5,4,5]]</td><td class="res">33</td></tr>
+    <tr><td><code>'replicate'</code></td><td>[[1,1,2],[1,1,2],[4,4,5]]</td><td class="res">21</td></tr>
+    <tr><td><code>'circular'</code></td><td>[[9,7,8],[3,1,2],[6,4,5]]</td><td class="res">45</td></tr>
+  </tbody>
+</table>
+
+<p>El fragmento 4 comprueba esas cuatro sumas con <code>nn.Conv2d</code> y pesos todos a 1. En la práctica casi siempre se deja <code>'zeros'</code>: es lo más simple y el resto solo importa cuando los bordes de la imagen tienen significado propio.</p>
+
+<div class="callout ojo">
+  <span class="lbl">Ojo</span>
+  <p>Tres errores típicos: (1) olvidar el redondeo hacia abajo y escribir 12,5 en lugar de 12; (2) suponer que <code>padding=1</code> mantiene el tamaño con cualquier kernel (solo con k = 3; con k = 5 hace falta 2); (3) fiarse de <code>padding='same'</code> y luego cambiar a stride 2 (error). Además, en una imagen 28×28 con kernel 3, stride 2 y sin padding el resultado son 13 casillas, no 14: ya perdiste una fila y una columna. Para no discutirlo: <strong>el fragmento 4 y el experimento calculan la salida real</strong>.</p>
+</div>
+
+<div class="callout regla">
+  <span class="lbl">Regla fácil</span>
+  <p>Stride 1 y sin padding: la salida pierde \( d(k-1) \) píxeles por dimensión. Stride 1 con \( p=(k-1)/2 \) (kernel impar): mismo tamaño. Stride \( s \): el tamaño se divide, aproximadamente, entre \( s \).</p>
+</div>
+</section>
+
+<!-- =============================================================== -->
+<section>
+<h2 id="pooling">Activación y pooling: <code>nn.ReLU</code>, <code>nn.MaxPool2d</code> y compañía</h2>
+
+<p class="pregunta">Después de cada convolución viene un ReLU y, a menudo, un pooling. ¿Qué argumentos tiene <code>nn.MaxPool2d</code>, cuál es su stride por defecto y qué pasa cuando el mapa tiene un tamaño impar?</p>
+
+<div class="callout recuerda">
+  <span class="lbl">Recuerda (<a href="../curso-2/modulo-3.html#relu">ReLU</a> y <a href="../curso-2/modulo-3.html#pooling">pooling</a> en el Curso 2)</span>
+  <p>Una convolución es una operación lineal: sin una activación no lineal entre capas, apilar convoluciones equivale a una sola. Por eso va un ReLU (que deja pasar los positivos y pone a 0 los negativos) justo después. El <strong>pooling</strong> resume cada ventana en un número (el máximo o la media), reduce el tamaño del mapa y da algo de tolerancia a pequeños desplazamientos; no tiene parámetros que aprender.</p>
+</div>
+
+<h3>ReLU: tres formas de escribirlo</h3>
+
+<ul>
+  <li><code>nn.ReLU()</code>: una <strong>capa</strong>. Aparece en <code>nn.Sequential</code> y en los resúmenes del modelo.</li>
+  <li><code>torch.relu(x)</code> o <code>F.relu(x)</code>: una <strong>función</strong> que se llama dentro de <code>forward</code>. Hace lo mismo, pero como no es un módulo, <strong>no aparece</strong> al listar las capas con <em>hooks</em> (lo verás con el «resumen» del fragmento 7).</li>
+</ul>
+
+<h3>MaxPool2d, AvgPool2d y AdaptiveAvgPool2d</h3>
+
+<pre class="ascii">nn.MaxPool2d(kernel_size, stride=None, padding=0, dilation=1, return_indices=False, ceil_mode=False)
+nn.AvgPool2d(kernel_size, stride=None, padding=0, ceil_mode=False, count_include_pad=True, divisor_override=None)
+nn.AdaptiveAvgPool2d(output_size)</pre>
+
+<ul>
+  <li><code>stride=None</code> significa <strong>«igual que <code>kernel_size</code>»</strong>: <code>nn.MaxPool2d(2)</code> tiene stride 2 y las ventanas no se solapan. Cuidado: el stride por defecto de <code>nn.Conv2d</code> es 1; el del pooling es el tamaño de la ventana.</li>
+  <li>El tamaño de salida sigue la misma fórmula que la convolución (con \( d=1 \)): \( \lfloor (n+2p-k)/s\rfloor+1 \). Con <code>nn.MaxPool2d(2)</code> sobre 7×7 sale ⌊(7 − 2)/2⌋ + 1 = <strong>3</strong>: la séptima fila y la séptima columna se descartan.</li>
+  <li><code>ceil_mode=True</code> cambia el suelo por techo: \( \lceil (n+2p-k)/s\rceil+1 \). Sobre 7×7 sale ⌈2,5⌉ + 1 = <strong>4</strong>, y la última ventana se queda con la fila y la columna que sobraban (más pequeña, 1×2 o 2×1 o 1×1) en lugar de tirarlas. Lo que no hace PyTorch es empezar una ventana fuera de la imagen: la regla es que la última ventana debe comenzar dentro de la entrada (o del marco izquierdo).</li>
+  <li><code>padding</code> debe ser como mucho la mitad del kernel. En max pooling el marco se ignora (es «menos infinito»). En average pooling, con <code>count_include_pad=True</code> (por defecto) los ceros del marco <em>cuentan</em> en el divisor.</li>
+  <li><code>AdaptiveAvgPool2d(output_size)</code> no pide kernel ni stride: le dices el <strong>tamaño de salida</strong> y calcula las ventanas, que van de \( \lfloor i\,n/m\rfloor \) a \( \lceil (i+1)\,n/m\rceil \) (para \( n \) de entrada y \( m \) de salida) y pueden solaparse. Con <code>output_size=1</code> hace la media de todo el mapa: es el <em>global average pooling</em> de Keras (<code>GlobalAveragePooling2D</code>), y la red funciona con imágenes de cualquier tamaño.</li>
+</ul>
+
+<div class="callout ejemplo">
+  <span class="lbl">Ejemplo numérico: el mapa 7×7 del experimento y del fragmento 5</span>
+  <p>Con <code>nn.MaxPool2d(2)</code> la primera ventana (filas 0–1, columnas 0–1) contiene <code>[[1,3],[4,2]]</code> y su máximo es <span class="res">4</span>; con <code>nn.AvgPool2d(2)</code> la media es (1+3+4+2)/4 = <span class="res">2,5</span>. La salida completa del max pooling es <code>[[4,2,5],[3,8,6],[4,3,6]]</code> (3×3). Con <code>ceil_mode=True</code> son 4×4 y aparecen una fila y una columna nuevas (<code>5, 2, 2, 3</code> abajo y <code>2, 4, 5</code> a la derecha, que estaban descartadas). Con <code>stride=1</code> sale 6×6 (⌊(7 − 2)/1⌋ + 1 = 6). <code>AdaptiveAvgPool2d(1)</code> da 2,2245, la media de las 49 casillas, y <code>AdaptiveAvgPool2d(3)</code> sobre 7×7 hace 9 medias de ventanas 3×3 que se solapan en una fila o columna (la primera, filas y columnas 0–2: 21/9 = 2,33).</p>
+</div>
+
+<figure class="demo" data-demo="curso5/c5m3-pooling-pytorch" data-titulo="los argumentos del pooling de PyTorch, sobre un mapa 7×7">
+  <div class="haz">Con MaxPool2d, kernel 2 y stride por defecto, recorre las 9 casillas de salida y fíjate en las × de la entrada. Activa <code>ceil_mode=True</code>. Pon stride 1. Pasa a AvgPool2d y a padding 1 y observa el divisor. Por último elige AdaptiveAvg y mueve <code>output_size</code> de 1 a 5.</div>
+  <div class="observa">Con 7×7, kernel 2 y stride 2 la última fila y columna de la entrada (×) no las lee nadie; <code>ceil_mode=True</code> las recupera con una ventana más pequeña. Con padding el marco no aporta nada al máximo, pero sí cuenta (como 0) en la media. Con la capa adaptativa todas las casillas se leen, y cuando 7 no se reparte exactamente las ventanas se solapan. Los resultados coinciden con los de las capas reales de PyTorch (comprobado con 55 combinaciones).</div>
+</figure>
+
+<div class="callout ojo">
+  <span class="lbl">Ojo</span>
+  <p>Si el mapa se queda más pequeño que la ventana, el pooling falla: <code>nn.MaxPool2d(2)</code> sobre un mapa de 1×1 da «Output size is too small» (fragmento 15). Con imágenes pequeñas (8×8) no puedes poner muchos pooling seguidos: 8 → 4 → 2 → 1 y se acabó.</p>
+</div>
+</section>
+
+<!-- =============================================================== -->
+<section>
+<h2 id="flatten">De mapas a vector: <code>nn.Flatten</code> y el <code>in_features</code> de la capa lineal</h2>
+
+<p class="pregunta">La última capa de mi CNN es <code>nn.Linear(?, 10)</code>. ¿Qué número va en el interrogante, y cómo lo saco sin equivocarme?</p>
+
+<p>Después de las convoluciones y los pooling, el tensor sigue siendo (N, C, H, W). La capa lineal final (<code>nn.Linear</code>) espera (N, F), un vector de F números por imagen. <code>nn.Flatten(start_dim=1, end_dim=-1)</code> hace el puente: aplana todas las dimensiones <strong>desde la 1 hasta el final</strong> y conserva la 0 (el lote). Así, un tensor (4, 32, 4, 4) pasa a (4, 512), con \( 512=32\cdot4\cdot4 \). Es lo mismo que <code>x.view(x.size(0), -1)</code> (el <code>-1</code> significa «calcula tú el resto»), que es como lo escribe el laboratorio original.</p>
+
+<div class="callout analogia">
+  <span class="lbl">Analogía</span>
+  <p>Desplegar una pila de hojas y pegarlas en una sola tira larga, <em>imagen por imagen</em>: la tira de la primera imagen, la de la segunda… Si aplanaras también el lote (<code>start_dim=0</code>), meterías todas las imágenes en una única tira gigante y la red ya no sabría dónde acaba una y empieza la otra.</p>
+</div>
+
+<p>La regla para el interrogante: <strong>\( \text{in\_features}=C\cdot H\cdot W \)</strong> del tensor que llega al <code>Flatten</code>. Con la CNN del laboratorio, 32 canales de 4×4: \( 32\cdot4\cdot4=512 \), por eso <code>nn.Linear(32 * 4 * 4, 10)</code>. Hay tres maneras de obtenerlo sin cuentas a mano:</p>
+
+<ol class="pasos">
+  <li><strong>A mano</strong>, con la fórmula del tamaño capa a capa (lo harás en el siguiente apartado).</li>
+  <li><strong>Con un forward de prueba</strong>: pasas un tensor de ceros <code>torch.zeros(1, C, H, W)</code> por el «cuerpo» de la red (hasta el <code>Flatten</code>, dentro de <code>torch.no_grad()</code>) y lees <code>.shape[1]</code>. Es lo más fiable (fragmento 6: 64).</li>
+  <li><strong><code>nn.LazyLinear(out_features)</code></strong>: no pide <code>in_features</code>; lo deduce en la primera llamada y se convierte en una <code>nn.Linear</code> normal. Antes de esa primera llamada sus parámetros no existen (<code>UninitializedParameter</code>), así que hay que hacer un forward de prueba <em>antes</em> de crear el optimizador.</li>
+</ol>
+
+<p>Si te equivocas, el error es claro pero poco amable: <code>mat1 and mat2 shapes cannot be multiplied (4x512 and 100x10)</code>. Léelo así: la <em>primera</em> pareja (4×512) es el tensor que llega (lote 4, 512 valores) y la <em>segunda</em> (100×10) es la capa que esperabas (<code>in_features=100</code>). Si la primera cifra de la primera pareja no es el tamaño del lote, probablemente se te olvidó un <code>Flatten</code> o aplanaste de más.</p>
+
+<h3>La alternativa que no depende del tamaño: <code>AdaptiveAvgPool2d(1)</code></h3>
+
+<p>Si antes del <code>Flatten</code> pones <code>nn.AdaptiveAvgPool2d(1)</code>, el mapa de cada canal se reduce a <strong>un solo número</strong> (su media): salen \( C \) valores sea cual sea el tamaño de la imagen, y <code>nn.Linear(C, 10)</code> sirve para 8×8, 12×12 o 20×20 (fragmento 6). Es lo que hacen ResNet y casi todas las redes modernas; la desventaja es que se pierde la información de <em>dónde</em> estaba cada característica.</p>
+
+<div class="callout recuerda">
+  <span class="lbl">Recuerda (<a href="../curso-2/modulo-3.html#flatten-dense">Curso 2 · módulo 3</a>)</span>
+  <p>Casi todos los parámetros de una CNN pequeña están en la primera capa lineal después del <code>Flatten</code>: conecta cada valor aplanado con cada neurona. Por eso, cuando la imagen crece, es el <code>Flatten</code> el que dispara el tamaño del modelo, y por eso se prefiere el pooling global.</p>
+</div>
+</section>
+
+<!-- =============================================================== -->
+<section>
+<h2 id="arquitectura">Una CNN completa, capa a capa: formas, parámetros y el «resumen» con hooks</h2>
+
+<p class="pregunta">Quiero clasificar dígitos de 16×16 con dos convoluciones y una capa lineal. ¿Qué forma tiene el tensor después de cada capa, qué número va en <code>nn.Linear(?, 10)</code> y cuántos parámetros tiene la red?</p>
+
+<p>El patrón de casi todas las CNN pequeñas es el mismo y se repite: <strong>convolución → ReLU → pooling</strong>, tantas veces como haga falta; después, <strong>aplanar</strong> y una o dos capas lineales. A medida que avanzas, el tamaño de los mapas <em>baja</em> (el pooling lo divide entre 2) y el número de canales <em>sube</em> (cada convolución crea más filtros): la imagen se va convirtiendo en «muchas características pequeñas».</p>
+
+<p>Así queda la red del laboratorio de IBM, escrita como <code>nn.Module</code> (está entera en el fragmento 7 y se entrena en el 9):</p>
+
+<pre class="ascii">class CNN(nn.Module):
+    def __init__(self, out_1=16, out_2=32):
+        super().__init__()
+        self.cnn1 = nn.Conv2d(in_channels=1, out_channels=out_1, kernel_size=5, padding=2)
+        self.maxpool1 = nn.MaxPool2d(kernel_size=2)
+        self.cnn2 = nn.Conv2d(in_channels=out_1, out_channels=out_2, kernel_size=5, stride=1, padding=2)
+        self.maxpool2 = nn.MaxPool2d(kernel_size=2)
+        self.fc1 = nn.Linear(out_2 * 4 * 4, 10)
+
+    def forward(self, x):
+        x = self.maxpool1(torch.relu(self.cnn1(x)))
+        x = self.maxpool2(torch.relu(self.cnn2(x)))
+        x = x.view(x.size(0), -1)
+        return self.fc1(x)</pre>
+
+<div class="callout ejemplo">
+  <span class="lbl">Ejemplo numérico: la red del laboratorio con una imagen de 1×16×16 (N es el tamaño del lote)</span>
+  <table>
+    <thead><tr><th>Paso</th><th>Cuenta del tamaño</th><th>Forma de salida</th><th>Parámetros</th><th>Multiplicaciones por imagen</th></tr></thead>
+    <tbody>
+      <tr><td>entrada</td><td>—</td><td>(N, 1, 16, 16)</td><td>0</td><td>0</td></tr>
+      <tr><td><code>cnn1</code> k5, p2</td><td>⌊(16 + 4 − 5)/1⌋ + 1 = 16</td><td>(N, 16, 16, 16)</td><td>16·(1·25 + 1) = <span class="res">416</span></td><td>16·16·16·25·1 = 102.400</td></tr>
+      <tr><td>ReLU + <code>maxpool1</code></td><td>⌊(16 − 2)/2⌋ + 1 = 8</td><td>(N, 16, 8, 8)</td><td>0</td><td>0</td></tr>
+      <tr><td><code>cnn2</code> k5, p2</td><td>⌊(8 + 4 − 5)/1⌋ + 1 = 8</td><td>(N, 32, 8, 8)</td><td>32·(16·25 + 1) = <span class="res">12.832</span></td><td>32·8·8·25·16 = 819.200</td></tr>
+      <tr><td>ReLU + <code>maxpool2</code></td><td>⌊(8 − 2)/2⌋ + 1 = 4</td><td>(N, 32, 4, 4)</td><td>0</td><td>0</td></tr>
+      <tr><td><code>view</code> (aplanar)</td><td>32·4·4 = 512</td><td>(N, 512)</td><td>0</td><td>0</td></tr>
+      <tr><td><code>fc1</code></td><td>—</td><td>(N, 10)</td><td>512·10 + 10 = <span class="res">5.130</span></td><td>512·10 = 5.120</td></tr>
+      <tr><td><strong>Total</strong></td><td></td><td></td><td><strong>18.378</strong></td><td><strong>926.720</strong></td></tr>
+    </tbody>
+  </table>
+  <p>Las «multiplicaciones» de una convolución son \( C_{out}\cdot H_{out}\cdot W_{out}\cdot k^2\cdot C_{in} \): cada uno de los \( C_{out}\cdot H_{out}\cdot W_{out} \) números de la salida cuesta \( k^2 C_{in} \) multiplicaciones. Fíjate en que <strong>casi todo el cálculo está en la segunda convolución</strong> (819.200 de 926.720, el 88 %) y no en la capa lineal.</p>
+</div>
+
+<p>Dos detalles de esta clase que conviene notar. Primero, el laboratorio usa <code>torch.relu(...)</code> (una función) dentro de <code>forward</code> en lugar de capas <code>nn.ReLU()</code>; funciona igual, pero esas activaciones no aparecen como módulos. Segundo, usa <code>x.view(x.size(0), -1)</code> en lugar de <code>nn.Flatten()</code>, y por eso tienes que acordarte tú de que <code>nn.Linear</code> espera \( 32\cdot4\cdot4 \).</p>
+
+<h3>La misma cuenta en una red a medida: fotos de 100×100 en color</h3>
+
+<p>Para una foto RGB de 100×100 con tres clases, una red típica es <code>Conv2d(3,16,3)</code> → ReLU → <code>MaxPool2d(2)</code> → <code>Conv2d(16,32,3)</code> → ReLU → <code>MaxPool2d(2)</code> → <code>Flatten</code> → <code>Linear(?,100)</code> → ReLU → <code>Linear(100,3)</code>. Sin padding, los tamaños son 100 → 98 → 49 → 47 → 23, así que tras aplanar hay \( 32\cdot23\cdot23=16.928 \) valores. Parámetros: 448 + 4.640 + 1.692.900 + 303 = <strong>1.698.291</strong>. El 99,7 % está en la primera capa lineal (1.692.900 de 1.698.291): las convoluciones, que hacen el trabajo visual, son baratísimas en parámetros y es el aplanado lo que los dispara. Compara con los 3.000.100 que costaba <em>solo</em> la primera capa si se conectaba la foto sin convolución.</p>
+
+<h3>Un «resumen» de la red con hooks (sin instalar nada)</h3>
+
+<p>En Keras, <code>model.summary()</code> te daba esta tabla. En PyTorch hay paquetes (<code>torchinfo</code>, <code>torchsummary</code>) pero puedes construirla en diez líneas con <strong><em>hooks</em></strong>: un <em>hook</em> es una función que PyTorch llama automáticamente cada vez que un módulo termina su <code>forward</code>. Con <code>modulo.register_forward_hook(f)</code>, la función <code>f(modulo, entrada, salida)</code> recibe la forma de lo que sale de esa capa. El fragmento 7 registra un hook en cada módulo «hoja» (el que no contiene otros módulos), pasa un tensor de ceros <code>torch.zeros(1, *forma_entrada)</code> y escribe una fila por capa; su salida cuadra con la tabla de arriba (18.378 parámetros) y también da 1.898 para la CNN pequeña de dígitos 8×8 y 1.698.291 para la de las fotos. Como el modelo del laboratorio usa <code>torch.relu</code> y <code>view</code>, el resumen no muestra ni ReLU ni aplanado; las otras dos redes, escritas con <code>nn.Sequential</code>, sí.</p>
+
+<figure class="demo" data-demo="curso5/c5m3-constructor-cnn" data-titulo="constructor de CNN: forma, parámetros y multiplicaciones capa a capa">
+  <div class="haz">Pulsa «CNN del laboratorio» y comprueba que salen 18.378 parámetros. Después «Red de papel 100×100×3» y busca la capa que concentra los parámetros. Prueba a vaciar la red, elegir entrada 1×28×28 y añadir tú: Conv2d (16, kernel 3, padding 1), MaxPool2d, otra Conv2d, MaxPool2d, y el aplanado con su Linear. Luego añade una Conv2d con kernel 7 sobre un mapa pequeño, o una Conv2d <em>después</em> de aplanar, para ver los errores.</div>
+  <div class="observa">Cada fila recalcula la forma con la fórmula del tamaño, y la última capa lineal toma sola su <code>in_features</code> del aplanado. El gráfico de barras muestra dónde están los parámetros (casi siempre en la primera <code>Linear</code>) y, aparte, dónde están las multiplicaciones (casi siempre en las convoluciones). El código de PyTorch que escribe es el que tendrías que teclear; si falla una capa (el kernel no cabe, o aplicas <code>Conv2d</code> a un vector), la herramienta lo dice con las mismas palabras que PyTorch.</div>
+</figure>
+
+<div class="callout ojo">
+  <span class="lbl">Ojo</span>
+  <p>Un número en un <code>nn.Linear</code> que «sale de la nada» casi siempre es un descuido en la cuenta de las formas. Cámbiale a la red del laboratorio <code>padding=2</code> por <code>padding=0</code> y todos los tamaños bajan (12 → 6 → 2 → 1), de modo que <code>32 * 4 * 4</code> deja de valer. Por eso en la práctica se calcula <code>in_features</code> con un forward de prueba o con <code>LazyLinear</code> (fragmento 6), y se comprueba con el resumen.</p>
+</div>
+</section>
+
+<!-- =============================================================== -->
+<section>
+<h2 id="entrenar">Entrenar la CNN: Dataset, DataLoader y el bucle de siempre</h2>
+
+<p class="pregunta">Mi CNN tiene 18.378 parámetros y 1.347 imágenes de entrenamiento. ¿Cómo se las doy por lotes, qué cambia en el bucle de entrenamiento respecto a una red densa y qué acierto puedo esperar?</p>
+
+<div class="callout recuerda">
+  <span class="lbl">Recuerda (<a href="../curso-4/modulo-2.html">Curso 4 · módulo 2</a> y <a href="modulo-1.html#entrenar">módulo 1</a>)</span>
+  <p>Un <code>Dataset</code> es cualquier objeto con <code>__len__</code> y <code>__getitem__(i)</code> que devuelve el par (entrada, etiqueta). <code>DataLoader(dataset, batch_size, shuffle)</code> lo recorre en lotes, apilando las entradas en un solo tensor. Y el bucle de entrenamiento tiene siempre los mismos cinco pasos: <code>zero_grad()</code>, <em>forward</em>, pérdida, <code>backward()</code> y <code>step()</code>. Con la clasificación multiclase, <code>nn.CrossEntropyLoss</code> recibe los <em>logits</em> (sin softmax) y las etiquetas como enteros <code>long</code>. Nada de eso cambia con una CNN.</p>
+</div>
+
+<h3>Preparar las imágenes</h3>
+
+<p>Los cursos originales usan MNIST (60.000 imágenes de 28×28 que se descargan de internet) reducida a 16×16 con <code>transforms.Resize((16, 16))</code> y <code>ToTensor()</code>. Aquí, para que todo se pueda ejecutar sin conexión, se usan los dígitos de <code>load_digits</code> de scikit-learn (1.797 imágenes de 8×8, valores de 0 a 16), con los mismos pasos: dividir entre 16 para dejarlos en [0, 1], <code>unsqueeze(1)</code> para añadir el canal (NCHW) y <code>Resize((16, 16))</code> para llegar al tamaño de la red del laboratorio (fragmento 9: tensor de forma (1797, 1, 16, 16)). Se reservan 450 para prueba (25 %, <code>stratify</code> para que haya los mismos dígitos en ambas partes) y quedan <strong>1.347</strong> de entrenamiento. La versión con MNIST real es el fragmento 10; <strong>no se ha podido ejecutar aquí</strong> porque necesita internet (<code>download=True</code>).</p>
+
+<p>Para probar un <code>DataLoader</code> sin descargar nada existe <code>torchvision.datasets.FakeData</code>, que fabrica imágenes aleatorias con la misma interfaz que MNIST (fragmento 8). Las imágenes son ruido (no sirven para aprender), pero sí para comprobar formas y tipos: <code>dataset[0]</code> devuelve un tensor <code>float32</code> de forma (1, 16, 16) y una etiqueta entera.</p>
+
+<h3>Cuántos lotes salen: el último es el que sobra</h3>
+
+<div class="formula">\[ \text{lotes por época}=\left\lceil \frac{N}{B}\right\rceil \qquad\text{o}\qquad \left\lfloor \frac{N}{B}\right\rfloor \ \text{con } \texttt{drop\_last=True} \]</div>
+
+<p>\( N \) es el número de muestras y \( B \) el <code>batch_size</code>. Con \( N=1347 \) y \( B=100 \): \( 1347/100=13{,}47 \), así que hay <strong>14 lotes</strong>: 13 de 100 y uno final de 47 (fragmento 9). Con \( N=1050 \) (el <code>FakeData</code>): 11 lotes, el último de 50, y con <code>drop_last=True</code> son 10 (fragmento 8). Cada lote tiene forma (100, 1, 16, 16) y etiquetas (100,) de tipo <code>int64</code>. Cada lote es <em>una actualización de pesos</em>: 8 épocas × 14 lotes = 112 pasos de <code>step()</code>.</p>
+
+<figure class="demo" data-demo="curso5/c5m3-lotes" data-titulo="cómo reparte un DataLoader las muestras en lotes">
+  <div class="haz">Deja N = 1347 y batch_size = 100: deben salir 14 lotes y el último, de 47. Marca <code>drop_last=True</code>. Después busca un N con el que el último lote tenga <strong>una sola muestra</strong> (por ejemplo N = 1301 con batch_size = 100). Cambia <code>shuffle</code> y pulsa «Otra época».</div>
+  <div class="observa">Los colores alternos son los lotes; el borde negro marca el lote incompleto. Con <code>shuffle=True</code> los índices del primer lote cambian en cada época, pero el <em>número</em> de lotes no. Un lote de una sola muestra es peligroso: <code>BatchNorm1d</code> falla en entrenamiento y el gradiente de una sola imagen es muy ruidoso, por eso se suele poner <code>drop_last=True</code>.</div>
+</figure>
+
+<h3>El bucle de entrenamiento, paso a paso</h3>
+
+<p>El fragmento 9 entrena la red del laboratorio con <code>SGD(lr=0.1, momentum=0.9)</code>. Dentro de cada época: (1) <code>modelo.train()</code> activa el modo de entrenamiento; (2) para cada lote, <code>zero_grad()</code> borra los gradientes del paso anterior, <code>criterio(modelo(lx), ly)</code> calcula la pérdida, <code>backward()</code> calcula los gradientes y <code>step()</code> mueve los pesos; (3) al terminar, <code>modelo.eval()</code> y <code>torch.no_grad()</code> para medir el acierto con las 450 imágenes de prueba sin guardar gradientes. La pérdida media de la época se pondera por el tamaño del lote (<code>perdida.item() * len(ly)</code>) para que el lote de 47 no pese igual que los de 100.</p>
+
+<div class="callout ejemplo">
+  <span class="lbl">Ejemplo numérico: qué esperar de una red sin entrenar</span>
+  <p>Con 10 clases, una red que adivina al azar da a cada clase una probabilidad de 1/10, y su entropía cruzada es \( -\ln(1/10)=\ln 10\approx 2{,}30 \). Y acierta el 10 % de las veces. En el fragmento 9, la red recién creada acierta <strong>0,093</strong> en prueba (azar), la pérdida media de la primera época es 2,1184 (ya ha aprendido algo durante ella: empezó cerca de 2,30) y al final de la época 8 baja a 0,0196, con un acierto en prueba de <strong>0,980</strong>. La curva sube deprisa (0,364 → 0,776 → 0,940 en las tres primeras épocas) y luego se aplana.</p>
+</div>
+
+<div class="callout ojo">
+  <span class="lbl">Ojo</span>
+  <p>Tres cosas que se rompen sin avisar: (1) olvidar <code>model.eval()</code> al medir (no afecta a esta red porque no tiene dropout ni batchnorm, pero sí a la del siguiente apartado); (2) medir el acierto con las mismas imágenes con las que entrenas: tu modelo parecerá mejor de lo que es; (3) pasar al <code>DataLoader</code> etiquetas de forma (N, 1) o <code>float</code>: <code>CrossEntropyLoss</code> pide (N,) y <code>long</code> (los errores exactos están en el fragmento 15). Y no compares el 0,980 con el de MNIST real: son datos distintos, y MNIST no se ha ejecutado aquí.</p>
+</div>
+
+<p>Si ejecutas el fragmento 10 en tu máquina con internet, la primera línea imprime <code>60000 10000 600 2</code>: 60.000 imágenes de entrenamiento, 10.000 de validación, \( 60000/100=600 \) lotes y \( 10000/5000=2 \) lotes de validación. El acierto que obtengas no lo anticipo: no se ha medido aquí y depende del orden aleatorio de los lotes y de la inicialización.</p>
+</section>
+
+<!-- =============================================================== -->
+<section>
+<h2 id="batchnorm">nn.BatchNorm2d: normalizar cada canal</h2>
+
+<p class="pregunta">¿Qué normaliza exactamente <code>BatchNorm2d</code> en un tensor (N, C, H, W): cada imagen, cada píxel o cada canal? ¿Y por qué se coloca entre la convolución y el ReLU?</p>
+
+<div class="callout recuerda">
+  <span class="lbl">Recuerda (<a href="modulo-2.html#batchnorm">módulo 2</a>)</span>
+  <p>Con <code>nn.BatchNorm1d</code> normalizabas cada <em>característica</em> restando la media del lote y dividiendo por su desviación, y luego reescalabas con γ y β aprendidos. En <code>eval()</code> usaba las medias acumuladas (<code>running_mean</code>, <code>running_var</code>). <code>BatchNorm2d</code> hace lo mismo, con una diferencia: en una imagen, lo que equivale a una «característica» es un <strong>canal</strong>.</p>
+</div>
+
+<div class="callout analogia">
+  <span class="lbl">Analogía</span>
+  <p>Tres cámaras (los canales) graban a la vez, cada una con su propio brillo. Para comparar bien, normalizas <em>cada cámara</em> por separado: miras todo lo que ha grabado esa cámara en el lote (todas las imágenes, todos los píxeles) y la dejas con media 0 y desviación 1. No mezclas las cámaras, porque «brillante» no significa lo mismo para una que para otra.</p>
+</div>
+
+<div class="formula">\[ y=\gamma\,\frac{x-\mu_c}{\sqrt{\sigma_c^2+\varepsilon}}+\beta \qquad \mu_c=\frac1{NHW}\sum_{n,h,w}x_{n,c,h,w},\quad \sigma_c^2=\frac1{NHW}\sum_{n,h,w}(x_{n,c,h,w}-\mu_c)^2 \]</div>
+
+<p>\( x \) es un valor del canal \( c \); \( \mu_c \) y \( \sigma_c^2 \) son la media y la varianza <strong>de ese canal sobre todo el lote</strong> (se suman \( N\cdot H\cdot W \) valores, no \( N \)); \( \varepsilon=10^{-5} \) evita dividir por cero; \( \gamma \) y \( \beta \) son dos números <em>por canal</em> que la red aprende (<code>weight</code>, que empieza en 1, y <code>bias</code>, que empieza en 0). Una capa <code>nn.BatchNorm2d(C)</code> tiene así \( 2C \) parámetros entrenables, además de tres «buffers» que no se entrenan: <code>running_mean</code>, <code>running_var</code> y <code>num_batches_tracked</code>.</p>
+
+<div class="callout ejemplo">
+  <span class="lbl">Ejemplo numérico: <code>BatchNorm2d(2)</code> sobre un lote (2, 2, 2, 2) (fragmento 11)</span>
+  <p>El canal 0 contiene los 8 valores 1, 2, 3, 4, 5, 6, 7, 8 (dos imágenes de 2×2) y el canal 1 contiene 10, 20, …, 80.</p>
+  <ol class="pasos">
+    <li><strong>Media del canal 0:</strong> (1 + … + 8)/8 = <span class="res">4,5</span>. Canal 1: <span class="res">45</span>.</li>
+    <li><strong>Varianza (dividiendo entre 8):</strong> los cuadrados de las desviaciones suman 42, así que 42/8 = <span class="res">5,25</span>. Canal 1: <span class="res">525</span>.</li>
+    <li><strong>Normalizar el primer valor del canal 0:</strong> \( (1-4{,}5)/\sqrt{5{,}25+0{,}00001}=-3{,}5/2{,}2913=-1{,}5275 \). El segundo: \( (2-4{,}5)/2{,}2913=-1{,}0911 \). El resultado de <code>BatchNorm2d</code> coincide hasta el cuarto decimal.</li>
+    <li><strong>Resultado:</strong> con \( \gamma=1 \) y \( \beta=0 \), los dos canales salen con media 0 y desviación 1, aunque uno entró con valores de 1 a 8 y el otro de 10 a 80.</li>
+    <li><strong>Estadísticas acumuladas</strong> (momentum 0,1): <code>running_mean</code> = 0,9·0 + 0,1·[4,5; 45] = <span class="res">[0,45; 4,5]</span>. Para <code>running_var</code> PyTorch usa la varianza <em>corregida</em> (entre \( n-1=7 \)): 42/7 = 6 y 4200/7 = 600, así que 0,9·1 + 0,1·[6; 600] = <span class="res">[1,5; 60,9]</span>.</li>
+    <li><strong>En modo <code>eval()</code></strong> usa esos valores en lugar de los del lote: el primer valor del canal 0 da \( (1-0{,}45)/\sqrt{1{,}5+0{,}00001}=0{,}4491 \), distinto del −1,5275 de entrenamiento porque la estadística acumulada aún está lejos de la real.</li>
+  </ol>
+</div>
+
+<figure class="demo" data-demo="curso5/c5m3-batchnorm2d" data-titulo="BatchNorm2d sobre un lote de dos imágenes con dos canales">
+  <div class="haz">En modo <code>model.train()</code> sube la media y la desviación del canal 1: la fila «DESPUÉS» no cambia (media 0, desviación 1 por canal). Mueve γ y β. Pulsa «Nuevo lote» unas 30 veces y fíjate en cómo <code>running_mean</code> y <code>running_var</code> se acercan a la media y varianza del lote. Cambia a <code>model.eval()</code>.</div>
+  <div class="observa">La normalización la hace <strong>cada canal con sus propios números</strong>: el canal 0 (media 2, desviación 1) y el canal 1 (media 20, desviación 8) terminan con la misma escala. γ cambia la escala de salida y β la desplaza. En <code>eval()</code> el resultado depende de las estadísticas acumuladas: con pocas actualizaciones están lejos de las del lote y la salida no queda centrada. Los cálculos coinciden con <code>nn.BatchNorm2d</code> real (diferencias menores de 10<sup>−6</sup>).</div>
+</figure>
+
+<h3>Dónde se coloca y qué consecuencias tiene</h3>
+
+<ul>
+  <li><strong>Conv → BatchNorm2d → ReLU</strong> es el orden habitual (<code>self.pool(torch.relu(self.bn1(self.cnn1(x))))</code>). La normalización recibe la salida lineal de la convolución y deja al ReLU una entrada bien centrada.</li>
+  <li><strong><code>bias=False</code> en la convolución anterior.</strong> BatchNorm resta la media de cada canal, y un sesgo constante por canal es justo una media: desaparece. Escribir <code>nn.Conv2d(..., bias=False)</code> ahorra parámetros sin perder nada. En este módulo se deja el sesgo para que las cuentas coincidan con el laboratorio.</li>
+  <li><strong>Hay que llamar a <code>model.eval()</code>.</strong> En entrenamiento normaliza con el lote y actualiza <code>running_*</code>; en evaluación usa lo acumulado y no lo cambia. Si olvidas <code>eval()</code>, las predicciones dependen de qué otras imágenes vienen en el mismo lote.</li>
+  <li><strong>Necesita más de un valor por canal.</strong> Con \( N\cdot H\cdot W=1 \) (un lote de una imagen 1×1) falla con «Expected more than 1 value per channel when training». Con una sola imagen 2×2 funciona, porque hay 4 valores por canal (fragmento 11). Con <code>BatchNorm1d</code>, en cambio, un lote de 1 sí falla.</li>
+  <li><strong>Keras no usa los mismos números.</strong> Su <code>momentum</code> por defecto es 0,99 y pondera lo <em>antiguo</em>; el de PyTorch es 0,1 y pondera lo <em>nuevo</em> (\( \text{nuevo}=(1-m)\cdot\text{antiguo}+m\cdot\text{lote} \)). Equivalen aproximadamente 0,99 de Keras ↔ 0,01 de PyTorch. El \( \varepsilon \) también cambia: 10<sup>−3</sup> en Keras (comprobado en Keras 3) frente a 10<sup>−5</sup>.</li>
+</ul>
+
+<h3>¿Qué aporta? Un experimento, con sus límites</h3>
+
+<p>El fragmento 12 entrena la CNN del laboratorio con y sin <code>BatchNorm2d</code> (después de cada convolución, más una <code>BatchNorm1d(10)</code> a la salida, algo que en redes grandes casi no se usa y que aquí se deja para ver también esa variante). La versión con BN tiene 18.494 parámetros frente a 18.378: +116 = (2·16) + (2·32) + (2·10). Se entrena <strong>solo 4 épocas</strong>, con SGD <em>sin</em> momentum y tres tasas de aprendizaje, y se repite con tres semillas:</p>
+
+<table>
+  <thead><tr><th>lr</th><th>Acierto en prueba sin BatchNorm (3 semillas)</th><th>Media</th><th>Con BatchNorm (3 semillas)</th><th>Media</th></tr></thead>
+  <tbody>
+    <tr><td>0,01</td><td>0,338 · 0,462 · 0,091</td><td class="res">0,297</td><td>0,976 · 0,971 · 0,964</td><td class="res">0,970</td></tr>
+    <tr><td>0,1</td><td>0,867 · 0,831 · 0,533</td><td class="res">0,744</td><td>0,978 · 0,960 · 0,918</td><td class="res">0,952</td></tr>
+    <tr><td>0,5</td><td>0,813 · 0,102 · 0,858</td><td class="res">0,591</td><td>0,960 · 0,936 · 0,927</td><td class="res">0,941</td></tr>
+  </tbody>
+</table>
+
+<p>Lectura honesta: con BatchNorm la red <strong>aprende mucho más deprisa y con menos dependencia del <code>lr</code></strong> (con 0,01, que es poco, la red sin BN apenas se mueve en 4 épocas: 0,091 es azar; con BN ya está en 0,97). Y con un <code>lr</code> grande (0,5), una de las tres semillas sin BN se queda en 0,102 (no aprende nada). Pero el experimento mide <em>velocidad</em> con un presupuesto fijo de 4 épocas, no el mejor acierto final: el fragmento 9, sin BatchNorm pero con momentum 0,9 y 8 épocas, llega a 0,980. Con tres semillas por celda, las diferencias entre filas grandes (0,297 contra 0,970) son claras; las pequeñas (0,952 contra 0,941) no se pueden interpretar.</p>
+</section>
+
+<!-- =============================================================== -->
+<section>
+<h2 id="invariancia">¿Reconoce el dígito si se mueve? Equivarianza, invariancia y data augmentation</h2>
+
+<p class="pregunta">Se dice que las CNN «son invariantes a traslaciones». ¿Es verdad? ¿Qué ocurre si desplazo la imagen de prueba un solo píxel?</p>
+
+<p>Hay que separar dos propiedades. La convolución es <strong>equivariante</strong>: si desplazas la entrada, el mapa de características se desplaza igual, el mismo patrón en otro sitio. Eso <em>no</em> es lo mismo que <strong>invariante</strong> (que la salida final no cambie). Lo que hace que el final sea más o menos invariante son las etapas posteriores: el pooling absorbe desplazamientos pequeños <em>si no cruzan el borde de la ventana</em>, y el pooling global (<code>AdaptiveAvgPool2d(1)</code> o un máximo global) absorbe todos. Pero el <code>Flatten</code> seguido de <code>Linear</code> da a cada posición su propio peso, y rompe buena parte de la invariancia.</p>
+
+<div class="callout ejemplo">
+  <span class="lbl">Ejemplo numérico: el pooling absorbe unos desplazamientos y otros no (fragmento 5)</span>
+  <p>Una imagen 6×6 de ceros con un 9 en la posición (2, 2). <code>MaxPool2d(2)</code> mira ventanas 2×2: la que cubre filas 2–3 y columnas 2–3 contiene el 9 y da 9. Si el 9 se mueve un píxel hacia abajo y a la derecha, pasa a (3, 3): <strong>sigue en la misma ventana</strong> y la salida es idéntica. Si se mueve un píxel hacia arriba, pasa a (1, 2): cae en la ventana de las filas 0–1, y la salida es <strong>distinta</strong>. El fragmento 5 lo comprueba con <code>torch.roll</code> (igual: <code>True</code> y <code>False</code>).</p>
+</div>
+
+<p>El fragmento 13 lo mide en serio. Se compara una red densa (<code>Flatten → Linear(64,32) → ReLU → Linear(32,10)</code>, 2.410 parámetros) con la CNN pequeña de dígitos (1.898 parámetros), entrenadas con las imágenes originales de 8×8, y se prueban con las imágenes de prueba <em>desplazadas</em> un píxel (rellenando con ceros). Después se repite el entrenamiento con <strong>data augmentation</strong>: en cada lote se aplica un desplazamiento aleatorio de −1, 0 o +1 píxel en cada eje. Medias de 3 semillas, Adam (<code>lr=0.01</code>), 25 épocas:</p>
+
+<table>
+  <thead><tr><th>Imagen de prueba</th><th>Densa</th><th>CNN</th><th>Densa + aug.</th><th>CNN + aug.</th></tr></thead>
+  <tbody>
+    <tr><td>sin mover</td><td>0,976</td><td>0,978</td><td>0,891</td><td>0,950</td></tr>
+    <tr><td>1 px a la derecha</td><td>0,476</td><td>0,630</td><td>0,881</td><td>0,968</td></tr>
+    <tr><td>1 px abajo</td><td>0,410</td><td>0,516</td><td>0,810</td><td>0,910</td></tr>
+    <tr><td>1 px izquierda y arriba</td><td>0,156</td><td>0,336</td><td>0,807</td><td>0,930</td></tr>
+  </tbody>
+</table>
+
+<p>Qué dice y qué no dice la tabla: (1) <strong>Con las imágenes sin mover, las dos redes son iguales</strong> (0,976 y 0,978). Una prueba normal no distingue una de otra. (2) <strong>Un solo píxel hunde ambas</strong>: la densa cae a 0,41–0,48 (y a 0,156 en diagonal) y la CNN es mejor pero lejos de ser invariante (0,34–0,63). En una imagen de 8 píxeles, un píxel es el 12,5 % del lado: es un desplazamiento enorme. (3) <strong>La solución es mostrar desplazamientos al entrenar</strong>: con augmentation la CNN pasa a 0,91–0,97 en todos los casos, y la densa, que sigue peor, a 0,81–0,88. (4) El augmentation tiene un coste en las imágenes sin mover (la densa pierde 0,085, la CNN 0,028), porque en 8×8 los desplazamientos recortan parte del dígito. Hay más detalles que se simplifican: el desplazamiento es el mismo para todo el lote, no distinto en cada imagen, y solo se han probado tres semillas.</p>
+
+<figure class="demo" data-demo="curso5/c5m3-entrena-cnn" data-titulo="una CNN y una red densa se entrenan a la vez y se prueban con el trazo movido">
+  <div class="haz">Con «siempre en el centro» (ya vienen 30 épocas entrenadas), mira las barras: las dos redes aciertan con el trazo centrado, pero con el trazo desplazado la densa cae al azar (33 %) y la CNN no. Pulsa «Entrenar 20 épocas ▶» y observa los filtros. Cambia a «en cualquier sitio» y repite. Prueba «Otra semilla».</div>
+  <div class="observa">Aquí la tarea es distinguir tres trazos (horizontal, vertical y diagonal) en imágenes de 7×7 con ruido. La CNN tiene 55 parámetros (4 filtros 3×3, un máximo global y una capa lineal); la densa, 851. Con el trazo siempre en el centro, la densa lo memoriza posición a posición y no sabe qué hacer con el trazo desplazado; la CNN lo detecta donde esté y sufre mucho menos. Entrenando con trazos en cualquier sitio, la CNN llega a casi 100 % en ambos casos, y la densa se queda lejos (entre el 40 % y el 65 % en mis pruebas con 150 imágenes de entrenamiento). Las cifras exactas cambian con la semilla; el patrón no.</div>
+</figure>
+
+<div class="callout ojo">
+  <span class="lbl">Ojo</span>
+  <p>«Las CNN son invariantes a traslaciones» es una simplificación peligrosa: lo son <em>mucho más</em> que una red densa, pero no del todo, y menos con pocos pooling y un <code>Flatten</code> grande. Si tu problema necesita tolerar desplazamientos, giros o cambios de escala, métele variaciones en el entrenamiento (data augmentation, que verás con <code>torchvision.transforms</code> en el módulo siguiente) y mide con imágenes transformadas.</p>
+</div>
+</section>
+
+<!-- =============================================================== -->
+<section>
+<h2 id="dentro">Mirar dentro de la red: mapas de características y filtros</h2>
+
+<p class="pregunta">Mi CNN acierta, pero ¿qué «ve» en realidad? ¿Cómo saco los mapas intermedios y los pesos de un filtro?</p>
+
+<p>Los <em>hooks</em> que ya usaste para el resumen sirven también para <strong>guardar la salida de una capa</strong>. En el fragmento 14 se entrena la CNN pequeña de dígitos (15 épocas) y se registra un hook en el ReLU de cada convolución (<code>modelo[1]</code> y <code>modelo[4]</code> en un <code>nn.Sequential</code>: se accede por posición). Se pasa una imagen de prueba (un dígito 2, que la red predice bien) y quedan guardados dos tensores:</p>
+
+<ul>
+  <li>tras la primera convolución + ReLU: forma (1, 8, 8, 8), es decir, <strong>8 mapas</strong> de 8×8, uno por filtro; ningún canal está completamente apagado;</li>
+  <li>tras la segunda: (1, 16, 4, 4), <strong>16 mapas</strong> de 4×4, de los que 2 valen cero en toda esta imagen (sus filtros no encontraron lo que buscan; para otra imagen sí podrían activarse).</li>
+</ul>
+
+<p>Para «ver» un mapa, el fragmento lo escala entre 0 y 1 y lo dibuja con caracteres de ` .:-=+*#%@` (de menos a más activación). El canal más activo es el 2. Sus pesos están en <code>modelo[0].weight[2, 0]</code> (la forma del peso es (8, 1, 3, 3): canal de salida, canal de entrada, alto, ancho) y valen: fila superior −0,83 −0,82 0,09; fila central 0,75 0,66 0,91; fila inferior 0,41 0,41 0,60, con sesgo 0,14. Lectura: el filtro <em>resta</em> la tinta de la fila superior (sobre todo a la izquierda) y <em>suma</em> la del centro y la de debajo: responde con fuerza donde empieza un trazo (hay vacío arriba y tinta debajo). Es un detector de borde superior de trazos, parecido a los filtros que viste a mano al principio (Sobel). Pero <strong>estos números son de esta ejecución</strong>: con otra semilla, el canal 2 será otra cosa; lo que se repite es que los primeros filtros de una CNN acaban pareciéndose a detectores de bordes y los siguientes combinan bordes en formas.</p>
+
+<div class="callout analogia">
+  <span class="lbl">Analogía</span>
+  <p>Una cadena de revisores: el primero marca bordes sueltos («aquí hay una línea que baja»), el segundo mira los marcados del primero y busca combinaciones («dos líneas que forman una curva»), y el último aplana todo y decide «esto es un 2». Los mapas que has sacado son las anotaciones de cada revisor.</p>
+</div>
+
+<div class="callout ojo">
+  <span class="lbl">Ojo</span>
+  <p>El hook devuelve la <em>misma</em> salida que sigue viajando por la red: si la modificas por error (<code>salida += 1</code>), cambias el resultado. Por eso se guarda <code>salida.detach()</code>. Y no te fíes de un solo filtro para «explicar» el modelo: con 8 + 16 filtros, lo que ves es una muestra, no la explicación.</p>
+</div>
+</section>
+
+<!-- =============================================================== -->
+<section>
+<h2 id="errores">Los errores de forma más frecuentes, y cómo leerlos</h2>
+
+<p class="pregunta">PyTorch dice «expected input[5, 8, 8, 1] to have 1 channels, but got 8 channels instead». ¿Qué significa, y cómo lo arreglo en menos de un minuto?</p>
+
+<p>La mayoría de los fallos de una CNN son de <strong>forma</strong> o de <strong>tipo</strong>. El método para encontrarlos es siempre el mismo: imprime <code>x.shape</code> y <code>x.dtype</code> justo antes de la capa que falla, y compara con lo que esa capa espera. El fragmento 15 reproduce los errores más comunes con PyTorch real:</p>
+
+<table>
+  <thead><tr><th>Lo que haces</th><th>Mensaje (resumido)</th><th>Causa</th><th>Arreglo</th></tr></thead>
+  <tbody>
+    <tr><td>Pasas una imagen (8, 8) a <code>nn.Conv2d</code></td><td><code>Expected 3D (unbatched) or 4D (batched) input to conv2d, but got input of size: [8, 8]</code></td><td>Falta el canal (y el lote)</td><td><code>x.unsqueeze(0).unsqueeze(0)</code> o <code>x[None, None]</code></td></tr>
+    <tr><td>Lote de imágenes (5, 8, 8) sin canal</td><td><code>expected input[1, 5, 8, 8] to have 1 channels, but got 5 channels instead</code></td><td>PyTorch interpreta (5, 8, 8) como <em>una</em> imagen de 5 canales</td><td><code>x.unsqueeze(1)</code> → (5, 1, 8, 8)</td></tr>
+    <tr><td>Lote NHWC (5, 8, 8, 1), como Keras</td><td><code>expected input[5, 8, 8, 1] to have 1 channels, but got 8 channels instead</code></td><td>Lee la dimensión 1 (que es la altura, 8) como canales</td><td><code>x.permute(0, 3, 1, 2)</code></td></tr>
+    <tr><td>Tensor <code>uint8</code> (0–255)</td><td><code>Input type (unsigned char) and bias type (float) should be the same</code></td><td>Los pesos son <code>float32</code></td><td><code>x.float() / 255</code> o <code>ToTensor()</code></td></tr>
+    <tr><td>Imagen (1, 8, 8) sin lote</td><td>No hay error</td><td>PyTorch la acepta como «no agrupada» y la salida no tiene dimensión de lote: (8, 6, 6)</td><td>Si quieres un lote, <code>x.unsqueeze(0)</code>. Ojo con lo que venga después</td></tr>
+    <tr><td><code>MaxPool2d(2)</code> sobre un mapa 1×1</td><td><code>Calculated output size: (4x0x0). Output size is too small</code></td><td>Demasiados pooling para el tamaño de imagen</td><td>Menos pooling, imagen mayor o <code>AdaptiveAvgPool2d</code></td></tr>
+    <tr><td><code>nn.Linear</code> mal dimensionada</td><td><code>mat1 and mat2 shapes cannot be multiplied (4x512 and 100x10)</code></td><td><code>in_features</code> no coincide con lo aplanado</td><td>Forward de prueba o <code>LazyLinear</code> (fragmento 6)</td></tr>
+    <tr><td>Kernel mayor que el mapa</td><td><code>Calculated padded input size per channel: (6 x 6). Kernel size: (7 x 7). Kernel size can't be greater than actual input size</code></td><td>El mapa es más pequeño que el filtro</td><td>Menos capas antes, o <code>padding</code> (fragmento 4)</td></tr>
+    <tr><td>Etiquetas de forma (5, 1)</td><td><code>0D or 1D target tensor expected, multi-target not supported</code></td><td><code>CrossEntropyLoss</code> pide (N,)</td><td><code>y.squeeze(1)</code> o <code>y.view(-1)</code></td></tr>
+    <tr><td>Etiquetas <code>float</code></td><td><code>expected target dtype to be Long or Byte, but got Float</code></td><td>Las clases son enteros</td><td><code>y.long()</code></td></tr>
+  </tbody>
+</table>
+
+<p>Los mensajes sobre canales llevan una pista: la forma que PyTorch <em>vio</em> (por ejemplo <code>input[5, 8, 8, 1]</code>) y el número de canales que <em>leyó</em> (<code>got 8 channels</code>). Si ese número es en realidad tu altura o anchura, tienes NHWC. Si es tu tamaño de lote, te falta la dimensión de canal.</p>
+
+<figure class="demo" data-demo="curso5/c5m3-forma-entrada" data-titulo="qué hace nn.Conv2d con el tensor que le das">
+  <div class="haz">Elige uno por uno los tensores de la lista con <code>nn.Conv2d(1, 8, 3)</code> y mira el mensaje. Cambia a <code>nn.Conv2d(3, 8, 3)</code>: ¿qué tensores valen ahora? Cambia el dtype a <code>uint8</code> y repite.</div>
+  <div class="observa">Solo hay un formato recomendable: (N, C, H, W) con C igual a <code>in_channels</code> y <code>float32</code>. Una imagen suelta (C, H, W) también se acepta, pero devuelve la salida sin lote. El tipo <code>uint8</code> falla siempre, incluso con la forma correcta, y su error se muestra antes que el de la forma. Los mensajes son los de PyTorch real (se han comprobado las 28 combinaciones).</div>
+</figure>
+
+<div class="callout regla">
+  <span class="lbl">Receta de diagnóstico</span>
+  <ol class="pasos">
+    <li>Antes de entrenar, pasa <strong>un solo lote</strong> y escribe <code>print(x.shape, x.dtype)</code> a la entrada.</li>
+    <li>Pasa un tensor de ceros por el modelo capa a capa (o usa el resumen con hooks del fragmento 7) y compara cada forma con tu cuenta a mano.</li>
+    <li>Comprueba que la salida del modelo es (N, clases) y que las etiquetas son (N,) y <code>long</code>.</li>
+    <li>Dale al modelo una sola vuelta de entrenamiento y comprueba que la pérdida inicial ronda \( \ln(\text{clases}) \) (2,30 con 10 clases). Si es mucho mayor o menor, algo está mal en los datos o en la última capa.</li>
+  </ol>
+</div>
+</section>
+
+<!-- =============================================================== -->
+<section>
+<h2 id="chuleta">Chuleta del módulo</h2>
+
+<table>
+  <thead><tr><th>Quiero…</th><th>Fórmula o código</th></tr></thead>
+  <tbody>
+    <tr><td>Formato de un lote de imágenes</td><td>(N, C, H, W). Desde NumPy/PIL (H, W, C): <code>x.permute(2, 0, 1)</code> o <code>ToTensor()</code>; lote NHWC: <code>permute(0, 3, 1, 2)</code></td></tr>
+    <tr><td>Parámetros de <code>Conv2d</code></td><td>\( C_{out}(C_{in}k_Hk_W/\text{groups}+1) \); pesos de forma \( (C_{out},C_{in}/\text{groups},k_H,k_W) \)</td></tr>
+    <tr><td>Tamaño de salida</td><td>\( \lfloor (n+2p-d(k-1)-1)/s\rfloor+1 \). Mismo tamaño con stride 1: <code>padding=(k-1)//2</code> (k impar) o <code>padding='same'</code></td></tr>
+    <tr><td>Pooling</td><td><code>nn.MaxPool2d(k)</code>: stride = k. <code>ceil_mode=True</code> conserva la última ventana. <code>nn.AdaptiveAvgPool2d(1)</code>: media global</td></tr>
+    <tr><td>Aplanar</td><td><code>nn.Flatten()</code> (conserva el lote). <code>in_features</code> = C·H·W del tensor aplanado. <code>nn.LazyLinear(n)</code> lo deduce</td></tr>
+    <tr><td>Multiplicaciones de una convolución</td><td>\( C_{out}H_{out}W_{out}k^2C_{in} \)</td></tr>
+    <tr><td><code>BatchNorm2d(C)</code></td><td>2C parámetros; una media y varianza por canal sobre N·H·W valores; <code>eval()</code> usa las acumuladas; momentum 0,1</td></tr>
+    <tr><td>Lotes por época</td><td>⌈N/B⌉ (o ⌊N/B⌋ con <code>drop_last=True</code>)</td></tr>
+    <tr><td>Bucle de entrenamiento</td><td><code>model.train()</code> · <code>zero_grad()</code> · pérdida · <code>backward()</code> · <code>step()</code> · <code>model.eval()</code> + <code>torch.no_grad()</code> para medir</td></tr>
+    <tr><td>Pérdida inicial razonable</td><td>\( \ln(\text{clases}) \): 2,30 con 10 clases</td></tr>
+    <tr><td>Resumen del modelo</td><td><code>register_forward_hook</code> en cada módulo hoja + un tensor de ceros (fragmento 7)</td></tr>
+  </tbody>
+</table>
+
+<p>Y las diferencias de Keras que más tiempo hacen perder: <code>padding</code> por defecto 0 en PyTorch (<code>"valid"</code> en Keras), canal de entrada que tú escribes, activaciones como capas aparte, <code>MaxPool2d(k)</code> con stride \( k \) en ambos pero <code>Conv2d</code> con stride 1, BatchNorm con momentum opuesto, y lote en NCHW.</p>
+</section>
+
+<!-- =============================================================== -->
+<section id="codigo">
+<h2 id="codigo-del-modulo">Código del módulo</h2>
+<p class="codigo-intro">Quince fragmentos, en el orden en que aparecen en el módulo. Necesitas <code>torch</code> y <code>torchvision</code> (probado con PyTorch 2.14), <code>scikit-learn</code> (los dígitos de <code>load_digits</code> vienen incluidos: <strong>no hace falta internet</strong>) y <code>numpy</code>. Los cursos originales usan MNIST, que se descarga de internet; aquí se usan los dígitos de 8×8 de scikit-learn (ampliados a 16×16 cuando la red lo pide) y <code>FakeData</code> para probar el <code>DataLoader</code>. <strong>El fragmento 10, con MNIST real, no se ha podido ejecutar</strong> y lo dice así. Cada «Salida esperada» es la salida real de ejecutar el fragmento dos veces, con el mismo resultado, con las semillas que se ven en el código; los fragmentos 9, 12, 13 y 14 entrenan redes y tardan entre 5 y 20 segundos en una CPU con un hilo, y si los ejecutas en otra máquina, las cifras de los últimos decimales pueden variar. Cada fragmento es independiente de los demás (repite sus importaciones y datos), salvo el 10, que necesita la clase <code>CNN</code> del 9.</p>
+
+<article class="snippet" data-lang="python">
+  <header>
+    <h3>1 · Imágenes como tensores: NCHW, NHWC, <code>ToTensor</code> y <code>permute</code></h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Pasar los dígitos de scikit-learn y una foto de NumPy al formato (N, C, H, W) de PyTorch, y ver por qué <code>permute</code> deja el tensor «no contiguo» (y qué hacer con <code>view</code>).</p>
+  </header>
+  <pre class="code"><code>import numpy as np
+import torch
+from sklearn.datasets import load_digits
+from torchvision import transforms
+
+digitos = load_digits()
+print("array de scikit-learn:", digitos.images.shape, digitos.images.dtype, "| valor máximo:", digitos.images.max())
+
+x = torch.tensor(digitos.images[:5], dtype=torch.float32) / 16.0
+print("5 dígitos como tensor:", tuple(x.shape))
+x = x.unsqueeze(1)
+print("con la dimensión de canal:", tuple(x.shape), "-&gt; (N, C, H, W)")
+
+rgb = np.random.RandomState(0).randint(0, 256, size=(4, 6, 3), dtype=np.uint8)
+t = transforms.ToTensor()(rgb)
+print("foto NumPy (H, W, C):", rgb.shape, rgb.dtype, "máx", rgb.max())
+print("tras ToTensor (C, H, W):", tuple(t.shape), t.dtype, "máx", round(t.max().item(), 4))
+print("el píxel (fila 1, col 2): numpy", rgb[1, 2], "-&gt; tensor", (t[:, 1, 2] * 255).round().to(torch.uint8).tolist())
+
+lote_nhwc = torch.rand(2, 4, 6, 3)
+lote_nchw = lote_nhwc.permute(0, 3, 1, 2)
+print("NHWC:", tuple(lote_nhwc.shape), "strides", lote_nhwc.stride(), "contiguo:", lote_nhwc.is_contiguous())
+print("NCHW:", tuple(lote_nchw.shape), "strides", lote_nchw.stride(), "contiguo:", lote_nchw.is_contiguous())
+print("¿coincide con la memoria channels_last?", lote_nchw.is_contiguous(memory_format=torch.channels_last))
+print("comparten memoria:", lote_nchw.data_ptr() == lote_nhwc.data_ptr())
+try:
+    lote_nchw.view(2, -1)
+except RuntimeError as e:
+    print("view falla:", str(e).split(" (")[0])
+plano = lote_nchw.contiguous().view(2, -1)
+print("tras .contiguous().view:", tuple(plano.shape), "| strides de la copia", lote_nchw.contiguous().stride())
+print("reshape hace lo mismo:", torch.equal(lote_nchw.reshape(2, -1), plano))</code></pre>
+  <details class="linea-a-linea" open>
+    <summary>Línea por línea</summary>
+    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+      <tbody>
+        <tr data-lines="1-4"><td><code>import …</code></td><td>NumPy (para la foto), <code>torch</code>, los dígitos de scikit-learn y <code>transforms</code> de torchvision (donde vive <code>ToTensor</code>).</td></tr>
+        <tr data-lines="6-7"><td><code>digitos = load_digits() …</code></td><td>Carga los 1.797 dígitos. <code>digitos.images</code> es un array (1797, 8, 8) de <code>float64</code> con valores de 0 a 16; se imprime su forma, su tipo y su máximo.</td></tr>
+        <tr data-lines="9-10"><td><code>x = torch.tensor(… ) / 16.0</code></td><td>Convierte los 5 primeros dígitos a un tensor <code>float32</code> y los divide entre 16 para dejarlos entre 0 y 1. La forma es (5, 8, 8): 5 imágenes, pero <strong>sin dimensión de canal</strong>.</td></tr>
+        <tr data-lines="11-12"><td><code>x = x.unsqueeze(1) …</code></td><td><code>unsqueeze(1)</code> inserta una dimensión de tamaño 1 en la posición 1 (la de los canales): (5, 8, 8) pasa a (5, 1, 8, 8) = (N, C, H, W).</td></tr>
+        <tr data-lines="14"><td><code>rgb = np.random.RandomState(0).randint(…)</code></td><td>Fabrica una «foto» de mentira como las que da NumPy o PIL: 4 filas, 6 columnas, 3 canales (formato H, W, C), enteros <code>uint8</code> de 0 a 255, con una semilla para que sea siempre la misma.</td></tr>
+        <tr data-lines="15"><td><code>t = transforms.ToTensor()(rgb)</code></td><td><code>ToTensor()</code> hace tres cosas a la vez: reordena (H, W, C) a (C, H, W), convierte a <code>float32</code> y divide entre 255. Se crea el objeto y se llama como una función.</td></tr>
+        <tr data-lines="16-17"><td><code>print(…)</code></td><td>Muestra la forma y el tipo originales (4, 6, 3) <code>uint8</code> y los nuevos (3, 4, 6) <code>float32</code>, con el máximo antes y después (251 → 251/255).</td></tr>
+        <tr data-lines="18"><td><code>print("el píxel (fila 1, col 2)…")</code></td><td>Comprueba que es la misma imagen: el píxel de la fila 1, columna 2 tiene los tres canales en <code>rgb[1, 2]</code>; en el tensor, <code>t[:, 1, 2]</code> son los tres canales de ese píxel. Se multiplican por 255 y se redondean para volver a los enteros originales.</td></tr>
+        <tr data-lines="20-21"><td><code>lote_nhwc = … ; lote_nchw = …permute(0, 3, 1, 2)</code></td><td>Un lote de 2 imágenes 4×6 con 3 canales en formato NHWC (como Keras). <code>permute(0, 3, 1, 2)</code> reordena los ejes a NCHW <em>sin copiar los datos</em>: es una nueva «vista» de la misma memoria.</td></tr>
+        <tr data-lines="22-23"><td><code>print("NHWC:" …) ; print("NCHW:" …)</code></td><td><code>stride()</code> dice cuántos elementos hay que saltar en memoria para avanzar una posición en cada eje. <code>is_contiguous()</code> dice si el tensor está guardado en el orden «natural» de sus ejes.</td></tr>
+        <tr data-lines="24-25"><td><code>print(…channels_last…) ; print(…data_ptr…)</code></td><td>El tensor permutado coincide con el formato de memoria <code>channels_last</code>, y <code>data_ptr()</code> (la dirección del primer dato) es idéntica: no hay copia.</td></tr>
+        <tr data-lines="26-29"><td><code>try: lote_nchw.view(2, -1) …</code></td><td><code>view</code> solo puede reinterpretar memoria contigua. Aquí falla con un <code>RuntimeError</code>; se captura y se imprime solo el principio del mensaje (hasta el primer paréntesis).</td></tr>
+        <tr data-lines="30-31"><td><code>plano = lote_nchw.contiguous().view(2, -1) …</code></td><td><code>.contiguous()</code> hace una copia ordenada como NCHW; sobre ella <code>view(2, -1)</code> sí funciona y da (2, 72). Se imprimen los strides de la copia: (72, 24, 6, 1).</td></tr>
+        <tr data-lines="32"><td><code>print("reshape hace lo mismo:" …)</code></td><td><code>reshape</code> hace la copia solo cuando es necesaria; <code>torch.equal</code> comprueba que el resultado es el mismo.</td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>array de scikit-learn: (1797, 8, 8) float64 | valor máximo: 16.0
+5 dígitos como tensor: (5, 8, 8)
+con la dimensión de canal: (5, 1, 8, 8) -&gt; (N, C, H, W)
+foto NumPy (H, W, C): (4, 6, 3) uint8 máx 251
+tras ToTensor (C, H, W): (3, 4, 6) torch.float32 máx 0.9843
+el píxel (fila 1, col 2): numpy [195 118 125] -&gt; tensor [195, 118, 125]
+NHWC: (2, 4, 6, 3) strides (72, 18, 3, 1) contiguo: True
+NCHW: (2, 3, 4, 6) strides (72, 1, 18, 3) contiguo: False
+¿coincide con la memoria channels_last? True
+comparten memoria: True
+view falla: view size is not compatible with input tensor's size and stride
+tras .contiguous().view: (2, 72) | strides de la copia (72, 24, 6, 1)
+reshape hace lo mismo: True</pre>
+    <p>Los strides lo cuentan todo. El lote NHWC (2, 4, 6, 3) tiene strides (72, 18, 3, 1): para pasar de un canal al siguiente se salta 1 casilla (los tres canales de un píxel están juntos), para pasar a la columna siguiente 3, a la fila siguiente 18 y a la imagen siguiente 72. Tras <code>permute</code> la forma es (2, 3, 4, 6) pero los strides son (72, 1, 18, 3): el eje de los canales avanza de 1 en 1, así que <strong>los datos siguen en el orden antiguo</strong> y el tensor ya no es contiguo. Por eso <code>view</code> falla y <code>reshape</code> o <code>.contiguous()</code> sí valen. El tensor <code>ToTensor</code> conserva el valor del píxel (195, 118, 125) y pasa de 251 a 0,9843 = 251/255.</p>
+  </div>
+</article>
+
+<article class="snippet" data-lang="python">
+  <header>
+    <h3>2 · Convolución a mano frente a <code>F.conv2d</code> (y un filtro Sobel en <code>nn.Conv2d</code>)</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Escribir una convolución con dos bucles, comprobar que da lo mismo que <code>F.conv2d</code>, ver que PyTorch hace correlación (no gira el filtro) y fijar a mano los pesos de una capa.</p>
+  </header>
+  <pre class="code"><code>import torch
+import torch.nn as nn
+import torch.nn.functional as F
+
+imagen = torch.tensor([[1, 1, 2, 8, 9],
+                       [1, 2, 1, 9, 8],
+                       [2, 1, 1, 8, 9],
+                       [1, 1, 2, 9, 9],
+                       [1, 2, 1, 8, 8]], dtype=torch.float32)
+filtro = torch.tensor([[-1, 0, 1],
+                       [-1, 0, 1],
+                       [-1, 0, 1]], dtype=torch.float32)
+
+
+def conv_a_mano(img, k):
+    f = k.shape[0]
+    m = img.shape[0] - f + 1
+    salida = torch.zeros(m, m)
+    for i in range(m):
+        for j in range(m):
+            ventana = img[i:i + f, j:j + f]
+            salida[i, j] = (ventana * k).sum()
+    return salida
+
+
+a_mano = conv_a_mano(imagen, filtro)
+print("a mano:\n", a_mano)
+
+x = imagen.reshape(1, 1, 5, 5)
+w = filtro.reshape(1, 1, 3, 3)
+y = F.conv2d(x, w)
+print("F.conv2d:", tuple(y.shape), "-&gt;", y[0, 0].tolist())
+print("coinciden:", torch.equal(a_mano, y[0, 0]))
+y_giro = F.conv2d(x, torch.flip(w, dims=[2, 3]))
+print("con el filtro girado 180 grados:", y_giro[0, 0].tolist())
+
+conv = nn.Conv2d(in_channels=1, out_channels=1, kernel_size=3)
+sobel = torch.tensor([[1., 0., -1.], [2., 0., -2.], [1., 0., -1.]])
+with torch.no_grad():
+    conv.weight[0, 0] = sobel
+    conv.bias.zero_()
+borde = torch.zeros(1, 1, 6, 6)
+borde[:, :, :, 3:] = 1.0
+mapa = conv(borde)
+print("Sobel sobre un borde vertical (0 | 1):\n", mapa[0, 0].detach())
+print("mapa.requires_grad:", mapa.requires_grad, "| tipo de grad_fn:", type(mapa.grad_fn).__name__)</code></pre>
+  <details class="linea-a-linea" open>
+    <summary>Línea por línea</summary>
+    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+      <tbody>
+        <tr data-lines="1-3"><td><code>import …</code></td><td><code>torch</code>, <code>torch.nn</code> como <code>nn</code> (capas) y <code>torch.nn.functional</code> como <code>F</code> (las mismas operaciones, pero como funciones sin parámetros propios).</td></tr>
+        <tr data-lines="5-9"><td><code>imagen = torch.tensor([[…]])</code></td><td>Una imagen de 5×5 con una zona oscura (1-2) a la izquierda y otra clara (8-9) a la derecha: tiene un borde vertical.</td></tr>
+        <tr data-lines="10-12"><td><code>filtro = torch.tensor([[-1, 0, 1], …])</code></td><td>Un filtro 3×3 que resta la columna izquierda y suma la derecha: da un número grande donde la imagen sube de izquierda a derecha.</td></tr>
+        <tr data-lines="15-17"><td><code>def conv_a_mano(img, k): …</code></td><td>Función que recibe la imagen y el filtro. <code>f</code> es el lado del filtro y <code>m = lado − f + 1</code> el lado de la salida (sin padding y con stride 1).</td></tr>
+        <tr data-lines="18"><td><code>salida = torch.zeros(m, m)</code></td><td>Prepara la salida, de momento llena de ceros.</td></tr>
+        <tr data-lines="19-22"><td><code>for i … for j … ventana = …</code></td><td>Para cada posición (i, j): <code>img[i:i+f, j:j+f]</code> recorta la ventana, <code>ventana * k</code> multiplica casilla a casilla, <code>.sum()</code> suma y el resultado se guarda en <code>salida[i, j]</code>.</td></tr>
+        <tr data-lines="23"><td><code>return salida</code></td><td>Devuelve el mapa de salida (3×3).</td></tr>
+        <tr data-lines="26-27"><td><code>a_mano = conv_a_mano(…) …</code></td><td>Calcula y muestra el resultado de la función propia.</td></tr>
+        <tr data-lines="29-30"><td><code>x = imagen.reshape(1, 1, 5, 5) ; w = …</code></td><td><code>F.conv2d</code> exige un lote de imágenes <code>(N, C, H, W)</code> y un filtro <code>(C_out, C_in, kH, kW)</code>. Los dos se rehacen con un 1 en las dimensiones que sobran.</td></tr>
+        <tr data-lines="31-33"><td><code>y = F.conv2d(x, w) …</code></td><td>Aplica la convolución de PyTorch, muestra la forma (1, 1, 3, 3) y comprueba con <code>torch.equal</code> que coincide con la de los bucles.</td></tr>
+        <tr data-lines="34-35"><td><code>y_giro = F.conv2d(x, torch.flip(w, dims=[2, 3]))</code></td><td>Gira el filtro 180° (invirtiendo alto y ancho). Si PyTorch hiciera una «convolución matemática» de verdad, el resultado no cambiaría; cambia de signo.</td></tr>
+        <tr data-lines="37"><td><code>conv = nn.Conv2d(in_channels=1, out_channels=1, kernel_size=3)</code></td><td>Una capa convolucional de verdad, con un filtro 3×3 que empieza con pesos aleatorios.</td></tr>
+        <tr data-lines="38"><td><code>sobel = torch.tensor([[1., 0., -1.], …])</code></td><td>El filtro de Sobel vertical clásico.</td></tr>
+        <tr data-lines="39-41"><td><code>with torch.no_grad(): …</code></td><td>Dentro de <code>no_grad</code> se pueden modificar los parámetros sin que autograd lo registre: se pone el Sobel como peso del filtro (<code>conv.weight[0, 0]</code>) y el sesgo a cero.</td></tr>
+        <tr data-lines="42-43"><td><code>borde = torch.zeros(1, 1, 6, 6) ; borde[…] = 1.0</code></td><td>Una imagen 6×6 con las tres últimas columnas a 1: un borde vertical perfecto.</td></tr>
+        <tr data-lines="44-45"><td><code>mapa = conv(borde) …</code></td><td>Pasa la imagen por la capa. Se imprime con <code>.detach()</code> para quitarle el historial de autograd.</td></tr>
+        <tr data-lines="46"><td><code>print("mapa.requires_grad:" …)</code></td><td>El resultado de una capa con pesos entrenables lleva la cuenta del cálculo (<code>requires_grad=True</code> y un <code>grad_fn</code>): así podrá hacer <code>backward()</code>.</td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>a mano:
+ tensor([[ 0., 21., 22.],
+        [ 0., 22., 22.],
+        [ 0., 21., 22.]])
+F.conv2d: (1, 1, 3, 3) -&gt; [[0.0, 21.0, 22.0], [0.0, 22.0, 22.0], [0.0, 21.0, 22.0]]
+coinciden: True
+con el filtro girado 180 grados: [[0.0, -21.0, -22.0], [0.0, -22.0, -22.0], [0.0, -21.0, -22.0]]
+Sobel sobre un borde vertical (0 | 1):
+ tensor([[ 0., -4., -4.,  0.],
+        [ 0., -4., -4.,  0.],
+        [ 0., -4., -4.,  0.],
+        [ 0., -4., -4.,  0.]])
+mapa.requires_grad: True | tipo de grad_fn: ConvolutionBackward0</pre>
+    <p>La ventana de arriba a la izquierda contiene <code>[[1,1,2],[1,2,1],[2,1,1]]</code>: los números de la columna derecha menos los de la izquierda dan 2+1+1 − (1+1+2) = 0, y la salida es 0. En la ventana siguiente entra la zona clara y la diferencia sube a 21. Los dos métodos coinciden (<code>True</code>). Con el filtro girado todos los números cambian de signo (0 → 0, 21 → −21): <strong>PyTorch no gira el filtro</strong>, calcula una correlación cruzada; para la red es indiferente porque los pesos se aprenden. Con Sobel sobre el borde 0 | 1 salen −4 en las dos columnas que tocan el borde (el signo es negativo porque el Sobel de la lista resta la derecha de la izquierda) y 0 en el resto.</p>
+  </div>
+</article>
+
+<article class="snippet" data-lang="python">
+  <header>
+    <h3>3 · Por dentro de <code>nn.Conv2d</code>: pesos, parámetros, canales, <code>bias</code> y <code>groups</code></h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Ver la forma de <code>weight</code> y <code>bias</code>, contar parámetros, comprobar a mano una posición de la salida (suma sobre canales) y comparar <code>groups=1</code> con <code>groups=4</code>.</p>
+  </header>
+  <pre class="code"><code>import torch
+import torch.nn as nn
+
+torch.manual_seed(0)
+conv = nn.Conv2d(in_channels=3, out_channels=4, kernel_size=3)
+print(conv)
+print("weight:", tuple(conv.weight.shape), " (salida, entrada, alto, ancho)")
+print("bias:  ", tuple(conv.bias.shape))
+print("parámetros:", sum(p.numel() for p in conv.parameters()), "= (3*3*3 + 1) * 4 =", (3 * 3 * 3 + 1) * 4)
+
+x = torch.randn(2, 3, 8, 8)
+y = conv(x)
+print("entrada", tuple(x.shape), "-&gt; salida", tuple(y.shape))
+
+f, i, j = 2, 1, 4
+ventana = x[0, :, i:i + 3, j:j + 3]
+por_canal = [(ventana[c] * conv.weight[f, c]).sum().item() for c in range(3)]
+a_mano = sum(por_canal) + conv.bias[f].item()
+print("aporte de cada canal de entrada:", [round(p, 4) for p in por_canal])
+print("a mano:", round(a_mano, 5), "| nn.Conv2d:", round(y[0, f, i, j].item(), 5))
+
+sin_bias = nn.Conv2d(3, 4, 3, bias=False)
+print("bias=False -&gt;", sin_bias.bias, "| parámetros:", sum(p.numel() for p in sin_bias.parameters()))
+normal = nn.Conv2d(4, 8, 3)
+profunda = nn.Conv2d(4, 8, 3, groups=4)
+print("groups=1: weight", tuple(normal.weight.shape), "-&gt;", sum(p.numel() for p in normal.parameters()), "parámetros")
+print("groups=4: weight", tuple(profunda.weight.shape), "-&gt;", sum(p.numel() for p in profunda.parameters()), "parámetros")</code></pre>
+  <details class="linea-a-linea">
+    <summary>Línea por línea</summary>
+    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+      <tbody>
+        <tr data-lines="1-2"><td><code>import …</code></td><td><code>torch</code> y <code>torch.nn</code>.</td></tr>
+        <tr data-lines="4-6"><td><code>torch.manual_seed(0) …</code></td><td>Semilla (para que los pesos iniciales sean siempre los mismos). Se crea una capa con 3 canales de entrada, 4 filtros y kernel 3×3, y se imprime: <code>print(conv)</code> muestra sus argumentos.</td></tr>
+        <tr data-lines="7-8"><td><code>print("weight:" …) ; print("bias:  " …)</code></td><td><code>conv.weight</code> tiene forma (4, 3, 3, 3): (filtros, canales de entrada, alto, ancho). <code>conv.bias</code> tiene un número por filtro: (4,).</td></tr>
+        <tr data-lines="9"><td><code>print("parámetros:" …)</code></td><td>Suma los elementos de todos los parámetros con <code>p.numel()</code> y los compara con la fórmula \( (3\cdot3\cdot3+1)\cdot4 \).</td></tr>
+        <tr data-lines="11-13"><td><code>x = torch.randn(2, 3, 8, 8) ; y = conv(x) …</code></td><td>Un lote aleatorio de 2 imágenes con 3 canales de 8×8. La salida tiene 4 canales de 6×6 (sin padding, 8 − 3 + 1 = 6).</td></tr>
+        <tr data-lines="15-16"><td><code>f, i, j = 2, 1, 4 ; ventana = …</code></td><td>Elegimos comprobar el filtro 2 en la posición (fila 1, columna 4) de la primera imagen. <code>x[0, :, i:i+3, j:j+3]</code> recorta la ventana de <strong>los tres canales</strong> a la vez: forma (3, 3, 3).</td></tr>
+        <tr data-lines="17"><td><code>por_canal = […]</code></td><td>Para cada canal <code>c</code>: multiplica su ventana por el kernel de <em>ese</em> canal en el filtro 2 (<code>conv.weight[f, c]</code>) y suma. Resultan tres números.</td></tr>
+        <tr data-lines="18"><td><code>a_mano = sum(por_canal) + conv.bias[f].item()</code></td><td>Suma las tres aportaciones y añade el sesgo del filtro 2.</td></tr>
+        <tr data-lines="19-20"><td><code>print(…)</code></td><td>Muestra cada aportación y compara el valor calculado a mano con <code>y[0, f, i, j]</code>, el que dio la capa.</td></tr>
+        <tr data-lines="22-23"><td><code>sin_bias = nn.Conv2d(3, 4, 3, bias=False) …</code></td><td>Con <code>bias=False</code> no hay sesgos: <code>sin_bias.bias</code> es <code>None</code> y quedan 4·27 = 108 parámetros.</td></tr>
+        <tr data-lines="24-27"><td><code>normal = … ; profunda = … ; print(…)</code></td><td>Dos capas con 4 canales de entrada y 8 filtros: <code>groups=1</code> (cada filtro ve los 4 canales) y <code>groups=4</code> (cada canal tiene sus propios 2 filtros). Se comparan la forma del peso y el número de parámetros.</td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>Conv2d(3, 4, kernel_size=(3, 3), stride=(1, 1))
+weight: (4, 3, 3, 3)  (salida, entrada, alto, ancho)
+bias:   (4,)
+parámetros: 112 = (3*3*3 + 1) * 4 = 112
+entrada (2, 3, 8, 8) -&gt; salida (2, 4, 6, 6)
+aporte de cada canal de entrada: [-0.4834, 0.2271, 0.2042]
+a mano: -0.13092 | nn.Conv2d: -0.13092
+bias=False -&gt; None | parámetros: 108
+groups=1: weight (8, 4, 3, 3) -&gt; 296 parámetros
+groups=4: weight (8, 1, 3, 3) -&gt; 80 parámetros</pre>
+    <p>La capa tiene \( (3\cdot3\cdot3+1)\cdot4=112 \) parámetros, como dice la fórmula. La salida de la posición elegida es la suma de tres aportaciones (−0,4834 + 0,2271 + 0,2042) más el sesgo, y da −0,13092, idéntico al de <code>nn.Conv2d</code>: la convolución multicanal es literalmente «suma sobre los canales». Con <code>groups=4</code> el peso pasa de (8, 4, 3, 3) a (8, 1, 3, 3) y los parámetros de 296 a 80: \( 8\cdot(4\cdot9+1)=296 \) frente a \( 8\cdot(1\cdot9+1)=80 \).</p>
+  </div>
+</article>
+
+<article class="snippet" data-lang="python">
+  <header>
+    <h3>4 · Tamaño de la salida: fórmula frente a <code>nn.Conv2d</code> real, <code>padding</code> y <code>padding_mode</code></h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Comprobar la fórmula del tamaño con nueve combinaciones de kernel, stride, padding y dilation; ver <code>'valid'</code> y <code>'same'</code>; provocar los dos errores típicos; y comparar los cuatro <code>padding_mode</code>.</p>
+  </header>
+  <pre class="code"><code>import torch
+import torch.nn as nn
+
+
+def tam_formula(n, k, s=1, p=0, d=1):
+    return (n + 2 * p - d * (k - 1) - 1) // s + 1
+
+
+casos = [
+    (28, 5, 1, 0, 1),
+    (28, 5, 1, 2, 1),
+    (32, 3, 1, 1, 1),
+    (28, 3, 2, 0, 1),
+    (8, 3, 2, 0, 1),
+    (224, 7, 2, 3, 1),
+    (16, 5, 1, 2, 1),
+    (15, 3, 1, 0, 2),
+    (15, 3, 1, 2, 2),
+]
+print(f"{'n':&gt;4} {'k':&gt;2} {'s':&gt;2} {'p':&gt;2} {'d':&gt;2} | {'fórmula':&gt;7} {'real':&gt;5}")
+for n, k, s, p, d in casos:
+    conv = nn.Conv2d(1, 1, kernel_size=k, stride=s, padding=p, dilation=d)
+    real = conv(torch.zeros(1, 1, n, n)).shape[-1]
+    print(f"{n:4d} {k:2d} {s:2d} {p:2d} {d:2d} | {tam_formula(n, k, s, p, d):7d} {real:5d}")
+
+for pad in ["valid", "same"]:
+    conv = nn.Conv2d(1, 1, kernel_size=5, padding=pad)
+    print(f"padding='{pad}' con k=5, entrada 20 -&gt;", conv(torch.zeros(1, 1, 20, 20)).shape[-1])
+try:
+    nn.Conv2d(1, 1, kernel_size=3, stride=2, padding="same")
+except ValueError as e:
+    print("same con stride 2:", e)
+try:
+    nn.Conv2d(1, 1, kernel_size=7)(torch.zeros(1, 1, 6, 6))
+except RuntimeError as e:
+    print("filtro mayor que la imagen:", e)
+
+x = torch.arange(1.0, 10.0).reshape(1, 1, 3, 3)
+print("imagen:", x[0, 0].tolist())
+for modo in ["zeros", "reflect", "replicate", "circular"]:
+    conv = nn.Conv2d(1, 1, 3, padding=1, padding_mode=modo, bias=False)
+    with torch.no_grad():
+        conv.weight.fill_(1.0)
+    print(f"padding_mode={modo:9s} suma de la ventana en la esquina superior izquierda:", conv(x)[0, 0, 0, 0].item())</code></pre>
+  <details class="linea-a-linea">
+    <summary>Línea por línea</summary>
+    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+      <tbody>
+        <tr data-lines="1-2"><td><code>import …</code></td><td><code>torch</code> y <code>torch.nn</code>.</td></tr>
+        <tr data-lines="5-6"><td><code>def tam_formula(n, k, s=1, p=0, d=1): …</code></td><td>La fórmula \( \lfloor (n+2p-d(k-1)-1)/s\rfloor+1 \). En Python, <code>//</code> es la división que redondea hacia abajo.</td></tr>
+        <tr data-lines="9-19"><td><code>casos = […]</code></td><td>Nueve combinaciones (n, k, s, p, d): las de la tabla del texto, incluidas la primera capa de ResNet (224, 7, 2, 3) y dos con dilatación 2.</td></tr>
+        <tr data-lines="20"><td><code>print(f"{'n':>4} …)</code></td><td>Imprime la cabecera de la tabla. <code>:&gt;4</code> alinea a la derecha en 4 espacios.</td></tr>
+        <tr data-lines="21-24"><td><code>for n, k, s, p, d in casos: …</code></td><td>Para cada caso crea una <code>nn.Conv2d</code> de verdad y le pasa una imagen de ceros (1, 1, n, n); <code>.shape[-1]</code> es el ancho de la salida, el valor «real». Se imprime junto al de la fórmula.</td></tr>
+        <tr data-lines="26-28"><td><code>for pad in ["valid", "same"]: …</code></td><td>Con kernel 5 y entrada 20: <code>'valid'</code> (sin relleno) da 16 y <code>'same'</code> da 20.</td></tr>
+        <tr data-lines="29-32"><td><code>try: nn.Conv2d(…stride=2, padding="same") …</code></td><td><code>'same'</code> con stride 2 no se admite; el <code>ValueError</code> salta ya al crear la capa y el <code>except</code> lo imprime.</td></tr>
+        <tr data-lines="33-36"><td><code>try: nn.Conv2d(1, 1, kernel_size=7)(…6, 6)) …</code></td><td>Aplica un kernel 7×7 a una imagen 6×6: no cabe ni una ventana. Se captura el <code>RuntimeError</code> y se imprime entero.</td></tr>
+        <tr data-lines="38-39"><td><code>x = torch.arange(1.0, 10.0).reshape(1, 1, 3, 3) …</code></td><td>La imagen [[1,2,3],[4,5,6],[7,8,9]] como un lote de una imagen de un canal.</td></tr>
+        <tr data-lines="40-41"><td><code>for modo in […]: conv = nn.Conv2d(…padding_mode=modo…)</code></td><td>Para cada modo de relleno crea una capa 3×3 con <code>padding=1</code> y sin sesgo.</td></tr>
+        <tr data-lines="42-43"><td><code>with torch.no_grad(): conv.weight.fill_(1.0)</code></td><td>Pone los nueve pesos a 1: así la salida es simplemente la <strong>suma de la ventana</strong>.</td></tr>
+        <tr data-lines="44"><td><code>print(f"padding_mode={modo:9s} …")</code></td><td>Imprime la salida en la esquina superior izquierda, <code>conv(x)[0, 0, 0, 0]</code>: la suma de la ventana que incluye el marco.</td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>   n  k  s  p  d | fórmula  real
+  28  5  1  0  1 |      24    24
+  28  5  1  2  1 |      28    28
+  32  3  1  1  1 |      32    32
+  28  3  2  0  1 |      13    13
+   8  3  2  0  1 |       3     3
+ 224  7  2  3  1 |     112   112
+  16  5  1  2  1 |      16    16
+  15  3  1  0  2 |      11    11
+  15  3  1  2  2 |      15    15
+padding='valid' con k=5, entrada 20 -&gt; 16
+padding='same' con k=5, entrada 20 -&gt; 20
+same con stride 2: padding='same' is not supported for strided convolutions
+filtro mayor que la imagen: Calculated padded input size per channel: (6 x 6). Kernel size: (7 x 7). Kernel size can't be greater than actual input size
+imagen: [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0], [7.0, 8.0, 9.0]]
+padding_mode=zeros     suma de la ventana en la esquina superior izquierda: 12.0
+padding_mode=reflect   suma de la ventana en la esquina superior izquierda: 33.0
+padding_mode=replicate suma de la ventana en la esquina superior izquierda: 21.0
+padding_mode=circular  suma de la ventana en la esquina superior izquierda: 45.0</pre>
+    <p>En las nueve filas la fórmula y la red real coinciden (por ejemplo 28 → 24 con kernel 5, 28 → 13 con kernel 3 y stride 2, 224 → 112 con la primera capa de ResNet). <code>'same'</code> mantiene 20, <code>'valid'</code> da 16 y con stride 2 es un error. El mensaje del kernel gigante es literal: el mapa con marco mide 6×6 y el kernel 7×7. Las cuatro sumas son las de la tabla del texto: con ceros la ventana es <code>[[0,0,0],[0,1,2],[0,4,5]]</code> (12); reflejada, <code>[[5,4,5],[2,1,2],[5,4,5]]</code> (33); replicada, <code>[[1,1,2],[1,1,2],[4,4,5]]</code> (21); circular, <code>[[9,7,8],[3,1,2],[6,4,5]]</code> (45).</p>
+  </div>
+</article>
+
+<article class="snippet" data-lang="python">
+  <header>
+    <h3>5 · Pooling en PyTorch: <code>MaxPool2d</code>, <code>ceil_mode</code>, <code>AvgPool2d</code> y <code>AdaptiveAvgPool2d</code></h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Aplicar los tres pooling a un mapa 7×7, ver qué se pierde cuando el tamaño es impar, comprobar que el pooling no tiene parámetros y medir cuánta tolerancia a desplazamientos da.</p>
+  </header>
+  <pre class="code"><code>import torch
+import torch.nn as nn
+
+mapa = torch.tensor([[1, 3, 2, 0, 5, 1, 2],
+                     [4, 2, 1, 1, 3, 2, 0],
+                     [0, 1, 7, 2, 1, 0, 4],
+                     [3, 2, 1, 8, 0, 6, 1],
+                     [2, 0, 3, 1, 2, 1, 5],
+                     [1, 4, 0, 2, 6, 3, 2],
+                     [5, 1, 2, 0, 1, 2, 3]], dtype=torch.float32).reshape(1, 1, 7, 7)
+
+pool = nn.MaxPool2d(kernel_size=2)
+print(pool)
+print("7x7 con MaxPool2d(2):", tuple(pool(mapa).shape))
+print(pool(mapa)[0, 0].int())
+print("con ceil_mode=True:", tuple(nn.MaxPool2d(2, ceil_mode=True)(mapa).shape))
+print(nn.MaxPool2d(2, ceil_mode=True)(mapa)[0, 0].int())
+print("con stride=1:", tuple(nn.MaxPool2d(2, stride=1)(mapa).shape))
+media = nn.AvgPool2d(2)(mapa)
+print("AvgPool2d(2), primera ventana (1,3,4,2) -&gt;", media[0, 0, 0, 0].item(), "| forma", tuple(media.shape))
+print("AdaptiveAvgPool2d(1):", tuple(nn.AdaptiveAvgPool2d(1)(mapa).shape), "= media de todo el mapa", round(mapa.mean().item(), 4))
+print("AdaptiveAvgPool2d(3) sobre 7x7:", tuple(nn.AdaptiveAvgPool2d(3)(mapa).shape))
+
+print("pooling no tiene parámetros:", sum(p.numel() for p in pool.parameters()))
+
+punto = torch.zeros(1, 1, 6, 6)
+punto[0, 0, 2, 2] = 9.0
+pool2 = nn.MaxPool2d(2)
+base = pool2(punto)
+for nombre, (df, dc) in {"abajo-derecha": (1, 1), "arriba": (-1, 0)}.items():
+    mov = torch.roll(punto, shifts=(df, dc), dims=(2, 3))
+    print(f"punto desplazado 1 px ({nombre}): salida igual = {torch.equal(pool2(mov), base)}")</code></pre>
+  <details class="linea-a-linea">
+    <summary>Línea por línea</summary>
+    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+      <tbody>
+        <tr data-lines="1-2"><td><code>import …</code></td><td><code>torch</code> y <code>torch.nn</code>.</td></tr>
+        <tr data-lines="4-10"><td><code>mapa = torch.tensor([[…]]).reshape(1, 1, 7, 7)</code></td><td>Un mapa 7×7 con números del 0 al 8, puesto como un lote de una imagen con un canal. Se escribe con <code>dtype=torch.float32</code> porque el pooling necesita decimales.</td></tr>
+        <tr data-lines="12-13"><td><code>pool = nn.MaxPool2d(kernel_size=2) ; print(pool)</code></td><td>Una capa de max pooling con ventana 2×2. Al imprimirla se ve que <code>stride=2</code> (por defecto igual al kernel), <code>padding=0</code> y <code>ceil_mode=False</code>.</td></tr>
+        <tr data-lines="14-15"><td><code>print("7x7 con MaxPool2d(2):" …) ; print(pool(mapa)[0, 0].int())</code></td><td>La salida es 3×3. Se muestra como enteros: la última fila y columna del mapa se han descartado.</td></tr>
+        <tr data-lines="16-17"><td><code>print("con ceil_mode=True:" …)</code></td><td>Con <code>ceil_mode=True</code> el tamaño se redondea hacia arriba (4×4), y las ventanas del borde se quedan con lo que haya.</td></tr>
+        <tr data-lines="18"><td><code>print("con stride=1:" …)</code></td><td>Con stride 1 las ventanas se solapan y la salida es 6×6.</td></tr>
+        <tr data-lines="19-20"><td><code>media = nn.AvgPool2d(2)(mapa) …</code></td><td>Pooling por media. Se muestra el valor de la primera ventana, (1+3+4+2)/4 = 2,5, y la forma.</td></tr>
+        <tr data-lines="21"><td><code>print("AdaptiveAvgPool2d(1):" …)</code></td><td><code>AdaptiveAvgPool2d(1)</code> devuelve un solo número por canal: la media de todo el mapa, que se compara con <code>mapa.mean()</code>.</td></tr>
+        <tr data-lines="22"><td><code>print("AdaptiveAvgPool2d(3) sobre 7x7:" …)</code></td><td>Pide una salida de 3×3 sin decir kernel ni stride: PyTorch calcula ventanas que pueden solaparse.</td></tr>
+        <tr data-lines="24"><td><code>print("pooling no tiene parámetros:" …)</code></td><td>Suma los elementos de los parámetros de la capa: 0.</td></tr>
+        <tr data-lines="26-28"><td><code>punto = torch.zeros(1, 1, 6, 6) …</code></td><td>Una imagen 6×6 de ceros con un 9 en la posición (2, 2) y un max pooling 2×2.</td></tr>
+        <tr data-lines="29-32"><td><code>base = pool2(punto) ; for nombre, (df, dc) in {…}.items(): …</code></td><td><code>base</code> es la salida de referencia. Para dos desplazamientos (un píxel abajo-derecha y un píxel hacia arriba) mueve el punto con <code>torch.roll</code>, aplica el pooling y comprueba con <code>torch.equal</code> si la salida es idéntica a la de referencia.</td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>MaxPool2d(kernel_size=2, stride=2, padding=0, dilation=1, ceil_mode=False)
+7x7 con MaxPool2d(2): (1, 1, 3, 3)
+tensor([[4, 2, 5],
+        [3, 8, 6],
+        [4, 3, 6]], dtype=torch.int32)
+con ceil_mode=True: (1, 1, 4, 4)
+tensor([[4, 2, 5, 2],
+        [3, 8, 6, 4],
+        [4, 3, 6, 5],
+        [5, 2, 2, 3]], dtype=torch.int32)
+con stride=1: (1, 1, 6, 6)
+AvgPool2d(2), primera ventana (1,3,4,2) -&gt; 2.5 | forma (1, 1, 3, 3)
+AdaptiveAvgPool2d(1): (1, 1, 1, 1) = media de todo el mapa 2.2245
+AdaptiveAvgPool2d(3) sobre 7x7: (1, 1, 3, 3)
+pooling no tiene parámetros: 0
+punto desplazado 1 px (abajo-derecha): salida igual = True
+punto desplazado 1 px (arriba): salida igual = False</pre>
+    <p>La salida de <code>MaxPool2d(2)</code> es 3×3 (<code>[[4,2,5],[3,8,6],[4,3,6]]</code>) y con <code>ceil_mode=True</code> 4×4: la fila nueva <code>[5,2,2,3]</code> y la columna <code>[2,4,5]</code> son lo que antes se tiraba. <code>AvgPool2d(2)</code> da 2,5 en la primera ventana, <code>AdaptiveAvgPool2d(1)</code> da 2,2245 (la media de las 49 casillas) y el pooling no tiene parámetros. El desplazamiento abajo-derecha no cambia la salida (<code>True</code>) porque el 9 sigue en la misma ventana; el desplazamiento hacia arriba sí la cambia (<code>False</code>).</p>
+  </div>
+</article>
+
+<article class="snippet" data-lang="python">
+  <header>
+    <h3>6 · De mapas a vector: <code>Flatten</code>, <code>in_features</code>, <code>LazyLinear</code> y <code>AdaptiveAvgPool2d(1)</code></h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Aplanar un lote de mapas, provocar el error de <code>in_features</code>, calcularlo con un forward de prueba, dejar que <code>LazyLinear</code> lo deduzca y usar el pooling global para que la red acepte imágenes de cualquier tamaño.</p>
+  </header>
+  <pre class="code"><code>import torch
+import torch.nn as nn
+
+torch.manual_seed(0)
+x = torch.randn(4, 32, 4, 4)
+plano = nn.Flatten()(x)
+print("Flatten():", tuple(x.shape), "-&gt;", tuple(plano.shape), "(el lote se conserva)")
+print("Flatten(start_dim=0):", tuple(nn.Flatten(start_dim=0)(x).shape), "&lt;- mezcla también el lote")
+print("x.view(x.size(0), -1) igual que Flatten:", torch.equal(x.view(x.size(0), -1), plano))
+
+fc = nn.Linear(32 * 4 * 4, 10)
+print("Linear(512, 10):", tuple(fc(plano).shape))
+try:
+    nn.Linear(100, 10)(plano)
+except RuntimeError as e:
+    print("Linear mal dimensionada:", e)
+
+cuerpo = nn.Sequential(
+    nn.Conv2d(1, 8, 3, padding=1), nn.ReLU(), nn.MaxPool2d(2),
+    nn.Conv2d(8, 16, 3, padding=1), nn.ReLU(), nn.MaxPool2d(2),
+    nn.Flatten(),
+)
+with torch.no_grad():
+    n_feat = cuerpo(torch.zeros(1, 1, 8, 8)).shape[1]
+print("in_features descubierto con un forward de prueba:", n_feat)
+modelo = nn.Sequential(cuerpo, nn.Linear(n_feat, 10))
+print("salida del modelo:", tuple(modelo(torch.zeros(5, 1, 8, 8)).shape))
+
+perezoso = nn.Sequential(cuerpo, nn.LazyLinear(10))
+print("antes:", type(perezoso[1].weight).__name__)
+perezoso(torch.zeros(2, 1, 8, 8))
+print("después:", perezoso[1])
+
+gap = nn.Sequential(
+    nn.Conv2d(1, 16, 3, padding=1), nn.ReLU(),
+    nn.AdaptiveAvgPool2d(1), nn.Flatten(), nn.Linear(16, 10),
+)
+for lado in (8, 12, 20):
+    print(f"con AdaptiveAvgPool2d(1), imagen {lado}x{lado} -&gt;", tuple(gap(torch.zeros(3, 1, lado, lado)).shape))</code></pre>
+  <details class="linea-a-linea">
+    <summary>Línea por línea</summary>
+    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+      <tbody>
+        <tr data-lines="1-2"><td><code>import …</code></td><td><code>torch</code> y <code>torch.nn</code>.</td></tr>
+        <tr data-lines="4-5"><td><code>torch.manual_seed(0) ; x = torch.randn(4, 32, 4, 4)</code></td><td>Un lote de 4 «imágenes» de 32 mapas de 4×4, como el que dejaría la segunda convolución de la CNN del laboratorio.</td></tr>
+        <tr data-lines="6-7"><td><code>plano = nn.Flatten()(x) …</code></td><td><code>nn.Flatten()</code> aplana desde la dimensión 1 hasta el final: (4, 32, 4, 4) pasa a (4, 512). El lote (dimensión 0) se conserva.</td></tr>
+        <tr data-lines="8"><td><code>print("Flatten(start_dim=0):" …)</code></td><td>Con <code>start_dim=0</code> se aplana todo, incluido el lote: un solo vector de 2.048 números. Casi nunca es lo que quieres.</td></tr>
+        <tr data-lines="9"><td><code>print("x.view(x.size(0), -1) …")</code></td><td>La forma antigua de aplanar (la del laboratorio de IBM): conserva <code>x.size(0)</code> filas y deja que PyTorch calcule las columnas (<code>-1</code>). <code>torch.equal</code> confirma que es lo mismo.</td></tr>
+        <tr data-lines="11-12"><td><code>fc = nn.Linear(32 * 4 * 4, 10) …</code></td><td>La capa lineal con el <code>in_features</code> correcto, 512. La salida es (4, 10): 10 puntuaciones por imagen.</td></tr>
+        <tr data-lines="13-16"><td><code>try: nn.Linear(100, 10)(plano) …</code></td><td>Una capa con <code>in_features=100</code> no puede multiplicar un tensor de 512 columnas. Se captura el <code>RuntimeError</code> y se imprime.</td></tr>
+        <tr data-lines="18-22"><td><code>cuerpo = nn.Sequential(…)</code></td><td>El «cuerpo» de la CNN de dígitos 8×8: dos bloques conv → ReLU → pooling y un <code>Flatten</code> al final. Aún no tiene capa lineal.</td></tr>
+        <tr data-lines="23-25"><td><code>with torch.no_grad(): n_feat = cuerpo(torch.zeros(1, 1, 8, 8)).shape[1]</code></td><td>Se pasa una imagen de ceros por el cuerpo (sin gradientes) y se lee el número de columnas, <code>.shape[1]</code>: ese es el <code>in_features</code> de la capa lineal.</td></tr>
+        <tr data-lines="26-27"><td><code>modelo = nn.Sequential(cuerpo, nn.Linear(n_feat, 10)) …</code></td><td>Se monta el modelo completo con el número descubierto y se prueba con un lote de 5 imágenes: la salida es (5, 10).</td></tr>
+        <tr data-lines="29-32"><td><code>perezoso = nn.Sequential(cuerpo, nn.LazyLinear(10)) …</code></td><td><code>LazyLinear(10)</code> solo pide las salidas. Antes del primer forward sus parámetros son del tipo <code>UninitializedParameter</code>; al pasar datos, deduce el <code>in_features</code> y se convierte en una <code>Linear</code> normal.</td></tr>
+        <tr data-lines="34-37"><td><code>gap = nn.Sequential(…AdaptiveAvgPool2d(1), nn.Flatten(), nn.Linear(16, 10))</code></td><td>Otra red: una convolución con 16 filtros, el pooling global (un número por canal), el aplanado y una <code>Linear(16, 10)</code> cuyo tamaño no depende de la imagen.</td></tr>
+        <tr data-lines="38-39"><td><code>for lado in (8, 12, 20): …</code></td><td>Pasa imágenes de 8×8, 12×12 y 20×20 por la misma red: siempre sale (3, 10).</td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>Flatten(): (4, 32, 4, 4) -&gt; (4, 512) (el lote se conserva)
+Flatten(start_dim=0): (2048,) &lt;- mezcla también el lote
+x.view(x.size(0), -1) igual que Flatten: True
+Linear(512, 10): (4, 10)
+Linear mal dimensionada: mat1 and mat2 shapes cannot be multiplied (4x512 and 100x10)
+in_features descubierto con un forward de prueba: 64
+salida del modelo: (5, 10)
+antes: UninitializedParameter
+después: Linear(in_features=64, out_features=10, bias=True)
+con AdaptiveAvgPool2d(1), imagen 8x8 -&gt; (3, 10)
+con AdaptiveAvgPool2d(1), imagen 12x12 -&gt; (3, 10)
+con AdaptiveAvgPool2d(1), imagen 20x20 -&gt; (3, 10)</pre>
+    <p>El aplanado respeta el lote: (4, 32, 4, 4) → (4, 512), y con <code>start_dim=0</code> se mezclan las imágenes en un único vector de 2.048. La capa mal dimensionada da el error clásico <code>mat1 and mat2 shapes cannot be multiplied (4x512 and 100x10)</code>: la primera pareja es lo que llega y la segunda lo que la capa esperaba. El forward de prueba descubre que el cuerpo deja 16·2·2 = 64 valores (8 → 4 → 2). <code>LazyLinear</code> pasa de <code>UninitializedParameter</code> a <code>Linear(in_features=64, out_features=10)</code>. Con el pooling global la misma red acepta imágenes de 8, 12 o 20 píxeles.</p>
+  </div>
+</article>
+
+<article class="snippet" data-lang="python">
+  <header>
+    <h3>7 · Un «resumen» del modelo con hooks (formas y parámetros capa a capa)</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Escribir en diez líneas el equivalente de <code>model.summary()</code> de Keras con <code>register_forward_hook</code>, y comprobar con él las tres redes del módulo.</p>
+  </header>
+  <pre class="code"><code>import torch
+import torch.nn as nn
+
+
+def resumen(modelo, forma_entrada):
+    filas, ganchos = [], []
+
+    def anotar(modulo, entrada, salida):
+        n_par = sum(p.numel() for p in modulo.parameters(recurse=False))
+        filas.append((modulo.__class__.__name__, tuple(salida.shape), n_par))
+
+    for m in modelo.modules():
+        if len(list(m.children())) == 0:
+            ganchos.append(m.register_forward_hook(anotar))
+    modelo.eval()
+    with torch.no_grad():
+        modelo(torch.zeros(1, *forma_entrada))
+    for g in ganchos:
+        g.remove()
+    print(f"{'capa':&lt;12}{'forma de salida':&lt;22}{'parámetros':&gt;10}")
+    for nombre, forma, n in filas:
+        print(f"{nombre:&lt;12}{str(forma):&lt;22}{n:&gt;10d}")
+    print("total:", sum(p.numel() for p in modelo.parameters()), "\n")
+
+
+class CNN(nn.Module):
+    def __init__(self, out_1=16, out_2=32):
+        super().__init__()
+        self.cnn1 = nn.Conv2d(in_channels=1, out_channels=out_1, kernel_size=5, padding=2)
+        self.maxpool1 = nn.MaxPool2d(kernel_size=2)
+        self.cnn2 = nn.Conv2d(in_channels=out_1, out_channels=out_2, kernel_size=5, stride=1, padding=2)
+        self.maxpool2 = nn.MaxPool2d(kernel_size=2)
+        self.fc1 = nn.Linear(out_2 * 4 * 4, 10)
+
+    def forward(self, x):
+        x = self.maxpool1(torch.relu(self.cnn1(x)))
+        x = self.maxpool2(torch.relu(self.cnn2(x)))
+        x = x.view(x.size(0), -1)
+        return self.fc1(x)
+
+
+print("--- CNN del laboratorio (imágenes 16x16) ---")
+resumen(CNN(), (1, 16, 16))
+
+print("--- CNN pequeña para dígitos 8x8 ---")
+digitos = nn.Sequential(
+    nn.Conv2d(1, 8, 3, padding=1), nn.ReLU(), nn.MaxPool2d(2),
+    nn.Conv2d(8, 16, 3, padding=1), nn.ReLU(), nn.MaxPool2d(2),
+    nn.Flatten(), nn.Linear(64, 10),
+)
+resumen(digitos, (1, 8, 8))
+
+print("--- Red de papel: foto RGB de 100x100, tres clases ---")
+papel = nn.Sequential(
+    nn.Conv2d(3, 16, 3), nn.ReLU(), nn.MaxPool2d(2),
+    nn.Conv2d(16, 32, 3), nn.ReLU(), nn.MaxPool2d(2),
+    nn.Flatten(), nn.Linear(23 * 23 * 32, 100), nn.ReLU(), nn.Linear(100, 3),
+)
+resumen(papel, (3, 100, 100))</code></pre>
+  <details class="linea-a-linea">
+    <summary>Línea por línea</summary>
+    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+      <tbody>
+        <tr data-lines="1-2"><td><code>import …</code></td><td><code>torch</code> y <code>torch.nn</code>.</td></tr>
+        <tr data-lines="5-6"><td><code>def resumen(modelo, forma_entrada): filas, ganchos = [], []</code></td><td>Función que recibe el modelo y la forma de UNA imagen, sin lote, por ejemplo (1, 16, 16). <code>filas</code> guardará una fila por capa y <code>ganchos</code> los hooks registrados para poder quitarlos después.</td></tr>
+        <tr data-lines="8-10"><td><code>def anotar(modulo, entrada, salida): …</code></td><td>El hook. PyTorch lo llama con tres argumentos cada vez que un módulo termina su <code>forward</code>: el módulo, su entrada y su salida. Guarda el nombre de la clase, la forma de la salida y el número de parámetros <em>propios</em> del módulo (<code>recurse=False</code>).</td></tr>
+        <tr data-lines="12-14"><td><code>for m in modelo.modules(): if len(list(m.children())) == 0: …</code></td><td>Recorre todos los módulos; solo a los «hoja» (los que no contienen otros módulos) se les registra el hook con <code>register_forward_hook</code>, que devuelve un identificador para borrarlo.</td></tr>
+        <tr data-lines="15-17"><td><code>modelo.eval() ; with torch.no_grad(): modelo(torch.zeros(1, *forma_entrada))</code></td><td>Pasa una imagen de ceros por el modelo: al hacerlo, cada capa hoja dispara su hook. El <code>*</code> desempaqueta la forma: <code>(1, *(1, 16, 16))</code> es <code>(1, 1, 16, 16)</code>.</td></tr>
+        <tr data-lines="18-19"><td><code>for g in ganchos: g.remove()</code></td><td>Quita los hooks para no dejar basura en el modelo.</td></tr>
+        <tr data-lines="20-23"><td><code>print(…)</code></td><td>Imprime la cabecera con anchos fijos (<code>:&lt;12</code> alinea a la izquierda, <code>:&gt;10d</code> a la derecha), una fila por capa y el total de parámetros.</td></tr>
+        <tr data-lines="26-33"><td><code>class CNN(nn.Module): __init__ …</code></td><td>La CNN del laboratorio: dos convoluciones de 5×5 con padding 2, dos <code>MaxPool2d(2)</code> y una capa lineal de 32·4·4 entradas y 10 salidas.</td></tr>
+        <tr data-lines="35-39"><td><code>def forward(self, x): …</code></td><td>Conv → <code>torch.relu</code> → pooling, dos veces; <code>x.view(x.size(0), -1)</code> aplana; y <code>fc1</code> da los 10 logits. El ReLU es una función, no un módulo: por eso no aparecerá en el resumen.</td></tr>
+        <tr data-lines="42-43"><td><code>print(…) ; resumen(CNN(), (1, 16, 16))</code></td><td>Resumen de la CNN del laboratorio con imágenes 1×16×16.</td></tr>
+        <tr data-lines="45-51"><td><code>digitos = nn.Sequential(…) ; resumen(digitos, (1, 8, 8))</code></td><td>Una CNN pequeña para dígitos de 8×8, escrita con <code>nn.Sequential</code>: aquí los ReLU y el <code>Flatten</code> sí son módulos y salen en la tabla.</td></tr>
+        <tr data-lines="53-59"><td><code>papel = nn.Sequential(…) ; resumen(papel, (3, 100, 100))</code></td><td>La red de «papel» para fotos RGB de 100×100 y tres clases: <code>23 * 23 * 32</code> es la cuenta a mano del tamaño aplanado.</td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>--- CNN del laboratorio (imágenes 16x16) ---
+capa        forma de salida       parámetros
+Conv2d      (1, 16, 16, 16)              416
+MaxPool2d   (1, 16, 8, 8)                  0
+Conv2d      (1, 32, 8, 8)              12832
+MaxPool2d   (1, 32, 4, 4)                  0
+Linear      (1, 10)                     5130
+total: 18378 
+
+--- CNN pequeña para dígitos 8x8 ---
+capa        forma de salida       parámetros
+Conv2d      (1, 8, 8, 8)                  80
+ReLU        (1, 8, 8, 8)                   0
+MaxPool2d   (1, 8, 4, 4)                   0
+Conv2d      (1, 16, 4, 4)               1168
+ReLU        (1, 16, 4, 4)                  0
+MaxPool2d   (1, 16, 2, 2)                  0
+Flatten     (1, 64)                        0
+Linear      (1, 10)                      650
+total: 1898 
+
+--- Red de papel: foto RGB de 100x100, tres clases ---
+capa        forma de salida       parámetros
+Conv2d      (1, 16, 98, 98)              448
+ReLU        (1, 16, 98, 98)                0
+MaxPool2d   (1, 16, 49, 49)                0
+Conv2d      (1, 32, 47, 47)             4640
+ReLU        (1, 32, 47, 47)                0
+MaxPool2d   (1, 32, 23, 23)                0
+Flatten     (1, 16928)                     0
+Linear      (1, 100)                 1692900
+ReLU        (1, 100)                       0
+Linear      (1, 3)                       303
+total: 1698291 </pre>
+    <p>La tabla de la red del laboratorio reproduce la cuenta a mano: 416, 12.832 y 5.130 parámetros, total 18.378, con las formas (1, 16, 16, 16) → (1, 16, 8, 8) → (1, 32, 8, 8) → (1, 32, 4, 4) → (1, 10). No salen los ReLU ni el aplanado porque la clase usa <code>torch.relu</code> y <code>view</code>. En la CNN de dígitos sí aparecen y suman 1.898 (80 + 1.168 + 650). En la de papel, 448 + 4.640 + 1.692.900 + 303 = 1.698.291, y las formas (98, 49, 47, 23) coinciden con la fórmula: el aplanado es 16.928 = 32·23·23.</p>
+  </div>
+</article>
+
+<article class="snippet" data-lang="python">
+  <header>
+    <h3>8 · <code>Dataset</code> y <code>DataLoader</code> con <code>FakeData</code> (imágenes de relleno, sin internet)</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Ver la interfaz de un dataset de imágenes de torchvision y cómo el <code>DataLoader</code> las agrupa en lotes, sin descargar MNIST.</p>
+  </header>
+  <pre class="code"><code>import torch
+import torchvision.datasets as dsets
+import torchvision.transforms as transforms
+from torch.utils.data import DataLoader
+
+IMAGE_SIZE = 16
+composed = transforms.Compose([transforms.Resize((IMAGE_SIZE, IMAGE_SIZE)), transforms.ToTensor()])
+
+dataset = dsets.FakeData(size=1050, image_size=(1, 28, 28), num_classes=10, transform=composed, random_offset=0)
+print("imágenes en el dataset:", len(dataset))
+imagen, etiqueta = dataset[0]
+print("dataset[0] -&gt;", type(imagen).__name__, tuple(imagen.shape), imagen.dtype, "| etiqueta", etiqueta, type(etiqueta).__name__)
+print("rango de la imagen:", round(imagen.min().item(), 3), "a", round(imagen.max().item(), 3))
+
+cargador = DataLoader(dataset=dataset, batch_size=100, shuffle=True)
+print("lotes por época:", len(cargador))
+formas = [tuple(lx.shape) for lx, ly in cargador]
+print("primer lote:", formas[0], "| último lote:", formas[-1])
+lx, ly = next(iter(cargador))
+print("etiquetas del lote:", tuple(ly.shape), ly.dtype)
+sin_resto = DataLoader(dataset, batch_size=100, drop_last=True)
+print("con drop_last=True:", len(sin_resto), "lotes")</code></pre>
+  <details class="linea-a-linea">
+    <summary>Línea por línea</summary>
+    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+      <tbody>
+        <tr data-lines="1-4"><td><code>import …</code></td><td><code>torch</code>, los datasets de torchvision (alias <code>dsets</code>), las transformaciones y <code>DataLoader</code>.</td></tr>
+        <tr data-lines="6-7"><td><code>IMAGE_SIZE = 16 ; composed = transforms.Compose([…])</code></td><td>Una cadena de transformaciones: primero <code>Resize((16, 16))</code> (cambia el tamaño) y después <code>ToTensor()</code> (a tensor <code>float32</code> en [0, 1], con el canal delante). <code>Compose</code> las aplica en orden a cada imagen.</td></tr>
+        <tr data-lines="9"><td><code>dataset = dsets.FakeData(size=1050, image_size=(1, 28, 28), …)</code></td><td><code>FakeData</code> fabrica 1.050 imágenes aleatorias de 1 canal y 28×28, con 10 clases y la transformación anterior. Es una imitación del interfaz de MNIST (ruido, no dígitos); <code>random_offset=0</code> las hace siempre iguales.</td></tr>
+        <tr data-lines="10"><td><code>print("imágenes en el dataset:", len(dataset))</code></td><td><code>len(dataset)</code> llama a <code>__len__</code>.</td></tr>
+        <tr data-lines="11-12"><td><code>imagen, etiqueta = dataset[0] …</code></td><td><code>dataset[0]</code> llama a <code>__getitem__(0)</code> y devuelve el par (imagen, etiqueta). Se imprime el tipo, la forma, el <code>dtype</code> de la imagen y el tipo de la etiqueta.</td></tr>
+        <tr data-lines="13"><td><code>print("rango de la imagen:" …)</code></td><td>El mínimo y el máximo de los píxeles, redondeados a 3 decimales.</td></tr>
+        <tr data-lines="15-16"><td><code>cargador = DataLoader(dataset=dataset, batch_size=100, shuffle=True) …</code></td><td>El <code>DataLoader</code> reparte el dataset en lotes de 100, desordenando en cada época. <code>len(cargador)</code> es el número de lotes.</td></tr>
+        <tr data-lines="17-18"><td><code>formas = [tuple(lx.shape) for lx, ly in cargador] …</code></td><td>Recorre una época entera y apunta la forma de cada lote de imágenes; se imprimen el primero y el último.</td></tr>
+        <tr data-lines="19-20"><td><code>lx, ly = next(iter(cargador)) …</code></td><td><code>next(iter(…))</code> saca un único lote. Las etiquetas vienen como un tensor (100,) de enteros de 64 bits.</td></tr>
+        <tr data-lines="21-22"><td><code>sin_resto = DataLoader(dataset, batch_size=100, drop_last=True) …</code></td><td>Con <code>drop_last=True</code> se descarta el último lote si no está completo.</td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>imágenes en el dataset: 1050
+dataset[0] -&gt; Tensor (1, 16, 16) torch.float32 | etiqueta 2 int
+rango de la imagen: 0.212 a 0.835
+lotes por época: 11
+primer lote: (100, 1, 16, 16) | último lote: (50, 1, 16, 16)
+etiquetas del lote: (100,) torch.int64
+con drop_last=True: 10 lotes</pre>
+    <p>Cada elemento es un tensor <code>float32</code> de forma (1, 16, 16) (<code>Resize</code> ya redujo las de 28×28) y una etiqueta Python <code>int</code>. Con 1.050 imágenes y lotes de 100 hay \( \lceil1050/100\rceil=11 \) lotes: diez de (100, 1, 16, 16) y uno final de (50, 1, 16, 16). Con <code>drop_last=True</code> quedan 10. El <code>DataLoader</code> añadió la dimensión de lote y convirtió las etiquetas en un tensor <code>int64</code>, que es lo que pide <code>CrossEntropyLoss</code>.</p>
+  </div>
+</article>
+
+<article class="snippet" data-lang="python">
+  <header>
+    <h3>9 · Entrenar la CNN del laboratorio con dígitos de 16×16</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Preparar los datos (NCHW, <code>Resize</code>, división entrenamiento/prueba), definir la CNN, entrenarla 8 épocas con <code>DataLoader</code> y medir pérdida y acierto en cada época.</p>
+  </header>
+  <pre class="code"><code>import torch
+import torch.nn as nn
+from sklearn.datasets import load_digits
+from sklearn.model_selection import train_test_split
+from torch.utils.data import TensorDataset, DataLoader
+from torchvision import transforms
+
+torch.set_num_threads(1)
+torch.manual_seed(0)
+
+digitos = load_digits()
+X = torch.tensor(digitos.images, dtype=torch.float32).unsqueeze(1) / 16.0
+y = torch.tensor(digitos.target, dtype=torch.long)
+X = transforms.Resize((16, 16))(X)
+print("imágenes:", tuple(X.shape), "| etiquetas:", tuple(y.shape), y.dtype)
+
+idx_tr, idx_te = train_test_split(range(len(y)), test_size=0.25, stratify=y.numpy(), random_state=0)
+X_tr, y_tr, X_te, y_te = X[idx_tr], y[idx_tr], X[idx_te], y[idx_te]
+print("entrenamiento:", len(y_tr), "| prueba:", len(y_te))
+
+cargador = DataLoader(TensorDataset(X_tr, y_tr), batch_size=100, shuffle=True)
+print("lotes por época:", len(cargador))
+lote_x, lote_y = next(iter(cargador))
+print("un lote:", tuple(lote_x.shape), lote_x.dtype, "|", tuple(lote_y.shape), lote_y.dtype)
+
+
+class CNN(nn.Module):
+    def __init__(self, out_1=16, out_2=32):
+        super().__init__()
+        self.cnn1 = nn.Conv2d(in_channels=1, out_channels=out_1, kernel_size=5, padding=2)
+        self.maxpool1 = nn.MaxPool2d(kernel_size=2)
+        self.cnn2 = nn.Conv2d(in_channels=out_1, out_channels=out_2, kernel_size=5, stride=1, padding=2)
+        self.maxpool2 = nn.MaxPool2d(kernel_size=2)
+        self.fc1 = nn.Linear(out_2 * 4 * 4, 10)
+
+    def forward(self, x):
+        x = self.maxpool1(torch.relu(self.cnn1(x)))
+        x = self.maxpool2(torch.relu(self.cnn2(x)))
+        x = x.view(x.size(0), -1)
+        return self.fc1(x)
+
+
+def precision(modelo, X, y):
+    modelo.eval()
+    with torch.no_grad():
+        return (modelo(X).argmax(dim=1) == y).float().mean().item()
+
+
+modelo = CNN()
+criterio = nn.CrossEntropyLoss()
+optimizador = torch.optim.SGD(modelo.parameters(), lr=0.1, momentum=0.9)
+print(f"antes de entrenar: acierto en prueba = {precision(modelo, X_te, y_te):.3f}")
+for epoca in range(1, 9):
+    modelo.train()
+    perdida_total = 0.0
+    for lx, ly in cargador:
+        optimizador.zero_grad()
+        perdida = criterio(modelo(lx), ly)
+        perdida.backward()
+        optimizador.step()
+        perdida_total += perdida.item() * len(ly)
+    print(f"época {epoca}: pérdida media = {perdida_total / len(y_tr):.4f} | acierto en prueba = {precision(modelo, X_te, y_te):.3f}")</code></pre>
+  <details class="linea-a-linea">
+    <summary>Línea por línea</summary>
+    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+      <tbody>
+        <tr data-lines="1-6"><td><code>import …</code></td><td><code>torch</code>, <code>nn</code>, los dígitos y <code>train_test_split</code> de scikit-learn, <code>TensorDataset</code> y <code>DataLoader</code> y <code>transforms</code>.</td></tr>
+        <tr data-lines="8-9"><td><code>torch.set_num_threads(1) ; torch.manual_seed(0)</code></td><td>Un solo hilo de CPU (para que el resultado sea repetible y no sature la máquina) y la semilla de PyTorch para pesos iniciales y orden de los lotes.</td></tr>
+        <tr data-lines="11-13"><td><code>digitos = load_digits() ; X = … ; y = …</code></td><td>Imágenes como <code>float32</code> en [0, 1], con <code>unsqueeze(1)</code> para el canal; etiquetas como enteros <code>long</code>.</td></tr>
+        <tr data-lines="14-15"><td><code>X = transforms.Resize((16, 16))(X) …</code></td><td><code>Resize</code> también funciona sobre tensores y cambia de 8×8 a 16×16 (interpolación). Se imprime (1797, 1, 16, 16).</td></tr>
+        <tr data-lines="17-19"><td><code>idx_tr, idx_te = train_test_split(…) …</code></td><td>Divide los índices en 75 % entrenamiento y 25 % prueba; <code>stratify</code> mantiene la misma proporción de cada dígito; <code>random_state=0</code> lo hace repetible. Luego se seleccionan las imágenes con esos índices.</td></tr>
+        <tr data-lines="21-24"><td><code>cargador = DataLoader(TensorDataset(X_tr, y_tr), …)</code></td><td><code>TensorDataset</code> junta imágenes y etiquetas; el <code>DataLoader</code> las entrega en lotes de 100, desordenadas. Se imprime el número de lotes y la forma y el tipo de uno.</td></tr>
+        <tr data-lines="27-34"><td><code>class CNN(nn.Module): __init__ …</code></td><td>La CNN del laboratorio: <code>cnn1</code> (1 → 16 canales, kernel 5, padding 2), <code>maxpool1</code>, <code>cnn2</code> (16 → 32), <code>maxpool2</code> y <code>fc1</code> con \( 32\cdot4\cdot4 \) entradas y 10 salidas.</td></tr>
+        <tr data-lines="36-40"><td><code>def forward(self, x): …</code></td><td>Conv → ReLU → pooling, dos veces; aplanado con <code>view</code>; capa lineal final que devuelve <em>logits</em> (sin softmax).</td></tr>
+        <tr data-lines="43-46"><td><code>def precision(modelo, X, y): …</code></td><td>Función para medir el acierto: <code>eval()</code>, sin gradientes, <code>argmax(dim=1)</code> elige la clase con mayor puntuación, se compara con las etiquetas y se saca la media.</td></tr>
+        <tr data-lines="49-51"><td><code>modelo = CNN() ; criterio = … ; optimizador = …</code></td><td>Se crea la red, la pérdida <code>CrossEntropyLoss</code> y el optimizador SGD con <code>lr=0.1</code> y <code>momentum=0.9</code>.</td></tr>
+        <tr data-lines="52"><td><code>print(f"antes de entrenar: …")</code></td><td>Acierto de la red sin entrenar, con las 450 imágenes de prueba.</td></tr>
+        <tr data-lines="53-55"><td><code>for epoca in range(1, 9): modelo.train() …</code></td><td>Ocho épocas. <code>train()</code> pone el modelo en modo entrenamiento y <code>perdida_total</code> acumula la pérdida.</td></tr>
+        <tr data-lines="56-60"><td><code>for lx, ly in cargador: …</code></td><td>Los cinco pasos de siempre por cada lote: <code>zero_grad()</code>, <em>forward</em> y pérdida, <code>backward()</code> y <code>step()</code>.</td></tr>
+        <tr data-lines="61"><td><code>perdida_total += perdida.item() * len(ly)</code></td><td>Suma la pérdida del lote ponderada por su tamaño (el último lote tiene 47 imágenes, no 100).</td></tr>
+        <tr data-lines="62"><td><code>print(f"época {epoca}: …")</code></td><td>Al acabar la época, imprime la pérdida media del entrenamiento y el acierto en prueba.</td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>imágenes: (1797, 1, 16, 16) | etiquetas: (1797,) torch.int64
+entrenamiento: 1347 | prueba: 450
+lotes por época: 14
+un lote: (100, 1, 16, 16) torch.float32 | (100,) torch.int64
+antes de entrenar: acierto en prueba = 0.093
+época 1: pérdida media = 2.1184 | acierto en prueba = 0.364
+época 2: pérdida media = 0.9182 | acierto en prueba = 0.776
+época 3: pérdida media = 0.2981 | acierto en prueba = 0.940
+época 4: pérdida media = 0.1585 | acierto en prueba = 0.947
+época 5: pérdida media = 0.0770 | acierto en prueba = 0.958
+época 6: pérdida media = 0.0583 | acierto en prueba = 0.969
+época 7: pérdida media = 0.0342 | acierto en prueba = 0.978
+época 8: pérdida media = 0.0196 | acierto en prueba = 0.980</pre>
+    <p>1.797 imágenes de 1×16×16; 1.347 de entrenamiento y 450 de prueba; 14 lotes por época (13 de 100 y uno de 47). La red sin entrenar acierta 0,093 (azar con 10 clases es 0,10). La pérdida baja de 2,1184 en la época 1 (el azar puro sería \( \ln10=2{,}30 \)) a 0,0196 en la 8, y el acierto en prueba sube de 0,364 a 0,980. La mayor mejora ocurre en las épocas 2 y 3 (0,776 y 0,940).</p>
+  </div>
+</article>
+
+<article class="snippet" data-lang="python">
+  <header>
+    <h3>10 · La versión con MNIST real (necesita internet)</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Es el mismo entrenamiento con el conjunto MNIST del laboratorio original: descarga 60.000 imágenes de entrenamiento y 10.000 de validación, las reduce a 16×16 y entrena la red de 5 épocas. <strong>No se ha ejecutado aquí</strong>.</p>
+  </header>
+  <pre class="code"><code>import torch
+import torch.nn as nn
+import torchvision.datasets as dsets
+import torchvision.transforms as transforms
+from torch.utils.data import DataLoader
+
+IMAGE_SIZE = 16
+composed = transforms.Compose([transforms.Resize((IMAGE_SIZE, IMAGE_SIZE)), transforms.ToTensor()])
+train_dataset = dsets.MNIST(root="./data", train=True, download=True, transform=composed)
+validation_dataset = dsets.MNIST(root="./data", train=False, download=True, transform=composed)
+train_loader = DataLoader(dataset=train_dataset, batch_size=100, shuffle=True)
+validation_loader = DataLoader(dataset=validation_dataset, batch_size=5000)
+print(len(train_dataset), len(validation_dataset), len(train_loader), len(validation_loader))
+
+model = CNN(out_1=16, out_2=32)
+criterion = nn.CrossEntropyLoss()
+optimizer = torch.optim.SGD(model.parameters(), lr=0.1)
+cost_list, accuracy_list = [], []
+for epoch in range(5):
+    cost = 0.0
+    model.train()
+    for x, y in train_loader:
+        optimizer.zero_grad()
+        loss = criterion(model(x), y)
+        loss.backward()
+        optimizer.step()
+        cost += loss.item()
+    correct = 0
+    model.eval()
+    with torch.no_grad():
+        for x_val, y_val in validation_loader:
+            correct += (model(x_val).argmax(dim=1) == y_val).sum().item()
+    cost_list.append(cost)
+    accuracy_list.append(correct / len(validation_dataset))
+    print(f"época {epoch + 1}: coste = {cost:.2f} | acierto en validación = {accuracy_list[-1]:.4f}")</code></pre>
+  <details class="linea-a-linea">
+    <summary>Línea por línea</summary>
+    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+      <tbody>
+        <tr data-lines="1-5"><td><code>import …</code></td><td><code>torch</code>, <code>nn</code>, los datasets y las transformaciones de torchvision y <code>DataLoader</code>.</td></tr>
+        <tr data-lines="7-8"><td><code>IMAGE_SIZE = 16 ; composed = transforms.Compose([…])</code></td><td>Reduce las imágenes de 28×28 a 16×16 y las convierte en tensores (como en el fragmento 8).</td></tr>
+        <tr data-lines="9-10"><td><code>train_dataset = dsets.MNIST(…download=True…) ; validation_dataset = …</code></td><td>Descarga MNIST (si no está ya en <code>./data</code>) y crea el conjunto de entrenamiento (<code>train=True</code>) y el de validación (<code>train=False</code>). <strong>Esto es lo que necesita internet</strong>.</td></tr>
+        <tr data-lines="11-12"><td><code>train_loader = … ; validation_loader = …</code></td><td>Dos <code>DataLoader</code>: el de entrenamiento con lotes de 100 y desordenados, y el de validación con lotes grandes (5.000) porque no hay que entrenar.</td></tr>
+        <tr data-lines="13"><td><code>print(len(train_dataset), …)</code></td><td>Imprime cuántas imágenes y cuántos lotes hay en cada conjunto.</td></tr>
+        <tr data-lines="15-17"><td><code>model = CNN(out_1=16, out_2=32) ; criterion = … ; optimizer = …</code></td><td>Usa la clase <code>CNN</code> del fragmento 9 (hay que tenerla definida antes), la pérdida <code>CrossEntropyLoss</code> y un SGD con <code>lr=0.1</code>.</td></tr>
+        <tr data-lines="18"><td><code>cost_list, accuracy_list = [], []</code></td><td>Dos listas para guardar la pérdida y el acierto de cada época.</td></tr>
+        <tr data-lines="19-21"><td><code>for epoch in range(5): cost = 0.0 ; model.train()</code></td><td>Cinco épocas, con el coste acumulado a cero y la red en modo entrenamiento.</td></tr>
+        <tr data-lines="22-27"><td><code>for x, y in train_loader: …</code></td><td>El bucle de siempre sobre los lotes: <code>zero_grad</code>, <em>forward</em> y pérdida, <code>backward</code>, <code>step</code>; <code>cost</code> suma la pérdida de cada lote.</td></tr>
+        <tr data-lines="28-32"><td><code>correct = 0 ; model.eval() ; with torch.no_grad(): …</code></td><td>Pasa a modo evaluación y, sin gradientes, cuenta cuántas predicciones (<code>argmax(dim=1)</code>) coinciden con las etiquetas de validación.</td></tr>
+        <tr data-lines="33-35"><td><code>cost_list.append(cost) …</code></td><td>Guarda el coste y el acierto de la época (aciertos / total) y los imprime.</td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>No ejecutado</strong>
+    <p><strong>No ejecutado: necesita internet</strong> (<code>download=True</code> descarga MNIST) y esta máquina no tiene acceso. No hay, por tanto, cifras de coste ni de acierto que mostrar, y no las invento. Lo que sí se puede anticipar con las cuentas del módulo: la primera línea imprimiría <code>60000 10000 600 2</code> (60.000 imágenes de entrenamiento, 10.000 de validación, \( 60000/100=600 \) lotes de entrenamiento y \( 10000/5000=2 \) de validación) y después cinco líneas, una por época, con el coste acumulado y el acierto. Para ejecutarlo hay que pegar antes la clase <code>CNN</code> del fragmento 9. El fragmento 9 hace lo mismo con los dígitos de scikit-learn y sí se ha ejecutado.</p>
+  </div>
+</article>
+
+<article class="snippet" data-lang="python">
+  <header>
+    <h3>11 · <code>BatchNorm2d</code> a mano</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Comprobar que <code>nn.BatchNorm2d</code> normaliza cada canal con la media y la varianza de sus N·H·W valores, ver sus parámetros y «buffers», las estadísticas acumuladas y la diferencia entre <code>train()</code> y <code>eval()</code>.</p>
+  </header>
+  <pre class="code"><code>import torch
+import torch.nn as nn
+
+x = torch.tensor([[[[1., 2.], [3., 4.]], [[10., 20.], [30., 40.]]],
+                  [[[5., 6.], [7., 8.]], [[50., 60.], [70., 80.]]]])
+print("lote (N, C, H, W):", tuple(x.shape))
+
+bn = nn.BatchNorm2d(num_features=2)
+print("parámetros:", [(n, tuple(p.shape)) for n, p in bn.named_parameters()], "| gamma inicial", bn.weight.tolist(), "| beta inicial", bn.bias.tolist())
+print("buffers:", [(n, tuple(b.shape)) for n, b in bn.named_buffers()])
+
+y = bn(x)
+for c in range(2):
+    v = x[:, c]
+    media, var = v.mean(), v.var(unbiased=False)
+    a_mano = (v - media) / torch.sqrt(var + bn.eps)
+    print(f"canal {c}: {v.numel()} valores, media = {media.item():.2f}, varianza = {var.item():.2f}, coincide con BatchNorm2d: {torch.allclose(a_mano, y[:, c], atol=1e-5)}")
+print("canal 0 normalizado, imagen 0:", [round(v, 4) for v in y[0, 0].flatten().tolist()])
+print("media y desviación de la salida (canal 1):", round(y[:, 1].mean().item(), 4), round(y[:, 1].std(unbiased=False).item(), 4))
+
+print("running_mean tras 1 lote:", [round(v, 2) for v in bn.running_mean.tolist()], "(0.9*0 + 0.1*[4.5, 45])")
+print("running_var  tras 1 lote:", [round(v, 2) for v in bn.running_var.tolist()], "(0.9*1 + 0.1*[6, 600])")
+print("num_batches_tracked:", bn.num_batches_tracked.item())
+
+bn.eval()
+y_eval = bn(x)
+print("modo eval, canal 0, imagen 0:", [round(v, 4) for v in y_eval[0, 0].flatten().tolist()])
+
+bn.train()
+print("1 imagen 2x2 en train: forma", tuple(bn(x[:1]).shape), "(4 valores por canal: sirve)")
+try:
+    bn(torch.zeros(1, 2, 1, 1))
+except ValueError as e:
+    print("1 imagen de 1x1 en train:", e)</code></pre>
+  <details class="linea-a-linea">
+    <summary>Línea por línea</summary>
+    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+      <tbody>
+        <tr data-lines="1-2"><td><code>import …</code></td><td><code>torch</code> y <code>torch.nn</code>.</td></tr>
+        <tr data-lines="4-6"><td><code>x = torch.tensor([[[[1., 2.], …]]]) ; print(…)</code></td><td>Un lote de 2 imágenes, cada una con 2 canales de 2×2. El canal 0 vale 1…8 y el canal 1 vale 10…80. La forma es (N, C, H, W) = (2, 2, 2, 2).</td></tr>
+        <tr data-lines="8-9"><td><code>bn = nn.BatchNorm2d(num_features=2) …</code></td><td><code>num_features</code> es el número de canales. <code>named_parameters()</code> lista los parámetros entrenables: <code>weight</code> (γ, empieza en 1) y <code>bias</code> (β, empieza en 0), uno por canal.</td></tr>
+        <tr data-lines="10"><td><code>print("buffers:" …)</code></td><td><code>named_buffers()</code> lista lo que se guarda pero no se entrena: <code>running_mean</code>, <code>running_var</code> y <code>num_batches_tracked</code>.</td></tr>
+        <tr data-lines="12"><td><code>y = bn(x)</code></td><td>Pasa el lote por la capa (que está en modo entrenamiento al crearse). Esto además actualiza los buffers.</td></tr>
+        <tr data-lines="13-16"><td><code>for c in range(2): v = x[:, c] …</code></td><td>Para cada canal: <code>x[:, c]</code> son sus 8 valores (de las dos imágenes); calcula su media y su varianza <em>sin corregir</em> (<code>unbiased=False</code>, dividiendo entre 8) y normaliza a mano con \( (v-\mu)/\sqrt{\sigma^2+\varepsilon} \).</td></tr>
+        <tr data-lines="17"><td><code>print(f"canal {c}: …")</code></td><td>Imprime cuántos valores hay, la media, la varianza y si <code>torch.allclose</code> confirma que el cálculo a mano coincide con <code>BatchNorm2d</code>.</td></tr>
+        <tr data-lines="18"><td><code>print("canal 0 normalizado, imagen 0:" …)</code></td><td>Muestra los cuatro valores normalizados de la primera imagen del canal 0.</td></tr>
+        <tr data-lines="19"><td><code>print("media y desviación de la salida …")</code></td><td>Comprueba que el canal 1 de la salida tiene media 0 y desviación 1.</td></tr>
+        <tr data-lines="21-23"><td><code>print("running_mean tras 1 lote:" …)</code></td><td>Las estadísticas acumuladas tras ese único lote (momentum 0,1), con la cuenta a mano al lado, y el contador de lotes.</td></tr>
+        <tr data-lines="25-27"><td><code>bn.eval() ; y_eval = bn(x) …</code></td><td>Pasa al modo evaluación y repite: ahora normaliza con <code>running_mean</code> y <code>running_var</code> y no los cambia.</td></tr>
+        <tr data-lines="29-30"><td><code>bn.train() ; print(… bn(x[:1]).shape …)</code></td><td>Vuelve al modo entrenamiento y pasa solo la primera imagen (1, 2, 2, 2): hay 4 valores por canal, así que funciona.</td></tr>
+        <tr data-lines="31-34"><td><code>try: bn(torch.zeros(1, 2, 1, 1)) …</code></td><td>Una imagen de 1×1 deja un único valor por canal: no se puede calcular una varianza. PyTorch lanza <code>ValueError</code>.</td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>lote (N, C, H, W): (2, 2, 2, 2)
+parámetros: [('weight', (2,)), ('bias', (2,))] | gamma inicial [1.0, 1.0] | beta inicial [0.0, 0.0]
+buffers: [('running_mean', (2,)), ('running_var', (2,)), ('num_batches_tracked', ())]
+canal 0: 8 valores, media = 4.50, varianza = 5.25, coincide con BatchNorm2d: True
+canal 1: 8 valores, media = 45.00, varianza = 525.00, coincide con BatchNorm2d: True
+canal 0 normalizado, imagen 0: [-1.5275, -1.0911, -0.6547, -0.2182]
+media y desviación de la salida (canal 1): 0.0 1.0
+running_mean tras 1 lote: [0.45, 4.5] (0.9*0 + 0.1*[4.5, 45])
+running_var  tras 1 lote: [1.5, 60.9] (0.9*1 + 0.1*[6, 600])
+num_batches_tracked: 1
+modo eval, canal 0, imagen 0: [0.4491, 1.2656, 2.0821, 2.8986]
+1 imagen 2x2 en train: forma (1, 2, 2, 2) (4 valores por canal: sirve)
+1 imagen de 1x1 en train: Expected more than 1 value per channel when training, got input size torch.Size([1, 2, 1, 1])</pre>
+    <p>Cada canal se normaliza por separado: el 0 con media 4,50 y varianza 5,25, el 1 con media 45,00 y varianza 525,00, y en ambos la cuenta a mano coincide con <code>BatchNorm2d</code> (<code>True</code>). El primer valor normalizado es −1,5275 = (1 − 4,5)/√5,25. La salida del canal 1 tiene media 0,0 y desviación 1,0. Las estadísticas acumuladas son 0,9·0 + 0,1·[4,5; 45] = [0,45; 4,5] para la media y 0,9·1 + 0,1·[6; 600] = [1,5; 60,9] para la varianza (PyTorch usa aquí la varianza corregida: 42/7 = 6 y 4200/7 = 600). En <code>eval()</code> el mismo valor sale distinto (0,4491 frente a −1,5275) porque usa esas estadísticas. Con 4 valores por canal funciona; con uno solo falla.</p>
+  </div>
+</article>
+
+<article class="snippet" data-lang="python">
+  <header>
+    <h3>12 · CNN con y sin <code>BatchNorm2d</code>: un experimento con tres semillas</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Medir, con el mismo presupuesto (4 épocas, SGD sin momentum), cuánto cambia el acierto en prueba cuando se añade batch normalization, para tres tasas de aprendizaje y tres semillas.</p>
+  </header>
+  <pre class="code"><code>import torch
+import torch.nn as nn
+from sklearn.datasets import load_digits
+from sklearn.model_selection import train_test_split
+from torch.utils.data import TensorDataset, DataLoader
+from torchvision import transforms
+
+torch.set_num_threads(1)
+
+digitos = load_digits()
+X = transforms.Resize((16, 16))(torch.tensor(digitos.images, dtype=torch.float32).unsqueeze(1) / 16.0)
+y = torch.tensor(digitos.target, dtype=torch.long)
+idx_tr, idx_te = train_test_split(range(len(y)), test_size=0.25, stratify=y.numpy(), random_state=0)
+X_tr, y_tr, X_te, y_te = X[idx_tr], y[idx_tr], X[idx_te], y[idx_te]
+
+
+class CNN(nn.Module):
+    def __init__(self, out_1=16, out_2=32):
+        super().__init__()
+        self.cnn1 = nn.Conv2d(1, out_1, kernel_size=5, padding=2)
+        self.cnn2 = nn.Conv2d(out_1, out_2, kernel_size=5, padding=2)
+        self.pool = nn.MaxPool2d(2)
+        self.fc1 = nn.Linear(out_2 * 4 * 4, 10)
+
+    def forward(self, x):
+        x = self.pool(torch.relu(self.cnn1(x)))
+        x = self.pool(torch.relu(self.cnn2(x)))
+        return self.fc1(x.view(x.size(0), -1))
+
+
+class CNNBatch(nn.Module):
+    def __init__(self, out_1=16, out_2=32):
+        super().__init__()
+        self.cnn1 = nn.Conv2d(1, out_1, kernel_size=5, padding=2)
+        self.bn1 = nn.BatchNorm2d(out_1)
+        self.cnn2 = nn.Conv2d(out_1, out_2, kernel_size=5, padding=2)
+        self.bn2 = nn.BatchNorm2d(out_2)
+        self.pool = nn.MaxPool2d(2)
+        self.fc1 = nn.Linear(out_2 * 4 * 4, 10)
+        self.bn_fc = nn.BatchNorm1d(10)
+
+    def forward(self, x):
+        x = self.pool(torch.relu(self.bn1(self.cnn1(x))))
+        x = self.pool(torch.relu(self.bn2(self.cnn2(x))))
+        return self.bn_fc(self.fc1(x.view(x.size(0), -1)))
+
+
+def entrenar(clase, lr, semilla, epocas=4):
+    torch.manual_seed(semilla)
+    modelo = clase()
+    cargador = DataLoader(TensorDataset(X_tr, y_tr), batch_size=100, shuffle=True)
+    optimizador = torch.optim.SGD(modelo.parameters(), lr=lr)
+    criterio = nn.CrossEntropyLoss()
+    for _ in range(epocas):
+        modelo.train()
+        for lx, ly in cargador:
+            optimizador.zero_grad()
+            perdida = criterio(modelo(lx), ly)
+            perdida.backward()
+            optimizador.step()
+    modelo.eval()
+    with torch.no_grad():
+        acierto = (modelo(X_te).argmax(1) == y_te).float().mean().item()
+    return perdida.item(), acierto
+
+
+print("parámetros  CNN:", sum(p.numel() for p in CNN().parameters()), "| CNN con BatchNorm:", sum(p.numel() for p in CNNBatch().parameters()))
+print("claves de state_dict de la capa bn1:", [k for k in CNNBatch().state_dict() if k.startswith("bn1")])
+print()
+print(f"{'modelo':&lt;14}{'lr':&gt;5}  acierto en prueba tras 4 épocas (semillas 0, 1, 2)")
+for lr in (0.01, 0.1, 0.5):
+    for nombre, clase in (("sin BatchNorm", CNN), ("con BatchNorm", CNNBatch)):
+        aciertos = [entrenar(clase, lr, s)[1] for s in (0, 1, 2)]
+        print(f"{nombre:&lt;14}{lr:&gt;5}  " + "  ".join(f"{a:.3f}" for a in aciertos) + f"   media {sum(aciertos)/3:.3f}")</code></pre>
+  <details class="linea-a-linea">
+    <summary>Línea por línea</summary>
+    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+      <tbody>
+        <tr data-lines="1-6"><td><code>import …</code></td><td>Las mismas importaciones que en el fragmento 9.</td></tr>
+        <tr data-lines="8"><td><code>torch.set_num_threads(1)</code></td><td>Un solo hilo.</td></tr>
+        <tr data-lines="10-14"><td><code>digitos = load_digits() ; X = … ; y = … ; idx_tr … ; X_tr …</code></td><td>Mismos datos y misma división que en el fragmento 9: imágenes 1×16×16, 1.347 de entrenamiento y 450 de prueba.</td></tr>
+        <tr data-lines="17-23"><td><code>class CNN(nn.Module): __init__ …</code></td><td>La CNN del laboratorio, con un único <code>MaxPool2d</code> compartido (no tiene parámetros, así que se puede reutilizar).</td></tr>
+        <tr data-lines="25-28"><td><code>def forward(self, x): …</code></td><td>Conv → ReLU → pooling dos veces, aplanado con <code>view</code> y capa lineal, todo en pocas líneas.</td></tr>
+        <tr data-lines="31-40"><td><code>class CNNBatch(nn.Module): __init__ …</code></td><td>La misma red con una <code>BatchNorm2d</code> tras cada convolución (de 16 y de 32 canales) y una <code>BatchNorm1d(10)</code> a la salida.</td></tr>
+        <tr data-lines="42-45"><td><code>def forward(self, x): …</code></td><td>Conv → <strong>BatchNorm2d</strong> → ReLU → pooling, dos veces; después la capa lineal y la <code>BatchNorm1d</code> final.</td></tr>
+        <tr data-lines="48-50"><td><code>def entrenar(clase, lr, semilla, epocas=4): …</code></td><td>Función que entrena una red desde cero. <code>manual_seed(semilla)</code> fija los pesos iniciales y el orden de los lotes; <code>clase()</code> crea el modelo.</td></tr>
+        <tr data-lines="51-53"><td><code>cargador = … ; optimizador = … ; criterio = …</code></td><td>Lotes de 100 desordenados, SGD sin momentum con el <code>lr</code> dado y la pérdida de clasificación.</td></tr>
+        <tr data-lines="54-60"><td><code>for _ in range(epocas): modelo.train() …</code></td><td>El bucle de entrenamiento de siempre durante 4 épocas.</td></tr>
+        <tr data-lines="61-64"><td><code>modelo.eval() … return perdida.item(), acierto</code></td><td>Evalúa en prueba, sin gradientes, y devuelve la última pérdida y el acierto.</td></tr>
+        <tr data-lines="67"><td><code>print("parámetros  CNN:" …)</code></td><td>Cuenta los parámetros entrenables de cada versión.</td></tr>
+        <tr data-lines="68-69"><td><code>print("claves de state_dict …") ; print()</code></td><td>Muestra las claves del <code>state_dict</code> de la primera BatchNorm (los parámetros <em>y</em> los buffers) y deja una línea en blanco.</td></tr>
+        <tr data-lines="70"><td><code>print(f"{'modelo':<14}…")</code></td><td>Cabecera de la tabla de resultados.</td></tr>
+        <tr data-lines="71-74"><td><code>for lr in (0.01, 0.1, 0.5): … for nombre, clase in …</code></td><td>Para cada tasa de aprendizaje y cada versión entrena con las semillas 0, 1 y 2, y imprime los tres aciertos y su media.</td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>parámetros  CNN: 18378 | CNN con BatchNorm: 18494
+claves de state_dict de la capa bn1: ['bn1.weight', 'bn1.bias', 'bn1.running_mean', 'bn1.running_var', 'bn1.num_batches_tracked']
+
+modelo           lr  acierto en prueba tras 4 épocas (semillas 0, 1, 2)
+sin BatchNorm  0.01  0.338  0.462  0.091   media 0.297
+con BatchNorm  0.01  0.976  0.971  0.964   media 0.970
+sin BatchNorm   0.1  0.867  0.831  0.533   media 0.744
+con BatchNorm   0.1  0.978  0.960  0.918   media 0.952
+sin BatchNorm   0.5  0.813  0.102  0.858   media 0.591
+con BatchNorm   0.5  0.960  0.936  0.927   media 0.941</pre>
+    <p>Los parámetros pasan de 18.378 a 18.494 (+116 = 2·16 + 2·32 + 2·10). Las claves del <code>state_dict</code> de <code>bn1</code> son cinco: <code>weight</code>, <code>bias</code>, <code>running_mean</code>, <code>running_var</code> y <code>num_batches_tracked</code>. Con <code>lr=0.01</code>, sin BatchNorm la media de acierto en prueba es 0,297 (una semilla se queda en 0,091, azar) y con BatchNorm 0,970. Con 0,1: 0,744 frente a 0,952. Con 0,5: 0,591 (una semilla no aprende, 0,102) frente a 0,941. La conclusión se limita a estas condiciones: con BatchNorm la red <em>aprende más deprisa y es menos sensible al lr</em>; no se mide aquí el mejor acierto que podría alcanzar cada versión con más épocas ni con momentum.</p>
+  </div>
+</article>
+
+<article class="snippet" data-lang="python">
+  <header>
+    <h3>13 · ¿Y si el dígito se mueve? Red densa y CNN, con y sin data augmentation</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Entrenar una red densa y una CNN con dígitos de 8×8, probarlas con imágenes desplazadas un píxel y repetirlo entrenando con desplazamientos aleatorios (data augmentation). Tres semillas por casilla.</p>
+  </header>
+  <pre class="code"><code>import torch
+import torch.nn as nn
+import torch.nn.functional as F
+from sklearn.datasets import load_digits
+from sklearn.model_selection import train_test_split
+from torch.utils.data import TensorDataset, DataLoader
+
+torch.set_num_threads(1)
+
+digitos = load_digits()
+X = torch.tensor(digitos.images, dtype=torch.float32).unsqueeze(1) / 16.0
+y = torch.tensor(digitos.target, dtype=torch.long)
+idx_tr, idx_te = train_test_split(range(len(y)), test_size=0.25, stratify=y.numpy(), random_state=0)
+X_tr, y_tr, X_te, y_te = X[idx_tr], y[idx_tr], X[idx_te], y[idx_te]
+
+
+def densa():
+    return nn.Sequential(nn.Flatten(), nn.Linear(64, 32), nn.ReLU(), nn.Linear(32, 10))
+
+
+def conv():
+    return nn.Sequential(
+        nn.Conv2d(1, 8, 3, padding=1), nn.ReLU(), nn.MaxPool2d(2),
+        nn.Conv2d(8, 16, 3, padding=1), nn.ReLU(), nn.MaxPool2d(2),
+        nn.Flatten(), nn.Linear(64, 10),
+    )
+
+
+def desplazar(x, dx=0, dy=0):
+    x = F.pad(x, (max(dx, 0), max(-dx, 0), max(dy, 0), max(-dy, 0)))
+    h, w = x.shape[-2:]
+    return x[..., max(-dy, 0):h - max(dy, 0), max(-dx, 0):w - max(dx, 0)]
+
+
+def acierto(modelo, X, y):
+    modelo.eval()
+    with torch.no_grad():
+        return (modelo(X).argmax(1) == y).float().mean().item()
+
+
+def entrenar(fabrica, semilla, aumentar=False):
+    torch.manual_seed(semilla)
+    modelo = fabrica()
+    cargador = DataLoader(TensorDataset(X_tr, y_tr), batch_size=64, shuffle=True)
+    optimizador = torch.optim.Adam(modelo.parameters(), lr=0.01)
+    criterio = nn.CrossEntropyLoss()
+    for _ in range(25):
+        modelo.train()
+        for lx, ly in cargador:
+            if aumentar:
+                dx, dy = torch.randint(-1, 2, (2,)).tolist()
+                lx = desplazar(lx, dx, dy)
+            optimizador.zero_grad()
+            criterio(modelo(lx), ly).backward()
+            optimizador.step()
+    return modelo
+
+
+print("parámetros  densa:", sum(p.numel() for p in densa().parameters()), "| CNN:", sum(p.numel() for p in conv().parameters()))
+pruebas = [("sin mover", 0, 0), ("1 px a la derecha", 1, 0), ("1 px abajo", 0, 1), ("1 px izquierda y arriba", -1, -1)]
+modelos = [("densa", densa, False), ("CNN", conv, False), ("densa + aug", densa, True), ("CNN + aug", conv, True)]
+res = {n: {p[0]: [] for p in pruebas} for n, _, _ in modelos}
+for semilla in (0, 1, 2):
+    for nombre, fabrica, aug in modelos:
+        m = entrenar(fabrica, semilla, aug)
+        for etiqueta, dx, dy in pruebas:
+            res[nombre][etiqueta].append(acierto(m, desplazar(X_te, dx, dy), y_te))
+print(f"{'imagen de prueba':&lt;26}" + "".join(f"{n:&gt;13}" for n, _, _ in modelos))
+for etiqueta, _, _ in pruebas:
+    print(f"{etiqueta:&lt;26}" + "".join(f"{sum(res[n][etiqueta]) / 3:13.3f}" for n, _, _ in modelos))</code></pre>
+  <details class="linea-a-linea">
+    <summary>Línea por línea</summary>
+    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+      <tbody>
+        <tr data-lines="1-6"><td><code>import …</code></td><td>Además de lo habitual, <code>torch.nn.functional</code> como <code>F</code> (se usa <code>F.pad</code>).</td></tr>
+        <tr data-lines="8"><td><code>torch.set_num_threads(1)</code></td><td>Un solo hilo.</td></tr>
+        <tr data-lines="10-14"><td><code>digitos = load_digits() ; … X_tr …</code></td><td>Los dígitos originales de 8×8 (sin reducir ni ampliar), con canal y entre 0 y 1; misma división que antes.</td></tr>
+        <tr data-lines="17-18"><td><code>def densa(): return nn.Sequential(…)</code></td><td>Una red densa de 2.410 parámetros: aplanar 64 píxeles → 32 neuronas con ReLU → 10 salidas.</td></tr>
+        <tr data-lines="21-26"><td><code>def conv(): return nn.Sequential(…)</code></td><td>La CNN pequeña de 1.898 parámetros: dos bloques conv → ReLU → pooling, aplanado y una capa lineal.</td></tr>
+        <tr data-lines="29-32"><td><code>def desplazar(x, dx=0, dy=0): …</code></td><td>Desplaza las imágenes <code>dx</code> píxeles a la derecha y <code>dy</code> hacia abajo. <code>F.pad</code> añade ceros en los lados (el orden es izquierda, derecha, arriba, abajo) y luego se recorta al tamaño original.</td></tr>
+        <tr data-lines="35-38"><td><code>def acierto(modelo, X, y): …</code></td><td>Acierto del modelo con unas imágenes dadas, en modo evaluación y sin gradientes.</td></tr>
+        <tr data-lines="41-46"><td><code>def entrenar(fabrica, semilla, aumentar=False): …</code></td><td>Crea el modelo con la fábrica, fija la semilla y prepara lotes de 64, el optimizador Adam (<code>lr=0.01</code>) y la pérdida.</td></tr>
+        <tr data-lines="47-49"><td><code>for _ in range(25): modelo.train() ; for lx, ly in cargador:</code></td><td>25 épocas, recorriendo los lotes.</td></tr>
+        <tr data-lines="50-52"><td><code>if aumentar: dx, dy = torch.randint(-1, 2, (2,)).tolist() …</code></td><td>Si hay augmentation: elige al azar un desplazamiento de −1, 0 o +1 en cada eje (<code>randint(-1, 2, …)</code> da valores en {−1, 0, 1}) y desplaza <em>todo el lote</em> igual.</td></tr>
+        <tr data-lines="53-56"><td><code>optimizador.zero_grad() … return modelo</code></td><td>El paso de entrenamiento habitual en dos líneas, y la devolución del modelo entrenado.</td></tr>
+        <tr data-lines="59"><td><code>print("parámetros  densa:" …)</code></td><td>Parámetros de cada modelo.</td></tr>
+        <tr data-lines="60-61"><td><code>pruebas = […] ; modelos = […]</code></td><td>Las cuatro imágenes de prueba (sin mover, 1 px a la derecha, 1 px abajo, 1 px arriba-izquierda) y los cuatro modelos (densa y CNN, con y sin augmentation).</td></tr>
+        <tr data-lines="62-67"><td><code>res = {…} ; for semilla in (0, 1, 2): …</code></td><td>Para cada semilla y cada modelo: entrena y mide el acierto con las cuatro versiones de las imágenes de prueba, guardándolo en <code>res</code>.</td></tr>
+        <tr data-lines="68-70"><td><code>print(…) ; for etiqueta … print(…)</code></td><td>Imprime la tabla: una fila por imagen de prueba, una columna por modelo, con la media de las tres semillas.</td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>parámetros  densa: 2410 | CNN: 1898
+imagen de prueba                  densa          CNN  densa + aug    CNN + aug
+sin mover                         0.976        0.978        0.891        0.950
+1 px a la derecha                 0.476        0.630        0.881        0.968
+1 px abajo                        0.410        0.516        0.810        0.910
+1 px izquierda y arriba           0.156        0.336        0.807        0.930</pre>
+    <p>Sin mover, las dos redes son iguales (0,976 y 0,978). Con la imagen desplazada, ambas se hunden: 1 px a la derecha, densa 0,476 y CNN 0,630; en diagonal, 0,156 y 0,336. Con augmentation la CNN pasa a 0,968, 0,910 y 0,930, y la densa a 0,881, 0,810 y 0,807. Con las imágenes sin mover, el augmentation cuesta: la densa baja a 0,891 y la CNN a 0,950. Con tres semillas por casilla, las diferencias de unas décimas son claras; las de pocas centésimas, no.</p>
+  </div>
+</article>
+
+<article class="snippet" data-lang="python">
+  <header>
+    <h3>14 · Mirar dentro de la CNN: <code>register_forward_hook</code>, mapas y un filtro</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Entrenar una CNN pequeña, guardar las salidas intermedias con hooks, dibujar un mapa de características con caracteres y leer los pesos de un filtro de la primera capa.</p>
+  </header>
+  <pre class="code"><code>import torch
+import torch.nn as nn
+from sklearn.datasets import load_digits
+from sklearn.model_selection import train_test_split
+from torch.utils.data import TensorDataset, DataLoader
+
+torch.set_num_threads(1)
+torch.manual_seed(0)
+
+digitos = load_digits()
+X = torch.tensor(digitos.images, dtype=torch.float32).unsqueeze(1) / 16.0
+y = torch.tensor(digitos.target, dtype=torch.long)
+idx_tr, idx_te = train_test_split(range(len(y)), test_size=0.25, stratify=y.numpy(), random_state=0)
+X_tr, y_tr, X_te, y_te = X[idx_tr], y[idx_tr], X[idx_te], y[idx_te]
+
+modelo = nn.Sequential(
+    nn.Conv2d(1, 8, 3, padding=1), nn.ReLU(), nn.MaxPool2d(2),
+    nn.Conv2d(8, 16, 3, padding=1), nn.ReLU(), nn.MaxPool2d(2),
+    nn.Flatten(), nn.Linear(64, 10),
+)
+cargador = DataLoader(TensorDataset(X_tr, y_tr), batch_size=64, shuffle=True)
+optimizador = torch.optim.Adam(modelo.parameters(), lr=0.01)
+criterio = nn.CrossEntropyLoss()
+for _ in range(15):
+    for lx, ly in cargador:
+        optimizador.zero_grad()
+        criterio(modelo(lx), ly).backward()
+        optimizador.step()
+modelo.eval()
+
+guardadas = {}
+
+
+def guardar(nombre):
+    def gancho(modulo, entrada, salida):
+        guardadas[nombre] = salida.detach()
+    return gancho
+
+
+modelo[1].register_forward_hook(guardar("tras conv1+ReLU"))
+modelo[4].register_forward_hook(guardar("tras conv2+ReLU"))
+with torch.no_grad():
+    pred = modelo(X_te[:1]).argmax(1).item()
+print("dígito real:", y_te[0].item(), "| predicción:", pred)
+for nombre, a in guardadas.items():
+    print(f"{nombre}: forma {tuple(a.shape)}, canales sin ninguna activación: {(a[0].sum(dim=(1, 2)) == 0).sum().item()}")
+
+
+def dibujo(m):
+    m = m / (m.max() + 1e-9)
+    return ["".join(" .:-=+*#%@"[min(9, int(v * 10))] for v in fila) for fila in m]
+
+
+mapa1 = guardadas["tras conv1+ReLU"][0]
+mejor = mapa1.sum(dim=(1, 2)).argmax().item()
+print("\nimagen de entrada | canal", mejor, "tras conv1+ReLU (el más activo)")
+for a, b in zip(dibujo(X_te[0, 0]), dibujo(mapa1[mejor])):
+    print(a, "  |  ", b)
+print("\nfiltro 3x3 de ese canal:")
+for fila in modelo[0].weight[mejor, 0].detach():
+    print("  " + "  ".join(f"{v:6.2f}" for v in fila.tolist()))
+print("sesgo:", round(modelo[0].bias[mejor].item(), 3))</code></pre>
+  <details class="linea-a-linea">
+    <summary>Línea por línea</summary>
+    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+      <tbody>
+        <tr data-lines="1-8"><td><code>import … torch.manual_seed(0)</code></td><td>Las importaciones habituales, un solo hilo y la semilla.</td></tr>
+        <tr data-lines="10-14"><td><code>digitos = load_digits() ; … X_tr …</code></td><td>Los dígitos de 8×8 con canal, entre 0 y 1 y la misma división de siempre.</td></tr>
+        <tr data-lines="16-20"><td><code>modelo = nn.Sequential(…)</code></td><td>La CNN pequeña (1.898 parámetros). En un <code>Sequential</code> las capas se numeran: 0 conv, 1 ReLU, 2 pooling, 3 conv, 4 ReLU, 5 pooling, 6 aplanado, 7 lineal.</td></tr>
+        <tr data-lines="21-23"><td><code>cargador = … ; optimizador = … ; criterio = …</code></td><td>Lotes de 64, Adam y la pérdida de clasificación.</td></tr>
+        <tr data-lines="24-28"><td><code>for _ in range(15): for lx, ly in cargador: …</code></td><td>15 épocas de entrenamiento con el bucle habitual.</td></tr>
+        <tr data-lines="29"><td><code>modelo.eval()</code></td><td>Pasa a modo evaluación.</td></tr>
+        <tr data-lines="31"><td><code>guardadas = {}</code></td><td>Un diccionario donde los hooks dejarán las salidas.</td></tr>
+        <tr data-lines="34-37"><td><code>def guardar(nombre): def gancho(…): …</code></td><td>Una función que fabrica hooks. Cada hook guarda en el diccionario la salida de su capa con <code>detach()</code> (sin el historial de gradientes).</td></tr>
+        <tr data-lines="40-41"><td><code>modelo[1].register_forward_hook(…) ; modelo[4].register_forward_hook(…)</code></td><td>Registra un hook en el primer y en el segundo ReLU (<code>modelo[1]</code> y <code>modelo[4]</code>).</td></tr>
+        <tr data-lines="42-44"><td><code>with torch.no_grad(): pred = …</code></td><td>Pasa la primera imagen de prueba (<code>X_te[:1]</code> mantiene la dimensión de lote). Al hacerlo se disparan los hooks. Imprime el dígito real y la predicción.</td></tr>
+        <tr data-lines="45-46"><td><code>for nombre, a in guardadas.items(): print(…)</code></td><td>Para cada mapa guardado imprime su forma y cuántos canales tienen suma cero (completamente apagados por el ReLU) para esta imagen.</td></tr>
+        <tr data-lines="49-51"><td><code>def dibujo(m): …</code></td><td>Convierte un mapa 2D en texto: lo divide por su máximo (pasa a [0, 1]) y cada valor se convierte en uno de los diez caracteres de <code>" .:-=+*#%@"</code> (de menos a más activación).</td></tr>
+        <tr data-lines="54-55"><td><code>mapa1 = … ; mejor = mapa1.sum(dim=(1, 2)).argmax().item()</code></td><td>Toma los 8 mapas de la primera capa y elige el canal con mayor suma, el más activo.</td></tr>
+        <tr data-lines="56-58"><td><code>print(…) ; for a, b in zip(…): print(a, "  |  ", b)</code></td><td>Dibuja la imagen de entrada y el mapa del canal elegido en dos columnas, fila a fila.</td></tr>
+        <tr data-lines="59-61"><td><code>print("\nfiltro 3x3 de ese canal:") ; for fila in …</code></td><td>Imprime los nueve pesos del filtro: <code>modelo[0].weight[mejor, 0]</code> (canal de salida <code>mejor</code>, canal de entrada 0).</td></tr>
+        <tr data-lines="62"><td><code>print("sesgo:" …)</code></td><td>El sesgo de ese filtro.</td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>dígito real: 2 | predicción: 2
+tras conv1+ReLU: forma (1, 8, 8, 8), canales sin ninguna activación: 0
+tras conv2+ReLU: forma (1, 16, 4, 4), canales sin ninguna activación: 2
+
+imagen de entrada | canal 2 tras conv1+ReLU (el más activo)
+  =@%.     |    :#@@+: 
+  +%*@     |    :=:=-= 
+   - @-    |       :.:.
+     @-    |       +-. 
+    .@:    |      :#-. 
+    #%     |    .:*@+:.
+  -#@@%    |    :*@@#==
+  +@%*%.   |    :==:.  
+
+filtro 3x3 de ese canal:
+   -0.83   -0.82    0.09
+    0.75    0.66    0.91
+    0.41    0.41    0.60
+sesgo: 0.14</pre>
+    <p>La red acierta el dígito (2). Tras la primera convolución + ReLU quedan 8 mapas de 8×8 (ninguno apagado) y tras la segunda, 16 de 4×4, de los cuales dos están a cero en esta imagen. En el dibujo, el mapa del canal 2 se enciende (<code>@</code>, <code>#</code>) en la parte superior (fila 0) y en la base del dígito (filas 5 y 6). El filtro de ese canal tiene pesos negativos en la fila superior (−0,83 y −0,82) y positivos en el centro y debajo (0,75; 0,66; 0,91; 0,41; 0,41; 0,60), con sesgo 0,14: detecta tinta que empieza debajo de un espacio vacío. Con otra semilla estos números serían otros.</p>
+  </div>
+</article>
+
+<article class="snippet" data-lang="python">
+  <header>
+    <h3>15 · Errores de forma y de tipo reproducidos con PyTorch real</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Provocar a propósito los errores más comunes al usar <code>nn.Conv2d</code>, el pooling y <code>CrossEntropyLoss</code>, leer sus mensajes y ver la corrección de cada uno.</p>
+  </header>
+  <pre class="code"><code>import torch
+import torch.nn as nn
+
+conv = nn.Conv2d(1, 8, kernel_size=3)
+
+
+def probar(titulo, f):
+    try:
+        r = f()
+        print(f"{titulo}: OK -&gt; {tuple(r.shape)}")
+    except Exception as e:
+        print(f"{titulo}: {type(e).__name__}: {str(e)[:150]}")
+
+
+probar("1) imagen (8, 8) sin canal ni lote", lambda: conv(torch.zeros(8, 8)))
+probar("2) lote (5, 8, 8) sin canal", lambda: conv(torch.zeros(5, 8, 8)))
+probar("3) lote NHWC (5, 8, 8, 1)", lambda: conv(torch.zeros(5, 8, 8, 1)))
+probar("4) tensor entero uint8", lambda: conv(torch.zeros(5, 1, 8, 8, dtype=torch.uint8)))
+probar("5) una sola imagen (1, 8, 8)", lambda: conv(torch.zeros(1, 8, 8)))
+probar("6) lote bien formado (5, 1, 8, 8)", lambda: conv(torch.zeros(5, 1, 8, 8)))
+probar("7) pooling sobre mapa de 1x1", lambda: nn.MaxPool2d(2)(torch.zeros(1, 4, 1, 1)))
+
+logits = torch.randn(5, 10)
+probar("8) etiquetas (5, 1)", lambda: nn.CrossEntropyLoss()(logits, torch.zeros(5, 1, dtype=torch.long)))
+probar("9) etiquetas float", lambda: nn.CrossEntropyLoss()(logits, torch.zeros(5)))
+probar("10) etiquetas (5,) long", lambda: nn.CrossEntropyLoss()(logits, torch.zeros(5, dtype=torch.long)))
+
+x_mal = torch.zeros(5, 8, 8, 1).permute(0, 3, 1, 2)
+probar("11) NHWC corregido con permute(0,3,1,2)", lambda: conv(x_mal))</code></pre>
+  <details class="linea-a-linea">
+    <summary>Línea por línea</summary>
+    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+      <tbody>
+        <tr data-lines="1-2"><td><code>import …</code></td><td><code>torch</code> y <code>torch.nn</code>.</td></tr>
+        <tr data-lines="4"><td><code>conv = nn.Conv2d(1, 8, kernel_size=3)</code></td><td>Una convolución con 1 canal de entrada y 8 filtros 3×3.</td></tr>
+        <tr data-lines="7-12"><td><code>def probar(titulo, f): …</code></td><td>Ejecuta la función <code>f</code>: si funciona imprime «OK» y la forma del resultado; si lanza una excepción, imprime su tipo y los primeros 150 caracteres del mensaje. Así el programa sigue tras cada error.</td></tr>
+        <tr data-lines="15"><td><code>probar("1) imagen (8, 8) …", lambda: conv(torch.zeros(8, 8)))</code></td><td>Una imagen suelta (8, 8), sin canal ni lote. <code>lambda: …</code> es una mini-función sin nombre que se ejecuta dentro de <code>probar</code>.</td></tr>
+        <tr data-lines="16"><td><code>probar("2) lote (5, 8, 8) …")</code></td><td>Cinco imágenes sin dimensión de canal: PyTorch cree que es <em>una</em> imagen de 5 canales.</td></tr>
+        <tr data-lines="17"><td><code>probar("3) lote NHWC …")</code></td><td>Un lote en formato NHWC (como Keras), (5, 8, 8, 1).</td></tr>
+        <tr data-lines="18"><td><code>probar("4) tensor entero uint8" …)</code></td><td>Un lote bien formado pero de enteros <code>uint8</code>.</td></tr>
+        <tr data-lines="19"><td><code>probar("5) una sola imagen (1, 8, 8)" …)</code></td><td>Una imagen con canal pero sin lote.</td></tr>
+        <tr data-lines="20"><td><code>probar("6) lote bien formado …")</code></td><td>El caso correcto: (5, 1, 8, 8) en <code>float32</code>.</td></tr>
+        <tr data-lines="21"><td><code>probar("7) pooling sobre mapa de 1x1" …)</code></td><td><code>MaxPool2d(2)</code> aplicado a un mapa de 1×1.</td></tr>
+        <tr data-lines="23"><td><code>logits = torch.randn(5, 10)</code></td><td>Puntuaciones aleatorias para 5 muestras y 10 clases, para probar la pérdida.</td></tr>
+        <tr data-lines="24"><td><code>probar("8) etiquetas (5, 1)" …)</code></td><td>Etiquetas con forma (5, 1), una columna.</td></tr>
+        <tr data-lines="25"><td><code>probar("9) etiquetas float" …)</code></td><td>Etiquetas de tipo <code>float</code>.</td></tr>
+        <tr data-lines="26"><td><code>probar("10) etiquetas (5,) long" …)</code></td><td>El caso correcto: un vector de 5 enteros <code>long</code>. Devuelve un escalar (forma <code>()</code>).</td></tr>
+        <tr data-lines="28-29"><td><code>x_mal = torch.zeros(5, 8, 8, 1).permute(0, 3, 1, 2) ; probar("11) …")</code></td><td>La corrección del caso 3: un <code>permute(0, 3, 1, 2)</code> lleva NHWC a NCHW.</td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>1) imagen (8, 8) sin canal ni lote: RuntimeError: Expected 3D (unbatched) or 4D (batched) input to conv2d, but got input of size: [8, 8]
+2) lote (5, 8, 8) sin canal: RuntimeError: Given groups=1, weight of size [8, 1, 3, 3], expected input[1, 5, 8, 8] to have 1 channels, but got 5 channels instead
+3) lote NHWC (5, 8, 8, 1): RuntimeError: Given groups=1, weight of size [8, 1, 3, 3], expected input[5, 8, 8, 1] to have 1 channels, but got 8 channels instead
+4) tensor entero uint8: RuntimeError: Input type (unsigned char) and bias type (float) should be the same
+5) una sola imagen (1, 8, 8): OK -&gt; (8, 6, 6)
+6) lote bien formado (5, 1, 8, 8): OK -&gt; (5, 8, 6, 6)
+7) pooling sobre mapa de 1x1: RuntimeError: Given input size: (4x1x1). Calculated output size: (4x0x0). Output size is too small
+8) etiquetas (5, 1): RuntimeError: 0D or 1D target tensor expected, multi-target not supported
+9) etiquetas float: RuntimeError: expected target dtype to be Long or Byte, but got Float
+10) etiquetas (5,) long: OK -&gt; ()
+11) NHWC corregido con permute(0,3,1,2): OK -&gt; (5, 8, 6, 6)</pre>
+    <p>Cada error dice lo que PyTorch <em>vio</em>: en el 1, un tensor de 2 dimensiones; en el 2, <code>input[1, 5, 8, 8]</code> con 5 canales cuando se esperaba 1; en el 3, <code>input[5, 8, 8, 1]</code> con 8 canales (la altura leída como canales). El caso 4 (<code>uint8</code>) pide el mismo tipo que los pesos. El caso 5 <strong>no da error</strong>: una imagen (1, 8, 8) se interpreta como sin lote y la salida (8, 6, 6) no tiene dimensión de lote. El caso 7 falla porque la salida sería de tamaño 0, y el 8 y el 9 son las dos formas de pasar mal las etiquetas. Los casos 6, 10 y 11 son los correctos.</p>
+  </div>
+</article>
+</section>
+
+<section>
+<h2 id="quiz">Comprueba lo aprendido</h2>
+<div class="quiz">
+<script type="application/json" class="quiz-data">
+{
+ "titulo": "Cuestionario del módulo 3: redes convolucionales con PyTorch",
+ "preguntas": [
+  {
+   "q": "¿Cuántos parámetros entrenables tiene <code>nn.Conv2d(16, 32, 3)</code>?",
+   "opciones": [
+    "4.608 (32·16·9: solo los pesos)",
+    "4.640 (32 · (16·9 + 1))",
+    "144 (16·3·3, un solo filtro)",
+    "4.617 (los pesos más un único sesgo para toda la capa)"
+   ],
+   "correcta": 1,
+   "porque": "Cada uno de los 32 filtros tiene 16 canales de entrada con un kernel 3×3 (144 pesos) y un sesgo: 145, y 32·145 = 4.640. La primera opción olvida los sesgos (hay uno <em>por filtro</em>); la tercera cuenta un solo filtro."
+  },
+  {
+   "q": "Entra una imagen de 28×28 en <code>nn.Conv2d(1, 8, kernel_size=5, stride=2, padding=2)</code>. ¿De qué lado es el mapa de salida?",
+   "opciones": [
+    "13 (se olvida el «+1» final)",
+    "15 (se redondea 13,5 hacia arriba y luego se suma 1)",
+    "14",
+    "28 (el padding mantiene el tamaño)"
+   ],
+   "correcta": 2,
+   "porque": "\\( \\lfloor(28+2\\cdot2-5)/2\\rfloor+1=\\lfloor13{,}5\\rfloor+1=14 \\). El redondeo es siempre hacia abajo y el «+1» es la primera ventana; el padding solo mantiene el tamaño si el stride es 1."
+  },
+  {
+   "q": "Tienes un lote de fotos de Keras con forma (32, 28, 28, 3) y una <code>nn.Conv2d(3, 8, 3)</code>. ¿Cómo lo arreglas?",
+   "opciones": [
+    "<code>x.permute(0, 3, 1, 2)</code>, que lo deja en (32, 3, 28, 28)",
+    "<code>x.view(32, 3, 28, 28)</code>, que da la forma que quiero",
+    "<code>x.transpose(1, 2)</code>",
+    "Pongo <code>in_channels=28</code>: así deja de dar error"
+   ],
+   "correcta": 0,
+   "porque": "<code>permute</code> reordena los ejes llevando los canales a la posición 1. <code>view</code> da la forma pedida pero <em>mezcla los píxeles</em> (no mueve los ejes, reinterpreta la memoria). <code>transpose(1, 2)</code> intercambia alto y ancho. Y con <code>in_channels=28</code> no hay error, pero la red trata las filas como si fueran canales."
+  },
+  {
+   "q": "Aplicas <code>nn.MaxPool2d(2)</code> a un mapa de 7×7 con los argumentos por defecto. ¿Qué sale?",
+   "opciones": [
+    "Un mapa de 4×4 (se redondea hacia arriba)",
+    "Un mapa de 7×7: el pooling no cambia el tamaño",
+    "Un mapa de 6×6 (stride 1)",
+    "Un mapa de 3×3: la última fila y la última columna no entran en ninguna ventana"
+   ],
+   "correcta": 3,
+   "porque": "El stride por defecto del pooling es igual al kernel (2), así que \\( \\lfloor(7-2)/2\\rfloor+1=3 \\) y las ventanas llegan hasta la fila 5; la fila 6 se pierde. Con <code>ceil_mode=True</code> saldría 4×4, y con <code>stride=1</code>, 6×6."
+  },
+  {
+   "q": "El último tensor antes de la capa lineal tiene forma (N, 64, 5, 5). ¿Qué <code>in_features</code> lleva <code>nn.Linear</code> tras un <code>nn.Flatten()</code>?",
+   "opciones": [
+    "64 (los canales)",
+    "1.600 (64·5·5)",
+    "320 (64·5)",
+    "N·1.600 (se incluye el lote)"
+   ],
+   "correcta": 1,
+   "porque": "<code>Flatten</code> aplana desde la dimensión 1 y conserva el lote: cada imagen pasa a \\( 64\\cdot5\\cdot5=1600 \\) números. Si no estás seguro, pasa un tensor de ceros por el cuerpo de la red y lee <code>.shape[1]</code> (fragmento 6) o usa <code>nn.LazyLinear</code>."
+  },
+  {
+   "q": "¿Cuántos parámetros <em>entrenables</em> tiene <code>nn.BatchNorm2d(16)</code>?",
+   "opciones": [
+    "32 (γ y β: 16 de cada)",
+    "16 (solo γ)",
+    "64 (γ, β, <code>running_mean</code> y <code>running_var</code>)",
+    "2 (una γ y una β para toda la capa)"
+   ],
+   "correcta": 0,
+   "porque": "Hay una γ (<code>weight</code>) y una β (<code>bias</code>) por canal: 2·16 = 32. <code>running_mean</code> y <code>running_var</code> son «buffers»: se guardan en el <code>state_dict</code> pero no se entrenan, y <code>num_batches_tracked</code> es un contador."
+  },
+  {
+   "q": "Has entrenado una CNN con <code>BatchNorm2d</code> y llamas a <code>model.eval()</code>. ¿Qué media y varianza usa la capa?",
+   "opciones": [
+    "Las del lote actual, igual que en entrenamiento",
+    "Las de cada imagen por separado",
+    "<code>running_mean</code> y <code>running_var</code>, acumuladas durante el entrenamiento",
+    "Siempre 0 y 1"
+   ],
+   "correcta": 2,
+   "porque": "En <code>eval()</code> la capa usa las estadísticas acumuladas (media móvil con momentum 0,1) y no las modifica; así el resultado de una imagen no depende de las demás del lote. En el fragmento 11, el mismo valor sale −1,5275 en <code>train()</code> y 0,4491 en <code>eval()</code> tras un solo lote."
+  },
+  {
+   "q": "Tienes 1.347 imágenes y un <code>DataLoader</code> con <code>batch_size=100</code> y <code>drop_last=False</code>. ¿Qué lotes salen por época?",
+   "opciones": [
+    "13 lotes de 100; las 47 restantes se descartan",
+    "14 lotes de 100 (se repiten muestras para completar el último)",
+    "13 lotes: 12 de 100 y uno de 147",
+    "14 lotes: 13 de 100 y uno final de 47"
+   ],
+   "correcta": 3,
+   "porque": "\\( \\lceil1347/100\\rceil=14 \\) lotes: 13 completos y uno con las 47 que sobran. Con <code>drop_last=True</code> serían 13 y se ignorarían esas 47 en la época. PyTorch nunca repite muestras para completar un lote."
+  },
+  {
+   "q": "PyTorch dice «expected input[5, 8, 8, 1] to have 1 channels, but got 8 channels instead». ¿Qué pasa?",
+   "opciones": [
+    "Las etiquetas no son de tipo <code>long</code>",
+    "Es un lote NHWC: la capa lee la altura (8) como canales; hay que hacer <code>permute(0, 3, 1, 2)</code>",
+    "La imagen es <code>uint8</code> y hay que dividir entre 255",
+    "El kernel es mayor que la imagen"
+   ],
+   "correcta": 1,
+   "porque": "El mensaje enseña la forma que vio, (5, 8, 8, 1), y el número que leyó como canales: 8, la dimensión 1. Eso significa que los canales están al final (formato de Keras). El caso <code>uint8</code> da otro mensaje (<em>Input type (unsigned char) and bias type (float)…</em>)."
+  },
+  {
+   "q": "¿Cuántos parámetros tiene <code>nn.Conv2d(4, 8, 3, groups=4)</code>?",
+   "opciones": [
+    "296 (el valor con <code>groups=1</code>)",
+    "72 (sin contar los sesgos)",
+    "80 (8·(1·9 + 1))",
+    "32"
+   ],
+   "correcta": 2,
+   "porque": "Con <code>groups=4</code> cada filtro solo ve \\( 4/4=1 \\) canal de entrada: el peso tiene forma (8, 1, 3, 3), es decir, 72 números, más 8 sesgos: 80. Con <code>groups=1</code> serían \\( 8\\cdot(4\\cdot9+1)=296 \\) (fragmento 3)."
+  },
+  {
+   "q": "Una imagen de entrada con 3 canales pasa por <code>nn.Conv2d(3, 16, 3)</code>. ¿Cuántos mapas de salida obtienes?",
+   "opciones": [
+    "16: uno por filtro, cada filtro suma sus tres canales",
+    "48: tres por filtro",
+    "3: uno por canal de entrada",
+    "1"
+   ],
+   "correcta": 0,
+   "porque": "Cada filtro tiene un kernel por canal de entrada, pero suma las tres aportaciones (más el sesgo) y produce <em>un</em> mapa. Hay 16 filtros, así que salen 16 mapas. En el ejemplo de <code>nn.Conv2d(2, 2, 2)</code>, el valor 3,5 era 0 + 3 + 0,5."
+  },
+  {
+   "q": "Se entrenan una red densa y una CNN con dígitos sin mover, y se prueban con la imagen movida 1 píxel a la derecha (fragmento 13). ¿Qué ocurre?",
+   "opciones": [
+    "La CNN no cambia: es invariante a traslaciones",
+    "Solo baja la red densa; la CNN sigue por encima de 0,95",
+    "Las dos suben porque ven más información",
+    "Las dos bajan mucho (0,476 la densa y 0,630 la CNN); entrenar con desplazamientos aleatorios recupera gran parte (0,881 y 0,968)"
+   ],
+   "correcta": 3,
+   "porque": "La convolución es equivariante, pero tras un <code>Flatten</code> y una capa lineal la red no es invariante, y con imágenes de 8 píxeles un píxel es mucho. La CNN lo soporta mejor que la densa, pero no lo resuelve; el data augmentation sí lo arregla en gran parte. Medias de 3 semillas."
+  }
+ ]
+}
+</script>
+</div>
+</section>
+
+<section class="resumen">
+<h2 class="sin-num sin-toc">Resumen del módulo</h2>
+<ul>
+  <li><strong>Formato:</strong> PyTorch usa (N, C, H, W); Keras, NumPy y PIL (H, W, C). <code>ToTensor()</code> reordena y divide entre 255; en un lote NHWC, <code>permute(0, 3, 1, 2)</code>. Una imagen suelta (1, 8, 8) se acepta como «sin lote» y la salida pierde esa dimensión. El tensor permutado no es contiguo: <code>view</code> falla y <code>reshape</code> o <code>.contiguous()</code> funcionan.</li>
+  <li><strong>Convolución:</strong> PyTorch hace correlación cruzada (no gira el filtro). Un filtro tiene un kernel por canal de entrada, suma las aportaciones y añade un sesgo; <code>weight</code> tiene forma \( (C_{out},C_{in}/\text{groups},k,k) \) y la capa \( C_{out}(C_{in}k^2+1) \) parámetros: 416 y 12.832 en la CNN del laboratorio, 112 en <code>nn.Conv2d(3, 4, 3)</code>, 80 con <code>groups=4</code>.</li>
+  <li><strong>Tamaño:</strong> \( \lfloor(n+2p-d(k-1)-1)/s\rfloor+1 \). 28 → 24 (k5), 28 → 28 (k5, p2), 28 → 13 (k3, s2), 224 → 112 (k7, s2, p3). <code>padding='same'</code> solo con stride 1; <code>padding_mode</code> cambia con qué se rellena el marco (sumas 12 / 33 / 21 / 45 en el ejemplo).</li>
+  <li><strong>Pooling:</strong> <code>MaxPool2d(k)</code> tiene stride = k (el de <code>Conv2d</code> es 1) y no tiene parámetros; con 7×7 sale 3×3, o 4×4 con <code>ceil_mode=True</code>. <code>AdaptiveAvgPool2d(1)</code> da la media de cada canal y hace que la red acepte imágenes de cualquier tamaño.</li>
+  <li><strong>Del mapa al vector:</strong> <code>nn.Flatten()</code> conserva el lote; <code>in_features</code> = C·H·W (512 en la CNN del laboratorio). Se obtiene con la cuenta, con un forward de prueba o con <code>LazyLinear</code>. Un «resumen» del modelo se hace con <code>register_forward_hook</code>: 18.378 parámetros (laboratorio), 1.898 (dígitos 8×8), 1.698.291 (fotos de 100×100×3, el 99,7 % en la primera <code>Linear</code>).</li>
+  <li><strong>Parámetros frente a cálculo:</strong> la convolución ahorra parámetros (448 frente a 3.000.100 para una foto 100×100×3) pero no multiplicaciones: la CNN del laboratorio hace 926.720 por imagen, el 88 % en la segunda convolución.</li>
+  <li><strong>Entrenar:</strong> lotes por época \( \lceil N/B\rceil \) (1.347/100 → 14, el último de 47); <code>CrossEntropyLoss</code> con logits y etiquetas <code>long</code> de forma (N,); <code>train()</code> / <code>eval()</code> + <code>no_grad()</code>. Con los dígitos reducidos a 16×16, la CNN del laboratorio pasa de 0,093 a 0,980 de acierto en prueba en 8 épocas. El ejemplo con MNIST real no se ha podido ejecutar (necesita internet).</li>
+  <li><strong>BatchNorm2d:</strong> una media y una varianza por canal sobre N·H·W valores, 2C parámetros y buffers acumulados (momentum 0,1, varianza corregida); en <code>eval()</code> usa los acumulados; falla con un solo valor por canal. En 4 épocas de SGD, la media de acierto pasó de 0,297 a 0,970 con <code>lr=0.01</code>: aprende más deprisa, no se mide el límite.</li>
+  <li><strong>Invariancia:</strong> la convolución es equivariante, no invariante. Con un píxel de desplazamiento, la densa baja a 0,476 y la CNN a 0,630; entrenando con desplazamientos aleatorios suben a 0,881 y 0,968.</li>
+  <li><strong>Errores:</strong> imprime <code>x.shape</code> y <code>x.dtype</code>; el mensaje enseña la forma que PyTorch vio y los canales que leyó. Pérdida inicial razonable: \( \ln(\text{clases}) \).</li>
+</ul>
+<p>Siguiente paso: en el <a href="modulo-4.html">módulo 4</a> usarás estas mismas capas dentro de redes ya entrenadas (ResNet, con su primera capa 7×7 de stride 2 que acabas de calcular) y de <strong>TorchVision</strong>: transfer learning, congelar capas y cambiar la última.</p>
+</section>
+
+</div>
+</main>
+</body>
+</html>
