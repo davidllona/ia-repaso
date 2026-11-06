@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+
+<html lang="es"><head><meta charset="utf-8"/><meta content="width=device-width,initial-scale=1" name="viewport"/><title>Lección 6 · Self-attention: Q, K y V · Curso 2 · Cuaderno de IA</title><meta content="Una RNN pasa toda la información por un cuello de botella (el estado \(h\)) y, para que la palabra 1 influya en la palabra 50, el mensaje tiene que atravesar 49 pasos, deteriorándose en el camino." name="description"/><script>try{var t=localStorage.getItem('cuaderno-ia:tema');if(t)document.documentElement.setAttribute('data-theme',t)}catch(e){}</script><link href="../../assets/css/style.css" rel="stylesheet"/><script src="../../assets/js/curriculum.js"></script><script src="../../assets/js/lab.js"></script><script defer="" src="../../assets/js/app.js"></script><script defer="" src="../../assets/js/microanimations.js"></script></head><body data-course="2" data-lesson="6" data-module="4" data-root="../../"><main><div class="page" data-micro="3min"><header class="hero leccion"><div class="hero-grid"><div><p class="eyebrow">Curso 2 · Módulo 4 · Lección 6 de 8</p><h1>Self-attention: Q, K y V</h1><p class="lead">Una RNN pasa toda la información por un cuello de botella (el estado \(h\)) y, para que la palabra 1 influya en la palabra 50, el mensaje tiene que atravesar 49 pasos, deteriorándose en el camino.</p><p class="meta-line"><span class="read-time" data-render="read-time"></span><a href="../modulo-4.html">Índice del módulo</a></p></div><div aria-hidden="true" class="hero-tile"></div></div></header><details class="predice"><summary>Antes de mirar el ejemplo: ¿qué crees que va a cambiar al mover los controles?</summary><div><p>Una RNN pasa toda la información por un cuello de botella (el estado \(h\)) y, para que la palabra 1 influya en la palabra 50, el mensaje tiene que atravesar 49 pasos, deteriorándose en el camino.</p></div></details><section aria-label="Explicación breve" class="micro-core"><div class="micro-kicker">01 · ENTENDER <span>≈ 45 s</span></div><h2>La idea en palabras sencillas</h2><p>Una RNN pasa toda la información por un cuello de botella (el estado \(h\)) y, para que la palabra 1 influya en la palabra 50, el mensaje tiene que atravesar 49 pasos, deteriorándose en el camino.</p><div class="micro-example"><span aria-hidden="true" class="micro-example-icon">💡</span><div><strong>Otro ejemplo · Idioma</strong><p>En «Ana dejó su mochila porque estaba cansada», el contexto ayuda a decidir a quién describe «cansada».</p></div></div></section><div class="micro-kicker micro-checkpoint">02 · RESPONDER <span>≈ 15 s</span></div><section aria-label="Pregunta intercalada" class="quiz mini micro-check"><script class="quiz-data" type="application/json">{"titulo": "Pausa rápida · Comprueba la idea", "preguntas": [{"q": "En atención, ¿qué indica un peso alto entre dos tokens?", "opciones": ["Que desaparece la posición", "Que uno resulta relevante para interpretar el otro", "Que ambos son números primos"], "correcta": 1, "porque": "La atención pondera relaciones entre elementos."}]}</script></section><section aria-label="Animación interactiva" class="micro-viz" data-index="12" data-micro-viz="attention"><div class="micro-kicker">03 · EXPERIMENTAR <span>≈ 45 s</span></div><div class="micro-viz-title"><div><h2>Qué parte del contexto importa</h2><p>Selecciona otra palabra y observa qué conexiones destacan.</p></div><span aria-hidden="true" class="micro-viz-symbol">✦</span></div><div aria-live="polite" class="micro-viz-stage"><p>Animación interactiva: Qué parte del contexto importa</p></div></section><div class="micro-kicker micro-checkpoint">04 · APLICAR <span>≈ 15 s</span></div><section aria-label="Pregunta intercalada" class="quiz mini micro-check"><script class="quiz-data" type="application/json">{"titulo": "Pausa rápida · ¿Lo aplicarías?", "preguntas": [{"q": "¿Qué representan Q, K y V de forma intuitiva?", "opciones": ["Consulta, clave y valor", "Calidad, kernel y volumen", "Clase, target y test"], "correcta": 0, "porque": "Q pregunta, K permite comparar, V aporta información."}]}</script></section><div class="micro-finish"><strong>Idea que te llevas</strong><span>Una RNN pasa toda la información por un cuello de botella (el estado \(h\)) y, para que la palabra 1 influya en la palabra 50, el mensaje tiene que at</span><small>¿Quieres más ejemplos, fórmulas o código? Los tienes justo debajo, sin límite de tiempo.</small></div><details class="profundizar micro-legacy"><summary><span>Explorar más: explicación y simulaciones completas<small>Todo el texto original, tablas y demos avanzadas. Opcional.</small></span></summary><div class="prof-body"><section><h2>Self-attention: Q, K y V</h2>
+<p>Una RNN pasa toda la información por un cuello de botella (el estado \(h\)) y, para que la palabra 1 influya en la palabra 50, el mensaje tiene que atravesar 49 pasos, deteriorándose en el camino. La innovación de los <strong>Transformers</strong> (2017, el artículo se llama <em>«Attention Is All You Need»</em>) fue eliminar la recurrencia y dejar que <strong>cada token se relacione directamente con cualquier otro token del contexto</strong>, sin importar la distancia. A este mecanismo se le llama <strong><abbr class="t" data-def="Atención: un mecanismo por el que cada elemento de una secuencia decide cuánto 'mira' a cada uno de los demás y construye su nueva representación como una mezcla ponderada.">attention</abbr></strong> y, cuando todos los tokens miran a los de su misma secuencia, <strong>self-attention</strong> (auto-atención).</p>
+<p>El resultado: cada token pasa de tener un vector «genérico» (el del embedding) a tener uno <strong>contextualizado</strong>. El «banco» del atraco y el «banco» del parque empiezan con el mismo embedding, pero, tras mirar a «atraco», «dinero» o «parque», acaban con vectores distintos.</p>
+<p>Para decidir a quién mirar, cada token juega tres papeles a la vez. Se calculan tres vectores distintos a partir de su embedding (cada uno con su propia matriz de pesos, que se aprende):</p>
+<ul class="flow">
+<li class="a">X<small>n × d_model</small></li>
+<li class="d">Q = X·W<sub>Q</sub><br/>K = X·W<sub>K</sub><br/>V = X·W<sub>V</sub><small>tres matrices que se aprenden</small></li>
+<li class="b">Q·Kᵀ<small>n × n puntuaciones</small></li>
+<li>÷ √d<sub>k</sub><small>escalar</small></li>
+<li class="b">softmax<small>por filas</small></li>
+<li class="c">·V<small>mezcla ponderada</small></li>
+</ul>
+<div class="callout ejemplo"><span class="lbl">Ejemplo tomado del módulo</span><p>Título del historial Puntuación \(Q_{\text{Shrek}} \cdot K\) \(e^{\text{puntuación}}\) Peso (softmax) Saw 0,5 1,6487 1,6487 / 90,533 = 0,0182 → 1,8 % Toy Story 4,2 66,6863 66,6863 / 90,533 = 0,7366 → 73,7 % Shrek 3,1 22,1980 22,1980 /…</p></div></section><figure class="demo" data-demo="curso2/c2m4-atencion" data-titulo="Mapa de atención de un subtítulo de 6 tokens">
+<div class="haz">Haz clic en una fila del mapa (por ejemplo «El», «persigue» o «al») o elígela en el desplegable. Cambia entre la Cabeza 1 y la Cabeza 2. Mueve la temperatura. Activa la máscara causal y, por último, desactiva «Con información de posición».</div>
+<div class="observa">Cada fila es un reparto de pesos que suma 1. Con la Cabeza 1, «El» y «astuto» miran sobre todo a «detective», y «al» a «ladrón»; «persigue» reparte su atención entre sus dos sustantivos. La Cabeza 2 hace otra cosa: los sustantivos buscan al verbo. La tabla de abajo muestra el cálculo de q·k, la división entre √3 y el peso. Sin posición, «El» no sabe distinguir entre «detective» y «ladrón»: reparte el peso a partes iguales. <strong>Ojo:</strong> las matrices W_Q y W_K de este experimento están elegidas a mano para que el mecanismo se vea; en un modelo real las aprende el entrenamiento.</div>
+</figure><div class="resumen"><h2 class="sin-num sin-toc">En pocas líneas</h2><ul><li><strong>Self-attention: Q, K y V:</strong> Una RNN pasa toda la información por un cuello de botella (el estado \(h\)) y, para que la palabra 1 influya en la palabra 50, el…</li><li>Antes de continuar, intenta explicar la demo sin mirar su resultado.</li></ul></div><section class="quiz mini"><script class="quiz-data" type="application/json">{"titulo": "¿Lo tienes?", "preguntas": [{"q": "¿Qué concepto estamos trabajando en esta lección?", "opciones": ["Tokens y embeddings: cómo se le da una palabra a una red", "Self-attention: Q, K y V", "RNN: una red con memoria"], "correcta": 1, "porque": "Una RNN pasa toda la información por un cuello de botella (el estado \\(h\\)) y, para que la palabra 1 influya en la palabra 50, el mensaje tiene que atravesar 49 pasos, deteriorándose en el camino."}, {"q": "¿Cuál de estas afirmaciones recoge lo que acabas de estudiar?", "opciones": ["Siempre hay un único método que sirve para todos los problemas.", "Lo importante es comprender la idea y comprobarla con ejemplos, no memorizar términos.", "Una RNN pasa toda la información por un cuello de botella (el estado \\(h\\)) y, para que la palabra 1 influya en la palabra 50, el mensaje tiene que atravesar 49 pasos, deteriorándose en el camino."], "correcta": 2, "porque": "La explicación central es: Una RNN pasa toda la información por un cuello de botella (el estado \\(h\\)) y, para que la palabra 1 influya en la palabra 50, el mensaje tiene que atravesar 49 pasos, deteriorándose en el camino."}, {"q": "Si una demo o un ejemplo te desconcierta, ¿cuál es la mejor forma de aprenderlo?", "opciones": ["Ignorar los resultados que no coinciden con tu intuición.", "Memorizar el nombre sin entender la operación.", "Volver a los números, cambiar un valor y explicar qué ocurre."], "correcta": 2, "porque": "Explorar qué cambia y por qué ayuda a conectar el concepto con su resultado."}]}</script></section></div></details><details class="profundizar"><summary><span>Profundizar: explicación completa<small>Matices, fórmulas, tablas, otros ejemplos y experimentos del módulo original.</small></span></summary><div class="prof-body"><section>
+<h2 id="atencion">Self-attention: Q, K y V</h2>
+<p class="pregunta">En un subtítulo de <em>La casa de papel</em> oyes «el atraco al banco» y, en otra escena, «se sentaron en un banco del parque». La palabra «banco» no significa lo mismo en las dos. ¿Cómo puede una red decidir qué significa cada palabra mirando las <em>otras</em> palabras de la frase?</p>
+<h3>La idea: que cada token mire directamente a los demás</h3>
+<p>Una RNN pasa toda la información por un cuello de botella (el estado \(h\)) y, para que la palabra 1 influya en la palabra 50, el mensaje tiene que atravesar 49 pasos, deteriorándose en el camino. La innovación de los <strong>Transformers</strong> (2017, el artículo se llama <em>«Attention Is All You Need»</em>) fue eliminar la recurrencia y dejar que <strong>cada token se relacione directamente con cualquier otro token del contexto</strong>, sin importar la distancia. A este mecanismo se le llama <strong><abbr class="t" data-def="Atención: un mecanismo por el que cada elemento de una secuencia decide cuánto 'mira' a cada uno de los demás y construye su nueva representación como una mezcla ponderada.">attention</abbr></strong> y, cuando todos los tokens miran a los de su misma secuencia, <strong>self-attention</strong> (auto-atención).</p>
+<p>El resultado: cada token pasa de tener un vector «genérico» (el del embedding) a tener uno <strong>contextualizado</strong>. El «banco» del atraco y el «banco» del parque empiezan con el mismo embedding, pero, tras mirar a «atraco», «dinero» o «parque», acaban con vectores distintos.</p>
+<h3>Consulta, clave y valor (Q, K, V)</h3>
+<p>Para decidir a quién mirar, cada token juega tres papeles a la vez. Se calculan tres vectores distintos a partir de su embedding (cada uno con su propia matriz de pesos, que se aprende):</p>
+<ul>
+<li><strong>Q (<em>query</em>, consulta)</strong>: <em>«¿qué estoy buscando?»</em></li>
+<li><strong>K (<em>key</em>, clave)</strong>: <em>«¿soy relevante para esa búsqueda?»</em> (una etiqueta que me describe)</li>
+<li><strong>V (<em>value</em>, valor)</strong>: <em>«¿qué información aporto?»</em> (mi contenido)</li>
+</ul>
+<div class="callout analogia">
+<span class="lbl">Analogía: el catálogo de Netflix</span>
+<p>Abres Netflix con una <strong>pregunta</strong> en la cabeza (Q): «quiero algo divertido para ver en familia». Cada película del catálogo tiene una <strong>etiqueta</strong> (K: «comedia», «familiar», «terror»…) y un <strong>contenido</strong> (V: la película en sí). Comparas tu pregunta con todas las etiquetas y ves cuánto encaja cada una (las <em>puntuaciones</em>). Luego no te llevas una sola película: te llevas <strong>un resumen mezclado de todas</strong>, aportando mucho de las que encajan bien y casi nada de las demás. Eso que te llevas es la nueva representación de tu token. Y cada token de la frase hace lo mismo con su propia pregunta, a la vez.</p>
+</div>
+<h3>Un primer ejemplo con tres títulos</h3>
+<p>Has visto, en este orden, tres películas: «Saw», «Toy Story» y «Shrek». Netflix quiere recomendarte la siguiente y se pregunta, con la última («Shrek»): <em>«¿qué títulos de tu historial importan para esto?»</em>. Cogemos la consulta de «Shrek» y la comparamos con las claves de los tres títulos (incluida ella misma). El <strong>producto escalar</strong> \(Q \cdot K\) mide cuánto encajan (cuanto mayor, más relevante). Supón que sale (cifras inventadas):</p>
+<div class="callout ejemplo">
+<span class="lbl">Ejemplo numérico</span>
+<table>
+<thead><tr><th>Título del historial</th><th>Puntuación \(Q_{\text{Shrek}} \cdot K\)</th><th>\(e^{\text{puntuación}}\)</th><th>Peso (softmax)</th></tr></thead>
+<tbody>
+<tr><td>Saw</td><td>0,5</td><td>1,6487</td><td>1,6487 / 90,533 = 0,0182 → <strong>1,8 %</strong></td></tr>
+<tr><td>Toy Story</td><td>4,2</td><td>66,6863</td><td>66,6863 / 90,533 = 0,7366 → <strong>73,7 %</strong></td></tr>
+<tr><td>Shrek</td><td>3,1</td><td>22,1980</td><td>22,1980 / 90,533 = 0,2452 → <strong>24,5 %</strong></td></tr>
+<tr><td><em>Suma</em></td><td></td><td>90,533</td><td>100 %</td></tr>
+</tbody>
+</table>
+<ol class="pasos">
+<li>La <strong>softmax</strong> (módulo 1) convierte las puntuaciones en pesos que son positivos y suman 1. A «Shrek» le importa sobre todo «Toy Story» (≈ 74 %), algo él mismo (≈ 25 %) y casi nada «Saw».</li>
+<li>Cada título tiene un vector valor. Con valores de ejemplo en 2 dimensiones (imagina que el primer número es el «perfil de animación familiar» y el segundo el «perfil de terror»), \(V_{\text{Saw}} = (0, 1)\), \(V_{\text{Toy Story}} = (1, 0)\), \(V_{\text{Shrek}} = (0{,}5;\, 0{,}5)\), la nueva representación de «Shrek» es la <strong>suma ponderada</strong>: \(0{,}0182\cdot(0,1) + 0{,}7366\cdot(1,0) + 0{,}2452\cdot(0{,}5;0{,}5) = (0{,}8592;\; 0{,}1408)\).</li>
+</ol>
+<p>Ese vector es «Shrek» <em>contextualizado</em> por tu historial: se parece sobre todo al valor de «Toy Story» (86 % de perfil de animación familiar y 14 % de terror), así que lo siguiente que te recomendaría sería algo de animación. (Las notas del curso redondean los pesos a 2 %, 73 % y 25 %; con más decimales sale lo de la tabla, que puedes comprobar en el fragmento 11.)</p>
+</div>
+<h3>Los pasos, con matrices</h3>
+<p>Hecho para todos los tokens a la vez, con matrices. Llamamos \(X\) a la matriz de entrada: una fila por token (\(n\) tokens, \(d_{model}\) columnas).</p>
+<ul class="flow">
+<li class="a">X<small>n × d_model</small></li>
+<li class="d">Q = X·W<sub>Q</sub><br/>K = X·W<sub>K</sub><br/>V = X·W<sub>V</sub><small>tres matrices que se aprenden</small></li>
+<li class="b">Q·Kᵀ<small>n × n puntuaciones</small></li>
+<li>÷ √d<sub>k</sub><small>escalar</small></li>
+<li class="b">softmax<small>por filas</small></li>
+<li class="c">·V<small>mezcla ponderada</small></li>
+</ul>
+<div class="formula">\[ \text{Attention}(Q, K, V) = \operatorname{softmax}\!\Big( \frac{Q K^{\top}}{\sqrt{d_k}} \Big)\, V \]</div>
+<ul>
+<li>\(Q K^{\top}\): la matriz \(n \times n\) de <strong>puntuaciones</strong>. La entrada \((i, j)\) es el producto escalar de la consulta del token \(i\) con la clave del token \(j\): <em>cuánto le interesa el token \(j\) al token \(i\)</em>.</li>
+<li>\(d_k\): la dimensión de las claves (y consultas). Dividimos entre \(\sqrt{d_k}\) para que las puntuaciones no se disparen (se explica más abajo).</li>
+<li>softmax <strong>por filas</strong>: cada fila (cada token que consulta) queda como un reparto de pesos que suma 1.</li>
+<li>Multiplicar por \(V\): la salida del token \(i\) es la suma de los valores \(V_j\) ponderada con la fila \(i\) de pesos.</li>
+</ul>
+<h3>Un ejemplo completo a mano (3 tokens, \(d = 2\))</h3>
+<div class="callout ejemplo">
+<span class="lbl">Ejemplo numérico</span>
+<p>Tres títulos de tu historial (tres tokens) descritos con 2 rasgos, una fila por título: el primer rasgo es cuánta <em>acción</em> tiene y el segundo cuánto <em>humor</em>. Así, «Rápidos y Furiosos» es \((1, 0)\), «Shrek» es \((0, 1)\) y «Los Vengadores» es \((1, 1)\) (cifras inventadas). Y tres matrices de pesos pequeñas (en un modelo real las aprende la red):</p>
+<div class="formula">\[ X = \begin{bmatrix} 1 &amp; 0 \\ 0 &amp; 1 \\ 1 &amp; 1 \end{bmatrix},\quad
+  W_Q = \begin{bmatrix} 1 &amp; 0 \\ 1 &amp; 1 \end{bmatrix},\quad
+  W_K = \begin{bmatrix} 1 &amp; 1 \\ 0 &amp; 1 \end{bmatrix},\quad
+  W_V = \begin{bmatrix} 1 &amp; 0 \\ 0 &amp; 2 \end{bmatrix} \]</div>
+<ol class="pasos">
+<li><strong>Q, K y V.</strong> Cada fila de \(X\) se multiplica por la matriz. Por ejemplo, la fila 3 de Q es \((1,1)\cdot W_Q = (1\cdot 1 + 1\cdot 1,\; 1\cdot 0 + 1\cdot 1) = (2, 1)\). Haciendo lo mismo con todas:
+      <div class="formula">\[ Q = \begin{bmatrix} 1 &amp; 0 \\ 1 &amp; 1 \\ 2 &amp; 1 \end{bmatrix},\quad
+      K = \begin{bmatrix} 1 &amp; 1 \\ 0 &amp; 1 \\ 1 &amp; 2 \end{bmatrix},\quad
+      V = \begin{bmatrix} 1 &amp; 0 \\ 0 &amp; 2 \\ 1 &amp; 2 \end{bmatrix} \]</div></li>
+<li><strong>Puntuaciones \(QK^{\top}\).</strong> La entrada \((i,j)\) es \(Q_i \cdot K_j\). Por ejemplo, \(Q_3 \cdot K_3 = 2\cdot 1 + 1 \cdot 2 = 4\):
+      <div class="formula">\[ Q K^{\top} = \begin{bmatrix} 1 &amp; 0 &amp; 1 \\ 2 &amp; 1 &amp; 3 \\ 3 &amp; 1 &amp; 4 \end{bmatrix} \]</div></li>
+<li><strong>Escalar.</strong> \(d_k = 2\), así que se divide entre \(\sqrt{2} = 1{,}4142\):
+      <div class="formula">\[ \frac{Q K^{\top}}{\sqrt{2}} = \begin{bmatrix} 0{,}7071 &amp; 0 &amp; 0{,}7071 \\ 1{,}4142 &amp; 0{,}7071 &amp; 2{,}1213 \\ 2{,}1213 &amp; 0{,}7071 &amp; 2{,}8284 \end{bmatrix} \]</div></li>
+<li><strong>Softmax por filas.</strong> Fila 1: \(e^{0{,}7071} = 2{,}0281\), \(e^{0} = 1\), \(e^{0{,}7071} = 2{,}0281\); suma \(= 5{,}0562\); pesos \(= (0{,}4011;\; 0{,}1978;\; 0{,}4011)\). Fila 2: \(e^{\cdot} = (4{,}1133;\; 2{,}0281;\; 8{,}3421)\), suma \(14{,}4835\). Fila 3: \(e^{\cdot} = (8{,}3421;\; 2{,}0281;\; 16{,}9188)\), suma \(27{,}289\):
+      <div class="formula">\[ A = \begin{bmatrix} 0{,}4011 &amp; 0{,}1978 &amp; 0{,}4011 \\ 0{,}2840 &amp; 0{,}1400 &amp; 0{,}5760 \\ 0{,}3057 &amp; 0{,}0743 &amp; 0{,}6200 \end{bmatrix} \]</div>
+      Cada fila suma 1. Fíjate en la fila 3: «Los Vengadores» (\(Q = (2,1)\)) puntúa mucho con su propia clave (la 3) y por eso se pone el 62 % del peso.</li>
+<li><strong>Mezcla de valores \(A\,V\).</strong> Fila 1: \(0{,}4011\cdot(1,0) + 0{,}1978\cdot(0,2) + 0{,}4011\cdot(1,2) = (0{,}8022;\; 1{,}1978)\). Resultado completo:
+      <div class="formula">\[ \text{Salida} = A\,V = \begin{bmatrix} 0{,}8022 &amp; 1{,}1978 \\ 0{,}8600 &amp; 1{,}4320 \\ 0{,}9257 &amp; 1{,}3886 \end{bmatrix} \]</div></li>
+</ol>
+<p>Resultado: tres vectores de 2 números, uno por título (token), cada uno <strong>mezcla de los valores de todos</strong> según lo que cada título «preguntó». Esta cuenta está comprobada con NumPy y con la capa <code>MultiHeadAttention</code> de Keras en el fragmento 11.</p>
+</div>
+<h3>Por qué se divide entre \(\sqrt{d_k}\)</h3>
+<p>Supón que las componentes de \(q\) y de \(k\) son números «normales» (media 0 y varianza 1). El producto escalar \(q\cdot k\) es una suma de \(d_k\) productos, y la varianza de una suma de términos independientes es la suma de varianzas: <strong>varianza \(d_k\), desviación \(\sqrt{d_k}\)</strong>. Con \(d_k = 64\) las puntuaciones oscilan alrededor de ±8; con \(d_k = 256\), de ±16.</p>
+<p>¿Y qué le pasa a la softmax con puntuaciones tan grandes? Se <strong>satura</strong>:</p>
+<div class="callout ejemplo">
+<span class="lbl">Ejemplo numérico</span>
+<ol class="pasos">
+<li>Imagina que un título puntúa así a tres títulos de tu historial, sin escalar: \((8,\, 0,\, -8)\): \(e^{8} = 2981\), \(e^{0} = 1\), \(e^{-8} = 0{,}0003\). Pesos: \((0{,}9997;\; 0{,}0003;\; 0{,}0000)\). Un solo token se lo lleva todo.</li>
+<li>Las mismas puntuaciones divididas entre \(\sqrt{64} = 8\): \((1,\, 0,\, -1)\) → \(e^{1} = 2{,}718\), \(e^{0} = 1\), \(e^{-1} = 0{,}368\). Pesos: \((0{,}665;\; 0{,}245;\; 0{,}090)\). Hay un favorito, pero los demás siguen contando.</li>
+<li>El gradiente de una softmax es proporcional a \(p(1-p)\): en el primer caso vale \(0{,}9997 \cdot 0{,}0003 \approx 0{,}0003\) (casi nada: la red <em>no puede aprender</em>); en el segundo, \(0{,}665 \cdot 0{,}335 = 0{,}22\).</li>
+</ol>
+</div>
+<figure class="demo" data-demo="curso2/c2m4-escala-dk" data-titulo="Por qué dividir entre la raíz de d_k">
+<div class="haz">Sube d_k hasta 256 con «Dividir entre √d_k» apagado. Luego enciéndelo. Pulsa «Otra muestra al azar» varias veces.</div>
+<div class="observa">Sin dividir, la campana se ensancha como √d_k (con d_k = 64, ±8) y el softmax casi siempre da un peso cercano a 1 a una sola clave: el «peso máximo medio» se dispara y la «pendiente» se hunde. Dividiendo, la campana mide siempre ±1 sea cual sea d_k.</div>
+</figure>
+<h3>Atención multi-cabeza</h3>
+<p>Una sola atención solo puede hacer <em>una pregunta</em> a la vez. Pero para entender una frase hacen falta varias a la vez: «¿quién hace la acción?», «¿qué adjetivo describe a este nombre?», «¿qué palabra va justo antes?». Es como elegir qué ver: miras el género, el reparto y el director a la vez, y cada una de esas miradas es una cabeza. La <strong>atención multi-cabeza</strong> (<em>multi-head attention</em>) ejecuta <strong>\(h\) atenciones en paralelo</strong>, cada una con sus propias matrices \(W_Q, W_K, W_V\) y con dimensión reducida \(d_k = d_{model} / h\). Después se <em>concatenan</em> las \(h\) salidas y se pasan por una última matriz \(W_O\) que devuelve el tamaño \(d_{model}\).</p>
+<div class="callout ejemplo">
+<span class="lbl">Ejemplo numérico</span>
+<p>\(d_{model} = 8\) y \(h = 2\) cabezas → \(d_k = 4\). Cada cabeza produce una salida de 4 números por token; se concatenan 2 × 4 = 8 y \(W_O\) (8 × 8) las mezcla.</p>
+<p>Parámetros: tres proyecciones \(d_{model} \to h\cdot d_k = 8\) (con sesgo): \(3\cdot(8\cdot 8 + 8) = 216\), más la de salida \(8 \cdot 8 + 8 = 72\): <strong>288</strong> en total, es decir \(4 d_{model}^2 + 4 d_{model}\). <em>No depende del número de cabezas</em>: con \(h = 1\) serían los mismos (la diferencia es que las cabezas dividen el trabajo). El fragmento 11 lo comprueba con <code>MultiHeadAttention(num_heads=2, key_dim=4)</code>.</p>
+</div>
+<p>En Keras, <code>key_dim</code> es el tamaño de cada cabeza \(d_k\) (<strong>no</strong> el total). Por eso se suele escribir <code>key_dim = embed_dim // num_heads</code>. (Algunos tutoriales de Keras ponen <code>key_dim = embed_dim</code>: funciona, pero cada cabeza es tan ancha como todo el modelo, con más parámetros. Con \(d_{model} = 32\) y 2 cabezas: 4.224 parámetros con <code>key_dim=16</code> frente a 8.416 con <code>key_dim=32</code>.)</p>
+<h3>Máscara causal: no mirar al futuro</h3>
+<p>Cuando un modelo genera texto, al predecir la palabra \(t\) solo conoce las palabras anteriores. Es como recomendarte el capítulo 4 sabiendo solo los capítulos 1 a 3. Si durante el entrenamiento dejáramos a cada token mirar a los siguientes, <em>haría trampa</em>: leería la respuesta, como quien lee el final de la serie antes de adivinar qué pasa (un <em>spoiler</em>). La <strong>máscara causal</strong> lo evita: antes de la softmax, se pone \(-\infty\) en las puntuaciones de las posiciones futuras (el triángulo superior de la matriz). Como \(e^{-\infty} = 0\), esos pesos valen exactamente 0.</p>
+<div class="callout ejemplo">
+<span class="lbl">Ejemplo numérico</span>
+<p>Con las puntuaciones escaladas del ejemplo anterior:</p>
+<ul>
+<li>Fila 1 (solo puede ver el token 1): peso \((1, 0, 0)\).</li>
+<li>Fila 2 (ve los tokens 1 y 2): \(e^{1{,}4142} = 4{,}1133\) y \(e^{0{,}7071} = 2{,}0281\), suma \(6{,}1414\) → \((0{,}6698;\; 0{,}3302;\; 0)\).</li>
+<li>Fila 3 (ve los tres): igual que antes, \((0{,}3057;\; 0{,}0743;\; 0{,}6200)\).</li>
+</ul>
+<p>En Keras: <code>MultiHeadAttention(...)(x, x, use_causal_mask=True)</code> (fragmento 11). Una consecuencia práctica: el modelo puede entrenarse con <strong>toda la frase a la vez</strong> y aprender a predecir cada siguiente palabra en paralelo, sin que ninguna vea la suya.</p>
+</div>
+<h3>El bloque Transformer</h3>
+<p>La atención sola no es un Transformer. Un <strong>bloque</strong> añade tres ingredientes y se repite muchas veces (6, 12, 96…):</p>
+<figure class="figura">
+<svg aria-label="Un bloque Transformer de encoder: atención multi-cabeza, suma residual y normalización, red feed-forward, suma residual y normalización" role="img" viewbox="-30 0 600 440"><defs><marker id="ah-blk" markerheight="7" markerwidth="7" orient="auto-start-reverse" refx="9" refy="5" viewbox="0 0 10 10"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--ink)"></path></marker></defs><rect class="fill-a" height="34" rx="6" width="160" x="180" y="388"></rect><text font-size="13" font-weight="600" text-anchor="middle" x="260.0" y="409.0">Entrada (n × d)</text><line class="stroke" marker-end="url(#ah-blk)" x1="260" x2="260" y1="388" y2="352"></line><rect class="fill-d" height="52" rx="6" width="220" x="150" y="300"></rect><text font-size="14" font-weight="600" text-anchor="middle" x="260.0" y="323.0">Atención multi-cabeza</text><text class="muted" font-size="12" text-anchor="middle" x="260.0" y="339.0">Q, K, V salen de la misma entrada</text><line class="stroke" marker-end="url(#ah-blk)" x1="260" x2="260" y1="300" y2="268"></line><rect class="fill-b" height="36" rx="6" width="160" x="180" y="232"></rect><text font-size="13" font-weight="600" text-anchor="middle" x="260.0" y="254.0">Suma + LayerNorm</text><line class="stroke" marker-end="url(#ah-blk)" x1="260" x2="260" y1="232" y2="196"></line><rect class="fill-d" height="52" rx="6" width="220" x="150" y="144"></rect><text font-size="14" font-weight="600" text-anchor="middle" x="260.0" y="167.0">Feed-forward</text><text class="muted" font-size="12" text-anchor="middle" x="260.0" y="183.0">Dense(d_ff) + ReLU → Dense(d)</text><line class="stroke" marker-end="url(#ah-blk)" x1="260" x2="260" y1="144" y2="112"></line><rect class="fill-b" height="36" rx="6" width="160" x="180" y="76"></rect><text font-size="13" font-weight="600" text-anchor="middle" x="260.0" y="98.0">Suma + LayerNorm</text><line class="stroke" marker-end="url(#ah-blk)" x1="260" x2="260" y1="76" y2="44"></line><rect class="fill-c" height="34" rx="6" width="160" x="180" y="10"></rect><text font-size="13" font-weight="600" text-anchor="middle" x="260.0" y="31.0">Salida (n × d)</text><path class="stroke" d="M140,405 L90,405 L90,250 L178,250" marker-end="url(#ah-blk)" stroke-dasharray="5 4"></path><text class="muted" font-size="12" font-weight="400" text-anchor="end" x="84" y="330">atajo (residual)</text><path class="stroke" d="M90,250 L90,94 L178,94" marker-end="url(#ah-blk)" stroke-dasharray="5 4"></path><text class="muted" font-size="12" font-weight="400" text-anchor="start" x="390" y="170">cada token por separado</text><text class="muted" font-size="12" font-weight="400" text-anchor="start" x="380" y="326">mezcla tokens entre sí</text></svg>
+<figcaption>Un bloque Transformer de encoder. La entrada y la salida tienen la misma forma (n × d), así que los bloques se pueden apilar.</figcaption>
+</figure>
+<ol>
+<li><strong>Atención multi-cabeza</strong>: los tokens se <em>mezclan</em> entre sí.</li>
+<li><strong>Conexión residual + <abbr class="t" data-def="Layer Normalization: normaliza cada token por separado (media 0 y desviación 1 a lo largo de sus d números) y luego aplica una escala y un desplazamiento que se aprenden.">LayerNorm</abbr></strong>: se <em>suma</em> la entrada del sub-bloque a su salida (\(y = x + F(x)\)) y se normaliza. La suma crea un atajo por el que el gradiente pasa intacto (\(\partial y/\partial x = 1 + \partial F/\partial x\)): la misma idea de «autopista» de la cinta de la LSTM, y es lo que permite apilar decenas de bloques.</li>
+<li><strong>Red feed-forward</strong>: dos capas <code>Dense</code> (\(d_{model} \to d_{ff} \to d_{model}\), con ReLU en medio y normalmente \(d_{ff} = 4\,d_{model}\)) aplicadas <em>a cada token por separado</em>, con los mismos pesos para todos. La atención mezcla tokens; el feed-forward «piensa» sobre cada uno.</li>
+<li><strong>Otra residual + LayerNorm</strong>.</li>
+</ol>
+<div class="callout ejemplo">
+<span class="lbl">Ejemplo numérico: LayerNorm</span>
+<p>Un token con \(d = 4\) números: \(x = (2, 4, 6, 8)\). Media: \(\mu = 5\). Varianza: \(((-3)^2 + (-1)^2 + 1^2 + 3^2)/4 = 5\). Desviación: \(\sqrt{5} = 2{,}236\). Normalizado: \((x - \mu)/\sigma = (-1{,}342;\; -0{,}447;\; 0{,}447;\; 1{,}342)\). Después se aplica \(\gamma \cdot \hat{x} + \beta\) (dos vectores que se aprenden, al principio 1 y 0). A diferencia de <em>BatchNorm</em> (que normaliza cada variable a lo largo del lote), <strong>LayerNorm normaliza cada token por dentro</strong>: no depende del tamaño del lote ni de la longitud de la frase, y por eso es la normalización de los Transformers.</p>
+</div>
+<div class="callout ojo">
+<span class="lbl">Ojo</span>
+<p>El dibujo y el código de este módulo colocan la LayerNorm <em>después</em> de la suma (el esquema del artículo original, «post-LN»). Muchos modelos actuales la ponen <em>antes</em> de cada sub-bloque («pre-LN») porque entrena con más estabilidad cuando hay muchas capas. Es un detalle de ingeniería: el mecanismo es el mismo.</p>
+</div>
+<figure class="demo" data-demo="curso2/c2m4-forma-bloque" data-titulo="Las formas y los parámetros dentro de un bloque Transformer">
+<div class="haz">Pon la longitud en 4096 con d_model = 768, 12 cabezas y lote 32. Después baja la longitud a 128 y sube y baja d_model.</div>
+<div class="observa">Mira que la matriz de atención tiene forma (lote, cabezas, n, n): con n = 4096 y 12 cabezas son unos 25,8 GB solo en puntuaciones. Los cuadrados del dibujo están a escala: duplicar n multiplica por 4 el área. En cambio, el número de parámetros no cambia con n: el feed-forward se lleva dos tercios de ellos y la atención el tercio restante.</div>
+</figure>
+<h3>Encoder, decoder y atención cruzada</h3>
+<p>Combinando bloques salen tres familias:</p>
+<table>
+<thead><tr><th>Arquitectura</th><th>Atención</th><th>Para qué</th><th>Ejemplos</th></tr></thead>
+<tbody>
+<tr><td><strong>Solo encoder</strong></td><td>Cada token mira a <em>todos</em> (izquierda y derecha)</td><td>Entender un texto: clasificar, etiquetar, buscar</td><td>BERT</td></tr>
+<tr><td><strong>Solo decoder</strong></td><td>Con <em>máscara causal</em>: cada token mira solo hacia atrás</td><td>Generar texto, un token detrás de otro</td><td>GPT</td></tr>
+<tr><td><strong>Encoder + decoder</strong></td><td>El encoder lee todo; el decoder genera y además «consulta» al encoder</td><td>Traducir, resumir (muchos a muchos con distinta longitud)</td><td>El Transformer original, T5</td></tr>
+</tbody>
+</table>
+<p>Ese «consultar al encoder» se llama <strong>cross-attention</strong> (atención cruzada): las consultas Q vienen de una secuencia (la que se está generando) y las claves y valores K y V vienen de <em>otra</em>. Es lo que permite relacionar <strong>dos fuentes distintas</strong>: texto ↔ texto en una traducción, o <strong>texto ↔ imagen</strong> en un modelo que describe fotos (lo verás con BLIP en el módulo 5: las palabras que se generan «miran» a zonas de la imagen). En la <em>self-attention</em>, en cambio, Q, K y V salen de la misma secuencia (texto ↔ texto).</p>
+<h3>Atención frente a RNN: paralelismo y precio</h3>
+<table>
+<thead><tr><th></th><th>RNN / LSTM</th><th>Self-attention</th></tr></thead>
+<tbody>
+<tr><td>Pasos que no se pueden hacer a la vez</td><td>\(n\) (cada paso espera al anterior)</td><td>1 (todo es multiplicar matrices)</td></tr>
+<tr><td>Camino entre dos tokens cualesquiera</td><td>hasta \(n\) pasos</td><td>1 paso (se miran directamente)</td></tr>
+<tr><td>Coste de cálculo por capa</td><td>\(n \cdot d^2\)</td><td>\(n^2 \cdot d\)</td></tr>
+<tr><td>Memoria que crece</td><td>con \(n\) (un estado por paso)</td><td>con \(n^2\) (la matriz de puntuaciones)</td></tr>
+</tbody>
+</table>
+<p>Dos grandes ventajas: <strong>dependencias largas</strong> (una palabra puede relacionarse directamente con otra muy lejana) y <strong>paralelización</strong> (todas las posiciones se calculan a la vez, ideal para una GPU: por eso se pudieron entrenar modelos con billones de palabras). El precio: la matriz \(n \times n\) crece al cuadrado. Con 512 tokens son 262.144 puntuaciones por cabeza; con 4.096 (8 veces más), 16.777.216 (64 veces más).</p>
+<div class="callout ojo">
+<span class="lbl">Limitaciones</span>
+<ul>
+<li><strong>Datos, potencia y memoria</strong>: los Transformers grandes necesitan cantidades enormes de texto y GPUs; con pocos datos, una LSTM o un modelo sencillo suele funcionar igual o mejor.</li>
+<li><strong>Contexto limitado</strong>: solo ven una ventana de \(n\) tokens (miles, no infinitos).</li>
+<li><strong>Sesgos</strong>: aprenden de los textos que ven; si los datos contienen prejuicios o errores, el modelo puede reproducirlos.</li>
+</ul>
+</div>
+</section></div></details><details class="profundizar" id="codigo"><summary><span>Ver código explicado paso a paso<small>1 fragmento(s) original(es), con cada línea comentada y salida esperada.</small></span></summary><div class="prof-body"><article class="snippet" data-lang="python">
+<header>
+<h3>11 · Self-attention paso a paso: NumPy, MultiHeadAttention y máscara causal</h3>
+<p class="para-que"><strong>Para qué sirve</strong> Calcular a mano con NumPy el ejemplo de tres tokens, comprobar que la capa <code>MultiHeadAttention</code> de Keras da lo mismo con los mismos pesos, ver la máscara causal y contar los parámetros de una capa real.</p>
+</header>
+<pre class="code"><code>import numpy as np
+from tensorflow import keras
+from tensorflow.keras import layers
+
+np.set_printoptions(precision=4, suppress=True)
+
+def softmax(z):
+    e = np.exp(z - z.max(axis=-1, keepdims=True))     # restar el máximo evita desbordamientos
+    return e / e.sum(axis=-1, keepdims=True)
+
+# 3 tokens, d_model = 2 (una fila por token) y tres matrices de pesos pequeñas
+X = np.array([[1, 0], [0, 1], [1, 1]], dtype="float32")
+W_Q = np.array([[1, 0], [1, 1]], dtype="float32")
+W_K = np.array([[1, 1], [0, 1]], dtype="float32")
+W_V = np.array([[1, 0], [0, 2]], dtype="float32")
+
+Q, K, V = X @ W_Q, X @ W_K, X @ W_V                  # consultas, claves y valores
+puntuaciones = Q @ K.T                                # (3 x 3): q_i · k_j
+escaladas = puntuaciones / np.sqrt(K.shape[1])        # dividir entre raíz de d_k
+A = softmax(escaladas)                                # cada fila suma 1
+salida = A @ V                                        # mezcla ponderada de los valores
+print("Q:\n", Q, "\nK:\n", K, "\nV:\n", V)
+print("puntuaciones:\n", puntuaciones)
+print("escaladas:\n", escaladas)
+print("pesos A:\n", A, "\nsuma por filas:", A.sum(axis=1))
+print("salida:\n", salida)
+
+# La misma cuenta con la capa de Keras (1 cabeza, sin sesgos, con NUESTROS pesos)
+mha = layers.MultiHeadAttention(num_heads=1, key_dim=2, use_bias=False)
+mha(X[None], X[None])                                 # construye la capa (lote de 1 frase)
+mha.query_dense.set_weights([W_Q.reshape(2, 1, 2)])   # forma (d_model, cabezas, key_dim)
+mha.key_dense.set_weights([W_K.reshape(2, 1, 2)])
+mha.value_dense.set_weights([W_V.reshape(2, 1, 2)])
+mha.output_dense.set_weights([np.eye(2, dtype="float32").reshape(1, 2, 2)])   # identidad: sin mezcla final
+salida_k, pesos_k = mha(X[None], X[None], return_attention_scores=True)
+print("¿salida igual a la de NumPy?", np.allclose(salida_k[0], salida, atol=1e-5))
+print("¿pesos iguales a los de NumPy?", np.allclose(pesos_k[0, 0], A, atol=1e-5))
+
+# Máscara causal: cada token solo mira hacia atrás (y a sí mismo)
+_, pesos_c = mha(X[None], X[None], return_attention_scores=True, use_causal_mask=True)
+print("pesos con máscara causal:\n", pesos_c[0, 0].numpy())
+
+# El ejemplo del historial: la consulta de «Shrek» frente a «Saw», «Toy Story», «Shrek»
+print("softmax([0.5, 4.2, 3.1]) =", softmax(np.array([0.5, 4.2, 3.1])).round(3))
+
+# Parámetros de una capa "de verdad" (con sesgos): d_model = 8, 2 cabezas de key_dim = 4
+mha2 = layers.MultiHeadAttention(num_heads=2, key_dim=4)
+mha2(np.zeros((1, 3, 8), "float32"), np.zeros((1, 3, 8), "float32"))
+print("parámetros con d_model=8, 2 cabezas, key_dim=4:", mha2.count_params(), "= 4*8*8 + 4*8 =", 4 * 8 * 8 + 4 * 8)</code></pre>
+<details class="linea-a-linea" open="">
+<summary>Línea por línea</summary>
+<p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+<table class="lineas">
+<thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+<tbody>
+<tr data-lines="1-3"><td><code>import numpy as np / from tensorflow import keras / ...</code></td><td>NumPy para la cuenta a mano; Keras y capas para la comparación.</td></tr>
+<tr data-lines="5"><td><code>np.set_printoptions(precision=4, suppress=True)</code></td><td>Imprime los arrays con 4 decimales y sin notación científica.</td></tr>
+<tr data-lines="7-9"><td><code>def softmax(z): ...</code></td><td>La softmax por filas. Restar el máximo de cada fila (<code>z.max(axis=-1, keepdims=True)</code>) no cambia el resultado, pero evita que <code>np.exp</code> se desborde con números grandes. <code>axis=-1</code> es «a lo largo de la última dimensión», es decir, cada fila.</td></tr>
+<tr data-lines="11-15"><td><code>X = np.array([[1, 0], [0, 1], [1, 1]], dtype="float32") ...</code></td><td>Las entradas y las tres matrices de pesos del ejemplo hecho a mano. <code>X</code> tiene una fila por token.</td></tr>
+<tr data-lines="17"><td><code>Q, K, V = X @ W_Q, X @ W_K, X @ W_V</code></td><td>Calcula las consultas, las claves y los valores con tres multiplicaciones de matrices.</td></tr>
+<tr data-lines="18"><td><code>puntuaciones = Q @ K.T</code></td><td>La matriz 3 × 3 de productos escalares \(Q_i \cdot K_j\). <code>K.T</code> es la traspuesta.</td></tr>
+<tr data-lines="19"><td><code>escaladas = puntuaciones / np.sqrt(K.shape[1])</code></td><td>Divide entre \(\sqrt{d_k}\); <code>K.shape[1]</code> es \(d_k = 2\).</td></tr>
+<tr data-lines="20"><td><code>A = softmax(escaladas)</code></td><td>Los pesos de atención: cada fila suma 1.</td></tr>
+<tr data-lines="21"><td><code>salida = A @ V</code></td><td>La mezcla ponderada de los valores: la nueva representación de cada token.</td></tr>
+<tr data-lines="22-26"><td><code>print("Q:\n", Q, ...) ...</code></td><td>Escribe cada paso intermedio para poder compararlo con la mano. <code>\n</code> es un salto de línea.</td></tr>
+<tr data-lines="28-29"><td><code>mha = layers.MultiHeadAttention(num_heads=1, key_dim=2, use_bias=False)</code></td><td>La capa de Keras con 1 cabeza de tamaño 2 y <strong>sin sesgos</strong>, para que haga exactamente \(Q = XW_Q\), etc.</td></tr>
+<tr data-lines="30"><td><code>mha(X[None], X[None])</code></td><td>Una primera llamada con datos (<code>X[None]</code> añade la dimensión de lote: forma (1, 3, 2)) para que Keras cree los pesos. Los dos argumentos son <em>query</em> y <em>value</em>; la clave toma por defecto el valor.</td></tr>
+<tr data-lines="31-33"><td><code>mha.query_dense.set_weights([W_Q.reshape(2, 1, 2)]) ...</code></td><td>Copia nuestras matrices en las proyecciones de consulta, clave y valor. Keras guarda cada una con forma <code>(d_model, cabezas, key_dim)</code>, por eso el <code>reshape(2, 1, 2)</code>.</td></tr>
+<tr data-lines="34"><td><code>mha.output_dense.set_weights([np.eye(2, ...).reshape(1, 2, 2)])</code></td><td>La proyección de salida \(W_O\), que Keras aplica al final, se fija a la <strong>identidad</strong> para que no mezcle nada más.</td></tr>
+<tr data-lines="35"><td><code>salida_k, pesos_k = mha(X[None], X[None], return_attention_scores=True)</code></td><td>Ejecuta la capa. Con <code>return_attention_scores=True</code> devuelve también los pesos de atención, con forma <code>(lote, cabezas, tokens, tokens)</code>.</td></tr>
+<tr data-lines="36-37"><td><code>print("¿salida igual a la de NumPy?", np.allclose(...))</code></td><td>Comprueba, con una tolerancia pequeña, que la salida y los pesos de Keras coinciden con los de NumPy.</td></tr>
+<tr data-lines="39-41"><td><code>_, pesos_c = mha(..., use_causal_mask=True)</code></td><td><code>use_causal_mask=True</code> aplica la máscara causal: cada token solo atiende a sí mismo y a los anteriores. Se imprimen los pesos resultantes.</td></tr>
+<tr data-lines="43-44"><td><code>print("softmax([0.5, 4.2, 3.1]) =", ...)</code></td><td>El ejemplo del historial «Saw, Toy Story, Shrek»: las tres puntuaciones de la consulta «Shrek» convertidas en pesos.</td></tr>
+<tr data-lines="46-47"><td><code>mha2 = layers.MultiHeadAttention(num_heads=2, key_dim=4)</code></td><td>Ahora una capa «de verdad» (con sesgos): 2 cabezas de tamaño 4 para un modelo de \(d_{model} = 8\).</td></tr>
+<tr data-lines="48"><td><code>mha2(np.zeros((1, 3, 8), "float32"), np.zeros((1, 3, 8), "float32"))</code></td><td>La llama una vez con ceros solo para que Keras construya los pesos (query y value; la clave toma por defecto el valor): lote 1, 3 tokens, 8 números por token.</td></tr>
+<tr data-lines="49"><td><code>print("parámetros ...", mha2.count_params(), ...)</code></td><td>Cuenta los parámetros de la capa y los compara con \(4\,d_{model}^2 + 4\,d_{model}\).</td></tr>
+</tbody>
+</table>
+</details>
+<div class="salida">
+<strong>Salida esperada (valores aproximados)</strong>
+<pre>Q:
+ [[1. 0.]
+ [1. 1.]
+ [2. 1.]]
+K:
+ [[1. 1.]
+ [0. 1.]
+ [1. 2.]]
+V:
+ [[1. 0.]
+ [0. 2.]
+ [1. 2.]]
+puntuaciones:
+ [[1. 0. 1.]
+ [2. 1. 3.]
+ [3. 1. 4.]]
+escaladas:
+ [[0.7071 0.     0.7071]
+ [1.4142 0.7071 2.1213]
+ [2.1213 0.7071 2.8284]]
+pesos A:
+ [[0.4011 0.1978 0.4011]
+ [0.284  0.14   0.576 ]
+ [0.3057 0.0743 0.62  ]]
+suma por filas: [1. 1. 1.]
+salida:
+ [[0.8022 1.1978]
+ [0.86   1.432 ]
+ [0.9257 1.3886]]
+¿salida igual a la de NumPy? True
+¿pesos iguales a los de NumPy? True
+pesos con máscara causal:
+ [[1.     0.     0.    ]
+ [0.6698 0.3302 0.    ]
+ [0.3057 0.0743 0.62  ]]
+softmax([0.5, 4.2, 3.1]) = [0.018 0.737 0.245]
+parámetros con d_model=8, 2 cabezas, key_dim=4: 288 = 4*8*8 + 4*8 = 288</pre>
+<p>Q, K, V, las puntuaciones, los pesos y la salida coinciden con los de la sección de atención (por ejemplo la salida del primer token es \((0{,}8022;\ 1{,}1978)\)). Las dos comprobaciones de Keras dan <code>True</code>: la capa hace justo esta cuenta. Con la máscara causal, la fila 1 es \((1, 0, 0)\), la 2 reparte entre los dos primeros tokens \((0{,}6698;\ 0{,}3302)\) y la 3 queda igual que sin máscara, porque ya podía ver a todos. La softmax de las puntuaciones del ejemplo de «Shrek» da \((0{,}018;\ 0{,}737;\ 0{,}245)\). Finalmente, la capa con 2 cabezas y \(d_{model} = 8\) tiene 288 parámetros, que es \(4 \cdot 8^2 + 4 \cdot 8\).</p>
+</div>
+</article></div></details></div></main></body></html>

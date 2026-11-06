@@ -59,6 +59,8 @@ def check_page(browser, base, rel, shots):
     page.on("response", lambda r: logs.append(f"HTTP {r.status}: {r.url}") if r.status >= 400 else None)
     page.goto(url, wait_until="networkidle")
     page.wait_for_timeout(300)
+    # Abrir los bloques plegados (Profundizar, predicciones) para que sus demos se monten y se revisen
+    page.evaluate("document.querySelectorAll('details.profundizar,details.predice').forEach(d => { d.open = true; })")
 
     # Recorrer la página para disparar la carga perezosa de las demos
     height = page.evaluate("document.documentElement.scrollHeight")
@@ -135,6 +137,8 @@ def check_page(browser, base, rel, shots):
         stem = rel.replace("/", "_").replace(".html", "")
         figs = page.query_selector_all("figure.demo")
         for i, f in enumerate(figs, start=1):
+            if not f.is_visible():
+                continue
             f.scroll_into_view_if_needed()
             page.wait_for_timeout(200)
             f.screenshot(path=f"{shots}/{stem}_demo{i}.png")
@@ -182,7 +186,10 @@ def main():
     base = f"http://127.0.0.1:{port}"
     total = 0
     with sync_playwright() as p:
-        browser = p.chromium.launch()
+        # Use system Chromium where Playwright browser bundle is not installed.
+        import shutil
+        executable = shutil.which("chromium") or shutil.which("google-chrome")
+        browser = p.chromium.launch(executable_path=executable, args=["--no-sandbox"] if executable else [])
         for rel in pages:
             probs = check_page(browser, base, rel, args.shots)
             total += len(probs)

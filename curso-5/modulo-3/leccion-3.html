@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+
+<html lang="es"><head><meta charset="utf-8"/><meta content="width=device-width,initial-scale=1" name="viewport"/><title>Lección 3 · La convolución a mano y con F.conv2d · Curso 5 · Cuaderno de IA</title><meta content="En PyTorch hay dos formas de llamar a la operación:" name="description"/><script>try{var t=localStorage.getItem('cuaderno-ia:tema');if(t)document.documentElement.setAttribute('data-theme',t)}catch(e){}</script><link href="../../assets/css/style.css" rel="stylesheet"/><script src="../../assets/js/curriculum.js"></script><script src="../../assets/js/lab.js"></script><script defer="" src="../../assets/js/app.js"></script><script defer="" src="../../assets/js/microanimations.js"></script></head><body data-course="5" data-lesson="3" data-module="3" data-root="../../"><main><div class="page" data-micro="3min"><header class="hero leccion"><div class="hero-grid"><div><p class="eyebrow">Curso 5 · Módulo 3 · Lección 3 de 14</p><h1>La convolución a mano y con F.conv2d</h1><p class="lead">En PyTorch hay dos formas de llamar a la operación:</p><p class="meta-line"><span class="read-time" data-render="read-time"></span><a href="../modulo-3.html">Índice del módulo</a></p></div><div aria-hidden="true" class="hero-tile"></div></div></header><details class="predice"><summary>Si el filtro (la lupa que recorre el fotograma) es solo una matriz de 3×3, ¿cuál es el código mínimo que calcula una convolución, y cómo se comprueba que nn.Conv2d hace exactamente eso?<span class="hint"></span></summary><div><p>En PyTorch hay dos formas de llamar a la operación:</p></div></details><section aria-label="Explicación breve" class="micro-core"><div class="micro-kicker">01 · ENTENDER <span>≈ 45 s</span></div><h2>La idea en palabras sencillas</h2><p>La función espera la entrada como (N, C_in, H, W) y el filtro como (C_out, C_in, kH, kW). Para nuestro ejemplo de un fotograma, un canal y un filtro: x.reshape(1, 1, 5, 5) y w.reshape(1, 1, 3, 3).</p><div class="micro-example"><span aria-hidden="true" class="micro-example-icon">🐾</span><div><strong>Otro ejemplo · Mascotas</strong><p>Para detectar orejas en una foto, un filtro busca formas locales aunque aparezcan en posiciones distintas.</p></div></div></section><div class="micro-kicker micro-checkpoint">02 · RESPONDER <span>≈ 15 s</span></div><section aria-label="Pregunta intercalada" class="quiz mini micro-check"><script class="quiz-data" type="application/json">{"titulo": "Pausa rápida · Comprueba la idea", "preguntas": [{"q": "Un kernel 3×3 se coloca sobre una foto. ¿Qué analiza primero?", "opciones": ["Solo la etiqueta final", "Nueve posiciones próximas de la imagen", "Todas las fotografías del dataset a la vez"], "correcta": 1, "porque": "El filtro procesa una región local y luego se desplaza."}]}</script></section><section aria-label="Animación interactiva" class="micro-viz" data-index="11" data-micro-viz="convolution"><div class="micro-kicker">03 · EXPERIMENTAR <span>≈ 45 s</span></div><div class="micro-viz-title"><div><h2>Una ventana recorre la imagen</h2><p>Avanza el filtro 3×3; fíjate en qué píxeles observa cada vez.</p></div><span aria-hidden="true" class="micro-viz-symbol">✦</span></div><div aria-live="polite" class="micro-viz-stage"><p>Animación interactiva: Una ventana recorre la imagen</p></div></section><div class="micro-kicker micro-checkpoint">04 · APLICAR <span>≈ 15 s</span></div><section aria-label="Pregunta intercalada" class="quiz mini micro-check"><script class="quiz-data" type="application/json">{"titulo": "Pausa rápida · ¿Lo aplicarías?", "preguntas": [{"q": "¿Por qué compartir un filtro en distintas posiciones es útil?", "opciones": ["Porque permite buscar el mismo patrón en varias zonas", "Porque hace innecesarias las imágenes", "Porque siempre produce una sola clase"], "correcta": 0, "porque": "La convolución reutiliza los pesos del filtro en diferentes zonas."}]}</script></section><div class="micro-finish"><strong>Idea que te llevas</strong><span>La función espera la entrada como (N, C_in, H, W) y el filtro como (C_out, C_in, kH, kW)</span><small>¿Quieres más ejemplos, fórmulas o código? Los tienes justo debajo, sin límite de tiempo.</small></div><details class="profundizar micro-legacy"><summary><span>Explorar más: explicación y simulaciones completas<small>Todo el texto original, tablas y demos avanzadas. Opcional.</small></span></summary><div class="prof-body"><section><h2>La convolución a mano y con F.conv2d</h2>
+<p>En PyTorch hay dos formas de llamar a la operación:</p>
+<p>La función espera la entrada como (N, C_in, H, W) y el filtro como <strong>(C_out, C_in, kH, kW)</strong>. Para nuestro ejemplo de un fotograma, un canal y un filtro: <code>x.reshape(1, 1, 5, 5)</code> y <code>w.reshape(1, 1, 3, 3)</code>. El <a href="#codigo">fragmento 2</a> escribe la convolución con dos bucles (ventana, producto, suma), la compara con <code>F.conv2d</code> (coinciden en los 9 valores) y comprueba lo de la correlación: con el filtro girado 180° (<code>torch.flip(w, dims=[2, 3])</code>) el mapa cambia de signo, <code>[[0, −21, −22], …]</code>, como debe ser.</p>
+<p>Una <code>nn.Conv2d</code> nace con pesos aleatorios. Para ver la operación pura se pueden sobrescribir dentro de <code>with torch.no_grad():</code> (así PyTorch no intenta derivar la asignación): <code>conv.weight[0, 0] = sobel</code> y <code>conv.bias.zero_()</code>. El filtro de Sobel vertical \( \begin{pmatrix}1&amp;0&amp;-1\\2&amp;0&amp;-2\\1&amp;0&amp;-1\end{pmatrix} \) resta lo que hay a la derecha de lo que hay a la izquierda (con más peso a la fila central). Sobre un fotograma de 6×6 con la mitad izquierda a 0 (la sala a oscuras) y la derecha a 1 (la pantalla encendida), las ventanas que ven el salto dan \( -(1+2+1)=-4 \) y las que no, 0: la salida 4×4 tiene las columnas centrales a −4 y las laterales a 0 (fragmento 2).</p>
+<div class="callout ejemplo"><span class="lbl">Con números</span><p>Si el filtro (la lupa que recorre el fotograma) es solo una matriz de 3×3, ¿cuál es el código mínimo que calcula una convolución, y cómo se comprueba que nn.Conv2d hace exactamente eso?</p></div></section><div class="resumen"><h2 class="sin-num sin-toc">En pocas líneas</h2><ul><li><strong>La convolución a mano y con F.conv2d:</strong> En PyTorch hay dos formas de llamar a la operación:</li><li>Antes de continuar, intenta explicar la demo sin mirar su resultado.</li></ul></div><section class="quiz mini"><script class="quiz-data" type="application/json">{"titulo": "¿Lo tienes?", "preguntas": [{"q": "¿Qué concepto estamos trabajando en esta lección?", "opciones": ["¿Reconoce el dígito si se mueve? Equivarianza, invariancia y data augmentation", "La convolución a mano y con F.conv2d", "Entrenar la CNN: Dataset, DataLoader y el bucle de siempre"], "correcta": 1, "porque": "En PyTorch hay dos formas de llamar a la operación:"}, {"q": "¿Cuál de estas afirmaciones recoge lo que acabas de estudiar?", "opciones": ["Siempre hay un único método que sirve para todos los problemas.", "Lo importante es comprender la idea y comprobarla con ejemplos, no memorizar términos.", "En PyTorch hay dos formas de llamar a la operación:"], "correcta": 2, "porque": "La explicación central es: En PyTorch hay dos formas de llamar a la operación:"}, {"q": "Si una demo o un ejemplo te desconcierta, ¿cuál es la mejor forma de aprenderlo?", "opciones": ["Ignorar los resultados que no coinciden con tu intuición.", "Memorizar el nombre sin entender la operación.", "Volver a los números, cambiar un valor y explicar qué ocurre."], "correcta": 2, "porque": "Explorar qué cambia y por qué ayuda a conectar el concepto con su resultado."}]}</script></section></div></details><details class="profundizar"><summary><span>Profundizar: explicación completa<small>Matices, fórmulas, tablas, otros ejemplos y experimentos del módulo original.</small></span></summary><div class="prof-body"><section>
+<h2 id="conv-mano">La convolución a mano y con <code>F.conv2d</code></h2>
+<p class="pregunta">Si el filtro (la lupa que recorre el fotograma) es solo una matriz de 3×3, ¿cuál es el código mínimo que calcula una convolución, y cómo se comprueba que <code>nn.Conv2d</code> hace exactamente eso?</p>
+<div class="callout recuerda">
+<span class="lbl">Recuerda (<a href="../../curso-2/modulo-3.html#convolucion">Curso 2 · módulo 3</a>)</span>
+<p>Se coloca el filtro (la lupa) sobre una ventana del fotograma, se multiplica elemento a elemento, se suman los productos y se guarda un solo número; luego la ventana se desliza. Con el fotograma 5×5 del Curso 2 (a la izquierda, la sala a oscuras con valores 1–2; a la derecha, la pantalla encendida con 8–9) y el filtro de borde vertical \( [-1,0,1] \) por fila, el mapa 3×3 que sale es <code>[[0, 21, 22], [0, 22, 22], [0, 21, 22]]</code>. Y llamábamos «convolución» a lo que en rigor es una <em>correlación cruzada</em>: el filtro no se gira.</p>
+</div>
+<p>En PyTorch hay dos formas de llamar a la operación:</p>
+<ul>
+<li><code>nn.Conv2d</code>: una <strong>capa</strong> con sus pesos guardados dentro (<code>conv.weight</code>, <code>conv.bias</code>) y entrenables. Es lo que se usa al construir redes.</li>
+<li><code>torch.nn.functional.conv2d(x, w)</code> (se importa como <code>F.conv2d</code>): una <strong>función</strong> a la que le pasas tú los pesos. No guarda nada. Es útil para experimentos como este.</li>
+</ul>
+<p>La función espera la entrada como (N, C_in, H, W) y el filtro como <strong>(C_out, C_in, kH, kW)</strong>. Para nuestro ejemplo de un fotograma, un canal y un filtro: <code>x.reshape(1, 1, 5, 5)</code> y <code>w.reshape(1, 1, 3, 3)</code>. El <a href="#codigo">fragmento 2</a> escribe la convolución con dos bucles (ventana, producto, suma), la compara con <code>F.conv2d</code> (coinciden en los 9 valores) y comprueba lo de la correlación: con el filtro girado 180° (<code>torch.flip(w, dims=[2, 3])</code>) el mapa cambia de signo, <code>[[0, −21, −22], …]</code>, como debe ser.</p>
+<h3>Poner los pesos a mano: el filtro de Sobel</h3>
+<p>Una <code>nn.Conv2d</code> nace con pesos aleatorios. Para ver la operación pura se pueden sobrescribir dentro de <code>with torch.no_grad():</code> (así PyTorch no intenta derivar la asignación): <code>conv.weight[0, 0] = sobel</code> y <code>conv.bias.zero_()</code>. El filtro de Sobel vertical \( \begin{pmatrix}1&amp;0&amp;-1\\2&amp;0&amp;-2\\1&amp;0&amp;-1\end{pmatrix} \) resta lo que hay a la derecha de lo que hay a la izquierda (con más peso a la fila central). Sobre un fotograma de 6×6 con la mitad izquierda a 0 (la sala a oscuras) y la derecha a 1 (la pantalla encendida), las ventanas que ven el salto dan \( -(1+2+1)=-4 \) y las que no, 0: la salida 4×4 tiene las columnas centrales a −4 y las laterales a 0 (fragmento 2).</p>
+<div class="callout ojo">
+<span class="lbl">Ojo</span>
+<p>La salida de una capa con pesos entrenables lleva <code>grad_fn=&lt;ConvolutionBackward0&gt;</code> (PyTorch está apuntando el grafo para el <code>backward</code>). Para imprimirla o pasarla a NumPy hay que hacer <code>.detach()</code>, o evaluar dentro de <code>torch.no_grad()</code>. Si no, <code>.numpy()</code> falla con «Can't call numpy() on Tensor that requires grad».</p>
+</div>
+</section></div></details><details class="profundizar" id="codigo"><summary><span>Ver código explicado paso a paso<small>1 fragmento(s) original(es), con cada línea comentada y salida esperada.</small></span></summary><div class="prof-body"><article class="snippet" data-lang="python">
+<header>
+<h3>2 · Convolución a mano frente a <code>F.conv2d</code> (y un filtro Sobel en <code>nn.Conv2d</code>)</h3>
+<p class="para-que"><strong>Para qué sirve</strong> Escribir una convolución con dos bucles, comprobar que da lo mismo que <code>F.conv2d</code>, ver que PyTorch hace correlación (no gira el filtro) y fijar a mano los pesos de una capa.</p>
+</header>
+<pre class="code"><code>import torch
+import torch.nn as nn
+import torch.nn.functional as F
+
+imagen = torch.tensor([[1, 1, 2, 8, 9],
+                       [1, 2, 1, 9, 8],
+                       [2, 1, 1, 8, 9],
+                       [1, 1, 2, 9, 9],
+                       [1, 2, 1, 8, 8]], dtype=torch.float32)
+filtro = torch.tensor([[-1, 0, 1],
+                       [-1, 0, 1],
+                       [-1, 0, 1]], dtype=torch.float32)
+
+
+def conv_a_mano(img, k):
+    f = k.shape[0]
+    m = img.shape[0] - f + 1
+    salida = torch.zeros(m, m)
+    for i in range(m):
+        for j in range(m):
+            ventana = img[i:i + f, j:j + f]
+            salida[i, j] = (ventana * k).sum()
+    return salida
+
+
+a_mano = conv_a_mano(imagen, filtro)
+print("a mano:\n", a_mano)
+
+x = imagen.reshape(1, 1, 5, 5)
+w = filtro.reshape(1, 1, 3, 3)
+y = F.conv2d(x, w)
+print("F.conv2d:", tuple(y.shape), "-&gt;", y[0, 0].tolist())
+print("coinciden:", torch.equal(a_mano, y[0, 0]))
+y_giro = F.conv2d(x, torch.flip(w, dims=[2, 3]))
+print("con el filtro girado 180 grados:", y_giro[0, 0].tolist())
+
+conv = nn.Conv2d(in_channels=1, out_channels=1, kernel_size=3)
+sobel = torch.tensor([[1., 0., -1.], [2., 0., -2.], [1., 0., -1.]])
+with torch.no_grad():
+    conv.weight[0, 0] = sobel
+    conv.bias.zero_()
+borde = torch.zeros(1, 1, 6, 6)
+borde[:, :, :, 3:] = 1.0
+mapa = conv(borde)
+print("Sobel sobre un borde vertical (0 | 1):\n", mapa[0, 0].detach())
+print("mapa.requires_grad:", mapa.requires_grad, "| tipo de grad_fn:", type(mapa.grad_fn).__name__)</code></pre>
+<details class="linea-a-linea" open="">
+<summary>Línea por línea</summary>
+<p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+<table class="lineas">
+<thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+<tbody>
+<tr data-lines="1-3"><td><code>import …</code></td><td><code>torch</code>, <code>torch.nn</code> como <code>nn</code> (capas) y <code>torch.nn.functional</code> como <code>F</code> (las mismas operaciones, pero como funciones sin parámetros propios).</td></tr>
+<tr data-lines="5-9"><td><code>imagen = torch.tensor([[…]])</code></td><td>Una imagen de 5×5 con una zona oscura (1-2) a la izquierda y otra clara (8-9) a la derecha: tiene un borde vertical.</td></tr>
+<tr data-lines="10-12"><td><code>filtro = torch.tensor([[-1, 0, 1], …])</code></td><td>Un filtro 3×3 que resta la columna izquierda y suma la derecha: da un número grande donde la imagen sube de izquierda a derecha.</td></tr>
+<tr data-lines="15-17"><td><code>def conv_a_mano(img, k): …</code></td><td>Función que recibe la imagen y el filtro. <code>f</code> es el lado del filtro y <code>m = lado − f + 1</code> el lado de la salida (sin padding y con stride 1).</td></tr>
+<tr data-lines="18"><td><code>salida = torch.zeros(m, m)</code></td><td>Prepara la salida, de momento llena de ceros.</td></tr>
+<tr data-lines="19-22"><td><code>for i … for j … ventana = …</code></td><td>Para cada posición (i, j): <code>img[i:i+f, j:j+f]</code> recorta la ventana, <code>ventana * k</code> multiplica casilla a casilla, <code>.sum()</code> suma y el resultado se guarda en <code>salida[i, j]</code>.</td></tr>
+<tr data-lines="23"><td><code>return salida</code></td><td>Devuelve el mapa de salida (3×3).</td></tr>
+<tr data-lines="26-27"><td><code>a_mano = conv_a_mano(…) …</code></td><td>Calcula y muestra el resultado de la función propia.</td></tr>
+<tr data-lines="29-30"><td><code>x = imagen.reshape(1, 1, 5, 5) ; w = …</code></td><td><code>F.conv2d</code> exige un lote de imágenes <code>(N, C, H, W)</code> y un filtro <code>(C_out, C_in, kH, kW)</code>. Los dos se rehacen con un 1 en las dimensiones que sobran.</td></tr>
+<tr data-lines="31-33"><td><code>y = F.conv2d(x, w) …</code></td><td>Aplica la convolución de PyTorch, muestra la forma (1, 1, 3, 3) y comprueba con <code>torch.equal</code> que coincide con la de los bucles.</td></tr>
+<tr data-lines="34-35"><td><code>y_giro = F.conv2d(x, torch.flip(w, dims=[2, 3]))</code></td><td>Gira el filtro 180° (invirtiendo alto y ancho). Si PyTorch hiciera una «convolución matemática» de verdad, el resultado no cambiaría; cambia de signo.</td></tr>
+<tr data-lines="37"><td><code>conv = nn.Conv2d(in_channels=1, out_channels=1, kernel_size=3)</code></td><td>Una capa convolucional de verdad, con un filtro 3×3 que empieza con pesos aleatorios.</td></tr>
+<tr data-lines="38"><td><code>sobel = torch.tensor([[1., 0., -1.], …])</code></td><td>El filtro de Sobel vertical clásico.</td></tr>
+<tr data-lines="39-41"><td><code>with torch.no_grad(): …</code></td><td>Dentro de <code>no_grad</code> se pueden modificar los parámetros sin que autograd lo registre: se pone el Sobel como peso del filtro (<code>conv.weight[0, 0]</code>) y el sesgo a cero.</td></tr>
+<tr data-lines="42-43"><td><code>borde = torch.zeros(1, 1, 6, 6) ; borde[…] = 1.0</code></td><td>Una imagen 6×6 con las tres últimas columnas a 1: un borde vertical perfecto.</td></tr>
+<tr data-lines="44-45"><td><code>mapa = conv(borde) …</code></td><td>Pasa la imagen por la capa. Se imprime con <code>.detach()</code> para quitarle el historial de autograd.</td></tr>
+<tr data-lines="46"><td><code>print("mapa.requires_grad:" …)</code></td><td>El resultado de una capa con pesos entrenables lleva la cuenta del cálculo (<code>requires_grad=True</code> y un <code>grad_fn</code>): así podrá hacer <code>backward()</code>.</td></tr>
+</tbody>
+</table>
+</details>
+<div class="salida">
+<strong>Salida esperada</strong>
+<pre>a mano:
+ tensor([[ 0., 21., 22.],
+        [ 0., 22., 22.],
+        [ 0., 21., 22.]])
+F.conv2d: (1, 1, 3, 3) -&gt; [[0.0, 21.0, 22.0], [0.0, 22.0, 22.0], [0.0, 21.0, 22.0]]
+coinciden: True
+con el filtro girado 180 grados: [[0.0, -21.0, -22.0], [0.0, -22.0, -22.0], [0.0, -21.0, -22.0]]
+Sobel sobre un borde vertical (0 | 1):
+ tensor([[ 0., -4., -4.,  0.],
+        [ 0., -4., -4.,  0.],
+        [ 0., -4., -4.,  0.],
+        [ 0., -4., -4.,  0.]])
+mapa.requires_grad: True | tipo de grad_fn: ConvolutionBackward0</pre>
+<p>La ventana de arriba a la izquierda contiene <code>[[1,1,2],[1,2,1],[2,1,1]]</code>: los números de la columna derecha menos los de la izquierda dan 2+1+1 − (1+1+2) = 0, y la salida es 0. En la ventana siguiente entra la zona clara y la diferencia sube a 21. Los dos métodos coinciden (<code>True</code>). Con el filtro girado todos los números cambian de signo (0 → 0, 21 → −21): <strong>PyTorch no gira el filtro</strong>, calcula una correlación cruzada; para la red es indiferente porque los pesos se aprenden. Con Sobel sobre el borde 0 | 1 salen −4 en las dos columnas que tocan el borde (el signo es negativo porque el Sobel de la lista resta la derecha de la izquierda) y 0 en el resto.</p>
+</div>
+</article></div></details></div></main></body></html>

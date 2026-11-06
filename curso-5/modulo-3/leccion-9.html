@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+
+<html lang="es"><head><meta charset="utf-8"/><meta content="width=device-width,initial-scale=1" name="viewport"/><title>Lección 9 · Entrenar la CNN: Dataset, DataLoader y el bucle de siempre · Curso 5 · Cuaderno de IA</title><meta content="Los cursos originales usan MNIST (60.000 imágenes de 28×28 que se descargan de internet) reducida a 16×16 con transforms.Resize((16, 16)) y ToTensor() ." name="description"/><script>try{var t=localStorage.getItem('cuaderno-ia:tema');if(t)document.documentElement.setAttribute('data-theme',t)}catch(e){}</script><link href="../../assets/css/style.css" rel="stylesheet"/><script src="../../assets/js/curriculum.js"></script><script src="../../assets/js/lab.js"></script><script defer="" src="../../assets/js/app.js"></script><script defer="" src="../../assets/js/microanimations.js"></script></head><body data-course="5" data-lesson="9" data-module="3" data-root="../../"><main><div class="page" data-micro="3min"><header class="hero leccion"><div class="hero-grid"><div><p class="eyebrow">Curso 5 · Módulo 3 · Lección 9 de 14</p><h1>Entrenar la CNN: Dataset, DataLoader y el bucle de siempre</h1><p class="lead">Los cursos originales usan MNIST (60.000 imágenes de 28×28 que se descargan de internet) reducida a 16×16 con transforms.Resize((16, 16)) y ToTensor() .</p><p class="meta-line"><span class="read-time" data-render="read-time"></span><a href="../modulo-3.html">Índice del módulo</a></p></div><div aria-hidden="true" class="hero-tile"></div></div></header><details class="predice"><summary>Antes de mirar el ejemplo: ¿qué crees que va a cambiar al mover los controles?</summary><div><p>Los cursos originales usan MNIST (60.000 imágenes de 28×28 que se descargan de internet) reducida a 16×16 con transforms.Resize((16, 16)) y ToTensor() .</p></div></details><section aria-label="Explicación breve" class="micro-core"><div class="micro-kicker">01 · ENTENDER <span>≈ 45 s</span></div><h2>La idea en palabras sencillas</h2><p>Los cursos originales usan MNIST (60.000 imágenes de 28×28 que se descargan de internet) reducida a 16×16 con transforms.Resize((16, 16)) y ToTensor().</p><div class="micro-example"><span aria-hidden="true" class="micro-example-icon">🐾</span><div><strong>Otro ejemplo · Mascotas</strong><p>Para detectar orejas en una foto, un filtro busca formas locales aunque aparezcan en posiciones distintas.</p></div></div></section><div class="micro-kicker micro-checkpoint">02 · RESPONDER <span>≈ 15 s</span></div><section aria-label="Pregunta intercalada" class="quiz mini micro-check"><script class="quiz-data" type="application/json">{"titulo": "Pausa rápida · Comprueba la idea", "preguntas": [{"q": "100 ejemplos en batches de 20. ¿Cuántos batches completos?", "opciones": ["100", "5", "20"], "correcta": 1, "porque": "100/20 = 5 lotes de 20 ejemplos."}]}</script></section><section aria-label="Animación interactiva" class="micro-viz" data-index="17" data-micro-viz="convolution"><div class="micro-kicker">03 · EXPERIMENTAR <span>≈ 45 s</span></div><div class="micro-viz-title"><div><h2>Una ventana recorre la imagen</h2><p>Avanza el filtro 3×3; fíjate en qué píxeles observa cada vez.</p></div><span aria-hidden="true" class="micro-viz-symbol">✦</span></div><div aria-live="polite" class="micro-viz-stage"><p>Animación interactiva: Una ventana recorre la imagen</p></div></section><div class="micro-kicker micro-checkpoint">04 · APLICAR <span>≈ 15 s</span></div><section aria-label="Pregunta intercalada" class="quiz mini micro-check"><script class="quiz-data" type="application/json">{"titulo": "Pausa rápida · ¿Lo aplicarías?", "preguntas": [{"q": "¿Un epoch significa un batch?", "opciones": ["No, suele ser una pasada por todo TRAIN", "Sí, son sinónimos", "Sí, independientemente de la cantidad de datos"], "correcta": 0, "porque": "Un epoch recorre el conjunto de entrenamiento; suele incluir varios batches."}]}</script></section><div class="micro-finish"><strong>Idea que te llevas</strong><span>Los cursos originales usan MNIST (60</span><small>¿Quieres más ejemplos, fórmulas o código? Los tienes justo debajo, sin límite de tiempo.</small></div><details class="profundizar micro-legacy"><summary><span>Explorar más: explicación y simulaciones completas<small>Todo el texto original, tablas y demos avanzadas. Opcional.</small></span></summary><div class="prof-body"><section><h2>Entrenar la CNN: Dataset, DataLoader y el bucle de siempre</h2>
+<p>Los cursos originales usan MNIST (60.000 imágenes de 28×28 que se descargan de internet) reducida a 16×16 con <code>transforms.Resize((16, 16))</code> y <code>ToTensor()</code>. Aquí, para que todo se pueda ejecutar sin conexión, se usan los dígitos de <code>load_digits</code> de scikit-learn (1.797 imágenes de 8×8, valores de 0 a 16), con los mismos pasos: dividir entre 16 para dejarlos en [0, 1], <code>unsqueeze(1)</code> para añadir el canal (NCHW) y <code>Resize((16, 16))</code> para llegar al tamaño de la red del laboratorio (fragmento 9: tensor de forma (1797, 1, 16, 16)). Se reservan 450 para prueba (25 %, <code>stratify</code> para que haya los mismos dígitos en ambas partes) y quedan <strong>1.347</strong> de entrenamiento. La versión con MNIST real es el fragmento 10; <strong>no se ha podido ejecutar aquí</strong> porque necesita internet (<code>download=True</code>).</p>
+<p>Para probar un <code>DataLoader</code> sin descargar nada existe <code>torchvision.datasets.FakeData</code>, que fabrica imágenes aleatorias con la misma interfaz que MNIST (fragmento 8). Las imágenes son ruido (no sirven para aprender), pero sí para comprobar formas y tipos: <code>dataset[0]</code> devuelve un tensor <code>float32</code> de forma (1, 16, 16) y una etiqueta entera.</p>
+<p>\( N \) es el número de muestras y \( B \) el <code>batch_size</code>. Con \( N=1347 \) y \( B=100 \): \( 1347/100=13{,}47 \), así que hay <strong>14 lotes</strong>: 13 de 100 y uno final de 47 (fragmento 9). Con \( N=1050 \) (el <code>FakeData</code>): 11 lotes, el último de 50, y con <code>drop_last=True</code> son 10 (fragmento 8). Es como revisar una estantería de 1.347 pósters en montones de 100: salen 13 montones llenos y uno con los 47 que sobran. Cada lote tiene forma (100, 1, 16, 16) y etiquetas (100,) de tipo <code>int64</code>. Cada lote es <em>una actualización de pesos</em>: 8 épocas × 14 lotes = 112 pasos de <code>step()</code>.</p>
+<div class="callout ejemplo"><span class="lbl">Ejemplo tomado del módulo</span><p>: qué esperar de una red sin entrenar Con 10 clases (10 géneros), una red que adivina al azar, como quien elige el género tirando un dado de 10 caras, da a cada clase una probabilidad de 1/10, y su entropía cruzada es \( -\ln(1/10)=\ln…</p></div></section><figure class="demo" data-demo="curso5/c5m3-lotes" data-titulo="cómo reparte un DataLoader una estantería de miniaturas en lotes">
+<div class="haz">Deja N = 1347 y batch_size = 100: deben salir 14 lotes y el último, de 47. Marca <code>drop_last=True</code>. Después busca un N con el que el último lote tenga <strong>una sola muestra</strong> (por ejemplo N = 1301 con batch_size = 100). Cambia <code>shuffle</code> y pulsa «Otra época».</div>
+<div class="observa">Los colores alternos son los lotes; el borde negro marca el lote incompleto. Con <code>shuffle=True</code> los índices del primer lote cambian en cada época, pero el <em>número</em> de lotes no. Un lote de una sola muestra es peligroso: <code>BatchNorm1d</code> falla en entrenamiento y el gradiente de una sola imagen es muy ruidoso, por eso se suele poner <code>drop_last=True</code>.</div>
+</figure><div class="resumen"><h2 class="sin-num sin-toc">En pocas líneas</h2><ul><li><strong>Entrenar la CNN: Dataset, DataLoader y el bucle de siempre:</strong> Los cursos originales usan MNIST (60.000 imágenes de 28×28 que se descargan de internet) reducida a 16×16 con transforms.Resize((16…</li><li>Antes de continuar, intenta explicar la demo sin mirar su resultado.</li></ul></div><section class="quiz mini"><script class="quiz-data" type="application/json">{"titulo": "¿Lo tienes?", "preguntas": [{"q": "¿Qué concepto estamos trabajando en esta lección?", "opciones": ["Por qué una CNN, y qué cambia al pasar de Keras a PyTorch", "Entrenar la CNN: Dataset, DataLoader y el bucle de siempre", "Los errores de forma más frecuentes, y cómo leerlos"], "correcta": 1, "porque": "Los cursos originales usan MNIST (60.000 imágenes de 28×28 que se descargan de internet) reducida a 16×16 con transforms.Resize((16, 16)) y ToTensor() ."}, {"q": "¿Cuál de estas afirmaciones recoge lo que acabas de estudiar?", "opciones": ["Siempre hay un único método que sirve para todos los problemas.", "Lo importante es comprender la idea y comprobarla con ejemplos, no memorizar términos.", "Los cursos originales usan MNIST (60.000 imágenes de 28×28 que se descargan de internet) reducida a 16×16 con transforms.Resize((16, 16)) y ToTensor() ."], "correcta": 2, "porque": "La explicación central es: Los cursos originales usan MNIST (60.000 imágenes de 28×28 que se descargan de internet) reducida a 16×16 con transforms.Resize((16, 16)) y ToTensor() ."}, {"q": "Si una demo o un ejemplo te desconcierta, ¿cuál es la mejor forma de aprenderlo?", "opciones": ["Ignorar los resultados que no coinciden con tu intuición.", "Memorizar el nombre sin entender la operación.", "Volver a los números, cambiar un valor y explicar qué ocurre."], "correcta": 2, "porque": "Explorar qué cambia y por qué ayuda a conectar el concepto con su resultado."}]}</script></section></div></details><details class="profundizar"><summary><span>Profundizar: explicación completa<small>Matices, fórmulas, tablas, otros ejemplos y experimentos del módulo original.</small></span></summary><div class="prof-body"><section>
+<h2 id="entrenar">Entrenar la CNN: Dataset, DataLoader y el bucle de siempre</h2>
+<p class="pregunta">Mi CNN tiene 18.378 parámetros y 1.347 miniaturas de entrenamiento (aquí, dígitos manuscritos que hacen de pósters pequeños). ¿Cómo se las doy por lotes, qué cambia en el bucle de entrenamiento respecto a una red densa y qué acierto puedo esperar?</p>
+<div class="callout recuerda">
+<span class="lbl">Recuerda (<a href="../../curso-4/modulo-2.html">Curso 4 · módulo 2</a> y <a href="../modulo-1.html#entrenar">módulo 1</a>)</span>
+<p>Un <code>Dataset</code> es cualquier objeto con <code>__len__</code> y <code>__getitem__(i)</code> que devuelve el par (entrada, etiqueta). <code>DataLoader(dataset, batch_size, shuffle)</code> lo recorre en lotes, apilando las entradas en un solo tensor. Y el bucle de entrenamiento tiene siempre los mismos cinco pasos: <code>zero_grad()</code>, <em>forward</em>, pérdida, <code>backward()</code> y <code>step()</code>. Con la clasificación multiclase, <code>nn.CrossEntropyLoss</code> recibe los <em>logits</em> (sin softmax) y las etiquetas como enteros <code>long</code>. Nada de eso cambia con una CNN.</p>
+</div>
+<h3>Preparar las imágenes</h3>
+<p>Los cursos originales usan MNIST (60.000 imágenes de 28×28 que se descargan de internet) reducida a 16×16 con <code>transforms.Resize((16, 16))</code> y <code>ToTensor()</code>. Aquí, para que todo se pueda ejecutar sin conexión, se usan los dígitos de <code>load_digits</code> de scikit-learn (1.797 imágenes de 8×8, valores de 0 a 16), con los mismos pasos: dividir entre 16 para dejarlos en [0, 1], <code>unsqueeze(1)</code> para añadir el canal (NCHW) y <code>Resize((16, 16))</code> para llegar al tamaño de la red del laboratorio (fragmento 9: tensor de forma (1797, 1, 16, 16)). Se reservan 450 para prueba (25 %, <code>stratify</code> para que haya los mismos dígitos en ambas partes) y quedan <strong>1.347</strong> de entrenamiento. La versión con MNIST real es el fragmento 10; <strong>no se ha podido ejecutar aquí</strong> porque necesita internet (<code>download=True</code>).</p>
+<p>Para probar un <code>DataLoader</code> sin descargar nada existe <code>torchvision.datasets.FakeData</code>, que fabrica imágenes aleatorias con la misma interfaz que MNIST (fragmento 8). Las imágenes son ruido (no sirven para aprender), pero sí para comprobar formas y tipos: <code>dataset[0]</code> devuelve un tensor <code>float32</code> de forma (1, 16, 16) y una etiqueta entera.</p>
+<h3>Cuántos lotes salen: el último es el que sobra</h3>
+<div class="formula">\[ \text{lotes por época}=\left\lceil \frac{N}{B}\right\rceil \qquad\text{o}\qquad \left\lfloor \frac{N}{B}\right\rfloor \ \text{con } \texttt{drop\_last=True} \]</div>
+<p>\( N \) es el número de muestras y \( B \) el <code>batch_size</code>. Con \( N=1347 \) y \( B=100 \): \( 1347/100=13{,}47 \), así que hay <strong>14 lotes</strong>: 13 de 100 y uno final de 47 (fragmento 9). Con \( N=1050 \) (el <code>FakeData</code>): 11 lotes, el último de 50, y con <code>drop_last=True</code> son 10 (fragmento 8). Es como revisar una estantería de 1.347 pósters en montones de 100: salen 13 montones llenos y uno con los 47 que sobran. Cada lote tiene forma (100, 1, 16, 16) y etiquetas (100,) de tipo <code>int64</code>. Cada lote es <em>una actualización de pesos</em>: 8 épocas × 14 lotes = 112 pasos de <code>step()</code>.</p>
+<h3>El bucle de entrenamiento, paso a paso</h3>
+<p>El fragmento 9 entrena la red del laboratorio con <code>SGD(lr=0.1, momentum=0.9)</code>. Dentro de cada época: (1) <code>modelo.train()</code> activa el modo de entrenamiento; (2) para cada lote, <code>zero_grad()</code> borra los gradientes del paso anterior, <code>criterio(modelo(lx), ly)</code> calcula la pérdida, <code>backward()</code> calcula los gradientes y <code>step()</code> mueve los pesos; (3) al terminar, <code>modelo.eval()</code> y <code>torch.no_grad()</code> para medir el acierto con las 450 imágenes de prueba sin guardar gradientes. La pérdida media de la época se pondera por el tamaño del lote (<code>perdida.item() * len(ly)</code>) para que el lote de 47 no pese igual que los de 100.</p>
+<div class="callout ejemplo">
+<span class="lbl">Ejemplo numérico: qué esperar de una red sin entrenar</span>
+<p>Con 10 clases (10 géneros), una red que adivina al azar, como quien elige el género tirando un dado de 10 caras, da a cada clase una probabilidad de 1/10, y su entropía cruzada es \( -\ln(1/10)=\ln 10\approx 2{,}30 \). Y acierta el 10 % de las veces. En el fragmento 9, la red recién creada acierta <strong>0,093</strong> en prueba (azar), la pérdida media de la primera época es 2,1184 (ya ha aprendido algo durante ella: empezó cerca de 2,30) y al final de la época 8 baja a 0,0196, con un acierto en prueba de <strong>0,980</strong>. La curva sube deprisa (0,364 → 0,776 → 0,940 en las tres primeras épocas) y luego se aplana.</p>
+</div>
+<div class="callout ojo">
+<span class="lbl">Ojo</span>
+<p>Tres cosas que se rompen sin avisar: (1) olvidar <code>model.eval()</code> al medir (no afecta a esta red porque no tiene dropout ni batchnorm, pero sí a la del siguiente apartado); (2) medir el acierto con las mismas imágenes con las que entrenas (como examinar a alguien con las mismas películas que ya vio): tu modelo parecerá mejor de lo que es; (3) pasar al <code>DataLoader</code> etiquetas de forma (N, 1) o <code>float</code>: <code>CrossEntropyLoss</code> pide (N,) y <code>long</code> (los errores exactos están en el fragmento 15). Y no compares el 0,980 con el de MNIST real: son datos distintos, y MNIST no se ha ejecutado aquí.</p>
+</div>
+<p>Si ejecutas el fragmento 10 en tu máquina con internet, la primera línea imprime <code>60000 10000 600 2</code>: 60.000 imágenes de entrenamiento, 10.000 de validación, \( 60000/100=600 \) lotes y \( 10000/5000=2 \) lotes de validación. El acierto que obtengas no lo anticipo: no se ha medido aquí y depende del orden aleatorio de los lotes y de la inicialización.</p>
+</section></div></details><details class="profundizar" id="codigo"><summary><span>Ver código explicado paso a paso<small>3 fragmento(s) original(es), con cada línea comentada y salida esperada.</small></span></summary><div class="prof-body"><article class="snippet" data-lang="python">
+<header>
+<h3>8 · <code>Dataset</code> y <code>DataLoader</code> con <code>FakeData</code> (imágenes de relleno, sin internet)</h3>
+<p class="para-que"><strong>Para qué sirve</strong> Ver la interfaz de un dataset de imágenes de torchvision y cómo el <code>DataLoader</code> las agrupa en lotes, sin descargar MNIST.</p>
+</header>
+<pre class="code"><code>import torch
+import torchvision.datasets as dsets
+import torchvision.transforms as transforms
+from torch.utils.data import DataLoader
+
+IMAGE_SIZE = 16
+composed = transforms.Compose([transforms.Resize((IMAGE_SIZE, IMAGE_SIZE)), transforms.ToTensor()])
+
+dataset = dsets.FakeData(size=1050, image_size=(1, 28, 28), num_classes=10, transform=composed, random_offset=0)
+print("imágenes en el dataset:", len(dataset))
+imagen, etiqueta = dataset[0]
+print("dataset[0] -&gt;", type(imagen).__name__, tuple(imagen.shape), imagen.dtype, "| etiqueta", etiqueta, type(etiqueta).__name__)
+print("rango de la imagen:", round(imagen.min().item(), 3), "a", round(imagen.max().item(), 3))
+
+cargador = DataLoader(dataset=dataset, batch_size=100, shuffle=True)
+print("lotes por época:", len(cargador))
+formas = [tuple(lx.shape) for lx, ly in cargador]
+print("primer lote:", formas[0], "| último lote:", formas[-1])
+lx, ly = next(iter(cargador))
+print("etiquetas del lote:", tuple(ly.shape), ly.dtype)
+sin_resto = DataLoader(dataset, batch_size=100, drop_last=True)
+print("con drop_last=True:", len(sin_resto), "lotes")</code></pre>
+<details class="linea-a-linea">
+<summary>Línea por línea</summary>
+<p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+<table class="lineas">
+<thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+<tbody>
+<tr data-lines="1-4"><td><code>import …</code></td><td><code>torch</code>, los datasets de torchvision (alias <code>dsets</code>), las transformaciones y <code>DataLoader</code>.</td></tr>
+<tr data-lines="6-7"><td><code>IMAGE_SIZE = 16 ; composed = transforms.Compose([…])</code></td><td>Una cadena de transformaciones: primero <code>Resize((16, 16))</code> (cambia el tamaño) y después <code>ToTensor()</code> (a tensor <code>float32</code> en [0, 1], con el canal delante). <code>Compose</code> las aplica en orden a cada imagen.</td></tr>
+<tr data-lines="9"><td><code>dataset = dsets.FakeData(size=1050, image_size=(1, 28, 28), …)</code></td><td><code>FakeData</code> fabrica 1.050 imágenes aleatorias de 1 canal y 28×28, con 10 clases y la transformación anterior. Es una imitación del interfaz de MNIST (ruido, no dígitos); <code>random_offset=0</code> las hace siempre iguales.</td></tr>
+<tr data-lines="10"><td><code>print("imágenes en el dataset:", len(dataset))</code></td><td><code>len(dataset)</code> llama a <code>__len__</code>.</td></tr>
+<tr data-lines="11-12"><td><code>imagen, etiqueta = dataset[0] …</code></td><td><code>dataset[0]</code> llama a <code>__getitem__(0)</code> y devuelve el par (imagen, etiqueta). Se imprime el tipo, la forma, el <code>dtype</code> de la imagen y el tipo de la etiqueta.</td></tr>
+<tr data-lines="13"><td><code>print("rango de la imagen:" …)</code></td><td>El mínimo y el máximo de los píxeles, redondeados a 3 decimales.</td></tr>
+<tr data-lines="15-16"><td><code>cargador = DataLoader(dataset=dataset, batch_size=100, shuffle=True) …</code></td><td>El <code>DataLoader</code> reparte el dataset en lotes de 100, desordenando en cada época. <code>len(cargador)</code> es el número de lotes.</td></tr>
+<tr data-lines="17-18"><td><code>formas = [tuple(lx.shape) for lx, ly in cargador] …</code></td><td>Recorre una época entera y apunta la forma de cada lote de imágenes; se imprimen el primero y el último.</td></tr>
+<tr data-lines="19-20"><td><code>lx, ly = next(iter(cargador)) …</code></td><td><code>next(iter(…))</code> saca un único lote. Las etiquetas vienen como un tensor (100,) de enteros de 64 bits.</td></tr>
+<tr data-lines="21-22"><td><code>sin_resto = DataLoader(dataset, batch_size=100, drop_last=True) …</code></td><td>Con <code>drop_last=True</code> se descarta el último lote si no está completo.</td></tr>
+</tbody>
+</table>
+</details>
+<div class="salida">
+<strong>Salida esperada</strong>
+<pre>imágenes en el dataset: 1050
+dataset[0] -&gt; Tensor (1, 16, 16) torch.float32 | etiqueta 2 int
+rango de la imagen: 0.212 a 0.835
+lotes por época: 11
+primer lote: (100, 1, 16, 16) | último lote: (50, 1, 16, 16)
+etiquetas del lote: (100,) torch.int64
+con drop_last=True: 10 lotes</pre>
+<p>Cada elemento es un tensor <code>float32</code> de forma (1, 16, 16) (<code>Resize</code> ya redujo las de 28×28) y una etiqueta Python <code>int</code>. Con 1.050 imágenes y lotes de 100 hay \( \lceil1050/100\rceil=11 \) lotes: diez de (100, 1, 16, 16) y uno final de (50, 1, 16, 16). Con <code>drop_last=True</code> quedan 10. El <code>DataLoader</code> añadió la dimensión de lote y convirtió las etiquetas en un tensor <code>int64</code>, que es lo que pide <code>CrossEntropyLoss</code>.</p>
+</div>
+</article><article class="snippet" data-lang="python">
+<header>
+<h3>9 · Entrenar la CNN del laboratorio con dígitos de 16×16</h3>
+<p class="para-que"><strong>Para qué sirve</strong> Preparar los datos (NCHW, <code>Resize</code>, división entrenamiento/prueba), definir la CNN, entrenarla 8 épocas con <code>DataLoader</code> y medir pérdida y acierto en cada época.</p>
+</header>
+<pre class="code"><code>import torch
+import torch.nn as nn
+from sklearn.datasets import load_digits
+from sklearn.model_selection import train_test_split
+from torch.utils.data import TensorDataset, DataLoader
+from torchvision import transforms
+
+torch.set_num_threads(1)
+torch.manual_seed(0)
+
+digitos = load_digits()
+X = torch.tensor(digitos.images, dtype=torch.float32).unsqueeze(1) / 16.0
+y = torch.tensor(digitos.target, dtype=torch.long)
+X = transforms.Resize((16, 16))(X)
+print("imágenes:", tuple(X.shape), "| etiquetas:", tuple(y.shape), y.dtype)
+
+idx_tr, idx_te = train_test_split(range(len(y)), test_size=0.25, stratify=y.numpy(), random_state=0)
+X_tr, y_tr, X_te, y_te = X[idx_tr], y[idx_tr], X[idx_te], y[idx_te]
+print("entrenamiento:", len(y_tr), "| prueba:", len(y_te))
+
+cargador = DataLoader(TensorDataset(X_tr, y_tr), batch_size=100, shuffle=True)
+print("lotes por época:", len(cargador))
+lote_x, lote_y = next(iter(cargador))
+print("un lote:", tuple(lote_x.shape), lote_x.dtype, "|", tuple(lote_y.shape), lote_y.dtype)
+
+
+class CNN(nn.Module):
+    def __init__(self, out_1=16, out_2=32):
+        super().__init__()
+        self.cnn1 = nn.Conv2d(in_channels=1, out_channels=out_1, kernel_size=5, padding=2)
+        self.maxpool1 = nn.MaxPool2d(kernel_size=2)
+        self.cnn2 = nn.Conv2d(in_channels=out_1, out_channels=out_2, kernel_size=5, stride=1, padding=2)
+        self.maxpool2 = nn.MaxPool2d(kernel_size=2)
+        self.fc1 = nn.Linear(out_2 * 4 * 4, 10)
+
+    def forward(self, x):
+        x = self.maxpool1(torch.relu(self.cnn1(x)))
+        x = self.maxpool2(torch.relu(self.cnn2(x)))
+        x = x.view(x.size(0), -1)
+        return self.fc1(x)
+
+
+def precision(modelo, X, y):
+    modelo.eval()
+    with torch.no_grad():
+        return (modelo(X).argmax(dim=1) == y).float().mean().item()
+
+
+modelo = CNN()
+criterio = nn.CrossEntropyLoss()
+optimizador = torch.optim.SGD(modelo.parameters(), lr=0.1, momentum=0.9)
+print(f"antes de entrenar: acierto en prueba = {precision(modelo, X_te, y_te):.3f}")
+for epoca in range(1, 9):
+    modelo.train()
+    perdida_total = 0.0
+    for lx, ly in cargador:
+        optimizador.zero_grad()
+        perdida = criterio(modelo(lx), ly)
+        perdida.backward()
+        optimizador.step()
+        perdida_total += perdida.item() * len(ly)
+    print(f"época {epoca}: pérdida media = {perdida_total / len(y_tr):.4f} | acierto en prueba = {precision(modelo, X_te, y_te):.3f}")</code></pre>
+<details class="linea-a-linea">
+<summary>Línea por línea</summary>
+<p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+<table class="lineas">
+<thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+<tbody>
+<tr data-lines="1-6"><td><code>import …</code></td><td><code>torch</code>, <code>nn</code>, los dígitos y <code>train_test_split</code> de scikit-learn, <code>TensorDataset</code> y <code>DataLoader</code> y <code>transforms</code>.</td></tr>
+<tr data-lines="8-9"><td><code>torch.set_num_threads(1) ; torch.manual_seed(0)</code></td><td>Un solo hilo de CPU (para que el resultado sea repetible y no sature la máquina) y la semilla de PyTorch para pesos iniciales y orden de los lotes.</td></tr>
+<tr data-lines="11-13"><td><code>digitos = load_digits() ; X = … ; y = …</code></td><td>Imágenes como <code>float32</code> en [0, 1], con <code>unsqueeze(1)</code> para el canal; etiquetas como enteros <code>long</code>.</td></tr>
+<tr data-lines="14-15"><td><code>X = transforms.Resize((16, 16))(X) …</code></td><td><code>Resize</code> también funciona sobre tensores y cambia de 8×8 a 16×16 (interpolación). Se imprime (1797, 1, 16, 16).</td></tr>
+<tr data-lines="17-19"><td><code>idx_tr, idx_te = train_test_split(…) …</code></td><td>Divide los índices en 75 % entrenamiento y 25 % prueba; <code>stratify</code> mantiene la misma proporción de cada dígito; <code>random_state=0</code> lo hace repetible. Luego se seleccionan las imágenes con esos índices.</td></tr>
+<tr data-lines="21-24"><td><code>cargador = DataLoader(TensorDataset(X_tr, y_tr), …)</code></td><td><code>TensorDataset</code> junta imágenes y etiquetas; el <code>DataLoader</code> las entrega en lotes de 100, desordenadas. Se imprime el número de lotes y la forma y el tipo de uno.</td></tr>
+<tr data-lines="27-34"><td><code>class CNN(nn.Module): __init__ …</code></td><td>La CNN del laboratorio: <code>cnn1</code> (1 → 16 canales, kernel 5, padding 2), <code>maxpool1</code>, <code>cnn2</code> (16 → 32), <code>maxpool2</code> y <code>fc1</code> con \( 32\cdot4\cdot4 \) entradas y 10 salidas.</td></tr>
+<tr data-lines="36-40"><td><code>def forward(self, x): …</code></td><td>Conv → ReLU → pooling, dos veces; aplanado con <code>view</code>; capa lineal final que devuelve <em>logits</em> (sin softmax).</td></tr>
+<tr data-lines="43-46"><td><code>def precision(modelo, X, y): …</code></td><td>Función para medir el acierto: <code>eval()</code>, sin gradientes, <code>argmax(dim=1)</code> elige la clase con mayor puntuación, se compara con las etiquetas y se saca la media.</td></tr>
+<tr data-lines="49-51"><td><code>modelo = CNN() ; criterio = … ; optimizador = …</code></td><td>Se crea la red, la pérdida <code>CrossEntropyLoss</code> y el optimizador SGD con <code>lr=0.1</code> y <code>momentum=0.9</code>.</td></tr>
+<tr data-lines="52"><td><code>print(f"antes de entrenar: …")</code></td><td>Acierto de la red sin entrenar, con las 450 imágenes de prueba.</td></tr>
+<tr data-lines="53-55"><td><code>for epoca in range(1, 9): modelo.train() …</code></td><td>Ocho épocas. <code>train()</code> pone el modelo en modo entrenamiento y <code>perdida_total</code> acumula la pérdida.</td></tr>
+<tr data-lines="56-60"><td><code>for lx, ly in cargador: …</code></td><td>Los cinco pasos de siempre por cada lote: <code>zero_grad()</code>, <em>forward</em> y pérdida, <code>backward()</code> y <code>step()</code>.</td></tr>
+<tr data-lines="61"><td><code>perdida_total += perdida.item() * len(ly)</code></td><td>Suma la pérdida del lote ponderada por su tamaño (el último lote tiene 47 imágenes, no 100).</td></tr>
+<tr data-lines="62"><td><code>print(f"época {epoca}: …")</code></td><td>Al acabar la época, imprime la pérdida media del entrenamiento y el acierto en prueba.</td></tr>
+</tbody>
+</table>
+</details>
+<div class="salida">
+<strong>Salida esperada</strong>
+<pre>imágenes: (1797, 1, 16, 16) | etiquetas: (1797,) torch.int64
+entrenamiento: 1347 | prueba: 450
+lotes por época: 14
+un lote: (100, 1, 16, 16) torch.float32 | (100,) torch.int64
+antes de entrenar: acierto en prueba = 0.093
+época 1: pérdida media = 2.1184 | acierto en prueba = 0.364
+época 2: pérdida media = 0.9182 | acierto en prueba = 0.776
+época 3: pérdida media = 0.2981 | acierto en prueba = 0.940
+época 4: pérdida media = 0.1585 | acierto en prueba = 0.947
+época 5: pérdida media = 0.0770 | acierto en prueba = 0.958
+época 6: pérdida media = 0.0583 | acierto en prueba = 0.969
+época 7: pérdida media = 0.0342 | acierto en prueba = 0.978
+época 8: pérdida media = 0.0196 | acierto en prueba = 0.980</pre>
+<p>1.797 imágenes de 1×16×16; 1.347 de entrenamiento y 450 de prueba; 14 lotes por época (13 de 100 y uno de 47). La red sin entrenar acierta 0,093 (azar con 10 clases es 0,10). La pérdida baja de 2,1184 en la época 1 (el azar puro sería \( \ln10=2{,}30 \)) a 0,0196 en la 8, y el acierto en prueba sube de 0,364 a 0,980. La mayor mejora ocurre en las épocas 2 y 3 (0,776 y 0,940).</p>
+</div>
+</article><article class="snippet" data-lang="python">
+<header>
+<h3>10 · La versión con MNIST real (necesita internet)</h3>
+<p class="para-que"><strong>Para qué sirve</strong> Es el mismo entrenamiento con el conjunto MNIST del laboratorio original: descarga 60.000 imágenes de entrenamiento y 10.000 de validación, las reduce a 16×16 y entrena la red de 5 épocas. <strong>No se ha ejecutado aquí</strong>.</p>
+</header>
+<pre class="code"><code>import torch
+import torch.nn as nn
+import torchvision.datasets as dsets
+import torchvision.transforms as transforms
+from torch.utils.data import DataLoader
+
+IMAGE_SIZE = 16
+composed = transforms.Compose([transforms.Resize((IMAGE_SIZE, IMAGE_SIZE)), transforms.ToTensor()])
+train_dataset = dsets.MNIST(root="./data", train=True, download=True, transform=composed)
+validation_dataset = dsets.MNIST(root="./data", train=False, download=True, transform=composed)
+train_loader = DataLoader(dataset=train_dataset, batch_size=100, shuffle=True)
+validation_loader = DataLoader(dataset=validation_dataset, batch_size=5000)
+print(len(train_dataset), len(validation_dataset), len(train_loader), len(validation_loader))
+
+model = CNN(out_1=16, out_2=32)
+criterion = nn.CrossEntropyLoss()
+optimizer = torch.optim.SGD(model.parameters(), lr=0.1)
+cost_list, accuracy_list = [], []
+for epoch in range(5):
+    cost = 0.0
+    model.train()
+    for x, y in train_loader:
+        optimizer.zero_grad()
+        loss = criterion(model(x), y)
+        loss.backward()
+        optimizer.step()
+        cost += loss.item()
+    correct = 0
+    model.eval()
+    with torch.no_grad():
+        for x_val, y_val in validation_loader:
+            correct += (model(x_val).argmax(dim=1) == y_val).sum().item()
+    cost_list.append(cost)
+    accuracy_list.append(correct / len(validation_dataset))
+    print(f"época {epoch + 1}: coste = {cost:.2f} | acierto en validación = {accuracy_list[-1]:.4f}")</code></pre>
+<details class="linea-a-linea">
+<summary>Línea por línea</summary>
+<p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+<table class="lineas">
+<thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+<tbody>
+<tr data-lines="1-5"><td><code>import …</code></td><td><code>torch</code>, <code>nn</code>, los datasets y las transformaciones de torchvision y <code>DataLoader</code>.</td></tr>
+<tr data-lines="7-8"><td><code>IMAGE_SIZE = 16 ; composed = transforms.Compose([…])</code></td><td>Reduce las imágenes de 28×28 a 16×16 y las convierte en tensores (como en el fragmento 8).</td></tr>
+<tr data-lines="9-10"><td><code>train_dataset = dsets.MNIST(…download=True…) ; validation_dataset = …</code></td><td>Descarga MNIST (si no está ya en <code>./data</code>) y crea el conjunto de entrenamiento (<code>train=True</code>) y el de validación (<code>train=False</code>). <strong>Esto es lo que necesita internet</strong>.</td></tr>
+<tr data-lines="11-12"><td><code>train_loader = … ; validation_loader = …</code></td><td>Dos <code>DataLoader</code>: el de entrenamiento con lotes de 100 y desordenados, y el de validación con lotes grandes (5.000) porque no hay que entrenar.</td></tr>
+<tr data-lines="13"><td><code>print(len(train_dataset), …)</code></td><td>Imprime cuántas imágenes y cuántos lotes hay en cada conjunto.</td></tr>
+<tr data-lines="15-17"><td><code>model = CNN(out_1=16, out_2=32) ; criterion = … ; optimizer = …</code></td><td>Usa la clase <code>CNN</code> del fragmento 9 (hay que tenerla definida antes), la pérdida <code>CrossEntropyLoss</code> y un SGD con <code>lr=0.1</code>.</td></tr>
+<tr data-lines="18"><td><code>cost_list, accuracy_list = [], []</code></td><td>Dos listas para guardar la pérdida y el acierto de cada época.</td></tr>
+<tr data-lines="19-21"><td><code>for epoch in range(5): cost = 0.0 ; model.train()</code></td><td>Cinco épocas, con el coste acumulado a cero y la red en modo entrenamiento.</td></tr>
+<tr data-lines="22-27"><td><code>for x, y in train_loader: …</code></td><td>El bucle de siempre sobre los lotes: <code>zero_grad</code>, <em>forward</em> y pérdida, <code>backward</code>, <code>step</code>; <code>cost</code> suma la pérdida de cada lote.</td></tr>
+<tr data-lines="28-32"><td><code>correct = 0 ; model.eval() ; with torch.no_grad(): …</code></td><td>Pasa a modo evaluación y, sin gradientes, cuenta cuántas predicciones (<code>argmax(dim=1)</code>) coinciden con las etiquetas de validación.</td></tr>
+<tr data-lines="33-35"><td><code>cost_list.append(cost) …</code></td><td>Guarda el coste y el acierto de la época (aciertos / total) y los imprime.</td></tr>
+</tbody>
+</table>
+</details>
+<div class="salida">
+<strong>No ejecutado</strong>
+<p><strong>No ejecutado: necesita internet</strong> (<code>download=True</code> descarga MNIST) y esta máquina no tiene acceso. No hay, por tanto, cifras de coste ni de acierto que mostrar, y no las invento. Lo que sí se puede anticipar con las cuentas del módulo: la primera línea imprimiría <code>60000 10000 600 2</code> (60.000 imágenes de entrenamiento, 10.000 de validación, \( 60000/100=600 \) lotes de entrenamiento y \( 10000/5000=2 \) de validación) y después cinco líneas, una por época, con el coste acumulado y el acierto. Para ejecutarlo hay que pegar antes la clase <code>CNN</code> del fragmento 9. El fragmento 9 hace lo mismo con los dígitos de scikit-learn y sí se ha ejecutado.</p>
+</div>
+</article></div></details></div></main></body></html>

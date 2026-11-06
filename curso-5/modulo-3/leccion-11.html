@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+
+<html lang="es"><head><meta charset="utf-8"/><meta content="width=device-width,initial-scale=1" name="viewport"/><title>Lección 11 · ¿Reconoce el dígito si se mueve? Equivarianza, invariancia y data augmentation · Curso 5 · Cuaderno de IA</title><meta content="Hay que separar dos propiedades." name="description"/><script>try{var t=localStorage.getItem('cuaderno-ia:tema');if(t)document.documentElement.setAttribute('data-theme',t)}catch(e){}</script><link href="../../assets/css/style.css" rel="stylesheet"/><script src="../../assets/js/curriculum.js"></script><script src="../../assets/js/lab.js"></script><script defer="" src="../../assets/js/app.js"></script><script defer="" src="../../assets/js/microanimations.js"></script></head><body data-course="5" data-lesson="11" data-module="3" data-root="../../"><main><div class="page" data-micro="3min"><header class="hero leccion"><div class="hero-grid"><div><p class="eyebrow">Curso 5 · Módulo 3 · Lección 11 de 14</p><h1>¿Reconoce el dígito si se mueve? Equivarianza, invariancia y data augmentation</h1><p class="lead">Hay que separar dos propiedades.</p><p class="meta-line"><span class="read-time" data-render="read-time"></span><a href="../modulo-3.html">Índice del módulo</a></p></div><div aria-hidden="true" class="hero-tile"></div></div></header><details class="predice"><summary>Se dice que las CNN «son invariantes a traslaciones»: Woody se reconoce lo mismo en el centro del póster que en una esquina. ¿Es verdad? ¿Qué ocurre si desplazo la miniatura de prueba un solo píxel?<span class="hint"></span></summary><div><p>Hay que separar dos propiedades.</p></div></details><section aria-label="Explicación breve" class="micro-core"><div class="micro-kicker">01 · ENTENDER <span>≈ 45 s</span></div><h2>La idea en palabras sencillas</h2><p>Qué dice y qué no dice la tabla: (1) Con las imágenes sin mover, las dos redes son iguales (0,976 y 0,978). Una prueba normal no distingue una de otra. (2) Un solo píxel hunde ambas: la densa cae a 0,41–0,48 (y a 0,156 en diagonal) y la CNN es mejor pero lejos de ser invariante (0,34–0,63).</p><div class="micro-example"><span aria-hidden="true" class="micro-example-icon">🐾</span><div><strong>Otro ejemplo · Mascotas</strong><p>Una red combina tamaño, orejas y pelaje para distinguir patrones que no dependen de una sola regla.</p></div></div></section><div class="micro-kicker micro-checkpoint">02 · RESPONDER <span>≈ 15 s</span></div><section aria-label="Pregunta intercalada" class="quiz mini micro-check"><script class="quiz-data" type="application/json">{"titulo": "Pausa rápida · Comprueba la idea", "preguntas": [{"q": "Una neurona recibe dos entradas. ¿Qué hace con los pesos?", "opciones": ["Elige siempre la entrada mayor", "Borra las entradas al entrenar", "Multiplica cada entrada por su peso y combina resultados"], "correcta": 2, "porque": "La suma ponderada combina entradas, pesos y bias antes de la activación."}]}</script></section><section aria-label="Animación interactiva" class="micro-viz" data-index="19" data-micro-viz="neural"><div class="micro-kicker">03 · EXPERIMENTAR <span>≈ 45 s</span></div><div class="micro-viz-title"><div><h2>Señales que atraviesan una red</h2><p>Pulsa «Propagar» para seguir el recorrido de entradas a salida.</p></div><span aria-hidden="true" class="micro-viz-symbol">✦</span></div><div aria-live="polite" class="micro-viz-stage"><p>Animación interactiva: Señales que atraviesan una red</p></div></section><div class="micro-kicker micro-checkpoint">04 · APLICAR <span>≈ 15 s</span></div><section aria-label="Pregunta intercalada" class="quiz mini micro-check"><script class="quiz-data" type="application/json">{"titulo": "Pausa rápida · ¿Lo aplicarías?", "preguntas": [{"q": "¿Cuándo se actualizan los pesos de una red?", "opciones": ["Nunca: los pesos son fijos", "Al aplicar el optimizador durante el entrenamiento", "Cada vez que se abre la página"], "correcta": 1, "porque": "El optimizador utiliza los gradientes para ajustar parámetros durante el aprendizaje."}]}</script></section><div class="micro-finish"><strong>Idea que te llevas</strong><span>Qué dice y qué no dice la tabla: (1) Con las imágenes sin mover, las dos redes son iguales (0,976 y 0,978)</span><small>¿Quieres más ejemplos, fórmulas o código? Los tienes justo debajo, sin límite de tiempo.</small></div><details class="profundizar micro-legacy"><summary><span>Explorar más: explicación y simulaciones completas<small>Todo el texto original, tablas y demos avanzadas. Opcional.</small></span></summary><div class="prof-body"><section><h2>¿Reconoce el dígito si se mueve? Equivarianza, invariancia y data augmentation</h2>
+<p>Hay que separar dos propiedades. La convolución es <strong>equivariante</strong>: si desplazas la entrada, el mapa de características se desplaza igual, el mismo patrón en otro sitio. Eso <em>no</em> es lo mismo que <strong>invariante</strong> (que la salida final no cambie). Lo que hace que el final sea más o menos invariante son las etapas posteriores: el pooling absorbe desplazamientos pequeños <em>si no cruzan el borde de la ventana</em>, y el pooling global (<code>AdaptiveAvgPool2d(1)</code> o un máximo global) absorbe todos. Pero el <code>Flatten</code> seguido de <code>Linear</code> da a cada posición su propio peso, y rompe buena parte de la invariancia.</p>
+<p>El fragmento 13 lo mide en serio. Es como mover la cara del actor un píxel dentro del fotograma. Se compara una red densa (<code>Flatten → Linear(64,32) → ReLU → Linear(32,10)</code>, 2.410 parámetros) con la CNN pequeña de dígitos (1.898 parámetros), entrenadas con las imágenes originales de 8×8, y se prueban con las imágenes de prueba <em>desplazadas</em> un píxel (rellenando con ceros). Después se repite el entrenamiento con <strong>data augmentation</strong>: en cada lote se aplica un desplazamiento aleatorio de −1, 0 o +1 píxel en cada eje. Medias de 3 semillas, Adam (<code>lr=0.01</code>), 25 épocas:</p>
+<p>Qué dice y qué no dice la tabla: (1) Con las imágenes sin mover, las dos redes son iguales (0,976 y 0,978). Una prueba normal no distingue una de otra. (2) Un solo píxel hunde ambas : la densa cae a 0,41–0,48 (y a 0,156 en diagonal) y la CNN es mejor pero lejos de ser invariante (0,34–0,63).</p>
+<div class="callout ejemplo"><span class="lbl">Ejemplo tomado del módulo</span><p>: el pooling absorbe unos desplazamientos y otros no (fragmento 5) Un fotograma nocturno de 6×6 (el cielo es todo ceros) con una estrella brillante, un 9, en la posición (2, 2).</p></div></section><figure class="demo" data-demo="curso5/c5m3-entrena-cnn" data-titulo="una CNN y una red densa se entrenan a la vez y se prueban con el logo movido">
+<div class="haz">Con «siempre en el centro» (ya vienen 30 épocas entrenadas), mira las barras: las dos redes aciertan con el logo centrado, pero con el logo desplazado la densa cae al azar (33 %) y la CNN no. Pulsa «Entrenar 20 épocas ▶» y observa los filtros. Cambia a «en cualquier sitio» y repite. Prueba «Otra semilla».</div>
+<div class="observa">Aquí la tarea es distinguir tres tipos de logo (una raya horizontal, vertical o diagonal) en fotogramas de 7×7 con ruido (el grano de la película). La CNN tiene 55 parámetros (4 filtros 3×3, un máximo global y una capa lineal); la densa, 851. Con el logo siempre en el centro, la densa lo memoriza posición a posición y no sabe qué hacer con el logo desplazado; la CNN lo detecta donde esté y sufre mucho menos. Entrenando con el logo en cualquier sitio, la CNN llega a casi 100 % en ambos casos, y la densa se queda lejos (entre el 40 % y el 65 % en mis pruebas con 150 imágenes de entrenamiento). Las cifras exactas cambian con la semilla; el patrón no.</div>
+</figure><div class="resumen"><h2 class="sin-num sin-toc">En pocas líneas</h2><ul><li><strong>¿Reconoce el dígito si se mueve? Equivarianza, invariancia y data…:</strong> Hay que separar dos propiedades.</li><li>Antes de continuar, intenta explicar la demo sin mirar su resultado.</li></ul></div><section class="quiz mini"><script class="quiz-data" type="application/json">{"titulo": "¿Lo tienes?", "preguntas": [{"q": "¿Qué concepto estamos trabajando en esta lección?", "opciones": ["Stride, padding, dilation y el tamaño de la salida", "De mapas a vector: nn.Flatten y el in_features de la capa lineal", "¿Reconoce el dígito si se mueve? Equivarianza, invariancia y data augmentation"], "correcta": 2, "porque": "Hay que separar dos propiedades."}, {"q": "¿Cuál de estas afirmaciones recoge lo que acabas de estudiar?", "opciones": ["Hay que separar dos propiedades.", "Siempre hay un único método que sirve para todos los problemas.", "Lo importante es comprender la idea y comprobarla con ejemplos, no memorizar términos."], "correcta": 0, "porque": "La explicación central es: Hay que separar dos propiedades."}, {"q": "Si una demo o un ejemplo te desconcierta, ¿cuál es la mejor forma de aprenderlo?", "opciones": ["Volver a los números, cambiar un valor y explicar qué ocurre.", "Ignorar los resultados que no coinciden con tu intuición.", "Memorizar el nombre sin entender la operación."], "correcta": 0, "porque": "Explorar qué cambia y por qué ayuda a conectar el concepto con su resultado."}]}</script></section></div></details><details class="profundizar"><summary><span>Profundizar: explicación completa<small>Matices, fórmulas, tablas, otros ejemplos y experimentos del módulo original.</small></span></summary><div class="prof-body"><section>
+<h2 id="invariancia">¿Reconoce el dígito si se mueve? Equivarianza, invariancia y data augmentation</h2>
+<p class="pregunta">Se dice que las CNN «son invariantes a traslaciones»: Woody se reconoce lo mismo en el centro del póster que en una esquina. ¿Es verdad? ¿Qué ocurre si desplazo la miniatura de prueba un solo píxel?</p>
+<p>Hay que separar dos propiedades. La convolución es <strong>equivariante</strong>: si desplazas la entrada, el mapa de características se desplaza igual, el mismo patrón en otro sitio. Eso <em>no</em> es lo mismo que <strong>invariante</strong> (que la salida final no cambie). Lo que hace que el final sea más o menos invariante son las etapas posteriores: el pooling absorbe desplazamientos pequeños <em>si no cruzan el borde de la ventana</em>, y el pooling global (<code>AdaptiveAvgPool2d(1)</code> o un máximo global) absorbe todos. Pero el <code>Flatten</code> seguido de <code>Linear</code> da a cada posición su propio peso, y rompe buena parte de la invariancia.</p>
+<div class="callout ejemplo">
+<span class="lbl">Ejemplo numérico: el pooling absorbe unos desplazamientos y otros no (fragmento 5)</span>
+<p>Un fotograma nocturno de 6×6 (el cielo es todo ceros) con una estrella brillante, un 9, en la posición (2, 2). <code>MaxPool2d(2)</code> mira ventanas 2×2: la que cubre filas 2–3 y columnas 2–3 contiene el 9 y da 9. Si la estrella se mueve un píxel hacia abajo y a la derecha, pasa a (3, 3): <strong>sigue en la misma ventana</strong> y la salida es idéntica. Si se mueve un píxel hacia arriba, pasa a (1, 2): cae en la ventana de las filas 0–1, y la salida es <strong>distinta</strong>. El fragmento 5 lo comprueba con <code>torch.roll</code> (igual: <code>True</code> y <code>False</code>).</p>
+</div>
+<p>El fragmento 13 lo mide en serio. Es como mover la cara del actor un píxel dentro del fotograma. Se compara una red densa (<code>Flatten → Linear(64,32) → ReLU → Linear(32,10)</code>, 2.410 parámetros) con la CNN pequeña de dígitos (1.898 parámetros), entrenadas con las imágenes originales de 8×8, y se prueban con las imágenes de prueba <em>desplazadas</em> un píxel (rellenando con ceros). Después se repite el entrenamiento con <strong>data augmentation</strong>: en cada lote se aplica un desplazamiento aleatorio de −1, 0 o +1 píxel en cada eje. Medias de 3 semillas, Adam (<code>lr=0.01</code>), 25 épocas:</p>
+<table>
+<thead><tr><th>Imagen de prueba</th><th>Densa</th><th>CNN</th><th>Densa + aug.</th><th>CNN + aug.</th></tr></thead>
+<tbody>
+<tr><td>sin mover</td><td>0,976</td><td>0,978</td><td>0,891</td><td>0,950</td></tr>
+<tr><td>1 px a la derecha</td><td>0,476</td><td>0,630</td><td>0,881</td><td>0,968</td></tr>
+<tr><td>1 px abajo</td><td>0,410</td><td>0,516</td><td>0,810</td><td>0,910</td></tr>
+<tr><td>1 px izquierda y arriba</td><td>0,156</td><td>0,336</td><td>0,807</td><td>0,930</td></tr>
+</tbody>
+</table>
+<p>Qué dice y qué no dice la tabla: (1) <strong>Con las imágenes sin mover, las dos redes son iguales</strong> (0,976 y 0,978). Una prueba normal no distingue una de otra. (2) <strong>Un solo píxel hunde ambas</strong>: la densa cae a 0,41–0,48 (y a 0,156 en diagonal) y la CNN es mejor pero lejos de ser invariante (0,34–0,63). En una imagen de 8 píxeles, un píxel es el 12,5 % del lado: es un desplazamiento enorme. (3) <strong>La solución es mostrar desplazamientos al entrenar</strong>: con augmentation la CNN pasa a 0,91–0,97 en todos los casos, y la densa, que sigue peor, a 0,81–0,88. (4) El augmentation tiene un coste en las imágenes sin mover (la densa pierde 0,085, la CNN 0,028), porque en 8×8 los desplazamientos recortan parte del dígito. Hay más detalles que se simplifican: el desplazamiento es el mismo para todo el lote, no distinto en cada imagen, y solo se han probado tres semillas.</p>
+<div class="callout ojo">
+<span class="lbl">Ojo</span>
+<p>«Las CNN son invariantes a traslaciones» es una simplificación peligrosa: lo son <em>mucho más</em> que una red densa, pero no del todo, y menos con pocos pooling y un <code>Flatten</code> grande. Si tu problema necesita tolerar desplazamientos, giros o cambios de escala, métele variaciones en el entrenamiento (data augmentation, que verás con <code>torchvision.transforms</code> en el módulo siguiente) y mide con imágenes transformadas.</p>
+</div>
+</section></div></details><details class="profundizar" id="codigo"><summary><span>Ver código explicado paso a paso<small>1 fragmento(s) original(es), con cada línea comentada y salida esperada.</small></span></summary><div class="prof-body"><article class="snippet" data-lang="python">
+<header>
+<h3>13 · ¿Y si el dígito se mueve? Red densa y CNN, con y sin data augmentation</h3>
+<p class="para-que"><strong>Para qué sirve</strong> Entrenar una red densa y una CNN con dígitos de 8×8, probarlas con imágenes desplazadas un píxel y repetirlo entrenando con desplazamientos aleatorios (data augmentation). Tres semillas por casilla.</p>
+</header>
+<pre class="code"><code>import torch
+import torch.nn as nn
+import torch.nn.functional as F
+from sklearn.datasets import load_digits
+from sklearn.model_selection import train_test_split
+from torch.utils.data import TensorDataset, DataLoader
+
+torch.set_num_threads(1)
+
+digitos = load_digits()
+X = torch.tensor(digitos.images, dtype=torch.float32).unsqueeze(1) / 16.0
+y = torch.tensor(digitos.target, dtype=torch.long)
+idx_tr, idx_te = train_test_split(range(len(y)), test_size=0.25, stratify=y.numpy(), random_state=0)
+X_tr, y_tr, X_te, y_te = X[idx_tr], y[idx_tr], X[idx_te], y[idx_te]
+
+
+def densa():
+    return nn.Sequential(nn.Flatten(), nn.Linear(64, 32), nn.ReLU(), nn.Linear(32, 10))
+
+
+def conv():
+    return nn.Sequential(
+        nn.Conv2d(1, 8, 3, padding=1), nn.ReLU(), nn.MaxPool2d(2),
+        nn.Conv2d(8, 16, 3, padding=1), nn.ReLU(), nn.MaxPool2d(2),
+        nn.Flatten(), nn.Linear(64, 10),
+    )
+
+
+def desplazar(x, dx=0, dy=0):
+    x = F.pad(x, (max(dx, 0), max(-dx, 0), max(dy, 0), max(-dy, 0)))
+    h, w = x.shape[-2:]
+    return x[..., max(-dy, 0):h - max(dy, 0), max(-dx, 0):w - max(dx, 0)]
+
+
+def acierto(modelo, X, y):
+    modelo.eval()
+    with torch.no_grad():
+        return (modelo(X).argmax(1) == y).float().mean().item()
+
+
+def entrenar(fabrica, semilla, aumentar=False):
+    torch.manual_seed(semilla)
+    modelo = fabrica()
+    cargador = DataLoader(TensorDataset(X_tr, y_tr), batch_size=64, shuffle=True)
+    optimizador = torch.optim.Adam(modelo.parameters(), lr=0.01)
+    criterio = nn.CrossEntropyLoss()
+    for _ in range(25):
+        modelo.train()
+        for lx, ly in cargador:
+            if aumentar:
+                dx, dy = torch.randint(-1, 2, (2,)).tolist()
+                lx = desplazar(lx, dx, dy)
+            optimizador.zero_grad()
+            criterio(modelo(lx), ly).backward()
+            optimizador.step()
+    return modelo
+
+
+print("parámetros  densa:", sum(p.numel() for p in densa().parameters()), "| CNN:", sum(p.numel() for p in conv().parameters()))
+pruebas = [("sin mover", 0, 0), ("1 px a la derecha", 1, 0), ("1 px abajo", 0, 1), ("1 px izquierda y arriba", -1, -1)]
+modelos = [("densa", densa, False), ("CNN", conv, False), ("densa + aug", densa, True), ("CNN + aug", conv, True)]
+res = {n: {p[0]: [] for p in pruebas} for n, _, _ in modelos}
+for semilla in (0, 1, 2):
+    for nombre, fabrica, aug in modelos:
+        m = entrenar(fabrica, semilla, aug)
+        for etiqueta, dx, dy in pruebas:
+            res[nombre][etiqueta].append(acierto(m, desplazar(X_te, dx, dy), y_te))
+print(f"{'imagen de prueba':&lt;26}" + "".join(f"{n:&gt;13}" for n, _, _ in modelos))
+for etiqueta, _, _ in pruebas:
+    print(f"{etiqueta:&lt;26}" + "".join(f"{sum(res[n][etiqueta]) / 3:13.3f}" for n, _, _ in modelos))</code></pre>
+<details class="linea-a-linea">
+<summary>Línea por línea</summary>
+<p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+<table class="lineas">
+<thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+<tbody>
+<tr data-lines="1-6"><td><code>import …</code></td><td>Además de lo habitual, <code>torch.nn.functional</code> como <code>F</code> (se usa <code>F.pad</code>).</td></tr>
+<tr data-lines="8"><td><code>torch.set_num_threads(1)</code></td><td>Un solo hilo.</td></tr>
+<tr data-lines="10-14"><td><code>digitos = load_digits() ; … X_tr …</code></td><td>Los dígitos originales de 8×8 (sin reducir ni ampliar), con canal y entre 0 y 1; misma división que antes.</td></tr>
+<tr data-lines="17-18"><td><code>def densa(): return nn.Sequential(…)</code></td><td>Una red densa de 2.410 parámetros: aplanar 64 píxeles → 32 neuronas con ReLU → 10 salidas.</td></tr>
+<tr data-lines="21-26"><td><code>def conv(): return nn.Sequential(…)</code></td><td>La CNN pequeña de 1.898 parámetros: dos bloques conv → ReLU → pooling, aplanado y una capa lineal.</td></tr>
+<tr data-lines="29-32"><td><code>def desplazar(x, dx=0, dy=0): …</code></td><td>Desplaza las imágenes <code>dx</code> píxeles a la derecha y <code>dy</code> hacia abajo. <code>F.pad</code> añade ceros en los lados (el orden es izquierda, derecha, arriba, abajo) y luego se recorta al tamaño original.</td></tr>
+<tr data-lines="35-38"><td><code>def acierto(modelo, X, y): …</code></td><td>Acierto del modelo con unas imágenes dadas, en modo evaluación y sin gradientes.</td></tr>
+<tr data-lines="41-46"><td><code>def entrenar(fabrica, semilla, aumentar=False): …</code></td><td>Crea el modelo con la fábrica, fija la semilla y prepara lotes de 64, el optimizador Adam (<code>lr=0.01</code>) y la pérdida.</td></tr>
+<tr data-lines="47-49"><td><code>for _ in range(25): modelo.train() ; for lx, ly in cargador:</code></td><td>25 épocas, recorriendo los lotes.</td></tr>
+<tr data-lines="50-52"><td><code>if aumentar: dx, dy = torch.randint(-1, 2, (2,)).tolist() …</code></td><td>Si hay augmentation: elige al azar un desplazamiento de −1, 0 o +1 en cada eje (<code>randint(-1, 2, …)</code> da valores en {−1, 0, 1}) y desplaza <em>todo el lote</em> igual.</td></tr>
+<tr data-lines="53-56"><td><code>optimizador.zero_grad() … return modelo</code></td><td>El paso de entrenamiento habitual en dos líneas, y la devolución del modelo entrenado.</td></tr>
+<tr data-lines="59"><td><code>print("parámetros  densa:" …)</code></td><td>Parámetros de cada modelo.</td></tr>
+<tr data-lines="60-61"><td><code>pruebas = […] ; modelos = […]</code></td><td>Las cuatro imágenes de prueba (sin mover, 1 px a la derecha, 1 px abajo, 1 px arriba-izquierda) y los cuatro modelos (densa y CNN, con y sin augmentation).</td></tr>
+<tr data-lines="62-67"><td><code>res = {…} ; for semilla in (0, 1, 2): …</code></td><td>Para cada semilla y cada modelo: entrena y mide el acierto con las cuatro versiones de las imágenes de prueba, guardándolo en <code>res</code>.</td></tr>
+<tr data-lines="68-70"><td><code>print(…) ; for etiqueta … print(…)</code></td><td>Imprime la tabla: una fila por imagen de prueba, una columna por modelo, con la media de las tres semillas.</td></tr>
+</tbody>
+</table>
+</details>
+<div class="salida">
+<strong>Salida esperada</strong>
+<pre>parámetros  densa: 2410 | CNN: 1898
+imagen de prueba                  densa          CNN  densa + aug    CNN + aug
+sin mover                         0.976        0.978        0.891        0.950
+1 px a la derecha                 0.476        0.630        0.881        0.968
+1 px abajo                        0.410        0.516        0.810        0.910
+1 px izquierda y arriba           0.156        0.336        0.807        0.930</pre>
+<p>Sin mover, las dos redes son iguales (0,976 y 0,978). Con la imagen desplazada, ambas se hunden: 1 px a la derecha, densa 0,476 y CNN 0,630; en diagonal, 0,156 y 0,336. Con augmentation la CNN pasa a 0,968, 0,910 y 0,930, y la densa a 0,881, 0,810 y 0,807. Con las imágenes sin mover, el augmentation cuesta: la densa baja a 0,891 y la CNN a 0,950. Con tres semillas por casilla, las diferencias de unas décimas son claras; las de pocas centésimas, no.</p>
+</div>
+</article></div></details></div></main></body></html>

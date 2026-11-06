@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+
+<html lang="es"><head><meta charset="utf-8"/><meta content="width=device-width,initial-scale=1" name="viewport"/><title>Lección 10 · Keras Tuner: buscar hiperparámetros sin hacerlo a mano · Curso 3 · Cuaderno de IA</title><meta content="Un parámetro es lo que la red aprende (los pesos)." name="description"/><script>try{var t=localStorage.getItem('cuaderno-ia:tema');if(t)document.documentElement.setAttribute('data-theme',t)}catch(e){}</script><link href="../../assets/css/style.css" rel="stylesheet"/><script src="../../assets/js/curriculum.js"></script><script src="../../assets/js/lab.js"></script><script defer="" src="../../assets/js/app.js"></script><script defer="" src="../../assets/js/microanimations.js"></script></head><body data-course="3" data-lesson="10" data-module="5" data-root="../../"><main><div class="page" data-micro="3min"><header class="hero leccion"><div class="hero-grid"><div><p class="eyebrow">Curso 3 · Módulo 5 · Lección 10 de 14</p><h1>Keras Tuner: buscar hiperparámetros sin hacerlo a mano</h1><p class="lead">Un parámetro es lo que la red aprende (los pesos).</p><p class="meta-line"><span class="read-time" data-render="read-time"></span><a href="../modulo-5.html">Índice del módulo</a></p></div><div aria-hidden="true" class="hero-tile"></div></div></header><details class="predice"><summary>¿Cuántas capas? ¿Cuántas neuronas? ¿Qué learning rate? ¿Con Dropout o sin él? Probar combinaciones a mano es lento, y casi siempre acabas probando las que ya se te ocurrían. ¿Se puede automatizar la búsqueda?<span class="hint"></span></summary><div><p>Un parámetro es lo que la red aprende (los pesos).</p></div></details><section aria-label="Explicación breve" class="micro-core"><div class="micro-kicker">01 · ENTENDER <span>≈ 45 s</span></div><h2>La idea en palabras sencillas</h2><p>Un parámetro es lo que la red aprende (los pesos). Un hiperparámetro es lo que decides tú antes de entrenar. Keras Tuner ( pip install keras-tuner, se importa como keras_tuner ) entrena muchos modelos con combinaciones distintas y te dice cuál rindió mejor en validación.</p><div class="micro-example"><span aria-hidden="true" class="micro-example-icon">🏠</span><div><strong>Otro ejemplo · Casa</strong><p>Una neurona combina metros y habitaciones; cada dato tiene un peso y produce una salida.</p></div></div></section><div class="micro-kicker micro-checkpoint">02 · RESPONDER <span>≈ 15 s</span></div><section aria-label="Pregunta intercalada" class="quiz mini micro-check"><script class="quiz-data" type="application/json">{"titulo": "Pausa rápida · Comprueba la idea", "preguntas": [{"q": "Una neurona recibe dos entradas. ¿Qué hace con los pesos?", "opciones": ["Elige siempre la entrada mayor", "Borra las entradas al entrenar", "Multiplica cada entrada por su peso y combina resultados"], "correcta": 2, "porque": "La suma ponderada combina entradas, pesos y bias antes de la activación."}]}</script></section><section aria-label="Animación interactiva" class="micro-viz" data-index="18" data-micro-viz="neural"><div class="micro-kicker">03 · EXPERIMENTAR <span>≈ 45 s</span></div><div class="micro-viz-title"><div><h2>Señales que atraviesan una red</h2><p>Pulsa «Propagar» para seguir el recorrido de entradas a salida.</p></div><span aria-hidden="true" class="micro-viz-symbol">✦</span></div><div aria-live="polite" class="micro-viz-stage"><p>Animación interactiva: Señales que atraviesan una red</p></div></section><div class="micro-kicker micro-checkpoint">04 · APLICAR <span>≈ 15 s</span></div><section aria-label="Pregunta intercalada" class="quiz mini micro-check"><script class="quiz-data" type="application/json">{"titulo": "Pausa rápida · ¿Lo aplicarías?", "preguntas": [{"q": "¿Cuándo se actualizan los pesos de una red?", "opciones": ["Nunca: los pesos son fijos", "Al aplicar el optimizador durante el entrenamiento", "Cada vez que se abre la página"], "correcta": 1, "porque": "El optimizador utiliza los gradientes para ajustar parámetros durante el aprendizaje."}]}</script></section><div class="micro-finish"><strong>Idea que te llevas</strong><span>Un parámetro es lo que la red aprende (los pesos)</span><small>¿Quieres más ejemplos, fórmulas o código? Los tienes justo debajo, sin límite de tiempo.</small></div><details class="profundizar micro-legacy"><summary><span>Explorar más: explicación y simulaciones completas<small>Todo el texto original, tablas y demos avanzadas. Opcional.</small></span></summary><div class="prof-body"><section><h2>Keras Tuner: buscar hiperparámetros sin hacerlo a mano</h2>
+<p>Un <strong>parámetro</strong> es lo que la red aprende (los pesos). Un <strong><abbr class="t" data-def="Hiperparámetro: un ajuste que decides tú antes de entrenar y que el entrenamiento no cambia: learning rate, número de capas, neuronas por capa, tasa de Dropout, tamaño del lote.">hiperparámetro</abbr></strong> es lo que decides tú antes de entrenar. <strong>Keras Tuner</strong> (<code>pip install keras-tuner</code>, se importa como <code>keras_tuner</code>) entrena muchos modelos con combinaciones distintas y te dice cuál rindió mejor en validación.</p>
+<p>Se escribe una función que recibe un objeto <code>hp</code> (<code>HyperParameters</code>) y devuelve un modelo <strong>compilado</strong>. En lugar de números fijos, usas <code>hp.Int</code>, <code>hp.Float</code>, <code>hp.Choice</code> y <code>hp.Boolean</code>: cada llamada <em>declara</em> un hiperparámetro y, a la vez, devuelve el valor que toca probar en este intento.</p>
+<p>Los hiperparámetros <strong>condicionales</strong> (la tasa de Dropout solo tiene sentido si hay Dropout; las unidades de la capa 3 solo si hay 3 capas) se declaran dentro de <code>with hp.conditional_scope("n_capas", [2, 3]):</code>. Sin eso, el Tuner sigue muestreando (y guardando) valores de hiperparámetros que ese modelo no usa, y los resultados se llenan de ruido. El fragmento 11 define el espacio de búsqueda de una red de 1 a 3 capas.</p>
+<div class="callout ejemplo"><span class="lbl">Ejemplo tomado del módulo</span><p>· por qué el learning rate se muestrea en escala logarítmica Si eliges un número al azar de forma uniforme entre 0,0001 y 0,1, la probabilidad de que sea mayor que 0,01 es \( (0{,}1-0{,}01)/(0{,}1-0{,}0001)\approx 0{,}90 \): el 90 % de las…</p></div></section><figure class="demo" data-demo="curso3/c3m5-tuner" data-titulo="Cuatro estrategias de búsqueda con el mismo presupuesto">
+<div class="haz">Hay un paisaje oculto: la precisión de validación depende del learning rate (eje horizontal, en escala logarítmica) y del número de neuronas (eje vertical). Elige una estrategia en el selector y mira dónde prueba (los puntos). Activa «mostrar la superficie real» para ver lo que el tuner no ve. Compara la tabla con el mismo presupuesto en épocas (por defecto 270 = 10 entrenamientos completos). Pulsa «Otro paisaje y otras semillas» varias veces. Sube y baja el presupuesto.</div>
+<div class="observa">Con 270 épocas, la rejilla prueba 9 combinaciones, el azar y la bayesiana 10 y <strong>Hyperband 63</strong>, porque descarta pronto. Los puntos de la bayesiana, tras unos iniciales al azar, <em>se agrupan</em> cerca de la zona buena; los del azar y la rejilla se reparten por todas partes. Ningún método gana siempre: en los seis paisajes que genera el botón, la búsqueda aleatoria da entre 0,82 y 0,90, la bayesiana entre 0,87 y 0,91, la rejilla entre 0,89 y 0,90 y Hyperband entre 0,885 y 0,896. <strong>Hyperband es el más regular</strong> (pocos malos resultados); el azar con solo 10 intentos es el más variable. Con presupuestos muy pequeños (108 épocas = 4 entrenamientos) todo depende de la suerte.</div>
+</figure><div class="resumen"><h2 class="sin-num sin-toc">En pocas líneas</h2><ul><li><strong>Keras Tuner: buscar hiperparámetros sin hacerlo a mano:</strong> Un parámetro es lo que la red aprende (los pesos).</li><li>Antes de continuar, intenta explicar la demo sin mirar su resultado.</li></ul></div><section class="quiz mini"><script class="quiz-data" type="application/json">{"titulo": "¿Lo tienes?", "preguntas": [{"q": "¿Qué concepto estamos trabajando en esta lección?", "opciones": ["Keras Tuner: buscar hiperparámetros sin hacerlo a mano", "Gradientes que explotan o se desvanecen: inicialización y recorte", "tf.data : que el modelo no espere a los datos"], "correcta": 0, "porque": "Un parámetro es lo que la red aprende (los pesos)."}, {"q": "¿Cuál de estas afirmaciones recoge lo que acabas de estudiar?", "opciones": ["Lo importante es comprender la idea y comprobarla con ejemplos, no memorizar términos.", "Un parámetro es lo que la red aprende (los pesos).", "Siempre hay un único método que sirve para todos los problemas."], "correcta": 1, "porque": "La explicación central es: Un parámetro es lo que la red aprende (los pesos)."}, {"q": "Si una demo o un ejemplo te desconcierta, ¿cuál es la mejor forma de aprenderlo?", "opciones": ["Memorizar el nombre sin entender la operación.", "Volver a los números, cambiar un valor y explicar qué ocurre.", "Ignorar los resultados que no coinciden con tu intuición."], "correcta": 1, "porque": "Explorar qué cambia y por qué ayuda a conectar el concepto con su resultado."}]}</script></section></div></details><details class="profundizar"><summary><span>Profundizar: explicación completa<small>Matices, fórmulas, tablas, otros ejemplos y experimentos del módulo original.</small></span></summary><div class="prof-body"><section>
+<h2 id="tuner">Keras Tuner: buscar hiperparámetros sin hacerlo a mano</h2>
+<p class="pregunta">¿Cuántas capas? ¿Cuántas neuronas? ¿Qué learning rate? ¿Con Dropout o sin él? Probar combinaciones a mano es lento, y casi siempre acabas probando las que ya se te ocurrían. ¿Se puede automatizar la búsqueda?</p>
+<p>Un <strong>parámetro</strong> es lo que la red aprende (los pesos). Un <strong><abbr class="t" data-def="Hiperparámetro: un ajuste que decides tú antes de entrenar y que el entrenamiento no cambia: learning rate, número de capas, neuronas por capa, tasa de Dropout, tamaño del lote.">hiperparámetro</abbr></strong> es lo que decides tú antes de entrenar. <strong>Keras Tuner</strong> (<code>pip install keras-tuner</code>, se importa como <code>keras_tuner</code>) entrena muchos modelos con combinaciones distintas y te dice cuál rindió mejor en validación.</p>
+<div class="callout analogia">
+<span class="lbl">Analogía</span>
+<p>Elegir qué película ver este viernes entre 30 candidatas. Verlas todas enteras es imposible (cada una son dos horas), así que necesitas una estrategia. Una: escoger al azar. Otra: elegir la siguiente mirando cómo te salieron las anteriores («la de ciencia ficción me gustó, busco otra parecida»). Otra: ver solo los primeros 10 minutos de muchas y seguir únicamente con las que enganchan, descartando sin remordimientos las que ya se ven flojas. Son, en ese orden, <code>RandomSearch</code>, <code>BayesianOptimization</code> y <code>Hyperband</code>.</p>
+</div>
+<h3>El espacio de búsqueda: <code>build_model(hp)</code></h3>
+<p>Se escribe una función que recibe un objeto <code>hp</code> (<code>HyperParameters</code>) y devuelve un modelo <strong>compilado</strong>. En lugar de números fijos, usas <code>hp.Int</code>, <code>hp.Float</code>, <code>hp.Choice</code> y <code>hp.Boolean</code>: cada llamada <em>declara</em> un hiperparámetro y, a la vez, devuelve el valor que toca probar en este intento.</p>
+<table>
+<caption>Los cuatro tipos de hiperparámetro</caption>
+<thead><tr><th>Llamada</th><th>Qué prueba</th></tr></thead>
+<tbody>
+<tr><td><code>hp.Int("unidades", 8, 64, step=8)</code></td><td>Un entero: 8, 16, 24, …, 64</td></tr>
+<tr><td><code>hp.Float("lr", 1e-4, 1e-1, sampling="log")</code></td><td>Un decimal, con muestreo <strong>logarítmico</strong>: cada «década» (10⁻⁴ a 10⁻³, 10⁻³ a 10⁻², …) es igual de probable</td></tr>
+<tr><td><code>hp.Choice("activacion", ["relu", "tanh"])</code></td><td>Uno de la lista</td></tr>
+<tr><td><code>hp.Boolean("usar_dropout")</code></td><td><code>True</code> o <code>False</code></td></tr>
+</tbody>
+</table>
+<div class="callout ejemplo">
+<span class="lbl">Ejemplo numérico · por qué el learning rate se muestrea en escala logarítmica</span>
+<p>Si eliges un número al azar de forma <em>uniforme</em> entre 0,0001 y 0,1, la probabilidad de que sea mayor que 0,01 es \( (0{,}1-0{,}01)/(0{,}1-0{,}0001)\approx 0{,}90 \): el 90 % de las pruebas caerían en la última década y casi nunca probarías 0,0003 o 0,001. Con <code>sampling="log"</code> las tres décadas (10⁻⁴-10⁻³, 10⁻³-10⁻², 10⁻²-10⁻¹) tienen un 33 % cada una. Lo que importa de un learning rate es su <em>orden de magnitud</em>.</p>
+</div>
+<p>Los hiperparámetros <strong>condicionales</strong> (la tasa de Dropout solo tiene sentido si hay Dropout; las unidades de la capa 3 solo si hay 3 capas) se declaran dentro de <code>with hp.conditional_scope("n_capas", [2, 3]):</code>. Sin eso, el Tuner sigue muestreando (y guardando) valores de hiperparámetros que ese modelo no usa, y los resultados se llenan de ruido. El fragmento 11 define el espacio de búsqueda de una red de 1 a 3 capas.</p>
+<h3>Las estrategias de búsqueda</h3>
+<table>
+<caption>Las cuatro clases principales de <code>keras_tuner</code></caption>
+<thead><tr><th>Clase</th><th>Cómo elige el siguiente intento</th><th>Argumentos propios</th></tr></thead>
+<tbody>
+<tr><td><code>GridSearch</code></td><td>Recorre una rejilla de combinaciones, una a una</td><td><code>max_trials</code></td></tr>
+<tr><td><code>RandomSearch</code></td><td>Combinaciones al azar</td><td><code>max_trials</code>, <code>seed</code></td></tr>
+<tr><td><code>BayesianOptimization</code></td><td>Ajusta un modelo (proceso gaussiano) a los resultados anteriores y prueba donde espera mejorar</td><td><code>max_trials</code>, <code>num_initial_points</code></td></tr>
+<tr><td><code>Hyperband</code></td><td>Entrena muchos modelos pocas épocas, descarta los malos y da más épocas a los buenos</td><td><code>max_epochs</code>, <code>factor</code>, <code>hyperband_iterations</code></td></tr>
+</tbody>
+</table>
+<div class="callout ejemplo">
+<span class="lbl">Ejemplo numérico · rejilla frente a azar con 9 pruebas</span>
+<p>Solo dos hiperparámetros, el learning rate (muy importante) y el número de neuronas (casi irrelevante). Con una rejilla de 3 × 3 = 9 pruebas, solo se prueban <strong>3 valores distintos del learning rate</strong> (cada uno repetido 3 veces con neuronas distintas). Con 9 pruebas al azar, se prueban <strong>9 valores distintos</strong> del learning rate. Cuando solo unos pocos hiperparámetros importan, el azar explora mucho mejor lo que sí importa. Por eso <code>RandomSearch</code> suele batir a <code>GridSearch</code> con el mismo presupuesto. (Es como elegir película con dos criterios, el género, que importa mucho, y el color del póster, que casi nada: una rejilla de 3 × 3 solo te deja probar 3 géneros distintos.)</p>
+</div>
+<p><strong>Hyperband</strong> merece una cuenta. Con <code>max_epochs=9</code> y <code>factor=3</code>, una «ronda» entrena muchos modelos 1 época, se queda con el tercio mejor, lo entrena hasta 3 épocas, se queda con el tercio mejor y lo lleva hasta 9. Es como ver el primer capítulo de 9 series, quedarte con las 3 mejores, dejarlas hasta el tercer capítulo y seguir hasta el noveno solo con la mejor. El fragmento 12 lo ejecuta y lista los intentos:</p>
+<table>
+<caption>Intentos de Hyperband con <code>max_epochs=9</code>, <code>factor=3</code> (fragmento 12)</caption>
+<thead><tr><th>Bracket</th><th>Ronda</th><th>Modelos</th><th>Épocas (de la… a la…)</th><th>Épocas gastadas</th></tr></thead>
+<tbody>
+<tr><td>2</td><td>0</td><td>9</td><td>0 → 1</td><td>9</td></tr>
+<tr><td>2</td><td>1</td><td>3</td><td>1 → 3</td><td>6</td></tr>
+<tr><td>2</td><td>2</td><td>1</td><td>3 → 9</td><td>6</td></tr>
+<tr><td>1</td><td>0</td><td>5</td><td>0 → 3</td><td>15</td></tr>
+<tr><td>1</td><td>1</td><td>2</td><td>3 → 9</td><td>12</td></tr>
+<tr><td>0</td><td>0</td><td>3</td><td>0 → 9</td><td>27</td></tr>
+</tbody>
+</table>
+<p>En total 23 intentos, 17 configuraciones distintas y 75 épocas entrenadas, frente a las \( 17\cdot 9=153 \) que habría costado entrenar todas hasta el final: <strong>la mitad</strong>. Un «bracket» es una apuesta con distinta agresividad: el 2 prueba mucho y descarta pronto; el 0 prueba pocas configuraciones pero las entrena enteras (por si las que parecen malas al principio son «de arranque lento»). Los que sobreviven <strong>continúan</strong> desde donde se quedaron (de la época 1 a la 3, no reempiezan).</p>
+<h3>Un ejemplo completo con <code>RandomSearch</code></h3>
+<p>El fragmento 11 busca la mejor red para el problema de las dos lunas (400 datos de entrenamiento, 200 de validación) con 6 intentos de 15 épocas cada uno:</p>
+<table>
+<caption>Los 6 intentos ordenados por precisión de validación (fragmento 11)</caption>
+<thead><tr><th>Intento</th><th>val_accuracy</th><th>Capas</th><th>Unidades</th><th>Activación</th><th>Dropout</th><th>lr</th></tr></thead>
+<tbody>
+<tr><td>4</td><td class="res">0,900</td><td>3</td><td>[32, 32, 64]</td><td>relu</td><td>0,2</td><td>0,0010</td></tr>
+<tr><td>1</td><td>0,895</td><td>3</td><td>[32, 8, 8]</td><td>tanh</td><td>0,1</td><td>0,0081</td></tr>
+<tr><td>2</td><td>0,895</td><td>2</td><td>[40, 56]</td><td>relu</td><td>—</td><td>0,0024</td></tr>
+<tr><td>5</td><td>0,895</td><td>3</td><td>[64, 16, 48]</td><td>relu</td><td>—</td><td>0,0024</td></tr>
+<tr><td>3</td><td>0,865</td><td>1</td><td>[8]</td><td>tanh</td><td>—</td><td>0,0005</td></tr>
+<tr><td>0</td><td>0,715</td><td>1</td><td>[32]</td><td>relu</td><td>—</td><td>0,0001</td></tr>
+</tbody>
+</table>
+<p>Cómo leerla. <strong>El peor intento (0,715) es el del learning rate más pequeño</strong> (0,0001): en 15 épocas apenas avanzó. Es el efecto que más se ve, el de siempre. Los cuatro primeros están todos entre 0,895 y 0,900: <strong>esa diferencia es ruido</strong>, porque con 200 datos de validación la precisión tiene una incertidumbre de \( \sqrt{0{,}9\cdot0{,}1/200}\approx0{,}02 \) y dos puntos de 0,005 de diferencia no distinguen nada. Quedarse con el «ganador» exacto es menos importante que descubrir qué zona del espacio funciona (lr entre 0,001 y 0,01, redes de 2-3 capas). Después de la búsqueda se hace lo habitual: <code>mejor = tuner.get_best_hyperparameters(1)[0]</code>, se <strong>reconstruye el modelo</strong> con <code>tuner.hypermodel.build(mejor)</code> y se <strong>reentrena con todos los datos</strong> (el fragmento lo hace: 3329 parámetros, 0,882 de precisión con el conjunto completo).</p>
+<h3>Bayesiana y la clase <code>HyperModel</code></h3>
+<p>El fragmento 12 define el modelo como una clase <code>HyperModel</code> con dos métodos: <code>build(self, hp)</code>, igual que antes, y <code>fit(self, hp, modelo, *args, **kwargs)</code>, que <strong>también puede declarar hiperparámetros</strong> (aquí <code>batch_size</code> entre 16, 32 y 64) porque el Tuner llama a este <code>fit</code> en lugar del de Keras. Con <code>BayesianOptimization</code> (8 intentos, los 4 primeros al azar):</p>
+<table>
+<thead><tr><th>Intento</th><th>Unidades</th><th>lr</th><th>batch_size</th><th>val_accuracy</th></tr></thead>
+<tbody>
+<tr><td>0</td><td>32</td><td>0,0155</td><td>16</td><td>0,890</td></tr>
+<tr><td>1</td><td>16</td><td>0,0017</td><td>32</td><td>0,870</td></tr>
+<tr><td>2</td><td>40</td><td>0,0148</td><td>32</td><td>0,885</td></tr>
+<tr><td>3</td><td>48</td><td>0,0912</td><td>16</td><td>0,895</td></tr>
+<tr><td>4</td><td>64</td><td>0,0165</td><td>16</td><td>0,895</td></tr>
+<tr><td>5</td><td>64</td><td>0,1000</td><td>64</td><td class="res">0,910</td></tr>
+<tr><td>6</td><td>64</td><td>0,0244</td><td>64</td><td>0,890</td></tr>
+<tr><td>7</td><td>48</td><td>0,0023</td><td>32</td><td>0,895</td></tr>
+</tbody>
+</table>
+<p>Los intentos 4 a 7 ya no son aleatorios: el modelo del Tuner propone puntos donde espera mejorar o donde está más incierto (de ahí las unidades 64 repetidas y el learning rate en el límite superior, 0,1). Es un proceso <strong>secuencial</strong>: cada intento necesita los resultados de los anteriores, y por eso es más difícil de paralelizar que <code>RandomSearch</code>.</p>
+<div class="callout ojo">
+<span class="lbl">Ojo · cinco errores de búsqueda de hiperparámetros</span>
+<p><strong>(1) Reutilizar la carpeta.</strong> El Tuner guarda sus resultados en <code>directory/project_name</code> y, si existen, <strong>los reanuda</strong>: tu segundo experimento «nuevo» puede devolver al instante los intentos del anterior. Pon <code>overwrite=True</code> o cambia <code>project_name</code>. <strong>(2) Elegir con los datos de prueba.</strong> La búsqueda debe usar validación; el conjunto de prueba se mira una sola vez al final. <strong>(3) Fiarse de diferencias pequeñas</strong> (ver arriba): repite o usa validación cruzada si la diferencia importa. <strong>(4) No acotar el coste.</strong> El coste es \( \text{intentos}\times\text{épocas} \); usa pocas épocas y un <code>EarlyStopping</code> en <code>search(..., callbacks=[...])</code>. <strong>(5) Condicionales sin <code>conditional_scope</code>:</strong> el espacio se llena de hiperparámetros «fantasma» que ensucian los resultados.</p>
+</div>
+<div class="callout regla">
+<span class="lbl">Regla fácil</span>
+<p>Empieza con <code>RandomSearch</code> (simple y robusto), en escala logarítmica para el learning rate y con pocas épocas. Si cada entrenamiento es caro y muchos intentos son claramente malos desde el principio, usa <code>Hyperband</code>. Si cada intento es muy caro y solo puedes permitirte unos 20-50, prueba <code>BayesianOptimization</code>. Y busca primero los hiperparámetros que más pesan: <strong>el learning rate casi siempre es el primero</strong>.</p>
+</div>
+</section></div></details><details class="profundizar" id="codigo"><summary><span>Ver código explicado paso a paso<small>2 fragmento(s) original(es), con cada línea comentada y salida esperada.</small></span></summary><div class="prof-body"><article class="snippet" data-lang="python">
+<header>
+<h3>6 · Los pasos de cada optimizador, comprobados a mano, y una comparación</h3>
+<p class="para-que"><strong>Para qué sirve</strong> Aplica gradientes fijos a una sola variable para ver la regla de cada optimizador (SGD, momentum, Nesterov, Adam, AdamW) y después entrena la misma red con cinco optimizadores.</p>
+</header>
+<pre class="code"><code>import numpy as np
+import tensorflow as tf
+import keras
+from sklearn.datasets import make_moons
+
+# 1) Los pasos de cada optimizador, comprobados a mano sobre UNA variable (w = 1, gradiente fijo g = 0.5)
+def pasos(opt, n=2, g=0.5, w0=1.0):
+    w = keras.Variable([w0])
+    salida = []
+    for _ in range(n):
+        opt.apply_gradients([(tf.constant([g]), w)])
+        salida.append(round(float(w.numpy()[0]), 4))
+    return salida
+
+print("SGD lr=0.1                    :", pasos(keras.optimizers.SGD(0.1)))
+print("SGD lr=0.1 momentum=0.9       :", pasos(keras.optimizers.SGD(0.1, momentum=0.9)))
+print("SGD lr=0.1 mom=0.9 nesterov   :", pasos(keras.optimizers.SGD(0.1, momentum=0.9, nesterov=True)))
+print("Adam lr=0.1                   :", pasos(keras.optimizers.Adam(0.1)))
+print("Adam, gradiente 100 veces mayor:", pasos(keras.optimizers.Adam(0.1), g=50.0))
+print("Adam, gradiente 0, sin decay  :", pasos(keras.optimizers.Adam(0.1), g=0.0))
+print("AdamW wd=0.1, gradiente 0     :", pasos(keras.optimizers.AdamW(0.1, weight_decay=0.1), g=0.0))
+
+# 2) Los mismos datos y la misma red con distintos optimizadores
+X, y = make_moons(n_samples=500, noise=0.2, random_state=0)
+X, y = X.astype("float32"), y.astype("float32")
+
+def entrenar(opt):
+    keras.utils.set_random_seed(0)
+    m = keras.Sequential([keras.Input(shape=(2,)), keras.layers.Dense(16, activation="relu"),
+                          keras.layers.Dense(1, activation="sigmoid")])
+    m.compile(optimizer=opt, loss="binary_crossentropy", metrics=["accuracy"])
+    h = m.fit(X, y, epochs=30, batch_size=32, verbose=0)
+    return h.history["loss"][-1], h.history["accuracy"][-1], int(m.optimizer.iterations.numpy())
+
+print()
+print(f"{'optimizador':&lt;28}{'loss final':&gt;11}{'accuracy':&gt;10}{'pasos':&gt;7}")
+for nombre, opt in [("SGD(0.01)", keras.optimizers.SGD(0.01)),
+                    ("SGD(0.01, momentum=0.9)", keras.optimizers.SGD(0.01, momentum=0.9)),
+                    ("RMSprop(0.001)", keras.optimizers.RMSprop(0.001)),
+                    ("Adam(0.001)", keras.optimizers.Adam(0.001)),
+                    ("AdamW(0.001)", keras.optimizers.AdamW(0.001))]:
+    l, a, it = entrenar(opt)
+    print(f"{nombre:&lt;28}{l:&gt;11.3f}{a:&gt;10.3f}{it:&gt;7}")</code></pre>
+<details class="linea-a-linea" open="">
+<summary>Línea por línea</summary>
+<p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+<table class="lineas">
+<thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+<tbody>
+<tr data-lines="1-4"><td><code>import numpy as np …</code></td><td>Importaciones; <code>make_moons</code> dará los datos de la segunda parte.</td></tr>
+<tr data-lines="6-9"><td><code># 1) Los pasos de cada optimizador, comprobados a mano sobre UNA va… …</code></td><td>Comentario y definición de <code>pasos(opt, n, g, w0)</code>: crea una variable con un solo número (<code>w0 = 1</code>) y una lista donde guardar su valor tras cada paso. <code>keras.Variable</code> es la variable de Keras 3.</td></tr>
+<tr data-lines="10-12"><td><code>for _ in range(n): …</code></td><td>Repite <code>n</code> veces: aplica el optimizador con el gradiente constante <code>g</code> (en un tensor, emparejado con la variable) y anota el valor redondeado.</td></tr>
+<tr data-lines="13"><td><code>return salida</code></td><td>Devuelve la lista de valores.</td></tr>
+<tr data-lines="15-17"><td><code>print("SGD lr=0.1                    :", pasos(keras.optimizers.SGD… …</code></td><td>SGD, SGD con momentum y SGD con Nesterov, todos con \( \eta = 0{,}1 \) y gradiente 0,5.</td></tr>
+<tr data-lines="18-20"><td><code>print("Adam lr=0.1                   :", pasos(keras.optimizers.Ada… …</code></td><td>Adam con gradiente 0,5; con gradiente 50 (100 veces mayor, para ver que el paso no cambia) y con gradiente 0 (para ver que no se mueve).</td></tr>
+<tr data-lines="21"><td><code>print("AdamW wd=0.1, gradiente 0     :", pasos(keras.optimizers.Ada…</code></td><td>AdamW con <code>weight_decay=0.1</code> y gradiente 0: solo actúa la caída de pesos.</td></tr>
+<tr data-lines="23-25"><td><code># 2) Los mismos datos y la misma red con distintos optimizadores …</code></td><td>Segunda parte: 500 puntos de dos lunas (ruido 0,2) en <code>float32</code>.</td></tr>
+<tr data-lines="27-28"><td><code>def entrenar(opt): …</code></td><td><code>entrenar(opt)</code> recibe un optimizador. Fija la semilla en cada llamada para que <em>todos</em> partan de los mismos pesos iniciales.</td></tr>
+<tr data-lines="29-31"><td><code>m = keras.Sequential([keras.Input(shape=(2,)), keras.layers.Dense(1… …</code></td><td>Una red con una capa oculta de 16 neuronas y salida sigmoide, compilada con el optimizador que toque.</td></tr>
+<tr data-lines="32-33"><td><code>h = m.fit(X, y, epochs=30, batch_size=32, verbose=0) …</code></td><td>Entrena 30 épocas con lotes de 32 (16 lotes por época = 480 pasos) y devuelve la pérdida final, la precisión final y el número de pasos del optimizador.</td></tr>
+<tr data-lines="35-36"><td><code>print() …</code></td><td>Imprime una línea en blanco y la cabecera de la tabla; <code>:&lt;28</code> y <code>:&gt;11</code> son anchos de columna.</td></tr>
+<tr data-lines="37-41"><td><code>for nombre, opt in [("SGD(0.01)", keras.optimizers.SGD(0.01)), …</code></td><td>Los cinco optimizadores con sus valores habituales: <code>SGD(0.01)</code>, con momentum 0,9, <code>RMSprop(0.001)</code>, <code>Adam(0.001)</code> y <code>AdamW(0.001)</code>.</td></tr>
+<tr data-lines="42-43"><td><code>l, a, it = entrenar(opt) …</code></td><td>Entrena con cada uno e imprime una fila de la tabla.</td></tr>
+</tbody>
+</table>
+</details>
+<div class="salida">
+<strong>Salida esperada</strong>
+<pre>SGD lr=0.1                    : [0.95, 0.9]
+SGD lr=0.1 momentum=0.9       : [0.95, 0.855]
+SGD lr=0.1 mom=0.9 nesterov   : [0.905, 0.7695]
+Adam lr=0.1                   : [0.9, 0.8]
+Adam, gradiente 100 veces mayor: [0.9, 0.8]
+Adam, gradiente 0, sin decay  : [1.0, 1.0]
+AdamW wd=0.1, gradiente 0     : [0.99, 0.9801]
+
+optimizador                  loss final  accuracy  pasos
+SGD(0.01)                         0.393     0.834    480
+SGD(0.01, momentum=0.9)           0.286     0.872    480
+RMSprop(0.001)                    0.317     0.862    480
+Adam(0.001)                       0.323     0.862    480
+AdamW(0.001)                      0.323     0.862    480</pre>
+<p>Primera parte (comprueba cada cuenta con la tabla del texto): SGD da 0,95 y 0,90; el momentum acumula velocidad (0,95 y 0,855); Nesterov va más lejos en el primer paso (0,905 y 0,7695); Adam avanza 0,1 en cada paso <strong>sin importar si el gradiente es 0,5 o 50</strong> (el paso normalizado de Adam vale \( \eta \)); con gradiente 0 Adam no se mueve; y AdamW con gradiente 0 solo encoge el peso por 0,99 en cada paso (0,99 y 0,9801). Segunda parte: tras 480 pasos el mejor es SGD con momentum (pérdida 0,286, precisión 0,872) y el peor SGD sin momentum (0,393 y 0,834). <code>Adam</code> y <code>AdamW</code> dan idéntico a tres decimales porque su <code>weight_decay</code> (0,004) apenas actúa en 480 pasos.</p>
+</div>
+</article><article class="snippet" data-lang="python">
+<header>
+<h3>11 · Keras Tuner con RandomSearch y build_model(hp)</h3>
+<p class="para-que"><strong>Para qué sirve</strong> Define un espacio de búsqueda con hiperparámetros de los cuatro tipos (uno condicional), lanza 6 intentos aleatorios, lista los resultados y reentrena el mejor con todos los datos.</p>
+</header>
+<pre class="code"><code>import os, tempfile
+import numpy as np
+import keras
+import keras_tuner as kt
+from sklearn.datasets import make_moons
+
+keras.utils.set_random_seed(0)
+X, y = make_moons(n_samples=600, noise=0.3, random_state=0)
+X, y = X.astype("float32"), y.astype("float32")
+Xe, ye, Xv, yv = X[:400], y[:400], X[400:], y[400:]
+
+def build_model(hp):
+    modelo = keras.Sequential([keras.Input(shape=(2,))])
+    n_capas = hp.Int("n_capas", 1, 3)
+    activacion = hp.Choice("activacion", ["relu", "tanh"])
+    for i in range(n_capas):
+        with hp.conditional_scope("n_capas", list(range(i + 1, 4))):
+            modelo.add(keras.layers.Dense(hp.Int(f"unidades_{i}", 8, 64, step=8), activation=activacion))
+    if hp.Boolean("usar_dropout"):
+        with hp.conditional_scope("usar_dropout", [True]):
+            modelo.add(keras.layers.Dropout(hp.Float("tasa_dropout", 0.1, 0.5, step=0.1)))
+    modelo.add(keras.layers.Dense(1, activation="sigmoid"))
+    lr = hp.Float("lr", 1e-4, 1e-1, sampling="log")
+    modelo.compile(optimizer=keras.optimizers.Adam(lr), loss="binary_crossentropy", metrics=["accuracy"])
+    return modelo
+
+carpeta = tempfile.mkdtemp()
+tuner = kt.RandomSearch(build_model, objective="val_accuracy", max_trials=6, seed=0,
+                        directory=carpeta, project_name="moons", overwrite=True)
+tuner.search(Xe, ye, epochs=15, batch_size=32, validation_data=(Xv, yv), verbose=0)
+
+print("espacio de búsqueda:", [h.name for h in tuner.oracle.get_space().space])
+print()
+print("trial  val_accuracy  capas  unidades      activación  dropout  lr")
+for t in tuner.oracle.get_best_trials(6):
+    hp = t.hyperparameters
+    unidades = [hp.get(f"unidades_{i}") for i in range(hp.get("n_capas"))]
+    drop = hp.get("tasa_dropout") if hp.is_active("tasa_dropout") else "-"
+    print(f"{t.trial_id:&lt;7}{t.score:&gt;11.3f}{hp.get('n_capas'):&gt;7}  {str(unidades):&lt;14}{hp.get('activacion'):&lt;12}{str(drop):&lt;9}{hp.get('lr'):.4f}")
+
+mejor = tuner.get_best_hyperparameters(1)[0]
+print()
+print("mejor lr:", round(mejor.get("lr"), 4), "| capas:", mejor.get("n_capas"), "| activación:", mejor.get("activacion"))
+
+# Lo habitual: reconstruir el modelo con los mejores hiperparámetros y reentrenarlo
+modelo = tuner.hypermodel.build(mejor)
+modelo.fit(X, y, epochs=15, batch_size=32, verbose=0)
+print("parámetros del modelo final:", modelo.count_params(), "| accuracy con todos los datos:", round(float(modelo.evaluate(X, y, verbose=0)[1]), 3))
+print("carpeta del proyecto:", sorted(os.listdir(os.path.join(carpeta, "moons")))[:3], "...")</code></pre>
+<details class="linea-a-linea" open="">
+<summary>Línea por línea</summary>
+<p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+<table class="lineas">
+<thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+<tbody>
+<tr data-lines="1-5"><td><code>import os, tempfile …</code></td><td>Importaciones: <code>os</code> y <code>tempfile</code> (para la carpeta del Tuner), NumPy, Keras, <code>keras_tuner</code> con el alias <code>kt</code> y <code>make_moons</code>.</td></tr>
+<tr data-lines="7"><td><code>keras.utils.set_random_seed(0)</code></td><td>Semilla.</td></tr>
+<tr data-lines="8-10"><td><code>X, y = make_moons(n_samples=600, noise=0.3, random_state=0) …</code></td><td>600 puntos de dos lunas con ruido 0,3. Los 400 primeros son para entrenar la búsqueda y los 200 últimos para validar.</td></tr>
+<tr data-lines="12-15"><td><code>def build_model(hp): …</code></td><td>La función <code>build_model(hp)</code>. Empieza un modelo vacío con su entrada. <code>hp.Int("n_capas", 1, 3)</code> declara el número de capas (entre 1 y 3) y <code>hp.Choice</code> la activación.</td></tr>
+<tr data-lines="16-18"><td><code>for i in range(n_capas): …</code></td><td>Un bucle añade las capas. Cada una declara su número de neuronas con <code>hp.Int(..., 8, 64, step=8)</code> dentro de un <code>conditional_scope</code>: <code>unidades_i</code> solo está activo si hay al menos <code>i + 1</code> capas.</td></tr>
+<tr data-lines="19-21"><td><code>if hp.Boolean("usar_dropout"): …</code></td><td>Un <code>hp.Boolean</code> decide si hay Dropout; si lo hay (<code>conditional_scope</code>), su tasa es un <code>hp.Float</code> de 0,1 a 0,5 en pasos de 0,1.</td></tr>
+<tr data-lines="22-25"><td><code>modelo.add(keras.layers.Dense(1, activation="sigmoid")) …</code></td><td>Capa de salida, learning rate con muestreo logarítmico entre 1e-4 y 1e-1, compilación y devolución del modelo.</td></tr>
+<tr data-lines="27"><td><code>carpeta = tempfile.mkdtemp()</code></td><td>Una carpeta temporal para los resultados del Tuner.</td></tr>
+<tr data-lines="28-29"><td><code>tuner = kt.RandomSearch(build_model, objective="val_accuracy", max_… …</code></td><td><code>RandomSearch</code>: optimiza <code>val_accuracy</code> en 6 intentos, con semilla propia, en esa carpeta; <code>overwrite=True</code> evita reanudar una búsqueda anterior.</td></tr>
+<tr data-lines="30"><td><code>tuner.search(Xe, ye, epochs=15, batch_size=32, validation_data=(Xv,…</code></td><td><code>search</code> recibe los argumentos de <code>fit</code>: datos, épocas, lote y validación.</td></tr>
+<tr data-lines="32-34"><td><code>print("espacio de búsqueda:", [h.name for h in tuner.oracle.get_spa… …</code></td><td>Lista los hiperparámetros del espacio (los condicionales también aparecen) y la cabecera de la tabla.</td></tr>
+<tr data-lines="35-39"><td><code>for t in tuner.oracle.get_best_trials(6): …</code></td><td>Recorre los intentos ordenados de mejor a peor (<code>oracle.get_best_trials</code>). Para cada uno lee los valores (<code>hp.get</code>), las unidades de las capas que existen y el Dropout solo si estaba activo (<code>hp.is_active</code>).</td></tr>
+<tr data-lines="41-43"><td><code>mejor = tuner.get_best_hyperparameters(1)[0] …</code></td><td><code>get_best_hyperparameters(1)[0]</code> devuelve los mejores hiperparámetros; se imprimen tres.</td></tr>
+<tr data-lines="45-47"><td><code># Lo habitual: reconstruir el modelo con los mejores hiperparámetro… …</code></td><td>Lo habitual: reconstruir el modelo con los mejores hiperparámetros (<code>tuner.hypermodel.build</code>) y reentrenarlo con <strong>todos</strong> los datos.</td></tr>
+<tr data-lines="48-49"><td><code>print("parámetros del modelo final:", modelo.count_params(), "| acc… …</code></td><td>Número de parámetros y precisión sobre los datos de entrenamiento; y qué archivos escribe el Tuner.</td></tr>
+</tbody>
+</table>
+</details>
+<div class="salida">
+<strong>Salida esperada</strong>
+<pre>espacio de búsqueda: ['n_capas', 'activacion', 'unidades_0', 'usar_dropout', 'lr', 'unidades_1', 'unidades_2', 'tasa_dropout']
+
+trial  val_accuracy  capas  unidades      activación  dropout  lr
+4            0.900      3  [32, 32, 64]  relu        0.2      0.0010
+1            0.895      3  [32, 8, 8]    tanh        0.1      0.0081
+2            0.895      2  [40, 56]      relu        -        0.0024
+5            0.895      3  [64, 16, 48]  relu        -        0.0024
+3            0.865      1  [8]           tanh        -        0.0005
+0            0.715      1  [32]          relu        -        0.0001
+
+mejor lr: 0.001 | capas: 3 | activación: relu
+parámetros del modelo final: 3329 | accuracy con todos los datos: 0.882
+carpeta del proyecto: ['oracle.json', 'trial_0', 'trial_1'] ...</pre>
+<p>El espacio tiene 8 hiperparámetros (los de capas 2 y 3 y la tasa de Dropout son condicionales). La tabla está ordenada por <code>val_accuracy</code>: el mejor (intento 4) tiene 3 capas, ReLU, Dropout 0,2 y lr 0,001 con 0,900; el peor (intento 0, 0,715) tiene el learning rate más pequeño (0,0001): no le dio tiempo a aprender en 15 épocas. Los cuatro mejores se mueven entre 0,895 y 0,900: <strong>diferencias dentro del ruido</strong> de una validación de 200 datos. El modelo final tiene 3329 parámetros (\( 96+1056+2112+65 \)) y 0,882 de precisión sobre todos los datos. La carpeta del proyecto contiene <code>oracle.json</code> y una carpeta por intento.</p>
+</div>
+</article></div></details></div></main></body></html>

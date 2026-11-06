@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+
+<html lang="es"><head><meta charset="utf-8"/><meta content="width=device-width,initial-scale=1" name="viewport"/><title>Lección 13 · Precisión mixta: números más pequeños, entrenamiento más rápido · Curso 3 · Cuaderno de IA</title><meta content="Un número de float32 usa 32 bits y cubre magnitudes de unos \( 10^{-38} \) a \( 3{,}4\cdot10^{38} \)." name="description"/><script>try{var t=localStorage.getItem('cuaderno-ia:tema');if(t)document.documentElement.setAttribute('data-theme',t)}catch(e){}</script><link href="../../assets/css/style.css" rel="stylesheet"/><script src="../../assets/js/curriculum.js"></script><script src="../../assets/js/lab.js"></script><script defer="" src="../../assets/js/app.js"></script><script defer="" src="../../assets/js/microanimations.js"></script></head><body data-course="3" data-lesson="13" data-module="5" data-root="../../"><main><div class="page" data-micro="3min"><header class="hero leccion"><div class="hero-grid"><div><p class="eyebrow">Curso 3 · Módulo 5 · Lección 13 de 14</p><h1>Precisión mixta: números más pequeños, entrenamiento más rápido</h1><p class="lead">Un número de float32 usa 32 bits y cubre magnitudes de unos \( 10^{-38} \) a \( 3{,}4\cdot10^{38} \).</p><p class="meta-line"><span class="read-time" data-render="read-time"></span><a href="../modulo-5.html">Índice del módulo</a></p></div><div aria-hidden="true" class="hero-tile"></div></div></header><details class="predice"><summary>Una GPU moderna hace cuentas con números de 16 bits mucho más deprisa (y con la mitad de memoria) que con 32. ¿Por qué no entrenamos todo en 16 bits? ¿Qué se rompe?<span class="hint"></span></summary><div><p>Un número de float32 usa 32 bits y cubre magnitudes de unos \( 10^{-38} \) a \( 3{,}4\cdot10^{38} \).</p></div></details><section aria-label="Explicación breve" class="micro-core"><div class="micro-kicker">01 · ENTENDER <span>≈ 45 s</span></div><h2>La idea en palabras sencillas</h2><p>· escalar un gradiente de 10⁻⁸ Sin escalar: \( 10^{-8} \) en float16 es 0.</p><div class="micro-example"><span aria-hidden="true" class="micro-example-icon">💡</span><div><strong>Otro ejemplo · Alarma</strong><p>La alarma sonó cuando no había humo: falso positivo. No sonó con humo: falso negativo.</p></div></div></section><div class="micro-kicker micro-checkpoint">02 · RESPONDER <span>≈ 15 s</span></div><section aria-label="Pregunta intercalada" class="quiz mini micro-check"><script class="quiz-data" type="application/json">{"titulo": "Pausa rápida · Comprueba la idea", "preguntas": [{"q": "Un detector dice «hay humo», pero no hay. ¿Qué error es?", "opciones": ["Falso negativo", "Verdadero positivo", "Falso positivo"], "correcta": 2, "porque": "Positivo predicho sin positivo real es un falso positivo."}]}</script></section><section aria-label="Animación interactiva" class="micro-viz" data-index="21" data-micro-viz="evaluation"><div class="micro-kicker">03 · EXPERIMENTAR <span>≈ 45 s</span></div><div class="micro-viz-title"><div><h2>Los aciertos y los errores tienen nombre</h2><p>Cambia el caso y comprueba qué celda de la matriz se ilumina.</p></div><span aria-hidden="true" class="micro-viz-symbol">✦</span></div><div aria-live="polite" class="micro-viz-stage"><p>Animación interactiva: Los aciertos y los errores tienen nombre</p></div></section><div class="micro-kicker micro-checkpoint">04 · APLICAR <span>≈ 15 s</span></div><section aria-label="Pregunta intercalada" class="quiz mini micro-check"><script class="quiz-data" type="application/json">{"titulo": "Pausa rápida · ¿Lo aplicarías?", "preguntas": [{"q": "Con muchas clases negativas, ¿por qué puede engañar la accuracy?", "opciones": ["Porque siempre es igual al recall", "Porque acertar solo la clase mayoritaria puede inflarla", "Porque no existe en clasificación"], "correcta": 1, "porque": "El porcentaje global puede ocultar un bajo recall de la clase importante."}]}</script></section><div class="micro-finish"><strong>Idea que te llevas</strong><span>· escalar un gradiente de 10⁻⁸ Sin escalar: \( 10^{-8} \) en float16 es 0</span><small>¿Quieres más ejemplos, fórmulas o código? Los tienes justo debajo, sin límite de tiempo.</small></div><details class="profundizar micro-legacy"><summary><span>Explorar más: explicación y simulaciones completas<small>Todo el texto original, tablas y demos avanzadas. Opcional.</small></span></summary><div class="prof-body"><section><h2>Precisión mixta: números más pequeños, entrenamiento más rápido</h2>
+<p>Un número de <strong>float32</strong> usa 32 bits y cubre magnitudes de unos \( 10^{-38} \) a \( 3{,}4\cdot10^{38} \). Un <strong>float16</strong> usa 16 y solo llega de \( 6{,}1\cdot10^{-5} \) (el menor «normal»; por debajo pierde precisión hasta \( \approx6\cdot10^{-8} \)) a <strong>65504</strong>. Pasarse por arriba da <code>inf</code> (<em>overflow</em>) y quedarse por debajo da 0 (<em>underflow</em>). El fragmento 15 lo comprueba:</p>
+<p>El problema real: <strong>los gradientes suelen ser muy pequeños</strong> (\( 10^{-8} \) es habitual en las primeras capas) y en float16 se convierten en 0, así que esos pesos no se actualizan. La solución se llama <strong>loss scaling</strong> (escalado de la pérdida): multiplicar la pérdida por un número grande \( S \) antes de derivar, lo que multiplica <em>todos</em> los gradientes por \( S \) (por la regla de la cadena) y los saca de la zona de underflow; luego se <strong>dividen entre \( S \) en float32</strong> antes de aplicar el paso.</p>
+<p>Basta una línea antes de crear el modelo: <code>keras.mixed_precision.set_global_policy("mixed_float16")</code>. Con ella, cada capa <strong>calcula en float16 pero guarda sus pesos en float32</strong> (el fragmento 15: <code>compute_dtype = float16</code>, <code>kernel.dtype = float32</code>), de modo que las actualizaciones pequeñas no se pierden. Al compilar, Keras envuelve tu optimizador en un <code>LossScaleOptimizer</code> con escala dinámica: parte de \( 2^{15}=32768 \) y la dobla tras 2000 pasos sin overflow (<code>dynamic_growth_steps</code>). Tras 5 épocas = 35 pasos la escala sigue en 32768 y lleva 35 pasos buenos seguidos: no hubo ningún <code>inf</code>.</p>
+<div class="callout ejemplo"><span class="lbl">Ejemplo tomado del módulo</span><p>· escalar un gradiente de 10⁻⁸ Sin escalar: \( 10^{-8} \) en float16 es 0.</p></div></section><figure class="demo" data-demo="curso3/c3m5-fp16" data-titulo="Loss scaling: rescatar gradientes del underflow">
+<div class="haz">Se simulan 3000 gradientes con tamaños repartidos alrededor de 10⁻⁶·⁵ y se redondean de verdad a float16. Con «Sin escalar» mira qué porcentaje se convierte en 0. Sube la escala <em>S</em> (es una potencia de 2) con el deslizador y observa los porcentajes. Luego sube la magnitud de los gradientes hasta 10⁻³ y la escala hasta 2²⁰, y pulsa el botón dinámico.</div>
+<div class="observa">Con gradientes típicos de 10⁻⁶·⁵ y sin escalar, el <strong>15,7 %</strong> se convierte en 0; con \( S=2^6 \) baja al 0,2 % y con \( S=2^{10} \) a 0 %. Pero <strong>no se puede subir \( S \) sin límite</strong>: con gradientes de tamaño 10⁻³ y \( S=2^{20} \) un 3 % ya hace overflow (<code>inf</code>), y un solo <code>inf</code> estropea el paso entero. Por eso Keras usa un escalado <strong>dinámico</strong>: parte de un valor alto, y si aparece <code>inf</code> o <code>nan</code> <strong>salta ese paso y divide \( S \) entre 2</strong>; tras muchos pasos seguidos sin problemas lo vuelve a doblar.</div>
+</figure><div class="resumen"><h2 class="sin-num sin-toc">En pocas líneas</h2><ul><li><strong>Precisión mixta: números más pequeños, entrenamiento más rápido:</strong> Un número de float32 usa 32 bits y cubre magnitudes de unos \( 10^{-38} \) a \( 3{,}4\cdot10^{38} \).</li><li>Antes de continuar, intenta explicar la demo sin mirar su resultado.</li></ul></div><section class="quiz mini"><script class="quiz-data" type="application/json">{"titulo": "¿Lo tienes?", "preguntas": [{"q": "¿Qué concepto estamos trabajando en esta lección?", "opciones": ["Precisión mixta: números más pequeños, entrenamiento más rápido", "Optimizadores en la práctica: Nesterov, AdamW y los mandos de Keras", "Gradientes que explotan o se desvanecen: inicialización y recorte"], "correcta": 0, "porque": "Un número de float32 usa 32 bits y cubre magnitudes de unos \\( 10^{-38} \\) a \\( 3{,}4\\cdot10^{38} \\)."}, {"q": "¿Cuál de estas afirmaciones recoge lo que acabas de estudiar?", "opciones": ["Lo importante es comprender la idea y comprobarla con ejemplos, no memorizar términos.", "Un número de float32 usa 32 bits y cubre magnitudes de unos \\( 10^{-38} \\) a \\( 3{,}4\\cdot10^{38} \\).", "Siempre hay un único método que sirve para todos los problemas."], "correcta": 1, "porque": "La explicación central es: Un número de float32 usa 32 bits y cubre magnitudes de unos \\( 10^{-38} \\) a \\( 3{,}4\\cdot10^{38} \\)."}, {"q": "Si una demo o un ejemplo te desconcierta, ¿cuál es la mejor forma de aprenderlo?", "opciones": ["Memorizar el nombre sin entender la operación.", "Volver a los números, cambiar un valor y explicar qué ocurre.", "Ignorar los resultados que no coinciden con tu intuición."], "correcta": 1, "porque": "Explorar qué cambia y por qué ayuda a conectar el concepto con su resultado."}]}</script></section></div></details><details class="profundizar"><summary><span>Profundizar: explicación completa<small>Matices, fórmulas, tablas, otros ejemplos y experimentos del módulo original.</small></span></summary><div class="prof-body"><section>
+<h2 id="precision-mixta">Precisión mixta: números más pequeños, entrenamiento más rápido</h2>
+<p class="pregunta">Una GPU moderna hace cuentas con números de 16 bits mucho más deprisa (y con la mitad de memoria) que con 32. ¿Por qué no entrenamos todo en 16 bits? ¿Qué se rompe?</p>
+<p>Un número de <strong>float32</strong> usa 32 bits y cubre magnitudes de unos \( 10^{-38} \) a \( 3{,}4\cdot10^{38} \). Un <strong>float16</strong> usa 16 y solo llega de \( 6{,}1\cdot10^{-5} \) (el menor «normal»; por debajo pierde precisión hasta \( \approx6\cdot10^{-8} \)) a <strong>65504</strong>. Pasarse por arriba da <code>inf</code> (<em>overflow</em>) y quedarse por debajo da 0 (<em>underflow</em>). El fragmento 15 lo comprueba:</p>
+<table>
+<thead><tr><th>Operación en NumPy</th><th>Resultado</th></tr></thead>
+<tbody>
+<tr><td><code>np.float16(70000)</code></td><td class="res"><code>inf</code> (overflow)</td></tr>
+<tr><td><code>np.float16(1e-8)</code></td><td class="res"><code>0.0</code> (underflow)</td></tr>
+<tr><td>máximo de float16 / de float32</td><td>65504 / \( 3{,}4\cdot10^{38} \)</td></tr>
+</tbody>
+</table>
+<p>El problema real: <strong>los gradientes suelen ser muy pequeños</strong> (\( 10^{-8} \) es habitual en las primeras capas) y en float16 se convierten en 0, así que esos pesos no se actualizan. La solución se llama <strong>loss scaling</strong> (escalado de la pérdida): multiplicar la pérdida por un número grande \( S \) antes de derivar, lo que multiplica <em>todos</em> los gradientes por \( S \) (por la regla de la cadena) y los saca de la zona de underflow; luego se <strong>dividen entre \( S \) en float32</strong> antes de aplicar el paso.</p>
+<div class="callout analogia">
+<span class="lbl">Analogía</span>
+<p>Ver una película en 720p en vez de 4K: pesa la mitad y va más rápido, pero los detalles finísimos desaparecen (un gradiente muy pequeño se queda en 0). El <em>loss scaling</em> es subir mucho el volumen de un susurro antes de mandarlo por un altavoz barato, que si no lo ignoraría, y bajarlo de nuevo al llegar. Pero si lo subes demasiado, el sonido se satura y revienta (<em>overflow</em>).</p>
+</div>
+<div class="callout ejemplo">
+<span class="lbl">Ejemplo numérico · escalar un gradiente de 10⁻⁸</span>
+<ol class="pasos">
+<li><strong>Sin escalar:</strong> \( 10^{-8} \) en float16 es 0. El peso no se mueve.</li>
+<li><strong>Con \( S=1024 \):</strong> \( 10^{-8}\cdot1024=1{,}024\cdot10^{-5} \), que sí cabe en float16 (se guarda como 1,025·10⁻⁵ con el redondeo).</li>
+<li><strong>Desescalar:</strong> \( 1{,}025\cdot10^{-5}/1024=1{,}0012\cdot10^{-8} \). Es el gradiente real con un error del 0,12 %.</li>
+</ol>
+</div>
+<h3>En Keras 3</h3>
+<p>Basta una línea antes de crear el modelo: <code>keras.mixed_precision.set_global_policy("mixed_float16")</code>. Con ella, cada capa <strong>calcula en float16 pero guarda sus pesos en float32</strong> (el fragmento 15: <code>compute_dtype = float16</code>, <code>kernel.dtype = float32</code>), de modo que las actualizaciones pequeñas no se pierden. Al compilar, Keras envuelve tu optimizador en un <code>LossScaleOptimizer</code> con escala dinámica: parte de \( 2^{15}=32768 \) y la dobla tras 2000 pasos sin overflow (<code>dynamic_growth_steps</code>). Tras 5 épocas = 35 pasos la escala sigue en 32768 y lleva 35 pasos buenos seguidos: no hubo ningún <code>inf</code>.</p>
+<div class="callout ojo">
+<span class="lbl">Ojo · tres detalles de la precisión mixta</span>
+<p><strong>(1) La última capa en float32.</strong> Un softmax en float16 es numéricamente inestable: se acaba el modelo con <code>keras.layers.Activation("softmax", dtype="float32")</code>, como en el fragmento. <strong>(2) Solo acelera en hardware con soporte</strong> (GPU con tensor cores, TPU). En una CPU como la de estas pruebas no esperes ganar tiempo: el fragmento solo muestra la mecánica, no la velocidad. <strong>(3) <code>bfloat16</code></strong> (<code>"mixed_bfloat16"</code>) tiene el mismo rango que float32 con menos decimales, y no necesita escalado de la pérdida: es lo habitual en TPU. Y recuerda dejar la política global como estaba (<code>set_global_policy("float32")</code>) si sigues con otros experimentos en la misma sesión.</p>
+</div>
+<div class="callout regla">
+<span class="lbl">Regla fácil</span>
+<p>Precisión mixta = <strong>cálculo en 16 bits, pesos y actualización en 32, pérdida escalada y salida en float32</strong>. Es «gratis» en la GPU adecuada (una línea y casi el doble de velocidad); en otro hardware, no la actives.</p>
+</div>
+</section></div></details><details class="profundizar" id="codigo"><summary><span>Ver código explicado paso a paso<small>1 fragmento(s) original(es), con cada línea comentada y salida esperada.</small></span></summary><div class="prof-body"><article class="snippet" data-lang="python">
+<header>
+<h3>15 · Precisión mixta y loss scaling</h3>
+<p class="para-que"><strong>Para qué sirve</strong> Enseña los límites del float16 con NumPy, activa la política <code>mixed_float16</code> en Keras y comprueba qué se calcula en cada precisión y cómo trabaja el optimizador con escala dinámica.</p>
+</header>
+<pre class="code"><code>import warnings
+import numpy as np
+import keras
+
+warnings.filterwarnings("ignore", category=RuntimeWarning)   # NumPy avisa del overflow que vamos a provocar a propósito
+
+# 1) Los límites del float16, con NumPy
+print("float16: máximo =", float(np.finfo(np.float16).max), "| mínimo normal =", float(np.finfo(np.float16).tiny), "| float32 máximo =", float(np.finfo(np.float32).max))
+print("np.float16(70000)  -&gt;", np.float16(np.float32(70000)), "(overflow)")
+print("np.float16(1e-8)   -&gt;", np.float16(1e-8), "(underflow)")
+escalado = np.float16(1e-8 * 1024)
+print("np.float16(1e-8 * 1024) -&gt;", escalado, "-&gt; desescalado:", f"{float(escalado) / 1024:.4e}", "(el valor real era 1e-08)")
+
+# 2) La política de precisión mixta: cálculo en float16, pesos en float32
+keras.utils.set_random_seed(0)
+keras.mixed_precision.set_global_policy("mixed_float16")
+print()
+print("política global:", keras.mixed_precision.global_policy().name)
+modelo = keras.Sequential([
+    keras.Input(shape=(4,)),
+    keras.layers.Dense(16, activation="relu"),
+    keras.layers.Dense(3),
+    keras.layers.Activation("softmax", dtype="float32"),     # la salida, en float32 por estabilidad numérica
+])
+capa = modelo.layers[0]
+print("capa Dense -&gt; cálculo:", capa.compute_dtype, "| variables:", capa.kernel.dtype)
+print("salida de la última capa:", modelo(np.random.rand(2, 4).astype("float32")).dtype)
+
+modelo.compile(optimizer=keras.optimizers.Adam(0.01), loss="sparse_categorical_crossentropy", metrics=["accuracy"])
+print("optimizador tras compile:", type(modelo.optimizer).__name__, "envolviendo a", type(modelo.optimizer.inner_optimizer).__name__)
+print("escala inicial:", modelo.optimizer.initial_scale, "= 2^15 | sube x2 tras", modelo.optimizer.dynamic_growth_steps, "pasos sin overflow")
+
+rng = np.random.default_rng(0)
+X = rng.normal(size=(200, 4)).astype("float32")
+y = (X[:, 0] + X[:, 1] &gt; 0).astype("int32") + (X[:, 2] &gt; 1).astype("int32")
+h = modelo.fit(X, y, epochs=5, batch_size=32, verbose=0)
+print("entrena sin problemas: loss", round(h.history["loss"][0], 3), "-&gt;", round(h.history["loss"][-1], 3))
+estado = {v.path.split("/")[-1]: float(v.numpy()) for v in modelo.optimizer.variables if v.shape == ()}
+print("tras 5 épocas (35 pasos): escala =", estado["dynamic_scale"], "| pasos buenos seguidos =", estado["step_counter"])
+
+keras.mixed_precision.set_global_policy("float32")           # restaurar</code></pre>
+<details class="linea-a-linea" open="">
+<summary>Línea por línea</summary>
+<p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+<table class="lineas">
+<thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+<tbody>
+<tr data-lines="1-3"><td><code>import warnings …</code></td><td>Importaciones.</td></tr>
+<tr data-lines="5"><td><code>warnings.filterwarnings("ignore", category=RuntimeWarning)   # NumP…</code></td><td>NumPy avisa del desbordamiento que vamos a provocar a propósito; se silencia el aviso.</td></tr>
+<tr data-lines="7-10"><td><code># 1) Los límites del float16, con NumPy …</code></td><td>1) Los límites del float16 con NumPy: máximo 65504, menor valor normal \( 6{,}1\cdot10^{-5} \) y el máximo de float32. Convertir 70000 da <code>inf</code> (overflow) y 1e-8 da 0 (underflow).</td></tr>
+<tr data-lines="11-12"><td><code>escalado = np.float16(1e-8 * 1024) …</code></td><td>Escalar antes de convertir: \( 10^{-8}\cdot1024 \) sí se representa; al desescalar (dividir entre 1024 en float32) se recupera casi el valor real.</td></tr>
+<tr data-lines="14-16"><td><code># 2) La política de precisión mixta: cálculo en float16, pesos en f… …</code></td><td>2) Fija la semilla y activa la política global <code>mixed_float16</code>: las capas que se creen a partir de ahora usarán float16 para calcular y float32 para sus pesos.</td></tr>
+<tr data-lines="17-18"><td><code>print() …</code></td><td>Imprime el nombre de la política.</td></tr>
+<tr data-lines="19-24"><td><code>modelo = keras.Sequential([ …</code></td><td>Un modelo de 4 entradas, una capa oculta de 16, una de 3 salidas (3 clases) y una capa <code>Activation("softmax", dtype="float32")</code>: la salida se calcula en float32 por estabilidad.</td></tr>
+<tr data-lines="25-27"><td><code>capa = modelo.layers[0] …</code></td><td>Comprueba el tipo de cálculo y el de las variables de la primera capa, y el tipo de la salida del modelo.</td></tr>
+<tr data-lines="29-31"><td><code>modelo.compile(optimizer=keras.optimizers.Adam(0.01), loss="sparse_… …</code></td><td><code>compile</code> envuelve el optimizador en un <code>LossScaleOptimizer</code>. Imprime su tipo y el del optimizador interior, la escala inicial (\( 2^{15} \)) y cada cuántos pasos sin problemas se duplica.</td></tr>
+<tr data-lines="33-35"><td><code>rng = np.random.default_rng(0) …</code></td><td>Datos: 200 muestras, 4 variables y una etiqueta de 3 clases (0, 1 o 2) que depende de ellas.</td></tr>
+<tr data-lines="36-37"><td><code>h = modelo.fit(X, y, epochs=5, batch_size=32, verbose=0) …</code></td><td>Entrena 5 épocas con lotes de 32 (35 pasos) e imprime la pérdida inicial y la final.</td></tr>
+<tr data-lines="38-39"><td><code>estado = {v.path.split("/")[-1]: float(v.numpy()) for v in modelo.o… …</code></td><td>Lee del optimizador sus variables escalares (<code>dynamic_scale</code> y <code>step_counter</code>) e imprime la escala actual y los pasos buenos seguidos.</td></tr>
+<tr data-lines="41"><td><code>keras.mixed_precision.set_global_policy("float32")           # rest…</code></td><td>Restaura la política global a float32 para no afectar a otros experimentos.</td></tr>
+</tbody>
+</table>
+</details>
+<div class="salida">
+<strong>Salida esperada</strong>
+<pre>float16: máximo = 65504.0 | mínimo normal = 6.103515625e-05 | float32 máximo = 3.4028234663852886e+38
+np.float16(70000)  -&gt; inf (overflow)
+np.float16(1e-8)   -&gt; 0.0 (underflow)
+np.float16(1e-8 * 1024) -&gt; 1.025e-05 -&gt; desescalado: 1.0012e-08 (el valor real era 1e-08)
+
+política global: mixed_float16
+capa Dense -&gt; cálculo: float16 | variables: float32
+salida de la última capa: &lt;dtype: 'float32'&gt;
+optimizador tras compile: LossScaleOptimizer envolviendo a Adam
+escala inicial: 32768.0 = 2^15 | sube x2 tras 2000 pasos sin overflow
+entrena sin problemas: loss 1.175 -&gt; 0.549
+tras 5 épocas (35 pasos): escala = 32768.0 | pasos buenos seguidos = 35.0</pre>
+<p>El máximo de float16 es 65504 (el de float32 es \( 3{,}4\cdot10^{38} \)). 70000 se convierte en <code>inf</code> y \( 10^{-8} \) en 0, pero escalado por 1024 se guarda como 1,025·10⁻⁵ y, al desescalar, vale 1,0012·10⁻⁸: el 0,12 % de error. La política es <code>mixed_float16</code>: la capa calcula en float16 y guarda sus pesos en float32, y la salida es float32. El optimizador es un <code>LossScaleOptimizer</code> que envuelve a Adam, con escala inicial 32768 (\( 2^{15} \)) y duplicación tras 2000 pasos buenos. El entrenamiento va bien (pérdida de 1,175 a 0,549) y tras 35 pasos la escala sigue en 32768 con 35 pasos buenos seguidos: no hubo ningún overflow.</p>
+</div>
+</article></div></details></div></main></body></html>

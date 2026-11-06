@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+
+<html lang="es"><head><meta charset="utf-8"/><meta content="width=device-width,initial-scale=1" name="viewport"/><title>Lección 8 · Una CNN completa, capa a capa: formas, parámetros y el «resumen» con hooks · Curso 5 · Cuaderno de IA</title><meta content="El patrón de casi todas las CNN pequeñas es el mismo y se repite: convolución → ReLU → pooling , tantas veces como haga falta; después, aplanar y una o dos capas lineales." name="description"/><script>try{var t=localStorage.getItem('cuaderno-ia:tema');if(t)document.documentElement.setAttribute('data-theme',t)}catch(e){}</script><link href="../../assets/css/style.css" rel="stylesheet"/><script src="../../assets/js/curriculum.js"></script><script src="../../assets/js/lab.js"></script><script defer="" src="../../assets/js/app.js"></script><script defer="" src="../../assets/js/microanimations.js"></script></head><body data-course="5" data-lesson="8" data-module="3" data-root="../../"><main><div class="page" data-micro="3min"><header class="hero leccion"><div class="hero-grid"><div><p class="eyebrow">Curso 5 · Módulo 3 · Lección 8 de 14</p><h1>Una CNN completa, capa a capa: formas, parámetros y el «resumen» con hooks</h1><p class="lead">El patrón de casi todas las CNN pequeñas es el mismo y se repite: convolución → ReLU → pooling , tantas veces como haga falta; después, aplanar y una o dos capas lineales.</p><p class="meta-line"><span class="read-time" data-render="read-time"></span><a href="../modulo-3.html">Índice del módulo</a></p></div><div aria-hidden="true" class="hero-tile"></div></div></header><details class="predice"><summary>Antes de mirar el ejemplo: ¿qué crees que va a cambiar al mover los controles?</summary><div><p>El patrón de casi todas las CNN pequeñas es el mismo y se repite: convolución → ReLU → pooling , tantas veces como haga falta; después, aplanar y una o dos capas lineales.</p></div></details><section aria-label="Explicación breve" class="micro-core"><div class="micro-kicker">01 · ENTENDER <span>≈ 45 s</span></div><h2>La idea en palabras sencillas</h2><p>El patrón de casi todas las CNN pequeñas es el mismo y se repite: convolución → ReLU → pooling, tantas veces como haga falta; después, aplanar y una o dos capas lineales.</p><div class="micro-example"><span aria-hidden="true" class="micro-example-icon">🩻</span><div><strong>Otro ejemplo · Radiografía</strong><p>La misma operación busca patrones locales en diferentes partes de una imagen médica.</p></div></div></section><div class="micro-kicker micro-checkpoint">02 · RESPONDER <span>≈ 15 s</span></div><section aria-label="Pregunta intercalada" class="quiz mini micro-check"><script class="quiz-data" type="application/json">{"titulo": "Pausa rápida · Comprueba la idea", "preguntas": [{"q": "Un kernel 3×3 se coloca sobre una foto. ¿Qué analiza primero?", "opciones": ["Todas las fotografías del dataset a la vez", "Solo la etiqueta final", "Nueve posiciones próximas de la imagen"], "correcta": 2, "porque": "El filtro procesa una región local y luego se desplaza."}]}</script></section><section aria-label="Animación interactiva" class="micro-viz" data-index="16" data-micro-viz="convolution"><div class="micro-kicker">03 · EXPERIMENTAR <span>≈ 45 s</span></div><div class="micro-viz-title"><div><h2>Una ventana recorre la imagen</h2><p>Avanza el filtro 3×3; fíjate en qué píxeles observa cada vez.</p></div><span aria-hidden="true" class="micro-viz-symbol">✦</span></div><div aria-live="polite" class="micro-viz-stage"><p>Animación interactiva: Una ventana recorre la imagen</p></div></section><div class="micro-kicker micro-checkpoint">04 · APLICAR <span>≈ 15 s</span></div><section aria-label="Pregunta intercalada" class="quiz mini micro-check"><script class="quiz-data" type="application/json">{"titulo": "Pausa rápida · ¿Lo aplicarías?", "preguntas": [{"q": "¿Por qué compartir un filtro en distintas posiciones es útil?", "opciones": ["Porque siempre produce una sola clase", "Porque permite buscar el mismo patrón en varias zonas", "Porque hace innecesarias las imágenes"], "correcta": 1, "porque": "La convolución reutiliza los pesos del filtro en diferentes zonas."}]}</script></section><div class="micro-finish"><strong>Idea que te llevas</strong><span>El patrón de casi todas las CNN pequeñas es el mismo y se repite: convolución → ReLU → pooling, tantas veces como haga falta; después, aplanar y una o</span><small>¿Quieres más ejemplos, fórmulas o código? Los tienes justo debajo, sin límite de tiempo.</small></div><details class="profundizar micro-legacy"><summary><span>Explorar más: explicación y simulaciones completas<small>Todo el texto original, tablas y demos avanzadas. Opcional.</small></span></summary><div class="prof-body"><section><h2>Una CNN completa, capa a capa: formas, parámetros y el «resumen» con hooks</h2>
+<p>El patrón de casi todas las CNN pequeñas es el mismo y se repite: <strong>convolución → ReLU → pooling</strong>, tantas veces como haga falta; después, <strong>aplanar</strong> y una o dos capas lineales. A medida que avanzas, el tamaño de los mapas <em>baja</em> (el pooling lo divide entre 2) y el número de canales <em>sube</em> (cada convolución crea más filtros): la imagen se va convirtiendo en «muchas características pequeñas».</p>
+<p>Así queda la red del laboratorio de IBM, escrita como <code>nn.Module</code> (está entera en el fragmento 7 y se entrena en el 9):</p>
+<p>Dos detalles de esta clase que conviene notar. Primero, el laboratorio usa <code>torch.relu(...)</code> (una función) dentro de <code>forward</code> en lugar de capas <code>nn.ReLU()</code>; funciona igual, pero esas activaciones no aparecen como módulos. Segundo, usa <code>x.view(x.size(0), -1)</code> en lugar de <code>nn.Flatten()</code>, y por eso tienes que acordarte tú de que <code>nn.Linear</code> espera \( 32\cdot4\cdot4 \).</p>
+<div class="callout ejemplo"><span class="lbl">Ejemplo tomado del módulo</span><p>: la red del laboratorio con una miniatura de 1×16×16 (N es el tamaño del lote) Paso Cuenta del tamaño Forma de salida Parámetros Multiplicaciones por imagen entrada — (N, 1, 16, 16) 0 0 cnn1 k5, p2 ⌊(16 + 4 − 5)/1⌋ + 1 = 16 (N, 16, 16…</p></div></section><figure class="demo" data-demo="curso5/c5m3-constructor-cnn" data-titulo="constructor de CNN: forma, parámetros y multiplicaciones capa a capa">
+<div class="haz">Pulsa «CNN del laboratorio» y comprueba que salen 18.378 parámetros. Después «Red de papel 100×100×3» y busca la capa que concentra los parámetros. Prueba a vaciar la red, elegir la entrada 1×28×28 y añadir tú: Conv2d (16, kernel 3, padding 1), MaxPool2d, otra Conv2d, MaxPool2d, y el aplanado con su Linear. Luego añade una Conv2d con kernel 7 sobre un mapa pequeño, o una Conv2d <em>después</em> de aplanar, para ver los errores.</div>
+<div class="observa">Cada fila recalcula la forma con la fórmula del tamaño, y la última capa lineal toma sola su <code>in_features</code> del aplanado. El gráfico de barras muestra dónde están los parámetros (casi siempre en la primera <code>Linear</code>) y, aparte, dónde están las multiplicaciones (casi siempre en las convoluciones). El código de PyTorch que escribe es el que tendrías que teclear; si falla una capa (el kernel no cabe, o aplicas <code>Conv2d</code> a un vector), la herramienta lo dice con las mismas palabras que PyTorch.</div>
+</figure><div class="resumen"><h2 class="sin-num sin-toc">En pocas líneas</h2><ul><li><strong>Una CNN completa, capa a capa: formas, parámetros y el «resumen» con…:</strong> El patrón de casi todas las CNN pequeñas es el mismo y se repite: convolución → ReLU → pooling , tantas veces como haga falta…</li><li>Antes de continuar, intenta explicar la demo sin mirar su resultado.</li></ul></div><section class="quiz mini"><script class="quiz-data" type="application/json">{"titulo": "¿Lo tienes?", "preguntas": [{"q": "¿Qué concepto estamos trabajando en esta lección?", "opciones": ["Mirar dentro de la red: mapas de características y filtros", "Chuleta del módulo", "Una CNN completa, capa a capa: formas, parámetros y el «resumen» con hooks"], "correcta": 2, "porque": "El patrón de casi todas las CNN pequeñas es el mismo y se repite: convolución → ReLU → pooling , tantas veces como haga falta; después, aplanar y una o dos capas lineales."}, {"q": "¿Cuál de estas afirmaciones recoge lo que acabas de estudiar?", "opciones": ["El patrón de casi todas las CNN pequeñas es el mismo y se repite: convolución → ReLU → pooling , tantas veces como haga falta; después, aplanar y una o dos capas lineales.", "Siempre hay un único método que sirve para todos los problemas.", "Lo importante es comprender la idea y comprobarla con ejemplos, no memorizar términos."], "correcta": 0, "porque": "La explicación central es: El patrón de casi todas las CNN pequeñas es el mismo y se repite: convolución → ReLU → pooling , tantas veces como haga falta; después, aplanar y una o dos capas lineales."}, {"q": "Si una demo o un ejemplo te desconcierta, ¿cuál es la mejor forma de aprenderlo?", "opciones": ["Volver a los números, cambiar un valor y explicar qué ocurre.", "Ignorar los resultados que no coinciden con tu intuición.", "Memorizar el nombre sin entender la operación."], "correcta": 0, "porque": "Explorar qué cambia y por qué ayuda a conectar el concepto con su resultado."}]}</script></section></div></details><details class="profundizar"><summary><span>Profundizar: explicación completa<small>Matices, fórmulas, tablas, otros ejemplos y experimentos del módulo original.</small></span></summary><div class="prof-body"><section>
+<h2 id="arquitectura">Una CNN completa, capa a capa: formas, parámetros y el «resumen» con hooks</h2>
+<p class="pregunta">Quiero clasificar miniaturas de 16×16 (en el código serán dígitos del 0 al 9; imagina pósters pequeños que hay que repartir en 10 géneros) con dos convoluciones y una capa lineal. ¿Qué forma tiene el tensor después de cada capa, qué número va en <code>nn.Linear(?, 10)</code> y cuántos parámetros tiene la red?</p>
+<p>El patrón de casi todas las CNN pequeñas es el mismo y se repite: <strong>convolución → ReLU → pooling</strong>, tantas veces como haga falta; después, <strong>aplanar</strong> y una o dos capas lineales. A medida que avanzas, el tamaño de los mapas <em>baja</em> (el pooling lo divide entre 2) y el número de canales <em>sube</em> (cada convolución crea más filtros): la imagen se va convirtiendo en «muchas características pequeñas».</p>
+<p>Así queda la red del laboratorio de IBM, escrita como <code>nn.Module</code> (está entera en el fragmento 7 y se entrena en el 9):</p>
+<pre class="ascii">class CNN(nn.Module):
+    def __init__(self, out_1=16, out_2=32):
+        super().__init__()
+        self.cnn1 = nn.Conv2d(in_channels=1, out_channels=out_1, kernel_size=5, padding=2)
+        self.maxpool1 = nn.MaxPool2d(kernel_size=2)
+        self.cnn2 = nn.Conv2d(in_channels=out_1, out_channels=out_2, kernel_size=5, stride=1, padding=2)
+        self.maxpool2 = nn.MaxPool2d(kernel_size=2)
+        self.fc1 = nn.Linear(out_2 * 4 * 4, 10)
+
+    def forward(self, x):
+        x = self.maxpool1(torch.relu(self.cnn1(x)))
+        x = self.maxpool2(torch.relu(self.cnn2(x)))
+        x = x.view(x.size(0), -1)
+        return self.fc1(x)</pre>
+<div class="callout ejemplo">
+<span class="lbl">Ejemplo numérico: la red del laboratorio con una miniatura de 1×16×16 (N es el tamaño del lote)</span>
+<table>
+<thead><tr><th>Paso</th><th>Cuenta del tamaño</th><th>Forma de salida</th><th>Parámetros</th><th>Multiplicaciones por imagen</th></tr></thead>
+<tbody>
+<tr><td>entrada</td><td>—</td><td>(N, 1, 16, 16)</td><td>0</td><td>0</td></tr>
+<tr><td><code>cnn1</code> k5, p2</td><td>⌊(16 + 4 − 5)/1⌋ + 1 = 16</td><td>(N, 16, 16, 16)</td><td>16·(1·25 + 1) = <span class="res">416</span></td><td>16·16·16·25·1 = 102.400</td></tr>
+<tr><td>ReLU + <code>maxpool1</code></td><td>⌊(16 − 2)/2⌋ + 1 = 8</td><td>(N, 16, 8, 8)</td><td>0</td><td>0</td></tr>
+<tr><td><code>cnn2</code> k5, p2</td><td>⌊(8 + 4 − 5)/1⌋ + 1 = 8</td><td>(N, 32, 8, 8)</td><td>32·(16·25 + 1) = <span class="res">12.832</span></td><td>32·8·8·25·16 = 819.200</td></tr>
+<tr><td>ReLU + <code>maxpool2</code></td><td>⌊(8 − 2)/2⌋ + 1 = 4</td><td>(N, 32, 4, 4)</td><td>0</td><td>0</td></tr>
+<tr><td><code>view</code> (aplanar)</td><td>32·4·4 = 512</td><td>(N, 512)</td><td>0</td><td>0</td></tr>
+<tr><td><code>fc1</code></td><td>—</td><td>(N, 10)</td><td>512·10 + 10 = <span class="res">5.130</span></td><td>512·10 = 5.120</td></tr>
+<tr><td><strong>Total</strong></td><td></td><td></td><td><strong>18.378</strong></td><td><strong>926.720</strong></td></tr>
+</tbody>
+</table>
+<p>Las «multiplicaciones» de una convolución son \( C_{out}\cdot H_{out}\cdot W_{out}\cdot k^2\cdot C_{in} \): cada uno de los \( C_{out}\cdot H_{out}\cdot W_{out} \) números de la salida cuesta \( k^2 C_{in} \) multiplicaciones. Fíjate en que <strong>casi todo el cálculo está en la segunda convolución</strong> (819.200 de 926.720, el 88 %) y no en la capa lineal.</p>
+</div>
+<p>Dos detalles de esta clase que conviene notar. Primero, el laboratorio usa <code>torch.relu(...)</code> (una función) dentro de <code>forward</code> en lugar de capas <code>nn.ReLU()</code>; funciona igual, pero esas activaciones no aparecen como módulos. Segundo, usa <code>x.view(x.size(0), -1)</code> en lugar de <code>nn.Flatten()</code>, y por eso tienes que acordarte tú de que <code>nn.Linear</code> espera \( 32\cdot4\cdot4 \).</p>
+<h3>La misma cuenta en una red a medida: pósters de 100×100 en color</h3>
+<p>Para un póster RGB de 100×100 con tres géneros (comedia, terror y drama, como en el Curso 2), una red típica es <code>Conv2d(3,16,3)</code> → ReLU → <code>MaxPool2d(2)</code> → <code>Conv2d(16,32,3)</code> → ReLU → <code>MaxPool2d(2)</code> → <code>Flatten</code> → <code>Linear(?,100)</code> → ReLU → <code>Linear(100,3)</code>. Sin padding, los tamaños son 100 → 98 → 49 → 47 → 23, así que tras aplanar hay \( 32\cdot23\cdot23=16.928 \) valores. Parámetros: 448 + 4.640 + 1.692.900 + 303 = <strong>1.698.291</strong>. El 99,7 % está en la primera capa lineal (1.692.900 de 1.698.291): las convoluciones, que hacen el trabajo visual, son baratísimas en parámetros y es el aplanado lo que los dispara. Compara con los 3.000.100 que costaba <em>solo</em> la primera capa si se conectaba el póster sin convolución.</p>
+<h3>Un «resumen» de la red con hooks (sin instalar nada)</h3>
+<p>En Keras, <code>model.summary()</code> te daba esta tabla. En PyTorch hay paquetes (<code>torchinfo</code>, <code>torchsummary</code>) pero puedes construirla en diez líneas con <strong><em>hooks</em></strong>: un <em>hook</em> es una función que PyTorch llama automáticamente cada vez que un módulo termina su <code>forward</code>. Con <code>modulo.register_forward_hook(f)</code>, la función <code>f(modulo, entrada, salida)</code> recibe la forma de lo que sale de esa capa. El fragmento 7 registra un hook en cada módulo «hoja» (el que no contiene otros módulos), pasa un tensor de ceros <code>torch.zeros(1, *forma_entrada)</code> y escribe una fila por capa; su salida cuadra con la tabla de arriba (18.378 parámetros) y también da 1.898 para la CNN pequeña de dígitos 8×8 y 1.698.291 para la de los pósters. Como el modelo del laboratorio usa <code>torch.relu</code> y <code>view</code>, el resumen no muestra ni ReLU ni aplanado; las otras dos redes, escritas con <code>nn.Sequential</code>, sí.</p>
+<div class="callout ojo">
+<span class="lbl">Ojo</span>
+<p>Un número en un <code>nn.Linear</code> que «sale de la nada» casi siempre es un descuido en la cuenta de las formas. Cámbiale a la red del laboratorio <code>padding=2</code> por <code>padding=0</code> y todos los tamaños bajan (12 → 6 → 2 → 1), de modo que <code>32 * 4 * 4</code> deja de valer. Por eso en la práctica se calcula <code>in_features</code> con un forward de prueba o con <code>LazyLinear</code> (fragmento 6), y se comprueba con el resumen.</p>
+</div>
+</section></div></details><details class="profundizar" id="codigo"><summary><span>Ver código explicado paso a paso<small>1 fragmento(s) original(es), con cada línea comentada y salida esperada.</small></span></summary><div class="prof-body"><article class="snippet" data-lang="python">
+<header>
+<h3>7 · Un «resumen» del modelo con hooks (formas y parámetros capa a capa)</h3>
+<p class="para-que"><strong>Para qué sirve</strong> Escribir en diez líneas el equivalente de <code>model.summary()</code> de Keras con <code>register_forward_hook</code>, y comprobar con él las tres redes del módulo.</p>
+</header>
+<pre class="code"><code>import torch
+import torch.nn as nn
+
+
+def resumen(modelo, forma_entrada):
+    filas, ganchos = [], []
+
+    def anotar(modulo, entrada, salida):
+        n_par = sum(p.numel() for p in modulo.parameters(recurse=False))
+        filas.append((modulo.__class__.__name__, tuple(salida.shape), n_par))
+
+    for m in modelo.modules():
+        if len(list(m.children())) == 0:
+            ganchos.append(m.register_forward_hook(anotar))
+    modelo.eval()
+    with torch.no_grad():
+        modelo(torch.zeros(1, *forma_entrada))
+    for g in ganchos:
+        g.remove()
+    print(f"{'capa':&lt;12}{'forma de salida':&lt;22}{'parámetros':&gt;10}")
+    for nombre, forma, n in filas:
+        print(f"{nombre:&lt;12}{str(forma):&lt;22}{n:&gt;10d}")
+    print("total:", sum(p.numel() for p in modelo.parameters()), "\n")
+
+
+class CNN(nn.Module):
+    def __init__(self, out_1=16, out_2=32):
+        super().__init__()
+        self.cnn1 = nn.Conv2d(in_channels=1, out_channels=out_1, kernel_size=5, padding=2)
+        self.maxpool1 = nn.MaxPool2d(kernel_size=2)
+        self.cnn2 = nn.Conv2d(in_channels=out_1, out_channels=out_2, kernel_size=5, stride=1, padding=2)
+        self.maxpool2 = nn.MaxPool2d(kernel_size=2)
+        self.fc1 = nn.Linear(out_2 * 4 * 4, 10)
+
+    def forward(self, x):
+        x = self.maxpool1(torch.relu(self.cnn1(x)))
+        x = self.maxpool2(torch.relu(self.cnn2(x)))
+        x = x.view(x.size(0), -1)
+        return self.fc1(x)
+
+
+print("--- CNN del laboratorio (imágenes 16x16) ---")
+resumen(CNN(), (1, 16, 16))
+
+print("--- CNN pequeña para dígitos 8x8 ---")
+digitos = nn.Sequential(
+    nn.Conv2d(1, 8, 3, padding=1), nn.ReLU(), nn.MaxPool2d(2),
+    nn.Conv2d(8, 16, 3, padding=1), nn.ReLU(), nn.MaxPool2d(2),
+    nn.Flatten(), nn.Linear(64, 10),
+)
+resumen(digitos, (1, 8, 8))
+
+print("--- Red de papel: póster RGB de 100x100, tres clases ---")
+papel = nn.Sequential(
+    nn.Conv2d(3, 16, 3), nn.ReLU(), nn.MaxPool2d(2),
+    nn.Conv2d(16, 32, 3), nn.ReLU(), nn.MaxPool2d(2),
+    nn.Flatten(), nn.Linear(23 * 23 * 32, 100), nn.ReLU(), nn.Linear(100, 3),
+)
+resumen(papel, (3, 100, 100))</code></pre>
+<details class="linea-a-linea">
+<summary>Línea por línea</summary>
+<p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+<table class="lineas">
+<thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+<tbody>
+<tr data-lines="1-2"><td><code>import …</code></td><td><code>torch</code> y <code>torch.nn</code>.</td></tr>
+<tr data-lines="5-6"><td><code>def resumen(modelo, forma_entrada): filas, ganchos = [], []</code></td><td>Función que recibe el modelo y la forma de UNA imagen, sin lote, por ejemplo (1, 16, 16). <code>filas</code> guardará una fila por capa y <code>ganchos</code> los hooks registrados para poder quitarlos después.</td></tr>
+<tr data-lines="8-10"><td><code>def anotar(modulo, entrada, salida): …</code></td><td>El hook. PyTorch lo llama con tres argumentos cada vez que un módulo termina su <code>forward</code>: el módulo, su entrada y su salida. Guarda el nombre de la clase, la forma de la salida y el número de parámetros <em>propios</em> del módulo (<code>recurse=False</code>).</td></tr>
+<tr data-lines="12-14"><td><code>for m in modelo.modules(): if len(list(m.children())) == 0: …</code></td><td>Recorre todos los módulos; solo a los «hoja» (los que no contienen otros módulos) se les registra el hook con <code>register_forward_hook</code>, que devuelve un identificador para borrarlo.</td></tr>
+<tr data-lines="15-17"><td><code>modelo.eval() ; with torch.no_grad(): modelo(torch.zeros(1, *forma_entrada))</code></td><td>Pasa una imagen de ceros por el modelo: al hacerlo, cada capa hoja dispara su hook. El <code>*</code> desempaqueta la forma: <code>(1, *(1, 16, 16))</code> es <code>(1, 1, 16, 16)</code>.</td></tr>
+<tr data-lines="18-19"><td><code>for g in ganchos: g.remove()</code></td><td>Quita los hooks para no dejar basura en el modelo.</td></tr>
+<tr data-lines="20-23"><td><code>print(…)</code></td><td>Imprime la cabecera con anchos fijos (<code>:&lt;12</code> alinea a la izquierda, <code>:&gt;10d</code> a la derecha), una fila por capa y el total de parámetros.</td></tr>
+<tr data-lines="26-33"><td><code>class CNN(nn.Module): __init__ …</code></td><td>La CNN del laboratorio: dos convoluciones de 5×5 con padding 2, dos <code>MaxPool2d(2)</code> y una capa lineal de 32·4·4 entradas y 10 salidas.</td></tr>
+<tr data-lines="35-39"><td><code>def forward(self, x): …</code></td><td>Conv → <code>torch.relu</code> → pooling, dos veces; <code>x.view(x.size(0), -1)</code> aplana; y <code>fc1</code> da los 10 logits. El ReLU es una función, no un módulo: por eso no aparecerá en el resumen.</td></tr>
+<tr data-lines="42-43"><td><code>print(…) ; resumen(CNN(), (1, 16, 16))</code></td><td>Resumen de la CNN del laboratorio con imágenes 1×16×16.</td></tr>
+<tr data-lines="45-51"><td><code>digitos = nn.Sequential(…) ; resumen(digitos, (1, 8, 8))</code></td><td>Una CNN pequeña para dígitos de 8×8, escrita con <code>nn.Sequential</code>: aquí los ReLU y el <code>Flatten</code> sí son módulos y salen en la tabla.</td></tr>
+<tr data-lines="53-59"><td><code>papel = nn.Sequential(…) ; resumen(papel, (3, 100, 100))</code></td><td>La red de «papel» para pósters RGB de 100×100 y tres clases: <code>23 * 23 * 32</code> es la cuenta a mano del tamaño aplanado.</td></tr>
+</tbody>
+</table>
+</details>
+<div class="salida">
+<strong>Salida esperada</strong>
+<pre>--- CNN del laboratorio (imágenes 16x16) ---
+capa        forma de salida       parámetros
+Conv2d      (1, 16, 16, 16)              416
+MaxPool2d   (1, 16, 8, 8)                  0
+Conv2d      (1, 32, 8, 8)              12832
+MaxPool2d   (1, 32, 4, 4)                  0
+Linear      (1, 10)                     5130
+total: 18378 
+
+--- CNN pequeña para dígitos 8x8 ---
+capa        forma de salida       parámetros
+Conv2d      (1, 8, 8, 8)                  80
+ReLU        (1, 8, 8, 8)                   0
+MaxPool2d   (1, 8, 4, 4)                   0
+Conv2d      (1, 16, 4, 4)               1168
+ReLU        (1, 16, 4, 4)                  0
+MaxPool2d   (1, 16, 2, 2)                  0
+Flatten     (1, 64)                        0
+Linear      (1, 10)                      650
+total: 1898 
+
+--- Red de papel: póster RGB de 100x100, tres clases ---
+capa        forma de salida       parámetros
+Conv2d      (1, 16, 98, 98)              448
+ReLU        (1, 16, 98, 98)                0
+MaxPool2d   (1, 16, 49, 49)                0
+Conv2d      (1, 32, 47, 47)             4640
+ReLU        (1, 32, 47, 47)                0
+MaxPool2d   (1, 32, 23, 23)                0
+Flatten     (1, 16928)                     0
+Linear      (1, 100)                 1692900
+ReLU        (1, 100)                       0
+Linear      (1, 3)                       303
+total: 1698291 </pre>
+<p>La tabla de la red del laboratorio reproduce la cuenta a mano: 416, 12.832 y 5.130 parámetros, total 18.378, con las formas (1, 16, 16, 16) → (1, 16, 8, 8) → (1, 32, 8, 8) → (1, 32, 4, 4) → (1, 10). No salen los ReLU ni el aplanado porque la clase usa <code>torch.relu</code> y <code>view</code>. En la CNN de dígitos sí aparecen y suman 1.898 (80 + 1.168 + 650). En la de papel, 448 + 4.640 + 1.692.900 + 303 = 1.698.291, y las formas (98, 49, 47, 23) coinciden con la fórmula: el aplanado es 16.928 = 32·23·23.</p>
+</div>
+</article></div></details></div></main></body></html>

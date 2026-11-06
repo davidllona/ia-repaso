@@ -1,0 +1,458 @@
+<!DOCTYPE html>
+
+<html lang="es"><head><meta charset="utf-8"/><meta content="width=device-width,initial-scale=1" name="viewport"/><title>Lección 8 · Generación de texto con un Transformer decoder · Curso 3 · Cuaderno de IA</title><meta content="Sin internet no podemos bajar un corpus, y un texto sintético tiene una ventaja: podemos calcular exactamente cuánto vale un modelo perfecto." name="description"/><script>try{var t=localStorage.getItem('cuaderno-ia:tema');if(t)document.documentElement.setAttribute('data-theme',t)}catch(e){}</script><link href="../../assets/css/style.css" rel="stylesheet"/><script src="../../assets/js/curriculum.js"></script><script src="../../assets/js/lab.js"></script><script defer="" src="../../assets/js/app.js"></script><script defer="" src="../../assets/js/microanimations.js"></script></head><body data-course="3" data-lesson="8" data-module="3" data-root="../../"><main><div class="page" data-micro="3min"><header class="hero leccion"><div class="hero-grid"><div><p class="eyebrow">Curso 3 · Módulo 3 · Lección 8 de 8</p><h1>Generación de texto con un Transformer decoder</h1><p class="lead">Sin internet no podemos bajar un corpus, y un texto sintético tiene una ventaja: podemos calcular exactamente cuánto vale un modelo perfecto.</p><p class="meta-line"><span class="read-time" data-render="read-time"></span><a href="../modulo-3.html">Índice del módulo</a></p></div><div aria-hidden="true" class="hero-tile"></div></div></header><details class="predice"><summary>Antes de mirar el ejemplo: ¿qué crees que va a cambiar al mover los controles?</summary><div><p>Sin internet no podemos bajar un corpus, y un texto sintético tiene una ventaja: podemos calcular exactamente cuánto vale un modelo perfecto.</p></div></details><section aria-label="Explicación breve" class="micro-core"><div class="micro-kicker">01 · ENTENDER <span>≈ 45 s</span></div><h2>La idea en palabras sencillas</h2><p>Sin internet no podemos bajar un corpus, y un texto sintético tiene una ventaja: podemos calcular exactamente cuánto vale un modelo perfecto.</p><div class="micro-example"><span aria-hidden="true" class="micro-example-icon">💡</span><div><strong>Otro ejemplo · Mensajes</strong><p>Un asistente considera varias palabras para interpretar «banco» como asiento o entidad financiera.</p></div></div></section><div class="micro-kicker micro-checkpoint">02 · RESPONDER <span>≈ 15 s</span></div><section aria-label="Pregunta intercalada" class="quiz mini micro-check"><script class="quiz-data" type="application/json">{"titulo": "Pausa rápida · Comprueba la idea", "preguntas": [{"q": "En «Fui al banco a retirar dinero», ¿qué ayuda a interpretar «banco»?", "opciones": ["Únicamente su primera letra", "El contexto «retirar dinero»", "Solo la longitud de la palabra"], "correcta": 1, "porque": "La atención permite relacionar términos y su contexto."}]}</script></section><section aria-label="Animación interactiva" class="micro-viz" data-index="14" data-micro-viz="attention"><div class="micro-kicker">03 · EXPERIMENTAR <span>≈ 45 s</span></div><div class="micro-viz-title"><div><h2>Qué parte del contexto importa</h2><p>Selecciona otra palabra y observa qué conexiones destacan.</p></div><span aria-hidden="true" class="micro-viz-symbol">✦</span></div><div aria-live="polite" class="micro-viz-stage"><p>Animación interactiva: Qué parte del contexto importa</p></div></section><div class="micro-kicker micro-checkpoint">04 · APLICAR <span>≈ 15 s</span></div><section aria-label="Pregunta intercalada" class="quiz mini micro-check"><script class="quiz-data" type="application/json">{"titulo": "Pausa rápida · ¿Lo aplicarías?", "preguntas": [{"q": "¿Qué busca un mecanismo de atención?", "opciones": ["Ponderar qué elementos de la entrada son relevantes", "Borrar toda la información anterior", "Convertir siempre imágenes en texto"], "correcta": 0, "porque": "La atención asigna importancia relativa a diferentes elementos del contexto."}]}</script></section><div class="micro-finish"><strong>Idea que te llevas</strong><span>Sin internet no podemos bajar un corpus, y un texto sintético tiene una ventaja: podemos calcular exactamente cuánto vale un modelo perfecto</span><small>¿Quieres más ejemplos, fórmulas o código? Los tienes justo debajo, sin límite de tiempo.</small></div><details class="profundizar micro-legacy"><summary><span>Explorar más: explicación y simulaciones completas<small>Todo el texto original, tablas y demos avanzadas. Opcional.</small></span></summary><div class="prof-body"><section><h2>Generación de texto con un Transformer decoder</h2>
+<p>Sin internet no podemos bajar un corpus, y un texto sintético tiene una ventaja: podemos calcular <em>exactamente</em> cuánto vale un modelo perfecto. Imagina que son los subtítulos de una serie infantil muy sencilla. Escribimos una gramática pequeña de frases como «la niña pequeña lee un libro .» o «el gato negro duerme en el sofá .»: un sujeto (6 sustantivos, con su artículo <em>el/la</em>), un adjetivo opcional que <strong>concuerda en género</strong> (negro/negra, pequeño/pequeña) y un verbo con su complemento (<em>duerme en…</em>, <em>bebe…</em>, <em>lee…</em>, <em>corre por…</em>). Salen 144 frases distintas y generamos 1.500 al azar (10.115 palabras). Aprender esa gramática exige memoria de lo anterior: para escribir «negra» hay que acordarse de que el sustantivo era «gata».</p>
+<p>Un modelo solo ve números, así que cada palabra se cambia por un id. <code>keras.layers.TextVectorization</code> hace todo el trayecto: <code>standardize</code> (qué limpieza aplicar: aquí solo pasar a minúsculas; la opción por defecto también borraría los signos de puntuación, incluido nuestro «.» que marca el final de frase), <code>split</code> (por espacios), y construye el <strong>vocabulario</strong> con <code>adapt</code>. El vocabulario reserva el id 0 para el relleno (cadena vacía) y el id 1 para las palabras desconocidas (<code>[UNK]</code>); aquí tiene 31 entradas: esas 2 más 29 palabras. Las palabras de verdad empiezan en el id 2 y están ordenadas de más a menos frecuentes.</p>
+<p>Una vez convertido en números, el texto <em>es</em> una secuencia de enteros y cabe en las herramientas de la primera sección. Cortamos ventanas de 16 ids y para cada posición el objetivo es <strong>el id siguiente</strong>: las entradas son <code>ids[:-1]</code> y los objetivos <code>ids[1:]</code>, desplazados un lugar. Una ventana de 16 palabras proporciona así 16 ejercicios a la vez («dada la 1.ª, la 2.ª», «dadas las 2 primeras, la 3.ª»…), y la <strong>máscara causal</strong> impide que cada posición mire a la palabra que tiene que adivinar.</p>
+<div class="callout ejemplo"><span class="lbl">Ejemplo tomado del módulo</span><p>Ventana de entrada: la niña pequeña duerme en el .</p></div></section><figure class="demo" data-demo="curso3/c3m3-generacion" data-titulo="El mini-GPT del módulo, funcionando en tu navegador">
+<div class="haz">Empieza con «el gato» y pulsa «Siguiente token» varias veces; después «Completar la frase». Luego sube la temperatura a 2,5 y repite. Por último deja la temperatura alta y pon top-k = 3.</div>
+<div class="observa">Este modelo es de verdad el del fragmento 15: sus 19.615 pesos están en este archivo y el cálculo (embedding, dos bloques causales, capa de salida) se hace aquí con JavaScript; los logits coinciden con los de Keras salvo diferencias de redondeo (menos de 0,003). Con T baja salen frases correctas pero repetidas; con T alta salen mezclas sin sentido («bebe lee la gata…»); y el top-k las evita. Las barras muestran el reparto que se sortea; la marca vertical es lo que daría el modelo sin tocar nada.</div>
+</figure><div class="resumen"><h2 class="sin-num sin-toc">En pocas líneas</h2><ul><li><strong>Generación de texto con un Transformer decoder:</strong> Sin internet no podemos bajar un corpus, y un texto sintético tiene una ventaja: podemos calcular exactamente cuánto vale un modelo…</li><li>Antes de continuar, intenta explicar la demo sin mirar su resultado.</li></ul></div><section class="quiz mini"><script class="quiz-data" type="application/json">{"titulo": "¿Lo tienes?", "preguntas": [{"q": "¿Qué concepto estamos trabajando en esta lección?", "opciones": ["Por qué las RNN y las LSTM se quedan cortas", "Atención multi-cabeza y MultiHeadAttention", "Generación de texto con un Transformer decoder"], "correcta": 2, "porque": "Sin internet no podemos bajar un corpus, y un texto sintético tiene una ventaja: podemos calcular exactamente cuánto vale un modelo perfecto."}, {"q": "¿Cuál de estas afirmaciones recoge lo que acabas de estudiar?", "opciones": ["Sin internet no podemos bajar un corpus, y un texto sintético tiene una ventaja: podemos calcular exactamente cuánto vale un modelo perfecto.", "Siempre hay un único método que sirve para todos los problemas.", "Lo importante es comprender la idea y comprobarla con ejemplos, no memorizar términos."], "correcta": 0, "porque": "La explicación central es: Sin internet no podemos bajar un corpus, y un texto sintético tiene una ventaja: podemos calcular exactamente cuánto vale un modelo perfecto."}, {"q": "Si una demo o un ejemplo te desconcierta, ¿cuál es la mejor forma de aprenderlo?", "opciones": ["Volver a los números, cambiar un valor y explicar qué ocurre.", "Ignorar los resultados que no coinciden con tu intuición.", "Memorizar el nombre sin entender la operación."], "correcta": 0, "porque": "Explorar qué cambia y por qué ayuda a conectar el concepto con su resultado."}]}</script></section></div></details><details class="profundizar"><summary><span>Profundizar: explicación completa<small>Matices, fórmulas, tablas, otros ejemplos y experimentos del módulo original.</small></span></summary><div class="prof-body"><section>
+<h2 id="texto">Generación de texto con un Transformer decoder</h2>
+<p class="pregunta">Un GPT se entrena con una sola tarea: «dado lo anterior, adivina la siguiente palabra» (como el autocompletado de un subtítulo). ¿Cómo se monta eso en Keras de principio a fin, y cómo se elige la palabra cuando el modelo solo da probabilidades?</p>
+<h3>Los datos: una gramática propia, para saber la respuesta correcta</h3>
+<p>Sin internet no podemos bajar un corpus, y un texto sintético tiene una ventaja: podemos calcular <em>exactamente</em> cuánto vale un modelo perfecto. Imagina que son los subtítulos de una serie infantil muy sencilla. Escribimos una gramática pequeña de frases como «la niña pequeña lee un libro .» o «el gato negro duerme en el sofá .»: un sujeto (6 sustantivos, con su artículo <em>el/la</em>), un adjetivo opcional que <strong>concuerda en género</strong> (negro/negra, pequeño/pequeña) y un verbo con su complemento (<em>duerme en…</em>, <em>bebe…</em>, <em>lee…</em>, <em>corre por…</em>). Salen 144 frases distintas y generamos 1.500 al azar (10.115 palabras). Aprender esa gramática exige memoria de lo anterior: para escribir «negra» hay que acordarse de que el sustantivo era «gata».</p>
+<h3>Tokenización con <code>TextVectorization</code></h3>
+<p>Un modelo solo ve números, así que cada palabra se cambia por un id. <code>keras.layers.TextVectorization</code> hace todo el trayecto: <code>standardize</code> (qué limpieza aplicar: aquí solo pasar a minúsculas; la opción por defecto también borraría los signos de puntuación, incluido nuestro «.» que marca el final de frase), <code>split</code> (por espacios), y construye el <strong>vocabulario</strong> con <code>adapt</code>. El vocabulario reserva el id 0 para el relleno (cadena vacía) y el id 1 para las palabras desconocidas (<code>[UNK]</code>); aquí tiene 31 entradas: esas 2 más 29 palabras. Las palabras de verdad empiezan en el id 2 y están ordenadas de más a menos frecuentes.</p>
+<h3>El texto es una serie de ids: las mismas ventanas</h3>
+<p>Una vez convertido en números, el texto <em>es</em> una secuencia de enteros y cabe en las herramientas de la primera sección. Cortamos ventanas de 16 ids y para cada posición el objetivo es <strong>el id siguiente</strong>: las entradas son <code>ids[:-1]</code> y los objetivos <code>ids[1:]</code>, desplazados un lugar. Una ventana de 16 palabras proporciona así 16 ejercicios a la vez («dada la 1.ª, la 2.ª», «dadas las 2 primeras, la 3.ª»…), y la <strong>máscara causal</strong> impide que cada posición mire a la palabra que tiene que adivinar.</p>
+<div class="callout ejemplo">
+<span class="lbl">Ejemplo numérico</span>
+<p>Ventana de entrada: <code>la niña pequeña duerme en el</code>. Objetivos desplazados: <code>niña pequeña duerme en el sofá</code>.</p>
+<ol class="pasos">
+<li>Posición 1: ve «la» → debe decir «niña».</li>
+<li>Posición 2: ve «la niña» → debe decir «pequeña».</li>
+<li>Posición 6: ve «la niña pequeña duerme en el» → debe decir «sofá» (o «cama»: ¡dos opciones válidas!).</li>
+</ol>
+<p>Seis ejercicios en una sola pasada, cada uno con su respuesta. Sin la máscara causal, la posición 1 podría «ver» la palabra «niña» de la posición 2 y copiarla.</p>
+</div>
+<h3>El modelo: embedding con posición + bloques causales + una capa de salida</h3>
+<ol class="pasos">
+<li><strong><code>TokenAndPositionEmbedding</code></strong> (capa propia): suma el embedding de la palabra y el embedding de su posición (los dos aprendidos).</li>
+<li><strong>2 × <code>TransformerBlock(causal=True)</code></strong>: el mismo bloque de antes, pero con <code>use_causal_mask=True</code> en la atención.</li>
+<li><strong><code>Dense(31)</code> sin activación</strong>: devuelve 31 números por posición, uno por palabra del vocabulario, llamados <strong>logits</strong> (puntuaciones sin normalizar). El softmax lo aplica la pérdida.</li>
+</ol>
+<p>La pérdida es <code>SparseCategoricalCrossentropy(from_logits=True)</code>: para cada posición toma \(-\ln p(\text{palabra correcta})\) y la promedia. Con <code>from_logits=True</code> se le dan los logits y ella hace el softmax de forma numéricamente estable (si la capa final ya tuviera <code>softmax</code>, se pondría <code>from_logits=False</code>; mezclar las dos cosas es un error clásico).</p>
+<h3>La pérdida, la perplejidad y el «suelo» de la gramática</h3>
+<p>La <strong>perplejidad</strong> es \(e^{\text{pérdida}}\): el número de opciones igualmente probables entre las que el modelo «duda» de media. Un modelo que reparte al azar entre las 31 palabras tendría pérdida \(\ln 31 = 3{,}43\) y perplejidad 31. Nuestra gramática, en cambio, deja decidir poco: tras «el gato» hay que decidir si lleva adjetivo (y cuál de 2) y luego elegir uno de 4 verbos, y tras «bebe» solo queda elegir entre 2 complementos; el resto está determinado (género, preposiciones, el punto final). Sumando la entropía de las elecciones libres, la frase media tiene 4,911 nats de incertidumbre repartidos en 6,75 palabras: el <strong>suelo teórico</strong> es 4,911 / 6,75 = <strong>0,728 nats por palabra</strong>, es decir, perplejidad 2,07. Ningún modelo puede bajar de ahí (salvo memorizando la muestra).</p>
+<p>El fragmento 15 entrena el mini-GPT (19.615 parámetros) durante 12 épocas, unos 30 segundos de CPU. La pérdida baja de 1,155 en la primera época a 0,751 en la tercera y a <strong>0,729</strong> al final: perplejidad <strong>2,07</strong>, pegada al suelo. El modelo ha aprendido la gramática, incluida la concordancia de género, a partir de ejemplos y sin que nadie se la explicase.</p>
+<h3>Del logit a la palabra: temperatura y top-k</h3>
+<p>El modelo no escribe la palabra: da <strong>una probabilidad por cada palabra posible</strong>. Quedarse siempre con la más probable (<em>decodificación voraz</em>, <em>greedy</em>) produce textos repetitivos; elegir al azar según las probabilidades da variedad. Dos mandos controlan ese azar:</p>
+<ul>
+<li><strong>Temperatura \(T\):</strong> se dividen los logits entre \(T\) antes del softmax, \(p_i = \dfrac{e^{z_i/T}}{\sum_j e^{z_j/T}}\). \(T&lt;1\) afila el reparto (más seguro, más repetitivo); \(T&gt;1\) lo aplana (más variado, más disparates); \(T \to 0\) equivale al voraz.</li>
+<li><strong>top-k:</strong> se descartan todas las palabras salvo las \(k\) con más puntuación y se renormaliza. Corta de raíz las rarezas, aunque \(T\) sea alta. (Una variante, <em>top-p</em> o <em>nucleus</em>, deja las palabras necesarias para sumar una probabilidad \(p\).)</li>
+</ul>
+<div class="callout ejemplo">
+<span class="lbl">Ejemplo numérico</span>
+<p>Cuatro palabras con logits \(z = (2,\ 1,\ 0,\ -1)\). Para verlo con Netflix, imagina que son cuatro películas candidatas a recomendarte: <strong>Toy Story</strong> (palabra 1), <strong>Shrek</strong> (2), <strong>Titanic</strong> (3) y <strong>Matrix</strong> (4), con puntuaciones inventadas. La temperatura mide lo «aventurero» que es el recomendador.</p>
+<table>
+<thead><tr><th></th><th>Toy Story</th><th>Shrek</th><th>Titanic</th><th>Matrix</th></tr></thead>
+<tbody>
+<tr><td>\(T=1\): \(e^{z}\) = 7,389 · 2,718 · 1 · 0,368 (suma 11,475)</td><td class="res">0,644</td><td>0,237</td><td>0,087</td><td>0,032</td></tr>
+<tr><td>\(T=0{,}5\): \(z/T = (4, 2, 0, -2)\)</td><td class="res">0,865</td><td>0,117</td><td>0,016</td><td>0,002</td></tr>
+<tr><td>\(T=2\): \(z/T = (1, 0{,}5, 0, -0{,}5)\)</td><td class="res">0,455</td><td>0,276</td><td>0,167</td><td>0,102</td></tr>
+<tr><td>\(T=1\) con top-\(k=2\): quedan 7,389 y 2,718 (suma 10,107)</td><td class="res">0,731</td><td>0,269</td><td>0</td><td>0</td></tr>
+</tbody>
+</table>
+<p>Con \(T=0{,}5\) la favorita (Toy Story) pasa de 64,4 % a 86,5 %: el recomendador es más conservador; con \(T=2\) baja a 45,5 % y la última (Matrix) sube del 3,2 % al 10,2 %: se vuelve más aventurero. El top-2 ni siquiera deja que Titanic y Matrix entren en el sorteo.</p>
+</div>
+<p>El fragmento 16 lo mide: para cada ajuste genera 240 palabras (unas 35 frases) y comprueba cuántas pertenecen a la gramática. El porcentaje de frases que pertenecen a la gramática es del 100 % con \(T=0{,}7\) y \(T=1\), baja al 86 % con \(T=1{,}5\), se hunde al 35 % con \(T=2\) y se recupera al 97 % si a \(T=1{,}5\) le añades top-\(k=3\). La «creatividad» cuesta corrección, y los mandos permiten elegir el compromiso.</p>
+<div class="callout ojo">
+<span class="lbl">Ojo</span>
+<p>Es raro que las probabilidades del modelo sean exactamente las de la gramática: tras «… el gato negro» los cuatro verbos son igual de probables (25 % cada uno), y el modelo reparte 43 %, 21 %, 18 % y 18 % (fragmento 16). Es un modelo pequeño entrenado 12 épocas con 1.500 frases: la pérdida media está en el suelo, pero en contextos concretos puede inclinarse. Las probabilidades de un modelo no son verdades: son su opinión.</p>
+</div>
+<div class="callout ojo">
+<span class="lbl">Ojo: código del curso que falla en Keras 3</span>
+<p>Muchos tutoriales antiguos importan <code>tf.keras.layers.experimental.preprocessing.TextVectorization</code>. En Keras 3 ya no existe: da <code>AttributeError: module 'keras._tf_keras.keras.layers' has no attribute 'experimental'</code>. Ahora es <code>keras.layers.TextVectorization</code> (y <code>keras.utils.pad_sequences</code> en lugar de <code>keras.preprocessing.sequence.pad_sequences</code>).</p>
+</div>
+<h3>Guardar y recargar un modelo con capas propias</h3>
+<p>Un modelo con capas propias se guarda igual que cualquier otro (<code>modelo.save("x.keras")</code>), pero para recargarlo Keras tiene que poder <strong>reconstruir tus clases</strong>: de ahí el decorador <code>@keras.saving.register_keras_serializable()</code> y el método <code>get_config</code>, que devuelve los argumentos del constructor (el archivo guarda la configuración y los pesos). Sin ellos, <code>load_model</code> falla con «Unknown layer». El fragmento 17 guarda el mini-GPT (345 KB), lo recarga y comprueba que da exactamente las mismas predicciones.</p>
+<div class="callout recuerda">
+<span class="lbl">De juguete a GPT de verdad</span>
+<p>Lo que has construido es, en miniatura, la receta de un GPT: embedding con posición → bloques con atención causal → logits sobre el vocabulario → entrenamiento «adivina la siguiente» → muestreo con temperatura y top-k. Las diferencias son de escala (bloques por docenas, \(d_{model}\) de miles, vocabulario de decenas de miles de piezas de subpalabra, billones de palabras de entrenamiento) y de refinamiento posterior (ajuste con instrucciones, alineación). En el <a href="../../curso-2/modulo-4.html">módulo 4 del Curso 2</a> tienes esa historia.</p>
+</div>
+</section></div></details><details class="profundizar" id="codigo"><summary><span>Ver código explicado paso a paso<small>5 fragmento(s) original(es), con cada línea comentada y salida esperada.</small></span></summary><div class="prof-body"><article class="snippet" data-lang="python">
+<header>
+<h3>10 · LayerNormalization: a mano, con Keras y comparada con BatchNormalization</h3>
+<p class="para-que"><strong>Para qué sirve</strong> Comprobar que <code>LayerNormalization</code> hace la cuenta \((x-\mu)/\sqrt{\sigma^2+\varepsilon}\) token a token, y ver con números qué diferencia a <code>BatchNormalization</code>. Usa <code>layers</code> del fragmento 7.</p>
+</header>
+<pre class="code"><code>v = np.array([[2., 4., 6., 8.], [10., 20., 30., 40.]], dtype="float32")
+
+mu = v.mean(axis=-1, keepdims=True)
+var = v.var(axis=-1, keepdims=True)
+manual = (v - mu) / np.sqrt(var + 1e-3)
+
+ln = layers.LayerNormalization(epsilon=1e-3)
+print("LayerNorm a mano :\n", manual.round(3))
+print("LayerNorm Keras  :\n", ln(v).numpy().round(3))
+print("media y desv. de cada fila tras normalizar:", ln(v).numpy().mean(axis=-1).round(3), ln(v).numpy().std(axis=-1).round(3))
+
+bn = layers.BatchNormalization(epsilon=1e-3)
+sal = bn(v, training=True).numpy()
+print("BatchNorm (por columna):\n", sal.round(3))
+print("parámetros LayerNorm:", ln.count_params(), "(gamma y beta, uno por número del token)")</code></pre>
+<details class="linea-a-linea" open="">
+<summary>Línea por línea</summary>
+<p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+<table class="lineas">
+<thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+<tbody>
+<tr data-lines="1"><td><code>v = np.array([[2., 4., 6., 8.], [10., 20., 30., 40.]], dtype="float32")</code></td><td>Dos «tokens» de 4 números cada uno, a escalas muy distintas (la segunda fila es 5 veces mayor).</td></tr>
+<tr data-lines="3"><td><code>mu = v.mean(axis=-1, keepdims=True)</code></td><td>La media de cada fila (<code>axis=-1</code> = a lo largo de los rasgos). <code>keepdims=True</code> deja la forma <code>(2, 1)</code> para poder restar después.</td></tr>
+<tr data-lines="4"><td><code>var = v.var(axis=-1, keepdims=True)</code></td><td>La varianza de cada fila.</td></tr>
+<tr data-lines="5"><td><code>manual = (v - mu) / np.sqrt(var + 1e-3)</code></td><td>La fórmula con \(\varepsilon = 0{,}001\) (el valor por defecto de la capa de Keras).</td></tr>
+<tr data-lines="7"><td><code>ln = layers.LayerNormalization(epsilon=1e-3)</code></td><td>La capa de Keras. Por defecto normaliza sobre el último eje, el de los rasgos.</td></tr>
+<tr data-lines="8-9"><td><code>print("LayerNorm a mano :\n", ...); print("LayerNorm Keras  :\n", ln(v)...)</code></td><td>Imprime los dos resultados para compararlos.</td></tr>
+<tr data-lines="10"><td><code>print("media y desv. de cada fila tras normalizar:", ...)</code></td><td>Comprueba que cada fila queda con media 0 y desviación 1.</td></tr>
+<tr data-lines="12"><td><code>bn = layers.BatchNormalization(epsilon=1e-3)</code></td><td>La normalización por lotes, para comparar.</td></tr>
+<tr data-lines="13"><td><code>sal = bn(v, training=True).numpy()</code></td><td>La aplica en modo entrenamiento (<code>training=True</code>), que usa las estadísticas del propio lote.</td></tr>
+<tr data-lines="14"><td><code>print("BatchNorm (por columna):\n", ...)</code></td><td>Su resultado.</td></tr>
+<tr data-lines="15"><td><code>print("parámetros LayerNorm:", ln.count_params(), ...)</code></td><td>Los parámetros entrenables: \(\gamma\) y \(\beta\), cada uno con 4 números (uno por rasgo).</td></tr>
+</tbody>
+</table>
+</details>
+<div class="salida">
+<strong>Salida esperada</strong>
+<pre>LayerNorm a mano :
+ [[-1.342 -0.447  0.447  1.342]
+ [-1.342 -0.447  0.447  1.342]]
+LayerNorm Keras  :
+ [[-1.342 -0.447  0.447  1.342]
+ [-1.342 -0.447  0.447  1.342]]
+media y desv. de cada fila tras normalizar: [-0.  0.] [1. 1.]
+BatchNorm (por columna):
+ [[-1. -1. -1. -1.]
+ [ 1.  1.  1.  1.]]
+parámetros LayerNorm: 8 (gamma y beta, uno por número del token)</pre>
+<p>La cuenta a mano y la capa coinciden, y las dos filas (aunque una es 5 veces mayor) acaban idénticas: <code>(-1,342; -0,447; 0,447; 1,342)</code> con media 0 y desviación 1. BatchNorm, en cambio, normaliza <em>cada columna</em> con las dos filas del lote: con solo dos ejemplos cada columna queda en −1 y +1, algo muy dependiente de qué ejemplos haya en el lote. Y LayerNorm tiene 8 parámetros: \(\gamma\) y \(\beta\) de 4 números.</p>
+</div>
+</article><article class="snippet" data-lang="python">
+<header>
+<h3>14 · Un texto sintético, su entropía y <code>TextVectorization</code></h3>
+<p class="para-que"><strong>Para qué sirve</strong> Generar el texto de entrenamiento con una gramática pequeña, calcular exactamente cuánto vale un modelo perfecto, y convertir las palabras en ids con <code>TextVectorization</code>. Usa <code>np</code>, <code>layers</code> y <code>softmax</code> de los anteriores.</p>
+</header>
+<pre class="code"><code>import itertools, random
+
+SUJETOS = [("el", "gato"), ("el", "perro"), ("el", "niño"), ("la", "gata"), ("la", "niña"), ("la", "abuela")]
+ADJETIVOS = {"el": ["negro", "pequeño"], "la": ["negra", "pequeña"]}
+PREDICADOS = [["duerme", "en", "el", "sofá"], ["duerme", "en", "la", "cama"],
+              ["bebe", "leche"], ["bebe", "agua"],
+              ["lee", "un", "libro"], ["lee", "una", "carta"],
+              ["corre", "por", "el", "parque"], ["corre", "por", "la", "calle"]]
+
+todas = []
+for (det, nombre), pred in itertools.product(SUJETOS, PREDICADOS):
+    todas.append((1 / 6 / 8 / 2, [det, nombre] + pred + ["."]))
+    for adj in ADJETIVOS[det]:
+        todas.append((1 / 6 / 8 / 4, [det, nombre, adj] + pred + ["."]))
+
+H = -sum(p * np.log(p) for p, _ in todas)
+largo_medio = sum(p * len(f) for p, f in todas)
+print("frases distintas:", len(todas), " prob. total:", round(sum(p for p, _ in todas), 3))
+print("entropía por frase:", round(H, 3), "nats;  tokens por frase:", round(largo_medio, 3))
+print("suelo teórico de la pérdida:", round(H / largo_medio, 3), "nats por token  (perplejidad", round(float(np.exp(H / largo_medio)), 2), ")")
+
+random.seed(0)
+probs = [p for p, _ in todas]
+frases = [" ".join(f) for f in random.choices([f for _, f in todas], weights=probs, k=1500)]
+print(frases[0]); print(frases[1]); print(frases[2])
+
+texto = " ".join(frases)
+vec = layers.TextVectorization(standardize="lower", split="whitespace", output_mode="int")
+vec.adapt(frases)
+vocab = [str(w) for w in vec.get_vocabulary()]
+print("tamaño del vocabulario:", len(vocab))
+print(vocab[:8], "...")
+ids = vec([texto]).numpy()[0]
+print("tokens en el texto:", len(ids), " primeros ids:", ids[:9])
+print("vuelta a texto:", " ".join(vocab[i] for i in ids[:9]))</code></pre>
+<details class="linea-a-linea" open="">
+<summary>Línea por línea</summary>
+<p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+<table class="lineas">
+<thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+<tbody>
+<tr data-lines="1"><td><code>import itertools, random</code></td><td>Módulos estándar de Python: combinaciones (<code>itertools</code>) y azar (<code>random</code>).</td></tr>
+<tr data-lines="3"><td><code>SUJETOS = [("el", "gato"), ...]</code></td><td>Seis sujetos, cada uno como pareja (artículo, sustantivo).</td></tr>
+<tr data-lines="4"><td><code>ADJETIVOS = {"el": [...], "la": [...]}</code></td><td>Un diccionario: los adjetivos válidos para cada artículo. Esto impone la <strong>concordancia de género</strong>.</td></tr>
+<tr data-lines="5-8"><td><code>PREDICADOS = [[...], ...]</code></td><td>Ocho predicados (verbo + complemento), cada uno como lista de palabras.</td></tr>
+<tr data-lines="10"><td><code>todas = []</code></td><td>Aquí se guardarán todas las frases posibles con su probabilidad.</td></tr>
+<tr data-lines="11"><td><code>for (det, nombre), pred in itertools.product(SUJETOS, PREDICADOS):</code></td><td><code>product</code> recorre todas las combinaciones sujeto × predicado (6 × 8 = 48).</td></tr>
+<tr data-lines="12"><td><code>todas.append((1 / 6 / 8 / 2, [det, nombre] + pred + ["."]))</code></td><td>La frase sin adjetivo. Su probabilidad: 1/6 (sujeto) × 1/8 (predicado) × 1/2 (sin adjetivo). Se le añade el «.» final.</td></tr>
+<tr data-lines="13-14"><td><code>for adj in ADJETIVOS[det]: todas.append((1 / 6 / 8 / 4, ...))</code></td><td>Las dos frases con adjetivo, cada una con probabilidad 1/6 × 1/8 × 1/4 (1/2 de llevar adjetivo × 1/2 de cuál).</td></tr>
+<tr data-lines="16"><td><code>H = -sum(p * np.log(p) for p, _ in todas)</code></td><td>La <strong>entropía</strong> de una frase: \(-\sum p \ln p\), en nats (logaritmo natural).</td></tr>
+<tr data-lines="17"><td><code>largo_medio = sum(p * len(f) for p, f in todas)</code></td><td>Número medio de palabras (con el punto) por frase.</td></tr>
+<tr data-lines="18"><td><code>print("frases distintas:", ...)</code></td><td>Cuántas frases hay y que sus probabilidades suman 1.</td></tr>
+<tr data-lines="19"><td><code>print("entropía por frase:", ...)</code></td><td>Entropía y longitud media.</td></tr>
+<tr data-lines="20"><td><code>print("suelo teórico de la pérdida:", ...)</code></td><td>Entropía dividida entre palabras por frase = mejor pérdida posible por palabra, y su exponencial = perplejidad mínima.</td></tr>
+<tr data-lines="22"><td><code>random.seed(0)</code></td><td>Semilla del azar.</td></tr>
+<tr data-lines="23"><td><code>probs = [p for p, _ in todas]</code></td><td>Lista de probabilidades, en el mismo orden que las frases.</td></tr>
+<tr data-lines="24"><td><code>frases = [" ".join(f) for f in random.choices([...], weights=probs, k=1500)]</code></td><td>Elige 1.500 frases al azar con esas probabilidades y une las palabras de cada una con espacios.</td></tr>
+<tr data-lines="25"><td><code>print(frases[0]); print(frases[1]); print(frases[2])</code></td><td>Tres frases de muestra.</td></tr>
+<tr data-lines="27"><td><code>texto = " ".join(frases)</code></td><td>Todo el corpus como un único texto largo.</td></tr>
+<tr data-lines="28"><td><code>vec = layers.TextVectorization(standardize="lower", split="whitespace", output_mode="int")</code></td><td>La capa de tokenización: pasa a minúsculas (<code>standardize="lower"</code>; la opción por defecto también quitaría el «.»), parte por espacios y devuelve ids enteros.</td></tr>
+<tr data-lines="29"><td><code>vec.adapt(frases)</code></td><td>«Lee» las frases y construye el vocabulario ordenado por frecuencia.</td></tr>
+<tr data-lines="30"><td><code>vocab = [str(w) for w in vec.get_vocabulary()]</code></td><td>La lista de palabras: posición = id. Se convierte a <code>str</code> normales para imprimirlas limpias.</td></tr>
+<tr data-lines="31"><td><code>print("tamaño del vocabulario:", len(vocab))</code></td><td>Número de entradas.</td></tr>
+<tr data-lines="32"><td><code>print(vocab[:8], "...")</code></td><td>Las primeras: el id 0 es la cadena vacía (relleno) y el 1 es <code>[UNK]</code> (palabra desconocida).</td></tr>
+<tr data-lines="33"><td><code>ids = vec([texto]).numpy()[0]</code></td><td>Tokeniza el texto entero (una lista con un único texto) y se queda con la primera fila: un array de ids.</td></tr>
+<tr data-lines="34"><td><code>print("tokens en el texto:", len(ids), ...)</code></td><td>Cuántas palabras hay y los primeros ids.</td></tr>
+<tr data-lines="35"><td><code>print("vuelta a texto:", " ".join(vocab[i] for i in ids[:9]))</code></td><td>Comprobación: traduce los ids a palabras con el vocabulario.</td></tr>
+</tbody>
+</table>
+</details>
+<div class="salida">
+<strong>Salida esperada</strong>
+<pre>frases distintas: 144  prob. total: 1.0
+entropía por frase: 4.911 nats;  tokens por frase: 6.75
+suelo teórico de la pérdida: 0.728 nats por token  (perplejidad 2.07 )
+la abuela negra duerme en el sofá .
+la niña lee un libro .
+el niño lee un libro .
+tamaño del vocabulario: 31
+['', '[UNK]', '.', 'el', 'la', 'en', 'duerme', 'bebe'] ...
+tokens en el texto: 10115  primeros ids: [ 4 14 28  6  5  3 19  2  4]
+vuelta a texto: la abuela negra duerme en el sofá . la</pre>
+<p>Hay 144 frases posibles; cada una aporta 4,911 nats de incertidumbre en 6,75 palabras, así que el <strong>suelo es 0,728 nats por palabra (perplejidad 2,07)</strong>. El vocabulario tiene 31 entradas (relleno, <code>[UNK]</code>, el punto y las 28 palabras restantes, ordenadas por frecuencia). El corpus son 10.115 palabras; los ids <code>[4, 14, 28, 6, 5, 3, 19, 2, 4]</code> son «la abuela negra duerme en el sofá . la» (el id 2 es el punto).</p>
+</div>
+</article><article class="snippet" data-lang="python">
+<header>
+<h3>15 · Un mini-GPT: ventanas desplazadas, decoder causal y perplejidad</h3>
+<p class="para-que"><strong>Para qué sirve</strong> Preparar los pares (entrada, siguiente palabra) con las mismas herramientas que las series, construir un Transformer decoder pequeño con una capa propia <code>TokenAndPositionEmbedding</code>, entrenarlo y comparar su pérdida con el suelo teórico. Usa <code>ids</code> y <code>vocab</code> (fragmento 14) y <code>TransformerBlock</code> (11).</p>
+</header>
+<pre class="code"><code>import tensorflow as tf
+
+LARGO = 16
+x_ds = keras.utils.timeseries_dataset_from_array(ids[:-1], None, sequence_length=LARGO, sequence_stride=2, batch_size=None)
+y_ds = keras.utils.timeseries_dataset_from_array(ids[1:], None, sequence_length=LARGO, sequence_stride=2, batch_size=None)
+ds_texto = tf.data.Dataset.zip((x_ds, y_ds)).shuffle(4000, seed=0).batch(64)
+for xb, yb in ds_texto.take(1):
+    print("lote:", xb.shape, yb.shape)
+    print("entrada:", [vocab[i] for i in xb[0][:6].numpy()])
+    print("objetivo:", [vocab[i] for i in yb[0][:6].numpy()])
+
+@keras.saving.register_keras_serializable(package="c3m3")
+class TokenAndPositionEmbedding(layers.Layer):
+    def __init__(self, maxlen, vocab_size, d_model, **kwargs):
+        super().__init__(**kwargs)
+        self.maxlen, self.vocab_size, self.d_model = maxlen, vocab_size, d_model
+        self.tok = layers.Embedding(vocab_size, d_model)
+        self.pos = layers.Embedding(maxlen, d_model)
+
+    def call(self, ids):
+        posiciones = ops.arange(ops.shape(ids)[1])
+        return self.tok(ids) + self.pos(posiciones)
+
+    def get_config(self):
+        return {**super().get_config(), "maxlen": self.maxlen, "vocab_size": self.vocab_size, "d_model": self.d_model}
+
+keras.utils.set_random_seed(0)
+entradas = keras.Input(shape=(None,), dtype="int32")
+h = TokenAndPositionEmbedding(LARGO, len(vocab), 32)(entradas)
+for _ in range(2):
+    h = TransformerBlock(32, 2, 64, dropout=0.0, causal=True)(h)
+logits = layers.Dense(len(vocab))(h)
+gpt = keras.Model(entradas, logits)
+gpt.compile(optimizer=keras.optimizers.Adam(3e-3), loss=keras.losses.SparseCategoricalCrossentropy(from_logits=True))
+print("parámetros:", gpt.count_params())
+hist = gpt.fit(ds_texto, epochs=12, verbose=0)
+for e in (0, 2, 5, 11):
+    print(f"época {e + 1:2d}  pérdida = {hist.history['loss'][e]:.3f}")
+print("perplejidad final:", round(float(np.exp(hist.history["loss"][-1])), 2))</code></pre>
+<details class="linea-a-linea" open="">
+<summary>Línea por línea</summary>
+<p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+<table class="lineas">
+<thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+<tbody>
+<tr data-lines="1"><td><code>import tensorflow as tf</code></td><td>Para usar <code>tf.data.Dataset.zip</code>.</td></tr>
+<tr data-lines="3"><td><code>LARGO = 16</code></td><td>Longitud de contexto: el modelo ve ventanas de 16 palabras.</td></tr>
+<tr data-lines="4"><td><code>x_ds = keras.utils.timeseries_dataset_from_array(ids[:-1], None, sequence_length=LARGO, sequence_stride=2, batch_size=None)</code></td><td>Ventanas de 16 ids de <code>ids[:-1]</code> (todas menos la última palabra). Sin objetivos (<code>None</code>); un paso de 2 para no repetir tanto; <code>batch_size=None</code> deja el dataset sin agrupar en lotes.</td></tr>
+<tr data-lines="5"><td><code>y_ds = ...(ids[1:], None, ...)</code></td><td>Las mismas ventanas pero de <code>ids[1:]</code>: cada posición contiene <strong>la palabra siguiente</strong> a la de <code>x_ds</code>.</td></tr>
+<tr data-lines="6"><td><code>ds_texto = tf.data.Dataset.zip((x_ds, y_ds)).shuffle(4000, seed=0).batch(64)</code></td><td><code>zip</code> junta ambos en pares (entrada, objetivo), <code>shuffle(4000)</code> baraja las ventanas con un buffer de 4.000 y <code>batch(64)</code> forma lotes de 64.</td></tr>
+<tr data-lines="7-10"><td><code>for xb, yb in ds_texto.take(1): print(...)</code></td><td>Mira un lote: sus formas y las 6 primeras palabras de entrada y de objetivo del primer ejemplo, ya traducidas.</td></tr>
+<tr data-lines="12-13"><td><code>@...register_keras_serializable(...) class TokenAndPositionEmbedding(layers.Layer):</code></td><td>Una capa propia registrada para poder guardarla.</td></tr>
+<tr data-lines="14-16"><td><code>def __init__(self, maxlen, vocab_size, d_model, **kwargs): ...</code></td><td>Constructor: guarda los argumentos.</td></tr>
+<tr data-lines="17"><td><code>self.tok = layers.Embedding(vocab_size, d_model)</code></td><td>La tabla de embeddings de palabras: un vector de 32 números por id.</td></tr>
+<tr data-lines="18"><td><code>self.pos = layers.Embedding(maxlen, d_model)</code></td><td>La tabla de embeddings de <strong>posiciones</strong> (aprendida): un vector por posición 0…15.</td></tr>
+<tr data-lines="20"><td><code>def call(self, ids):</code></td><td>Recibe ids enteros de forma <code>(lote, pasos)</code>.</td></tr>
+<tr data-lines="21"><td><code>posiciones = ops.arange(ops.shape(ids)[1])</code></td><td>Los números 0, 1, …, pasos-1.</td></tr>
+<tr data-lines="22"><td><code>return self.tok(ids) + self.pos(posiciones)</code></td><td>Embedding de la palabra + embedding de su posición. Salida <code>(lote, pasos, 32)</code>.</td></tr>
+<tr data-lines="24-25"><td><code>def get_config(self): ...</code></td><td>Argumentos para guardar y recargar.</td></tr>
+<tr data-lines="27"><td><code>keras.utils.set_random_seed(0)</code></td><td>Semilla fija.</td></tr>
+<tr data-lines="28"><td><code>entradas = keras.Input(shape=(None,), dtype="int32")</code></td><td>Entrada de ids de <strong>cualquier longitud</strong> (<code>None</code>): así podemos generar con prompts cortos.</td></tr>
+<tr data-lines="29"><td><code>h = TokenAndPositionEmbedding(LARGO, len(vocab), 32)(entradas)</code></td><td>Palabras + posiciones → vectores de 32.</td></tr>
+<tr data-lines="30-31"><td><code>for _ in range(2): h = TransformerBlock(32, 2, 64, dropout=0.0, causal=True)(h)</code></td><td>Dos bloques <strong>causales</strong> de 2 cabezas, sin dropout (el modelo es pequeño y los datos abundantes).</td></tr>
+<tr data-lines="32"><td><code>logits = layers.Dense(len(vocab))(h)</code></td><td>Una puntuación (logit) por cada palabra del vocabulario y por cada posición. Sin activación.</td></tr>
+<tr data-lines="33"><td><code>gpt = keras.Model(entradas, logits)</code></td><td>Crea el modelo.</td></tr>
+<tr data-lines="34"><td><code>gpt.compile(optimizer=keras.optimizers.Adam(3e-3), loss=keras.losses.SparseCategoricalCrossentropy(from_logits=True))</code></td><td>Adam con tasa 0,003 y entropía cruzada que recibe <strong>logits</strong> (<code>from_logits=True</code>: ella aplica el softmax por dentro).</td></tr>
+<tr data-lines="35"><td><code>print("parámetros:", gpt.count_params())</code></td><td>Total de parámetros.</td></tr>
+<tr data-lines="36"><td><code>hist = gpt.fit(ds_texto, epochs=12, verbose=0)</code></td><td>Entrena 12 épocas.</td></tr>
+<tr data-lines="37-38"><td><code>for e in (0, 2, 5, 11): print(f"época ... pérdida = ...")</code></td><td>Pérdida en las épocas 1, 3, 6 y 12.</td></tr>
+<tr data-lines="39"><td><code>print("perplejidad final:", round(float(np.exp(hist.history["loss"][-1])), 2))</code></td><td>La perplejidad, \(e^{\text{pérdida}}\), de la última época (<code>[-1]</code> = último elemento).</td></tr>
+</tbody>
+</table>
+</details>
+<div class="salida">
+<strong>Salida esperada</strong>
+<pre>lote: (64, 16) (64, 16)
+entrada: ['la', 'niña', 'pequeña', 'duerme', 'en', 'el']
+objetivo: ['niña', 'pequeña', 'duerme', 'en', 'el', 'sofá']
+parámetros: 19615
+época  1  pérdida = 1.155
+época  3  pérdida = 0.751
+época  6  pérdida = 0.742
+época 12  pérdida = 0.729
+perplejidad final: 2.07</pre>
+<p>Un lote son 64 ventanas de 16 palabras en la entrada y otras 64 en el objetivo, desplazadas un lugar: a «la, niña, pequeña, duerme, en, el» le corresponde «niña, pequeña, duerme, en, el, sofá». El modelo tiene 19.615 parámetros. La pérdida baja de 1,155 a <strong>0,729</strong>, perplejidad <strong>2,07</strong>: exactamente el suelo que calculamos en el fragmento 14 (0,728). El modelo ha aprendido la gramática. La pérdida está medida sobre los propios datos de entrenamiento; con una gramática tan pequeña es lo esperado, pero con un corpus real se vigila también una pérdida de validación.</p>
+</div>
+</article><article class="snippet" data-lang="python">
+<header>
+<h3>16 · Generar texto: temperatura, top-k y cuántas frases salen válidas</h3>
+<p class="para-que"><strong>Para qué sirve</strong> Escribir el bucle de generación (predecir, muestrear, añadir la palabra y repetir), mirar cómo la temperatura cambia el reparto de probabilidades del modelo real y medir qué porcentaje de frases generadas son gramaticalmente válidas. Usa <code>gpt</code>, <code>vec</code>, <code>vocab</code>, <code>LARGO</code>, <code>todas</code> y <code>softmax</code> de fragmentos anteriores.</p>
+</header>
+<pre class="code"><code>def siguiente_token(logits, temperatura=1.0, top_k=None, rng=None):
+    z = logits / temperatura
+    if top_k is not None:
+        corte = np.sort(z)[-top_k]
+        z = np.where(z &gt;= corte, z, -np.inf)
+    p = softmax(z)
+    return int(rng.choice(len(p), p=p)), p
+
+def generar(prompt, n=14, **kw):
+    seq = list(vec([prompt]).numpy()[0])
+    rng = np.random.default_rng(0)
+    for _ in range(n):
+        ventana = np.array(seq[-LARGO:])[None]
+        logits = gpt(ventana, training=False).numpy()[0, -1]
+        t, _ = siguiente_token(logits, rng=rng, **kw)
+        seq.append(t)
+    return " ".join(vocab[i] for i in seq)
+
+logits = gpt(vec(["la niña pequeña lee un libro . el gato negro"]).numpy(), training=False).numpy()[0, -1]
+orden = np.argsort(logits)[::-1][:5]
+print("tras «… el gato negro»:")
+for T in (1.0, 0.5, 2.0):
+    p = softmax(logits / T)
+    print(f"  T={T}: " + "  ".join(f"{vocab[i]} {p[i]:.2f}" for i in orden))
+
+print()
+print("T=0.01 :", generar("el gato", temperatura=0.01))
+print("T=1.0  :", generar("el gato", temperatura=1.0))
+print("T=2.0  :", generar("el gato", temperatura=2.0))
+print("T=1,k=3:", generar("el gato", temperatura=1.0, top_k=3))
+
+validas = {" ".join(f) for _, f in todas}
+def porcentaje_validas(**kw):
+    texto_generado = generar(". el", n=240, **kw)
+    frases_g = [f.strip() for f in texto_generado.split(".")[1:-1]]
+    return 100 * np.mean([(f + " .") in validas for f in frases_g]), len(frases_g)
+
+print()
+for nombre, kw in (("T=0.7", dict(temperatura=0.7)), ("T=1.0", dict(temperatura=1.0)), ("T=1.5", dict(temperatura=1.5)), ("T=2.0", dict(temperatura=2.0)), ("T=1.5, k=3", dict(temperatura=1.5, top_k=3))):
+    pct, n_f = porcentaje_validas(**kw)
+    print(f"{nombre:&lt;11} frases generadas: {n_f:2d}   gramaticalmente válidas: {pct:5.1f} %")</code></pre>
+<details class="linea-a-linea" open="">
+<summary>Línea por línea</summary>
+<p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+<table class="lineas">
+<thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+<tbody>
+<tr data-lines="1"><td><code>def siguiente_token(logits, temperatura=1.0, top_k=None, rng=None):</code></td><td>Función que elige la siguiente palabra a partir de los logits del modelo.</td></tr>
+<tr data-lines="2"><td><code>z = logits / temperatura</code></td><td>Divide los logits entre la temperatura.</td></tr>
+<tr data-lines="3-5"><td><code>if top_k is not None: corte = np.sort(z)[-top_k]; z = np.where(z &gt;= corte, z, -np.inf)</code></td><td>Si hay top-k: <code>np.sort(z)[-top_k]</code> es la puntuación del <em>k</em>-ésimo mejor; todo lo que quede por debajo se pone a <code>-inf</code> (probabilidad 0).</td></tr>
+<tr data-lines="6"><td><code>p = softmax(z)</code></td><td>Las probabilidades finales (suman 1).</td></tr>
+<tr data-lines="7"><td><code>return int(rng.choice(len(p), p=p)), p</code></td><td>Sortea un id respetando las probabilidades (<code>rng.choice</code> con <code>p=</code>) y lo devuelve junto con el reparto.</td></tr>
+<tr data-lines="9"><td><code>def generar(prompt, n=14, **kw):</code></td><td>Genera <code>n</code> palabras a partir de un texto inicial; <code>**kw</code> reenvía temperatura y top-k.</td></tr>
+<tr data-lines="10"><td><code>seq = list(vec([prompt]).numpy()[0])</code></td><td>Convierte el prompt en una lista de ids.</td></tr>
+<tr data-lines="11"><td><code>rng = np.random.default_rng(0)</code></td><td>Azar con semilla: así cada llamada es reproducible.</td></tr>
+<tr data-lines="12"><td><code>for _ in range(n):</code></td><td>Repite <code>n</code> veces: el bucle autorregresivo.</td></tr>
+<tr data-lines="13"><td><code>ventana = np.array(seq[-LARGO:])[None]</code></td><td>Las últimas 16 palabras (el contexto máximo) como un lote de un ejemplo (<code>[None]</code> añade el eje del lote).</td></tr>
+<tr data-lines="14"><td><code>logits = gpt(ventana, training=False).numpy()[0, -1]</code></td><td>Llama al modelo y se queda con los logits de la <strong>última posición</strong> (<code>[0, -1]</code>): son los de la palabra que viene.</td></tr>
+<tr data-lines="15"><td><code>t, _ = siguiente_token(logits, rng=rng, **kw)</code></td><td>Elige la palabra.</td></tr>
+<tr data-lines="16"><td><code>seq.append(t)</code></td><td>La añade al texto; en la vuelta siguiente el modelo la verá.</td></tr>
+<tr data-lines="17"><td><code>return " ".join(vocab[i] for i in seq)</code></td><td>Traduce los ids a texto.</td></tr>
+<tr data-lines="19"><td><code>logits = gpt(vec([...]).numpy(), training=False).numpy()[0, -1]</code></td><td>Logits tras el contexto «la niña pequeña lee un libro . el gato negro». El contexto es una frase completa seguida del comienzo de otra, «el gato negro»: lo que toca ahora es un verbo.</td></tr>
+<tr data-lines="20"><td><code>orden = np.argsort(logits)[::-1][:5]</code></td><td>Los ids de las 5 palabras con mayor logit (<code>argsort</code> ordena de menor a mayor; <code>[::-1]</code> lo invierte).</td></tr>
+<tr data-lines="21"><td><code>print("tras «… el gato negro»:")</code></td><td>Cabecera.</td></tr>
+<tr data-lines="22-24"><td><code>for T in (1.0, 0.5, 2.0): p = softmax(logits / T); print(...)</code></td><td>Para tres temperaturas, imprime la probabilidad de esas 5 palabras.</td></tr>
+<tr data-lines="26"><td><code>print()</code></td><td>Línea en blanco.</td></tr>
+<tr data-lines="27-30"><td><code>print("T=0.01 :", generar("el gato", temperatura=0.01)) ...</code></td><td>Genera texto con cuatro ajustes: casi voraz (T=0,01), T=1, T=2 y T=1 con top-3.</td></tr>
+<tr data-lines="32"><td><code>validas = {" ".join(f) for _, f in todas}</code></td><td>El conjunto de las 144 frases válidas de la gramática (como textos).</td></tr>
+<tr data-lines="33"><td><code>def porcentaje_validas(**kw):</code></td><td>Mide qué proporción de frases generadas es válida.</td></tr>
+<tr data-lines="34"><td><code>texto_generado = generar(". el", n=240, **kw)</code></td><td>Genera 240 palabras empezando tras un punto.</td></tr>
+<tr data-lines="35"><td><code>frases_g = [f.strip() for f in texto_generado.split(".")[1:-1]]</code></td><td>Parte el texto por los puntos, descarta el primer y el último trozo (incompletos) y limpia espacios.</td></tr>
+<tr data-lines="36"><td><code>return 100 * np.mean([(f + " .") in validas for f in frases_g]), len(frases_g)</code></td><td>Comprueba si cada frase (con su punto) está en el conjunto válido y devuelve el porcentaje y el número de frases.</td></tr>
+<tr data-lines="38"><td><code>print()</code></td><td>Línea en blanco.</td></tr>
+<tr data-lines="39"><td><code>for nombre, kw in ((...), ...):</code></td><td>Recorre cinco ajustes (T=0,7; 1; 1,5; 2 y T=1,5 con top-3). <code>dict(temperatura=...)</code> crea el diccionario de argumentos.</td></tr>
+<tr data-lines="40"><td><code>pct, n_f = porcentaje_validas(**kw)</code></td><td>Mide con ese ajuste (<code>**kw</code> reparte el diccionario en argumentos).</td></tr>
+<tr data-lines="41"><td><code>print(f"{nombre:&lt;11} frases generadas: ...")</code></td><td>Imprime el resultado.</td></tr>
+</tbody>
+</table>
+</details>
+<div class="salida">
+<strong>Salida esperada</strong>
+<pre>tras «… el gato negro»:
+  T=1.0: bebe 0.43  corre 0.21  lee 0.18  duerme 0.18  negra 0.00
+  T=0.5: bebe 0.63  corre 0.15  lee 0.11  duerme 0.11  negra 0.00
+  T=2.0: bebe 0.30  corre 0.21  lee 0.20  duerme 0.20  negra 0.02
+
+T=0.01 : el gato pequeño bebe leche . la gata pequeña bebe leche . el niño pequeño bebe
+T=1.0  : el gato pequeño bebe agua . la gata negra lee una carta . el perro duerme
+T=2.0  : el gato pequeño bebe lee la gata pequeña lee un libro corre por  negra duerme
+T=1,k=3: el gato pequeño bebe agua . la gata negra bebe leche . la niña pequeña duerme
+
+T=0.7       frases generadas: 34   gramaticalmente válidas: 100.0 %
+T=1.0       frases generadas: 37   gramaticalmente válidas: 100.0 %
+T=1.5       frases generadas: 36   gramaticalmente válidas:  86.1 %
+T=2.0       frases generadas: 37   gramaticalmente válidas:  35.1 %
+T=1.5, k=3  frases generadas: 35   gramaticalmente válidas:  97.1 %</pre>
+<p>Tras «… el gato negro» el modelo pone un 43 % en «bebe» con T=1; con T=0,5 sube al 63 % y con T=2 baja al 30 %: la temperatura afila o aplana el reparto, y las palabras que casi no tenían probabilidad (como «negra», que no concuerda) siguen en 0,00–0,02. A T=0,01 el texto es repetitivo; a T=1 es variado y correcto; a T=2 aparece «el gato pequeño bebe lee la gata…», un disparate. Midiendo 240 palabras por ajuste: 100 % de frases válidas con T=0,7 y T=1, 86 % con 1,5, solo 35 % con T=2 y 97 % si a T=1,5 se le añade top-3. Resultados con semilla fija: cambian si cambias la semilla.</p>
+</div>
+</article><article class="snippet" data-lang="python">
+<header>
+<h3>17 · Guardar y recargar un modelo con capas propias</h3>
+<p class="para-que"><strong>Para qué sirve</strong> Guardar el mini-GPT en un archivo <code>.keras</code>, recargarlo en un objeto nuevo y comprobar que las predicciones son idénticas: así se comprueba que <code>get_config</code> y el registro de las clases funcionan. Usa <code>gpt</code>, <code>vec</code> y las capas de los fragmentos anteriores.</p>
+</header>
+<pre class="code"><code>import os, tempfile
+
+ruta = os.path.join(tempfile.mkdtemp(), "gpt_mini.keras")
+gpt.save(ruta)
+recuperado = keras.models.load_model(ruta)
+
+prueba = vec(["la niña pequeña lee"]).numpy()
+a = gpt(prueba, training=False).numpy()
+b = recuperado(prueba, training=False).numpy()
+print("archivo:", os.path.basename(ruta), " tamaño:", os.path.getsize(ruta) // 1024, "KB")
+print("mismas predicciones tras cargar:", np.allclose(a, b, atol=1e-5))
+print("capas recuperadas:", [type(c).__name__ for c in recuperado.layers])
+config = TransformerBlock(32, 2, 64).get_config()
+print({k: config[k] for k in ("d_model", "num_heads", "ff_dim", "dropout", "causal")})</code></pre>
+<details class="linea-a-linea" open="">
+<summary>Línea por línea</summary>
+<p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+<table class="lineas">
+<thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+<tbody>
+<tr data-lines="1"><td><code>import os, tempfile</code></td><td>Módulos estándar: sistema de archivos y carpetas temporales.</td></tr>
+<tr data-lines="3"><td><code>ruta = os.path.join(tempfile.mkdtemp(), "gpt_mini.keras")</code></td><td>Una ruta de archivo dentro de una carpeta temporal nueva (para no ensuciar tu disco). La extensión <code>.keras</code> es el formato de guardado de Keras 3.</td></tr>
+<tr data-lines="4"><td><code>gpt.save(ruta)</code></td><td>Guarda en un único archivo la arquitectura (con la <code>config</code> de cada capa), los pesos y el estado del optimizador.</td></tr>
+<tr data-lines="5"><td><code>recuperado = keras.models.load_model(ruta)</code></td><td>Lo carga. Keras reconstruye cada capa propia llamando a su clase con lo que devolvió <code>get_config</code>, gracias al decorador de registro.</td></tr>
+<tr data-lines="7"><td><code>prueba = vec(["la niña pequeña lee"]).numpy()</code></td><td>Un prompt de prueba como ids.</td></tr>
+<tr data-lines="8-9"><td><code>a = gpt(prueba, training=False).numpy(); b = recuperado(prueba, ...)</code></td><td>Los logits del modelo original y del recuperado.</td></tr>
+<tr data-lines="10"><td><code>print("archivo:", ..., " tamaño:", ... // 1024, "KB")</code></td><td>Nombre y tamaño en kilobytes (<code>os.path.getsize</code> da bytes; <code>// 1024</code> los pasa a KB).</td></tr>
+<tr data-lines="11"><td><code>print("mismas predicciones tras cargar:", np.allclose(a, b, atol=1e-5))</code></td><td>¿Coinciden los logits?</td></tr>
+<tr data-lines="12"><td><code>print("capas recuperadas:", [type(c).__name__ for c in recuperado.layers])</code></td><td>Los nombres de las clases de las capas del modelo recuperado: las propias han vuelto a ser <code>TokenAndPositionEmbedding</code> y <code>TransformerBlock</code>.</td></tr>
+<tr data-lines="13-14"><td><code>config = TransformerBlock(32, 2, 64).get_config(); print({...})</code></td><td>Muestra algunas claves de lo que devuelve <code>get_config</code>: los argumentos del constructor, que es todo lo que hace falta para reconstruir la capa.</td></tr>
+</tbody>
+</table>
+</details>
+<div class="salida">
+<strong>Salida esperada</strong>
+<pre>archivo: gpt_mini.keras  tamaño: 345 KB
+mismas predicciones tras cargar: True
+capas recuperadas: ['InputLayer', 'TokenAndPositionEmbedding', 'TransformerBlock', 'TransformerBlock', 'Dense']
+{'d_model': 32, 'num_heads': 2, 'ff_dim': 64, 'dropout': 0.1, 'causal': False}</pre>
+<p>El archivo pesa unos 345 KB y el modelo recuperado da las mismas predicciones (<code>True</code>), con sus capas propias intactas. Las últimas cifras impresas (<code>dropout 0.1</code>, <code>causal False</code>) son los valores por defecto de un bloque nuevo, no del modelo cargado: sirven para ver qué claves guarda <code>get_config</code>. Si hubieras olvidado el decorador o <code>get_config</code>, <code>load_model</code> fallaría con un error de «Unknown layer» (o habría que pasar <code>custom_objects={...}</code>).</p>
+</div>
+</article></div></details></div></main></body></html>

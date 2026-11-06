@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+
+<html lang="es"><head><meta charset="utf-8"/><meta content="width=device-width,initial-scale=1" name="viewport"/><title>Lección 10 · Mejoras de DQN: Double, Dueling y Prioritized Replay · Curso 3 · Cuaderno de IA</title><meta content="El objetivo usa un max sobre valores estimados , y estimados con ruido." name="description"/><script>try{var t=localStorage.getItem('cuaderno-ia:tema');if(t)document.documentElement.setAttribute('data-theme',t)}catch(e){}</script><link href="../../assets/css/style.css" rel="stylesheet"/><script src="../../assets/js/curriculum.js"></script><script src="../../assets/js/lab.js"></script><script defer="" src="../../assets/js/app.js"></script><script defer="" src="../../assets/js/microanimations.js"></script></head><body data-course="3" data-lesson="10" data-module="6" data-root="../../"><main><div class="page" data-micro="3min"><header class="hero leccion"><div class="hero-grid"><div><p class="eyebrow">Curso 3 · Módulo 6 · Lección 10 de 12</p><h1>Mejoras de DQN: Double, Dueling y Prioritized Replay</h1><p class="lead">El objetivo usa un max sobre valores estimados , y estimados con ruido.</p><p class="meta-line"><span class="read-time" data-render="read-time"></span><a href="../modulo-6.html">Índice del módulo</a></p></div><div aria-hidden="true" class="hero-tile"></div></div></header><details class="predice"><summary>El DQN de 2015 funciona, pero se le conocen defectos concretos. Por ejemplo, ¿qué pasa si un recomendador se cree que una película es mejor de lo que es? ¿Qué se ha mejorado desde entonces?<span class="hint"></span></summary><div><p>El objetivo usa un max sobre valores estimados , y estimados con ruido.</p></div></details><section aria-label="Explicación breve" class="micro-core"><div class="micro-kicker">01 · ENTENDER <span>≈ 45 s</span></div><h2>La idea en palabras sencillas</h2><p>El objetivo usa un max sobre valores estimados, y estimados con ruido.</p><div class="micro-example"><span aria-hidden="true" class="micro-example-icon">💡</span><div><strong>Otro ejemplo · Texto</strong><p>Un modelo puede generar la siguiente palabra a partir de palabras anteriores, una decisión detrás de otra.</p></div></div></section><div class="micro-kicker micro-checkpoint">02 · RESPONDER <span>≈ 15 s</span></div><section aria-label="Pregunta intercalada" class="quiz mini micro-check"><script class="quiz-data" type="application/json">{"titulo": "Pausa rápida · Comprueba la idea", "preguntas": [{"q": "¿Qué distingue a un modelo generativo?", "opciones": ["Solo dibuja fronteras de decisión", "Necesita predecir siempre el precio", "Puede producir nuevas muestras aprendiendo patrones"], "correcta": 2, "porque": "Los modelos generativos intentan modelar datos para crear nuevas muestras."}]}</script></section><section aria-label="Animación interactiva" class="micro-viz" data-index="19" data-micro-viz="generative"><div class="micro-kicker">03 · EXPERIMENTAR <span>≈ 45 s</span></div><div class="micro-viz-title"><div><h2>Del ruido a una estructura</h2><p>Avanza la transformación y observa cómo emerge un patrón.</p></div><span aria-hidden="true" class="micro-viz-symbol">✦</span></div><div aria-live="polite" class="micro-viz-stage"><p>Animación interactiva: Del ruido a una estructura</p></div></section><div class="micro-kicker micro-checkpoint">04 · APLICAR <span>≈ 15 s</span></div><section aria-label="Pregunta intercalada" class="quiz mini micro-check"><script class="quiz-data" type="application/json">{"titulo": "Pausa rápida · ¿Lo aplicarías?", "preguntas": [{"q": "En un proceso de difusión generativa, ¿qué suele aprender la red?", "opciones": ["A convertir todas las imágenes a blanco", "A estimar y eliminar ruido progresivamente", "A clasificar exclusivamente correos"], "correcta": 1, "porque": "Los modelos de difusión suelen aprender cómo invertir un proceso de añadir ruido."}]}</script></section><div class="micro-finish"><strong>Idea que te llevas</strong><span>El objetivo usa un max sobre valores estimados, y estimados con ruido</span><small>¿Quieres más ejemplos, fórmulas o código? Los tienes justo debajo, sin límite de tiempo.</small></div><details class="profundizar micro-legacy"><summary><span>Explorar más: explicación y simulaciones completas<small>Todo el texto original, tablas y demos avanzadas. Opcional.</small></span></summary><div class="prof-body"><section><h2>Mejoras de DQN: Double, Dueling y Prioritized Replay</h2>
+<p>El objetivo usa un <code>max</code> sobre valores <em>estimados</em>, y estimados con ruido. El máximo de números con ruido está sesgado hacia arriba: imagina 10 películas que en realidad gustan exactamente igual (valen 0) pero un crítico las puntúa con un error aleatorio; la que saque la nota más alta parecerá buena solo por suerte. Si luego le preguntas a un segundo crítico por esa misma película, ya no saldrá tan alta. En DQN, la mayor de las 10 estimaciones casi seguro será positiva, y con el tiempo el agente se vuelve optimista sin motivo. <strong>Double DQN</strong> separa las dos tareas que el <code>max</code> hace a la vez, <em>elegir</em> la mejor acción y <em>valorarla</em>, y las reparte entre las dos redes que ya tenemos:</p>
+<p>La red <strong>principal</strong> (\( \theta \)) elige la acción (como el primer crítico, que escoge su película favorita) y la red <strong>objetivo</strong> (\( \theta^{-} \)) dice cuánto vale (como el segundo crítico, que la puntúa). Si una de las dos se equivoca con una acción, es poco probable que la otra se equivoque igual, así que desaparece el sesgo. Con los números del <a href="#frag-14">fragmento 14</a> (\( r = 1 \), \( \gamma = 0{,}9 \), tres películas candidatas que el recomendador podría enseñar a continuación; red principal \( [2; 3{,}5; 3] \), objetivo \( [2{,}2; 2{,}4; 3{,}1] \)):</p>
+<p>En muchos estados no importa mucho qué acción elijas (en StreamFlix, con un usuario que ya está enganchado a una serie y no va a cancelar, da casi igual cuál enseñes primero; en CartPole, con el palo ya vertical y el carro en el centro, empujar a un lado u otro apenas cambia el futuro inmediato). La red <strong>dueling</strong> tiene un tronco común y dos ramas:</p>
+<div class="callout ejemplo"><span class="lbl">Ejemplo tomado del módulo</span><p>DQN: \( y = 1 + 0{,}9 \cdot \max(2{,}2;\, 2{,}4;\, 3{,}1) = 1 + 0{,}9 \cdot 3{,}1 = \) 3,79 .</p></div></section><figure class="demo" data-demo="curso3/c3m6-double" data-titulo="Sobreestimación: el máximo de estimaciones con ruido">
+<div class="haz">Cada barra es una película candidata a recomendar y todas valen exactamente 0 (gustan igual); la red las puntúa con ruido. Sube el número de acciones (películas) de 2 a 20 con σ = 1. Después sube σ. Pulsa «Sortear otra vez» varias veces y mira la barra naranja (la mayor) y el punto azul.</div>
+<div class="observa">Todas las acciones valen 0. Aun así, la barra más alta siempre es positiva: es lo que el DQN clásico usa en su objetivo. El punto azul (otra estimación independiente de esa misma acción) cae a cualquier lado de 0. En la gráfica de abajo, el sesgo del máximo crece con el número de acciones y con el ruido; el de Double DQN se queda en 0.</div>
+</figure><div class="resumen"><h2 class="sin-num sin-toc">En pocas líneas</h2><ul><li><strong>Mejoras de DQN: Double, Dueling y Prioritized Replay:</strong> El objetivo usa un max sobre valores estimados , y estimados con ruido.</li><li>Antes de continuar, intenta explicar la demo sin mirar su resultado.</li></ul></div><section class="quiz mini"><script class="quiz-data" type="application/json">{"titulo": "¿Lo tienes?", "preguntas": [{"q": "¿Qué concepto estamos trabajando en esta lección?", "opciones": ["Mejoras de DQN: Double, Dueling y Prioritized Replay", "Q-learning: aprender la tabla Q sin conocer el mapa", "Gymnasium: el laboratorio de entornos"], "correcta": 0, "porque": "El objetivo usa un max sobre valores estimados , y estimados con ruido."}, {"q": "¿Cuál de estas afirmaciones recoge lo que acabas de estudiar?", "opciones": ["Lo importante es comprender la idea y comprobarla con ejemplos, no memorizar términos.", "El objetivo usa un max sobre valores estimados , y estimados con ruido.", "Siempre hay un único método que sirve para todos los problemas."], "correcta": 1, "porque": "La explicación central es: El objetivo usa un max sobre valores estimados , y estimados con ruido."}, {"q": "Si una demo o un ejemplo te desconcierta, ¿cuál es la mejor forma de aprenderlo?", "opciones": ["Memorizar el nombre sin entender la operación.", "Volver a los números, cambiar un valor y explicar qué ocurre.", "Ignorar los resultados que no coinciden con tu intuición."], "correcta": 1, "porque": "Explorar qué cambia y por qué ayuda a conectar el concepto con su resultado."}]}</script></section></div></details><details class="profundizar"><summary><span>Profundizar: explicación completa<small>Matices, fórmulas, tablas, otros ejemplos y experimentos del módulo original.</small></span></summary><div class="prof-body"><section>
+<h2 id="mejoras">Mejoras de DQN: Double, Dueling y Prioritized Replay</h2>
+<p class="pregunta">El DQN de 2015 funciona, pero se le conocen defectos concretos. Por ejemplo, ¿qué pasa si un recomendador se cree que una película es mejor de lo que es? ¿Qué se ha mejorado desde entonces?</p>
+<h3>Double DQN: contra la sobreestimación</h3>
+<p>El objetivo usa un <code>max</code> sobre valores <em>estimados</em>, y estimados con ruido. El máximo de números con ruido está sesgado hacia arriba: imagina 10 películas que en realidad gustan exactamente igual (valen 0) pero un crítico las puntúa con un error aleatorio; la que saque la nota más alta parecerá buena solo por suerte. Si luego le preguntas a un segundo crítico por esa misma película, ya no saldrá tan alta. En DQN, la mayor de las 10 estimaciones casi seguro será positiva, y con el tiempo el agente se vuelve optimista sin motivo. <strong>Double DQN</strong> separa las dos tareas que el <code>max</code> hace a la vez, <em>elegir</em> la mejor acción y <em>valorarla</em>, y las reparte entre las dos redes que ya tenemos:</p>
+<div class="formula">\[ y_{\text{DQN}} = r + \gamma \max_{a'} Q(s', a';\theta^{-}) \qquad\quad y_{\text{Double}} = r + \gamma\; Q\big(s',\; \arg\max_{a'} Q(s', a';\theta);\; \theta^{-}\big) \]</div>
+<p>La red <strong>principal</strong> (\( \theta \)) elige la acción (como el primer crítico, que escoge su película favorita) y la red <strong>objetivo</strong> (\( \theta^{-} \)) dice cuánto vale (como el segundo crítico, que la puntúa). Si una de las dos se equivoca con una acción, es poco probable que la otra se equivoque igual, así que desaparece el sesgo. Con los números del <a href="#frag-14">fragmento 14</a> (\( r = 1 \), \( \gamma = 0{,}9 \), tres películas candidatas que el recomendador podría enseñar a continuación; red principal \( [2; 3{,}5; 3] \), objetivo \( [2{,}2; 2{,}4; 3{,}1] \)):</p>
+<div class="callout ejemplo">
+<span class="lbl">Ejemplo numérico</span>
+<ol class="pasos">
+<li><strong>DQN:</strong> \( y = 1 + 0{,}9 \cdot \max(2{,}2;\, 2{,}4;\, 3{,}1) = 1 + 0{,}9 \cdot 3{,}1 = \) <span class="res">3,79</span>.</li>
+<li><strong>Double DQN:</strong> la red principal elige la acción 1 (3,5 es su máximo); la red objetivo la valora en 2,4: \( y = 1 + 0{,}9 \cdot 2{,}4 = \) <span class="res">3,16</span>.</li>
+</ol>
+<p>Y una simulación con 100 000 sorteos de 10 acciones (películas) que valen 0 realmente: el máximo de las estimaciones vale en media <strong>1,54</strong>; evaluar la acción elegida con otra estimación independiente, <strong>−0,002</strong>.</p>
+</div>
+<h3>Dueling: separar «cómo es de buen el estado» de «qué acción»</h3>
+<p>En muchos estados no importa mucho qué acción elijas (en StreamFlix, con un usuario que ya está enganchado a una serie y no va a cancelar, da casi igual cuál enseñes primero; en CartPole, con el palo ya vertical y el carro en el centro, empujar a un lado u otro apenas cambia el futuro inmediato). La red <strong>dueling</strong> tiene un tronco común y dos ramas:</p>
+<div class="formula">\[ Q(s,a) \;=\; V(s) \;+\; \Big( A(s,a) - \frac{1}{|\mathcal{A}|}\sum_{a'} A(s,a') \Big) \]</div>
+<ul>
+<li>\( V(s) \): un solo número, «lo bueno que es este estado» (un usuario con ganas de ver algo un viernes por la noche).</li>
+<li>\( A(s,a) \): la <strong>ventaja</strong> (<em>advantage</em>) de cada acción, «cuánto mejor o peor es esta acción que la media» (cuánto mejor es enseñarle <em>Matrix</em> que lo que le enseñarías en promedio).</li>
+<li>Restar la media de las ventajas obliga a que sus valores estén centrados en 0. Sin eso, \( V \) y \( A \) podrían repartirse de muchas formas distintas con el mismo \( Q \).</li>
+</ul>
+<p>Así la red aprende \( V(s) \) con cada experiencia, no solo con la acción realizada. En el <a href="#frag-14">fragmento 14</a> se construye en Keras (259 parámetros) y se comprueba que la media de los \( Q \) es exactamente \( V(s) \).</p>
+<h3>Prioritized Experience Replay: estudiar más lo que más se falla</h3>
+<p>El replay uniforme trata igual una transición aburrida que una sorprendente. En el <strong>replay priorizado</strong> la probabilidad de muestrear una transición \( i \) es proporcional a su error TD:</p>
+<div class="formula">\[ P(i) = \frac{|\delta_i|^{\alpha}}{\sum_k |\delta_k|^{\alpha}}, \qquad w_i = \Big( \frac{1}{N \cdot P(i)} \Big)^{\beta} \]</div>
+<p>Priorizar sesga el entrenamiento (se ve demasiado de lo «sorprendente»), así que se corrige multiplicando cada pérdida por un peso de importancia \( w_i \): las transiciones muy probables pesan menos. Con 4 recomendaciones pasadas (4 transiciones) con errores \( |\delta| = 0{,}1;\; 0{,}5;\; 2;\; 0{,}4 \) (la tercera fue la que más sorprendió al recomendador) y \( \alpha = 1 \), \( \beta = 1 \): la suma es 3, así que \( P = [0{,}033;\; 0{,}167;\; 0{,}667;\; 0{,}133] \); los pesos \( 1/(4P) \) son \( [7{,}5;\; 1{,}5;\; 0{,}375;\; 1{,}875] \) y, normalizados por el máximo, \( [1;\; 0{,}2;\; 0{,}05;\; 0{,}25] \). La transición con error 2 se muestrea 20 veces más que la de 0,1 (0,667/0,033), pero su paso de gradiente se multiplica por solo 0,05.</p>
+<p>Otras mejoras que se combinan en el algoritmo <em>Rainbow</em> (2017): retornos de <em>n</em> pasos (usar \( r_t + \gamma r_{t+1} + \dots + \gamma^n Q \) como objetivo), redes con ruido para explorar (<em>noisy nets</em>) y aprender la <em>distribución</em> del retorno en lugar de su media. Para entrenar agentes de verdad hay librerías como Stable-Baselines3 o TF-Agents; en este módulo programamos las piezas a mano para entender qué hace cada una.</p>
+</section></div></details><details class="profundizar" id="codigo"><summary><span>Ver código explicado paso a paso<small>2 fragmento(s) original(es), con cada línea comentada y salida esperada.</small></span></summary><div class="prof-body"><article class="snippet" data-lang="python" id="frag-12">
+<header>
+<h3>12 · Replay buffer, objetivo con red objetivo y un paso de entrenamiento</h3>
+<p class="para-que"><strong>Para qué sirve</strong> Montar a pequeña escala las tres piezas de DQN que no son «la red»: guardar transiciones en un <code>deque</code>, muestrear un minilote, calcular el objetivo \( y = r + \gamma \max_{a'} Q_{obj}(s',a')\,(1-\text{fin}) \) con una <em>segunda</em> red, y entrenar con <code>GradientTape</code>. Se imprime cada cifra para poder seguirla.</p>
+</header>
+<pre class="code"><code>import random
+from collections import deque
+import numpy as np
+import tensorflow as tf
+import keras
+from keras import layers
+import gymnasium as gym
+
+keras.utils.set_random_seed(0)
+random.seed(0)
+gamma = 0.99
+
+def crear_red():
+    return keras.Sequential([keras.Input(shape=(4,)),
+                             layers.Dense(16, activation="relu"),
+                             layers.Dense(2)])
+
+q, q_obj = crear_red(), crear_red()
+print("¿pesos iguales al crearlas?", np.allclose(q.get_weights()[0], q_obj.get_weights()[0]))
+q_obj.set_weights(q.get_weights())
+print("¿pesos iguales tras set_weights?", np.allclose(q.get_weights()[0], q_obj.get_weights()[0]))
+copia_objetivo = [w.copy() for w in q_obj.get_weights()]
+
+env = gym.make("CartPole-v1")
+env.action_space.seed(0)
+buffer = deque(maxlen=12)
+obs, _ = env.reset(seed=3)
+fin = False
+while not fin:
+    a = env.action_space.sample()
+    obs2, r, terminated, truncated, _ = env.step(a)
+    buffer.append((obs, a, r, obs2, float(terminated)))
+    obs, fin = obs2, terminated or truncated
+print("transiciones guardadas (capacidad 12):", len(buffer), "| la última es final:", buffer[-1][4])
+
+lote = random.sample(list(buffer)[:-1], 3) + [buffer[-1]]
+s, a, r, s2, f = [np.array(x, dtype="float32") for x in zip(*lote)]
+a = a.astype("int32")
+
+q_sig = q_obj.predict(s2, verbose=0)
+y = r + gamma * q_sig.max(axis=1) * (1 - f)
+for i in range(4):
+    print(f"transición {i}: r={r[i]:.0f} fin={f[i]:.0f} max Q_obj(s')={q_sig[i].max():7.4f} -&gt; y={y[i]:.4f}")
+
+optimizador = keras.optimizers.Adam(1e-2)
+huber = keras.losses.Huber()
+for paso in range(51):
+    with tf.GradientTape() as cinta:
+        q_sa = tf.reduce_sum(q(s) * tf.one_hot(a, 2), axis=1)
+        perdida = huber(y, q_sa)
+    grads = cinta.gradient(perdida, q.trainable_variables)
+    optimizador.apply_gradients(zip(grads, q.trainable_variables))
+    if paso in (0, 10, 50):
+        print(f"paso {paso:2d}: pérdida Huber = {float(perdida):.4f}")
+
+objetivo_quieta = all(np.allclose(a, b) for a, b in zip(copia_objetivo, q_obj.get_weights()))
+print("¿la red objetivo sigue sin moverse tras 51 pasos?", objetivo_quieta)
+print("¿la red principal sí ha cambiado?", not np.allclose(q.get_weights()[0], q_obj.get_weights()[0]))</code></pre>
+<details class="linea-a-linea">
+<summary>Línea por línea</summary>
+<p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+<table class="lineas">
+<thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+<tbody>
+<tr data-lines="1"><td><code>import random</code></td><td>Módulo estándar para elegir elementos al azar (<code>random.sample</code>).</td></tr>
+<tr data-lines="2"><td><code>from collections import deque</code></td><td><code>deque</code> es una lista de longitud máxima: al llenarse, cada elemento nuevo expulsa al más antiguo. Es el replay buffer.</td></tr>
+<tr data-lines="3"><td><code>import numpy as np</code></td><td>NumPy.</td></tr>
+<tr data-lines="4"><td><code>import tensorflow as tf</code></td><td>TensorFlow: lo usamos para <code>GradientTape</code> y <code>one_hot</code>.</td></tr>
+<tr data-lines="5"><td><code>import keras</code></td><td>Keras.</td></tr>
+<tr data-lines="6"><td><code>from keras import layers</code></td><td>Capas.</td></tr>
+<tr data-lines="7"><td><code>import gymnasium as gym</code></td><td>Entornos.</td></tr>
+<tr data-lines="9"><td><code>keras.utils.set_random_seed(0)</code></td><td>Semilla de Keras/NumPy/TensorFlow.</td></tr>
+<tr data-lines="10"><td><code>random.seed(0)</code></td><td>Semilla del módulo <code>random</code> (el de <code>random.sample</code>), que Keras no controla.</td></tr>
+<tr data-lines="11"><td><code>gamma = 0.99</code></td><td>Factor de descuento.</td></tr>
+<tr data-lines="13-16"><td><code>def crear_red(): …</code></td><td>Función que construye una red pequeña (4 → 16 → 2). Se usa para crear las dos redes con la misma arquitectura.</td></tr>
+<tr data-lines="18"><td><code>q, q_obj = crear_red(), crear_red()</code></td><td>Dos redes: <code>q</code> (la que se entrena) y <code>q_obj</code> (la <strong>red objetivo</strong>, que solo se usa para calcular objetivos).</td></tr>
+<tr data-lines="19"><td><code>print("¿pesos iguales al crearlas?", np.allclose(q.get_wei …</code></td><td><code>get_weights()</code> devuelve la lista de arrays de pesos; <code>[0]</code> es la matriz de la primera capa. Al crearlas, cada red tiene pesos distintos: <code>False</code>.</td></tr>
+<tr data-lines="20"><td><code>q_obj.set_weights(q.get_weights())</code></td><td><strong>Copia los pesos</strong> de <code>q</code> a <code>q_obj</code>. Esto es lo que se repite cada cierto número de pasos en un DQN.</td></tr>
+<tr data-lines="21"><td><code>print("¿pesos iguales tras set_weights?", np.allclose(q.ge …</code></td><td>Ahora son iguales: <code>True</code>.</td></tr>
+<tr data-lines="22"><td><code>copia_objetivo = [w.copy() for w in q_obj.get_weights()]</code></td><td>Guarda una copia de los pesos de la red objetivo para comprobar al final que no se ha movido.</td></tr>
+<tr data-lines="24"><td><code>env = gym.make("CartPole-v1")</code></td><td>Entorno CartPole.</td></tr>
+<tr data-lines="25"><td><code>env.action_space.seed(0)</code></td><td>Semilla del muestreo de acciones (si no, <code>sample()</code> daría resultados distintos cada vez).</td></tr>
+<tr data-lines="26"><td><code>buffer = deque(maxlen=12)</code></td><td>Buffer con capacidad para 12 transiciones (en un DQN real serían decenas de miles).</td></tr>
+<tr data-lines="27"><td><code>obs, _ = env.reset(seed=3)</code></td><td>Empieza un episodio.</td></tr>
+<tr data-lines="28"><td><code>fin = False</code></td><td>Indicador de fin.</td></tr>
+<tr data-lines="29"><td><code>while not fin:</code></td><td>Juega con acciones al azar hasta que el palo caiga.</td></tr>
+<tr data-lines="30"><td><code>a = env.action_space.sample()</code></td><td>Acción aleatoria.</td></tr>
+<tr data-lines="31"><td><code>obs2, r, terminated, truncated, _ = env.step(a)</code></td><td>Ejecuta la acción.</td></tr>
+<tr data-lines="32"><td><code>buffer.append((obs, a, r, obs2, float(terminated)))</code></td><td>Guarda la <strong>transición</strong> completa: (estado, acción, recompensa, estado siguiente, ¿fin?). Se guarda <code>terminated</code> (caída real) y no <code>truncated</code>: la distinción importa para el objetivo.</td></tr>
+<tr data-lines="33"><td><code>obs, fin = obs2, terminated or truncated</code></td><td>El estado siguiente pasa a ser el actual; el bucle se para en cualquiera de los dos fines.</td></tr>
+<tr data-lines="34"><td><code>print("transiciones guardadas (capacidad 12):", len(buffer …</code></td><td>Cuántas transiciones hay (12, el máximo: las más antiguas se han expulsado) y si la última es final.</td></tr>
+<tr data-lines="36"><td><code>lote = random.sample(list(buffer)[:-1], 3) + [buffer[-1]]</code></td><td>Minilote de 4 transiciones: 3 al azar entre las no finales y, a propósito, la última (que es final) para ver el efecto de ese indicador. En un DQN real se muestrean todas al azar.</td></tr>
+<tr data-lines="37"><td><code>s, a, r, s2, f = [np.array(x, dtype="float32") for x in zi …</code></td><td><code>zip(*lote)</code> «transpone» la lista de tuplas: agrupa todos los estados, todas las acciones, etc. Cada grupo se convierte en un array <code>float32</code>.</td></tr>
+<tr data-lines="38"><td><code>a = a.astype("int32")</code></td><td>Las acciones deben ser enteros, para usarlas como índice en <code>one_hot</code>.</td></tr>
+<tr data-lines="40"><td><code>q_sig = q_obj.predict(s2, verbose=0)</code></td><td>Valores Q de los estados siguientes, calculados con la <strong>red objetivo</strong>: forma <code>(4, 2)</code>.</td></tr>
+<tr data-lines="41"><td><code>y = r + gamma * q_sig.max(axis=1) * (1 - f)</code></td><td><strong>El objetivo de DQN</strong>: <code>q_sig.max(axis=1)</code> es el mejor valor de cada fila (<code>axis=1</code> recorre las acciones); <code>(1 - f)</code> lo anula en las transiciones finales.</td></tr>
+<tr data-lines="42"><td><code>for i in range(4):</code></td><td>Recorre las 4 transiciones del lote...</td></tr>
+<tr data-lines="43"><td><code>print(f"transición {i}: r={r[i]:.0f} fin={f[i]:.0f} max Q_ …</code></td><td>...e imprime su recompensa, su indicador de fin, el valor futuro y el objetivo \( y \).</td></tr>
+<tr data-lines="45"><td><code>optimizador = keras.optimizers.Adam(1e-2)</code></td><td>Optimizador Adam con un learning rate algo alto (0,01) para ver bajar la pérdida rápido.</td></tr>
+<tr data-lines="46"><td><code>huber = keras.losses.Huber()</code></td><td>Pérdida de Huber.</td></tr>
+<tr data-lines="47"><td><code>for paso in range(51):</code></td><td>51 pasos de descenso sobre este mismo lote.</td></tr>
+<tr data-lines="48-50"><td><code>with tf.GradientTape() as cinta: …</code></td><td>La <strong>cinta</strong> graba el cálculo hacia delante. <code>q(s)</code> da los Q de todas las acciones, <code>tf.one_hot(a, 2)</code> crea una máscara (1 en la acción realmente hecha, 0 en la otra) y <code>reduce_sum(..., axis=1)</code> se queda con \( Q(s,a) \). La pérdida compara el objetivo <code>y</code> con ese valor.</td></tr>
+<tr data-lines="51"><td><code>grads = cinta.gradient(perdida, q.trainable_variables)</code></td><td>Derivadas de la pérdida respecto a cada peso de <code>q</code> (solo de <code>q</code>: la red objetivo no está en la cuenta).</td></tr>
+<tr data-lines="52"><td><code>optimizador.apply_gradients(zip(grads, q.trainable_variabl …</code></td><td>Aplica el paso de Adam a cada peso.</td></tr>
+<tr data-lines="53"><td><code>if paso in (0, 10, 50):</code></td><td>En tres momentos...</td></tr>
+<tr data-lines="54"><td><code>print(f"paso {paso:2d}: pérdida Huber = {float(perdida):.4 …</code></td><td>...imprime la pérdida.</td></tr>
+<tr data-lines="56"><td><code>objetivo_quieta = all(np.allclose(a, b) for a, b in zip(co …</code></td><td>Compara los pesos actuales de <code>q_obj</code> con la copia guardada: <code>all(...)</code> es verdadero si <em>todos</em> los arrays son iguales.</td></tr>
+<tr data-lines="57"><td><code>print("¿la red objetivo sigue sin moverse tras 51 pasos?", …</code></td><td>La red objetivo no se ha movido: <code>True</code>.</td></tr>
+<tr data-lines="58"><td><code>print("¿la red principal sí ha cambiado?", not np.allclose …</code></td><td>En cambio, la principal sí ha cambiado (sus pesos ya no coinciden con los de la objetivo).</td></tr>
+</tbody>
+</table>
+</details>
+<div class="salida">
+<strong>Salida esperada</strong>
+<pre>¿pesos iguales al crearlas? False
+¿pesos iguales tras set_weights? True
+transiciones guardadas (capacidad 12): 12 | la última es final: 1.0
+transición 0: r=1 fin=0 max Q_obj(s')= 0.0840 -&gt; y=1.0831
+transición 1: r=1 fin=0 max Q_obj(s')=-0.0196 -&gt; y=0.9806
+transición 2: r=1 fin=0 max Q_obj(s')= 0.0482 -&gt; y=1.0477
+transición 3: r=1 fin=1 max Q_obj(s')= 0.1586 -&gt; y=1.0000
+paso  0: pérdida Huber = 0.5026
+paso 10: pérdida Huber = 0.1260
+paso 50: pérdida Huber = 0.0061
+¿la red objetivo sigue sin moverse tras 51 pasos? True
+¿la red principal sí ha cambiado? True</pre>
+<p>Primero, dos redes recién creadas tienen pesos distintos (<code>False</code>) y <code>set_weights</code> las deja idénticas (<code>True</code>). El buffer guardó 12 transiciones (las 12 más recientes del episodio). En el lote, las tres primeras transiciones tienen \( r = 1 \) y un valor futuro pequeño (entre −0,02 y 0,08), de modo que \( y \) es algo mayor o menor que 1 (1,0831; 0,9806; 1,0477). La cuarta, la <strong>final</strong>, tiene un valor futuro de 0,1586 según la red objetivo, pero el objetivo es exactamente <strong>1,0000</strong>: el indicador <code>fin = 1</code> lo ha apagado. Después, 51 pasos sobre el mismo lote bajan la pérdida de Huber de 0,5026 a 0,1260 y a 0,0061: la red principal aprende a reproducir los objetivos. Mientras tanto, la red objetivo ha estado quieta (<code>True</code>): ese es precisamente su trabajo.</p>
+</div>
+</article><article class="snippet" data-lang="python" id="frag-14">
+<header>
+<h3>14 · Double DQN y red Dueling</h3>
+<p class="para-que"><strong>Para qué sirve</strong> Comprobar con números que el máximo de estimaciones con ruido sobreestima (el problema que resuelve Double DQN), calcular los dos objetivos a mano y construir en Keras una cabeza <em>dueling</em> que separa el valor del estado \( V(s) \) de la ventaja de cada acción \( A(s,a) \).</p>
+</header>
+<pre class="code"><code>import numpy as np
+import keras
+from keras import layers, ops
+
+gamma, r, fin = 0.9, 1.0, 0.0
+q_principal = np.array([2.0, 3.5, 3.0])
+q_objetivo = np.array([2.2, 2.4, 3.1])
+
+y_dqn = r + gamma * q_objetivo.max() * (1 - fin)
+a_estrella = q_principal.argmax()
+y_double = r + gamma * q_objetivo[a_estrella] * (1 - fin)
+print("DQN clásico   : y =", round(y_dqn, 3), "(el max se calcula con la red objetivo)")
+print("Double DQN    : y =", round(y_double, 3), f"(elige la acción {a_estrella} con la red principal y la evalúa con la objetivo)")
+
+rng = np.random.default_rng(0)
+ruido_a = rng.normal(0, 1, size=(100000, 10))
+ruido_b = rng.normal(0, 1, size=(100000, 10))
+print("10 acciones con Q real = 0 y estimaciones con ruido N(0,1):")
+print("  media de max(estimaciones)        =", ruido_a.max(axis=1).mean().round(3), "(sobreestima)")
+elegida = ruido_a.argmax(axis=1)
+print("  media evaluando con otra estimación =", ruido_b[np.arange(100000), elegida].mean().round(3), "(sin sesgo)")
+
+keras.utils.set_random_seed(0)
+entrada = keras.Input(shape=(4,))
+h = layers.Dense(32, activation="relu")(entrada)
+valor = layers.Dense(1, name="V")(h)
+ventaja = layers.Dense(2, name="A")(h)
+q = valor + (ventaja - ops.mean(ventaja, axis=1, keepdims=True))
+dueling = keras.Model(entrada, q, name="dueling")
+estado = np.array([[0.1, -0.2, 0.05, 0.3]], dtype="float32")
+print("params dueling:", dueling.count_params())
+print("Q(s,·) =", dueling.predict(estado, verbose=0).round(4)[0])
+extractor = keras.Model(entrada, [valor, ventaja])
+v, a = extractor.predict(estado, verbose=0)
+print("V(s) =", v.round(4)[0], "| A(s,·) =", a.round(4)[0], "| A centrada =", (a - a.mean()).round(4)[0])
+print("media de Q(s,·) =", dueling.predict(estado, verbose=0).mean().round(4), "= V(s)")</code></pre>
+<details class="linea-a-linea">
+<summary>Línea por línea</summary>
+<p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+<table class="lineas">
+<thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+<tbody>
+<tr data-lines="1"><td><code>import numpy as np</code></td><td>NumPy.</td></tr>
+<tr data-lines="2"><td><code>import keras</code></td><td>Keras.</td></tr>
+<tr data-lines="3"><td><code>from keras import layers, ops</code></td><td><code>layers</code> (capas) y <code>ops</code>, las operaciones matemáticas de Keras 3 (funcionan sobre tensores simbólicos).</td></tr>
+<tr data-lines="5"><td><code>gamma, r, fin = 0.9, 1.0, 0.0</code></td><td>Una transición de ejemplo: \( \gamma = 0{,}9 \), recompensa 1 y no es final (<code>fin = 0</code>).</td></tr>
+<tr data-lines="6"><td><code>q_principal = np.array([2.0, 3.5, 3.0])</code></td><td>Valores Q del estado siguiente según la red principal, para 3 acciones.</td></tr>
+<tr data-lines="7"><td><code>q_objetivo = np.array([2.2, 2.4, 3.1])</code></td><td>Los mismos valores según la red objetivo (estimaciones distintas, porque cada red tiene su ruido).</td></tr>
+<tr data-lines="9"><td><code>y_dqn = r + gamma * q_objetivo.max() * (1 - fin)</code></td><td>Objetivo del DQN clásico: la red objetivo elige <em>y</em> evalúa la mejor acción (\( \max = 3{,}1 \)).</td></tr>
+<tr data-lines="10"><td><code>a_estrella = q_principal.argmax()</code></td><td>Double DQN: la red <strong>principal</strong> elige la acción (la 1, con 3,5)...</td></tr>
+<tr data-lines="11"><td><code>y_double = r + gamma * q_objetivo[a_estrella] * (1 - fin)</code></td><td>...y la red <strong>objetivo</strong> la evalúa (2,4 en esa acción).</td></tr>
+<tr data-lines="12"><td><code>print("DQN clásico   : y =", round(y_dqn, 3), "(el max se …</code></td><td>Imprime el objetivo del DQN clásico.</td></tr>
+<tr data-lines="13"><td><code>print("Double DQN    : y =", round(y_double, 3), f"(elige …</code></td><td>Imprime el de Double DQN.</td></tr>
+<tr data-lines="15"><td><code>rng = np.random.default_rng(0)</code></td><td>Azar con semilla.</td></tr>
+<tr data-lines="16"><td><code>ruido_a = rng.normal(0, 1, size=(100000, 10))</code></td><td>100 000 sorteos de 10 estimaciones con ruido normal (media 0, desviación 1) de acciones cuyo valor real es 0: son las estimaciones de la primera red.</td></tr>
+<tr data-lines="17"><td><code>ruido_b = rng.normal(0, 1, size=(100000, 10))</code></td><td>Otras 100 000 × 10 estimaciones independientes: las de la segunda red.</td></tr>
+<tr data-lines="18"><td><code>print("10 acciones con Q real = 0 y estimaciones con ruido …</code></td><td>Explica el montaje.</td></tr>
+<tr data-lines="19"><td><code>print("  media de max(estimaciones)        =", ruido_a.max …</code></td><td>La media del máximo de las 10 estimaciones: lo que usaría un DQN clásico.</td></tr>
+<tr data-lines="20"><td><code>elegida = ruido_a.argmax(axis=1)</code></td><td>Por cada sorteo, qué acción parece la mejor según la primera red.</td></tr>
+<tr data-lines="21"><td><code>print("  media evaluando con otra estimación =", ruido_b[n …</code></td><td>Se mira, para esa misma acción, la estimación independiente de la segunda red (<code>ruido_b[np.arange(100000), elegida]</code> toma una celda por fila) y se promedia: lo que usaría Double DQN.</td></tr>
+<tr data-lines="23"><td><code>keras.utils.set_random_seed(0)</code></td><td>Semilla para los pesos de la red dueling.</td></tr>
+<tr data-lines="24"><td><code>entrada = keras.Input(shape=(4,))</code></td><td>Entrada simbólica de 4 valores (el estado).</td></tr>
+<tr data-lines="25"><td><code>h = layers.Dense(32, activation="relu")(entrada)</code></td><td>Tronco común: una capa oculta de 32 neuronas.</td></tr>
+<tr data-lines="26"><td><code>valor = layers.Dense(1, name="V")(h)</code></td><td>Rama del <strong>valor</strong>: un solo número \( V(s) \), «lo bueno que es este estado».</td></tr>
+<tr data-lines="27"><td><code>ventaja = layers.Dense(2, name="A")(h)</code></td><td>Rama de la <strong>ventaja</strong>: un número por acción \( A(s,a) \), «lo mejor o peor que es esta acción respecto a la media».</td></tr>
+<tr data-lines="28"><td><code>q = valor + (ventaja - ops.mean(ventaja, axis=1, keepdims= …</code></td><td>Combina las ramas: \( Q(s,a) = V(s) + A(s,a) - \text{media}_a A(s,a) \). Restar la media fuerza a que las ventajas estén centradas, así \( V \) y \( A \) no pueden «intercambiarse» sin cambiar \( Q \) (<code>keepdims=True</code> conserva el eje para poder restar).</td></tr>
+<tr data-lines="29"><td><code>dueling = keras.Model(entrada, q, name="dueling")</code></td><td>Modelo funcional con esa entrada y esa salida.</td></tr>
+<tr data-lines="30"><td><code>estado = np.array([[0.1, -0.2, 0.05, 0.3]], dtype="float32 …</code></td><td>Un estado de prueba de forma <code>(1, 4)</code>.</td></tr>
+<tr data-lines="31"><td><code>print("params dueling:", dueling.count_params())</code></td><td>Cuenta los parámetros: 160 (tronco) + 33 (rama V) + 66 (rama A) = 259.</td></tr>
+<tr data-lines="32"><td><code>print("Q(s,·) =", dueling.predict(estado, verbose=0).round …</code></td><td>Los dos valores Q.</td></tr>
+<tr data-lines="33"><td><code>extractor = keras.Model(entrada, [valor, ventaja])</code></td><td>Otro modelo con la misma entrada pero que devuelve las dos ramas por separado, para inspeccionarlas (comparte las capas con <code>dueling</code>).</td></tr>
+<tr data-lines="34"><td><code>v, a = extractor.predict(estado, verbose=0)</code></td><td>Obtiene \( V(s) \) y \( A(s,\cdot) \).</td></tr>
+<tr data-lines="35"><td><code>print("V(s) =", v.round(4)[0], "| A(s,·) =", a.round(4)[0] …</code></td><td>Imprime \( V \), la ventaja sin centrar y la ventaja centrada (restándole su media).</td></tr>
+<tr data-lines="36"><td><code>print("media de Q(s,·) =", dueling.predict(estado, verbose …</code></td><td>Comprueba que la media de los valores Q es exactamente \( V(s) \): la ventaja centrada suma cero.</td></tr>
+</tbody>
+</table>
+</details>
+<div class="salida">
+<strong>Salida esperada</strong>
+<pre>DQN clásico   : y = 3.79 (el max se calcula con la red objetivo)
+Double DQN    : y = 3.16 (elige la acción 1 con la red principal y la evalúa con la objetivo)
+10 acciones con Q real = 0 y estimaciones con ruido N(0,1):
+  media de max(estimaciones)        = 1.54 (sobreestima)
+  media evaluando con otra estimación = -0.002 (sin sesgo)
+params dueling: 259
+Q(s,·) = [-0.0494 -0.1849]
+V(s) = [-0.1172] | A(s,·) = [ 0.0842 -0.0513] | A centrada = [ 0.0677 -0.0677]
+media de Q(s,·) = -0.1172 = V(s)</pre>
+<p>Con los números inventados, el DQN clásico da \( y = 1 + 0{,}9 \cdot 3{,}1 = 3{,}79 \) y el Double DQN \( y = 1 + 0{,}9 \cdot 2{,}4 = 3{,}16 \): la acción que la red principal creía la mejor (la 1) no lo es tanto para la otra red, y el objetivo baja. La simulación lo generaliza: con 10 acciones cuyo valor real es 0, el máximo de las estimaciones con ruido vale en media <strong>1,54</strong> (sobreestimación pura: nada vale más de 0), mientras que evaluar la acción elegida con una estimación independiente da <strong>−0,002</strong> (≈ 0, sin sesgo). En la red dueling, 259 parámetros; la ventaja sin centrar es [0,0842; −0,0513], centrada [0,0677; −0,0677], y \( Q = -0{,}1172 + \) eso \( = \) [−0,0495; −0,1849] (Keras muestra −0,0494 por redondeo interno), con media −0,1172 = \( V(s) \).</p>
+</div>
+</article></div></details></div></main></body></html>

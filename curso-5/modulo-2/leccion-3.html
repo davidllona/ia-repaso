@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+
+<html lang="es"><head><meta charset="utf-8"/><meta content="width=device-width,initial-scale=1" name="viewport"/><title>Lección 3 · Cómo lo hace PyTorch: el grafo de autograd · Curso 5 · Cuaderno de IA</title><meta content="Cada vez que haces una operación con un tensor que tiene requires_grad=True , PyTorch apunta en el resultado qué operación lo creó ( grad_fn ) y de qué tensores venía." name="description"/><script>try{var t=localStorage.getItem('cuaderno-ia:tema');if(t)document.documentElement.setAttribute('data-theme',t)}catch(e){}</script><link href="../../assets/css/style.css" rel="stylesheet"/><script src="../../assets/js/curriculum.js"></script><script src="../../assets/js/lab.js"></script><script defer="" src="../../assets/js/app.js"></script><script defer="" src="../../assets/js/microanimations.js"></script></head><body data-course="5" data-lesson="3" data-module="2" data-root="../../"><main><div class="page" data-micro="3min"><header class="hero leccion"><div class="hero-grid"><div><p class="eyebrow">Curso 5 · Módulo 2 · Lección 3 de 11</p><h1>Cómo lo hace PyTorch: el grafo de autograd</h1><p class="lead">Cada vez que haces una operación con un tensor que tiene requires_grad=True , PyTorch apunta en el resultado qué operación lo creó ( grad_fn ) y de qué tensores venía.</p><p class="meta-line"><span class="read-time" data-render="read-time"></span><a href="../modulo-2.html">Índice del módulo</a></p></div><div aria-hidden="true" class="hero-tile"></div></div></header><details class="predice"><summary>¿Cómo sabe loss.backward() qué derivadas aplicar si no le has dicho nada de la red?<span class="hint"></span></summary><div><p>Cada vez que haces una operación con un tensor que tiene requires_grad=True , PyTorch apunta en el resultado qué operación lo creó ( grad_fn ) y de qué tensores venía.</p></div></details><section aria-label="Explicación breve" class="micro-core"><div class="micro-kicker">01 · ENTENDER <span>≈ 45 s</span></div><h2>La idea en palabras sencillas</h2><p>Cada vez que haces una operación con un tensor que tiene requires_grad=True, PyTorch apunta en el resultado qué operación lo creó ( grad_fn ) y de qué tensores venía.</p><div class="micro-example"><span aria-hidden="true" class="micro-example-icon">🛍️</span><div><strong>Otro ejemplo · Tienda</strong><p>La talla «M» es texto. Para ciertos algoritmos hay que codificarla en números sin inventar distancias.</p></div></div></section><div class="micro-kicker micro-checkpoint">02 · RESPONDER <span>≈ 15 s</span></div><section aria-label="Pregunta intercalada" class="quiz mini micro-check"><script class="quiz-data" type="application/json">{"titulo": "Pausa rápida · Comprueba la idea", "preguntas": [{"q": "En una tabla de temperatura aparece NaN. ¿Qué significa?", "opciones": ["La temperatura es muy alta", "La temperatura fue 0 °C", "No hay valor registrado"], "correcta": 2, "porque": "NaN representa un valor faltante, no cero."}]}</script></section><section aria-label="Animación interactiva" class="micro-viz" data-index="10" data-micro-viz="data"><div class="micro-kicker">03 · EXPERIMENTAR <span>≈ 45 s</span></div><div class="micro-viz-title"><div><h2>De datos imperfectos a datos útiles</h2><p>Pulsa «Preparar datos» y descubre qué se transforma.</p></div><span aria-hidden="true" class="micro-viz-symbol">✦</span></div><div aria-live="polite" class="micro-viz-stage"><p>Animación interactiva: De datos imperfectos a datos útiles</p></div></section><div class="micro-kicker micro-checkpoint">04 · APLICAR <span>≈ 15 s</span></div><section aria-label="Pregunta intercalada" class="quiz mini micro-check"><script class="quiz-data" type="application/json">{"titulo": "Pausa rápida · ¿Lo aplicarías?", "preguntas": [{"q": "¿Por qué conviene preparar los datos ANTES de entrenar?", "opciones": ["Para que el modelo reciba información coherente", "Para garantizar un 100 % de aciertos", "Para evitar siempre hacer pruebas"], "correcta": 0, "porque": "Las transformaciones y los datos faltantes afectan a lo que aprende el modelo."}]}</script></section><div class="micro-finish"><strong>Idea que te llevas</strong><span>Cada vez que haces una operación con un tensor que tiene requires_grad=True, PyTorch apunta en el resultado qué operación lo creó ( grad_fn ) y de qué</span><small>¿Quieres más ejemplos, fórmulas o código? Los tienes justo debajo, sin límite de tiempo.</small></div><details class="profundizar micro-legacy"><summary><span>Explorar más: explicación y simulaciones completas<small>Todo el texto original, tablas y demos avanzadas. Opcional.</small></span></summary><div class="prof-body"><section><h2>Cómo lo hace PyTorch: el grafo de autograd</h2>
+<p>Cada vez que haces una operación con un tensor que tiene <code>requires_grad=True</code>, PyTorch apunta en el resultado <strong>qué operación lo creó</strong> (<code>grad_fn</code>) y de qué tensores venía. Esas notas forman el <abbr class="t" data-def="Grafo computacional: red de nodos (operaciones) y aristas (tensores) que PyTorch construye durante el forward. El backward lo recorre al revés aplicando la regla de la cadena en cada nodo.">grafo computacional</abbr>, que se construye <em>sobre la marcha</em> en cada forward. <code>backward()</code> lo recorre al revés y, en cada nodo, aplica la derivada local que ese nodo conoce (<code>ReluBackward0</code> sabe que la derivada de ReLU es 1 o 0, <code>MvBackward0</code> sabe derivar un producto matriz-vector, etc.).</p>
+<p>El <a href="#codigo">fragmento 3</a> imprime ese grafo para la red 2-2-1: <code>PowBackward0</code> (la pérdida) ← <code>SubBackward0</code> ← <code>DotBackward0</code> ← <code>ReluBackward0</code> ← <code>MvBackward0</code>, con los <code>AccumulateGrad</code> en las hojas (los pesos), que es donde acaban los gradientes. Lo mismo, sin los nombres, es lo que viste con <code>tf.GradientTape</code> en el <a href="../../curso-3/modulo-5.html#gradientes">Curso 3</a>.</p>
+<div class="callout ejemplo"><span class="lbl">Con números</span><p>Cada vez que haces una operación con un tensor que tiene requires_grad=True , PyTorch apunta en el resultado qué operación lo creó ( grad_fn ) y de qué tensores venía.</p></div></section><div class="resumen"><h2 class="sin-num sin-toc">En pocas líneas</h2><ul><li><strong>Cómo lo hace PyTorch: el grafo de autograd:</strong> Cada vez que haces una operación con un tensor que tiene requires_grad=True , PyTorch apunta en el resultado qué operación lo creó (…</li><li>Antes de continuar, intenta explicar la demo sin mirar su resultado.</li></ul></div><section class="quiz mini"><script class="quiz-data" type="application/json">{"titulo": "¿Lo tienes?", "preguntas": [{"q": "¿Qué concepto estamos trabajando en esta lección?", "opciones": ["La receta completa: qué aporta cada pieza", "Cómo lo hace PyTorch: el grafo de autograd", "Batch normalization: normalizar lo que ve cada capa"], "correcta": 1, "porque": "Cada vez que haces una operación con un tensor que tiene requires_grad=True , PyTorch apunta en el resultado qué operación lo creó ( grad_fn ) y de qué tensores venía."}, {"q": "¿Cuál de estas afirmaciones recoge lo que acabas de estudiar?", "opciones": ["Siempre hay un único método que sirve para todos los problemas.", "Lo importante es comprender la idea y comprobarla con ejemplos, no memorizar términos.", "Cada vez que haces una operación con un tensor que tiene requires_grad=True , PyTorch apunta en el resultado qué operación lo creó ( grad_fn ) y de qué tensores venía."], "correcta": 2, "porque": "La explicación central es: Cada vez que haces una operación con un tensor que tiene requires_grad=True , PyTorch apunta en el resultado qué operación lo creó ( grad_fn ) y de qué tensores venía."}, {"q": "Si una demo o un ejemplo te desconcierta, ¿cuál es la mejor forma de aprenderlo?", "opciones": ["Ignorar los resultados que no coinciden con tu intuición.", "Memorizar el nombre sin entender la operación.", "Volver a los números, cambiar un valor y explicar qué ocurre."], "correcta": 2, "porque": "Explorar qué cambia y por qué ayuda a conectar el concepto con su resultado."}]}</script></section></div></details><details class="profundizar"><summary><span>Profundizar: explicación completa<small>Matices, fórmulas, tablas, otros ejemplos y experimentos del módulo original.</small></span></summary><div class="prof-body"><section>
+<h2 id="autograd">Cómo lo hace PyTorch: el grafo de autograd</h2>
+<p class="pregunta">¿Cómo sabe <code>loss.backward()</code> qué derivadas aplicar si no le has dicho nada de la red?</p>
+<p>Cada vez que haces una operación con un tensor que tiene <code>requires_grad=True</code>, PyTorch apunta en el resultado <strong>qué operación lo creó</strong> (<code>grad_fn</code>) y de qué tensores venía. Esas notas forman el <abbr class="t" data-def="Grafo computacional: red de nodos (operaciones) y aristas (tensores) que PyTorch construye durante el forward. El backward lo recorre al revés aplicando la regla de la cadena en cada nodo.">grafo computacional</abbr>, que se construye <em>sobre la marcha</em> en cada forward. <code>backward()</code> lo recorre al revés y, en cada nodo, aplica la derivada local que ese nodo conoce (<code>ReluBackward0</code> sabe que la derivada de ReLU es 1 o 0, <code>MvBackward0</code> sabe derivar un producto matriz-vector, etc.).</p>
+<div class="callout analogia">
+<span class="lbl">Analogía</span>
+<p>Es como grabar el «cómo se hizo» (el <em>making of</em>) mientras ruedas una película, apuntando cada escena («rodé esto», «monté aquello»). Cuando el público odia el final, rebobinas la grabación hacia atrás y cada escena te dice cuánto influyó. Si no grabaste (<code>torch.no_grad()</code>), no puedes rebobinar, pero tampoco gastas memoria.</p>
+</div>
+<p>El <a href="#codigo">fragmento 3</a> imprime ese grafo para la red 2-2-1: <code>PowBackward0</code> (la pérdida) ← <code>SubBackward0</code> ← <code>DotBackward0</code> ← <code>ReluBackward0</code> ← <code>MvBackward0</code>, con los <code>AccumulateGrad</code> en las hojas (los pesos), que es donde acaban los gradientes. Lo mismo, sin los nombres, es lo que viste con <code>tf.GradientTape</code> en el <a href="../../curso-3/modulo-5.html#gradientes">Curso 3</a>.</p>
+<h3>Tres detalles que importan al entrenar</h3>
+<ul>
+<li><strong>Los gradientes se acumulan.</strong> <code>backward()</code> <em>suma</em> el nuevo gradiente a lo que ya hubiera en <code>.grad</code>. Por eso el bucle de entrenamiento empieza cada paso con <code>optimizer.zero_grad()</code>: sin él, cada paso usaría el gradiente de todos los lotes anteriores sumados. En el fragmento 3, \( \partial(w^2)/\partial w=4 \) sale 4, 8, 12 si no lo pones a cero.</li>
+<li><strong>La neurona muerta.</strong> Si \( z&lt;0 \) la derivada de ReLU es 0 y no pasa ningún gradiente: ni a los pesos de esa neurona ni a lo que hay detrás de ella. Con \( z_2=-2 \), el fragmento 3 da <code>W1.grad = [[2, 4], [0, 0]]</code>: la segunda fila (la neurona 2) no aprende nada para este dato. Si una neurona queda en \( z&lt;0 \) para <em>todos</em> los datos, está muerta para siempre.</li>
+<li><strong>Evaluar sin grafo.</strong> Para medir (no entrenar) se usa <code>with torch.no_grad():</code>, que no construye el grafo y ahorra memoria.</li>
+</ul>
+<div class="callout ojo">
+<span class="lbl">Ojo</span>
+<p>Orden del bucle de entrenamiento en PyTorch: <code>optimizer.zero_grad()</code> → forward → pérdida → <code>loss.backward()</code> → <code>optimizer.step()</code>. Si olvidas el <code>zero_grad()</code> el modelo no da error: simplemente entrena mal, con gradientes acumulados. En Keras todo eso lo hacía <code>fit</code> por dentro (<a href="../../curso-2/modulo-1.html#bucle">bucle de entrenamiento</a>).</p>
+</div>
+</section></div></details><details class="profundizar" id="codigo"><summary><span>Ver código explicado paso a paso<small>1 fragmento(s) original(es), con cada línea comentada y salida esperada.</small></span></summary><div class="prof-body"><article class="snippet" data-lang="python">
+<header>
+<h3>3 · El grafo de autograd, la neurona muerta y la acumulación de gradientes</h3>
+<p class="para-que"><strong>Para qué sirve</strong> Ver el grafo que PyTorch construye al hacer el forward, comprobar que una neurona con ReLU en la zona plana no recibe gradiente y entender por qué hay que llamar a <code>zero_grad()</code>.</p>
+</header>
+<pre class="code"><code>import torch
+
+# 1) El grafo que PyTorch construye durante el forward
+x = torch.tensor([1.0, 2.0])
+W1 = torch.tensor([[1.0, 0.5], [-1.0, 1.0]], requires_grad=True)
+v = torch.tensor([2.0, -1.0], requires_grad=True)
+loss = ((v @ torch.relu(W1 @ x) - 2.0) ** 2)
+
+
+def cadena(fn, nivel=0):
+    print("  " * nivel + fn.name())
+    for siguiente, _ in fn.next_functions:
+        if siguiente is not None:
+            cadena(siguiente, nivel + 1)
+
+
+cadena(loss.grad_fn)
+
+# 2) Neurona muerta: con z &lt; 0 la ReLU corta el gradiente de su fila de pesos
+b1 = torch.tensor([-1.0, -3.0], requires_grad=True)     # la segunda neurona queda en z = -2
+W1.grad = None
+h = torch.relu(W1 @ x + b1)
+((v @ h + 0.5 - 2.0) ** 2).backward()
+print("z1 =", (W1 @ x + b1).tolist(), " h =", h.tolist())
+print("W1.grad =", W1.grad.tolist(), " b1.grad =", b1.grad.tolist())
+
+# 3) Los gradientes se acumulan: por eso existe zero_grad()
+w = torch.tensor(2.0, requires_grad=True)
+for i in range(3):
+    (w ** 2).backward()
+    print("tras el backward", i + 1, "-&gt; w.grad =", w.grad.item())
+w.grad.zero_()
+(w ** 2).backward()
+print("tras zero_() y otro backward -&gt; w.grad =", w.grad.item())</code></pre>
+<details class="linea-a-linea" open="">
+<summary>Línea por línea</summary>
+<p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+<table class="lineas">
+<thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+<tbody>
+<tr data-lines="1"><td><code>import torch</code></td><td>Importamos <code>torch</code>.</td></tr>
+<tr data-lines="3-6"><td><code># 1) El grafo que PyTorch construye durante el forward …</code></td><td>Los mismos datos y pesos del fragmento anterior (<code>x</code>, <code>W1</code>, <code>v</code>), con gradiente activado en los pesos.</td></tr>
+<tr data-lines="7"><td><code>loss = ((v @ torch.relu(W1 @ x) - 2.0) ** 2)</code></td><td>Calcula la pérdida de una sola vez: \((v\cdot \mathrm{relu}(W_1x)-2)^2\). Al hacerlo, cada operación deja una nota en el grafo.</td></tr>
+<tr data-lines="10-14"><td><code>def cadena(fn, nivel=0): …</code></td><td><code>cadena</code> recorre el grafo hacia atrás: imprime el nombre de cada nodo (<code>fn.name()</code>) con sangría según su profundidad y baja por <code>fn.next_functions</code> (los nodos que alimentan a éste), saltando los vacíos (<code>None</code>).</td></tr>
+<tr data-lines="17"><td><code>cadena(loss.grad_fn)</code></td><td>Empieza por <code>loss.grad_fn</code>, el nodo que produjo la pérdida: el último paso del forward.</td></tr>
+<tr data-lines="19-20"><td><code># 2) Neurona muerta: con z &lt; 0 la ReLU corta el gradiente de su fila de pesos …</code></td><td>Nuevo sesgo <code>b1</code> con segundo valor muy negativo: la segunda neurona tendrá \(z=-1\cdot1+1\cdot2-3=-2\), por debajo de cero.</td></tr>
+<tr data-lines="21"><td><code>W1.grad = None</code></td><td><code>W1.grad = None</code> borra los gradientes anteriores de <code>W1</code>.</td></tr>
+<tr data-lines="22-23"><td><code>h = torch.relu(W1 @ x + b1) …</code></td><td>Forward con los nuevos sesgos y <code>backward()</code> en la misma línea; el 0.5 y el −2.0 de la pérdida son <code>c</code> e <code>y</code> del ejemplo.</td></tr>
+<tr data-lines="24-25"><td><code>print("z1 =", (W1 @ x + b1).tolist(), " h =", h.tolist()) …</code></td><td>Imprime <code>z1</code>, <code>h</code> y los gradientes: la segunda fila de <code>W1.grad</code> y el segundo valor de <code>b1.grad</code> saldrán 0.</td></tr>
+<tr data-lines="27-28"><td><code># 3) Los gradientes se acumulan: por eso existe zero_grad() …</code></td><td>Un peso suelto <code>w = 2</code> para ver cómo se acumulan los gradientes.</td></tr>
+<tr data-lines="29-31"><td><code>for i in range(3): …</code></td><td>Tres veces seguidas: calcula \(w^2\), llama a <code>backward()</code> e imprime <code>w.grad</code>. La derivada de \(w^2\) en 2 es 4, pero PyTorch <strong>suma</strong> cada nuevo gradiente al anterior.</td></tr>
+<tr data-lines="32-34"><td><code>w.grad.zero_() …</code></td><td><code>w.grad.zero_()</code> pone el gradiente a cero (el guion bajo final significa «modifica en el sitio»); un nuevo <code>backward()</code> vuelve a dar 4.</td></tr>
+</tbody>
+</table>
+</details>
+<div class="salida">
+<strong>Salida esperada</strong>
+<pre>PowBackward0
+  SubBackward0
+    DotBackward0
+      torch::autograd::AccumulateGrad
+      ReluBackward0
+        MvBackward0
+          torch::autograd::AccumulateGrad
+z1 = [1.0, -2.0]  h = [1.0, 0.0]
+W1.grad = [[2.0, 4.0], [0.0, 0.0]]  b1.grad = [2.0, 0.0]
+tras el backward 1 -&gt; w.grad = 4.0
+tras el backward 2 -&gt; w.grad = 8.0
+tras el backward 3 -&gt; w.grad = 12.0
+tras zero_() y otro backward -&gt; w.grad = 4.0</pre>
+<p>El grafo se lee de arriba abajo: <code>PowBackward0</code> (el cuadrado) ← <code>SubBackward0</code> (la resta) ← <code>DotBackward0</code> (el producto <code>v @ h</code>), que se alimenta de <code>AccumulateGrad</code> (el peso <code>v</code>) y de <code>ReluBackward0</code> ← <code>MvBackward0</code> (<code>W1 @ x</code>) ← <code>AccumulateGrad</code> (<code>W1</code>). Con \(z=(1,-2)\), \(h=(1,0)\): la segunda neurona está «muerta» y su fila de <code>W1.grad</code> y su <code>b1.grad</code> valen 0. Y el gradiente de \(w^2\) sale 4, 8, 12 si no lo pones a cero: <strong>se acumula</strong>.</p>
+</div>
+</article></div></details></div></main></body></html>

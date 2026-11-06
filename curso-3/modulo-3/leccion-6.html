@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+
+<html lang="es"><head><meta charset="utf-8"/><meta content="width=device-width,initial-scale=1" name="viewport"/><title>Lección 6 · El bloque Transformer encoder, pieza a pieza · Curso 3 · Cuaderno de IA</title><meta content="Un bloque tiene dos sub-bloques (atención y red feed-forward), cada uno rodeado de una conexión residual y una normalización ." name="description"/><script>try{var t=localStorage.getItem('cuaderno-ia:tema');if(t)document.documentElement.setAttribute('data-theme',t)}catch(e){}</script><link href="../../assets/css/style.css" rel="stylesheet"/><script src="../../assets/js/curriculum.js"></script><script src="../../assets/js/lab.js"></script><script defer="" src="../../assets/js/app.js"></script><script defer="" src="../../assets/js/microanimations.js"></script></head><body data-course="3" data-lesson="6" data-module="3" data-root="../../"><main><div class="page" data-micro="3min"><header class="hero leccion"><div class="hero-grid"><div><p class="eyebrow">Curso 3 · Módulo 3 · Lección 6 de 8</p><h1>El bloque Transformer encoder, pieza a pieza</h1><p class="lead">Un bloque tiene dos sub-bloques (atención y red feed-forward), cada uno rodeado de una conexión residual y una normalización .</p><p class="meta-line"><span class="read-time" data-render="read-time"></span><a href="../modulo-3.html">Índice del módulo</a></p></div><div aria-hidden="true" class="hero-tile"></div></div></header><details class="predice"><summary>La atención mezcla tokens, pero sola no es un Transformer. ¿Qué más lleva un bloque, para qué sirve cada pieza y qué pasaría si la quitaras?<span class="hint"></span></summary><div><p>Un bloque tiene dos sub-bloques (atención y red feed-forward), cada uno rodeado de una conexión residual y una normalización .</p></div></details><section aria-label="Explicación breve" class="micro-core"><div class="micro-kicker">01 · ENTENDER <span>≈ 45 s</span></div><h2>La idea en palabras sencillas</h2><p>Un bloque tiene dos sub-bloques (atención y red feed-forward), cada uno rodeado de una conexión residual y una normalización.</p><div class="micro-example"><span aria-hidden="true" class="micro-example-icon">💡</span><div><strong>Otro ejemplo · Idioma</strong><p>En «Ana dejó su mochila porque estaba cansada», el contexto ayuda a decidir a quién describe «cansada».</p></div></div></section><div class="micro-kicker micro-checkpoint">02 · RESPONDER <span>≈ 15 s</span></div><section aria-label="Pregunta intercalada" class="quiz mini micro-check"><script class="quiz-data" type="application/json">{"titulo": "Pausa rápida · Comprueba la idea", "preguntas": [{"q": "En «Fui al banco a retirar dinero», ¿qué ayuda a interpretar «banco»?", "opciones": ["El contexto «retirar dinero»", "Solo la longitud de la palabra", "Únicamente su primera letra"], "correcta": 0, "porque": "La atención permite relacionar términos y su contexto."}]}</script></section><section aria-label="Animación interactiva" class="micro-viz" data-index="12" data-micro-viz="attention"><div class="micro-kicker">03 · EXPERIMENTAR <span>≈ 45 s</span></div><div class="micro-viz-title"><div><h2>Qué parte del contexto importa</h2><p>Selecciona otra palabra y observa qué conexiones destacan.</p></div><span aria-hidden="true" class="micro-viz-symbol">✦</span></div><div aria-live="polite" class="micro-viz-stage"><p>Animación interactiva: Qué parte del contexto importa</p></div></section><div class="micro-kicker micro-checkpoint">04 · APLICAR <span>≈ 15 s</span></div><section aria-label="Pregunta intercalada" class="quiz mini micro-check"><script class="quiz-data" type="application/json">{"titulo": "Pausa rápida · ¿Lo aplicarías?", "preguntas": [{"q": "¿Qué busca un mecanismo de atención?", "opciones": ["Borrar toda la información anterior", "Convertir siempre imágenes en texto", "Ponderar qué elementos de la entrada son relevantes"], "correcta": 2, "porque": "La atención asigna importancia relativa a diferentes elementos del contexto."}]}</script></section><div class="micro-finish"><strong>Idea que te llevas</strong><span>Un bloque tiene dos sub-bloques (atención y red feed-forward), cada uno rodeado de una conexión residual y una normalización</span><small>¿Quieres más ejemplos, fórmulas o código? Los tienes justo debajo, sin límite de tiempo.</small></div><details class="profundizar micro-legacy"><summary><span>Explorar más: explicación y simulaciones completas<small>Todo el texto original, tablas y demos avanzadas. Opcional.</small></span></summary><div class="prof-body"><section><h2>El bloque Transformer encoder, pieza a pieza</h2>
+<p>Un bloque tiene dos sub-bloques (atención y red feed-forward), cada uno rodeado de una <em>conexión residual</em> y una <em>normalización</em>. La entrada y la salida tienen la misma forma \((n, d_{model})\), así que se pueden apilar tantos bloques como quieras. Es el <code>TransformerBlock</code> que ya usaste en el proyecto del Curso 2; ahora vemos qué hace cada línea.</p>
+<p>Mantiene los números en una escala razonable a medida que atraviesan muchas capas (si no, tras 12 o 96 bloques los valores se disparan o se apagan y el entrenamiento se vuelve inestable). Normaliza <strong>cada token por separado</strong>: calcula la media \(\mu\) y la varianza \(\sigma^2\) de sus \(d_{model}\) números y los reescala:</p>
+<p>\(\gamma\) y \(\beta\) son dos vectores de \(d_{model}\) números que <strong>se aprenden</strong> (empiezan en 1 y 0) para que la red pueda «deshacer» la normalización si le conviene; \(\varepsilon\) es un número minúsculo para no dividir entre 0 (en <code>LayerNormalization</code> vale <code>0.001</code> por defecto; nuestro bloque usa <code>1e-6</code>).</p>
+<div class="callout ejemplo"><span class="lbl">Ejemplo tomado del módulo</span><p>Un token con \(d = 4\): \(x = (1, 2, 3, 10)\).</p></div></section><figure class="demo" data-demo="curso3/c3m3-layernorm-ejes" data-titulo="¿Sobre qué números se calcula la media?">
+<div class="haz">El tensor es un lote de 3 usuarios; cada usuario tiene 4 títulos de su historial y cada título está descrito con 5 números. Pulsa una casilla cualquiera con «LayerNorm (por token)»: se iluminan los 5 números de ese título. Cambia a «BatchNorm (por rasgo)» y pulsa otra casilla.</div>
+<div class="observa">LayerNorm mira solo una fila (un título, todos sus rasgos). BatchNorm mira una columna entera atravesando todos los usuarios y todos los títulos: 12 valores que no tienen nada que ver entre sí. Fíjate en la fórmula del texto: el valor de z que se muestra es la cuenta que acabamos de hacer a mano.</div>
+</figure><div class="resumen"><h2 class="sin-num sin-toc">En pocas líneas</h2><ul><li><strong>El bloque Transformer encoder, pieza a pieza:</strong> Un bloque tiene dos sub-bloques (atención y red feed-forward), cada uno rodeado de una conexión residual y una normalización .</li><li>Antes de continuar, intenta explicar la demo sin mirar su resultado.</li></ul></div><section class="quiz mini"><script class="quiz-data" type="application/json">{"titulo": "¿Lo tienes?", "preguntas": [{"q": "¿Qué concepto estamos trabajando en esta lección?", "opciones": ["Por qué las RNN y las LSTM se quedan cortas", "El bloque Transformer encoder, pieza a pieza", "Codificación posicional"], "correcta": 1, "porque": "Un bloque tiene dos sub-bloques (atención y red feed-forward), cada uno rodeado de una conexión residual y una normalización ."}, {"q": "¿Cuál de estas afirmaciones recoge lo que acabas de estudiar?", "opciones": ["Siempre hay un único método que sirve para todos los problemas.", "Lo importante es comprender la idea y comprobarla con ejemplos, no memorizar términos.", "Un bloque tiene dos sub-bloques (atención y red feed-forward), cada uno rodeado de una conexión residual y una normalización ."], "correcta": 2, "porque": "La explicación central es: Un bloque tiene dos sub-bloques (atención y red feed-forward), cada uno rodeado de una conexión residual y una normalización ."}, {"q": "Si una demo o un ejemplo te desconcierta, ¿cuál es la mejor forma de aprenderlo?", "opciones": ["Ignorar los resultados que no coinciden con tu intuición.", "Memorizar el nombre sin entender la operación.", "Volver a los números, cambiar un valor y explicar qué ocurre."], "correcta": 2, "porque": "Explorar qué cambia y por qué ayuda a conectar el concepto con su resultado."}]}</script></section></div></details><details class="profundizar"><summary><span>Profundizar: explicación completa<small>Matices, fórmulas, tablas, otros ejemplos y experimentos del módulo original.</small></span></summary><div class="prof-body"><section>
+<h2 id="bloque">El bloque Transformer encoder, pieza a pieza</h2>
+<p class="pregunta">La atención mezcla tokens, pero sola no es un Transformer. ¿Qué más lleva un bloque, para qué sirve cada pieza y qué pasaría si la quitaras?</p>
+<p>Un bloque tiene dos sub-bloques (atención y red feed-forward), cada uno rodeado de una <em>conexión residual</em> y una <em>normalización</em>. La entrada y la salida tienen la misma forma \((n, d_{model})\), así que se pueden apilar tantos bloques como quieras. Es el <code>TransformerBlock</code> que ya usaste en el proyecto del Curso 2; ahora vemos qué hace cada línea.</p>
+<pre class="ascii">x ──┬──────────────► (+) ─► LayerNorm ──┬────────────► (+) ─► LayerNorm ─► salida
+    │                  ▲                  │               ▲
+    └─ MultiHeadAttention (x, x) ─────────┘               │
+                                          └─ Dense(ff) ─► ReLU ─► Dense(d_model)
+
+Versión «post-LN» (la del artículo original y la de nuestro código): suma y luego normaliza.</pre>
+<h3>1 · LayerNormalization</h3>
+<p>Mantiene los números en una escala razonable a medida que atraviesan muchas capas (si no, tras 12 o 96 bloques los valores se disparan o se apagan y el entrenamiento se vuelve inestable). Normaliza <strong>cada token por separado</strong>: calcula la media \(\mu\) y la varianza \(\sigma^2\) de sus \(d_{model}\) números y los reescala:</p>
+<div class="formula">\[ \operatorname{LN}(x)_j = \gamma_j\,\frac{x_j - \mu}{\sqrt{\sigma^2 + \varepsilon}} + \beta_j \]</div>
+<p>\(\gamma\) y \(\beta\) son dos vectores de \(d_{model}\) números que <strong>se aprenden</strong> (empiezan en 1 y 0) para que la red pueda «deshacer» la normalización si le conviene; \(\varepsilon\) es un número minúsculo para no dividir entre 0 (en <code>LayerNormalization</code> vale <code>0.001</code> por defecto; nuestro bloque usa <code>1e-6</code>).</p>
+<div class="callout ejemplo">
+<span class="lbl">Ejemplo numérico</span>
+<p>Un token con \(d = 4\): \(x = (1, 2, 3, 10)\). Piensa en una película que recibe cuatro notas de 0 a 10 (cifras inventadas): tres críticos le ponen 1, 2 y 3 y uno le pone un 10. LayerNorm las pasa a una escala común.</p>
+<ol class="pasos">
+<li>Media: \(\mu = (1+2+3+10)/4 = 4\).</li>
+<li>Varianza: \(((1-4)^2 + (2-4)^2 + (3-4)^2 + (10-4)^2)/4 = (9 + 4 + 1 + 36)/4 = 12{,}5\). Desviación: \(\sqrt{12{,}5} = 3{,}536\).</li>
+<li>Normalizado (con \(\gamma = 1\), \(\beta = 0\) y \(\varepsilon\) despreciable): \((-3,\,-2,\,-1,\,6)/3{,}536 = (-0{,}849;\ -0{,}566;\ -0{,}283;\ 1{,}697)\). Media 0 y desviación 1.</li>
+</ol>
+</div>
+<p><strong>¿Por qué LayerNorm y no BatchNorm?</strong> BatchNorm calcula las estadísticas <em>a lo largo del lote</em> (una media por rasgo, mezclando ejemplos y tokens). Con secuencias de longitud variable, rellenos y lotes pequeños esas estadísticas son inestables, y en generación (un ejemplo cada vez) ni siquiera existen. LayerNorm usa solo los números del propio token: da igual el lote y la longitud.</p>
+<h3>2 · Conexión residual</h3>
+<p>En lugar de devolver solo lo que calcula el sub-bloque, se devuelve <strong>entrada + lo que calcula</strong>: \(y = x + F(x)\). Dos razones:</p>
+<ul>
+<li><strong>El camino directo.</strong> La derivada es \(\partial y/\partial x = 1 + F'(x)\): aunque \(F'\) sea casi 0, el gradiente pasa con valor 1. En 12 bloques con \(F' = 0{,}01\), el gradiente conserva \(1{,}01^{12} \approx 1{,}13\) en lugar de \(0{,}01^{12} = 10^{-24}\). Es el mismo truco que las ResNet y lo que permite apilar decenas de capas.</li>
+<li><strong>Lo que había se conserva.</strong> El sub-bloque solo tiene que aprender la <em>corrección</em> a la entrada, no reconstruirla entera: es como entregar el guion original más las notas de corrección, en lugar de reescribirlo desde cero.</li>
+</ul>
+<div class="callout ojo">
+<span class="lbl">Ojo</span>
+<p>La suma exige que \(x\) y \(F(x)\) tengan <strong>la misma forma</strong>. Por eso la atención devuelve \(d_{model}\) números (gracias a \(W_O\)) y por eso la red feed-forward termina en <code>Dense(d_model)</code>. Si cambias una de esas dimensiones, Keras protesta con un error de formas incompatibles al sumar.</p>
+</div>
+<h3>3 · Red feed-forward por posición</h3>
+<p>Dos capas <code>Dense</code> con una ReLU en medio: \(\operatorname{FFN}(x) = W_2\,\max(0,\,W_1 x + b_1) + b_2\), que sube de \(d_{model}\) a \(d_{ff}\) (habitualmente \(4\,d_{model}\)) y vuelve a bajar. Se aplica a <strong>cada token por separado y con los mismos pesos</strong> (<em>position-wise</em>): la atención mezcla información <em>entre</em> tokens y la FFN <em>procesa</em> lo que cada token ha recogido. Equivale a dos convoluciones <code>Conv1D</code> de tamaño de kernel 1; algunos ejemplos de Keras la escriben así. Es donde vive la mayor parte de los parámetros del bloque (el 66 % cuando \(d_{ff} = 4d_{model}\)).</p>
+<h3>Post-LN y pre-LN</h3>
+<p>Dónde se coloca la normalización cambia el comportamiento. <strong>Post-LN</strong> (artículo original): <code>x = LN(x + Sub(x))</code>. <strong>Pre-LN</strong> (GPT-2 en adelante): <code>x = x + Sub(LN(x))</code>, que deja el «carril» residual sin tocar y entrena de forma más estable con modelos muy profundos (en pre-LN se añade una LayerNorm final después del último bloque). Nuestro código usa post-LN por ser el de los tutoriales de Keras.</p>
+<figure class="demo" data-demo="curso3/c3m3-bloque-numeros" data-titulo="Un bloque Transformer con números reales">
+<div class="haz">Los 4 tokens son 4 películas de tu historial, cada una con una ficha de 4 números. Pulsa «Siguiente» desde el paso 0 hasta el 6 y observa cómo cambian la matriz y las medias/desviaciones de cada token. Luego quita las conexiones residuales y repite. Por último prueba pre-LN.</div>
+<div class="observa">Tras cada LayerNorm todas las filas tienen media 0 y desviación 1, incluida la de la peli 3, que entró con números triples. La atención y la FFN no cambian la forma (4 × 4). Al final, la «semejanza» entre la entrada y la salida es mayor con residuales que sin ellas: sin la suma, el bloque olvida lo que le llegó. Los mapas inferiores son los pesos de atención de las dos cabezas de este bloque.</div>
+</figure>
+<h3>Cuántos parámetros tiene un bloque</h3>
+<p>Con \(d = d_{model}\) y \(d_{ff}\): atención \(4d^2 + 4d\); FFN \(2\,d\,d_{ff} + d_{ff} + d\); dos LayerNorm \(4d\) (sus \(\gamma\) y \(\beta\)). Para \(d = 32\) y \(d_{ff} = 64\): \(4224 + 4192 + 128 = 8544\), justo lo que verás en el fragmento 11. Para BERT-base (\(d = 768\), \(d_{ff} = 3072\)) salen 7.087.872 por bloque y unos 85 millones los 12 bloques (el resto de sus ~110 millones son los embeddings de unas 30.000 piezas de vocabulario).</p>
+<figure class="demo" data-demo="curso3/c3m3-contador-params" data-titulo="Contador de parámetros de un Transformer">
+<div class="haz">Parte de la configuración por defecto (la del fragmento 15) y cambia el número de cabezas con el selector. Luego sube d_model a 128 y el vocabulario a 5.000. Por último activa «Error típico: key_dim = d_model».</div>
+<div class="observa">Las cabezas no mueven el total. Doblar d_model multiplica por 4 los parámetros de atención y de FFN (crecen con d²), mientras que el vocabulario solo pesa en las capas de entrada y de salida. Con key_dim = d_model la atención se infla h veces. Las cifras de la configuración por defecto coinciden con las de <code>model.summary()</code> de los fragmentos 12 y 15.</div>
+</figure>
+<h3>Encoder, decoder y la familia: BERT, GPT y compañía</h3>
+<p>Con este bloque se construyen las tres arquitecturas famosas, que solo se diferencian en la máscara y en cómo se entrenan:</p>
+<table>
+<thead><tr><th></th><th>Máscara</th><th>Se entrena para…</th><th>Sirve para</th></tr></thead>
+<tbody>
+<tr><td><strong>Encoder</strong> (BERT)</td><td>Ninguna: cada token ve a los de ambos lados</td><td>Rellenar palabras tapadas («masked language model»): «Shrek es una [MASK] de animación» → «película»</td><td>Entender texto: clasificar, extraer, buscar, medir similitud. También es lo que usaremos con series.</td></tr>
+<tr><td><strong>Decoder</strong> (GPT)</td><td>Causal: cada token solo ve hacia atrás</td><td>Predecir el token siguiente</td><td>Generar texto, código, etc. Es el que construiremos al final.</td></tr>
+<tr><td><strong>Encoder + decoder</strong> (Transformer original, T5)</td><td>Encoder libre; decoder causal con cross-attention al encoder</td><td>Secuencia → secuencia (traducir, resumir)</td><td>Cuando la entrada y la salida son textos distintos.</td></tr>
+</tbody>
+</table>
+<p>«Entender» frente a «generar» es solo cuestión de la máscara: con la causal el modelo puede entrenarse con la frase entera de una vez y aun así no hacer trampa. Otros usos del mismo bloque: Vision Transformers (el «texto» son trozos de imagen), audio y, como verás ahora, series temporales.</p>
+<h3>El bloque como capa propia de Keras</h3>
+<p>Como viste en el <a href="../modulo-1.html">módulo 1 de este curso</a>, una capa propia hereda de <code>keras.layers.Layer</code>. En el constructor (<code>__init__</code>) creas las sub-capas; <code>call</code> dice cómo fluyen los datos; <code>get_config</code> devuelve los argumentos del constructor para poder guardar y recargar el modelo. Dos detalles propios de Keras 3 que verás en el fragmento 11:</p>
+<ul>
+<li><code>@keras.saving.register_keras_serializable()</code> da un nombre a la clase para que <code>load_model</code> pueda reconstruirla.</li>
+<li>El argumento <code>training</code> de <code>call</code> activa o desactiva el <code>Dropout</code> (se apaga en <code>predict</code> y <code>evaluate</code>).</li>
+</ul>
+</section></div></details><details class="profundizar" id="codigo"><summary><span>Ver código explicado paso a paso<small>1 fragmento(s) original(es), con cada línea comentada y salida esperada.</small></span></summary><div class="prof-body"><article class="snippet" data-lang="python">
+<header>
+<h3>11 · Capas propias: <code>PositionalEncoding</code> y <code>TransformerBlock</code></h3>
+<p class="para-que"><strong>Para qué sirve</strong> Crear las dos capas que usaremos en el resto del módulo con <code>keras.layers.Layer</code>: la suma de la codificación sinusoidal y el bloque Transformer (atención + LayerNorm + FFN + residuales), y comprobar sus formas y parámetros. Usa <code>np</code> de los anteriores.</p>
+</header>
+<pre class="code"><code>import keras
+from keras import layers, ops
+
+@keras.saving.register_keras_serializable(package="c3m3")
+class PositionalEncoding(layers.Layer):
+    def __init__(self, max_pasos, d_model, **kwargs):
+        super().__init__(**kwargs)
+        self.max_pasos, self.d_model = max_pasos, d_model
+        pos = np.arange(max_pasos)[:, None]
+        i = np.arange(d_model // 2)[None, :]
+        angulos = pos / 10000 ** (2 * i / d_model)
+        pe = np.zeros((max_pasos, d_model), dtype="float32")
+        pe[:, 0::2], pe[:, 1::2] = np.sin(angulos), np.cos(angulos)
+        self.pe = pe
+
+    def call(self, x):
+        pe = ops.convert_to_tensor(self.pe)
+        return x + pe[: ops.shape(x)[1]]
+
+    def get_config(self):
+        return {**super().get_config(), "max_pasos": self.max_pasos, "d_model": self.d_model}
+
+@keras.saving.register_keras_serializable(package="c3m3")
+class TransformerBlock(layers.Layer):
+    def __init__(self, d_model, num_heads, ff_dim, dropout=0.1, causal=False, **kwargs):
+        super().__init__(**kwargs)
+        self.d_model, self.num_heads, self.ff_dim = d_model, num_heads, ff_dim
+        self.dropout, self.causal = dropout, causal
+        self.att = layers.MultiHeadAttention(num_heads=num_heads, key_dim=d_model // num_heads)
+        self.ffn = keras.Sequential([layers.Dense(ff_dim, activation="relu"), layers.Dense(d_model)])
+        self.norm1 = layers.LayerNormalization(epsilon=1e-6)
+        self.norm2 = layers.LayerNormalization(epsilon=1e-6)
+        self.drop = layers.Dropout(dropout)
+
+    def call(self, x, training=False):
+        a = self.att(x, x, use_causal_mask=self.causal)
+        x = self.norm1(x + self.drop(a, training=training))
+        f = self.ffn(x)
+        return self.norm2(x + self.drop(f, training=training))
+
+    def get_config(self):
+        return {**super().get_config(), "d_model": self.d_model, "num_heads": self.num_heads,
+                "ff_dim": self.ff_dim, "dropout": self.dropout, "causal": self.causal}
+
+bloque = TransformerBlock(d_model=32, num_heads=4, ff_dim=64)
+entrada = np.random.default_rng(0).normal(size=(2, 48, 32)).astype("float32")
+salida = bloque(entrada)
+print("entrada:", entrada.shape, "-&gt; salida:", salida.shape)
+print("parámetros del bloque:", bloque.count_params())
+for capa in (bloque.att, bloque.ffn, bloque.norm1, bloque.norm2):
+    print(f"  {type(capa).__name__:&lt;22} {capa.count_params():&gt;6}")</code></pre>
+<details class="linea-a-linea" open="">
+<summary>Línea por línea</summary>
+<p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+<table class="lineas">
+<thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+<tbody>
+<tr data-lines="1-2"><td><code>import keras; from keras import layers, ops</code></td><td>Además de las capas, importa <code>ops</code>: las operaciones de tensores de Keras 3 (<code>ops.shape</code>, <code>ops.arange</code>, <code>ops.convert_to_tensor</code>…), que valen para cualquier backend.</td></tr>
+<tr data-lines="4"><td><code>@keras.saving.register_keras_serializable(package="c3m3")</code></td><td>Un <em>decorador</em>: da a la clase de debajo un nombre registrado (<code>c3m3&gt;PositionalEncoding</code>) para que Keras pueda reconstruirla al cargar un modelo guardado.</td></tr>
+<tr data-lines="5"><td><code>class PositionalEncoding(layers.Layer):</code></td><td>Una capa propia: una clase que <em>hereda</em> de <code>layers.Layer</code> (como viste en el <a href="../modulo-1.html">módulo 1</a>).</td></tr>
+<tr data-lines="6-8"><td><code>def __init__(self, max_pasos, d_model, **kwargs): ...</code></td><td>El constructor. Recibe la longitud máxima y el tamaño del vector, pasa los demás argumentos a la clase base (<code>**kwargs</code>: nombre, tipo de dato…) y guarda los dos números para <code>get_config</code>.</td></tr>
+<tr data-lines="9-13"><td><code>pos = ...; i = ...; angulos = ...; pe = ...; pe[:, 0::2], ... = ...</code></td><td>La misma fórmula del fragmento 9, calculada una vez al crear la capa, en <code>float32</code>.</td></tr>
+<tr data-lines="14"><td><code>self.pe = pe</code></td><td>Guarda la tabla como atributo. Es una constante: no se entrena ni cuenta como parámetro.</td></tr>
+<tr data-lines="16"><td><code>def call(self, x):</code></td><td>Lo que hace la capa al recibir datos: aquí <code>x</code> es <code>(lote, pasos, d_model)</code>.</td></tr>
+<tr data-lines="17"><td><code>pe = ops.convert_to_tensor(self.pe)</code></td><td>Convierte la tabla de NumPy en un tensor. Es imprescindible: durante <code>fit</code> la longitud de la ventana es desconocida para TensorFlow y NumPy no sabe cortar con un tensor (el error del recuadro «Ojo»).</td></tr>
+<tr data-lines="18"><td><code>return x + pe[: ops.shape(x)[1]]</code></td><td>Corta la tabla a las primeras <code>pasos</code> posiciones y la suma a cada ejemplo del lote (NumPy y Keras «difunden» una tabla <code>(pasos, d)</code> sobre el lote <code>(lote, pasos, d)</code>).</td></tr>
+<tr data-lines="20-21"><td><code>def get_config(self): return {**super().get_config(), ...}</code></td><td>Devuelve un diccionario con los argumentos del constructor (más los de la clase base, con <code>**super().get_config()</code>) para poder guardar y recargar.</td></tr>
+<tr data-lines="23-24"><td><code>@...register_keras_serializable(...) class TransformerBlock(layers.Layer):</code></td><td>Registra y define el bloque.</td></tr>
+<tr data-lines="25"><td><code>def __init__(self, d_model, num_heads, ff_dim, dropout=0.1, causal=False, **kwargs):</code></td><td>Argumentos: tamaño del modelo, cabezas, ancho de la FFN, tasa de dropout y si la atención es causal (decoder) o libre (encoder).</td></tr>
+<tr data-lines="26-28"><td><code>super().__init__(**kwargs); self.d_model, ... = ...</code></td><td>Inicializa la clase base y guarda los argumentos (para <code>get_config</code>).</td></tr>
+<tr data-lines="29"><td><code>self.att = layers.MultiHeadAttention(num_heads=num_heads, key_dim=d_model // num_heads)</code></td><td>La atención, con <code>key_dim = d_model // num_heads</code> (la regla segura). <code>//</code> es la división entera.</td></tr>
+<tr data-lines="30"><td><code>self.ffn = keras.Sequential([Dense(ff_dim, activation="relu"), Dense(d_model)])</code></td><td>La red feed-forward: sube a <code>ff_dim</code> con ReLU y vuelve a <code>d_model</code> (la forma debe coincidir con la entrada para poder sumar).</td></tr>
+<tr data-lines="31-32"><td><code>self.norm1 = ...; self.norm2 = ...</code></td><td>Dos capas <code>LayerNormalization</code> (cada una con sus propios \(\gamma\) y \(\beta\)).</td></tr>
+<tr data-lines="33"><td><code>self.drop = layers.Dropout(dropout)</code></td><td>Dropout: apaga al azar una fracción de los números mientras se entrena, para reducir el sobreajuste.</td></tr>
+<tr data-lines="35"><td><code>def call(self, x, training=False):</code></td><td>El flujo de datos. <code>training</code> indica si se está entrenando (Keras lo rellena solo).</td></tr>
+<tr data-lines="36"><td><code>a = self.att(x, x, use_causal_mask=self.causal)</code></td><td>Self-attention (<code>query=x</code>, <code>value=x</code>); con máscara causal si es un decoder.</td></tr>
+<tr data-lines="37"><td><code>x = self.norm1(x + self.drop(a, training=training))</code></td><td>Residual + LayerNorm (post-LN): suma la entrada a la atención (con dropout) y normaliza.</td></tr>
+<tr data-lines="38"><td><code>f = self.ffn(x)</code></td><td>La red feed-forward, aplicada a cada token.</td></tr>
+<tr data-lines="39"><td><code>return self.norm2(x + self.drop(f, training=training))</code></td><td>Segunda residual + LayerNorm; la salida tiene la forma de la entrada.</td></tr>
+<tr data-lines="41-43"><td><code>def get_config(self): ...</code></td><td>Los argumentos del bloque, para guardarlo y recargarlo.</td></tr>
+<tr data-lines="45"><td><code>bloque = TransformerBlock(d_model=32, num_heads=4, ff_dim=64)</code></td><td>Crea un bloque de ejemplo.</td></tr>
+<tr data-lines="46"><td><code>entrada = np.random.default_rng(0).normal(...)</code></td><td>Entrada inventada: 2 ejemplos, 48 pasos, 32 números.</td></tr>
+<tr data-lines="47"><td><code>salida = bloque(entrada)</code></td><td>Llama al bloque (aquí se crean los pesos).</td></tr>
+<tr data-lines="48"><td><code>print("entrada:", ..., "-&gt; salida:", ...)</code></td><td>Las formas de entrada y salida.</td></tr>
+<tr data-lines="49"><td><code>print("parámetros del bloque:", bloque.count_params())</code></td><td>Total de parámetros.</td></tr>
+<tr data-lines="50-51"><td><code>for capa in (...): print(f"  {type(capa).__name__:&lt;22} ...")</code></td><td>Desglose por sub-capa: nombre de su clase (<code>:&lt;22</code> la alinea a la izquierda en 22 espacios) y sus parámetros.</td></tr>
+</tbody>
+</table>
+</details>
+<div class="salida">
+<strong>Salida esperada</strong>
+<pre>entrada: (2, 48, 32) -&gt; salida: (2, 48, 32)
+parámetros del bloque: 8544
+  MultiHeadAttention       4224
+  Sequential               4192
+  LayerNormalization         64
+  LayerNormalization         64</pre>
+<p>La forma no cambia: <code>(2, 48, 32)</code> entra y <code>(2, 48, 32)</code> sale, por eso se pueden apilar bloques. Parámetros: 4.224 de la atención + 4.192 de la FFN (\(32\cdot 64 + 64 + 64\cdot 32 + 32\)) + 64 + 64 de las dos LayerNorm = <strong>8.544</strong>, justo la fórmula de la sección del bloque.</p>
+</div>
+</article></div></details></div></main></body></html>

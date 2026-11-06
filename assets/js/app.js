@@ -16,6 +16,7 @@
   var ROOT = body.getAttribute("data-root") || "./";
   var curCourse = parseInt(body.getAttribute("data-course") || "0", 10);
   var curModule = parseInt(body.getAttribute("data-module") || "0", 10);
+  var curLesson = parseInt(body.getAttribute("data-lesson") || "0", 10);
 
   /* ---------- utilidades ---------- */
   function $(sel, ctx) { return (ctx || document).querySelector(sel); }
@@ -41,9 +42,12 @@
     return s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 60);
   }
   function courseById(id) { return CUR.courses.filter(function (c) { return c.id === id; })[0]; }
-  function href(course, mod) {
+  function href(course, mod, lesson) {
+    if (lesson) return ROOT + course.slug + "/" + mod.slug + "/" + lesson.slug + ".html";
     return ROOT + course.slug + "/" + (mod ? mod.slug + ".html" : "");
   }
+  function moduleOf(c, m) { var co = courseById(c); return co && co.modules.filter(function (x) { return x.n === m; })[0]; }
+  function lessonsOf(c, m) { var mo = moduleOf(c, m); return (mo && mo.lessons) || []; }
   var allModules = [];
   CUR.courses.forEach(function (c) { c.modules.forEach(function (m) { allModules.push({ c: c, m: m }); }); });
 
@@ -55,8 +59,19 @@
   };
   var DONE_KEY = "cuaderno-ia:hecho:v1";
   function doneMap() { try { return JSON.parse(store.get(DONE_KEY) || "{}") || {}; } catch (e) { return {}; } }
-  function isDone(c, m) { return !!doneMap()[c + "." + m]; }
+  /* Un módulo con lecciones está «estudiado» cuando lo están todas sus lecciones. */
+  function isLessonDone(c, m, l) { return !!doneMap()[c + "." + m + "." + l]; }
+  function setLessonDone(c, m, l, v) { var d = doneMap(); if (v) d[c + "." + m + "." + l] = 1; else delete d[c + "." + m + "." + l]; store.set(DONE_KEY, JSON.stringify(d)); }
+  function isDone(c, m) {
+    var ls = lessonsOf(c, m);
+    if (ls.length) return ls.every(function (l) { return isLessonDone(c, m, l.n); });
+    return !!doneMap()[c + "." + m];
+  }
   function setDone(c, m, v) { var d = doneMap(); if (v) d[c + "." + m] = 1; else delete d[c + "." + m]; store.set(DONE_KEY, JSON.stringify(d)); }
+  function lessonProgress(c, m) {
+    var ls = lessonsOf(c, m), done = ls.filter(function (l) { return isLessonDone(c, m, l.n); }).length;
+    return { done: done, total: ls.length };
+  }
   function courseProgress(c) {
     var done = c.modules.filter(function (m) { return isDone(c.id, m.n); }).length;
     return { done: done, total: c.modules.length };
@@ -183,7 +198,19 @@
         var a = el("a", { href: href(c, m) }, el("span", { class: "mn", text: String(m.n) }), el("span", { text: m.title }));
         if (isDone(c.id, m.n)) a.appendChild(el("span", { class: "done-dot", title: "Módulo estudiado" }));
         var li = el("li", {}, a);
-        if (c.id === curCourse && m.n === curModule) { a.setAttribute("aria-current", "page"); li.appendChild(el("ul", { class: "side-toc", id: "side-toc" })); }
+        if (c.id === curCourse && m.n === curModule) {
+          if (!curLesson) a.setAttribute("aria-current", "page");
+          if (m.lessons && m.lessons.length) {
+            var lul = el("ul", { class: "side-toc side-lessons" });
+            m.lessons.forEach(function (l) {
+              var la = el("a", { href: href(c, m, l), text: l.n + ". " + l.title });
+              if (l.n === curLesson) la.setAttribute("aria-current", "page");
+              if (isLessonDone(c.id, m.n, l.n)) la.classList.add("is-done");
+              lul.appendChild(el("li", {}, la));
+            });
+            li.appendChild(lul);
+          } else li.appendChild(el("ul", { class: "side-toc", id: "side-toc" }));
+        }
         ul.appendChild(li);
       });
       det.appendChild(ul); side.appendChild(det);
@@ -199,7 +226,7 @@
     $$("h2", page).forEach(function (h) {
       if (h.closest(".resumen,.quiz,.demo,.callout")) return;
       if (!h.id) h.id = slugify(h.textContent) || "sec-" + (items.length + 1);
-      if (!h.classList.contains("sin-num") && curModule) {
+      if (!h.classList.contains("sin-num") && curModule && !curLesson) {
         k++; h.insertBefore(el("span", { class: "num", text: curModule + "." + k }), h.firstChild);
       }
       if (!h.classList.contains("sin-toc")) items.push(h);
@@ -229,13 +256,55 @@
     });
     if (curCourse && curModule) {
       var box = $(".hero .hero-tile");
-      if (box) box.innerHTML = tileSVG("c" + curCourse + "m" + curModule, isDone(curCourse, curModule));
+      if (box) box.innerHTML = tileSVG("c" + curCourse + "m" + curModule + (curLesson ? "l" + curLesson : ""), curLesson ? isLessonDone(curCourse, curModule, curLesson) : isDone(curCourse, curModule));
     }
+    /* tiempo de lectura de la lección: cuenta el texto principal, no «Profundizar» ni el código */
+    $$('[data-render="read-time"]').forEach(function (b) {
+      var page = $(".page"); if (!page) return;
+      var clone = page.cloneNode(true);
+      $$(".profundizar,.snippet,pre,.quiz,.demo,.done-bar,.modnav,script,style", clone).forEach(function (n) { n.remove(); });
+      var words = clone.textContent.trim().split(/\s+/).length, min = Math.max(1, Math.round(words / 200));
+      if (page.getAttribute("data-micro") === "3min") {
+        b.textContent = "≈ 3 min · lectura + animación + 2 preguntas";
+      } else {
+        b.textContent = min + " min de lectura";
+      }
+    });
   }
 
   /* ---------- final de módulo: marcar + navegación ---------- */
+  function buildLessonFooter() {
+    var page = $(".page"); if (!page || !curLesson) return;
+    var c = courseById(curCourse), m = moduleOf(curCourse, curModule), ls = (m && m.lessons) || [];
+    var idx = -1; ls.forEach(function (l, i) { if (l.n === curLesson) idx = i; });
+    var btn = el("button", { class: "btn primary", type: "button" });
+    function paint() { btn.textContent = isLessonDone(curCourse, curModule, curLesson) ? "Desmarcar lección" : "Lección entendida ✓"; }
+    paint();
+    btn.addEventListener("click", function () {
+      setLessonDone(curCourse, curModule, curLesson, !isLessonDone(curCourse, curModule, curLesson)); paint();
+      var box = $(".hero-tile"); if (box) box.innerHTML = tileSVG("c" + curCourse + "m" + curModule + "l" + curLesson, isLessonDone(curCourse, curModule, curLesson));
+      var a = $('.side-lessons a[aria-current="page"]'); if (a) a.classList.toggle("is-done", isLessonDone(curCourse, curModule, curLesson));
+    });
+    var p = lessonProgress(curCourse, curModule);
+    page.appendChild(el("div", { class: "done-bar" },
+      el("p", { text: "¿Lo has entendido? Marca la lección. Llevas " + p.done + " de " + p.total + " de este módulo." }), btn));
+    var nav = el("nav", { class: "modnav", "aria-label": "Lección anterior y siguiente" });
+    var prev = ls[idx - 1], next = ls[idx + 1];
+    nav.appendChild(prev ? el("a", { class: "prev", href: href(c, m, prev) }, el("small", { text: "← Lección " + prev.n }), el("span", { text: prev.title }))
+      : el("a", { class: "prev", href: href(c, m) }, el("small", { text: "← Módulo " + m.n }), el("span", { text: "Índice de lecciones" })));
+    if (next) nav.appendChild(el("a", { class: "next", href: href(c, m, next) }, el("small", { text: "Lección " + next.n + " →" }), el("span", { text: next.title })));
+    else {
+      var mi = -1; allModules.forEach(function (x, i) { if (x.c.id === curCourse && x.m.n === curModule) mi = i; });
+      var nm = allModules[mi + 1];
+      nav.appendChild(nm ? el("a", { class: "next", href: href(nm.c, nm.m) }, el("small", { text: "Fin del módulo · siguiente →" }), el("span", { text: nm.m.title }))
+        : el("a", { class: "next", href: ROOT + "index.html" }, el("small", { text: "Fin del recorrido →" }), el("span", { text: "Volver a la portada" })));
+    }
+    page.appendChild(nav);
+  }
+
   function buildModuleFooter() {
-    var page = $(".page"); if (!page || !curModule) return;
+    var page = $(".page"); if (!page || !curModule || curLesson) return;
+    if (lessonsOf(curCourse, curModule).length) { buildModuleNavOnly(page); return; }
     var idx = -1;
     allModules.forEach(function (x, i) { if (x.c.id === curCourse && x.m.n === curModule) idx = i; });
     var btn = el("button", { class: "btn primary", type: "button" });
@@ -250,6 +319,11 @@
     });
     page.appendChild(el("div", { class: "done-bar" },
       el("p", { text: "¿Has entendido este módulo? Márcalo y su azulejo se coloreará en tu portada." }), btn));
+    buildModuleNavOnly(page);
+  }
+  function buildModuleNavOnly(page) {
+    var idx = -1;
+    allModules.forEach(function (x, i) { if (x.c.id === curCourse && x.m.n === curModule) idx = i; });
     var nav = el("nav", { class: "modnav", "aria-label": "Módulo anterior y siguiente" });
     var prev = allModules[idx - 1], next = allModules[idx + 1];
     nav.appendChild(prev ? el("a", { class: "prev", href: href(prev.c, prev.m) }, el("small", { text: "← Anterior · Curso " + prev.c.id }), el("span", { text: prev.m.title })) : el("span"));
@@ -288,6 +362,22 @@
         ul.appendChild(el("li", {}, a));
       });
       box.appendChild(ul);
+    });
+    $$('[data-render="lesson-list"]').forEach(function (box) {
+      var c = courseById(curCourse), m = moduleOf(curCourse, curModule); if (!c || !m || !m.lessons) return;
+      var p = lessonProgress(curCourse, curModule);
+      box.appendChild(el("div", { class: "progress", role: "progressbar", "aria-valuemin": "0", "aria-valuemax": String(p.total), "aria-valuenow": String(p.done), "aria-label": "Progreso del módulo" }, el("i", { style: "width:" + (p.total ? 100 * p.done / p.total : 0) + "%" })));
+      box.appendChild(el("div", { class: "progress-label", text: p.done + " de " + p.total + " lecciones entendidas" }));
+      var ol = el("ol", { class: "lesson-list" });
+      m.lessons.forEach(function (l) {
+        var done = isLessonDone(curCourse, curModule, l.n);
+        var a = el("a", { href: href(c, m, l), class: done ? "is-done" : "" },
+          el("span", { class: "ll-n", text: String(l.n) }),
+          el("span", { class: "ll-body" }, el("span", { class: "ll-title", text: l.title }), l.blurb ? el("span", { class: "ll-blurb", text: l.blurb }) : null),
+          el("span", { class: "ll-meta", text: done ? "✓ hecha" : (l.min ? l.min + " min" : "") }));
+        ol.appendChild(el("li", {}, a));
+      });
+      box.appendChild(ol);
     });
     $$('[data-render="wall"]').forEach(function (box) {
       var wall = el("div", { class: "wall", role: "list" });
@@ -461,6 +551,7 @@
     buildToc();
     buildHero();
     buildModuleFooter();
+    buildLessonFooter();
     renderLists();
     buildCode();
     buildQuizzes();
