@@ -58,16 +58,24 @@
     set: function (k, v) { try { localStorage.setItem(k, v); } catch (e) { mem[k] = v; } }
   };
   var DONE_KEY = "cuaderno-ia:hecho:v1";
+  /* Registro de cambios con fecha (clave → [valor, ms]) para poder sincronizar entre dispositivos */
+  var CHANGES_KEY = "cuaderno-ia:cambios:v1";
+  function markChange(key, v) {
+    var ch; try { ch = JSON.parse(store.get(CHANGES_KEY) || "{}") || {}; } catch (e) { ch = {}; }
+    ch[key] = [v ? 1 : 0, Date.now()];
+    store.set(CHANGES_KEY, JSON.stringify(ch));
+    try { window.dispatchEvent(new CustomEvent("cuaderno:progreso", { detail: { key: key, value: v ? 1 : 0 } })); } catch (e) {}
+  }
   function doneMap() { try { return JSON.parse(store.get(DONE_KEY) || "{}") || {}; } catch (e) { return {}; } }
   /* Un módulo con lecciones está «estudiado» cuando lo están todas sus lecciones. */
   function isLessonDone(c, m, l) { return !!doneMap()[c + "." + m + "." + l]; }
-  function setLessonDone(c, m, l, v) { var d = doneMap(); if (v) d[c + "." + m + "." + l] = 1; else delete d[c + "." + m + "." + l]; store.set(DONE_KEY, JSON.stringify(d)); }
+  function setLessonDone(c, m, l, v) { var k = c + "." + m + "." + l, d = doneMap(); if (v) d[k] = 1; else delete d[k]; store.set(DONE_KEY, JSON.stringify(d)); markChange(k, v); }
   function isDone(c, m) {
     var ls = lessonsOf(c, m);
     if (ls.length) return ls.every(function (l) { return isLessonDone(c, m, l.n); });
     return !!doneMap()[c + "." + m];
   }
-  function setDone(c, m, v) { var d = doneMap(); if (v) d[c + "." + m] = 1; else delete d[c + "." + m]; store.set(DONE_KEY, JSON.stringify(d)); }
+  function setDone(c, m, v) { var k = c + "." + m, d = doneMap(); if (v) d[k] = 1; else delete d[k]; store.set(DONE_KEY, JSON.stringify(d)); markChange(k, v); }
   function lessonProgress(c, m) {
     var ls = lessonsOf(c, m), done = ls.filter(function (l) { return isLessonDone(c, m, l.n); }).length;
     return { done: done, total: ls.length };
@@ -159,7 +167,9 @@
     var themeBtn = el("button", { class: "icon-btn theme-btn", type: "button", "aria-label": "Cambiar entre tema claro y oscuro",
       html: '<svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="5.5" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M8 2.5a5.5 5.5 0 0 0 0 11z" fill="currentColor"/></svg><span>Tema</span>' });
     var brand = el("a", { class: "brand", href: ROOT + "index.html", html: brandMark() + "<span>" + esc(CUR.site.name) + "</span><small>IBM AI Engineering</small>" });
-    var topbar = el("header", { class: "topbar" }, menuBtn, brand, nav, el("span", { class: "spacer" }), themeBtn);
+    var accountBtn = el("button", { class: "icon-btn cuenta-btn", type: "button", id: "cuenta-btn", "aria-haspopup": "dialog",
+      html: '<svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="5.5" r="3" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M2.5 14c.8-2.8 3-4.2 5.5-4.2s4.7 1.4 5.5 4.2" fill="none" stroke="currentColor" stroke-width="1.6"/></svg><span class="cuenta-label">Entrar</span>' });
+    var topbar = el("header", { class: "topbar" }, menuBtn, brand, nav, el("span", { class: "spacer" }), accountBtn, themeBtn);
 
     var side = buildSidebar();
     var shell = el("div", { class: "shell" });
@@ -168,6 +178,10 @@
     shell.appendChild(main);
 
     body.insertBefore(topbar, body.firstChild);
+    /* Cuenta y sincronización: se carga aparte para no frenar la página */
+    ["assets/js/cuenta-config.js", "assets/js/cuenta.js"].forEach(function (src) {
+      var sc = document.createElement("script"); sc.src = ROOT + src; sc.async = false; document.head.appendChild(sc);
+    });
     body.insertBefore(skip, body.firstChild);
 
     var foot = el("footer", { class: "footer" },

@@ -21,5 +21,8 @@ Abre `index.html` en el navegador, o sirve la carpeta: `python3 -m http.server 8
 - `tools/fix_anchors.py` – reescribe enlaces `modulo-M.html#ancla` a la lección donde está el ancla.
 - `tools/check_site.py` – comprobador (Playwright) de enlaces, demos y desbordes.
 
+## Cuenta (progreso en todos tus dispositivos)
+Botón «Entrar» en la barra superior: inicias sesión con correo y contraseña y las lecciones marcadas se sincronizan entre móvil, tablet y ordenador. Usa Supabase (gratis); cómo activarlo en `docs/CUENTA_Y_SINCRONIZACION.md`.
+
 ## Estado
 Cursos 1 a 6. El resto del certificado (cursos 7–13) se añade siguiendo `docs/GUIA_PARA_ANADIR_CURSOS.md`.
