@@ -1,98 +1,257 @@
-<!DOCTYPE html>
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lección 4 · Antes de predecir: eval() cambia el cálculo y no_grad() ahorra memoria · Módulo 4 · Curso 5 · Cuaderno de IA</title>
+<meta name="description" content="Inferencia con una red preentrenada: model.eval() para BatchNorm y Dropout, torch.no_grad() para no guardar el grafo y softmax para pasar de logits a probabilidades.">
+<script>try{var t=localStorage.getItem('cuaderno-ia:tema');if(t)document.documentElement.setAttribute('data-theme',t)}catch(e){}</script>
+<link rel="stylesheet" href="../../assets/css/style.css">
+<script src="../../assets/js/curriculum.js"></script>
+<script src="../../assets/js/lab.js"></script>
+<script src="../../assets/js/app.js" defer></script>
+</head>
+<body data-root="../../" data-course="5" data-module="4" data-lesson="4">
+<main>
+<div class="page">
 
-<html lang="es"><head><meta charset="utf-8"/><meta content="width=device-width,initial-scale=1" name="viewport"/><title>Lección 4 · El bloque residual: por qué ResNet puede ser profunda · Curso 5 · Cuaderno de IA</title><meta content="Un bloque normal calcula \( y = F(x) \), donde \( F \) son las convoluciones del bloque." name="description"/><script>try{var t=localStorage.getItem('cuaderno-ia:tema');if(t)document.documentElement.setAttribute('data-theme',t)}catch(e){}</script><link href="../../assets/css/style.css" rel="stylesheet"/><script src="../../assets/js/curriculum.js"></script><script src="../../assets/js/lab.js"></script><script defer="" src="../../assets/js/app.js"></script><script defer="" src="../../assets/js/microanimations.js"></script></head><body data-course="5" data-lesson="4" data-module="4" data-root="../../"><main><div class="page" data-micro="3min"><header class="hero leccion"><div class="hero-grid"><div><p class="eyebrow">Curso 5 · Módulo 4 · Lección 4 de 13</p><h1>El bloque residual: por qué ResNet puede ser profunda</h1><p class="lead">Un bloque normal calcula \( y = F(x) \), donde \( F \) son las convoluciones del bloque.</p><p class="meta-line"><span class="read-time" data-render="read-time"></span><a href="../modulo-4.html">Índice del módulo</a></p></div><div aria-hidden="true" class="hero-tile"></div></div></header><details class="predice"><summary>¿Qué es ese «atajo» de la ResNet y por qué hace que una red con muchas capas se pueda entrenar?<span class="hint"></span></summary><div><p>Un bloque normal calcula \( y = F(x) \), donde \( F \) son las convoluciones del bloque.</p></div></details><section aria-label="Explicación breve" class="micro-core"><div class="micro-kicker">01 · ENTENDER <span>≈ 45 s</span></div><h2>La idea en palabras sencillas</h2><p>Piensa en un aviso que viaja de la última capa a la primera, como un recado pasado en voz baja por una cola de gente: «el final de la serie no gustó, corrige el guion». Al entrenar, el error se propaga hacia atrás multiplicando derivadas capa a capa (regla de la cadena, módulo 2 ).</p><div class="micro-example"><span aria-hidden="true" class="micro-example-icon">🚲</span><div><strong>Otro ejemplo · Vehículos</strong><p>Reutilizas filtros entrenados en millones de fotos y cambias la última capa para detectar bicicletas.</p></div></div></section><div class="micro-kicker micro-checkpoint">02 · RESPONDER <span>≈ 15 s</span></div><section aria-label="Pregunta intercalada" class="quiz mini micro-check"><script class="quiz-data" type="application/json">{"titulo": "Pausa rápida · Comprueba la idea", "preguntas": [{"q": "Si reutilizas las capas visuales de un modelo ya entrenado, ¿qué técnica estás usando?", "opciones": ["Transfer learning", "Clustering sin etiquetas", "Regresión con una sola variable"], "correcta": 0, "porque": "El aprendizaje por transferencia aprovecha parámetros aprendidos antes."}]}</script></section><section aria-label="Animación interactiva" class="micro-viz" data-index="13" data-micro-viz="transfer"><div class="micro-kicker">03 · EXPERIMENTAR <span>≈ 45 s</span></div><div class="micro-viz-title"><div><h2>Reutilizar conocimiento previo</h2><p>Alterna entre «extraer características» y «ajustar capas».</p></div><span aria-hidden="true" class="micro-viz-symbol">✦</span></div><div aria-live="polite" class="micro-viz-stage"><p>Animación interactiva: Reutilizar conocimiento previo</p></div></section><div class="micro-kicker micro-checkpoint">04 · APLICAR <span>≈ 15 s</span></div><section aria-label="Pregunta intercalada" class="quiz mini micro-check"><script class="quiz-data" type="application/json">{"titulo": "Pausa rápida · ¿Lo aplicarías?", "preguntas": [{"q": "¿Qué significa congelar una capa durante el entrenamiento?", "opciones": ["Deja de producir salidas", "Se elimina de la arquitectura", "Sus pesos no se actualizan"], "correcta": 2, "porque": "Congelar impide actualizar esos parámetros durante el ajuste."}]}</script></section><div class="micro-finish"><strong>Idea que te llevas</strong><span>Piensa en un aviso que viaja de la última capa a la primera, como un recado pasado en voz baja por una cola de gente: «el final de la serie no gustó, </span><small>¿Quieres más ejemplos, fórmulas o código? Los tienes justo debajo, sin límite de tiempo.</small></div><details class="profundizar micro-legacy"><summary><span>Explorar más: explicación y simulaciones completas<small>Todo el texto original, tablas y demos avanzadas. Opcional.</small></span></summary><div class="prof-body"><section><h2>El bloque residual: por qué ResNet puede ser profunda</h2>
-<p>Un bloque normal calcula \( y = F(x) \), donde \( F \) son las convoluciones del bloque. Un <strong>bloque residual</strong> calcula \( y = \operatorname{ReLU}\big(F(x) + x\big) \): suma la entrada \( x \) a lo que producen las convoluciones. Ese \( + x \) es el atajo (<em>skip connection</em>). En vez de pedirle al bloque que aprenda la transformación completa, le pides que aprenda solo la <strong>diferencia</strong> (el <em>residuo</em>) respecto a la entrada.</p>
-<p>Piensa en un aviso que viaja de la última capa a la primera, como un recado pasado en voz baja por una cola de gente: «el final de la serie no gustó, corrige el guion». Al entrenar, el error se propaga hacia atrás multiplicando derivadas capa a capa (regla de la cadena, <a href="../modulo-2.html#desvanece">módulo 2</a>). Si cada capa multiplica por un número menor que 1, tras muchas capas el gradiente se hace diminuto y las primeras capas no aprenden. Con el atajo, la derivada de un bloque pasa a ser:</p>
-<p>Ese \( +1 \) (que viene de derivar \( x \) respecto a \( x \)) garantiza que siempre pasa gradiente, aunque la derivada de \( F \) sea pequeña. (Se supone la ReLU activa; en cada bloque real es la suma \( F(x)+x \) la que pasa por la ReLU.)</p>
-<div class="callout ejemplo"><span class="lbl">Ejemplo tomado del módulo</span><p>Una cadena de 10 bloques (10 personas pasándose el recado) en la que la derivada de cada \( F \) vale 0,1, es decir, cada una repite solo el 10 % del volumen que oye: Sin atajo: el gradiente que llega a la primera capa es \( 0{,}1^{10} =…</p></div></section><figure class="demo" data-demo="curso5/c5m4-residual" data-titulo="gradiente con y sin atajo, capa por capa">
-<div class="haz">Imagina el recado que pasa por N personas. Sube el número de bloques N hasta 60 con la escala de los pesos en 0,2 y mira las dos curvas (escala logarítmica: cada marca es 10 veces más). Luego sube la escala a 0,8 y a 2 y pulsa «Otros pesos aleatorios».</div>
-<div class="observa">Sin atajo (curva terracota) el gradiente de las primeras capas se desploma al crecer N: con N = 60 llega a \( 10^{-60} \) con escala 0,2 y a \( 10^{-24} \) con 0,8; con escala 2 todavía baja a \( 10^{-5} \). Con atajo (cobalto) se queda entre unas décimas y unas decenas en esos mismos casos (3,1; 52 y 11). No es un cálculo exacto de una ResNet real (aquí cada «bloque» es una sola neurona), pero muestra el mecanismo.</div>
-</figure><div class="resumen"><h2 class="sin-num sin-toc">En pocas líneas</h2><ul><li><strong>El bloque residual: por qué ResNet puede ser profunda:</strong> Un bloque normal calcula \( y = F(x) \), donde \( F \) son las convoluciones del bloque.</li><li>Antes de continuar, intenta explicar la demo sin mirar su resultado.</li></ul></div><section class="quiz mini"><script class="quiz-data" type="application/json">{"titulo": "¿Lo tienes?", "preguntas": [{"q": "¿Qué concepto estamos trabajando en esta lección?", "opciones": ["El bloque residual: por qué ResNet puede ser profunda", "Nuestro experimento: ¿ayuda de verdad el preentrenamiento?", "Por qué reutilizar una red ya entrenada"], "correcta": 0, "porque": "Un bloque normal calcula \\( y = F(x) \\), donde \\( F \\) son las convoluciones del bloque."}, {"q": "¿Cuál de estas afirmaciones recoge lo que acabas de estudiar?", "opciones": ["Lo importante es comprender la idea y comprobarla con ejemplos, no memorizar términos.", "Un bloque normal calcula \\( y = F(x) \\), donde \\( F \\) son las convoluciones del bloque.", "Siempre hay un único método que sirve para todos los problemas."], "correcta": 1, "porque": "La explicación central es: Un bloque normal calcula \\( y = F(x) \\), donde \\( F \\) son las convoluciones del bloque."}, {"q": "Si una demo o un ejemplo te desconcierta, ¿cuál es la mejor forma de aprenderlo?", "opciones": ["Memorizar el nombre sin entender la operación.", "Volver a los números, cambiar un valor y explicar qué ocurre.", "Ignorar los resultados que no coinciden con tu intuición."], "correcta": 1, "porque": "Explorar qué cambia y por qué ayuda a conectar el concepto con su resultado."}]}</script></section></div></details><details class="profundizar"><summary><span>Profundizar: explicación completa<small>Matices, fórmulas, tablas, otros ejemplos y experimentos del módulo original.</small></span></summary><div class="prof-body"><section>
-<h2 id="residual">El bloque residual: por qué ResNet puede ser profunda</h2>
-<p class="pregunta">¿Qué es ese «atajo» de la ResNet y por qué hace que una red con muchas capas se pueda entrenar?</p>
-<p>Un bloque normal calcula \( y = F(x) \), donde \( F \) son las convoluciones del bloque. Un <strong>bloque residual</strong> calcula \( y = \operatorname{ReLU}\big(F(x) + x\big) \): suma la entrada \( x \) a lo que producen las convoluciones. Ese \( + x \) es el atajo (<em>skip connection</em>). En vez de pedirle al bloque que aprenda la transformación completa, le pides que aprenda solo la <strong>diferencia</strong> (el <em>residuo</em>) respecto a la entrada.</p>
-<div class="callout analogia">
-<span class="lbl">Analogía</span>
-<p>Montas una película en varias revisiones. Una opción es volver a montarla entera desde cero en cada revisión (si te equivocas, estropeas todo lo anterior); otra es partir del montaje anterior y marcar solo los cambios («quita esta escena, alarga ese plano»). El bloque residual es la segunda: si el residuo \( F(x) \) vale casi 0, el bloque «no cambia nada» y la película pasa intacta. Añadir más revisiones (más bloques) casi nunca empeora el resultado.</p>
-</div>
-<h3>El motivo de verdad: el gradiente</h3>
-<p>Piensa en un aviso que viaja de la última capa a la primera, como un recado pasado en voz baja por una cola de gente: «el final de la serie no gustó, corrige el guion». Al entrenar, el error se propaga hacia atrás multiplicando derivadas capa a capa (regla de la cadena, <a href="../modulo-2.html#desvanece">módulo 2</a>). Si cada capa multiplica por un número menor que 1, tras muchas capas el gradiente se hace diminuto y las primeras capas no aprenden. Con el atajo, la derivada de un bloque pasa a ser:</p>
-<div class="formula">\[ \frac{\partial y}{\partial x} = \frac{\partial F(x)}{\partial x} + 1 \]</div>
-<p>Ese \( +1 \) (que viene de derivar \( x \) respecto a \( x \)) garantiza que siempre pasa gradiente, aunque la derivada de \( F \) sea pequeña. (Se supone la ReLU activa; en cada bloque real es la suma \( F(x)+x \) la que pasa por la ReLU.)</p>
-<div class="callout ejemplo">
-<span class="lbl">Ejemplo numérico</span>
-<p>Una cadena de 10 bloques (10 personas pasándose el recado) en la que la derivada de cada \( F \) vale 0,1, es decir, cada una repite solo el 10 % del volumen que oye:</p>
-<ol class="pasos">
-<li>Sin atajo: el gradiente que llega a la primera capa es \( 0{,}1^{10} = \) <strong>\( 10^{-10} \)</strong>, una diezmilmillonésima: esa capa no aprende.</li>
-<li>Con atajo: cada persona, además de lo que oye, reenvía el recado tal cual (el \( +1 \)); cada bloque multiplica por \( 0{,}1 + 1 = 1{,}1 \), así que \( 1{,}1^{10} \approx \) <strong>2,59</strong>: el gradiente llega entero (incluso algo amplificado).</li>
-<li>Con 60 bloques: sin atajo \( 10^{-60} \); con atajo \( 1{,}1^{60}\approx 304 \): el atajo no es magia, y por eso las ResNet usan además BatchNorm y buena inicialización.</li>
-</ol>
-</div>
-<p>El <a href="#frag-3">fragmento 3</a> abre un bloque real de la ResNet-18 y comprueba con números que su salida es exactamente <code>relu(F(x) + x)</code> y no <code>relu(F(x))</code>. Cuando un bloque cambia el número de canales o el tamaño (como el primero de <code>layer2</code>), \( x \) ya no puede sumarse directamente a \( F(x) \) porque no tiene la misma forma; entonces el atajo lleva una <strong>convolución 1×1</strong> con su BatchNorm (<code>downsample</code>) que adapta \( x \) a la forma de \( F(x) \).</p>
-</section></div></details><details class="profundizar" id="codigo"><summary><span>Ver código explicado paso a paso<small>1 fragmento(s) original(es), con cada línea comentada y salida esperada.</small></span></summary><div class="prof-body"><article class="snippet" data-lang="python" id="frag-3">
-<header>
-<h3>3 · Un bloque residual abierto: la salida es F(x) + x</h3>
-<p class="para-que"><strong>Para qué sirve</strong> Comprobar con números que un bloque de ResNet calcula exactamente «dos convoluciones más el atajo» (<code>relu(F(x) + x)</code>), y contar a mano sus parámetros, incluido el bloque especial con atajo de 1×1 que cambia de tamaño.</p>
+<header class="hero leccion">
+  <div class="hero-grid">
+    <div>
+      <p class="eyebrow">Curso 5 · Módulo 4 · Lección 4 de 8</p>
+      <h1>Antes de predecir: eval() cambia el cálculo y no_grad() ahorra memoria</h1>
+      <p class="lead">Ya tienes la carátula preparada. Faltan tres cosas: poner la red en modo evaluación, apagar el registro de gradientes y convertir las 1.000 puntuaciones en probabilidades.</p>
+      <p class="meta-line"><span class="read-time" data-render="read-time"></span><a href="../modulo-4.html">Índice del módulo</a></p>
+    </div>
+    <div class="hero-tile" aria-hidden="true"></div>
+  </div>
 </header>
-<pre class="code"><code>import torch
-import torch.nn.functional as F
+
+<details class="predice">
+  <summary>Pasas la misma carátula dos veces por una red en <code>train()</code>, cada vez en un lote distinto. ¿Sale la misma predicción?<span class="hint"></span></summary>
+  <div>
+    <p><strong>No necesariamente.</strong> En <code>train()</code> la BatchNorm normaliza con la media del lote y Dropout apaga neuronas al azar: la respuesta depende de qué otras carátulas la acompañen. En <code>eval()</code> la red es una función fija de su entrada.</p>
+  </div>
+</details>
+
+<section>
+<h2 id="idea">Tres pasos y para qué sirve cada uno</h2>
+<ol class="pasos">
+  <li><strong><code>modelo.eval()</code></strong>: la BatchNorm usa sus medias guardadas en vez de las del lote y Dropout deja de apagar neuronas.</li>
+  <li><strong><code>with torch.no_grad():</code></strong>: PyTorch no guarda el grafo para derivar. Ahorra memoria y tiempo; no cambia el resultado.</li>
+  <li><strong><code>softmax</code></strong>: convierte los 1.000 <em>logits</em> en probabilidades que suman 1; <code>topk</code> da las mejores.</li>
+</ol>
+<p>Las dos primeras se confunden mucho y son cosas distintas: <code>eval()</code> cambia <em>cómo se calcula</em> la salida; <code>no_grad()</code> cambia <em>si se guarda</em> lo necesario para derivar. Para predecir se usan las dos.</p>
+<p>Olvidar <code>eval()</code> es el fallo silencioso más frecuente: no da error, pero las predicciones salen distintas en cada ejecución, peores y dependientes del tamaño del lote. Si una red preentrenada «funciona raro», es lo primero que se mira.</p>
+</section>
+
+<figure class="demo" data-demo="curso5/c5m4-train-eval" data-titulo="la misma muestra en train() y en eval()">
+  <div class="haz">En <code>train()</code> cambia las otras películas de la sesión y pulsa «Otra máscara de Dropout». Luego pasa a <code>eval()</code>.</div>
+  <div class="observa">En <code>train()</code> tu película cambia con las demás; en <code>eval()</code> no cambia nunca.</div>
+</figure>
+
+<section>
+<h2 id="con-numeros">Con números: la mejor o la peor del día</h2>
+<div class="callout ejemplo">
+  <span class="lbl">Ejemplo numérico</span>
+  <p>En <code>train()</code>, la BatchNorm puntúa cada película «en relación con las de hoy». Una película vale 3:</p>
+  <ol class="pasos">
+    <li>Sesión (1, 2, 3): media 2, desviación 0,8165. El 3 pasa a (3 − 2) / 0,8165 = <strong>+1,22</strong>.</li>
+    <li>Sesión (3, 4, 5): media 4, misma desviación. El mismo 3 pasa a <strong>−1,22</strong>.</li>
+    <li>En <code>eval()</code> se usan la media y la desviación guardadas al entrenar: la respuesta es siempre la misma.</li>
+  </ol>
+</div>
+</section>
+
+<details class="predice">
+  <summary>Predices con <code>eval()</code> pero sin <code>no_grad()</code>. ¿Cambian las probabilidades?<span class="hint"></span></summary>
+  <div>
+    <p><strong>No.</strong> <code>no_grad()</code> no cambia el resultado: solo evita guardar el grafo de autograd. Gastarás más memoria y tiempo, pero las predicciones son las mismas. Lo que sí cambia el resultado es <code>eval()</code>.</p>
+  </div>
+</details>
+
+<div class="resumen">
+  <h2 class="sin-num sin-toc">En tres líneas</h2>
+  <ul>
+    <li><code>eval()</code> fija BatchNorm y Dropout: la misma entrada da siempre la misma salida.</li>
+    <li><code>no_grad()</code> solo ahorra memoria y tiempo; para predecir se usan los dos.</li>
+    <li><code>softmax</code> pasa de logits a probabilidades y <code>topk</code> da las mejores clases.</li>
+  </ul>
+</div>
+
+<section class="quiz mini">
+<script type="application/json" class="quiz-data">
+{
+ "titulo": "¿Lo tienes?",
+ "preguntas": [
+  {
+   "q": "Usas una red preentrenada para predecir y olvidas <code>modelo.eval()</code> (sigue en <code>train()</code>). ¿Qué síntoma esperas?",
+   "opciones": [
+    "Un error inmediato de PyTorch",
+    "Respuestas distintas según los otros elementos del lote (y de una ejecución a otra con Dropout), normalmente peores",
+    "Que la red use más memoria pero dé las mismas respuestas",
+    "Que tarde más, pero con el mismo resultado"
+   ],
+   "correcta": 1,
+   "porque": "En <code>train()</code>, BatchNorm normaliza con la media y varianza del lote en lugar de usar las guardadas, y Dropout apaga neuronas al azar. No hay error, solo resultados erráticos. El fragmento 5 lo comprueba con <code>torch.allclose(a, b)</code> entre <code>train()</code> y <code>eval()</code>: <code>False</code>; y el 17 mide un 48,1 % con lotes de una sola cifra en <code>train()</code> frente al 100 % en <code>eval()</code>."
+  },
+  {
+   "q": "¿Cuál de estas tres afirmaciones sobre <code>eval()</code> y <code>torch.no_grad()</code> es correcta?",
+   "opciones": [
+    "Son sinónimos: cualquiera de los dos sirve para predecir",
+    "<code>no_grad()</code> pone la BatchNorm en modo inferencia y <code>eval()</code> ahorra memoria",
+    "<code>eval()</code> cambia cómo se calcula la salida (BatchNorm y Dropout) y <code>no_grad()</code> evita guardar el grafo; para predecir se usan los dos",
+    "<code>eval()</code> congela los pesos para siempre"
+   ],
+   "correcta": 2,
+   "porque": "Son cosas independientes. <code>eval()</code> afecta a BatchNorm y Dropout; <code>no_grad()</code> solo decide si autograd registra las operaciones (ahorra memoria y tiempo). El fragmento 5 los separa: con <code>no_grad()</code>, <code>requires_grad</code> es <code>False</code>, y <code>train()</code> frente a <code>eval()</code> da salidas distintas sin tocar los gradientes. Y <code>eval()</code> no congela nada; se puede volver a <code>train()</code>."
+  },
+  {
+   "q": "La red devuelve 1.000 <em>logits</em>. ¿Qué hace <code>softmax</code> con ellos?",
+   "opciones": [
+    "Los ordena de mayor a menor",
+    "Los convierte en probabilidades que suman 1",
+    "Se queda con el mayor y borra el resto"
+   ],
+   "correcta": 1,
+   "porque": "Los logits son puntuaciones sin escala; <code>softmax</code> las convierte en probabilidades positivas que suman 1, sin cambiar cuál es la mayor. Para ordenar y quedarte con las mejores está <code>topk</code>."
+  }
+ ]
+}
+</script>
+</section>
+
+<details class="profundizar">
+  <summary><span>Profundizar: la explicación completa<small>Los tres pasos con inference_mode(), la diferencia entre eval() y no_grad(), el ejemplo de las dos sesiones completo, lo que mide el fragmento 5 y el aviso de volver a train().</small></span></summary>
+  <div class="prof-body">
+<h2 id="inferencia">Predecir con la red: <code>eval()</code>, <code>no_grad()</code> y <code>softmax</code></h2>
+
+<p class="pregunta">Ya tengo la carátula preparada. ¿Qué tres cosas tengo que hacer antes de llamar a la red, y por qué las dos primeras no son opcionales?</p>
+
+<ol class="pasos">
+  <li><strong><code>modelo.eval()</code></strong>: pone la red en <em>modo evaluación</em>. Cambia el comportamiento de dos tipos de capa: <code>BatchNorm</code> pasa de normalizar con las estadísticas del lote a usar sus medias móviles guardadas, y <code>Dropout</code> deja de apagar neuronas.</li>
+  <li><strong><code>with torch.no_grad():</code></strong>: le dice a PyTorch que no construya el grafo de autograd (el registro de operaciones para poder derivar después). Ahorra memoria y tiempo; no cambia el resultado. Existe también <code>torch.inference_mode()</code>, más estricto y algo más rápido.</li>
+  <li><strong><code>softmax</code></strong>: la red devuelve 1.000 puntuaciones sin escala (<em>logits</em>); <code>softmax</code> las convierte en probabilidades que suman 1, y <code>topk</code> da las mejores.</li>
+</ol>
+
+<p>Fíjate en que <code>eval()</code> y <code>no_grad()</code> son cosas <strong>distintas</strong> que se suelen confundir: <code>eval()</code> cambia <em>cómo se calcula</em> la salida; <code>no_grad()</code> cambia <em>si se guarda</em> lo necesario para derivar. Para predecir se usan las dos. Al entrenar, <code>train()</code> y gradientes activados.</p>
+
+<div class="callout ejemplo">
+  <span class="lbl">Ejemplo numérico: la misma muestra, dos respuestas distintas</span>
+  <p>Una BatchNorm en <code>train()</code> normaliza cada valor con la media y la desviación <strong>del lote</strong>, como un crítico que puntúa cada película «en relación con las que ha visto hoy». Toma una película con valor 3 en una sesión de tres películas (el lote):</p>
+  <ol class="pasos">
+    <li>Sesión (1, 2, 3): media 2, varianza \( ((-1)^2+0^2+1^2)/3 = 0{,}667 \), desviación 0,8165. El 3 pasa a \( (3-2)/0{,}8165 = \) <strong>+1,22</strong>.</li>
+    <li>Sesión (3, 4, 5): media 4, misma desviación. El mismo 3 pasa a \( (3-4)/0{,}8165 = \) <strong>−1,22</strong>.</li>
+    <li>La película es idéntica, pero la salida depende de qué otras pelis haya en la sesión: el mismo 3 es «la mejor del día» o «la peor del día». En <code>eval()</code> se usa la media y desviación fijas guardadas durante el entrenamiento, y la respuesta es siempre la misma.</li>
+  </ol>
+</div>
+
+<div class="callout recuerda">
+  <span class="lbl">Experimento de arriba: «la misma muestra en train() y en eval()», con todo detalle</span>
+  <p><strong>Haz esto.</strong> En modo <code>train()</code> cambia las otras películas de la sesión (parecidas, variadas, muy altas) y mira qué pasa con la primera barra. Pulsa «Otra máscara de Dropout». Después pasa a <code>eval()</code> (el crítico usa su criterio de siempre, no el de la sesión de hoy) y repite.</p>
+  <p><strong>Fíjate en.</strong> En <code>train()</code> la salida de tu película cambia con las otras de la sesión y, con Dropout, con la máscara aleatoria. En <code>eval()</code> no cambia nunca: la red es una función fija de su entrada, que es lo que quieres al predecir.</p>
+</div>
+
+<p>El <a href="#frag-5">fragmento 5</a> hace una inferencia completa con una ResNet-18 sin pesos entrenados (con pesos al azar, así que las clases que salen no significan nada: lo que importa es la mecánica), y mide <code>train() == eval()</code> (<code>False</code>), el efecto de olvidar <code>no_grad()</code> y el de <code>inference_mode()</code>. Con los pesos de ImageNet, la secuencia sería la misma línea por línea.</p>
+
+<div class="callout ojo">
+  <span class="lbl">Ojo</span>
+  <p>Olvidar <code>model.eval()</code> es el fallo silencioso más frecuente: no da error, las predicciones salen algo distintas en cada ejecución y peores, y dependen del tamaño del lote. Si una red preentrenada «funciona raro», lo primero que se mira es si está en <code>eval()</code>. Y al volver a entrenar hay que acordarse de <code>model.train()</code>.</p>
+</div>
+  </div>
+</details>
+
+<section>
+<h2 class="sin-num">Código</h2>
+<article class="snippet" data-lang="python" id="frag-5">
+      <header>
+        <h3>5 · Usar la red para predecir: eval(), no_grad(), softmax y las cinco mejores clases</h3>
+        <p class="para-que"><strong>Para qué sirve</strong> Hacer una inferencia completa con una ResNet-18: poner el modelo en modo evaluación, desactivar el grafo de gradientes, convertir las puntuaciones en probabilidades con <code>softmax</code>, leer las clases más probables con <code>topk</code> y ver qué cambia entre <code>train()</code> y <code>eval()</code> y entre <code>no_grad()</code> e <code>inference_mode()</code>. Con pesos al azar las respuestas no significan nada; lo que importa es la mecánica.</p>
+      </header>
+      <pre class="code"><code>import torch
 from torchvision import models
+from torchvision.models import ResNet18_Weights
 
 torch.manual_seed(0)
-modelo = models.resnet18(weights=None).eval()
-bloque = modelo.layer1[0]
-print(type(bloque).__name__, [n for n, _ in bloque.named_children()])
-print("parámetros del bloque:", sum(p.numel() for p in bloque.parameters()))
+modelo = models.resnet18(weights=None)
+categorias = ResNet18_Weights.DEFAULT.meta["categories"]
+x = torch.randn(1, 3, 224, 224)
 
-x = torch.randn(1, 64, 56, 56)
+modelo.eval()
 with torch.no_grad():
-    f = bloque.bn2(bloque.conv2(F.relu(bloque.bn1(bloque.conv1(x)))))
-    a_mano = F.relu(f + x)
-    oficial = bloque(x)
-print("a mano == oficial:", torch.allclose(a_mano, oficial, atol=1e-6))
-print("sin atajo == oficial:", torch.allclose(F.relu(f), oficial, atol=1e-6))
+    logits = modelo(x)
+print(logits.shape, logits.requires_grad)
 
-b2 = modelo.layer2[0]
-print("parámetros de layer2[0]:", sum(p.numel() for p in b2.parameters()))
-print(b2.downsample)</code></pre>
-<details class="linea-a-linea" open="">
-<summary>Línea por línea</summary>
-<p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
-<table class="lineas">
-<thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
-<tbody>
-<tr data-lines="1"><td><code>import torch</code></td><td>PyTorch.</td></tr>
-<tr data-lines="2"><td><code>import torch.nn.functional as F</code></td><td>Las funciones sin parámetros (<code>F.relu</code>, <code>F.softmax</code>…), por convención con el alias <code>F</code>.</td></tr>
-<tr data-lines="3"><td><code>from torchvision import models</code></td><td>Catálogo de modelos.</td></tr>
-<tr data-lines="5"><td><code>torch.manual_seed(0)</code></td><td>Semilla para que el tensor aleatorio de más abajo sea siempre el mismo.</td></tr>
-<tr data-lines="6"><td><code>modelo = models.resnet18(weights=None).eval()</code></td><td>Construye la red y la pone ya en modo evaluación (BatchNorm usa sus estadísticas guardadas, así el cálculo es determinista).</td></tr>
-<tr data-lines="7"><td><code>bloque = modelo.layer1[0]</code></td><td>El primer bloque de la primera etapa: un <code>BasicBlock</code>. Los corchetes funcionan porque <code>layer1</code> es un <code>nn.Sequential</code>.</td></tr>
-<tr data-lines="8"><td><code>print(type(bloque).__name__, [n for n, _ in bloque.named_children()])</code></td><td>Tipo del bloque y nombres de sus piezas internas.</td></tr>
-<tr data-lines="9"><td><code>print("parámetros del bloque:", sum(p.numel() for p in bloque.parameters()))</code></td><td>Cuenta los parámetros del bloque.</td></tr>
-<tr data-lines="11"><td><code>x = torch.randn(1, 64, 56, 56)</code></td><td>Un mapa de características de entrada inventado: 64 canales de 56×56, lote de 1. Es la forma que recibe <code>layer1</code>.</td></tr>
-<tr data-lines="12"><td><code>with torch.no_grad():</code></td><td>Sin gradientes, solo cálculo.</td></tr>
-<tr data-lines="13"><td><code>f = bloque.bn2(bloque.conv2(F.relu(bloque.bn1(bloque.conv1(x)))))</code></td><td>La parte «F(x)», leída de dentro afuera: convolución 1, BatchNorm 1, ReLU, convolución 2, BatchNorm 2. Es lo que el bloque <em>añade</em> a la entrada.</td></tr>
-<tr data-lines="14"><td><code>a_mano = F.relu(f + x)</code></td><td>El atajo: se <strong>suma la entrada original</strong> a F(x) y después se aplica la ReLU.</td></tr>
-<tr data-lines="15"><td><code>oficial = bloque(x)</code></td><td>Lo que calcula el bloque de TorchVision de verdad.</td></tr>
-<tr data-lines="16"><td><code>print("a mano == oficial:", torch.allclose(a_mano, oficial, atol=1e-6))</code></td><td><code>allclose</code> compara dos tensores permitiendo una diferencia minúscula (<code>atol</code>) por redondeos.</td></tr>
-<tr data-lines="17"><td><code>print("sin atajo == oficial:", torch.allclose(F.relu(f), oficial, atol=1e-6))</code></td><td>Contraprueba: si quitáramos el «+ x», el resultado ya no coincidiría con el del bloque.</td></tr>
-<tr data-lines="19"><td><code>b2 = modelo.layer2[0]</code></td><td>El primer bloque de la segunda etapa, que pasa de 64 a 128 canales y reduce el tamaño a la mitad.</td></tr>
-<tr data-lines="20"><td><code>print("parámetros de layer2[0]:", sum(p.numel() for p in b2.parameters()))</code></td><td>Sus parámetros: más que los del bloque anterior.</td></tr>
-<tr data-lines="21"><td><code>print(b2.downsample)</code></td><td>Muestra el «atajo con ajuste»: como la entrada (64 canales, 56×56) y F(x) (128 canales, 28×28) ya no tienen la misma forma, el atajo pasa por una convolución 1×1 con paso 2 y su BatchNorm antes de sumarse.</td></tr>
-</tbody>
-</table>
-</details>
-<div class="salida">
-<strong>Salida esperada</strong>
-<pre>BasicBlock ['conv1', 'bn1', 'relu', 'conv2', 'bn2']
-parámetros del bloque: 73984
-a mano == oficial: True
-sin atajo == oficial: False
-parámetros de layer2[0]: 230144
-Sequential(
-  (0): Conv2d(64, 128, kernel_size=(1, 1), stride=(2, 2), bias=False)
-  (1): BatchNorm2d(128, eps=1e-05, momentum=0.1, affine=True, bias=True, track_running_stats=True)
-)</pre>
-<p>Las dos comprobaciones lo dicen todo: el bloque calcula <code>relu(F(x) + x)</code> (<code>True</code>) y <strong>no</strong> <code>relu(F(x))</code> (<code>False</code>). Cuenta a mano del bloque: dos convoluciones 3×3 de 64 a 64 canales (\( 3\cdot3\cdot64\cdot64 = 36.864 \) cada una, sin sesgo) más dos BatchNorm con \( \gamma \) y \( \beta \) de 64 canales (\( 2\cdot64 = 128 \) cada una): \( 2\cdot36.864 + 2\cdot128 = 73.984 \). El bloque de <code>layer2[0]</code> tiene 230.144: \( 3\cdot3\cdot64\cdot128 = 73.728 \) + \( 3\cdot3\cdot128\cdot128 = 147.456 \) + dos BatchNorm de 128 canales (\( 2\cdot256 = 512 \)) + el atajo (\( 64\cdot128 = 8.192 \) de la convolución 1×1 y 256 de su BatchNorm). La suma da 230.144.</p>
+probs = torch.softmax(logits, dim=1)
+print(round(probs.sum().item(), 4), round(probs.max().item(), 4))
+top = probs.topk(3)
+for p, i in zip(top.values[0], top.indices[0]):
+    print(f"{i.item():4d} {categorias[i]:&lt;26s} {p.item():.4f}")
+
+salida = modelo(x)
+print("sin no_grad:", salida.requires_grad, salida.grad_fn is not None)
+
+modelo.train()
+a = modelo(x)
+modelo.eval()
+b = modelo(x)
+print("train() == eval():", torch.allclose(a, b))
+
+with torch.inference_mode():
+    c = modelo(x)
+print("inference_mode:", c.requires_grad, c.is_inference())</code></pre>
+      <details class="linea-a-linea" open>
+        <summary>Línea por línea</summary>
+        <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+        <table class="lineas">
+          <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+          <tbody>
+        <tr data-lines="1"><td><code>import torch</code></td><td>PyTorch.</td></tr>
+        <tr data-lines="2"><td><code>from torchvision import models</code></td><td>Catálogo de modelos.</td></tr>
+        <tr data-lines="3"><td><code>from torchvision.models import ResNet18_Weights</code></td><td>Los pesos, de los que solo vamos a leer los nombres de las clases.</td></tr>
+        <tr data-lines="5"><td><code>torch.manual_seed(0)</code></td><td>Semilla, para que los pesos aleatorios y la entrada sean siempre los mismos.</td></tr>
+        <tr data-lines="6"><td><code>modelo = models.resnet18(weights=None)</code></td><td>ResNet-18 con pesos al azar (sin internet no hay otros).</td></tr>
+        <tr data-lines="7"><td><code>categorias = ResNet18_Weights.DEFAULT.meta["categories"]</code></td><td>Los 1.000 nombres de clase de ImageNet, leídos de los metadatos (esto no descarga nada).</td></tr>
+        <tr data-lines="8"><td><code>x = torch.randn(1, 3, 224, 224)</code></td><td>Una imagen inventada ya «preprocesada»: lote de 1, 3 canales, 224×224.</td></tr>
+        <tr data-lines="10"><td><code>modelo.eval()</code></td><td>Modo evaluación: BatchNorm usa sus estadísticas guardadas y Dropout (si hubiera) no apaga nada. Es obligatorio antes de predecir.</td></tr>
+        <tr data-lines="11"><td><code>with torch.no_grad():</code></td><td>Dentro de este bloque PyTorch no registra operaciones para calcular gradientes: menos memoria y más rapidez, y el resultado queda desconectado del grafo.</td></tr>
+        <tr data-lines="12"><td><code>logits = modelo(x)</code></td><td>Las 1.000 puntuaciones crudas (<em>logits</em>), una por clase.</td></tr>
+        <tr data-lines="13"><td><code>print(logits.shape, logits.requires_grad)</code></td><td>Forma del resultado y si seguiría conectado al grafo de gradientes.</td></tr>
+        <tr data-lines="15"><td><code>probs = torch.softmax(logits, dim=1)</code></td><td>Convierte las puntuaciones en probabilidades que suman 1. <code>dim=1</code> es el eje de las clases.</td></tr>
+        <tr data-lines="16"><td><code>print(round(probs.sum().item(), 4), round(probs.max().item(), 4))</code></td><td>Comprobación: las probabilidades suman 1 y se imprime la mayor.</td></tr>
+        <tr data-lines="17"><td><code>top = probs.topk(3)</code></td><td>Las 3 probabilidades mayores y sus índices de clase.</td></tr>
+        <tr data-lines="18"><td><code>for p, i in zip(top.values[0], top.indices[0]):</code></td><td>Recorre las tres a la vez (<code>[0]</code> = primera imagen del lote).</td></tr>
+        <tr data-lines="19"><td><code>print(f"{i.item():4d} {categorias[i]:&lt;26s} {p.item():.4f}")</code></td><td>Índice de clase, nombre (leído de la lista de categorías) y probabilidad.</td></tr>
+        <tr data-lines="21"><td><code>salida = modelo(x)</code></td><td>Lo mismo pero <strong>fuera</strong> de <code>no_grad</code>.</td></tr>
+        <tr data-lines="22"><td><code>print("sin no_grad:", salida.requires_grad, salida.grad_fn is not None)</code></td><td>Ahora la salida sí está conectada al grafo (<code>requires_grad=True</code> y tiene <code>grad_fn</code>): se está gastando memoria para algo que no se va a entrenar.</td></tr>
+        <tr data-lines="24"><td><code>modelo.train()</code></td><td>Cambia a modo entrenamiento.</td></tr>
+        <tr data-lines="25"><td><code>a = modelo(x)</code></td><td>Predicción en modo entrenamiento: BatchNorm normaliza con las estadísticas <em>de este lote</em>.</td></tr>
+        <tr data-lines="26"><td><code>modelo.eval()</code></td><td>Vuelve a modo evaluación.</td></tr>
+        <tr data-lines="27"><td><code>b = modelo(x)</code></td><td>Predicción en modo evaluación: BatchNorm usa sus estadísticas guardadas.</td></tr>
+        <tr data-lines="28"><td><code>print("train() == eval():", torch.allclose(a, b))</code></td><td>Misma imagen, mismo modelo, resultados distintos según el modo.</td></tr>
+        <tr data-lines="30"><td><code>with torch.inference_mode():</code></td><td>Una versión todavía más estricta de <code>no_grad</code> pensada para producción.</td></tr>
+        <tr data-lines="31"><td><code>c = modelo(x)</code></td><td>Predicción dentro de ese bloque.</td></tr>
+        <tr data-lines="32"><td><code>print("inference_mode:", c.requires_grad, c.is_inference())</code></td><td>El resultado no tiene gradientes y está marcado como «tensor de inferencia» (no se podrá usar luego para entrenar).</td></tr>
+          </tbody>
+        </table>
+      </details>
+      <div class="salida">
+        <strong>Salida esperada</strong>
+    <pre>torch.Size([1, 1000]) False
+1.0 0.0865
+ 238 Greater Swiss Mountain dog 0.0865
+  58 water snake                0.0560
+ 381 spider monkey              0.0468
+sin no_grad: True True
+train() == eval(): False
+inference_mode: False True</pre>
+        <p>Con <code>no_grad()</code> la salida tiene forma <code>(1, 1000)</code> y <code>requires_grad=False</code>; sin él, <code>requires_grad=True</code>. Las probabilidades suman 1,0 y la mayor es 0,0865: con pesos aleatorios la red reparte la probabilidad sin criterio, y que la «mejor clase» sea <em>Greater Swiss Mountain dog</em> (índice 238) no significa nada. <strong>Con los pesos de ImageNet descargados</strong>, la misma secuencia de líneas (preprocesar la foto, <code>eval()</code>, <code>no_grad()</code>, <code>softmax</code>, <code>topk</code>) daría las clases reales; eso no se ha podido ejecutar aquí. Lo que sí se comprueba es el efecto de los modos: <code>train() == eval()</code> da <code>False</code> (BatchNorm normaliza distinto) y <code>inference_mode</code> devuelve un tensor sin gradientes marcado como de inferencia.</p>
+      </div>
+    </article>
+
+</section>
+
 </div>
-</article></div></details></div></main></body></html>
+</main>
+</body>
+</html>

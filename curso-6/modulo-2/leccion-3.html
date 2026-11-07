@@ -1,9 +1,287 @@
-<!DOCTYPE html>
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lección 3 · En PyTorch el bucle lo escribes tú, y train() o eval() cambian lo que hace la red · Módulo 2 · Curso 6 · Cuaderno de IA</title>
+<meta name="description" content="El mismo clasificador de pósters en PyTorch: una clase nn.Module con logits, el bucle de entrenamiento y validación escrito a mano y por qué model.train(), model.eval() y torch.no_grad() importan.">
+<script>try{var t=localStorage.getItem('cuaderno-ia:tema');if(t)document.documentElement.setAttribute('data-theme',t)}catch(e){}</script>
+<link rel="stylesheet" href="../../assets/css/style.css">
+<script src="../../assets/js/curriculum.js"></script>
+<script src="../../assets/js/lab.js"></script>
+<script src="../../assets/js/app.js" defer></script>
+</head>
+<body data-root="../../" data-course="6" data-module="2" data-lesson="3">
+<main>
+<div class="page">
 
-<html lang="es"><head><meta charset="utf-8"/><meta content="width=device-width,initial-scale=1" name="viewport"/><title>Lección 3 · La misma CNN con PyTorch · Curso 6 · Cuaderno de IA</title><meta content="La idea matemática es idéntica, pero PyTorch explicita más detalles de tensores y entrenamiento." name="description"/><script>try{var t=localStorage.getItem('cuaderno-ia:tema');if(t)document.documentElement.setAttribute('data-theme',t)}catch(e){}</script><link href="../../assets/css/style.css" rel="stylesheet"/><script src="../../assets/js/curriculum.js"></script><script src="../../assets/js/lab.js"></script><script defer="" src="../../assets/js/app.js"></script><script defer="" src="../../assets/js/microanimations.js"></script></head><body data-course="6" data-lesson="3" data-module="2" data-root="../../"><main><div class="page" data-micro="3min"><header class="hero leccion"><div class="hero-grid"><div><p class="eyebrow">Curso 6 · Módulo 2 · Lección 3 de 5</p><h1>La misma CNN con PyTorch</h1><p class="lead">La idea matemática es idéntica, pero PyTorch explicita más detalles de tensores y entrenamiento.</p><p class="meta-line"><span class="read-time" data-render="read-time"></span><a href="../modulo-2.html">Índice del módulo</a></p></div><div aria-hidden="true" class="hero-tile"></div></div></header><details class="predice"><summary>¿Qué forma tiene un lote de 16 imágenes RGB de 32×32 en PyTorch?<span class="hint"></span></summary><div><p>(16, 3, 32, 32): lote, canales, alto y ancho (NCHW).</p></div></details><section aria-label="Explicación breve" class="micro-core"><div class="micro-kicker">01 · ENTENDER <span>≈ 45 s</span></div><h2>La idea en palabras sencillas</h2><p>La idea matemática es idéntica, pero PyTorch explicita más detalles de tensores y entrenamiento.</p><div class="micro-example"><span aria-hidden="true" class="micro-example-icon">🐾</span><div><strong>Otro ejemplo · Mascotas</strong><p>Para detectar orejas en una foto, un filtro busca formas locales aunque aparezcan en posiciones distintas.</p></div></div></section><div class="micro-kicker micro-checkpoint">02 · RESPONDER <span>≈ 15 s</span></div><section aria-label="Pregunta intercalada" class="quiz mini micro-check"><script class="quiz-data" type="application/json">{"titulo": "Pausa rápida · Comprueba la idea", "preguntas": [{"q": "Un kernel 3×3 se coloca sobre una foto. ¿Qué analiza primero?", "opciones": ["Nueve posiciones próximas de la imagen", "Todas las fotografías del dataset a la vez", "Solo la etiqueta final"], "correcta": 0, "porque": "El filtro procesa una región local y luego se desplaza."}]}</script></section><section aria-label="Animación interactiva" class="micro-viz" data-index="11" data-micro-viz="convolution"><div class="micro-kicker">03 · EXPERIMENTAR <span>≈ 45 s</span></div><div class="micro-viz-title"><div><h2>Una ventana recorre la imagen</h2><p>Avanza el filtro 3×3; fíjate en qué píxeles observa cada vez.</p></div><span aria-hidden="true" class="micro-viz-symbol">✦</span></div><div aria-live="polite" class="micro-viz-stage"><p>Animación interactiva: Una ventana recorre la imagen</p></div></section><div class="micro-kicker micro-checkpoint">04 · APLICAR <span>≈ 15 s</span></div><section aria-label="Pregunta intercalada" class="quiz mini micro-check"><script class="quiz-data" type="application/json">{"titulo": "Pausa rápida · ¿Lo aplicarías?", "preguntas": [{"q": "¿Por qué compartir un filtro en distintas posiciones es útil?", "opciones": ["Porque hace innecesarias las imágenes", "Porque siempre produce una sola clase", "Porque permite buscar el mismo patrón en varias zonas"], "correcta": 2, "porque": "La convolución reutiliza los pesos del filtro en diferentes zonas."}]}</script></section><div class="micro-finish"><strong>Idea que te llevas</strong><span>La idea matemática es idéntica, pero PyTorch explicita más detalles de tensores y entrenamiento</span><small>¿Quieres más ejemplos, fórmulas o código? Los tienes justo debajo, sin límite de tiempo.</small></div><details class="profundizar micro-legacy"><summary><span>Explorar más: explicación y simulaciones completas<small>Todo el texto original, tablas y demos avanzadas. Opcional.</small></span></summary><div class="prof-body"><section><h2 id="concepto">La idea y el ejemplo</h2><p>PyTorch usa capas como <code>nn.Conv2d</code>, <code>nn.ReLU</code>, <code>nn.MaxPool2d</code> y <code>nn.Linear</code>. Aquí <code>nn.Sequential</code> también sirve para apilar operaciones sin crear una clase.</p><p>La diferencia que más errores causa es la forma: <strong>Keras suele usar NHWC</strong> y <strong>PyTorch NCHW</strong>. El otro detalle importante es que <code>nn.CrossEntropyLoss</code> espera logits (sin softmax) y etiquetas enteras de tipo <code>long</code>.</p><div class="callout ejemplo"><span class="lbl">Con números</span><p>(16,3,32,32) → Conv2d(3,8) → (16,8,32,32) → Pool → (16,8,16,16) → Flatten → (16,2048) → Linear(2048,2).</p></div></section><figure class="demo" data-demo="curso5/c5m3-constructor-cnn" data-titulo="Explora: La misma CNN con PyTorch"><div class="haz">Cambia filtros y capas en el constructor.</div><div class="observa">El tamaño que entra a Linear debe coincidir con el resultado de Flatten.</div></figure><div class="resumen"><h2 class="sin-num sin-toc">En tres ideas</h2><ul><li>La idea matemática es idéntica, pero PyTorch explicita más detalles de tensores y entrenamiento.</li><li>(16, 3, 32, 32): lote, canales, alto y ancho (NCHW).</li><li>Abre el código y explica cada línea antes de pasar a la siguiente lección.</li></ul></div><section class="quiz mini"><script class="quiz-data" type="application/json">{"titulo": "Mini test · Comprueba la idea", "preguntas": [{"q": "¿Qué forma espera Conv2d en PyTorch?", "opciones": ["(N, C, H, W)", "(N, H, W, C)", "(H, W) sin canales"], "correcta": 0, "porque": "(16, 3, 32, 32): lote, canales, alto y ancho (NCHW)."}, {"q": "¿Qué conviene hacer después de comprender el ejemplo?", "opciones": ["Probar otro caso y explicar qué cambia", "Memorizar números sin contexto", "Dar por bueno el resultado sin validar"], "correcta": 0, "porque": "Cambiar una entrada y observar la respuesta refuerza la comprensión."}]}</script></section></div></details><details class="profundizar" id="codigo"><summary><span>Código explicado línea a línea<small>Abre el ejemplo para entender qué hace cada instrucción y por qué.</small></span></summary><div class="prof-body"><section><h2 class="sin-num">Código de la lección</h2><article class="snippet" data-lang="python"><header><h3>La misma CNN con PyTorch</h3><p class="para-que"><strong>Para qué sirve</strong> La idea matemática es idéntica, pero PyTorch explicita más detalles de tensores y entrenamiento.</p></header><pre class="code"><code>import torch.nn as nn
-modelo = nn.Sequential(
-    nn.Conv2d(3, 8, kernel_size=3, padding=1),
-    nn.ReLU(), nn.MaxPool2d(2),
-    nn.Flatten(), nn.Linear(8 * 16 * 16, 2)
-)
-perdida = nn.CrossEntropyLoss()</code></pre><details class="linea-a-linea" open=""><summary>Línea por línea</summary><table class="lineas"><tbody><tr data-lines="1"><td><code>import torch.nn as nn</code></td><td>Importa las capas del paquete nn de PyTorch.</td></tr><tr data-lines="2"><td><code>modelo = nn.Sequential(</code></td><td>Empieza una cadena de operaciones.</td></tr><tr data-lines="3"><td><code>nn.Conv2d(3, 8, kernel_size=3, padding=1),</code></td><td>Recibe tres canales y aprende ocho filtros.</td></tr><tr data-lines="4"><td><code>nn.ReLU(), nn.MaxPool2d(2),</code></td><td>Activa y reduce el tamaño espacial a la mitad.</td></tr><tr data-lines="5"><td><code>nn.Flatten(), nn.Linear(8 * 16 * 16, 2)</code></td><td>Aplana las salidas y obtiene dos logits.</td></tr><tr data-lines="6"><td><code>)</code></td><td>Cierra la arquitectura.</td></tr><tr data-lines="7"><td><code>perdida = nn.CrossEntropyLoss()</code></td><td>Define la pérdida para etiquetas enteras y logits.</td></tr></tbody></table></details><div class="salida"><strong>Qué comprobar</strong><p>Ejemplo didáctico: adapta las rutas, datasets o variables que procedan y verifica la salida en tu propio entorno. No se afirma que se haya entrenado un modelo real.</p></div></article></section></div></details></div></main></body></html>
+<header class="hero leccion">
+  <div class="hero-grid">
+    <div>
+      <p class="eyebrow">Curso 6 · Módulo 2 · Lección 3 de 6</p>
+      <h1>En PyTorch el bucle lo escribes tú, y train() o eval() cambian lo que hace la red</h1>
+      <p class="lead">La misma red, 89.249 parámetros, pero escrita como clase <code>nn.Module</code>. No hay <code>fit</code>: el bucle de lotes, la validación y el guardado los escribes tú, y <code>red.train()</code> / <code>red.eval()</code> deciden si Dropout sortea o no.</p>
+      <p class="meta-line"><span class="read-time" data-render="read-time"></span><a href="../modulo-2.html">Índice del módulo</a></p>
+    </div>
+    <div class="hero-tile" aria-hidden="true"></div>
+  </div>
+</header>
+
+<details class="predice">
+  <summary>Evalúas cinco veces seguidas el mismo modelo sobre los mismos 200 pósters de validación, pero se te olvidó <code>red.eval()</code>. ¿Sale la misma accuracy las cinco veces?<span class="hint"></span></summary>
+  <div>
+    <p><strong>No.</strong> Medido con el modelo real de esta lección: 0,980, 0,975, 0,980, 0,980 y 0,975. Sin <code>eval()</code>, Dropout sigue apagando neuronas al azar en cada pasada. Con <code>red.eval()</code> sale 0,980 las cinco veces.</p>
+  </div>
+</details>
+
+<section>
+<h2 id="idea">Tres diferencias con Keras</h2>
+<p><strong>1. El modelo es una clase.</strong> En <code>__init__</code> se crean las piezas (dos <code>nn.Sequential</code>: el cuerpo de tres bloques y la cabeza) y en <code>forward</code> se dice cómo se usan. Tres detalles: el póster entra con el <strong>canal delante</strong>, <code>(N, 3, 32, 32)</code> (<a href="../modulo-1/leccion-6.html">Keras y PyTorch, lado a lado</a>); <code>Conv2d</code> pide los canales de entrada y <code>Linear</code> el tamaño aplanado (64·4·4), que Keras deducía solo; y la red termina <strong>sin sigmoide</strong>: devuelve <em>logits</em> y la sigmoide va dentro de <code>BCEWithLogitsLoss</code>, más estable (<a href="../../curso-4/modulo-4/leccion-5.html">lo viste aquí</a>).</p>
+<p><strong>2. El bucle es tuyo.</strong> Por cada lote, las cuatro líneas de siempre (<a href="../../curso-4/modulo-3/leccion-5.html">el bucle de todo PyTorch</a>): vaciar gradientes, forward y pérdida, <code>backward</code>, <code>step</code>. Al final de cada época validas y, si la <code>val_loss</code> mejora, guardas los pesos con <code>torch.save(red.state_dict(), "mejor.pt")</code>: es tu ModelCheckpoint hecho a mano.</p>
+<p><strong>3. La red tiene dos modos.</strong> <code>red.train()</code> enciende Dropout (y BatchNorm usa el lote); <code>red.eval()</code> lo apaga (<a href="../../curso-5/modulo-2/leccion-5.html">Dropout, en detalle</a>). Aparte, <code>torch.no_grad()</code> deja de grabar operaciones para <code>backward</code>: valida más rápido y con menos memoria. Son dos cosas distintas y en validación quieres las dos. En Keras, <code>fit</code> y <code>evaluate</code> lo hacían por ti.</p>
+</section>
+
+<figure class="demo" data-demo="curso6/c6m2-bucle" data-titulo="Recorre el bucle de PyTorch línea a línea">
+  <div class="haz">Pulsa <em>Siguiente línea</em> y luego <em>Acabar la época</em>. Repite con cada olvido activado.</div>
+  <div class="observa">Solo <code>step()</code> cambia los pesos, y cada olvido deja su huella.</div>
+</figure>
+
+<section>
+<h2 id="numeros">Con números: 12 épocas, 300 pasos</h2>
+<div class="callout ejemplo">
+  <span class="lbl">Ejemplo numérico</span>
+  <ol class="pasos">
+    <li>800 pósters en lotes de 32 son 800 / 32 = <strong>25 lotes</strong>: 25 llamadas a <code>step()</code> por época, 12 × 25 = <strong>300</strong> en total.</li>
+    <li>La <code>val_loss</code> mejor llega en la <strong>época 9</strong>: 0,076 con val_acc 0,980. Ahí se escribe <code>mejor.pt</code>; en la 10 rebota a 0,166 y no se sobrescribe.</li>
+    <li>Keras llegó a 0,068 en la época 16. No es que un framework aprenda mejor: misma red, distinta inicialización y distinto barajado. En la <a href="leccion-5.html">lección 5</a> lo medimos con varias semillas.</li>
+  </ol>
+</div>
+</section>
+
+<details class="predice">
+  <summary>La red devuelve logits. Para decir «acción» cuando la probabilidad es al menos 0,5, ¿qué comparación pones sobre el logit?<span class="hint"></span></summary>
+  <div>
+    <p><code>logits &gt; 0</code>. La sigmoide de 0 es exactamente 0,5 y la sigmoide crece siempre, así que «probabilidad ≥ 0,5» equivale a «logit ≥ 0». Así no hace falta calcular la sigmoide para medir la accuracy.</p>
+  </div>
+</details>
+
+<div class="resumen">
+  <h2 class="sin-num sin-toc">En tres líneas</h2>
+  <ul>
+    <li><code>nn.Module</code>: piezas en <code>__init__</code>, uso en <code>forward</code>; canal delante y logits sin sigmoide.</li>
+    <li>Por lote: <code>zero_grad</code> → pérdida → <code>backward</code> → <code>step</code>; por época: validar y guardar si mejora.</li>
+    <li><code>train()</code>/<code>eval()</code> cambian Dropout; <code>no_grad()</code> deja de grabar. En validación, las dos.</li>
+  </ul>
+</div>
+
+<section class="quiz mini">
+<script type="application/json" class="quiz-data">
+{
+ "titulo": "¿Lo tienes?",
+ "preguntas": [
+  {
+   "q": "La red de PyTorch termina en <code>nn.Linear(64, 1)</code> sin sigmoide. ¿Qué pérdida le corresponde?",
+   "opciones": [
+    "<code>nn.BCELoss()</code>",
+    "<code>nn.BCEWithLogitsLoss()</code>",
+    "<code>nn.CrossEntropyLoss()</code> con una neurona",
+    "<code>nn.MSELoss()</code>"
+   ],
+   "correcta": 1,
+   "porque": "<code>BCEWithLogitsLoss</code> aplica la sigmoide por dentro, de forma estable. <code>BCELoss</code> esperaría probabilidades ya pasadas por la sigmoide; <code>CrossEntropyLoss</code> es para K neuronas con softmax."
+  },
+  {
+   "q": "Tus pósters salen de NumPy con forma <code>(800, 32, 32, 3)</code>. ¿Qué hace <code>.permute(0, 3, 1, 2)</code>?",
+   "opciones": [
+    "Baraja los pósters",
+    "Los pone en <code>(800, 3, 32, 32)</code>: el canal pasa delante, como espera <code>Conv2d</code>",
+    "Gira cada imagen 90°"
+   ],
+   "correcta": 1,
+   "porque": "<code>permute</code> reordena ejes: el nuevo eje 1 es el antiguo 3 (canales). Keras usa canal al final; PyTorch, canal delante."
+  },
+  {
+   "q": "En validación escribes <code>with torch.no_grad():</code> pero olvidas <code>red.eval()</code>. ¿Qué pasa?",
+   "opciones": [
+    "Nada: <code>no_grad</code> ya apaga Dropout",
+    "No se graba para backward, pero Dropout sigue activo y la nota de validación sale peor y cambia en cada pasada",
+    "Da error porque falta <code>eval()</code>"
+   ],
+   "correcta": 1,
+   "porque": "Son interruptores independientes. <code>no_grad</code> solo afecta a autograd; el comportamiento de Dropout y BatchNorm lo decide el modo <code>train</code>/<code>eval</code>."
+  }
+ ]
+}
+</script>
+</section>
+
+<details class="profundizar">
+  <summary><span>Profundizar: la explicación completa<small>Por qué logits, las formas que más fallan, qué mide la pérdida de una época, state_dict, envoltorios tipo fit y errores típicos del laboratorio.</small></span></summary>
+  <div class="prof-body">
+<h2 id="detalle">El bucle de PyTorch, sin letra pequeña</h2>
+<h3>Por qué logits y <code>BCEWithLogitsLoss</code></h3>
+<p>Si la red terminara en <code>nn.Sigmoid()</code> y usaras <code>nn.BCELoss</code>, una salida muy segura (logit 40) daría una probabilidad que en <code>float32</code> se redondea a 1,0 exacto, y el logaritmo de 1 − 1 revienta. <code>BCEWithLogitsLoss</code> junta sigmoide y logaritmo en una fórmula que nunca calcula ese 1 − 1. Para predecir, pasas tú los logits por <code>torch.sigmoid</code> (lo harás en la <a href="leccion-4.html">lección 4</a>).</p>
+<h3>Las formas que más fallan</h3>
+<p><code>nn.Linear(64, 1)</code> devuelve <code>(N, 1)</code> y las etiquetas son <code>(N,)</code>. Si no haces <code>.squeeze(1)</code>, <code>BCEWithLogitsLoss</code> se queja del tamaño (y otras pérdidas, como <code>MSELoss</code>, harían broadcasting a <code>(N, N)</code> en silencio). Además, las etiquetas deben ser <code>float</code>, no enteros: por eso <code>crear_posters</code> devuelve <code>y</code> en <code>float32</code>. El <code>64 * 4 * 4</code> de la <code>Linear</code> lo calculas tú; si cambias el tamaño de imagen, cámbialo, o usa <code>nn.LazyLinear(64)</code>, que lo deduce en la primera pasada.</p>
+<h3>Qué cuenta la pérdida de cada época</h3>
+<p><code>loss.item()</code> es la media del lote. Multiplicarla por <code>len(xb)</code> y dividir al final entre 800 da la media por póster aunque el último lote fuese más corto. Es lo que Keras muestra como <code>loss</code>: la media de la época <em>mientras</em> los pesos cambiaban, con Dropout encendido. Por eso al principio <code>loss</code> puede salir mayor que <code>val_loss</code> (época 3: 0,448 frente a 0,438).</p>
+<h3><code>state_dict</code> frente al modelo entero</h3>
+<p><code>red.state_dict()</code> es un diccionario nombre → tensor con los 89.249 números. Para cargarlo hace falta la clase: <code>red = RedPosters(); red.load_state_dict(torch.load("mejor.pt"))</code>. Es la forma recomendada; <code>torch.save(red)</code> guarda el objeto con pickle y se rompe en cuanto mueves o renombras la clase.</p>
+<h3>¿Y si quiero algo como <code>fit</code>?</h3>
+<p>Existen envoltorios (PyTorch Lightning, el <code>Trainer</code> de Hugging Face, o la propia Keras 3 con backend PyTorch) que escriben el bucle por ti. Para el proyecto y el examen, conviene saber escribirlo a mano: es lo que preguntan.</p>
+<div class="callout ojo">
+  <span class="lbl">Ojo · errores típicos del laboratorio</span>
+  <p>Olvidar <code>opt.zero_grad()</code> (los gradientes se suman lote tras lote), olvidar <code>red.train()</code> al volver de validar (la segunda época entrenaría sin Dropout) y medir accuracy con <code>logits &gt; 0.5</code>, que equivale a probabilidad &gt; 0,62.</p>
+</div>
+  </div>
+</details>
+
+<section>
+<h2 class="sin-num">Código</h2>
+<article class="snippet" data-lang="python">
+  <header>
+    <h3>1 · La CNN como nn.Module, con las mismas formas y parámetros</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Escribir en PyTorch la arquitectura de la lección 1 y comprobar que tiene los mismos 89.249 parámetros. Guárdalo como <code>cnn_torch.py</code>: lo importan las lecciones 3 a 6.</p>
+  </header>
+  <pre class="code"><code>import torch
+from torch import nn
+
+class RedPosters(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.cuerpo = nn.Sequential(
+            nn.Conv2d(3, 16, 3, padding=1), nn.ReLU(), nn.MaxPool2d(2),
+            nn.Conv2d(16, 32, 3, padding=1), nn.ReLU(), nn.MaxPool2d(2),
+            nn.Conv2d(32, 64, 3, padding=1), nn.ReLU(), nn.MaxPool2d(2),
+        )
+        self.cabeza = nn.Sequential(
+            nn.Flatten(), nn.Linear(64 * 4 * 4, 64), nn.ReLU(),
+            nn.Dropout(0.3), nn.Linear(64, 1),
+        )
+
+    def forward(self, x):
+        return self.cabeza(self.cuerpo(x)).squeeze(1)     # logits, sin sigmoide
+
+if __name__ == "__main__":
+    red = RedPosters()
+    x = torch.rand(5, 3, 32, 32)                          # 5 pósters, canal delante
+    print("mapas tras el cuerpo:", tuple(red.cuerpo(x).shape))
+    print("salida:", tuple(red(x).shape))
+    print("parámetros:", sum(p.numel() for p in red.parameters()))</code></pre>
+  <details class="linea-a-linea" open>
+    <summary>Línea por línea</summary>
+    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+      <tbody>
+        <tr data-lines="1-2"><td><code>import torch / from torch import nn</code></td><td>PyTorch y su módulo de capas <code>nn</code>.</td></tr>
+        <tr data-lines="4"><td><code>class RedPosters(nn.Module):</code></td><td>La red es una clase que hereda de <code>nn.Module</code>: así PyTorch encuentra sus parámetros, la guarda y la cambia de modo.</td></tr>
+        <tr data-lines="5-6"><td><code>def __init__(self): super().__init__()</code></td><td>Constructor. <code>super().__init__()</code> prepara la maquinaria de <code>nn.Module</code>; sin él, falla al asignar capas.</td></tr>
+        <tr data-lines="7-11"><td><code>self.cuerpo = nn.Sequential(…)</code></td><td>Los tres bloques: <code>Conv2d(entrada, filtros, 3, padding=1)</code> (padding 1 con filtro 3 equivale a <code>same</code>), ReLU y <code>MaxPool2d(2)</code>.</td></tr>
+        <tr data-lines="12-15"><td><code>self.cabeza = nn.Sequential(…)</code></td><td>Flatten, <code>Linear(1.024 → 64)</code>, ReLU, Dropout 0,3 y <code>Linear(64 → 1)</code>. Sin sigmoide.</td></tr>
+        <tr data-lines="17-18"><td><code>def forward(self, x): return …squeeze(1)</code></td><td>Cómo se usa: cuerpo, cabeza y <code>squeeze(1)</code> para pasar de <code>(N, 1)</code> a <code>(N,)</code>. Devuelve logits.</td></tr>
+        <tr data-lines="20-21"><td><code>if __name__ … / red = RedPosters()</code></td><td>Al ejecutar el archivo, crea una red.</td></tr>
+        <tr data-lines="22"><td><code>x = torch.rand(5, 3, 32, 32)</code></td><td>Cinco pósters de mentira, con el canal delante.</td></tr>
+        <tr data-lines="23"><td><code>print(… red.cuerpo(x).shape)</code></td><td>Forma tras los tres bloques: 64 mapas de 4×4 por póster.</td></tr>
+        <tr data-lines="24"><td><code>print(… red(x).shape)</code></td><td><code>red(x)</code> llama a <code>forward</code>: un logit por póster.</td></tr>
+        <tr data-lines="25"><td><code>sum(p.numel() for p in red.parameters())</code></td><td>Cuenta los números de todos los tensores de pesos y bias.</td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>mapas tras el cuerpo: (5, 64, 4, 4)
+salida: (5,)
+parámetros: 89249</pre>
+    <p><code>(5, 64, 4, 4)</code> es el <code>(None, 4, 4, 64)</code> de Keras con el canal delante. Sale un logit por póster y <strong>89.249</strong> parámetros: exactamente los de Keras, porque las capas son las mismas.</p>
+  </div>
+</article>
+
+<article class="snippet" data-lang="python">
+  <header>
+    <h3>2 · El bucle de entrenamiento y validación, escrito a mano</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Entrenar <code>RedPosters</code> 12 épocas con los mismos pósters que Keras, validar al final de cada época y guardar la mejor en <code>mejor.pt</code> (la usan las lecciones 4 y 6). Necesita <code>posters.py</code> y <code>cnn_torch.py</code>.</p>
+  </header>
+  <pre class="code"><code>import torch
+from torch import nn
+from torch.utils.data import TensorDataset, DataLoader
+from posters import crear_posters
+from cnn_torch import RedPosters
+
+torch.manual_seed(0)
+def a_tensores(X, y):          # (N, 32, 32, 3) -&gt; (N, 3, 32, 32)
+    return torch.from_numpy(X).permute(0, 3, 1, 2), torch.from_numpy(y)
+X_tr, y_tr = a_tensores(*crear_posters(800, semilla=0))
+X_va, y_va = a_tensores(*crear_posters(200, semilla=1))
+lotes = DataLoader(TensorDataset(X_tr, y_tr), batch_size=32, shuffle=True)
+
+red = RedPosters()
+perdida = nn.BCEWithLogitsLoss()
+opt = torch.optim.Adam(red.parameters(), lr=1e-3)
+mejor = float("inf")
+for epoca in range(1, 13):
+    red.train()                                  # Dropout encendido
+    suma = 0.0
+    for xb, yb in lotes:
+        opt.zero_grad()
+        loss = perdida(red(xb), yb)
+        loss.backward()
+        opt.step()
+        suma += loss.item() * len(xb)
+    red.eval()                                   # Dropout apagado
+    with torch.no_grad():
+        logits = red(X_va)
+        val_loss = perdida(logits, y_va).item()
+        val_acc = ((logits &gt; 0).float() == y_va).float().mean().item()
+    if val_loss &lt; mejor:
+        mejor = val_loss
+        torch.save(red.state_dict(), "mejor.pt")
+    print(f"época {epoca:2d}  loss {suma/len(X_tr):.3f}  val_loss {val_loss:.3f}  val_acc {val_acc:.3f}")</code></pre>
+  <details class="linea-a-linea" open>
+    <summary>Línea por línea</summary>
+    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+      <tbody>
+        <tr data-lines="1-3"><td><code>import torch / nn / TensorDataset, DataLoader</code></td><td>PyTorch, las capas y las piezas para servir lotes.</td></tr>
+        <tr data-lines="4-5"><td><code>from posters … / from cnn_torch …</code></td><td>Los pósters y la red.</td></tr>
+        <tr data-lines="7"><td><code>torch.manual_seed(0)</code></td><td>Fija la semilla de PyTorch: misma inicialización y mismo barajado.</td></tr>
+        <tr data-lines="8-9"><td><code>def a_tensores(X, y): … permute(0, 3, 1, 2) …</code></td><td>Convierte los arrays a tensores (compartiendo memoria con <code>from_numpy</code>) y pone el canal delante.</td></tr>
+        <tr data-lines="10-11"><td><code>X_tr, y_tr = a_tensores(*crear_posters(…))</code></td><td>Los mismos 800 y 200 pósters que en Keras. El <code>*</code> reparte la tupla <code>(X, y)</code> en dos argumentos.</td></tr>
+        <tr data-lines="12"><td><code>lotes = DataLoader(TensorDataset(…), batch_size=32, shuffle=True)</code></td><td>Sirve lotes de 32 parejas (póster, etiqueta), barajados en cada época.</td></tr>
+        <tr data-lines="14-16"><td><code>red = … / perdida = … / opt = …</code></td><td>La red, la pérdida para logits y Adam con learning rate 0,001 sobre todos sus parámetros.</td></tr>
+        <tr data-lines="17"><td><code>mejor = float("inf")</code></td><td>La mejor <code>val_loss</code> vista; infinito para que la primera época siempre mejore.</td></tr>
+        <tr data-lines="18"><td><code>for epoca in range(1, 13):</code></td><td>12 épocas.</td></tr>
+        <tr data-lines="19-20"><td><code>red.train() / suma = 0.0</code></td><td>Modo entrenamiento (Dropout activo) y acumulador de la pérdida.</td></tr>
+        <tr data-lines="21-25"><td><code>for xb, yb in lotes: zero_grad / loss / backward / step</code></td><td>El paso de siempre: vaciar gradientes, forward y pérdida, gradientes hacia atrás y un paso de Adam.</td></tr>
+        <tr data-lines="26"><td><code>suma += loss.item() * len(xb)</code></td><td><code>.item()</code> saca el número del tensor; se pondera por el tamaño del lote.</td></tr>
+        <tr data-lines="27-29"><td><code>red.eval() / with torch.no_grad(): logits = red(X_va)</code></td><td>Modo evaluación (Dropout apagado), sin grabar gradientes, y los 200 pósters de validación de una vez.</td></tr>
+        <tr data-lines="30-31"><td><code>val_loss = … / val_acc = ((logits &gt; 0)…).mean()</code></td><td>Pérdida de validación y accuracy: logit &gt; 0 equivale a probabilidad &gt; 0,5.</td></tr>
+        <tr data-lines="32-34"><td><code>if val_loss &lt; mejor: … torch.save(red.state_dict(), "mejor.pt")</code></td><td>Si mejora, apunta el récord y guarda los pesos: el ModelCheckpoint a mano.</td></tr>
+        <tr data-lines="35"><td><code>print(f"época …")</code></td><td>Una línea por época, en el mismo formato que la lección 2.</td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>época  1  loss 0.651  val_loss 0.634  val_acc 0.630
+época  2  loss 0.527  val_loss 0.548  val_acc 0.725
+época  3  loss 0.448  val_loss 0.438  val_acc 0.775
+época  4  loss 0.345  val_loss 0.336  val_acc 0.820
+época  5  loss 0.239  val_loss 0.349  val_acc 0.825
+época  6  loss 0.177  val_loss 0.141  val_acc 0.950
+época  7  loss 0.119  val_loss 0.104  val_acc 0.955
+época  8  loss 0.087  val_loss 0.124  val_acc 0.940
+época  9  loss 0.070  val_loss 0.076  val_acc 0.980
+época 10  loss 0.107  val_loss 0.166  val_acc 0.930
+época 11  loss 0.082  val_loss 0.092  val_acc 0.970
+época 12  loss 0.063  val_loss 0.120  val_acc 0.950</pre>
+    <p>La validación mejora hasta la <strong>época 9</strong> (0,076, accuracy 0,980) y luego oscila: 0,166 en la 10, 0,092 en la 11. <code>mejor.pt</code> se queda con la 9. La trayectoria no es la de Keras porque el azar inicial es otro, pero el nivel final es el mismo: entre 0,95 y 0,98 de accuracy de validación.</p>
+  </div>
+</article>
+</section>
+
+</div>
+</main>
+</body>
+</html>

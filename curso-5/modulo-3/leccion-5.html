@@ -1,156 +1,441 @@
-<!DOCTYPE html>
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lección 5 · Del mapa al vector: in_features = C·H·W, capa a capa · Módulo 3 · Curso 5 · Cuaderno de IA</title>
+<meta name="description" content="Una CNN completa como nn.Module, la cuenta de formas capa a capa, nn.Flatten e in_features, LazyLinear, AdaptiveAvgPool2d(1) y un resumen del modelo con forward hooks.">
+<script>try{var t=localStorage.getItem('cuaderno-ia:tema');if(t)document.documentElement.setAttribute('data-theme',t)}catch(e){}</script>
+<link rel="stylesheet" href="../../assets/css/style.css">
+<script src="../../assets/js/curriculum.js"></script>
+<script src="../../assets/js/lab.js"></script>
+<script src="../../assets/js/app.js" defer></script>
+</head>
+<body data-root="../../" data-course="5" data-module="3" data-lesson="5">
+<main>
+<div class="page">
 
-<html lang="es"><head><meta charset="utf-8"/><meta content="width=device-width,initial-scale=1" name="viewport"/><title>Lección 5 · Stride, padding, dilation y el tamaño de la salida · Curso 5 · Cuaderno de IA</title><meta content="La dilatación ( dilation , que ya viste en el Curso 3 ) separa los puntos del filtro: con dilation=2 un kernel 3×3 toca píxeles alternos y cubre una zona de 5×5 con los mismos 9 pesos." name="description"/><script>try{var t=localStorage.getItem('cuaderno-ia:tema');if(t)document.documentElement.setAttribute('data-theme',t)}catch(e){}</script><link href="../../assets/css/style.css" rel="stylesheet"/><script src="../../assets/js/curriculum.js"></script><script src="../../assets/js/lab.js"></script><script defer="" src="../../assets/js/app.js"></script><script defer="" src="../../assets/js/microanimations.js"></script></head><body data-course="5" data-lesson="5" data-module="3" data-root="../../"><main><div class="page" data-micro="3min"><header class="hero leccion"><div class="hero-grid"><div><p class="eyebrow">Curso 5 · Módulo 3 · Lección 5 de 14</p><h1>Stride, padding, dilation y el tamaño de la salida</h1><p class="lead">La dilatación ( dilation , que ya viste en el Curso 3 ) separa los puntos del filtro: con dilation=2 un kernel 3×3 toca píxeles alternos y cubre una zona de 5×5 con los mismos 9 pesos.</p><p class="meta-line"><span class="read-time" data-render="read-time"></span><a href="../modulo-3.html">Índice del módulo</a></p></div><div aria-hidden="true" class="hero-tile"></div></div></header><details class="predice"><summary>Mi miniatura de póster mide 28×28 y mi filtro (la lupa) es de 5×5. ¿De qué tamaño sale el mapa? ¿Y si cambio el stride, añado padding o dilato el filtro? Esta cuenta decide el in_features de tu capa final.<span class="hint"></span></summary><div><p>Haz una predicción, compruébala en la animación y lee la explicación completa si quieres saber por qué.</p></div></details><section aria-label="Explicación breve" class="micro-core"><div class="micro-kicker">01 · ENTENDER <span>≈ 45 s</span></div><h2>La idea en palabras sencillas</h2><p>La dilatación ( dilation, que ya viste en el Curso 3 ) separa los puntos del filtro: con dilation=2 un kernel 3×3 toca píxeles alternos y cubre una zona de 5×5 con los mismos 9 pesos.</p><div class="micro-example"><span aria-hidden="true" class="micro-example-icon">🩻</span><div><strong>Otro ejemplo · Radiografía</strong><p>La misma operación busca patrones locales en diferentes partes de una imagen médica.</p></div></div></section><div class="micro-kicker micro-checkpoint">02 · RESPONDER <span>≈ 15 s</span></div><section aria-label="Pregunta intercalada" class="quiz mini micro-check"><script class="quiz-data" type="application/json">{"titulo": "Pausa rápida · Comprueba la idea", "preguntas": [{"q": "Si una ventana da saltos de 2 píxeles, ¿qué stride tiene?", "opciones": ["0", "2", "1"], "correcta": 1, "porque": "Stride especifica el avance entre posiciones."}]}</script></section><section aria-label="Animación interactiva" class="micro-viz" data-index="13" data-micro-viz="convolution"><div class="micro-kicker">03 · EXPERIMENTAR <span>≈ 45 s</span></div><div class="micro-viz-title"><div><h2>Una ventana recorre la imagen</h2><p>Avanza el filtro 3×3; fíjate en qué píxeles observa cada vez.</p></div><span aria-hidden="true" class="micro-viz-symbol">✦</span></div><div aria-live="polite" class="micro-viz-stage"><p>Animación interactiva: Una ventana recorre la imagen</p></div></section><div class="micro-kicker micro-checkpoint">04 · APLICAR <span>≈ 15 s</span></div><section aria-label="Pregunta intercalada" class="quiz mini micro-check"><script class="quiz-data" type="application/json">{"titulo": "Pausa rápida · ¿Lo aplicarías?", "preguntas": [{"q": "¿Para qué puede usarse padding?", "opciones": ["Para añadir bordes y controlar el tamaño de salida", "Para duplicar las clases", "Para convertir RGB en texto"], "correcta": 0, "porque": "Padding ayuda a controlar bordes y dimensiones de la convolución."}]}</script></section><div class="micro-finish"><strong>Idea que te llevas</strong><span>La dilatación ( dilation, que ya viste en el Curso 3 ) separa los puntos del filtro: con dilation=2 un kernel 3×3 toca píxeles alternos y cubre una zo</span><small>¿Quieres más ejemplos, fórmulas o código? Los tienes justo debajo, sin límite de tiempo.</small></div><details class="profundizar micro-legacy"><summary><span>Explorar más: explicación y simulaciones completas<small>Todo el texto original, tablas y demos avanzadas. Opcional.</small></span></summary><div class="prof-body"><section><h2>Stride, padding, dilation y el tamaño de la salida</h2>
-<p>La <strong>dilatación</strong> (<code>dilation</code>, que ya viste en el <a href="../../curso-3/modulo-2.html#repaso">Curso 3</a>) separa los puntos del filtro: con <code>dilation=2</code> un kernel 3×3 toca píxeles alternos y cubre una zona de 5×5 con los mismos 9 pesos. Su «tamaño efectivo» es \( d(k-1)+1 \). Con eso, la fórmula de la documentación de PyTorch (para cada dimensión) queda así:</p>
-<p>\( n_{\text{in}} \) es el lado de entrada, \( p \) el padding por cada lado (de ahí el \( 2p \)), \( d \) la dilatación, \( k \) el kernel, \( s \) el stride, y los corchetes \( \lfloor\cdot\rfloor \) significan «redondear hacia abajo». Con \( d=1 \) es la fórmula de siempre, \( \lfloor (n+2p-k)/s\rfloor+1 \). Por qué sale: con el marco, la fila mide \( n+2p \); la primera ventana ocupa \( d(k-1)+1 \) casillas; quedan \( n+2p-d(k-1)-1 \) por recorrer, a saltos de \( s \); y se suma 1 por la ventana inicial.</p>
-<p>Por defecto el marco es de ceros (<code>'zeros'</code>): las bandas negras del cine. Hay otros tres: <code>'reflect'</code> (refleja los píxeles del borde hacia fuera, como un espejo), <code>'replicate'</code> (estira el píxel del borde) y <code>'circular'</code> (el fotograma «se da la vuelta», como una cinta que se une por los extremos). Con un fotograma de 3×3 píxeles <code>[[1,2,3],[4,5,6],[7,8,9]]</code>, un filtro de unos 3×3 y <code>padding=1</code>, la ventana de la esquina superior izquierda suma:</p>
-<div class="callout ejemplo"><span class="lbl">Ejemplo tomado del módulo</span><p>(los mismos casos que ejecuta el fragmento 4 con nn.Conv2d de verdad) n k s p d Cuenta Salida 28 5 1 0 1 ⌊(28 + 0 − 4 − 1)/1⌋ + 1 = 23 + 1 24 28 5 1 2 1 ⌊(28 + 4 − 4 − 1)/1⌋ + 1 = 27 + 1 28 28 3 2 0 1 ⌊(28 − 2 − 1)/2⌋ + 1 = ⌊12,5⌋ + 1 13 8…</p></div></section><figure class="demo" data-demo="curso5/c5m3-tamano-salida" data-titulo="el tamaño del mapa de salida con todos los argumentos de Conv2d, sobre un fotograma">
-<div class="haz">Pulsa «Caso n=8, k=3, stride 2» y mueve «Ventana a resaltar»: fíjate en las casillas con una ×. Después sube padding a 1, activa <code>padding='same'</code> con k=5 y luego pon dilation=2 con k=3. Por último sube k hasta que no quepa ninguna ventana.</div>
-<div class="observa">La salida coincide con la cuenta de arriba para cualquier combinación (se ha comprobado contra <code>nn.Conv2d</code> real). Con dilation=2 las casillas que toca una ventana quedan alternas, pero la zona que cubre es de 5×5. Con <code>'same'</code> la salida mide lo mismo que la entrada. Cuando el filtro (con su dilatación) es mayor que el fotograma con marco, no cabe ninguna ventana y PyTorch lanza un error.</div>
-</figure><div class="resumen"><h2 class="sin-num sin-toc">En pocas líneas</h2><ul><li><strong>Stride, padding, dilation y el tamaño de la salida:</strong> La dilatación ( dilation , que ya viste en el Curso 3 ) separa los puntos del filtro: con dilation=2 un kernel 3×3 toca píxeles…</li><li>Antes de continuar, intenta explicar la demo sin mirar su resultado.</li></ul></div><section class="quiz mini"><script class="quiz-data" type="application/json">{"titulo": "¿Lo tienes?", "preguntas": [{"q": "¿Qué concepto estamos trabajando en esta lección?", "opciones": ["Chuleta del módulo", "El formato de las imágenes: NCHW frente a NHWC", "Stride, padding, dilation y el tamaño de la salida"], "correcta": 2, "porque": "La dilatación ( dilation , que ya viste en el Curso 3 ) separa los puntos del filtro: con dilation=2 un kernel 3×3 toca píxeles alternos y cubre una zona de 5×5 con los mismos 9 pesos."}, {"q": "¿Cuál de estas afirmaciones recoge lo que acabas de estudiar?", "opciones": ["La dilatación ( dilation , que ya viste en el Curso 3 ) separa los puntos del filtro: con dilation=2 un kernel 3×3 toca píxeles alternos y cubre una zona de 5×5 con los mismos 9 pesos.", "Siempre hay un único método que sirve para todos los problemas.", "Lo importante es comprender la idea y comprobarla con ejemplos, no memorizar términos."], "correcta": 0, "porque": "La explicación central es: La dilatación ( dilation , que ya viste en el Curso 3 ) separa los puntos del filtro: con dilation=2 un kernel 3×3 toca píxeles alternos y cubre una zona de 5×5 con los mismos 9 pesos."}, {"q": "Si una demo o un ejemplo te desconcierta, ¿cuál es la mejor forma de aprenderlo?", "opciones": ["Volver a los números, cambiar un valor y explicar qué ocurre.", "Ignorar los resultados que no coinciden con tu intuición.", "Memorizar el nombre sin entender la operación."], "correcta": 0, "porque": "Explorar qué cambia y por qué ayuda a conectar el concepto con su resultado."}]}</script></section></div></details><details class="profundizar"><summary><span>Profundizar: explicación completa<small>Matices, fórmulas, tablas, otros ejemplos y experimentos del módulo original.</small></span></summary><div class="prof-body"><section>
-<h2 id="tamano">Stride, padding, dilation y el tamaño de la salida</h2>
-<p class="pregunta">Mi miniatura de póster mide 28×28 y mi filtro (la lupa) es de 5×5. ¿De qué tamaño sale el mapa? ¿Y si cambio el stride, añado padding o dilato el filtro? Esta cuenta decide el <code>in_features</code> de tu capa final.</p>
-<div class="callout recuerda">
-<span class="lbl">Recuerda (<a href="../../curso-2/modulo-3.html#stride-padding">Curso 2 · módulo 3</a>)</span>
-<p>El <strong>stride</strong> es lo que salta la ventana entre una posición y la siguiente (como avanzar de uno en uno o de dos en dos por la tira de fotogramas); el <strong>padding</strong> añade un marco de ceros, como las bandas negras del cine, que evita que el fotograma se encoja y que los bordes pesen menos. Sin padding, un filtro de \( k \) píxeles quita \( k-1 \) píxeles por lado. En Keras escribías <code>padding="valid"</code> o <code>"same"</code>; aquí el padding es un número de píxeles por cada lado (<code>padding=2</code>) o una de las dos palabras.</p>
-</div>
-<h3>La fórmula de PyTorch (con dilatación)</h3>
-<p>La <strong>dilatación</strong> (<code>dilation</code>, que ya viste en el <a href="../../curso-3/modulo-2.html#repaso">Curso 3</a>) separa los puntos del filtro: con <code>dilation=2</code> un kernel 3×3 toca píxeles alternos y cubre una zona de 5×5 con los mismos 9 pesos. Su «tamaño efectivo» es \( d(k-1)+1 \). Con eso, la fórmula de la documentación de PyTorch (para cada dimensión) queda así:</p>
-<div class="formula">\[ n_{\text{out}}=\left\lfloor \frac{n_{\text{in}}+2p-d\,(k-1)-1}{s}\right\rfloor+1 \]</div>
-<p>\( n_{\text{in}} \) es el lado de entrada, \( p \) el padding por cada lado (de ahí el \( 2p \)), \( d \) la dilatación, \( k \) el kernel, \( s \) el stride, y los corchetes \( \lfloor\cdot\rfloor \) significan «redondear hacia abajo». Con \( d=1 \) es la fórmula de siempre, \( \lfloor (n+2p-k)/s\rfloor+1 \). Por qué sale: con el marco, la fila mide \( n+2p \); la primera ventana ocupa \( d(k-1)+1 \) casillas; quedan \( n+2p-d(k-1)-1 \) por recorrer, a saltos de \( s \); y se suma 1 por la ventana inicial.</p>
-<div class="callout ejemplo">
-<span class="lbl">Ejemplo numérico (los mismos casos que ejecuta el fragmento 4 con <code>nn.Conv2d</code> de verdad)</span>
-<table>
-<thead><tr><th>n</th><th>k</th><th>s</th><th>p</th><th>d</th><th>Cuenta</th><th>Salida</th></tr></thead>
-<tbody>
-<tr><td>28</td><td>5</td><td>1</td><td>0</td><td>1</td><td>⌊(28 + 0 − 4 − 1)/1⌋ + 1 = 23 + 1</td><td class="res">24</td></tr>
-<tr><td>28</td><td>5</td><td>1</td><td>2</td><td>1</td><td>⌊(28 + 4 − 4 − 1)/1⌋ + 1 = 27 + 1</td><td class="res">28</td></tr>
-<tr><td>28</td><td>3</td><td>2</td><td>0</td><td>1</td><td>⌊(28 − 2 − 1)/2⌋ + 1 = ⌊12,5⌋ + 1</td><td class="res">13</td></tr>
-<tr><td>8</td><td>3</td><td>2</td><td>0</td><td>1</td><td>⌊(8 − 2 − 1)/2⌋ + 1 = ⌊2,5⌋ + 1</td><td class="res">3</td></tr>
-<tr><td>224</td><td>7</td><td>2</td><td>3</td><td>1</td><td>⌊(224 + 6 − 6 − 1)/2⌋ + 1 = ⌊111,5⌋ + 1</td><td class="res">112</td></tr>
-<tr><td>15</td><td>3</td><td>1</td><td>0</td><td>2</td><td>⌊(15 − 4 − 1)/1⌋ + 1 = 10 + 1</td><td class="res">11</td></tr>
-<tr><td>15</td><td>3</td><td>1</td><td>2</td><td>2</td><td>⌊(15 + 4 − 4 − 1)/1⌋ + 1 = 14 + 1</td><td class="res">15</td></tr>
-</tbody>
-</table>
-<p>La fila 224/7/2/3 es la primera capa de ResNet sobre un fotograma de 224×224 (la que usarás en el módulo siguiente). La fila 8/3/2 tiene un detalle: \( 8-3 \) no es múltiplo de 2, así que <strong>la última fila y la última columna no las mira ninguna ventana</strong> (las ventanas empiezan en 0, 2 y 4 y llegan hasta la columna 6; la 7 queda fuera). Es la tira de película del Curso 2: una ventana de 3 fotogramas que avanza de 2 en 2 sobre una tira de 8 fotogramas se queda sin mirar el último.</p>
-</div>
-<h3><code>padding='valid'</code>, <code>padding='same'</code> y los números</h3>
-<ul>
-<li><code>padding='valid'</code> equivale a <code>padding=0</code> (y es el valor por defecto numérico).</li>
-<li><code>padding='same'</code> añade el relleno necesario para que, con <strong>stride 1</strong>, la salida mida lo mismo que la entrada: en total \( d(k-1) \) casillas. Con un kernel impar sale un reparto simétrico (\( (k-1)/2 \) por lado: <code>padding=1</code> para 3×3, <code>padding=2</code> para 5×5, <code>padding=3</code> para 7×7). Con un kernel par el total es impar y PyTorch reparte el sobrante hacia la derecha y abajo. Con <code>stride &gt; 1</code> da un <code>ValueError</code> (<em>padding='same' is not supported for strided convolutions</em>), a diferencia de Keras, donde <code>"same"</code> con stride 2 deja \( \lceil n/2\rceil \).</li>
-<li>Un número (<code>padding=2</code>) es el relleno <em>por cada lado</em>; una tupla <code>(1, 2)</code> da alto y ancho distintos.</li>
-</ul>
-<h3><code>padding_mode</code>: con qué se rellena el marco</h3>
-<p>Por defecto el marco es de ceros (<code>'zeros'</code>): las bandas negras del cine. Hay otros tres: <code>'reflect'</code> (refleja los píxeles del borde hacia fuera, como un espejo), <code>'replicate'</code> (estira el píxel del borde) y <code>'circular'</code> (el fotograma «se da la vuelta», como una cinta que se une por los extremos). Con un fotograma de 3×3 píxeles <code>[[1,2,3],[4,5,6],[7,8,9]]</code>, un filtro de unos 3×3 y <code>padding=1</code>, la ventana de la esquina superior izquierda suma:</p>
-<table>
-<thead><tr><th><code>padding_mode</code></th><th>Ventana que ve la esquina (filas −1 a 1, columnas −1 a 1)</th><th>Suma</th></tr></thead>
-<tbody>
-<tr><td><code>'zeros'</code></td><td>[[0,0,0],[0,1,2],[0,4,5]]</td><td class="res">12</td></tr>
-<tr><td><code>'reflect'</code></td><td>[[5,4,5],[2,1,2],[5,4,5]]</td><td class="res">33</td></tr>
-<tr><td><code>'replicate'</code></td><td>[[1,1,2],[1,1,2],[4,4,5]]</td><td class="res">21</td></tr>
-<tr><td><code>'circular'</code></td><td>[[9,7,8],[3,1,2],[6,4,5]]</td><td class="res">45</td></tr>
-</tbody>
-</table>
-<p>El fragmento 4 comprueba esas cuatro sumas con <code>nn.Conv2d</code> y pesos todos a 1. En la práctica casi siempre se deja <code>'zeros'</code>: es lo más simple y el resto solo importa cuando los bordes de la imagen tienen significado propio.</p>
-<div class="callout ojo">
-<span class="lbl">Ojo</span>
-<p>Tres errores típicos: (1) olvidar el redondeo hacia abajo y escribir 12,5 en lugar de 12; (2) suponer que <code>padding=1</code> mantiene el tamaño con cualquier kernel (solo con k = 3; con k = 5 hace falta 2); (3) fiarse de <code>padding='same'</code> y luego cambiar a stride 2 (error). Además, en una imagen 28×28 con kernel 3, stride 2 y sin padding el resultado son 13 casillas, no 14: ya perdiste una fila y una columna. Para no discutirlo: <strong>el fragmento 4 y el experimento calculan la salida real</strong>.</p>
-</div>
-<div class="callout regla">
-<span class="lbl">Regla fácil</span>
-<p>Stride 1 y sin padding: la salida pierde \( d(k-1) \) píxeles por dimensión. Stride 1 con \( p=(k-1)/2 \) (kernel impar): mismo tamaño. Stride \( s \): el tamaño se divide, aproximadamente, entre \( s \).</p>
-</div>
-</section></div></details><details class="profundizar" id="codigo"><summary><span>Ver código explicado paso a paso<small>1 fragmento(s) original(es), con cada línea comentada y salida esperada.</small></span></summary><div class="prof-body"><article class="snippet" data-lang="python">
-<header>
-<h3>4 · Tamaño de la salida: fórmula frente a <code>nn.Conv2d</code> real, <code>padding</code> y <code>padding_mode</code></h3>
-<p class="para-que"><strong>Para qué sirve</strong> Comprobar la fórmula del tamaño con nueve combinaciones de kernel, stride, padding y dilation; ver <code>'valid'</code> y <code>'same'</code>; provocar los dos errores típicos; y comparar los cuatro <code>padding_mode</code>.</p>
+<header class="hero leccion">
+  <div class="hero-grid">
+    <div>
+      <p class="eyebrow">Curso 5 · Módulo 3 · Lección 5 de 8</p>
+      <h1>Del mapa al vector: in_features = C·H·W, capa a capa</h1>
+      <p class="lead">Al final de una CNN hay que aplanar los mapas para la capa lineal. El número que va en <code>nn.Linear(?, 10)</code> sale de seguir las formas capa a capa, y casi todos los parámetros acaban justo ahí.</p>
+      <p class="meta-line"><span class="read-time" data-render="read-time"></span><a href="../modulo-3.html">Índice del módulo</a></p>
+    </div>
+    <div class="hero-tile" aria-hidden="true"></div>
+  </div>
 </header>
-<pre class="code"><code>import torch
+
+<details class="predice">
+  <summary>La CNN del laboratorio recibe miniaturas de 1×16×16 y tiene dos bloques <code>Conv2d(k=5, padding=2) → ReLU → MaxPool2d(2)</code>, con 16 y 32 filtros. ¿Qué número va en <code>nn.Linear(?, 10)</code>: 32, 512 u 8.192?<span class="hint"></span></summary>
+  <div>
+    <p><strong>512.</strong> Las convoluciones con padding 2 mantienen el tamaño y cada pooling lo divide entre 2: 16 → 8 → 4. Llegan 32 canales de 4×4, y \( 32\cdot4\cdot4=512 \).</p>
+  </div>
+</details>
+
+<section>
+<h2 id="idea">Seguir la forma hasta el final</h2>
+<p>Casi todas las CNN pequeñas repiten <strong>convolución → ReLU → pooling</strong> y luego <strong>aplanan</strong> para una o dos capas lineales. Por el camino los mapas se encogen y los canales crecen: el póster se convierte en «muchas características pequeñas».</p>
+<p><code>nn.Flatten()</code> aplana desde la dimensión 1 y <strong>conserva el lote</strong>: (N, 32, 4, 4) pasa a (N, 512), como cortar cada póster en filas y pegarlas en una tira, póster por póster. Por eso \( \text{in\_features}=C\cdot H\cdot W \). Se saca con la cuenta a mano, con un forward de prueba (<code>torch.zeros(1, C, H, W)</code>) o con <code>nn.LazyLinear</code>, que lo deduce en la primera llamada.</p>
+<p>Si te equivocas, PyTorch dice <code>mat1 and mat2 shapes cannot be multiplied (4x512 and 100x10)</code>: lo que llega frente a lo que esperabas. Y para ver la tabla completa, como el <code>summary()</code> de Keras, un <em>forward hook</em> anota la forma que sale de cada capa.</p>
+</section>
+
+<figure class="demo" data-demo="curso5/c5m3-constructor-cnn" data-titulo="constructor de CNN: forma, parámetros y multiplicaciones capa a capa">
+  <div class="haz">Pulsa «CNN del laboratorio» y luego «Red de papel: póster 100×100×3». Busca la capa que concentra los parámetros.</div>
+  <div class="observa">Los parámetros se amontonan en la primera <code>Linear</code>; las multiplicaciones, en las convoluciones.</div>
+</figure>
+
+<section>
+<h2 id="numeros">Con números: la CNN del laboratorio</h2>
+<div class="callout ejemplo">
+  <span class="lbl">Ejemplo numérico · miniatura 1×16×16, 10 géneros</span>
+  <table>
+    <thead><tr><th>Paso</th><th>Forma</th><th>Parámetros</th></tr></thead>
+    <tbody>
+      <tr><td>entrada</td><td>(N, 1, 16, 16)</td><td>0</td></tr>
+      <tr><td>cnn1 + pool</td><td>(N, 16, 8, 8)</td><td>16·(25 + 1) = 416</td></tr>
+      <tr><td>cnn2 + pool</td><td>(N, 32, 4, 4)</td><td>32·(400 + 1) = 12.832</td></tr>
+      <tr><td>aplanar</td><td>(N, 512)</td><td>0</td></tr>
+      <tr><td>fc1</td><td>(N, 10)</td><td>512·10 + 10 = 5.130</td></tr>
+      <tr><td><strong>Total</strong></td><td></td><td class="res">18.378</td></tr>
+    </tbody>
+  </table>
+  <p>Con pósters en color de 100×100 y una capa oculta de 100, el aplanado deja 16.928 valores y la primera <code>Linear</code> se lleva 1.692.900 de 1.698.291 parámetros: el 99,7 %.</p>
+</div>
+</section>
+
+<details class="predice">
+  <summary>Cambias <code>padding=2</code> por <code>padding=0</code> en las dos convoluciones del laboratorio. ¿Sigue valiendo <code>nn.Linear(32 * 4 * 4, 10)</code>?<span class="hint"></span></summary>
+  <div>
+    <p><strong>No.</strong> Los tamaños bajan a 16 → 12 → 6 → 2 → 1, así que llegan \( 32\cdot1\cdot1=32 \) valores y PyTorch se queja: <code>mat1 and mat2 shapes cannot be multiplied (Nx32 and 512x10)</code>. Por eso conviene un forward de prueba, <code>LazyLinear</code> o <code>AdaptiveAvgPool2d(1)</code>.</p>
+  </div>
+</details>
+
+<div class="resumen">
+  <h2 class="sin-num sin-toc">En tres líneas</h2>
+  <ul>
+    <li>Patrón: (Conv → ReLU → Pool) × n, Flatten y Linear; mapas que encogen, canales que crecen.</li>
+    <li>\( \text{in\_features}=C\cdot H\cdot W \) de lo que llega al <code>Flatten</code>: 512 en la red del laboratorio.</li>
+    <li>Casi todos los parámetros están en la primera <code>Linear</code>; <code>AdaptiveAvgPool2d(1)</code> la deja en C entradas.</li>
+  </ul>
+</div>
+
+<section class="quiz mini">
+<script type="application/json" class="quiz-data">
+{
+ "titulo": "¿Lo tienes?",
+ "preguntas": [
+  {
+   "q": "El último tensor antes de la capa lineal tiene forma (N, 64, 5, 5). ¿Qué <code>in_features</code> lleva <code>nn.Linear</code> tras un <code>nn.Flatten()</code>?",
+   "opciones": [
+    "64 (los canales)",
+    "1.600 (64·5·5)",
+    "320 (64·5)",
+    "N·1.600 (se incluye el lote)"
+   ],
+   "correcta": 1,
+   "porque": "<code>Flatten</code> aplana desde la dimensión 1 y conserva el lote: cada imagen pasa a \\( 64\\cdot5\\cdot5=1600 \\) números. Si no estás seguro, pasa un tensor de ceros por el cuerpo de la red y lee <code>.shape[1]</code> (fragmento 6) o usa <code>nn.LazyLinear</code>."
+  },
+  {
+   "q": "En la red de pósters de 100×100×3 (1.698.291 parámetros), ¿dónde está la mayoría?",
+   "opciones": [
+    "En la primera convolución",
+    "En la segunda convolución",
+    "En la primera capa lineal tras el aplanado (el 99,7 %)",
+    "Repartidos por igual"
+   ],
+   "correcta": 2,
+   "porque": "El aplanado deja \\( 32\\cdot23\\cdot23=16.928 \\) valores, y conectarlos con 100 neuronas cuesta 1.692.900 parámetros. Las convoluciones solo tienen 448 + 4.640."
+  },
+  {
+   "q": "¿Qué ventaja tiene poner <code>nn.AdaptiveAvgPool2d(1)</code> antes del <code>Flatten</code>?",
+   "opciones": [
+    "Aumenta la resolución de los mapas",
+    "Cada canal queda en un solo número, así que <code>nn.Linear(C, 10)</code> sirve para imágenes de cualquier tamaño",
+    "Elimina la necesidad de convoluciones",
+    "Hace que la red sea invariante a todo"
+   ],
+   "correcta": 1,
+   "porque": "Hace la media de cada mapa: salen C valores sea cual sea H × W. Es lo que usan ResNet y casi todas las redes modernas; el precio es perder dónde estaba cada característica."
+  }
+ ]
+}
+</script>
+</section>
+
+<details class="profundizar">
+  <summary><span>Profundizar: la explicación completa<small><code>nn.Flatten</code> y su analogía, las tres formas de sacar <code>in_features</code>, la red del laboratorio entera con multiplicaciones, la red de pósters de 100×100 y el «resumen» con <em>hooks</em>.</small></span></summary>
+  <div class="prof-body">
+<h2 id="flatten">De mapas a vector: <code>nn.Flatten</code> y el <code>in_features</code> de la capa lineal</h2>
+
+<p class="pregunta">La última capa de mi CNN es <code>nn.Linear(?, 10)</code>. ¿Qué número va en el interrogante, y cómo lo saco sin equivocarme?</p>
+
+<p>Después de las convoluciones y los pooling, el tensor sigue siendo (N, C, H, W). La capa lineal final (<code>nn.Linear</code>) espera (N, F), un vector de F números por imagen. <code>nn.Flatten(start_dim=1, end_dim=-1)</code> hace el puente: aplana todas las dimensiones <strong>desde la 1 hasta el final</strong> y conserva la 0 (el lote). Así, un tensor (4, 32, 4, 4) pasa a (4, 512), con \( 512=32\cdot4\cdot4 \). Es lo mismo que <code>x.view(x.size(0), -1)</code> (el <code>-1</code> significa «calcula tú el resto»), que es como lo escribe el laboratorio original.</p>
+
+<div class="callout analogia">
+  <span class="lbl">Analogía</span>
+  <p>Una carpeta con los pósters de la cartelera. Cortas cada póster en filas y pegas las filas una tras otra en una tira larga, <em>póster por póster</em>: la tira del primero, la del segundo… Si aplanaras también el lote (<code>start_dim=0</code>), meterías todos los pósters en una única tira gigante y la red ya no sabría dónde acaba uno y empieza el siguiente.</p>
+</div>
+
+<p>La regla para el interrogante: <strong>\( \text{in\_features}=C\cdot H\cdot W \)</strong> del tensor que llega al <code>Flatten</code>. Con la CNN del laboratorio, 32 canales de 4×4: \( 32\cdot4\cdot4=512 \), por eso <code>nn.Linear(32 * 4 * 4, 10)</code>. Hay tres maneras de obtenerlo sin cuentas a mano:</p>
+
+<ol class="pasos">
+  <li><strong>A mano</strong>, con la fórmula del tamaño capa a capa (lo harás en el siguiente apartado).</li>
+  <li><strong>Con un forward de prueba</strong>: pasas un tensor de ceros <code>torch.zeros(1, C, H, W)</code> por el «cuerpo» de la red (hasta el <code>Flatten</code>, dentro de <code>torch.no_grad()</code>) y lees <code>.shape[1]</code>. Es lo más fiable (fragmento 6: 64).</li>
+  <li><strong><code>nn.LazyLinear(out_features)</code></strong>: no pide <code>in_features</code>; lo deduce en la primera llamada y se convierte en una <code>nn.Linear</code> normal. Antes de esa primera llamada sus parámetros no existen (<code>UninitializedParameter</code>), así que hay que hacer un forward de prueba <em>antes</em> de crear el optimizador.</li>
+</ol>
+
+<p>Si te equivocas, el error es claro pero poco amable: <code>mat1 and mat2 shapes cannot be multiplied (4x512 and 100x10)</code>. Léelo así: la <em>primera</em> pareja (4×512) es el tensor que llega (lote 4, 512 valores) y la <em>segunda</em> (100×10) es la capa que esperabas (<code>in_features=100</code>). Si la primera cifra de la primera pareja no es el tamaño del lote, probablemente se te olvidó un <code>Flatten</code> o aplanaste de más.</p>
+
+<h3>La alternativa que no depende del tamaño: <code>AdaptiveAvgPool2d(1)</code></h3>
+
+<p>Si antes del <code>Flatten</code> pones <code>nn.AdaptiveAvgPool2d(1)</code>, el mapa de cada canal se reduce a <strong>un solo número</strong> (su media): salen \( C \) valores sea cual sea el tamaño de la imagen, y <code>nn.Linear(C, 10)</code> sirve para 8×8, 12×12 o 20×20 (fragmento 6). Es lo que hacen ResNet y casi todas las redes modernas; la desventaja es que se pierde la información de <em>dónde</em> estaba cada característica.</p>
+
+<div class="callout recuerda">
+  <span class="lbl">Recuerda (<a href="../../curso-2/modulo-3/leccion-7.html#flatten-dense">Curso 2 · módulo 3</a>)</span>
+  <p>Casi todos los parámetros de una CNN pequeña están en la primera capa lineal después del <code>Flatten</code>: conecta cada valor aplanado con cada neurona. Por eso, cuando la imagen crece, es el <code>Flatten</code> el que dispara el tamaño del modelo, y por eso se prefiere el pooling global.</p>
+</div>
+
+<h2 id="arquitectura">Una CNN completa, capa a capa: formas, parámetros y el «resumen» con hooks</h2>
+
+<p class="pregunta">Quiero clasificar miniaturas de 16×16 (en el código serán dígitos del 0 al 9; imagina pósters pequeños que hay que repartir en 10 géneros) con dos convoluciones y una capa lineal. ¿Qué forma tiene el tensor después de cada capa, qué número va en <code>nn.Linear(?, 10)</code> y cuántos parámetros tiene la red?</p>
+
+<p>El patrón de casi todas las CNN pequeñas es el mismo y se repite: <strong>convolución → ReLU → pooling</strong>, tantas veces como haga falta; después, <strong>aplanar</strong> y una o dos capas lineales. A medida que avanzas, el tamaño de los mapas <em>baja</em> (el pooling lo divide entre 2) y el número de canales <em>sube</em> (cada convolución crea más filtros): la imagen se va convirtiendo en «muchas características pequeñas».</p>
+
+<p>Así queda la red del laboratorio de IBM, escrita como <code>nn.Module</code> (está entera en el fragmento 7 y se entrena en el 9):</p>
+
+<pre class="ascii">class CNN(nn.Module):
+    def __init__(self, out_1=16, out_2=32):
+        super().__init__()
+        self.cnn1 = nn.Conv2d(in_channels=1, out_channels=out_1, kernel_size=5, padding=2)
+        self.maxpool1 = nn.MaxPool2d(kernel_size=2)
+        self.cnn2 = nn.Conv2d(in_channels=out_1, out_channels=out_2, kernel_size=5, stride=1, padding=2)
+        self.maxpool2 = nn.MaxPool2d(kernel_size=2)
+        self.fc1 = nn.Linear(out_2 * 4 * 4, 10)
+
+    def forward(self, x):
+        x = self.maxpool1(torch.relu(self.cnn1(x)))
+        x = self.maxpool2(torch.relu(self.cnn2(x)))
+        x = x.view(x.size(0), -1)
+        return self.fc1(x)</pre>
+
+<div class="callout ejemplo">
+  <span class="lbl">Ejemplo numérico: la red del laboratorio con una miniatura de 1×16×16 (N es el tamaño del lote)</span>
+  <table>
+    <thead><tr><th>Paso</th><th>Cuenta del tamaño</th><th>Forma de salida</th><th>Parámetros</th><th>Multiplicaciones por imagen</th></tr></thead>
+    <tbody>
+      <tr><td>entrada</td><td>—</td><td>(N, 1, 16, 16)</td><td>0</td><td>0</td></tr>
+      <tr><td><code>cnn1</code> k5, p2</td><td>⌊(16 + 4 − 5)/1⌋ + 1 = 16</td><td>(N, 16, 16, 16)</td><td>16·(1·25 + 1) = <span class="res">416</span></td><td>16·16·16·25·1 = 102.400</td></tr>
+      <tr><td>ReLU + <code>maxpool1</code></td><td>⌊(16 − 2)/2⌋ + 1 = 8</td><td>(N, 16, 8, 8)</td><td>0</td><td>0</td></tr>
+      <tr><td><code>cnn2</code> k5, p2</td><td>⌊(8 + 4 − 5)/1⌋ + 1 = 8</td><td>(N, 32, 8, 8)</td><td>32·(16·25 + 1) = <span class="res">12.832</span></td><td>32·8·8·25·16 = 819.200</td></tr>
+      <tr><td>ReLU + <code>maxpool2</code></td><td>⌊(8 − 2)/2⌋ + 1 = 4</td><td>(N, 32, 4, 4)</td><td>0</td><td>0</td></tr>
+      <tr><td><code>view</code> (aplanar)</td><td>32·4·4 = 512</td><td>(N, 512)</td><td>0</td><td>0</td></tr>
+      <tr><td><code>fc1</code></td><td>—</td><td>(N, 10)</td><td>512·10 + 10 = <span class="res">5.130</span></td><td>512·10 = 5.120</td></tr>
+      <tr><td><strong>Total</strong></td><td></td><td></td><td><strong>18.378</strong></td><td><strong>926.720</strong></td></tr>
+    </tbody>
+  </table>
+  <p>Las «multiplicaciones» de una convolución son \( C_{out}\cdot H_{out}\cdot W_{out}\cdot k^2\cdot C_{in} \): cada uno de los \( C_{out}\cdot H_{out}\cdot W_{out} \) números de la salida cuesta \( k^2 C_{in} \) multiplicaciones. Fíjate en que <strong>casi todo el cálculo está en la segunda convolución</strong> (819.200 de 926.720, el 88 %) y no en la capa lineal.</p>
+</div>
+
+<p>Dos detalles de esta clase que conviene notar. Primero, el laboratorio usa <code>torch.relu(...)</code> (una función) dentro de <code>forward</code> en lugar de capas <code>nn.ReLU()</code>; funciona igual, pero esas activaciones no aparecen como módulos. Segundo, usa <code>x.view(x.size(0), -1)</code> en lugar de <code>nn.Flatten()</code>, y por eso tienes que acordarte tú de que <code>nn.Linear</code> espera \( 32\cdot4\cdot4 \).</p>
+
+<h3>La misma cuenta en una red a medida: pósters de 100×100 en color</h3>
+
+<p>Para un póster RGB de 100×100 con tres géneros (comedia, terror y drama, como en el Curso 2), una red típica es <code>Conv2d(3,16,3)</code> → ReLU → <code>MaxPool2d(2)</code> → <code>Conv2d(16,32,3)</code> → ReLU → <code>MaxPool2d(2)</code> → <code>Flatten</code> → <code>Linear(?,100)</code> → ReLU → <code>Linear(100,3)</code>. Sin padding, los tamaños son 100 → 98 → 49 → 47 → 23, así que tras aplanar hay \( 32\cdot23\cdot23=16.928 \) valores. Parámetros: 448 + 4.640 + 1.692.900 + 303 = <strong>1.698.291</strong>. El 99,7 % está en la primera capa lineal (1.692.900 de 1.698.291): las convoluciones, que hacen el trabajo visual, son baratísimas en parámetros y es el aplanado lo que los dispara. Compara con los 3.000.100 que costaba <em>solo</em> la primera capa si se conectaba el póster sin convolución.</p>
+
+<h3>Un «resumen» de la red con hooks (sin instalar nada)</h3>
+
+<p>En Keras, <code>model.summary()</code> te daba esta tabla. En PyTorch hay paquetes (<code>torchinfo</code>, <code>torchsummary</code>) pero puedes construirla en diez líneas con <strong><em>hooks</em></strong>: un <em>hook</em> es una función que PyTorch llama automáticamente cada vez que un módulo termina su <code>forward</code>. Con <code>modulo.register_forward_hook(f)</code>, la función <code>f(modulo, entrada, salida)</code> recibe la forma de lo que sale de esa capa. El fragmento 7 registra un hook en cada módulo «hoja» (el que no contiene otros módulos), pasa un tensor de ceros <code>torch.zeros(1, *forma_entrada)</code> y escribe una fila por capa; su salida cuadra con la tabla de arriba (18.378 parámetros) y también da 1.898 para la CNN pequeña de dígitos 8×8 y 1.698.291 para la de los pósters. Como el modelo del laboratorio usa <code>torch.relu</code> y <code>view</code>, el resumen no muestra ni ReLU ni aplanado; las otras dos redes, escritas con <code>nn.Sequential</code>, sí.</p>
+
+<div class="callout recuerda">
+  <span class="lbl">Experimento de arriba: «constructor de CNN: forma, parámetros y multiplicaciones capa a capa», con todo detalle</span>
+  <p><strong>Haz esto.</strong> Pulsa «CNN del laboratorio» y comprueba que salen 18.378 parámetros. Después «Red de papel 100×100×3» y busca la capa que concentra los parámetros. Prueba a vaciar la red, elegir la entrada 1×28×28 y añadir tú: Conv2d (16, kernel 3, padding 1), MaxPool2d, otra Conv2d, MaxPool2d, y el aplanado con su Linear. Luego añade una Conv2d con kernel 7 sobre un mapa pequeño, o una Conv2d <em>después</em> de aplanar, para ver los errores.</p>
+  <p><strong>Fíjate en.</strong> Cada fila recalcula la forma con la fórmula del tamaño, y la última capa lineal toma sola su <code>in_features</code> del aplanado. El gráfico de barras muestra dónde están los parámetros (casi siempre en la primera <code>Linear</code>) y, aparte, dónde están las multiplicaciones (casi siempre en las convoluciones). El código de PyTorch que escribe es el que tendrías que teclear; si falla una capa (el kernel no cabe, o aplicas <code>Conv2d</code> a un vector), la herramienta lo dice con las mismas palabras que PyTorch.</p>
+</div>
+
+<div class="callout ojo">
+  <span class="lbl">Ojo</span>
+  <p>Un número en un <code>nn.Linear</code> que «sale de la nada» casi siempre es un descuido en la cuenta de las formas. Cámbiale a la red del laboratorio <code>padding=2</code> por <code>padding=0</code> y todos los tamaños bajan (12 → 6 → 2 → 1), de modo que <code>32 * 4 * 4</code> deja de valer. Por eso en la práctica se calcula <code>in_features</code> con un forward de prueba o con <code>LazyLinear</code> (fragmento 6), y se comprueba con el resumen.</p>
+</div>
+  </div>
+</details>
+
+
+<section>
+<h2 class="sin-num">Código</h2>
+<article class="snippet" data-lang="python" id="frag-6">
+  <header>
+    <h3>6 · De mapas a vector: <code>Flatten</code>, <code>in_features</code>, <code>LazyLinear</code> y <code>AdaptiveAvgPool2d(1)</code></h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Aplanar un lote de mapas, provocar el error de <code>in_features</code>, calcularlo con un forward de prueba, dejar que <code>LazyLinear</code> lo deduzca y usar el pooling global para que la red acepte imágenes de cualquier tamaño.</p>
+  </header>
+  <pre class="code"><code>import torch
+import torch.nn as nn
+
+torch.manual_seed(0)
+x = torch.randn(4, 32, 4, 4)
+plano = nn.Flatten()(x)
+print("Flatten():", tuple(x.shape), "-&gt;", tuple(plano.shape), "(el lote se conserva)")
+print("Flatten(start_dim=0):", tuple(nn.Flatten(start_dim=0)(x).shape), "&lt;- mezcla también el lote")
+print("x.view(x.size(0), -1) igual que Flatten:", torch.equal(x.view(x.size(0), -1), plano))
+
+fc = nn.Linear(32 * 4 * 4, 10)
+print("Linear(512, 10):", tuple(fc(plano).shape))
+try:
+    nn.Linear(100, 10)(plano)
+except RuntimeError as e:
+    print("Linear mal dimensionada:", e)
+
+cuerpo = nn.Sequential(
+    nn.Conv2d(1, 8, 3, padding=1), nn.ReLU(), nn.MaxPool2d(2),
+    nn.Conv2d(8, 16, 3, padding=1), nn.ReLU(), nn.MaxPool2d(2),
+    nn.Flatten(),
+)
+with torch.no_grad():
+    n_feat = cuerpo(torch.zeros(1, 1, 8, 8)).shape[1]
+print("in_features descubierto con un forward de prueba:", n_feat)
+modelo = nn.Sequential(cuerpo, nn.Linear(n_feat, 10))
+print("salida del modelo:", tuple(modelo(torch.zeros(5, 1, 8, 8)).shape))
+
+perezoso = nn.Sequential(cuerpo, nn.LazyLinear(10))
+print("antes:", type(perezoso[1].weight).__name__)
+perezoso(torch.zeros(2, 1, 8, 8))
+print("después:", perezoso[1])
+
+gap = nn.Sequential(
+    nn.Conv2d(1, 16, 3, padding=1), nn.ReLU(),
+    nn.AdaptiveAvgPool2d(1), nn.Flatten(), nn.Linear(16, 10),
+)
+for lado in (8, 12, 20):
+    print(f"con AdaptiveAvgPool2d(1), imagen {lado}x{lado} -&gt;", tuple(gap(torch.zeros(3, 1, lado, lado)).shape))</code></pre>
+  <details class="linea-a-linea">
+    <summary>Línea por línea</summary>
+    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+      <tbody>
+        <tr data-lines="1-2"><td><code>import …</code></td><td><code>torch</code> y <code>torch.nn</code>.</td></tr>
+        <tr data-lines="4-5"><td><code>torch.manual_seed(0) ; x = torch.randn(4, 32, 4, 4)</code></td><td>Un lote de 4 «imágenes» de 32 mapas de 4×4, como el que dejaría la segunda convolución de la CNN del laboratorio.</td></tr>
+        <tr data-lines="6-7"><td><code>plano = nn.Flatten()(x) …</code></td><td><code>nn.Flatten()</code> aplana desde la dimensión 1 hasta el final: (4, 32, 4, 4) pasa a (4, 512). El lote (dimensión 0) se conserva.</td></tr>
+        <tr data-lines="8"><td><code>print("Flatten(start_dim=0):" …)</code></td><td>Con <code>start_dim=0</code> se aplana todo, incluido el lote: un solo vector de 2.048 números. Casi nunca es lo que quieres.</td></tr>
+        <tr data-lines="9"><td><code>print("x.view(x.size(0), -1) …")</code></td><td>La forma antigua de aplanar (la del laboratorio de IBM): conserva <code>x.size(0)</code> filas y deja que PyTorch calcule las columnas (<code>-1</code>). <code>torch.equal</code> confirma que es lo mismo.</td></tr>
+        <tr data-lines="11-12"><td><code>fc = nn.Linear(32 * 4 * 4, 10) …</code></td><td>La capa lineal con el <code>in_features</code> correcto, 512. La salida es (4, 10): 10 puntuaciones por imagen.</td></tr>
+        <tr data-lines="13-16"><td><code>try: nn.Linear(100, 10)(plano) …</code></td><td>Una capa con <code>in_features=100</code> no puede multiplicar un tensor de 512 columnas. Se captura el <code>RuntimeError</code> y se imprime.</td></tr>
+        <tr data-lines="18-22"><td><code>cuerpo = nn.Sequential(…)</code></td><td>El «cuerpo» de la CNN de dígitos 8×8: dos bloques conv → ReLU → pooling y un <code>Flatten</code> al final. Aún no tiene capa lineal.</td></tr>
+        <tr data-lines="23-25"><td><code>with torch.no_grad(): n_feat = cuerpo(torch.zeros(1, 1, 8, 8)).shape[1]</code></td><td>Se pasa una imagen de ceros por el cuerpo (sin gradientes) y se lee el número de columnas, <code>.shape[1]</code>: ese es el <code>in_features</code> de la capa lineal.</td></tr>
+        <tr data-lines="26-27"><td><code>modelo = nn.Sequential(cuerpo, nn.Linear(n_feat, 10)) …</code></td><td>Se monta el modelo completo con el número descubierto y se prueba con un lote de 5 imágenes: la salida es (5, 10).</td></tr>
+        <tr data-lines="29-32"><td><code>perezoso = nn.Sequential(cuerpo, nn.LazyLinear(10)) …</code></td><td><code>LazyLinear(10)</code> solo pide las salidas. Antes del primer forward sus parámetros son del tipo <code>UninitializedParameter</code>; al pasar datos, deduce el <code>in_features</code> y se convierte en una <code>Linear</code> normal.</td></tr>
+        <tr data-lines="34-37"><td><code>gap = nn.Sequential(…AdaptiveAvgPool2d(1), nn.Flatten(), nn.Linear(16, 10))</code></td><td>Otra red: una convolución con 16 filtros, el pooling global (un número por canal), el aplanado y una <code>Linear(16, 10)</code> cuyo tamaño no depende de la imagen.</td></tr>
+        <tr data-lines="38-39"><td><code>for lado in (8, 12, 20): …</code></td><td>Pasa imágenes de 8×8, 12×12 y 20×20 por la misma red: siempre sale (3, 10).</td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>Flatten(): (4, 32, 4, 4) -&gt; (4, 512) (el lote se conserva)
+Flatten(start_dim=0): (2048,) &lt;- mezcla también el lote
+x.view(x.size(0), -1) igual que Flatten: True
+Linear(512, 10): (4, 10)
+Linear mal dimensionada: mat1 and mat2 shapes cannot be multiplied (4x512 and 100x10)
+in_features descubierto con un forward de prueba: 64
+salida del modelo: (5, 10)
+antes: UninitializedParameter
+después: Linear(in_features=64, out_features=10, bias=True)
+con AdaptiveAvgPool2d(1), imagen 8x8 -&gt; (3, 10)
+con AdaptiveAvgPool2d(1), imagen 12x12 -&gt; (3, 10)
+con AdaptiveAvgPool2d(1), imagen 20x20 -&gt; (3, 10)</pre>
+    <p>El aplanado respeta el lote: (4, 32, 4, 4) → (4, 512), y con <code>start_dim=0</code> se mezclan las imágenes en un único vector de 2.048. La capa mal dimensionada da el error clásico <code>mat1 and mat2 shapes cannot be multiplied (4x512 and 100x10)</code>: la primera pareja es lo que llega y la segunda lo que la capa esperaba. El forward de prueba descubre que el cuerpo deja 16·2·2 = 64 valores (8 → 4 → 2). <code>LazyLinear</code> pasa de <code>UninitializedParameter</code> a <code>Linear(in_features=64, out_features=10)</code>. Con el pooling global la misma red acepta imágenes de 8, 12 o 20 píxeles.</p>
+  </div>
+</article>
+
+<article class="snippet" data-lang="python" id="frag-7">
+  <header>
+    <h3>7 · Un «resumen» del modelo con hooks (formas y parámetros capa a capa)</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Escribir en diez líneas el equivalente de <code>model.summary()</code> de Keras con <code>register_forward_hook</code>, y comprobar con él las tres redes del módulo.</p>
+  </header>
+  <pre class="code"><code>import torch
 import torch.nn as nn
 
 
-def tam_formula(n, k, s=1, p=0, d=1):
-    return (n + 2 * p - d * (k - 1) - 1) // s + 1
+def resumen(modelo, forma_entrada):
+    filas, ganchos = [], []
 
+    def anotar(modulo, entrada, salida):
+        n_par = sum(p.numel() for p in modulo.parameters(recurse=False))
+        filas.append((modulo.__class__.__name__, tuple(salida.shape), n_par))
 
-casos = [
-    (28, 5, 1, 0, 1),
-    (28, 5, 1, 2, 1),
-    (32, 3, 1, 1, 1),
-    (28, 3, 2, 0, 1),
-    (8, 3, 2, 0, 1),
-    (224, 7, 2, 3, 1),
-    (16, 5, 1, 2, 1),
-    (15, 3, 1, 0, 2),
-    (15, 3, 1, 2, 2),
-]
-print(f"{'n':&gt;4} {'k':&gt;2} {'s':&gt;2} {'p':&gt;2} {'d':&gt;2} | {'fórmula':&gt;7} {'real':&gt;5}")
-for n, k, s, p, d in casos:
-    conv = nn.Conv2d(1, 1, kernel_size=k, stride=s, padding=p, dilation=d)
-    real = conv(torch.zeros(1, 1, n, n)).shape[-1]
-    print(f"{n:4d} {k:2d} {s:2d} {p:2d} {d:2d} | {tam_formula(n, k, s, p, d):7d} {real:5d}")
-
-for pad in ["valid", "same"]:
-    conv = nn.Conv2d(1, 1, kernel_size=5, padding=pad)
-    print(f"padding='{pad}' con k=5, entrada 20 -&gt;", conv(torch.zeros(1, 1, 20, 20)).shape[-1])
-try:
-    nn.Conv2d(1, 1, kernel_size=3, stride=2, padding="same")
-except ValueError as e:
-    print("same con stride 2:", e)
-try:
-    nn.Conv2d(1, 1, kernel_size=7)(torch.zeros(1, 1, 6, 6))
-except RuntimeError as e:
-    print("filtro mayor que la imagen:", e)
-
-x = torch.arange(1.0, 10.0).reshape(1, 1, 3, 3)
-print("imagen:", x[0, 0].tolist())
-for modo in ["zeros", "reflect", "replicate", "circular"]:
-    conv = nn.Conv2d(1, 1, 3, padding=1, padding_mode=modo, bias=False)
+    for m in modelo.modules():
+        if len(list(m.children())) == 0:
+            ganchos.append(m.register_forward_hook(anotar))
+    modelo.eval()
     with torch.no_grad():
-        conv.weight.fill_(1.0)
-    print(f"padding_mode={modo:9s} suma de la ventana en la esquina superior izquierda:", conv(x)[0, 0, 0, 0].item())</code></pre>
-<details class="linea-a-linea">
-<summary>Línea por línea</summary>
-<p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
-<table class="lineas">
-<thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
-<tbody>
-<tr data-lines="1-2"><td><code>import …</code></td><td><code>torch</code> y <code>torch.nn</code>.</td></tr>
-<tr data-lines="5-6"><td><code>def tam_formula(n, k, s=1, p=0, d=1): …</code></td><td>La fórmula \( \lfloor (n+2p-d(k-1)-1)/s\rfloor+1 \). En Python, <code>//</code> es la división que redondea hacia abajo.</td></tr>
-<tr data-lines="9-19"><td><code>casos = […]</code></td><td>Nueve combinaciones (n, k, s, p, d): las de la tabla del texto, incluidas la primera capa de ResNet (224, 7, 2, 3) y dos con dilatación 2.</td></tr>
-<tr data-lines="20"><td><code>print(f"{'n':&gt;4} …)</code></td><td>Imprime la cabecera de la tabla. <code>:&gt;4</code> alinea a la derecha en 4 espacios.</td></tr>
-<tr data-lines="21-24"><td><code>for n, k, s, p, d in casos: …</code></td><td>Para cada caso crea una <code>nn.Conv2d</code> de verdad y le pasa una imagen de ceros (1, 1, n, n); <code>.shape[-1]</code> es el ancho de la salida, el valor «real». Se imprime junto al de la fórmula.</td></tr>
-<tr data-lines="26-28"><td><code>for pad in ["valid", "same"]: …</code></td><td>Con kernel 5 y entrada 20: <code>'valid'</code> (sin relleno) da 16 y <code>'same'</code> da 20.</td></tr>
-<tr data-lines="29-32"><td><code>try: nn.Conv2d(…stride=2, padding="same") …</code></td><td><code>'same'</code> con stride 2 no se admite; el <code>ValueError</code> salta ya al crear la capa y el <code>except</code> lo imprime.</td></tr>
-<tr data-lines="33-36"><td><code>try: nn.Conv2d(1, 1, kernel_size=7)(…6, 6)) …</code></td><td>Aplica un kernel 7×7 a una imagen 6×6: no cabe ni una ventana. Se captura el <code>RuntimeError</code> y se imprime entero.</td></tr>
-<tr data-lines="38-39"><td><code>x = torch.arange(1.0, 10.0).reshape(1, 1, 3, 3) …</code></td><td>La imagen [[1,2,3],[4,5,6],[7,8,9]] como un lote de una imagen de un canal.</td></tr>
-<tr data-lines="40-41"><td><code>for modo in […]: conv = nn.Conv2d(…padding_mode=modo…)</code></td><td>Para cada modo de relleno crea una capa 3×3 con <code>padding=1</code> y sin sesgo.</td></tr>
-<tr data-lines="42-43"><td><code>with torch.no_grad(): conv.weight.fill_(1.0)</code></td><td>Pone los nueve pesos a 1: así la salida es simplemente la <strong>suma de la ventana</strong>.</td></tr>
-<tr data-lines="44"><td><code>print(f"padding_mode={modo:9s} …")</code></td><td>Imprime la salida en la esquina superior izquierda, <code>conv(x)[0, 0, 0, 0]</code>: la suma de la ventana que incluye el marco.</td></tr>
-</tbody>
-</table>
-</details>
-<div class="salida">
-<strong>Salida esperada</strong>
-<pre>   n  k  s  p  d | fórmula  real
-  28  5  1  0  1 |      24    24
-  28  5  1  2  1 |      28    28
-  32  3  1  1  1 |      32    32
-  28  3  2  0  1 |      13    13
-   8  3  2  0  1 |       3     3
- 224  7  2  3  1 |     112   112
-  16  5  1  2  1 |      16    16
-  15  3  1  0  2 |      11    11
-  15  3  1  2  2 |      15    15
-padding='valid' con k=5, entrada 20 -&gt; 16
-padding='same' con k=5, entrada 20 -&gt; 20
-same con stride 2: padding='same' is not supported for strided convolutions
-filtro mayor que la imagen: Calculated padded input size per channel: (6 x 6). Kernel size: (7 x 7). Kernel size can't be greater than actual input size
-imagen: [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0], [7.0, 8.0, 9.0]]
-padding_mode=zeros     suma de la ventana en la esquina superior izquierda: 12.0
-padding_mode=reflect   suma de la ventana en la esquina superior izquierda: 33.0
-padding_mode=replicate suma de la ventana en la esquina superior izquierda: 21.0
-padding_mode=circular  suma de la ventana en la esquina superior izquierda: 45.0</pre>
-<p>En las nueve filas la fórmula y la red real coinciden (por ejemplo 28 → 24 con kernel 5, 28 → 13 con kernel 3 y stride 2, 224 → 112 con la primera capa de ResNet). <code>'same'</code> mantiene 20, <code>'valid'</code> da 16 y con stride 2 es un error. El mensaje del kernel gigante es literal: el mapa con marco mide 6×6 y el kernel 7×7. Las cuatro sumas son las de la tabla del texto: con ceros la ventana es <code>[[0,0,0],[0,1,2],[0,4,5]]</code> (12); reflejada, <code>[[5,4,5],[2,1,2],[5,4,5]]</code> (33); replicada, <code>[[1,1,2],[1,1,2],[4,4,5]]</code> (21); circular, <code>[[9,7,8],[3,1,2],[6,4,5]]</code> (45).</p>
+        modelo(torch.zeros(1, *forma_entrada))
+    for g in ganchos:
+        g.remove()
+    print(f"{'capa':&lt;12}{'forma de salida':&lt;22}{'parámetros':&gt;10}")
+    for nombre, forma, n in filas:
+        print(f"{nombre:&lt;12}{str(forma):&lt;22}{n:&gt;10d}")
+    print("total:", sum(p.numel() for p in modelo.parameters()), "\n")
+
+
+class CNN(nn.Module):
+    def __init__(self, out_1=16, out_2=32):
+        super().__init__()
+        self.cnn1 = nn.Conv2d(in_channels=1, out_channels=out_1, kernel_size=5, padding=2)
+        self.maxpool1 = nn.MaxPool2d(kernel_size=2)
+        self.cnn2 = nn.Conv2d(in_channels=out_1, out_channels=out_2, kernel_size=5, stride=1, padding=2)
+        self.maxpool2 = nn.MaxPool2d(kernel_size=2)
+        self.fc1 = nn.Linear(out_2 * 4 * 4, 10)
+
+    def forward(self, x):
+        x = self.maxpool1(torch.relu(self.cnn1(x)))
+        x = self.maxpool2(torch.relu(self.cnn2(x)))
+        x = x.view(x.size(0), -1)
+        return self.fc1(x)
+
+
+print("--- CNN del laboratorio (imágenes 16x16) ---")
+resumen(CNN(), (1, 16, 16))
+
+print("--- CNN pequeña para dígitos 8x8 ---")
+digitos = nn.Sequential(
+    nn.Conv2d(1, 8, 3, padding=1), nn.ReLU(), nn.MaxPool2d(2),
+    nn.Conv2d(8, 16, 3, padding=1), nn.ReLU(), nn.MaxPool2d(2),
+    nn.Flatten(), nn.Linear(64, 10),
+)
+resumen(digitos, (1, 8, 8))
+
+print("--- Red de papel: póster RGB de 100x100, tres clases ---")
+papel = nn.Sequential(
+    nn.Conv2d(3, 16, 3), nn.ReLU(), nn.MaxPool2d(2),
+    nn.Conv2d(16, 32, 3), nn.ReLU(), nn.MaxPool2d(2),
+    nn.Flatten(), nn.Linear(23 * 23 * 32, 100), nn.ReLU(), nn.Linear(100, 3),
+)
+resumen(papel, (3, 100, 100))</code></pre>
+  <details class="linea-a-linea">
+    <summary>Línea por línea</summary>
+    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+      <tbody>
+        <tr data-lines="1-2"><td><code>import …</code></td><td><code>torch</code> y <code>torch.nn</code>.</td></tr>
+        <tr data-lines="5-6"><td><code>def resumen(modelo, forma_entrada): filas, ganchos = [], []</code></td><td>Función que recibe el modelo y la forma de UNA imagen, sin lote, por ejemplo (1, 16, 16). <code>filas</code> guardará una fila por capa y <code>ganchos</code> los hooks registrados para poder quitarlos después.</td></tr>
+        <tr data-lines="8-10"><td><code>def anotar(modulo, entrada, salida): …</code></td><td>El hook. PyTorch lo llama con tres argumentos cada vez que un módulo termina su <code>forward</code>: el módulo, su entrada y su salida. Guarda el nombre de la clase, la forma de la salida y el número de parámetros <em>propios</em> del módulo (<code>recurse=False</code>).</td></tr>
+        <tr data-lines="12-14"><td><code>for m in modelo.modules(): if len(list(m.children())) == 0: …</code></td><td>Recorre todos los módulos; solo a los «hoja» (los que no contienen otros módulos) se les registra el hook con <code>register_forward_hook</code>, que devuelve un identificador para borrarlo.</td></tr>
+        <tr data-lines="15-17"><td><code>modelo.eval() ; with torch.no_grad(): modelo(torch.zeros(1, *forma_entrada))</code></td><td>Pasa una imagen de ceros por el modelo: al hacerlo, cada capa hoja dispara su hook. El <code>*</code> desempaqueta la forma: <code>(1, *(1, 16, 16))</code> es <code>(1, 1, 16, 16)</code>.</td></tr>
+        <tr data-lines="18-19"><td><code>for g in ganchos: g.remove()</code></td><td>Quita los hooks para no dejar basura en el modelo.</td></tr>
+        <tr data-lines="20-23"><td><code>print(…)</code></td><td>Imprime la cabecera con anchos fijos (<code>:&lt;12</code> alinea a la izquierda, <code>:&gt;10d</code> a la derecha), una fila por capa y el total de parámetros.</td></tr>
+        <tr data-lines="26-33"><td><code>class CNN(nn.Module): __init__ …</code></td><td>La CNN del laboratorio: dos convoluciones de 5×5 con padding 2, dos <code>MaxPool2d(2)</code> y una capa lineal de 32·4·4 entradas y 10 salidas.</td></tr>
+        <tr data-lines="35-39"><td><code>def forward(self, x): …</code></td><td>Conv → <code>torch.relu</code> → pooling, dos veces; <code>x.view(x.size(0), -1)</code> aplana; y <code>fc1</code> da los 10 logits. El ReLU es una función, no un módulo: por eso no aparecerá en el resumen.</td></tr>
+        <tr data-lines="42-43"><td><code>print(…) ; resumen(CNN(), (1, 16, 16))</code></td><td>Resumen de la CNN del laboratorio con imágenes 1×16×16.</td></tr>
+        <tr data-lines="45-51"><td><code>digitos = nn.Sequential(…) ; resumen(digitos, (1, 8, 8))</code></td><td>Una CNN pequeña para dígitos de 8×8, escrita con <code>nn.Sequential</code>: aquí los ReLU y el <code>Flatten</code> sí son módulos y salen en la tabla.</td></tr>
+        <tr data-lines="53-59"><td><code>papel = nn.Sequential(…) ; resumen(papel, (3, 100, 100))</code></td><td>La red de «papel» para pósters RGB de 100×100 y tres clases: <code>23 * 23 * 32</code> es la cuenta a mano del tamaño aplanado.</td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>--- CNN del laboratorio (imágenes 16x16) ---
+capa        forma de salida       parámetros
+Conv2d      (1, 16, 16, 16)              416
+MaxPool2d   (1, 16, 8, 8)                  0
+Conv2d      (1, 32, 8, 8)              12832
+MaxPool2d   (1, 32, 4, 4)                  0
+Linear      (1, 10)                     5130
+total: 18378 
+
+--- CNN pequeña para dígitos 8x8 ---
+capa        forma de salida       parámetros
+Conv2d      (1, 8, 8, 8)                  80
+ReLU        (1, 8, 8, 8)                   0
+MaxPool2d   (1, 8, 4, 4)                   0
+Conv2d      (1, 16, 4, 4)               1168
+ReLU        (1, 16, 4, 4)                  0
+MaxPool2d   (1, 16, 2, 2)                  0
+Flatten     (1, 64)                        0
+Linear      (1, 10)                      650
+total: 1898 
+
+--- Red de papel: póster RGB de 100x100, tres clases ---
+capa        forma de salida       parámetros
+Conv2d      (1, 16, 98, 98)              448
+ReLU        (1, 16, 98, 98)                0
+MaxPool2d   (1, 16, 49, 49)                0
+Conv2d      (1, 32, 47, 47)             4640
+ReLU        (1, 32, 47, 47)                0
+MaxPool2d   (1, 32, 23, 23)                0
+Flatten     (1, 16928)                     0
+Linear      (1, 100)                 1692900
+ReLU        (1, 100)                       0
+Linear      (1, 3)                       303
+total: 1698291 </pre>
+    <p>La tabla de la red del laboratorio reproduce la cuenta a mano: 416, 12.832 y 5.130 parámetros, total 18.378, con las formas (1, 16, 16, 16) → (1, 16, 8, 8) → (1, 32, 8, 8) → (1, 32, 4, 4) → (1, 10). No salen los ReLU ni el aplanado porque la clase usa <code>torch.relu</code> y <code>view</code>. En la CNN de dígitos sí aparecen y suman 1.898 (80 + 1.168 + 650). En la de papel, 448 + 4.640 + 1.692.900 + 303 = 1.698.291, y las formas (98, 49, 47, 23) coinciden con la fórmula: el aplanado es 16.928 = 32·23·23.</p>
+  </div>
+</article>
+</section>
+
+
 </div>
-</article></div></details></div></main></body></html>
+</main>
+</body>
+</html>

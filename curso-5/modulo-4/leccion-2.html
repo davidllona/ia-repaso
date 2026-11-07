@@ -1,130 +1,390 @@
-<!DOCTYPE html>
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lección 2 · ResNet-18 encoge la carátula y suma un atajo para que el gradiente llegue · Módulo 4 · Curso 5 · Cuaderno de IA</title>
+<meta name="description" content="Por dentro de una ResNet-18: cómo pasa la carátula de 224 a 7 píxeles de lado, dónde están los 11,7 millones de parámetros y por qué el bloque residual F(x) + x deja pasar el gradiente.">
+<script>try{var t=localStorage.getItem('cuaderno-ia:tema');if(t)document.documentElement.setAttribute('data-theme',t)}catch(e){}</script>
+<link rel="stylesheet" href="../../assets/css/style.css">
+<script src="../../assets/js/curriculum.js"></script>
+<script src="../../assets/js/lab.js"></script>
+<script src="../../assets/js/app.js" defer></script>
+</head>
+<body data-root="../../" data-course="5" data-module="4" data-lesson="2">
+<main>
+<div class="page">
 
-<html lang="es"><head><meta charset="utf-8"/><meta content="width=device-width,initial-scale=1" name="viewport"/><title>Lección 2 · TorchVision: modelos, pesos y la nueva forma de pedirlos · Curso 5 · Cuaderno de IA</title><meta content="TorchVision es la librería de visión que acompaña a PyTorch." name="description"/><script>try{var t=localStorage.getItem('cuaderno-ia:tema');if(t)document.documentElement.setAttribute('data-theme',t)}catch(e){}</script><link href="../../assets/css/style.css" rel="stylesheet"/><script src="../../assets/js/curriculum.js"></script><script src="../../assets/js/lab.js"></script><script defer="" src="../../assets/js/app.js"></script><script defer="" src="../../assets/js/microanimations.js"></script></head><body data-course="5" data-lesson="2" data-module="4" data-root="../../"><main><div class="page" data-micro="3min"><header class="hero leccion"><div class="hero-grid"><div><p class="eyebrow">Curso 5 · Módulo 4 · Lección 2 de 13</p><h1>TorchVision: modelos, pesos y la nueva forma de pedirlos</h1><p class="lead">TorchVision es la librería de visión que acompaña a PyTorch.</p><p class="meta-line"><span class="read-time" data-render="read-time"></span><a href="../modulo-4.html">Índice del módulo</a></p></div><div aria-hidden="true" class="hero-tile"></div></div></header><details class="predice"><summary>¿Dónde están los «críticos» ya formados (las redes ya entrenadas), cómo los contrato, y qué diferencia hay con VGG16(weights="imagenet") de Keras?<span class="hint"></span></summary><div><p>TorchVision es la librería de visión que acompaña a PyTorch.</p></div></details><section aria-label="Explicación breve" class="micro-core"><div class="micro-kicker">01 · ENTENDER <span>≈ 45 s</span></div><h2>La idea en palabras sencillas</h2><p>TorchVision es la librería de visión que acompaña a PyTorch. Trae tres cosas: torchvision.datasets (conjuntos de datos y ImageFolder, para leer tus carpetas), torchvision.transforms (transformaciones de imágenes) y torchvision.models (arquitecturas, con sus pesos preentrenados). Hay una regla de versiones: torchvision debe corresponder a tu torch (en este cuaderno, torch 2.14.1 y torchvision 0.29.1 ).</p><div class="micro-example"><span aria-hidden="true" class="micro-example-icon">🌱</span><div><strong>Otro ejemplo · Plantas</strong><p>Un modelo visual preentrenado puede servir de punto de partida para reconocer enfermedades en hojas.</p></div></div></section><div class="micro-kicker micro-checkpoint">02 · RESPONDER <span>≈ 15 s</span></div><section aria-label="Pregunta intercalada" class="quiz mini micro-check"><script class="quiz-data" type="application/json">{"titulo": "Pausa rápida · Comprueba la idea", "preguntas": [{"q": "Si reutilizas las capas visuales de un modelo ya entrenado, ¿qué técnica estás usando?", "opciones": ["Clustering sin etiquetas", "Regresión con una sola variable", "Transfer learning"], "correcta": 2, "porque": "El aprendizaje por transferencia aprovecha parámetros aprendidos antes."}]}</script></section><section aria-label="Animación interactiva" class="micro-viz" data-index="11" data-micro-viz="transfer"><div class="micro-kicker">03 · EXPERIMENTAR <span>≈ 45 s</span></div><div class="micro-viz-title"><div><h2>Reutilizar conocimiento previo</h2><p>Alterna entre «extraer características» y «ajustar capas».</p></div><span aria-hidden="true" class="micro-viz-symbol">✦</span></div><div aria-live="polite" class="micro-viz-stage"><p>Animación interactiva: Reutilizar conocimiento previo</p></div></section><div class="micro-kicker micro-checkpoint">04 · APLICAR <span>≈ 15 s</span></div><section aria-label="Pregunta intercalada" class="quiz mini micro-check"><script class="quiz-data" type="application/json">{"titulo": "Pausa rápida · ¿Lo aplicarías?", "preguntas": [{"q": "¿Qué significa congelar una capa durante el entrenamiento?", "opciones": ["Se elimina de la arquitectura", "Sus pesos no se actualizan", "Deja de producir salidas"], "correcta": 1, "porque": "Congelar impide actualizar esos parámetros durante el ajuste."}]}</script></section><div class="micro-finish"><strong>Idea que te llevas</strong><span>TorchVision es la librería de visión que acompaña a PyTorch</span><small>¿Quieres más ejemplos, fórmulas o código? Los tienes justo debajo, sin límite de tiempo.</small></div><details class="profundizar micro-legacy"><summary><span>Explorar más: explicación y simulaciones completas<small>Todo el texto original, tablas y demos avanzadas. Opcional.</small></span></summary><div class="prof-body"><section><h2>TorchVision: modelos, pesos y la nueva forma de pedirlos</h2>
-<p><strong>TorchVision</strong> es la librería de visión que acompaña a PyTorch. Trae tres cosas: <code>torchvision.datasets</code> (conjuntos de datos y <code>ImageFolder</code>, para leer tus carpetas), <code>torchvision.transforms</code> (transformaciones de imágenes) y <code>torchvision.models</code> (arquitecturas, con sus pesos preentrenados). Hay una regla de versiones: <code>torchvision</code> debe corresponder a tu <code>torch</code> (en este cuaderno, <code>torch 2.14.1</code> y <code>torchvision 0.29.1</code>).</p>
-<p>Una <strong>arquitectura</strong> es el plano de la red (cuántas capas, de qué tipo): el puesto de trabajo del crítico. Los <strong>pesos</strong> son los números que se aprendieron al entrenarla: su experiencia tras ver miles de películas. Con la misma arquitectura puedes tener un crítico novato (pesos al azar) o uno veterano (pesos entrenados), y eso se decide con el argumento <code>weights=</code>:</p>
-<p>La primera vez que se piden, PyTorch descarga el archivo a la carpeta de caché (<code>~/.cache/torch/hub/checkpoints</code>, o la que indique la variable de entorno <code>TORCH_HOME</code>) y las siguientes lo lee de ahí. El <a href="#frag-1">fragmento 1</a> recorre el catálogo (80 arquitecturas de clasificación en esta versión), lee la información que cada conjunto de pesos lleva consigo (<code>.meta</code>: parámetros, categorías, exactitud publicada) y, al final, intenta descargar de verdad: <strong>en el entorno donde se ejecutó este cuaderno no hay internet y esa línea falla</strong> (es como si el crítico veterano no pudiera venir a la oficina y solo pudieras contratar al novato). Es un error útil, así que lo verás tal cual.</p>
-<div class="callout ejemplo"><span class="lbl">Con números</span><p>¿Dónde están los «críticos» ya formados (las redes ya entrenadas), cómo los contrato, y qué diferencia hay con VGG16(weights="imagenet") de Keras?</p></div></section><div class="resumen"><h2 class="sin-num sin-toc">En pocas líneas</h2><ul><li><strong>TorchVision: modelos, pesos y la nueva forma de pedirlos:</strong> TorchVision es la librería de visión que acompaña a PyTorch.</li><li>Antes de continuar, intenta explicar la demo sin mirar su resultado.</li></ul></div><section class="quiz mini"><script class="quiz-data" type="application/json">{"titulo": "¿Lo tienes?", "preguntas": [{"q": "¿Qué concepto estamos trabajando en esta lección?", "opciones": ["El preprocesado de ImageNet: la red espera números muy concretos", "Congelar, sustituir la última capa y entrenar solo la cabeza", "TorchVision: modelos, pesos y la nueva forma de pedirlos"], "correcta": 2, "porque": "TorchVision es la librería de visión que acompaña a PyTorch."}, {"q": "¿Cuál de estas afirmaciones recoge lo que acabas de estudiar?", "opciones": ["TorchVision es la librería de visión que acompaña a PyTorch.", "Siempre hay un único método que sirve para todos los problemas.", "Lo importante es comprender la idea y comprobarla con ejemplos, no memorizar términos."], "correcta": 0, "porque": "La explicación central es: TorchVision es la librería de visión que acompaña a PyTorch."}, {"q": "Si una demo o un ejemplo te desconcierta, ¿cuál es la mejor forma de aprenderlo?", "opciones": ["Volver a los números, cambiar un valor y explicar qué ocurre.", "Ignorar los resultados que no coinciden con tu intuición.", "Memorizar el nombre sin entender la operación."], "correcta": 0, "porque": "Explorar qué cambia y por qué ayuda a conectar el concepto con su resultado."}]}</script></section></div></details><details class="profundizar"><summary><span>Profundizar: explicación completa<small>Matices, fórmulas, tablas, otros ejemplos y experimentos del módulo original.</small></span></summary><div class="prof-body"><section>
-<h2 id="torchvision">TorchVision: modelos, pesos y la nueva forma de pedirlos</h2>
-<p class="pregunta">¿Dónde están los «críticos» ya formados (las redes ya entrenadas), cómo los contrato, y qué diferencia hay con <code>VGG16(weights="imagenet")</code> de Keras?</p>
-<p><strong>TorchVision</strong> es la librería de visión que acompaña a PyTorch. Trae tres cosas: <code>torchvision.datasets</code> (conjuntos de datos y <code>ImageFolder</code>, para leer tus carpetas), <code>torchvision.transforms</code> (transformaciones de imágenes) y <code>torchvision.models</code> (arquitecturas, con sus pesos preentrenados). Hay una regla de versiones: <code>torchvision</code> debe corresponder a tu <code>torch</code> (en este cuaderno, <code>torch 2.14.1</code> y <code>torchvision 0.29.1</code>).</p>
-<p>Una <strong>arquitectura</strong> es el plano de la red (cuántas capas, de qué tipo): el puesto de trabajo del crítico. Los <strong>pesos</strong> son los números que se aprendieron al entrenarla: su experiencia tras ver miles de películas. Con la misma arquitectura puedes tener un crítico novato (pesos al azar) o uno veterano (pesos entrenados), y eso se decide con el argumento <code>weights=</code>:</p>
-<table>
-<thead><tr><th>Escribes</th><th>Qué obtienes</th><th>¿Internet?</th></tr></thead>
-<tbody>
-<tr><td><code>models.resnet18(weights=None)</code></td><td>La arquitectura con pesos al azar (valor por defecto)</td><td>No</td></tr>
-<tr><td><code>models.resnet18(weights=ResNet18_Weights.DEFAULT)</code></td><td>Pesos entrenados en ImageNet-1K; <code>DEFAULT</code> = los mejores disponibles</td><td>Sí, la primera vez</td></tr>
-<tr><td><code>models.resnet18(weights="IMAGENET1K_V1")</code></td><td>Lo mismo, con el nombre del conjunto de pesos como texto</td><td>Sí, la primera vez</td></tr>
-<tr><td><code>models.get_model("resnet18", weights="DEFAULT")</code></td><td>Lo mismo, eligiendo el modelo por su nombre (útil para recorrer varios)</td><td>Sí, la primera vez</td></tr>
-</tbody>
-</table>
-<p>La primera vez que se piden, PyTorch descarga el archivo a la carpeta de caché (<code>~/.cache/torch/hub/checkpoints</code>, o la que indique la variable de entorno <code>TORCH_HOME</code>) y las siguientes lo lee de ahí. El <a href="#frag-1">fragmento 1</a> recorre el catálogo (80 arquitecturas de clasificación en esta versión), lee la información que cada conjunto de pesos lleva consigo (<code>.meta</code>: parámetros, categorías, exactitud publicada) y, al final, intenta descargar de verdad: <strong>en el entorno donde se ejecutó este cuaderno no hay internet y esa línea falla</strong> (es como si el crítico veterano no pudiera venir a la oficina y solo pudieras contratar al novato). Es un error útil, así que lo verás tal cual.</p>
-<div class="callout ojo">
-<span class="lbl">Ojo · versiones</span>
-<p>Hasta TorchVision 0.12 se escribía <code>models.resnet18(pretrained=True)</code>. Desde la 0.13 se escribe <code>weights=...</code> y <code>pretrained</code> está <em>deprecado</em>: en la 0.29.1 que usamos todavía funciona, pero lanza un <code>UserWarning</code> y equivale a pedir <code>IMAGENET1K_V1</code>; puede desaparecer en cualquier versión. Es el cambio que más rompe tutoriales antiguos. Además, hay arquitecturas con más de un conjunto de pesos: <code>ResNet50_Weights</code> tiene <code>IMAGENET1K_V1</code> (76,13 % de acierto) e <code>IMAGENET1K_V2</code> (80,858 %), y <code>DEFAULT</code> apunta a la V2. Si necesitas reproducir un resultado antiguo, pide la V1 por su nombre.</p>
-</div>
-<h3>Equivalencias Keras ↔ PyTorch para transfer learning</h3>
-<table>
-<thead><tr><th>Qué quieres</th><th>Keras (lo que ya sabes)</th><th>PyTorch (este módulo)</th></tr></thead>
-<tbody>
-<tr><td>Cargar la red entrenada</td><td><code>VGG16(weights="imagenet", include_top=False)</code></td><td><code>models.resnet18(weights=ResNet18_Weights.DEFAULT)</code></td></tr>
-<tr><td>Quitar la cabeza original</td><td><code>include_top=False</code> + tu propia <code>Dense</code></td><td>Sustituir <code>modelo.fc</code> por una <code>nn.Linear</code> nueva (la red conserva su cabeza hasta que la cambias)</td></tr>
-<tr><td>Preprocesar las imágenes</td><td><code>preprocess_input</code></td><td><code>weights.transforms()</code> o <code>transforms.Compose([...])</code></td></tr>
-<tr><td>Congelar</td><td><code>base.trainable = False</code></td><td><code>modelo.requires_grad_(False)</code></td></tr>
-<tr><td>«Recompilar» tras cambiar qué se entrena</td><td><code>model.compile(...)</code></td><td>Crear un optimizador <strong>nuevo</strong> con los parámetros que quieras entrenar</td></tr>
-<tr><td>Modo inferencia de BatchNorm</td><td><code>trainable=False</code> ya pone la BatchNorm en inferencia</td><td><strong>No</strong>: hay que llamar a <code>.eval()</code> a mano (sección de BatchNorm)</td></tr>
-<tr><td>Entrenar</td><td><code>model.fit(...)</code></td><td>Tu bucle de entrenamiento</td></tr>
-<tr><td>Usar la GPU</td><td>Automático si TensorFlow la ve</td><td><code>modelo.to(device)</code> y <code>x.to(device)</code> explícitos</td></tr>
-<tr><td>Guardar y cargar</td><td><code>model.save("x.keras")</code> / <code>load_weights</code></td><td><code>torch.save(modelo.state_dict(), ...)</code> / <code>load_state_dict</code></td></tr>
-</tbody>
-</table>
-<p>La diferencia de fondo es de filosofía: Keras esconde casi todo en <code>compile</code> y <code>fit</code>; PyTorch te hace escribir cada paso, y a cambio es más fácil ver (y equivocarse en) lo que ocurre. En el resto del módulo vamos pieza a pieza.</p>
-</section></div></details><details class="profundizar" id="codigo"><summary><span>Ver código explicado paso a paso<small>1 fragmento(s) original(es), con cada línea comentada y salida esperada.</small></span></summary><div class="prof-body"><article class="snippet" data-lang="python" id="frag-1">
-<header>
-<h3>1 · El catálogo de TorchVision y los pesos preentrenados (lo que se puede mirar sin descargar nada)</h3>
-<p class="para-que"><strong>Para qué sirve</strong> Ver qué modelos trae <code>torchvision.models</code>, qué son los «pesos» (<code>ResNet18_Weights</code>), qué información lleva cada uno (parámetros, clases, precisión, preprocesado) y qué ocurre exactamente cuando se piden los pesos reales sin tener internet.</p>
+<header class="hero leccion">
+  <div class="hero-grid">
+    <div>
+      <p class="eyebrow">Curso 5 · Módulo 4 · Lección 2 de 8</p>
+      <h1>ResNet-18 encoge la carátula y suma un atajo para que el gradiente llegue</h1>
+      <p class="lead">Dentro de la ResNet-18 la carátula pasa de 224 a 7 píxeles de lado mientras los canales suben hasta 512. Y cada bloque suma su entrada a su salida: ese atajo es lo que permite apilar tantas capas.</p>
+      <p class="meta-line"><span class="read-time" data-render="read-time"></span><a href="../modulo-4.html">Índice del módulo</a></p>
+    </div>
+    <div class="hero-tile" aria-hidden="true"></div>
+  </div>
 </header>
-<pre class="code"><code>import torch
-import torchvision
-from torchvision import models
-from torchvision.models import ResNet18_Weights
 
-print(torch.__version__, torchvision.__version__)
-
-nombres = models.list_models(module=models)
-print(len(nombres), nombres[:5])
-
-pesos = ResNet18_Weights.DEFAULT
-print(pesos)
-meta = pesos.meta
-print(meta["num_params"], len(meta["categories"]), meta["categories"][:3])
-print(meta["_metrics"])
-print(pesos.transforms())
-
-print(f"{'modelo':20s} {'parámetros':&gt;11s} {'acc@1':&gt;7s} {'archivo':&gt;9s} {'resize/crop':&gt;12s}")
-for nombre in ["resnet18", "resnet50", "mobilenet_v3_small", "efficientnet_b0", "vgg16", "convnext_tiny"]:
-    w = models.get_model_weights(nombre).DEFAULT
-    m, t = w.meta, w.transforms()
-    print(f"{nombre:20s} {m['num_params'] / 1e6:&gt;9.1f} M {m['_metrics']['ImageNet-1K']['acc@1']:&gt;6.1f}% {m['_file_size']:&gt;6.1f} MiB {t.resize_size[0]:&gt;6d}/{t.crop_size[0]}")
-
-try:
-    modelo = models.resnet18(weights=ResNet18_Weights.DEFAULT)
-except Exception as e:
-    print(type(e).__name__, "-&gt;", e)</code></pre>
-<details class="linea-a-linea" open="">
-<summary>Línea por línea</summary>
-<p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
-<table class="lineas">
-<thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
-<tbody>
-<tr data-lines="1"><td><code>import torch</code></td><td>Importa PyTorch, la librería de tensores y redes.</td></tr>
-<tr data-lines="2"><td><code>import torchvision</code></td><td>Importa TorchVision, la librería de visión que acompaña a PyTorch: modelos, conjuntos de datos y transformaciones de imágenes.</td></tr>
-<tr data-lines="3"><td><code>from torchvision import models</code></td><td><code>models</code> es el módulo que contiene las arquitecturas (<code>resnet18</code>, <code>vgg16</code>, <code>mobilenet_v2</code>…).</td></tr>
-<tr data-lines="4"><td><code>from torchvision.models import ResNet18_Weights</code></td><td>Importa la <em>enumeración</em> de pesos de ResNet-18: una lista con nombre de los conjuntos de pesos que existen para esa arquitectura.</td></tr>
-<tr data-lines="6"><td><code>print(torch.__version__, torchvision.__version__)</code></td><td>Muestra las versiones instaladas. Importa porque la API de TorchVision cambió en la 0.13 (de <code>pretrained=True</code> a <code>weights=</code>).</td></tr>
-<tr data-lines="8"><td><code>nombres = models.list_models(module=models)</code></td><td>Pide la lista de nombres de todos los modelos de clasificación disponibles. <code>module=models</code> filtra los de clasificación; sin él también salen los de detección y segmentación.</td></tr>
-<tr data-lines="9"><td><code>print(len(nombres), nombres[:5])</code></td><td>Cuántos hay y los cinco primeros por orden alfabético.</td></tr>
-<tr data-lines="11"><td><code>pesos = ResNet18_Weights.DEFAULT</code></td><td><code>DEFAULT</code> es un alias del mejor conjunto de pesos disponible. Es solo una <em>etiqueta</em>: todavía no se ha descargado nada.</td></tr>
-<tr data-lines="12"><td><code>print(pesos)</code></td><td>Al imprimirlo se ve a qué conjunto concreto apunta el alias.</td></tr>
-<tr data-lines="13"><td><code>meta = pesos.meta</code></td><td>Cada conjunto de pesos lleva un diccionario de <em>metadatos</em> que viaja con el propio código de TorchVision (no hace falta descargar nada para leerlo).</td></tr>
-<tr data-lines="14"><td><code>print(meta["num_params"], len(meta["categories"]), meta["categories"][:3])</code></td><td>Número de parámetros, cuántas clases distingue y los nombres de las tres primeras.</td></tr>
-<tr data-lines="15"><td><code>print(meta["_metrics"])</code></td><td>Exactitud publicada en ImageNet: <code>acc@1</code> (la clase correcta es la primera) y <code>acc@5</code> (está entre las cinco primeras).</td></tr>
-<tr data-lines="16"><td><code>print(pesos.transforms())</code></td><td>Devuelve el preprocesado exacto con el que se entrenaron esos pesos (tamaños, media y desviación). Tampoco necesita descargar.</td></tr>
-<tr data-lines="18"><td><code>print(f"{'modelo':20s} {'parámetros':&gt;11s} {'acc@1':&gt;7s} {'archivo':&gt;9s} {'resize/crop':&gt;12s}")</code></td><td>Cabecera de una tabla comparativa (los símbolos <code>:20s</code> y <code>:&gt;11s</code> fijan el ancho y la alineación de cada columna).</td></tr>
-<tr data-lines="19"><td><code>for nombre in ["resnet18", "resnet50", "mobilenet_v3_small", "efficientnet_b0", "vgg16", "convnext_tiny"]:</code></td><td>Recorre seis arquitecturas muy distintas en tamaño.</td></tr>
-<tr data-lines="20"><td><code>w = models.get_model_weights(nombre).DEFAULT</code></td><td><code>get_model_weights("resnet50")</code> devuelve la enumeración de pesos de esa arquitectura <em>por su nombre</em> (sin escribir <code>ResNet50_Weights</code>); <code>.DEFAULT</code> es el conjunto de pesos recomendado.</td></tr>
-<tr data-lines="21"><td><code>m, t = w.meta, w.transforms()</code></td><td>Guarda en <code>m</code> los metadatos y en <code>t</code> el preprocesado asociado a esos pesos (tamaño de redimensionado y de recorte).</td></tr>
-<tr data-lines="22"><td><code>print(f"{nombre:20s} {m['num_params'] / 1e6:&gt;9.1f} M {m['_metrics']['ImageNet-1K']['acc@1']:&gt;6.1f}% {m['_file_size']:&gt;6.1f} MiB {t.resize_size[0]:&gt;6d}/{t.crop_size[0]}")</code></td><td>Una fila por modelo: parámetros en millones, exactitud <code>acc@1</code> publicada, tamaño del archivo de pesos y los lados de <code>Resize</code> y <code>CenterCrop</code> que esos pesos esperan.</td></tr>
-<tr data-lines="24"><td><code>try:</code></td><td>Abre un bloque protegido: si lo que hay dentro falla, el programa no se rompe y salta al <code>except</code>.</td></tr>
-<tr data-lines="25"><td><code>modelo = models.resnet18(weights=ResNet18_Weights.DEFAULT)</code></td><td>Pide el modelo <strong>con los pesos reales</strong>, y eso sí necesita internet. En tu ordenador descarga unos 44,7 MiB a la carpeta de caché de PyTorch (<code>~/.cache/torch/hub/checkpoints</code>) y construye la red con esos pesos.</td></tr>
-<tr data-lines="26"><td><code>except Exception as e:</code></td><td>Si algo falla (aquí, la red), entra en este bloque con el error en <code>e</code>.</td></tr>
-<tr data-lines="27"><td><code>print(type(e).__name__, "-&gt;", e)</code></td><td>Imprime el tipo de error y su mensaje.</td></tr>
-</tbody>
-</table>
+<details class="predice">
+  <summary>Una carátula de 224×224 atraviesa la ResNet-18. Al llegar a la última etapa, ¿el mapa es más grande, igual o más pequeño? ¿Y el número de canales?<span class="hint"></span></summary>
+  <div>
+    <p><strong>El mapa encoge a 7×7 y los canales suben de 3 a 512.</strong> Es el crítico que se aleja del póster: ve menos píxeles, pero con más «opiniones» sobre cada zona (luz, caras, texto, estilo).</p>
+  </div>
 </details>
-<div class="salida">
-<strong>Salida esperada</strong>
-<pre>2.14.1+cu130 0.29.1+cu130
-80 ['alexnet', 'convnext_base', 'convnext_large', 'convnext_small', 'convnext_tiny']
-ResNet18_Weights.IMAGENET1K_V1
-11689512 1000 ['tench', 'goldfish', 'great white shark']
-{'ImageNet-1K': {'acc@1': 69.758, 'acc@5': 89.078}}
-ImageClassification(
-    crop_size=[224]
-    resize_size=[256]
-    mean=[0.485, 0.456, 0.406]
-    std=[0.229, 0.224, 0.225]
-    interpolation=InterpolationMode.BILINEAR
-)
-modelo                parámetros   acc@1   archivo  resize/crop
-resnet18                  11.7 M   69.8%   44.7 MiB    256/224
-resnet50                  25.6 M   80.9%   97.8 MiB    232/224
-mobilenet_v3_small         2.5 M   67.7%    9.8 MiB    256/224
-efficientnet_b0            5.3 M   77.7%   20.5 MiB    256/224
-vgg16                    138.4 M   71.6%  527.8 MiB    256/224
-convnext_tiny             28.6 M   82.5%  109.1 MiB    236/224
-Downloading: "https://download.pytorch.org/models/resnet18-f37072fd.pth" to /root/.cache/torch/hub/checkpoints/resnet18-f37072fd.pth
-URLError -&gt; &lt;urlopen error Tunnel connection failed: 403 Forbidden&gt;</pre>
-<p>Hay <strong>80</strong> arquitecturas de clasificación en esta versión. <code>DEFAULT</code> apunta a <code>ResNet18_Weights.IMAGENET1K_V1</code>: ResNet-18, entrenada con ImageNet-1K, con <strong>11.689.512</strong> parámetros, 1.000 clases (las tres primeras son «tench», «goldfish» y «great white shark») y una exactitud publicada de 69,758 % en <code>acc@1</code> y 89,078 % en <code>acc@5</code>. El preprocesado asociado es <code>resize_size=256</code>, <code>crop_size=224</code>, media <code>[0.485, 0.456, 0.406]</code> y desviación <code>[0.229, 0.224, 0.225]</code>. La tabla compara seis modelos: más parámetros no significa mejor. <code>vgg16</code> (el de tu proyecto de Keras) tiene <strong>138,4 M</strong> de parámetros y un archivo de 527,8 MiB y acierta el 71,6 %, mientras que <code>efficientnet_b0</code> con 5,3 M acierta el 77,7 % y <code>convnext_tiny</code> con 28,6 M el 82,5 %. Fíjate también en la última columna: <strong>cada conjunto de pesos trae su propio preprocesado</strong> (<code>resnet50</code> usa un redimensionado de 232 y <code>convnext_tiny</code> uno de 236, no 256), y por eso se pide con <code>weights.transforms()</code> en lugar de copiar números de otro modelo. Después, la línea <code>Downloading: …</code> la escribe PyTorch justo antes de intentar bajar el archivo, y la última línea es la parte que <strong>no</strong> funciona aquí: el entorno donde se ejecutó este cuaderno no tiene internet y la descarga falla con <code>URLError</code>. En tu ordenador, con conexión, esa línea no da error: descarga el archivo una vez y las siguientes veces lo lee de la caché.</p>
+
+<section>
+<h2 id="idea">Encoger, multiplicar los canales y sumar un atajo</h2>
+<p>La ResNet-18 tiene 18 capas con pesos: <code>conv1</code>, ocho bloques de dos convoluciones repartidos en <code>layer1</code>…<code>layer4</code>, y <code>fc</code>. Cada etapa desde <code>layer2</code> divide el lado entre 2 y dobla los canales. El lado de salida de una convolución es \( \lfloor (n + 2p - k)/s \rfloor + 1 \): \( n \) es el lado de entrada, \( k \) el del filtro, \( p \) el relleno y \( s \) el salto.</p>
+<p>Los parámetros se concentran al final: <code>layer4</code> tiene 8.393.728 de los 11.689.512 (el <strong>71,8 %</strong>). Por eso, cuando se afina, lo normal es descongelar solo <code>layer4</code>.</p>
+<p>Cada bloque es <strong>residual</strong>: calcula \( \operatorname{ReLU}(F(x) + x) \). En vez de rehacer la imagen, aprende solo la diferencia. Y al derivar, ese \( +x \) aporta un \( +1 \): \( F'(x) + 1 \). Es un recado en voz baja por una cola de gente: aunque cada uno repita solo el 10 %, con el atajo además reenvía el recado tal cual.</p>
+</section>
+
+<figure class="demo" data-demo="curso5/c5m4-resnet-tamanos" data-titulo="el tamaño del mapa en cada etapa de ResNet-18">
+  <div class="haz">Mueve el lado de la carátula entre 32 y 448 y pulsa «Volver a 224».</div>
+  <div class="observa">Con 224 sale 112 → 56 → 56 → 28 → 14 → 7. Los parámetros no cambian con el tamaño; la memoria, sí.</div>
+</figure>
+
+<figure class="demo" data-demo="curso5/c5m4-residual" data-titulo="gradiente con y sin atajo, capa por capa">
+  <div class="haz">Sube el número de bloques N hasta 60 con la escala en 0,2; luego prueba 0,8 y 2.</div>
+  <div class="observa">Sin atajo (terracota) el gradiente se desploma; con atajo (cobalto) se queda entre décimas y decenas.</div>
+</figure>
+
+<section>
+<h2 id="con-numeros">Con números: el tamaño y el gradiente</h2>
+<div class="callout ejemplo">
+  <span class="lbl">Ejemplo numérico</span>
+  <ol class="pasos">
+    <li><code>conv1</code> (\( k=7,\ s=2,\ p=3 \)): \( \lfloor (224+6-7)/2 \rfloor + 1 = 111 + 1 = \) <strong>112</strong>. El <code>maxpool</code> lo deja en 56, y <code>layer2</code>, <code>layer3</code> y <code>layer4</code> en 28, 14 y <strong>7</strong>.</li>
+    <li>Diez bloques sin atajo, con derivada 0,1 en cada uno: \( 0{,}1^{10} = 10^{-10} \). Las primeras capas no aprenden.</li>
+    <li>Con atajo cada bloque multiplica por \( 0{,}1 + 1 = 1{,}1 \): \( 1{,}1^{10} \approx \) <strong>2,59</strong>. El gradiente llega.</li>
+  </ol>
 </div>
-</article></div></details></div></main></body></html>
+</section>
+
+<details class="predice">
+  <summary>Con 60 bloques y la misma derivada 0,1 en cada \( F \), ¿el atajo deja el gradiente cerca de 1?<span class="hint"></span></summary>
+  <div>
+    <p><strong>No: \( 1{,}1^{60} \approx 304 \), se amplifica.</strong> El atajo evita que el gradiente desaparezca, pero no lo controla del todo. Por eso las ResNet usan además BatchNorm y una buena inicialización.</p>
+  </div>
+</details>
+
+<div class="resumen">
+  <h2 class="sin-num sin-toc">En tres líneas</h2>
+  <ul>
+    <li>El lado encoge con \( \lfloor (n+2p-k)/s \rfloor + 1 \): 224 → 112 → 56 → 28 → 14 → 7, y los canales suben a 512.</li>
+    <li><code>layer4</code> guarda el 71,8 % de los parámetros: es lo primero que se descongela al afinar.</li>
+    <li>El bloque residual suma \( F(x) + x \); su derivada \( F'(x) + 1 \) deja pasar el gradiente.</li>
+  </ul>
+</div>
+
+<section class="quiz mini">
+<script type="application/json" class="quiz-data">
+{
+ "titulo": "¿Lo tienes?",
+ "preguntas": [
+  {
+   "q": "En un bloque residual de ResNet, la derivada de \\( F(x) \\) vale 0,1. ¿Cuánto vale la derivada de la salida del bloque respecto de su entrada, y qué pasa tras 10 bloques iguales?",
+   "opciones": [
+    "0,1 por bloque; tras 10 bloques, \\( 10^{-10} \\)",
+    "1,1 por bloque; tras 10 bloques, \\( 1{,}1^{10}\\approx 2{,}59 \\)",
+    "0 por bloque, porque la ReLU lo anula",
+    "10 por bloque; tras 10 bloques, \\( 10^{10} \\)"
+   ],
+   "correcta": 1,
+   "porque": "La salida es \\( F(x)+x \\), cuya derivada es \\( F'(x)+1 = 1{,}1 \\). Diez bloques multiplican \\( 1{,}1^{10}\\approx 2{,}59 \\), así que el gradiente llega a las primeras capas. Sin atajo sería \\( 0{,}1^{10}=10^{-10} \\) (primera opción), que es el desvanecimiento que el atajo evita."
+  },
+  {
+   "q": "Con \\( \\lfloor (n+2p-k)/s \\rfloor + 1 \\), ¿qué lado sale de <code>conv1</code> (\\( k=7,\\ s=2,\\ p=3 \\)) con una carátula de 224?",
+   "opciones": [
+    "224",
+    "112",
+    "56"
+   ],
+   "correcta": 1,
+   "porque": "\\( (224 + 6 - 7)/2 = 111{,}5 \\); redondeado hacia abajo, 111, y más 1, 112. El 56 sale después, del <code>maxpool</code>."
+  },
+  {
+   "q": "¿Dónde está la mayoría de los parámetros de una ResNet-18?",
+   "opciones": [
+    "En <code>conv1</code>, la primera capa",
+    "En <code>layer4</code>, con un 71,8 %",
+    "En la capa final <code>fc</code>"
+   ],
+   "correcta": 1,
+   "porque": "<code>layer4</code> tiene 8.393.728 de 11.689.512 parámetros. <code>conv1</code> solo tiene 9.408 y <code>fc</code>, 513.000."
+  }
+ ]
+}
+</script>
+</section>
+
+<details class="profundizar">
+  <summary><span>Profundizar: la explicación completa<small>El esquema de la red, la fórmula de la convolución paso a paso, la cuenta a mano de los parámetros bloque a bloque, la analogía del montaje de una película, el gradiente con 60 bloques y el atajo con convolución 1×1.</small></span></summary>
+  <div class="prof-body">
+<h2 id="resnet">Por dentro de una ResNet-18</h2>
+
+<p class="pregunta">Antes de cambiarle la última capa al crítico, ¿qué tiene una ResNet-18 por dentro y cómo cambia el tamaño de la carátula al atravesarla?</p>
+
+<p>La <strong>ResNet</strong> (<abbr class="t" data-def="Residual Network: familia de redes (He et al., 2015) cuyos bloques suman a su salida la entrada original mediante un atajo ('skip connection'). Permitió entrenar redes de decenas y cientos de capas.">Red Residual</abbr>) es la familia de redes más usada para transfer learning por su equilibrio entre tamaño y calidad. La ResNet-18 tiene 18 capas con pesos: una convolución inicial, ocho bloques de dos convoluciones cada uno (16 capas) y la capa final. En PyTorch se ve así (<code>print(modelo)</code> la lista completa):</p>
+
+<ul class="flow">
+  <li class="a">conv1 + bn1<small>7×7, 64 canales, paso 2</small></li>
+  <li class="b">maxpool<small>3×3, paso 2</small></li>
+  <li class="c">layer1 ×2 bloques<small>64 canales</small></li>
+  <li class="d">layer2 ×2<small>128 canales, reduce a la mitad</small></li>
+  <li class="a">layer3 ×2<small>256 canales, reduce a la mitad</small></li>
+  <li class="b">layer4 ×2<small>512 canales, reduce a la mitad</small></li>
+  <li class="c">avgpool<small>promedia cada mapa a 1 número</small></li>
+  <li class="d">fc<small>512 → 1000 puntuaciones</small></li>
+</ul>
+
+<h3>Cómo cambia el tamaño: la fórmula de la convolución</h3>
+
+<p>Piensa en el crítico mirando un póster: primero se acerca y ve detalles finos (muchos píxeles, pocas ideas); en cada etapa se aleja un paso, ve menos píxeles pero con más «críticos» opinando sobre cada zona (más canales: luz, caras, texto, estilo…). Eso es lo que hace la red: el mapa encoge y los canales crecen. Una convolución desliza un filtro por la imagen. Si la entrada tiene lado \( n \), el filtro lado \( k \), se añade un borde de \( p \) píxeles de relleno (<em>padding</em>) y el filtro salta de \( s \) en \( s \) píxeles (<em>stride</em>), el lado de la salida es:</p>
+
+<div class="formula">\[ n_{\text{sal}} = \left\lfloor \frac{n + 2p - k}{s} \right\rfloor + 1 \]</div>
+
+<p>Donde \( \lfloor\cdot\rfloor \) es «redondear hacia abajo». El numerador \( n+2p-k \) es el recorrido que puede hacer el filtro; dividido entre el salto da cuántos saltos caben, y el \( +1 \) cuenta la posición inicial.</p>
+
+<div class="callout ejemplo">
+  <span class="lbl">Ejemplo numérico</span>
+  <p>Una carátula de 224 × 224 píxeles entra en <code>conv1</code> (\( k=7,\ s=2,\ p=3 \)); después pasa por <code>maxpool</code> (\( k=3,\ s=2,\ p=1 \)); y la primera convolución de <code>layer2</code> reduce con \( s=2 \) (\( k=3,\ p=1 \)).</p>
+  <ol class="pasos">
+    <li><code>conv1</code>: \( \lfloor (224+6-7)/2 \rfloor + 1 = \lfloor 111{,}5 \rfloor + 1 = \) <strong>112</strong>.</li>
+    <li><code>maxpool</code>: \( \lfloor (112+2-3)/2 \rfloor + 1 = \lfloor 55{,}5 \rfloor + 1 = \) <strong>56</strong>.</li>
+    <li><code>layer1</code> usa \( s=1,\ p=1,\ k=3 \): \( 56+2-3+1 = \) <strong>56</strong> (no cambia el tamaño).</li>
+    <li>Primera convolución de <code>layer2</code>: \( \lfloor (56+2-3)/2 \rfloor + 1 = \lfloor 27{,}5 \rfloor + 1 = \) <strong>28</strong>. Igual en <code>layer3</code> (14) y en <code>layer4</code> (7).</li>
+  </ol>
+  <p>Resultado: \( 224\to112\to56\to56\to28\to14\to7 \), mientras los canales suben de 3 a 64, 128, 256 y 512. El <code>avgpool</code> promedia cada mapa de \( 7\times7 \) en un solo número y deja un vector de 512; es lo que recibe <code>fc</code>.</p>
+</div>
+
+<div class="callout recuerda">
+  <span class="lbl">Experimento de arriba: «el tamaño del mapa en cada etapa de ResNet-18», con todo detalle</span>
+  <p><strong>Haz esto.</strong> Cambia el lado de la carátula de entrada (de 32 a 448) con el deslizador y compara cada etapa con el caso de 224. Pulsa «Volver a 224» para ver el tamaño con que se entrenó la red.</p>
+  <p><strong>Fíjate en.</strong> Con 224 sale exactamente 112 → 56 → 56 → 28 → 14 → 7. Con 32 la última etapa ya es de 1×1 y el aviso lo dice. Los parámetros no dependen del tamaño de la entrada (la convolución es la misma), pero la memoria sí crece con el cuadrado del lado, y la red solo se entrenó con imágenes vistas a escala 224: es como un crítico que siempre ha visto los pósters a un mismo tamaño y de repente le enseñas uno diminuto o gigante.</p>
+</div>
+
+<h3>Dónde están los parámetros: la cuenta a mano</h3>
+
+<p>Una convolución con \( c_{\text{ent}} \) canales de entrada, \( c_{\text{sal}} \) de salida y filtro \( k\times k \) tiene \( k\cdot k\cdot c_{\text{ent}}\cdot c_{\text{sal}} \) pesos (en ResNet no lleva sesgo porque la BatchNorm que le sigue ya aporta el suyo). Una BatchNorm con \( c \) canales tiene \( 2c \) parámetros que se aprenden (\( \gamma \) y \( \beta \)). Con eso:</p>
+
+<div class="callout ejemplo">
+  <span class="lbl">Ejemplo numérico</span>
+  <ol class="pasos">
+    <li><code>conv1</code>: \( 7\cdot7\cdot3\cdot64 = \) <strong>9.408</strong>. Su <code>bn1</code>: \( 2\cdot64 = 128 \).</li>
+    <li>Un bloque de <code>layer1</code> (dos convoluciones 3×3 de 64 a 64 y sus dos BatchNorm): \( 2\cdot(3\cdot3\cdot64\cdot64) + 2\cdot128 = 73.728 + 256 = \) <strong>73.984</strong>. Los dos bloques: 147.968.</li>
+    <li>El primer bloque de <code>layer2</code> es especial: sube de 64 a 128 canales y necesita un <strong>atajo con convolución 1×1</strong> (\( 64\cdot128 = 8.192 \) más una BatchNorm de 256), y suma \( 73.728 + 147.456 + 512 + 8.192 + 256 = 230.144 \). El segundo bloque, ya sin atajo, tiene 295.424. <code>layer2</code> completo: 525.568.</li>
+    <li>La capa final: \( 512\cdot1000+1000 = \) <strong>513.000</strong>.</li>
+    <li>Suma de toda la red: <strong>11.689.512</strong>, de los cuales 8.393.728 (el <strong>71,8 %</strong>) están en <code>layer4</code>.</li>
+  </ol>
+</div>
+
+<p>Los fragmentos <a href="#frag-2">2</a> y <a href="#frag-3">3</a> hacen estas cuentas en código y las comparan con las de PyTorch (coinciden). Fíjate en una consecuencia práctica: el cuerpo de la red pesa más de 11 millones de números, y de ellos casi tres cuartas partes están en el último bloque. Por eso, cuando se afina, lo normal es descongelar solo <code>layer4</code> (o <code>layer3</code> y <code>layer4</code>).</p>
+
+<h2 id="residual">El bloque residual: por qué ResNet puede ser profunda</h2>
+
+<p class="pregunta">¿Qué es ese «atajo» de la ResNet y por qué hace que una red con muchas capas se pueda entrenar?</p>
+
+<p>Un bloque normal calcula \( y = F(x) \), donde \( F \) son las convoluciones del bloque. Un <strong>bloque residual</strong> calcula \( y = \operatorname{ReLU}\big(F(x) + x\big) \): suma la entrada \( x \) a lo que producen las convoluciones. Ese \( + x \) es el atajo (<em>skip connection</em>). En vez de pedirle al bloque que aprenda la transformación completa, le pides que aprenda solo la <strong>diferencia</strong> (el <em>residuo</em>) respecto a la entrada.</p>
+
+<div class="callout analogia">
+  <span class="lbl">Analogía</span>
+  <p>Montas una película en varias revisiones. Una opción es volver a montarla entera desde cero en cada revisión (si te equivocas, estropeas todo lo anterior); otra es partir del montaje anterior y marcar solo los cambios («quita esta escena, alarga ese plano»). El bloque residual es la segunda: si el residuo \( F(x) \) vale casi 0, el bloque «no cambia nada» y la película pasa intacta. Añadir más revisiones (más bloques) casi nunca empeora el resultado.</p>
+</div>
+
+<h3>El motivo de verdad: el gradiente</h3>
+
+<p>Piensa en un aviso que viaja de la última capa a la primera, como un recado pasado en voz baja por una cola de gente: «el final de la serie no gustó, corrige el guion». Al entrenar, el error se propaga hacia atrás multiplicando derivadas capa a capa (regla de la cadena, <a href="../../curso-5/modulo-2/leccion-3.html#desvanece">módulo 2</a>). Si cada capa multiplica por un número menor que 1, tras muchas capas el gradiente se hace diminuto y las primeras capas no aprenden. Con el atajo, la derivada de un bloque pasa a ser:</p>
+
+<div class="formula">\[ \frac{\partial y}{\partial x} = \frac{\partial F(x)}{\partial x} + 1 \]</div>
+
+<p>Ese \( +1 \) (que viene de derivar \( x \) respecto a \( x \)) garantiza que siempre pasa gradiente, aunque la derivada de \( F \) sea pequeña. (Se supone la ReLU activa; en cada bloque real es la suma \( F(x)+x \) la que pasa por la ReLU.)</p>
+
+<div class="callout ejemplo">
+  <span class="lbl">Ejemplo numérico</span>
+  <p>Una cadena de 10 bloques (10 personas pasándose el recado) en la que la derivada de cada \( F \) vale 0,1, es decir, cada una repite solo el 10 % del volumen que oye:</p>
+  <ol class="pasos">
+    <li>Sin atajo: el gradiente que llega a la primera capa es \( 0{,}1^{10} = \) <strong>\( 10^{-10} \)</strong>, una diezmilmillonésima: esa capa no aprende.</li>
+    <li>Con atajo: cada persona, además de lo que oye, reenvía el recado tal cual (el \( +1 \)); cada bloque multiplica por \( 0{,}1 + 1 = 1{,}1 \), así que \( 1{,}1^{10} \approx \) <strong>2,59</strong>: el gradiente llega entero (incluso algo amplificado).</li>
+    <li>Con 60 bloques: sin atajo \( 10^{-60} \); con atajo \( 1{,}1^{60}\approx 304 \): el atajo no es magia, y por eso las ResNet usan además BatchNorm y buena inicialización.</li>
+  </ol>
+</div>
+
+<div class="callout recuerda">
+  <span class="lbl">Experimento de arriba: «gradiente con y sin atajo, capa por capa», con todo detalle</span>
+  <p><strong>Haz esto.</strong> Imagina el recado que pasa por N personas. Sube el número de bloques N hasta 60 con la escala de los pesos en 0,2 y mira las dos curvas (escala logarítmica: cada marca es 10 veces más). Luego sube la escala a 0,8 y a 2 y pulsa «Otros pesos aleatorios».</p>
+  <p><strong>Fíjate en.</strong> Sin atajo (curva terracota) el gradiente de las primeras capas se desploma al crecer N: con N = 60 llega a \( 10^{-60} \) con escala 0,2 y a \( 10^{-24} \) con 0,8; con escala 2 todavía baja a \( 10^{-5} \). Con atajo (cobalto) se queda entre unas décimas y unas decenas en esos mismos casos (3,1; 52 y 11). No es un cálculo exacto de una ResNet real (aquí cada «bloque» es una sola neurona), pero muestra el mecanismo.</p>
+</div>
+
+<p>El <a href="#frag-3">fragmento 3</a> abre un bloque real de la ResNet-18 y comprueba con números que su salida es exactamente <code>relu(F(x) + x)</code> y no <code>relu(F(x))</code>. Cuando un bloque cambia el número de canales o el tamaño (como el primero de <code>layer2</code>), \( x \) ya no puede sumarse directamente a \( F(x) \) porque no tiene la misma forma; entonces el atajo lleva una <strong>convolución 1×1</strong> con su BatchNorm (<code>downsample</code>) que adapta \( x \) a la forma de \( F(x) \).</p>
+  </div>
+</details>
+
+<section>
+<h2 class="sin-num">Código</h2>
+<article class="snippet" data-lang="python" id="frag-2">
+      <header>
+        <h3>2 · ResNet-18 por dentro: cuántos parámetros tiene cada parte y qué forma tiene la salida de cada etapa</h3>
+        <p class="para-que"><strong>Para qué sirve</strong> Abrir una ResNet-18 (con <code>weights=None</code>, es decir, sin pesos descargados: la <em>estructura</em> es idéntica), contar los parámetros de cada bloque, comprobar la cuenta a mano y seguir cómo cambia el tamaño de la imagen al atravesar la red con «ganchos» (<em>hooks</em>).</p>
+      </header>
+      <pre class="code"><code>import torch
+from torchvision import models
+
+modelo = models.resnet18(weights=None)
+
+total = 0
+for nombre, hijo in modelo.named_children():
+    n = sum(p.numel() for p in hijo.parameters())
+    total += n
+    print(f"{nombre:8s} {type(hijo).__name__:20s} {n:&gt;10,d}")
+print("total", f"{total:,d}")
+
+print("conv1 =", 7 * 7 * 3 * 64, " fc =", 512 * 1000 + 1000)
+
+formas = []
+def anotar(nombre):
+    def gancho(modulo, entrada, salida):
+        formas.append((nombre, tuple(salida.shape)))
+    return gancho
+
+for nombre in ["conv1", "maxpool", "layer1", "layer2", "layer3", "layer4", "avgpool", "fc"]:
+    getattr(modelo, nombre).register_forward_hook(anotar(nombre))
+
+modelo.eval()
+with torch.no_grad():
+    modelo(torch.zeros(1, 3, 224, 224))
+for nombre, forma in formas:
+    print(f"{nombre:8s} {forma}")</code></pre>
+      <details class="linea-a-linea" open>
+        <summary>Línea por línea</summary>
+        <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+        <table class="lineas">
+          <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+          <tbody>
+        <tr data-lines="1"><td><code>import torch</code></td><td>PyTorch.</td></tr>
+        <tr data-lines="2"><td><code>from torchvision import models</code></td><td>El catálogo de arquitecturas.</td></tr>
+        <tr data-lines="4"><td><code>modelo = models.resnet18(weights=None)</code></td><td>Construye la ResNet-18 con los pesos <strong>al azar</strong> (<code>weights=None</code>): misma estructura que la preentrenada, pero sin descargar nada.</td></tr>
+        <tr data-lines="6"><td><code>total = 0</code></td><td>Acumulador del número de parámetros.</td></tr>
+        <tr data-lines="7"><td><code>for nombre, hijo in modelo.named_children():</code></td><td><code>named_children()</code> recorre los módulos de primer nivel de la red, con su nombre (<code>conv1</code>, <code>bn1</code>, <code>layer1</code>…).</td></tr>
+        <tr data-lines="8"><td><code>n = sum(p.numel() for p in hijo.parameters())</code></td><td><code>parameters()</code> da todos los tensores de pesos de ese módulo y <code>numel()</code> cuenta sus elementos; sumados, el número de parámetros del bloque.</td></tr>
+        <tr data-lines="9"><td><code>total += n</code></td><td>Va sumando.</td></tr>
+        <tr data-lines="10"><td><code>print(f"{nombre:8s} {type(hijo).__name__:20s} {n:&gt;10,d}")</code></td><td>Una fila por bloque: nombre (8 caracteres), tipo de módulo (20) y parámetros con separador de miles (alineados a la derecha en 10).</td></tr>
+        <tr data-lines="11"><td><code>print("total", f"{total:,d}")</code></td><td>El total, que debe coincidir con los 11.689.512 de los metadatos del fragmento 1.</td></tr>
+        <tr data-lines="13"><td><code>print("conv1 =", 7 * 7 * 3 * 64, " fc =", 512 * 1000 + 1000)</code></td><td>La cuenta a mano: una convolución 7×7 con 3 canales de entrada y 64 filtros tiene \( 7\cdot7\cdot3\cdot64 \) pesos; la capa final, \( 512\cdot1000 \) pesos más 1.000 sesgos.</td></tr>
+        <tr data-lines="15"><td><code>formas = []</code></td><td>Lista donde los ganchos irán anotando lo que vean.</td></tr>
+        <tr data-lines="16"><td><code>def anotar(nombre):</code></td><td>Una función que fabrica ganchos, uno por capa, recordando el nombre de su capa.</td></tr>
+        <tr data-lines="17"><td><code>def gancho(modulo, entrada, salida):</code></td><td>Un <em>forward hook</em> es una función que PyTorch llama justo después de que un módulo calcule su salida. Recibe el módulo, su entrada y su salida.</td></tr>
+        <tr data-lines="18"><td><code>formas.append((nombre, tuple(salida.shape)))</code></td><td>Anota el nombre de la capa y la forma de su salida.</td></tr>
+        <tr data-lines="19"><td><code>return gancho</code></td><td>Devuelve el gancho ya configurado con su nombre.</td></tr>
+        <tr data-lines="21"><td><code>for nombre in ["conv1", "maxpool", "layer1", "layer2", "layer3", "layer4", "avgpool", "fc"]:</code></td><td>Recorre las etapas que queremos observar.</td></tr>
+        <tr data-lines="22"><td><code>getattr(modelo, nombre).register_forward_hook(anotar(nombre))</code></td><td><code>getattr(modelo, "layer1")</code> es lo mismo que <code>modelo.layer1</code>; <code>register_forward_hook</code> le engancha el anotador.</td></tr>
+        <tr data-lines="24"><td><code>modelo.eval()</code></td><td>Modo evaluación (BatchNorm usará sus estadísticas guardadas).</td></tr>
+        <tr data-lines="25"><td><code>with torch.no_grad():</code></td><td>No construir el grafo de gradientes: solo queremos mirar formas, y así gasta menos memoria.</td></tr>
+        <tr data-lines="26"><td><code>modelo(torch.zeros(1, 3, 224, 224))</code></td><td>Pasa una «imagen» negra de 224×224 con 3 canales y un lote de 1. Su contenido da igual: aquí solo importan las formas.</td></tr>
+        <tr data-lines="27"><td><code>for nombre, forma in formas:</code></td><td>Recorre lo que anotaron los ganchos, en orden de ejecución.</td></tr>
+        <tr data-lines="28"><td><code>print(f"{nombre:8s} {forma}")</code></td><td>Imprime la forma de salida de cada etapa.</td></tr>
+          </tbody>
+        </table>
+      </details>
+      <div class="salida">
+        <strong>Salida esperada</strong>
+    <pre>conv1    Conv2d                    9,408
+bn1      BatchNorm2d                 128
+relu     ReLU                          0
+maxpool  MaxPool2d                     0
+layer1   Sequential              147,968
+layer2   Sequential              525,568
+layer3   Sequential            2,099,712
+layer4   Sequential            8,393,728
+avgpool  AdaptiveAvgPool2d             0
+fc       Linear                  513,000
+total 11,689,512
+conv1 = 9408  fc = 513000
+conv1    (1, 64, 112, 112)
+maxpool  (1, 64, 56, 56)
+layer1   (1, 64, 56, 56)
+layer2   (1, 128, 28, 28)
+layer3   (1, 256, 14, 14)
+layer4   (1, 512, 7, 7)
+avgpool  (1, 512, 1, 1)
+fc       (1, 1000)</pre>
+        <p>Los parámetros se reparten de forma muy desigual: <code>layer4</code> tiene <strong>8.393.728</strong> (el 71,8 % del total) y la capa final <code>fc</code> otros 513.000, mientras que <code>conv1</code> solo tiene 9.408. Las dos cuentas a mano (9.408 y 513.000) coinciden con la tabla. <code>relu</code>, <code>maxpool</code> y <code>avgpool</code> no tienen parámetros: solo aplican una operación fija. El tamaño de la imagen se va reduciendo y los canales aumentando: <code>224×224×3 → 112×112×64 → 56×56×64 → 28×28×128 → 14×14×256 → 7×7×512</code>, y <code>avgpool</code> promedia cada mapa de 7×7 a un solo número, dejando un vector de 512. Ese vector es lo que recibe <code>fc</code> para producir las 1.000 puntuaciones.</p>
+      </div>
+    </article>
+
+<article class="snippet" data-lang="python" id="frag-3">
+      <header>
+        <h3>3 · Un bloque residual abierto: la salida es F(x) + x</h3>
+        <p class="para-que"><strong>Para qué sirve</strong> Comprobar con números que un bloque de ResNet calcula exactamente «dos convoluciones más el atajo» (<code>relu(F(x) + x)</code>), y contar a mano sus parámetros, incluido el bloque especial con atajo de 1×1 que cambia de tamaño.</p>
+      </header>
+      <pre class="code"><code>import torch
+import torch.nn.functional as F
+from torchvision import models
+
+torch.manual_seed(0)
+modelo = models.resnet18(weights=None).eval()
+bloque = modelo.layer1[0]
+print(type(bloque).__name__, [n for n, _ in bloque.named_children()])
+print("parámetros del bloque:", sum(p.numel() for p in bloque.parameters()))
+
+x = torch.randn(1, 64, 56, 56)
+with torch.no_grad():
+    f = bloque.bn2(bloque.conv2(F.relu(bloque.bn1(bloque.conv1(x)))))
+    a_mano = F.relu(f + x)
+    oficial = bloque(x)
+print("a mano == oficial:", torch.allclose(a_mano, oficial, atol=1e-6))
+print("sin atajo == oficial:", torch.allclose(F.relu(f), oficial, atol=1e-6))
+
+b2 = modelo.layer2[0]
+print("parámetros de layer2[0]:", sum(p.numel() for p in b2.parameters()))
+print(b2.downsample)</code></pre>
+      <details class="linea-a-linea" open>
+        <summary>Línea por línea</summary>
+        <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+        <table class="lineas">
+          <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+          <tbody>
+        <tr data-lines="1"><td><code>import torch</code></td><td>PyTorch.</td></tr>
+        <tr data-lines="2"><td><code>import torch.nn.functional as F</code></td><td>Las funciones sin parámetros (<code>F.relu</code>, <code>F.softmax</code>…), por convención con el alias <code>F</code>.</td></tr>
+        <tr data-lines="3"><td><code>from torchvision import models</code></td><td>Catálogo de modelos.</td></tr>
+        <tr data-lines="5"><td><code>torch.manual_seed(0)</code></td><td>Semilla para que el tensor aleatorio de más abajo sea siempre el mismo.</td></tr>
+        <tr data-lines="6"><td><code>modelo = models.resnet18(weights=None).eval()</code></td><td>Construye la red y la pone ya en modo evaluación (BatchNorm usa sus estadísticas guardadas, así el cálculo es determinista).</td></tr>
+        <tr data-lines="7"><td><code>bloque = modelo.layer1[0]</code></td><td>El primer bloque de la primera etapa: un <code>BasicBlock</code>. Los corchetes funcionan porque <code>layer1</code> es un <code>nn.Sequential</code>.</td></tr>
+        <tr data-lines="8"><td><code>print(type(bloque).__name__, [n for n, _ in bloque.named_children()])</code></td><td>Tipo del bloque y nombres de sus piezas internas.</td></tr>
+        <tr data-lines="9"><td><code>print("parámetros del bloque:", sum(p.numel() for p in bloque.parameters()))</code></td><td>Cuenta los parámetros del bloque.</td></tr>
+        <tr data-lines="11"><td><code>x = torch.randn(1, 64, 56, 56)</code></td><td>Un mapa de características de entrada inventado: 64 canales de 56×56, lote de 1. Es la forma que recibe <code>layer1</code>.</td></tr>
+        <tr data-lines="12"><td><code>with torch.no_grad():</code></td><td>Sin gradientes, solo cálculo.</td></tr>
+        <tr data-lines="13"><td><code>f = bloque.bn2(bloque.conv2(F.relu(bloque.bn1(bloque.conv1(x)))))</code></td><td>La parte «F(x)», leída de dentro afuera: convolución 1, BatchNorm 1, ReLU, convolución 2, BatchNorm 2. Es lo que el bloque <em>añade</em> a la entrada.</td></tr>
+        <tr data-lines="14"><td><code>a_mano = F.relu(f + x)</code></td><td>El atajo: se <strong>suma la entrada original</strong> a F(x) y después se aplica la ReLU.</td></tr>
+        <tr data-lines="15"><td><code>oficial = bloque(x)</code></td><td>Lo que calcula el bloque de TorchVision de verdad.</td></tr>
+        <tr data-lines="16"><td><code>print("a mano == oficial:", torch.allclose(a_mano, oficial, atol=1e-6))</code></td><td><code>allclose</code> compara dos tensores permitiendo una diferencia minúscula (<code>atol</code>) por redondeos.</td></tr>
+        <tr data-lines="17"><td><code>print("sin atajo == oficial:", torch.allclose(F.relu(f), oficial, atol=1e-6))</code></td><td>Contraprueba: si quitáramos el «+ x», el resultado ya no coincidiría con el del bloque.</td></tr>
+        <tr data-lines="19"><td><code>b2 = modelo.layer2[0]</code></td><td>El primer bloque de la segunda etapa, que pasa de 64 a 128 canales y reduce el tamaño a la mitad.</td></tr>
+        <tr data-lines="20"><td><code>print("parámetros de layer2[0]:", sum(p.numel() for p in b2.parameters()))</code></td><td>Sus parámetros: más que los del bloque anterior.</td></tr>
+        <tr data-lines="21"><td><code>print(b2.downsample)</code></td><td>Muestra el «atajo con ajuste»: como la entrada (64 canales, 56×56) y F(x) (128 canales, 28×28) ya no tienen la misma forma, el atajo pasa por una convolución 1×1 con paso 2 y su BatchNorm antes de sumarse.</td></tr>
+          </tbody>
+        </table>
+      </details>
+      <div class="salida">
+        <strong>Salida esperada</strong>
+    <pre>BasicBlock ['conv1', 'bn1', 'relu', 'conv2', 'bn2']
+parámetros del bloque: 73984
+a mano == oficial: True
+sin atajo == oficial: False
+parámetros de layer2[0]: 230144
+Sequential(
+  (0): Conv2d(64, 128, kernel_size=(1, 1), stride=(2, 2), bias=False)
+  (1): BatchNorm2d(128, eps=1e-05, momentum=0.1, affine=True, bias=True, track_running_stats=True)
+)</pre>
+        <p>Las dos comprobaciones lo dicen todo: el bloque calcula <code>relu(F(x) + x)</code> (<code>True</code>) y <strong>no</strong> <code>relu(F(x))</code> (<code>False</code>). Cuenta a mano del bloque: dos convoluciones 3×3 de 64 a 64 canales (\( 3\cdot3\cdot64\cdot64 = 36.864 \) cada una, sin sesgo) más dos BatchNorm con \( \gamma \) y \( \beta \) de 64 canales (\( 2\cdot64 = 128 \) cada una): \( 2\cdot36.864 + 2\cdot128 = 73.984 \). El bloque de <code>layer2[0]</code> tiene 230.144: \( 3\cdot3\cdot64\cdot128 = 73.728 \) + \( 3\cdot3\cdot128\cdot128 = 147.456 \) + dos BatchNorm de 128 canales (\( 2\cdot256 = 512 \)) + el atajo (\( 64\cdot128 = 8.192 \) de la convolución 1×1 y 256 de su BatchNorm). La suma da 230.144.</p>
+      </div>
+    </article>
+
+</section>
+
+</div>
+</main>
+</body>
+</html>

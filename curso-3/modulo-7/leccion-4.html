@@ -1,103 +1,369 @@
-<!DOCTYPE html>
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lección 4 · Una red pequeña con frenos, y tres vigilantes que deciden cuándo parar · Módulo 7 · Curso 3 · Cuaderno de IA</title>
+<meta name="description" content="La red de regresión con la API funcional (BatchNorm, Dropout y L2), cómo se cuentan sus parámetros y cómo los callbacks y las curvas deciden cuándo parar.">
+<script>try{var t=localStorage.getItem('cuaderno-ia:tema');if(t)document.documentElement.setAttribute('data-theme',t)}catch(e){}</script>
+<link rel="stylesheet" href="../../assets/css/style.css">
+<script src="../../assets/js/curriculum.js"></script>
+<script src="../../assets/js/lab.js"></script>
+<script src="../../assets/js/app.js" defer></script>
+</head>
+<body data-root="../../" data-course="3" data-module="7" data-lesson="4">
+<main>
+<div class="page">
 
-<html lang="es"><head><meta charset="utf-8"/><meta content="width=device-width,initial-scale=1" name="viewport"/><title>Lección 4 · Métricas y baselines: ¿contra quién compites? · Curso 3 · Cuaderno de IA</title><meta content="Un modelo de regresión se equivoca por una cantidad en cada fila: el error \( e_i = \hat y_i - y_i \) (lo que predijo menos lo real)." name="description"/><script>try{var t=localStorage.getItem('cuaderno-ia:tema');if(t)document.documentElement.setAttribute('data-theme',t)}catch(e){}</script><link href="../../assets/css/style.css" rel="stylesheet"/><script src="../../assets/js/curriculum.js"></script><script src="../../assets/js/lab.js"></script><script defer="" src="../../assets/js/app.js"></script><script defer="" src="../../assets/js/microanimations.js"></script></head><body data-course="3" data-lesson="4" data-module="7" data-root="../../"><main><div class="page" data-micro="3min"><header class="hero leccion"><div class="hero-grid"><div><p class="eyebrow">Curso 3 · Módulo 7 · Lección 4 de 18</p><h1>Métricas y baselines: ¿contra quién compites?</h1><p class="lead">Un modelo de regresión se equivoca por una cantidad en cada fila: el error \( e_i = \hat y_i - y_i \) (lo que predijo menos lo real).</p><p class="meta-line"><span class="read-time" data-render="read-time"></span><a href="../modulo-7.html">Índice del módulo</a></p></div><div aria-hidden="true" class="hero-tile"></div></div></header><details class="predice"><summary>Antes de mirar el ejemplo: ¿qué crees que va a cambiar al mover los controles?</summary><div><p>Un modelo de regresión se equivoca por una cantidad en cada fila: el error \( e_i = \hat y_i - y_i \) (lo que predijo menos lo real).</p></div></details><section aria-label="Explicación breve" class="micro-core"><div class="micro-kicker">01 · ENTENDER <span>≈ 45 s</span></div><h2>La idea en palabras sencillas</h2><p>Un modelo de regresión se equivoca por una cantidad en cada fila: el error \( e_i = \hat y_i - y_i \) (lo que predijo menos lo real).</p><div class="micro-example"><span aria-hidden="true" class="micro-example-icon">🌦️</span><div><strong>Otro ejemplo · Lluvia</strong><p>Predijiste «no llueve», pero llovió: falso negativo si «lluvia» es positivo.</p></div></div></section><div class="micro-kicker micro-checkpoint">02 · RESPONDER <span>≈ 15 s</span></div><section aria-label="Pregunta intercalada" class="quiz mini micro-check"><script class="quiz-data" type="application/json">{"titulo": "Pausa rápida · Comprueba la idea", "preguntas": [{"q": "Un detector dice «hay humo», pero no hay. ¿Qué error es?", "opciones": ["Falso negativo", "Verdadero positivo", "Falso positivo"], "correcta": 2, "porque": "Positivo predicho sin positivo real es un falso positivo."}]}</script></section><section aria-label="Animación interactiva" class="micro-viz" data-index="14" data-micro-viz="evaluation"><div class="micro-kicker">03 · EXPERIMENTAR <span>≈ 45 s</span></div><div class="micro-viz-title"><div><h2>Los aciertos y los errores tienen nombre</h2><p>Cambia el caso y comprueba qué celda de la matriz se ilumina.</p></div><span aria-hidden="true" class="micro-viz-symbol">✦</span></div><div aria-live="polite" class="micro-viz-stage"><p>Animación interactiva: Los aciertos y los errores tienen nombre</p></div></section><div class="micro-kicker micro-checkpoint">04 · APLICAR <span>≈ 15 s</span></div><section aria-label="Pregunta intercalada" class="quiz mini micro-check"><script class="quiz-data" type="application/json">{"titulo": "Pausa rápida · ¿Lo aplicarías?", "preguntas": [{"q": "Con muchas clases negativas, ¿por qué puede engañar la accuracy?", "opciones": ["Porque siempre es igual al recall", "Porque acertar solo la clase mayoritaria puede inflarla", "Porque no existe en clasificación"], "correcta": 1, "porque": "El porcentaje global puede ocultar un bajo recall de la clase importante."}]}</script></section><div class="micro-finish"><strong>Idea que te llevas</strong><span>Un modelo de regresión se equivoca por una cantidad en cada fila: el error \( e_i = \hat y_i - y_i \) (lo que predijo menos lo real)</span><small>¿Quieres más ejemplos, fórmulas o código? Los tienes justo debajo, sin límite de tiempo.</small></div><details class="profundizar micro-legacy"><summary><span>Explorar más: explicación y simulaciones completas<small>Todo el texto original, tablas y demos avanzadas. Opcional.</small></span></summary><div class="prof-body"><section><h2>Métricas y baselines: ¿contra quién compites?</h2>
-<p>Un modelo de regresión se equivoca por una cantidad en cada fila: el <strong>error</strong> \( e_i = \hat y_i - y_i \) (lo que predijo menos lo real). Hay tres formas habituales de resumir esos errores en una cifra:</p>
-<p>\( n \) es el número de filas; \( \hat y_i \) la predicción; \( y_i \) el valor real; \( \bar y \) la media de los valores reales. <strong>SSE</strong> (<em>sum of squared errors</em>) es la suma de los errores al cuadrado del modelo y <strong>SST</strong> (<em>total sum of squares</em>) la suma de los errores al cuadrado de un «modelo» que predijera siempre la media.</p>
-<p>Un <strong>baseline</strong> es un modelo de referencia, simple y barato. Sirve para saber cuánto vale de verdad tu modelo complejo: si una regresión lineal de cinco líneas consigue casi lo mismo, ¿para qué una red? Es como el recomendador más tonto de Netflix, «recomendar a todos la película más vista»: si tu algoritmo sofisticado no lo mejora, no merece el trabajo. Tres baselines escalonados:</p>
-<div class="callout ejemplo"><span class="lbl">Ejemplo tomado del módulo</span><p>· cuatro películas a mano Audiencia real de cuatro películas en su primera semana, en miles de espectadores: 100, 200, 150 y 250 (cifras inventadas para el ejemplo).</p></div></section><figure class="demo" data-demo="curso3/c3m7-metricas" data-titulo="MAE, RMSE y R² con ocho películas">
-<div class="haz">Cada punto es una película: su audiencia real (miles de espectadores, cifras inventadas) y la que predijo el recomendador. Empieza con σ = 15 y sesgo 0. Sube σ a 80: el R² cae. Activa «un estreno inesperado» y mira cómo el RMSE se separa del MAE. Pon un sesgo de +60: aunque el modelo «sigue la forma», el R² se hunde. Arrastra un punto azul en vertical para provocar tus propios errores.</div>
-<div class="observa">Las líneas rojas son los errores del modelo; las grises, los de «predecir siempre la media». <strong>R² = 1 − (suma de rojas²) / (suma de grises²)</strong>: cuando los errores del modelo se parecen en tamaño a los del baseline, R² ≈ 0; si son mayores, R² &lt; 0. Un solo error enorme aumenta el RMSE mucho más que el MAE.</div>
-</figure><div class="resumen"><h2 class="sin-num sin-toc">En pocas líneas</h2><ul><li><strong>Métricas y baselines: ¿contra quién compites?:</strong> Un modelo de regresión se equivoca por una cantidad en cada fila: el error \( e_i = \hat y_i - y_i \) (lo que predijo menos lo real).</li><li>Antes de continuar, intenta explicar la demo sin mirar su resultado.</li></ul></div><section class="quiz mini"><script class="quiz-data" type="application/json">{"titulo": "¿Lo tienes?", "preguntas": [{"q": "¿Qué concepto estamos trabajando en esta lección?", "opciones": ["Métricas y baselines: ¿contra quién compites?", "La base convolucional y sus capas BatchNorm", "Evaluar de verdad: matriz de confusión y análisis de errores"], "correcta": 0, "porque": "Un modelo de regresión se equivoca por una cantidad en cada fila: el error \\( e_i = \\hat y_i - y_i \\) (lo que predijo menos lo real)."}, {"q": "¿Cuál de estas afirmaciones recoge lo que acabas de estudiar?", "opciones": ["Lo importante es comprender la idea y comprobarla con ejemplos, no memorizar términos.", "Un modelo de regresión se equivoca por una cantidad en cada fila: el error \\( e_i = \\hat y_i - y_i \\) (lo que predijo menos lo real).", "Siempre hay un único método que sirve para todos los problemas."], "correcta": 1, "porque": "La explicación central es: Un modelo de regresión se equivoca por una cantidad en cada fila: el error \\( e_i = \\hat y_i - y_i \\) (lo que predijo menos lo real)."}, {"q": "Si una demo o un ejemplo te desconcierta, ¿cuál es la mejor forma de aprenderlo?", "opciones": ["Memorizar el nombre sin entender la operación.", "Volver a los números, cambiar un valor y explicar qué ocurre.", "Ignorar los resultados que no coinciden con tu intuición."], "correcta": 1, "porque": "Explorar qué cambia y por qué ayuda a conectar el concepto con su resultado."}]}</script></section></div></details><details class="profundizar"><summary><span>Profundizar: explicación completa<small>Matices, fórmulas, tablas, otros ejemplos y experimentos del módulo original.</small></span></summary><div class="prof-body"><section>
-<h2 id="baselines">Métricas y baselines: ¿contra quién compites?</h2>
-<p class="pregunta">Tu red tiene un error medio de 9,5 (miles de euros en los pisos; en Netflix serían, por ejemplo, 9,5 minutos de error al predecir lo que verá un usuario). ¿Es bueno? ¿Es mucho? Una cifra suelta no significa nada si no sabes <em>con qué compararla</em>.</p>
-<h3>Tres métricas para un número</h3>
-<p>Un modelo de regresión se equivoca por una cantidad en cada fila: el <strong>error</strong> \( e_i = \hat y_i - y_i \) (lo que predijo menos lo real). Hay tres formas habituales de resumir esos errores en una cifra:</p>
-<div class="formula">\[ \text{MAE} = \frac{1}{n}\sum_{i=1}^{n}|e_i| \qquad \text{RMSE} = \sqrt{\frac{1}{n}\sum_{i=1}^{n}e_i^2} \qquad R^2 = 1-\frac{\text{SSE}}{\text{SST}} = 1-\frac{\sum_i (y_i-\hat y_i)^2}{\sum_i (y_i-\bar y)^2} \]</div>
-<p>\( n \) es el número de filas; \( \hat y_i \) la predicción; \( y_i \) el valor real; \( \bar y \) la media de los valores reales. <strong>SSE</strong> (<em>sum of squared errors</em>) es la suma de los errores al cuadrado del modelo y <strong>SST</strong> (<em>total sum of squares</em>) la suma de los errores al cuadrado de un «modelo» que predijera siempre la media.</p>
-<ul>
-<li><strong>MAE</strong> (error absoluto medio): «de media me equivoco en tanto». Está en las unidades del problema y se lee directamente: un MAE de 15 son 15.000 € de error medio.</li>
-<li><strong>RMSE</strong> (raíz del error cuadrático medio): también en las unidades del problema, pero <strong>castiga más los errores grandes</strong> porque los eleva al cuadrado antes de promediar. Siempre es mayor o igual que el MAE; cuando es <em>bastante</em> mayor, hay algún error muy grande escondido en el promedio.</li>
-<li><strong>R²</strong> (coeficiente de determinación): compara tu modelo con el baseline de la media. Vale 1 si no te equivocas nunca; vale 0 si lo haces tan mal como predecir siempre la media; y puede ser <strong>negativo</strong> si lo haces peor que eso. No tiene unidades, así que sirve para comparar problemas distintos.</li>
-</ul>
-<div class="callout ejemplo">
-<span class="lbl">Ejemplo numérico · cuatro películas a mano</span>
-<p>Audiencia real de cuatro películas en su primera semana, en miles de espectadores: 100, 200, 150 y 250 (cifras inventadas para el ejemplo). El recomendador de Netflix había predicho 110, 190, 170 y 230.</p>
-<table>
-<thead><tr><th>Película</th><th>Real</th><th>Predicho</th><th>Error \( e \)</th><th>\( |e| \)</th><th>\( e^2 \)</th><th>\( (y-\bar y)^2 \)</th></tr></thead>
-<tbody>
-<tr><td>Toy Story</td><td>100</td><td>110</td><td>+10</td><td>10</td><td>100</td><td>(100 − 175)² = 5.625</td></tr>
-<tr><td>Shrek</td><td>200</td><td>190</td><td>−10</td><td>10</td><td>100</td><td>(200 − 175)² = 625</td></tr>
-<tr><td>Titanic</td><td>150</td><td>170</td><td>+20</td><td>20</td><td>400</td><td>(150 − 175)² = 625</td></tr>
-<tr><td>Matrix</td><td>250</td><td>230</td><td>−20</td><td>20</td><td>400</td><td>(250 − 175)² = 5.625</td></tr>
-<tr><td><strong>Suma</strong></td><td></td><td></td><td></td><td>60</td><td>1.000 (SSE)</td><td>12.500 (SST)</td></tr>
-</tbody>
-</table>
-<ol class="pasos">
-<li><strong>MAE</strong> = 60 / 4 = <strong>15</strong>: el recomendador se equivoca, de media, en 15.000 espectadores por película.</li>
-<li><strong>RMSE</strong> = \( \sqrt{1000/4} = \sqrt{250} \approx \) <strong>15,81</strong>. Es algo mayor que el MAE porque los errores de 20 pesan más que los de 10.</li>
-<li>La media real es \( \bar y = (100+200+150+250)/4 = 175 \). <strong>SST</strong> = 12.500.</li>
-<li><strong>R²</strong> = 1 − 1.000 / 12.500 = 1 − 0,08 = <strong>0,92</strong>: el modelo elimina el 92 % de la variación que tendría el baseline de la media.</li>
-<li>El baseline de la media (predecir 175 siempre) tiene MAE 50, RMSE 55,9 y R² = 0 por construcción: es la vara de medir.</li>
-</ol>
-<p>El <a href="leccion-3.html#frag-4">fragmento 4</a> repite estas cuentas, con los mismos números, en Python, las compara con las funciones de scikit-learn y define la función <code>evaluar</code> que usaremos de ahí en adelante.</p>
-</div>
-<h3>Los baselines: lo que hay que superar</h3>
-<p>Un <strong>baseline</strong> es un modelo de referencia, simple y barato. Sirve para saber cuánto vale de verdad tu modelo complejo: si una regresión lineal de cinco líneas consigue casi lo mismo, ¿para qué una red? Es como el recomendador más tonto de Netflix, «recomendar a todos la película más vista»: si tu algoritmo sofisticado no lo mejora, no merece el trabajo. Tres baselines escalonados:</p>
-<ol>
-<li><strong>La media</strong> (<code>DummyRegressor</code>): predice siempre el precio medio. R² ≈ 0. Es el suelo.</li>
-<li><strong>Regresión lineal</strong>: el modelo «razonable» más sencillo. Aprende un peso por columna y los suma.</li>
-<li><strong>Random forest</strong>: cientos de árboles de decisión cuyo promedio da la predicción. No necesita escalado y capta relaciones no lineales; suele ser un rival duro con datos tabulares.</li>
-</ol>
-<p>En el <a href="#frag-5">fragmento 5</a> los tres se montan dentro de un <code>make_pipeline(pre, modelo)</code>, de modo que el preprocesado se ajusta con el train y se reaplica solo a la validación. Resultados en validación:</p>
-<table>
-<thead><tr><th>Modelo</th><th>MAE (miles €)</th><th>RMSE (miles €)</th><th>R²</th></tr></thead>
-<tbody>
-<tr><th scope="row">Predecir la media</th><td>72,390</td><td>90,794</td><td>−0,011</td></tr>
-<tr><th scope="row">Regresión lineal</th><td>22,104</td><td>30,735</td><td>0,884</td></tr>
-<tr><th scope="row">Random forest (200 árboles)</th><td>11,998</td><td>18,216</td><td>0,959</td></tr>
-</tbody>
-</table>
-<p>La media da R² = −0,011 (ligeramente negativo, porque la media del train no es exactamente la de la validación). La regresión lineal explica ya el 88 % de la variación, pero se equivoca de media en 22.104 €. El random forest baja el error a la mitad (11.998 €), porque capta los efectos multiplicativos que una suma de efectos no puede representar. <strong>Este es el listón:</strong> una red que no baje de 12 de MAE en validación no merece el trabajo que cuesta.</p>
-</section></div></details><details class="profundizar" id="codigo"><summary><span>Ver código explicado paso a paso<small>1 fragmento(s) original(es), con cada línea comentada y salida esperada.</small></span></summary><div class="prof-body"><article class="snippet" data-lang="python" id="frag-5">
-<header>
-<h3>5 · Los tres baselines sobre la validación</h3>
-<p class="para-que"><strong>Para qué sirve</strong> Entrenar la media, la regresión lineal y un random forest, cada uno dentro de un pipeline con el preprocesado, y compararlos en una tabla. Es el listón que tendrá que superar la red. Continúa los fragmentos 3 y 4 (usa <code>pre</code> y <code>evaluar</code>).</p>
+<header class="hero leccion">
+  <div class="hero-grid">
+    <div>
+      <p class="eyebrow">Curso 3 · Módulo 7 · Lección 4 de 8</p>
+      <h1>Una red pequeña con frenos, y tres vigilantes que deciden cuándo parar</h1>
+      <p class="lead">La red repite un bloque Dense → BatchNorm → ReLU → Dropout con L2. Al entrenar, tres callbacks miran la validación en cada época: paran, bajan el learning rate y guardan el mejor modelo.</p>
+      <p class="meta-line"><span class="read-time" data-render="read-time"></span><a href="../modulo-7.html">Índice del módulo</a></p>
+    </div>
+    <div class="hero-tile" aria-hidden="true"></div>
+  </div>
 </header>
-<pre class="code"><code>from sklearn.dummy import DummyRegressor
-from sklearn.linear_model import LinearRegression
-from sklearn.ensemble import RandomForestRegressor
 
-candidatos = {
-    "media (dummy)": DummyRegressor(strategy="mean"),
-    "regresión lineal": LinearRegression(),
-    "random forest": RandomForestRegressor(n_estimators=200, random_state=0, n_jobs=1),
-}
-filas = {}
-for nombre, modelo_sk in candidatos.items():
-    tubo = make_pipeline(pre, modelo_sk).fit(X_train, y_train)
-    filas[nombre] = evaluar(y_val, tubo.predict(X_val))
-tabla = pd.DataFrame(filas).T.round(3)
-print(tabla.to_string())</code></pre>
-<details class="linea-a-linea">
-<summary>Línea por línea</summary>
-<p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
-<table class="lineas">
-<thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
-<tbody>
-<tr data-lines="1-3"><td><code>from sklearn.dummy import DummyRegressor …</code></td><td>Importa los tres modelos: <code>DummyRegressor</code> (predice siempre lo mismo), <code>LinearRegression</code> y <code>RandomForestRegressor</code>.</td></tr>
-<tr data-lines="5-9"><td><code>candidatos = { …</code></td><td>Un diccionario con los tres candidatos. El random forest tiene 200 árboles, <code>random_state=0</code> (reproducible) y <code>n_jobs=1</code> (un solo procesador, para no saturar la máquina).</td></tr>
-<tr data-lines="10"><td><code>filas = {}</code></td><td>Diccionario vacío donde guardar los resultados.</td></tr>
-<tr data-lines="11-13"><td><code>for nombre, modelo_sk in candidatos.items(): …</code></td><td>Para cada candidato: <code>make_pipeline(pre, modelo_sk)</code> encadena el preprocesado y el modelo; <code>.fit(X_train, y_train)</code> ajusta ambos con el train; <code>predict(X_val)</code> predice la validación (el preprocesado se aplica solo, con lo aprendido) y <code>evaluar</code> mide.</td></tr>
-<tr data-lines="14-15"><td><code>tabla = pd.DataFrame(filas).T.round(3) …</code></td><td>Convierte el diccionario en tabla (<code>.T</code> la traspone para que cada modelo sea una fila), redondea a 3 decimales y la imprime.</td></tr>
-</tbody>
-</table>
+<details class="predice">
+  <summary>Entrenas 400 épocas con solo 25 películas. La pérdida de entrenamiento no deja de bajar. ¿La de validación también?<span class="hint"></span></summary>
+  <div>
+    <p>No necesariamente. A partir de un momento la red se sabe de memoria las 25 películas: el train sigue bajando y la validación sube. Eso es <strong>sobreajuste</strong>, y por eso un callback vigila <code>val_loss</code> y se queda con la mejor época, no con la última.</p>
+  </div>
 </details>
-<div class="salida">
-<strong>Salida esperada</strong>
-<pre>                     MAE    RMSE     R2
-media (dummy)     72.390  90.794 -0.011
-regresión lineal  22.104  30.735  0.884
-random forest     11.998  18.216  0.959</pre>
-<p>La media no explica nada (R² = −0,011). La regresión lineal tiene MAE 22,104 (22.104 € de error medio) y R² 0,884. El random forest baja el MAE a 11,998 y sube el R² a 0,959. <strong>Ese es el listón en validación:</strong> la red tendrá que acercarse a 12 de MAE para justificarse.</p>
+
+<section>
+<h2 id="idea">Frenos dentro de la red, vigilantes fuera</h2>
+<p>La red de pisos repite dos veces el mismo bloque (64 y 32 neuronas) y termina en <code>Dense(1)</code> sin activación, porque es una regresión y la salida puede valer cualquier número.</p>
+<ul class="flow">
+  <li class="a">DENSE<small>combina las columnas</small></li>
+  <li class="b">BATCHNORM<small>re-centra cada neurona</small></li>
+  <li class="c">RELU<small>no linealidad</small></li>
+  <li class="d">DROPOUT<small>apaga neuronas al azar</small></li>
+</ul>
+<p><strong>BatchNorm</strong> es el ecualizador de volumen entre tráilers: deja cada neurona a un nivel parecido y el entrenamiento es más estable. <strong>Dropout</strong> es un ensayo en el que cada día faltan actores al azar: nadie depende del protagonista. <strong>L2</strong> suma a la pérdida \( \lambda \sum w^2 \) y cobra más a los pesos grandes.</p>
+<p>Al entrenar, tres callbacks del <a href="../modulo-5.html">módulo 5</a> miran <code>val_loss</code> tras cada época: <code>EarlyStopping(patience=15, restore_best_weights=True)</code> para y devuelve los pesos de la mejor época; <code>ReduceLROnPlateau</code> parte el learning rate por la mitad si se estanca; <code>ModelCheckpoint</code> guarda el mejor en disco.</p>
+</section>
+
+<figure class="demo" data-demo="curso3/c3m7-curvas" data-titulo="Curvas de aprendizaje: sobreajuste, infraajuste y parada">
+  <div class="haz">Con los valores iniciales mira cómo se separan las curvas. Activa EarlyStopping y sube λ a 0,01.</div>
+  <div class="observa">Train baja y validación sube: sobreajuste. EarlyStopping se queda con la mejor época (punto verde).</div>
+</figure>
+
+<section>
+<h2 id="numeros">Con números: los parámetros y la parada</h2>
+<div class="callout ejemplo">
+  <span class="lbl">Ejemplo numérico</span>
+<table>
+    <thead><tr><th>Capa</th><th>Cuenta</th><th>Parámetros</th></tr></thead>
+    <tbody>
+      <tr><td>densa1 (10 → 64)</td><td>10 · 64 + 64</td><td class="res">704</td></tr>
+      <tr><td>bn1</td><td>4 · 64</td><td class="res">256</td></tr>
+      <tr><td>densa2 (64 → 32)</td><td>64 · 32 + 32</td><td class="res">2.080</td></tr>
+      <tr><td>bn2</td><td>4 · 32</td><td class="res">128</td></tr>
+      <tr><td>precio (32 → 1)</td><td>32 + 1</td><td class="res">33</td></tr>
+      <tr><td><strong>Total</strong></td><td>de ellos 192 no entrenables</td><td class="res">3.201</td></tr>
+    </tbody>
+  </table>
+  <p>Al entrenar: 2.400 filas en lotes de 128 son ⌈18,75⌉ = 19 pasos por época. La mejor <code>val_loss</code> llegó en la época 97 y, con paciencia 15, el entrenamiento se detuvo en la 97 + 15 = <strong>112</strong>.</p>
 </div>
-</article></div></details></div></main></body></html>
+</section>
+
+<details class="predice">
+  <summary>Al final, la <code>loss</code> de entrenamiento vale 0,058 y la de validación 0,036. ¿Es un error que el train salga peor que la validación?<span class="hint"></span></summary>
+  <div>
+    <p>No. Al entrenar, Dropout apaga neuronas y BatchNorm usa las estadísticas del lote: la red trabaja «con las manos atadas». Al validar se usa la red completa. Es lo normal en redes con Dropout.</p>
+  </div>
+</details>
+
+<div class="resumen">
+  <h2 class="sin-num sin-toc">En tres líneas</h2>
+  <ul>
+    <li>Bloque Dense → BatchNorm → ReLU → Dropout y salida <code>Dense(1)</code> sin activación: 3.201 parámetros.</li>
+    <li>BatchNorm tiene 4 parámetros por neurona (2 entrenables); L2 suma \( \lambda \sum w^2 \) a la pérdida.</li>
+    <li><code>EarlyStopping</code>, <code>ReduceLROnPlateau</code> y <code>ModelCheckpoint</code> deciden mirando <code>val_loss</code>.</li>
+  </ul>
+</div>
+
+<section class="quiz mini">
+<script type="application/json" class="quiz-data">
+{
+ "titulo": "¿Lo tienes?",
+ "preguntas": [
+  {
+   "q": "Una capa <code>Dense</code> con 12 entradas y 16 neuronas va seguida de una <code>BatchNormalization</code>. ¿Cuántos parámetros entrenables y no entrenables suman las dos capas?",
+   "opciones": [
+    "240 entrenables y 32 no entrenables",
+    "208 entrenables y 64 no entrenables",
+    "272 entrenables y 0 no entrenables",
+    "224 entrenables y 32 no entrenables"
+   ],
+   "correcta": 0,
+   "porque": "La <code>Dense</code> tiene 12·16 pesos + 16 sesgos = 208 parámetros entrenables. La <code>BatchNormalization</code> tiene 4 parámetros por neurona: γ y β (entrenables, 2·16 = 32) y la media y la varianza móviles (no entrenables, 2·16 = 32). Total: 208 + 32 = 240 entrenables y 32 no entrenables. Las medias móviles no se actualizan con el gradiente, sino con un promedio durante el entrenamiento."
+  },
+  {
+   "q": "Entrenas con <code>EarlyStopping(monitor='val_loss', patience=10)</code> y sin <code>restore_best_weights</code>. El entrenamiento se detiene en la época 60 y el mejor valor de val_loss fue en la época 50. ¿Con qué pesos te quedas?",
+   "opciones": [
+    "Con los de la época 50, porque Keras guarda siempre los mejores",
+    "Con la media de los pesos de las épocas 50 a 60",
+    "Con los de la época 60, que ya están algo sobreajustados",
+    "Con los iniciales, porque la parada reinicia el modelo"
+   ],
+   "correcta": 2,
+   "porque": "Sin <code>restore_best_weights=True</code> el modelo se queda como estaba al parar, diez épocas después de su mejor momento. Con <code>restore_best_weights=True</code> Keras devolvería los de la época 50. Para guardar el mejor modelo en disco se usa <code>ModelCheckpoint(save_best_only=True)</code>, que es una pieza distinta."
+  },
+  {
+   "q": "Tienes 2.400 filas de entrenamiento y <code>batch_size=128</code>. ¿Cuántos pasos da cada época?",
+   "opciones": [
+    "18",
+    "128",
+    "19",
+    "2.400"
+   ],
+   "correcta": 2,
+   "porque": "2.400 / 128 = 18,75: hay 18 lotes completos de 128 y uno más de 96 filas. Se redondea hacia arriba: 19 pasos."
+  }
+ ]
+}
+</script>
+</section>
+
+
+<details class="profundizar">
+  <summary><span>Profundizar: la explicación completa<small>Por qué la API funcional, cada pieza del bloque con su cuenta, la penalización L2 a mano (0,525), los tres callbacks con el learning rate que baja a 0,000031 y cómo leer la curva de los pisos.</small></span></summary>
+  <div class="prof-body">
+<h2 id="red">La red con la API funcional: BatchNorm, Dropout y L2</h2>
+
+<p class="pregunta">Vamos a construir la red. ¿Qué capas, en qué orden, y cuál es el papel exacto de BatchNorm, Dropout y la regularización L2 en un problema tan sencillo como este?</p>
+
+<h3>Por qué la API funcional si bastaría un Sequential</h3>
+<p>Para una pila de capas en fila, <code>Sequential</code> sería suficiente, y conviene decirlo con honestidad. Usamos la <a href="../modulo-1.html">API funcional del módulo 1</a> por tres razones prácticas: el modelo queda <strong>nombrado</strong> (<code>Input</code>, <code>densa1</code>, <code>bn1</code>…), así que <code>summary()</code> y los mensajes de error se leen bien; se puede <strong>ampliar</strong> sin reescribirlo (añadir una segunda entrada o un atajo si el problema lo pide); y es la API que usarás al combinar bases preentrenadas en la parte 2.</p>
+
+<h3>El bloque que se repite: Dense → BatchNorm → ReLU → Dropout</h3>
+<ul class="flow">
+  <li class="a">DENSE<small>combina las columnas con pesos aprendidos</small></li>
+  <li class="b">BATCHNORM<small>re-centra y re-escala cada neurona</small></li>
+  <li class="c">RELU<small>la no linealidad</small></li>
+  <li class="d">DROPOUT<small>apaga neuronas al azar al entrenar</small></li>
+</ul>
+
+<ul>
+  <li><strong>Dense</strong>: \( z = xW + b \). La primera capa de 64 neuronas recibe 10 números y tiene \( 10\cdot 64 + 64 = 704 \) parámetros.</li>
+  <li><strong>BatchNormalization</strong> (<em>normalización por lotes</em>): para cada neurona, durante el entrenamiento, resta la media del lote y divide por su desviación; luego aplica dos parámetros aprendidos, \( \gamma \) (escala) y \( \beta \) (desplazamiento). Mantiene las salidas en un rango estable, lo que permite learning rates mayores y entrena más rápido. Tiene <strong>4 parámetros por neurona</strong>: \( \gamma \) y \( \beta \) (entrenables) y la media y varianza móviles (no entrenables, se calculan, no se aprenden por gradiente). Con 64 neuronas son 256 parámetros: 128 entrenables y 128 no entrenables.</li>
+  <li><strong>ReLU</strong>: \( \max(0, z) \). Es la no linealidad que hace que apilar capas sirva para algo. Va <em>después</em> de BatchNorm por convención del artículo original; ponerla antes también funciona y da resultados parecidos.</li>
+  <li><strong>Dropout(0,1)</strong>: durante el entrenamiento apaga al azar el 10 % de las neuronas en cada paso (y multiplica el resto por \( 1/(1-0{,}1) \) para compensar). Obliga a la red a no depender de una neurona concreta. Al predecir no hace nada (el argumento <code>training</code> del <a href="../modulo-1.html">módulo 1</a>).</li>
+</ul>
+
+<div class="callout analogia">
+  <span class="lbl">Analogía</span>
+  <p><strong>BatchNorm</strong> es el ecualizador de volumen al encadenar tráilers: unos suenan muy fuerte y otros casi no se oyen, así que se sube o baja cada uno a un nivel parecido antes de pasar al siguiente. <strong>Dropout</strong> es un ensayo de teatro en el que cada día faltan al azar algunos actores: todos aprenden a defender su escena sin depender de que esté el protagonista. Cada pieza hace la red más estable y menos dependiente de un solo camino.</p>
+</div>
+
+<p>Después de dos bloques (64 y 32 neuronas) va la salida: <code>Dense(1)</code> <strong>sin activación</strong>. Es una regresión: queremos un número cualquiera (positivo o negativo, en unidades estandarizadas), y una ReLU o una sigmoide recortaría lo que puede valer la salida.</p>
+
+<div class="callout ejemplo">
+  <span class="lbl">Ejemplo numérico · contar los parámetros de la red</span>
+  <table>
+    <thead><tr><th>Capa</th><th>Cuenta</th><th>Parámetros</th></tr></thead>
+    <tbody>
+      <tr><td><code>densa1</code> (10 → 64)</td><td>10 · 64 + 64</td><td class="res">704</td></tr>
+      <tr><td><code>bn1</code> (64)</td><td>4 · 64</td><td class="res">256</td></tr>
+      <tr><td><code>densa2</code> (64 → 32)</td><td>64 · 32 + 32</td><td class="res">2.080</td></tr>
+      <tr><td><code>bn2</code> (32)</td><td>4 · 32</td><td class="res">128</td></tr>
+      <tr><td><code>precio</code> (32 → 1)</td><td>32 · 1 + 1</td><td class="res">33</td></tr>
+      <tr><td><strong>Total</strong></td><td>704 + 256 + 2.080 + 128 + 33</td><td class="res">3.201</td></tr>
+      <tr><td>No entrenables</td><td>2 · (64 + 32): medias y varianzas móviles</td><td class="res">192</td></tr>
+      <tr><td>Entrenables</td><td>3.201 − 192</td><td class="res">3.009</td></tr>
+    </tbody>
+  </table>
+  <p>Son cifras minúsculas (3.201 parámetros frente a los millones de una CNN): para una tabla de 10 columnas no hace falta más. El <a href="#frag-6">fragmento 6</a> construye la red y su <code>summary()</code> confirma cada número.</p>
+</div>
+
+<h3>Regularización L2: castigar los pesos grandes</h3>
+<p>Una red con muchos parámetros puede memorizar el ruido del train. La <strong>regularización L2</strong> (también llamada <em>weight decay</em> en su forma clásica) añade a la pérdida una penalización por el tamaño de los pesos:</p>
+<div class="formula">\[ \text{pérdida total} = \underbrace{\frac{1}{n}\sum_i (\hat y_i - y_i)^2}_{\text{error (MSE)}} + \lambda \sum_j w_j^2 \]</div>
+<p>\( \lambda \) (aquí <code>l2=1e-4</code>) decide cuánto pesa la penalización y \( w_j \) son los pesos de la capa. Una red con pesos pequeños es más «suave» y reacciona menos a cada detalle del train.</p>
+<div class="callout ejemplo">
+  <span class="lbl">Ejemplo numérico · la penalización L2</span>
+  <p>Imagina una neurona que decide si ver una película según tres rasgos: género, actor y duración. Sus pesos son \( (0{,}5;\,-2;\,1) \) (uno por rasgo) y \( \lambda = 0{,}1 \): \( \sum w^2 = 0{,}25 + 4 + 1 = 5{,}25 \), así que la penalización es \( 0{,}1 \cdot 5{,}25 = 0{,}525 \). El peso −2, el del actor, aporta casi todo (4 de 5,25): si un solo rasgo lo decide todo, la neurona falla en cuanto sale una película con otro actor, y L2 le cobra más justo por eso. Presiona sobre todo a los pesos <em>grandes</em>. En el descenso de gradiente, cada peso sufre un empujón extra de \( 2\lambda w \) hacia cero (−0,4 para el peso −2: lo empuja hacia arriba, hacia 0).</p>
+</div>
+<p>El <a href="leccion-8.html#frag-7">fragmento 7</a> lo comprueba con una capa de 3 pesos: el MSE de los datos más la penalización a mano coincide exactamente con el número que da <code>evaluate()</code>.</p>
+
+<div class="callout ojo">
+  <span class="lbl">Ojo · la penalización está dentro de <code>loss</code> y de <code>val_loss</code></span>
+  <p>La penalización L2 se suma a la pérdida tanto al entrenar como al evaluar (lo demuestra el <a href="leccion-8.html#frag-7">fragmento 7</a>). Por eso la <code>loss</code> de Keras es el MSE <em>más</em> la penalización, y no es directamente el «MSE del modelo». Si quieres el error real del modelo, calcula las métricas aparte (con <code>evaluar</code>), como haremos con MAE, RMSE y R² en las unidades originales.</p>
+</div>
+
+<h2 id="entrenar">Entrenar con callbacks y leer las curvas</h2>
+
+<p class="pregunta">¿Cuántas épocas entrenas? Es como ver una serie para entender su trama: con un solo capítulo no la entiendes; viéndola cinco veces te sabes los diálogos de memoria sin entender mejor las series nuevas. Y el learning rate ideal al principio no es el ideal al final. ¿Quién decide eso mientras entrena?</p>
+
+<p>Los <em>callbacks</em> del <a href="../modulo-5.html">módulo 5</a> toman esas decisiones por ti, mirando la pérdida de validación después de cada época:</p>
+<ul>
+  <li><strong><code>EarlyStopping(monitor="val_loss", patience=15, restore_best_weights=True)</code></strong>: si <code>val_loss</code> no mejora en 15 épocas seguidas, detiene el entrenamiento y <strong>devuelve los pesos de la mejor época</strong> (no los de la última, que ya empezaban a empeorar).</li>
+  <li><strong><code>ReduceLROnPlateau(factor=0.5, patience=6, min_lr=1e-5)</code></strong>: si <code>val_loss</code> se estanca 6 épocas, <strong>reduce el learning rate a la mitad</strong>. Un paso grande avanza rápido al principio; uno pequeño afina al final.</li>
+  <li><strong><code>ModelCheckpoint("mejor_pisos.keras", save_best_only=True)</code></strong>: guarda en disco el modelo cada vez que <code>val_loss</code> bate su récord, de modo que si algo falla ya tienes la mejor versión.</li>
+</ul>
+
+<div class="callout ejemplo">
+  <span class="lbl">Ejemplo numérico · pasos, épocas y paciencia</span>
+  <p>Con 2.400 filas de entrenamiento y <code>batch_size=128</code>, una época son \( \lceil 2400/128 \rceil = \lceil 18{,}75 \rceil = 19 \) pasos (18 lotes de 128 y uno de 96). Si la mejor <code>val_loss</code> se logró en la época 97 y <code>patience=15</code>, el entrenamiento se detendría, como muy pronto, tras la época 112 (97 + 15) si ninguna de las 15 siguientes la supera. Es justo lo que ocurre en el <a href="#frag-8">fragmento 8</a>: 112 épocas ejecutadas y mejor época la 97.</p>
+  <p>El learning rate empezó en 0,001 y <code>ReduceLROnPlateau</code> lo redujo cinco veces a la mitad: \( 0{,}001 \cdot 0{,}5^5 = 0{,}00003125 \), que es el «lr final» de 0,000031 que imprime el fragmento. En la mejor época (la 97) iba por dos reducciones: \( 0{,}001 \cdot 0{,}5^2 = 0{,}00025 \).</p>
+</div>
+
+<div class="callout recuerda">
+  <span class="lbl">Experimento de arriba: «Curvas de aprendizaje: sobreajuste, infraajuste y parada», con todo detalle</span>
+  <p><strong>Haz esto.</strong> Imagina que la red aprende a predecir la nota de una película a partir de su duración, con solo 25 películas de entrenamiento y 100 de validación. Con los valores iniciales (40 neuronas, sin regularización, sin parada) entrena 400 épocas: mira cómo se separan las curvas. Activa EarlyStopping con patience 25 y comprueba dónde para. Sube λ hasta 0,01 y compara. Baja las neuronas a 3 para provocar infraajuste y sube el learning rate a 0,3 para ver la inestabilidad.</p>
+  <p><strong>Fíjate en.</strong> El diagnóstico sale de comparar las dos curvas. <strong>Sobreajuste:</strong> train baja, validación sube (la red se sabe de memoria las 25 películas y falla con las nuevas). <strong>Infraajuste:</strong> las dos se quedan altas. <strong>Learning rate alto:</strong> la curva de entrenamiento da saltos. <strong>Ajuste sano:</strong> ambas bajan juntas y se estabilizan cerca del nivel del ruido (línea de puntos). EarlyStopping se queda con la mejor época (punto verde) en vez de con la última.</p>
+</div>
+
+<p>La curva de la red de pisos (<a href="#frag-8">fragmento 8</a>) es de las sanas: la <code>val_loss</code> baja de 0,634 en la época 1 a 0,113 en la 10 y a 0,0357 en la mejor época, y se queda ahí sin repuntar (0,0358 en la última). Que la <code>loss</code> de entrenamiento (0,058) sea <em>mayor</em> que la de validación (0,036) no es un error: durante el entrenamiento Dropout apaga neuronas y BatchNorm usa estadísticas del lote, así que el modelo trabaja «con las manos atadas»; al validar se usa la red completa. Es normal en redes con Dropout.</p>
+
+<div class="callout ojo">
+  <span class="lbl">Ojo · la validación se va gastando</span>
+  <p>Cada vez que usas <code>val_loss</code> para parar, reducir el learning rate o guardar el mejor modelo, la validación te «cuenta» algo. Con una sola decisión no pasa nada; con cientos de pruebas (como en una búsqueda de hiperparámetros), la mejor <code>val_loss</code> está algo inflada a favor del modelo elegido. Por eso el número que importa se mide en el test, una vez, al final.</p>
+</div>
+  </div>
+</details>
+
+
+<section>
+<h2 class="sin-num">Código</h2>
+<article class="snippet" data-lang="python" id="frag-6">
+  <header>
+    <h3>6 · La red de regresión con la API funcional y su resumen</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Escribir una función <code>construir_modelo</code> que monte la red (Dense, BatchNorm, ReLU, Dropout, L2) con la API funcional y devuelva el modelo ya compilado, y ver su <code>summary()</code> con el número de parámetros de cada capa. Continúa el fragmento 3 (usa <code>Z_train</code>).</p>
+  </header>
+  <pre class="code"><code>import keras
+from keras import layers, regularizers
+
+def construir_modelo(n_entradas, unidades=(64, 32), dropout=0.1, l2=1e-4, bn=True, lr=1e-3):
+    entrada = keras.Input(shape=(n_entradas,), name="pisos")
+    x = entrada
+    for i, u in enumerate(unidades, start=1):
+        x = layers.Dense(u, kernel_regularizer=regularizers.l2(l2) if l2 else None, name=f"densa{i}")(x)
+        if bn:
+            x = layers.BatchNormalization(name=f"bn{i}")(x)
+        x = layers.Activation("relu", name=f"relu{i}")(x)
+        if dropout:
+            x = layers.Dropout(dropout, name=f"drop{i}")(x)
+    salida = layers.Dense(1, name="precio")(x)
+    modelo = keras.Model(entrada, salida, name="red_pisos")
+    modelo.compile(optimizer=keras.optimizers.Adam(lr), loss="mse", metrics=["mae"])
+    return modelo
+
+keras.utils.set_random_seed(42)
+modelo = construir_modelo(Z_train.shape[1])
+modelo.summary()</code></pre>
+  <details class="linea-a-linea">
+    <summary>Línea por línea</summary>
+    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+      <tbody>
+        <tr data-lines="1-2"><td><code>import keras …</code></td><td>Importa Keras y, de él, las capas (<code>layers</code>) y los regularizadores (<code>regularizers</code>).</td></tr>
+        <tr data-lines="4"><td><code>def construir_modelo(n_entradas, unidades=(64, 32), dro…</code></td><td>La función recibe cuántas columnas entran y los ajustes de la red: neuronas de cada capa oculta (<code>unidades</code>), tasa de Dropout, fuerza de L2, si lleva BatchNorm y learning rate. Los valores por defecto son los que usamos.</td></tr>
+        <tr data-lines="5-6"><td><code>entrada = keras.Input(shape=(n_entradas,), name="pisos") …</code></td><td><code>keras.Input</code> crea la entrada de forma <code>(n_entradas,)</code> (una fila de 10 números), con nombre. <code>x</code> es el «hilo» al que iremos enganchando capas.</td></tr>
+        <tr data-lines="7"><td><code>for i, u in enumerate(unidades, start=1):</code></td><td>Un bucle que construye un bloque por cada tamaño de <code>unidades</code> (<code>enumerate(…, start=1)</code> numera desde 1 para los nombres).</td></tr>
+        <tr data-lines="8"><td><code>x = layers.Dense(u, kernel_regularizer=regularizers.l2(…</code></td><td>Capa <code>Dense</code> aplicada a <code>x</code> con <code>(x)</code>. Si <code>l2</code> no es 0, lleva la penalización L2 en sus pesos (<code>kernel_regularizer</code>); si es 0, <code>None</code>.</td></tr>
+        <tr data-lines="9-10"><td><code>if bn: …</code></td><td>Si <code>bn</code> es cierto, añade una <code>BatchNormalization</code>.</td></tr>
+        <tr data-lines="11"><td><code>x = layers.Activation("relu", name=f"relu{i}")(x)</code></td><td>Activación ReLU como capa independiente (así la normalización queda antes de ella).</td></tr>
+        <tr data-lines="12-13"><td><code>if dropout: …</code></td><td>Si <code>dropout</code> no es 0, añade Dropout.</td></tr>
+        <tr data-lines="14"><td><code>salida = layers.Dense(1, name="precio")(x)</code></td><td>Capa de salida: una sola neurona, <strong>sin activación</strong> (regresión).</td></tr>
+        <tr data-lines="15"><td><code>modelo = keras.Model(entrada, salida, name="red_pisos")</code></td><td><code>keras.Model(entrada, salida)</code> recoge el grafo de capas en un modelo con nombre.</td></tr>
+        <tr data-lines="16"><td><code>modelo.compile(optimizer=keras.optimizers.Adam(lr), los…</code></td><td>Compila: optimizador Adam con el learning rate dado, pérdida MSE y el MAE como métrica a vigilar.</td></tr>
+        <tr data-lines="17"><td><code>return modelo</code></td><td>Devuelve el modelo.</td></tr>
+        <tr data-lines="19"><td><code>keras.utils.set_random_seed(42)</code></td><td>Fija la semilla de Python, NumPy y Keras de golpe, para que los pesos iniciales sean siempre los mismos.</td></tr>
+        <tr data-lines="20"><td><code>modelo = construir_modelo(Z_train.shape[1])</code></td><td>Construye la red con la configuración por defecto; <code>Z_train.shape[1]</code> es 10.</td></tr>
+        <tr data-lines="21"><td><code>modelo.summary()</code></td><td>Imprime la tabla resumen: capa, forma de salida y parámetros.</td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>Model: "red_pisos"
+┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━┓
+┃ Layer (type)                    ┃ Output Shape           ┃       Param # ┃
+┡━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━┩
+│ pisos (InputLayer)              │ (None, 10)             │             0 │
+├─────────────────────────────────┼────────────────────────┼───────────────┤
+│ densa1 (Dense)                  │ (None, 64)             │           704 │
+├─────────────────────────────────┼────────────────────────┼───────────────┤
+│ bn1 (BatchNormalization)        │ (None, 64)             │           256 │
+├─────────────────────────────────┼────────────────────────┼───────────────┤
+│ relu1 (Activation)              │ (None, 64)             │             0 │
+├─────────────────────────────────┼────────────────────────┼───────────────┤
+│ drop1 (Dropout)                 │ (None, 64)             │             0 │
+├─────────────────────────────────┼────────────────────────┼───────────────┤
+│ densa2 (Dense)                  │ (None, 32)             │         2,080 │
+├─────────────────────────────────┼────────────────────────┼───────────────┤
+│ bn2 (BatchNormalization)        │ (None, 32)             │           128 │
+├─────────────────────────────────┼────────────────────────┼───────────────┤
+│ relu2 (Activation)              │ (None, 32)             │             0 │
+├─────────────────────────────────┼────────────────────────┼───────────────┤
+│ drop2 (Dropout)                 │ (None, 32)             │             0 │
+├─────────────────────────────────┼────────────────────────┼───────────────┤
+│ precio (Dense)                  │ (None, 1)              │            33 │
+└─────────────────────────────────┴────────────────────────┴───────────────┘
+ Total params: 3,201 (12.50 KB)
+ Trainable params: 3,009 (11.75 KB)
+ Non-trainable params: 192 (768.00 B)</pre>
+    <p>La tabla coincide con las cuentas a mano: <code>densa1</code> 704, <code>bn1</code> 256, <code>densa2</code> 2.080, <code>bn2</code> 128 y <code>precio</code> 33. Total <strong>3.201</strong> parámetros, de los que <strong>3.009</strong> son entrenables y <strong>192</strong> no (las medias y varianzas móviles de las dos BatchNorm: 2 · (64 + 32)). Las capas ReLU y Dropout no tienen parámetros. El <code>None</code> de las formas es el tamaño del lote, que aún no se conoce.</p>
+  </div>
+</article>
+
+<article class="snippet" data-lang="python" id="frag-8">
+  <header>
+    <h3>8 · Entrenar con EarlyStopping, ReduceLROnPlateau y ModelCheckpoint</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Entrenar la red de los pisos dejando que tres callbacks decidan cuándo parar, cuándo bajar el learning rate y cuándo guardar, y leer de <code>history</code> qué pasó. Continúa el fragmento 6 (usa <code>modelo</code>).</p>
+  </header>
+  <pre class="code"><code>callbacks = [
+    keras.callbacks.EarlyStopping(monitor="val_loss", patience=15, restore_best_weights=True),
+    keras.callbacks.ReduceLROnPlateau(monitor="val_loss", factor=0.5, patience=6, min_lr=1e-5),
+    keras.callbacks.ModelCheckpoint("mejor_pisos.keras", monitor="val_loss", save_best_only=True),
+]
+hist = modelo.fit(Z_train, t_train, validation_data=(Z_val, t_val),
+                  epochs=150, batch_size=128, callbacks=callbacks, verbose=0)
+h = hist.history
+mejor = int(np.argmin(h["val_loss"]))
+print("épocas ejecutadas:", len(h["loss"]), "| mejor época:", mejor + 1)
+print(f"val_loss en la mejor época: {h['val_loss'][mejor]:.4f} | lr final: {h['learning_rate'][-1]:.6f}")
+for e in [0, 4, 9, mejor, len(h["loss"]) - 1]:
+    print(f"época {e + 1:3d}  loss={h['loss'][e]:.4f}  val_loss={h['val_loss'][e]:.4f}  lr={h['learning_rate'][e]:.5f}")</code></pre>
+  <details class="linea-a-linea">
+    <summary>Línea por línea</summary>
+    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+      <tbody>
+        <tr data-lines="1-5"><td><code>callbacks = [ …</code></td><td>Lista de tres <em>callbacks</em>: <code>EarlyStopping</code> (para si <code>val_loss</code> no mejora en 15 épocas y <code>restore_best_weights=True</code> devuelve los pesos de la mejor época), <code>ReduceLROnPlateau</code> (a la mitad tras 6 épocas sin mejorar, con suelo en 1e-5) y <code>ModelCheckpoint</code> (guarda en <code>mejor_pisos.keras</code> solo si mejora).</td></tr>
+        <tr data-lines="6-7"><td><code>hist = modelo.fit(Z_train, t_train, validation_data=(Z_…</code></td><td><code>fit</code> entrena: datos de train, validación para vigilar, hasta 150 épocas (el EarlyStopping parará antes), lotes de 128 y los callbacks. <code>verbose=0</code> silencia la barra de progreso.</td></tr>
+        <tr data-lines="8"><td><code>h = hist.history</code></td><td><code>hist.history</code> es un diccionario con la pérdida, la métrica y el learning rate de cada época.</td></tr>
+        <tr data-lines="9"><td><code>mejor = int(np.argmin(h["val_loss"]))</code></td><td><code>np.argmin</code> da la posición del menor <code>val_loss</code> (empezando en 0).</td></tr>
+        <tr data-lines="10"><td><code>print("épocas ejecutadas:", len(h["loss"]), "| mejor ép…</code></td><td>Cuántas épocas se ejecutaron (longitud de la lista) y cuál fue la mejor (+1 porque contamos desde 1).</td></tr>
+        <tr data-lines="11"><td><code>print(f"val_loss en la mejor época: {h['val_loss'][mejo…</code></td><td>La <code>val_loss</code> de la mejor época y el último learning rate.</td></tr>
+        <tr data-lines="12-13"><td><code>for e in [0, 4, 9, mejor, len(h["loss"]) - 1]: …</code></td><td>Imprime la primera época, la quinta, la décima, la mejor y la última: pérdida, pérdida de validación y learning rate.</td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>épocas ejecutadas: 112 | mejor época: 97
+val_loss en la mejor época: 0.0357 | lr final: 0.000031
+época   1  loss=0.9334  val_loss=0.6338  lr=0.00100
+época   5  loss=0.2059  val_loss=0.3034  lr=0.00100
+época  10  loss=0.1468  val_loss=0.1127  lr=0.00100
+época  97  loss=0.0584  val_loss=0.0357  lr=0.00025
+época 112  loss=0.0575  val_loss=0.0358  lr=0.00003</pre>
+    <p>Se ejecutaron <strong>112</strong> épocas (97 + 15 de paciencia) y la mejor fue la <strong>97</strong>, con <code>val_loss</code> 0,0357. El learning rate empezó en 0,001 y acabó en 0,000031 (cinco reducciones a la mitad; en la mejor época iba por 0,00025). La <code>val_loss</code> cae de 0,634 (época 1) a 0,113 (época 10) y 0,0357; la <code>loss</code> de entrenamiento queda por encima (0,058) por el Dropout y la BatchNorm en modo entrenamiento. Entre la época 97 y la 112 la validación apenas cambia (0,0357 → 0,0358): no hay sobreajuste.</p>
+  </div>
+</article>
+</section>
+
+
+</div>
+</main>
+</body>
+</html>

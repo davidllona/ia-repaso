@@ -1,203 +1,426 @@
-<!DOCTYPE html>
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lección 5 · Entrenar es corregir hacia atrás, empezando por p − y · Módulo 1 · Curso 5 · Cuaderno de IA</title>
+<meta name="description" content="La capa de salida y la pérdida para cada problema, un paso de entrenamiento de la red 2-2-1 hecho a mano (de 0.4125 a 0.7249), la simetría de los pesos iniciales y las mesetas.">
+<script>try{var t=localStorage.getItem('cuaderno-ia:tema');if(t)document.documentElement.setAttribute('data-theme',t)}catch(e){}</script>
+<link rel="stylesheet" href="../../assets/css/style.css">
+<script src="../../assets/js/curriculum.js"></script>
+<script src="../../assets/js/lab.js"></script>
+<script src="../../assets/js/app.js" defer></script>
+</head>
+<body data-root="../../" data-course="5" data-module="1" data-lesson="5">
+<main>
+<div class="page">
 
-<html lang="es"><head><meta charset="utf-8"/><meta content="width=device-width,initial-scale=1" name="viewport"/><title>Lección 5 · Construir la red: nn.Module y nn.Sequential · Curso 5 · Cuaderno de IA</title><meta content="Cuando la red es una cadena recta («sale de una capa y entra en la siguiente»), nn.Sequential te ahorra la clase:" name="description"/><script>try{var t=localStorage.getItem('cuaderno-ia:tema');if(t)document.documentElement.setAttribute('data-theme',t)}catch(e){}</script><link href="../../assets/css/style.css" rel="stylesheet"/><script src="../../assets/js/curriculum.js"></script><script src="../../assets/js/lab.js"></script><script defer="" src="../../assets/js/app.js"></script><script defer="" src="../../assets/js/microanimations.js"></script></head><body data-course="5" data-lesson="5" data-module="1" data-root="../../"><main><div class="page" data-micro="3min"><header class="hero leccion"><div class="hero-grid"><div><p class="eyebrow">Curso 5 · Módulo 1 · Lección 5 de 12</p><h1>Construir la red: nn.Module y nn.Sequential</h1><p class="lead">Cuando la red es una cadena recta («sale de una capa y entra en la siguiente»), nn.Sequential te ahorra la clase:</p><p class="meta-line"><span class="read-time" data-render="read-time"></span><a href="../modulo-1.html">Índice del módulo</a></p></div><div aria-hidden="true" class="hero-tile"></div></div></header><details class="predice"><summary>Ya sabes calcular una red a mano (la que predice si un usuario termina la serie). ¿Cómo se la entregas a PyTorch para que gestione los parámetros, calcule los gradientes y la guarde, sin escribir toda la cuenta?<span class="hint"></span></summary><div><p>Cuando la red es una cadena recta («sale de una capa y entra en la siguiente»), nn.Sequential te ahorra la clase:</p></div></details><section aria-label="Explicación breve" class="micro-core"><div class="micro-kicker">01 · ENTENDER <span>≈ 45 s</span></div><h2>La idea en palabras sencillas</h2><p>Cuando la red es una cadena recta («sale de una capa y entra en la siguiente»), nn.Sequential te ahorra la clase:</p><div class="micro-example"><span aria-hidden="true" class="micro-example-icon">💡</span><div><strong>Otro ejemplo · Gimnasio</strong><p>Una red recibe horas de sueño y actividad; combina señales antes de calcular su predicción.</p></div></div></section><div class="micro-kicker micro-checkpoint">02 · RESPONDER <span>≈ 15 s</span></div><section aria-label="Pregunta intercalada" class="quiz mini micro-check"><script class="quiz-data" type="application/json">{"titulo": "Pausa rápida · Comprueba la idea", "preguntas": [{"q": "Una neurona recibe dos entradas. ¿Qué hace con los pesos?", "opciones": ["Elige siempre la entrada mayor", "Borra las entradas al entrenar", "Multiplica cada entrada por su peso y combina resultados"], "correcta": 2, "porque": "La suma ponderada combina entradas, pesos y bias antes de la activación."}]}</script></section><section aria-label="Animación interactiva" class="micro-viz" data-index="11" data-micro-viz="neural"><div class="micro-kicker">03 · EXPERIMENTAR <span>≈ 45 s</span></div><div class="micro-viz-title"><div><h2>Señales que atraviesan una red</h2><p>Pulsa «Propagar» para seguir el recorrido de entradas a salida.</p></div><span aria-hidden="true" class="micro-viz-symbol">✦</span></div><div aria-live="polite" class="micro-viz-stage"><p>Animación interactiva: Señales que atraviesan una red</p></div></section><div class="micro-kicker micro-checkpoint">04 · APLICAR <span>≈ 15 s</span></div><section aria-label="Pregunta intercalada" class="quiz mini micro-check"><script class="quiz-data" type="application/json">{"titulo": "Pausa rápida · ¿Lo aplicarías?", "preguntas": [{"q": "¿Cuándo se actualizan los pesos de una red?", "opciones": ["Nunca: los pesos son fijos", "Al aplicar el optimizador durante el entrenamiento", "Cada vez que se abre la página"], "correcta": 1, "porque": "El optimizador utiliza los gradientes para ajustar parámetros durante el aprendizaje."}]}</script></section><div class="micro-finish"><strong>Idea que te llevas</strong><span>Cuando la red es una cadena recta («sale de una capa y entra en la siguiente»), nn</span><small>¿Quieres más ejemplos, fórmulas o código? Los tienes justo debajo, sin límite de tiempo.</small></div><details class="profundizar micro-legacy"><summary><span>Explorar más: explicación y simulaciones completas<small>Todo el texto original, tablas y demos avanzadas. Opcional.</small></span></summary><div class="prof-body"><section><h2>Construir la red: nn.Module y nn.Sequential</h2>
-<p>Cuando la red es una cadena recta («sale de una capa y entra en la siguiente»), <code>nn.Sequential</code> te ahorra la clase:</p>
-<p>Es exactamente lo mismo (el <a href="#frag-5">fragmento 5</a> lo demuestra: misma salida). Regla práctica: <strong><code>nn.Sequential</code> para cadenas simples; clase <code>nn.Module</code> cuando necesitas algo que no sea una cadena</strong> (varias entradas o salidas, atajos como los de ResNet, bucles en el <code>forward</code>, imprimir valores intermedios, activaciones o capas que se eligen en tiempo de ejecución).</p>
-<p>donde \( D_{in}H \) es el número de pesos de la capa oculta (una fila por neurona, una columna por entrada), \( H \) los sesgos de la oculta, \( H\,D_{out} \) los pesos de la salida y \( D_{out} \) sus sesgos.</p>
-<div class="callout ejemplo"><span class="lbl">Ejemplo tomado del módulo</span><p>· contar parámetros Red Cuenta Total XOR, 2-2-1 \( 2\cdot 2 + 2 + 2\cdot 1 + 1 = 4 + 2 + 2 + 1 \) 9 Ejemplo del fragmento 5, 2-3-1 \( 2\cdot 3 + 3 + 3\cdot 1 + 1 = 6 + 3 + 3 + 1 \) 13 Dígitos, 64-16-10 \( 64\cdot 16 + 16 + 16\cdot 10 + 10…</p></div></section><figure class="demo" data-demo="curso5/c5m1-parametros" data-titulo="Formas de los tensores y parámetros de una red D_in-H-D_out">
-<div class="haz">Pulsa los cuatro botones de ejemplo (XOR, lunas, dígitos y MNIST) y mira la barra. Piensa en N como «cuántos usuarios (o películas) pasas de golpe a la red», por ejemplo un lote de 32 películas. Después cambia h con el deslizador sin tocar nada más. Por último sube d_in y observa qué parte de la barra crece.</div>
-<div class="observa">Dobla las neuronas ocultas y se dobla casi todo: <code>W1</code> y <code>W2</code> crecen proporcionalmente a h. El tamaño del lote N <strong>no</strong> cambia ningún parámetro: solo cambia la primera dimensión de los tensores intermedios. El mensaje de error del final es el que verías si le dieras a la red una característica de más.</div>
-</figure><div class="resumen"><h2 class="sin-num sin-toc">En pocas líneas</h2><ul><li><strong>Construir la red: nn.Module y nn.Sequential:</strong> Cuando la red es una cadena recta («sale de una capa y entra en la siguiente»), nn.Sequential te ahorra la clase:</li><li>Antes de continuar, intenta explicar la demo sin mirar su resultado.</li></ul></div><section class="quiz mini"><script class="quiz-data" type="application/json">{"titulo": "¿Lo tienes?", "preguntas": [{"q": "¿Qué concepto estamos trabajando en esta lección?", "opciones": ["La capa oculta: dos rectas y una decisión sobre ellas", "Funciones de activación en PyTorch", "Construir la red: nn.Module y nn.Sequential"], "correcta": 2, "porque": "Cuando la red es una cadena recta («sale de una capa y entra en la siguiente»), nn.Sequential te ahorra la clase:"}, {"q": "¿Cuál de estas afirmaciones recoge lo que acabas de estudiar?", "opciones": ["Cuando la red es una cadena recta («sale de una capa y entra en la siguiente»), nn.Sequential te ahorra la clase:", "Siempre hay un único método que sirve para todos los problemas.", "Lo importante es comprender la idea y comprobarla con ejemplos, no memorizar términos."], "correcta": 0, "porque": "La explicación central es: Cuando la red es una cadena recta («sale de una capa y entra en la siguiente»), nn.Sequential te ahorra la clase:"}, {"q": "Si una demo o un ejemplo te desconcierta, ¿cuál es la mejor forma de aprenderlo?", "opciones": ["Volver a los números, cambiar un valor y explicar qué ocurre.", "Ignorar los resultados que no coinciden con tu intuición.", "Memorizar el nombre sin entender la operación."], "correcta": 0, "porque": "Explorar qué cambia y por qué ayuda a conectar el concepto con su resultado."}]}</script></section></div></details><details class="profundizar"><summary><span>Profundizar: explicación completa<small>Matices, fórmulas, tablas, otros ejemplos y experimentos del módulo original.</small></span></summary><div class="prof-body"><section>
-<h2 id="nn-module">Construir la red: nn.Module y nn.Sequential</h2>
-<p class="pregunta">Ya sabes calcular una red a mano (la que predice si un usuario termina la serie). ¿Cómo se la entregas a PyTorch para que gestione los parámetros, calcule los gradientes y la guarde, sin escribir toda la cuenta?</p>
-<div class="callout analogia">
-<span class="lbl">Analogía</span>
-<p>Una <code>nn.Module</code> es la <strong>ficha de una película</strong>: el reparto y el guion. El <code>__init__</code> es el <em>reparto</em>: la lista de actores que salen (las capas); todos quedan anotados en la ficha para que la productora (PyTorch) sepa a quién hay que ensayar con más ahínco (entrenar) y a quién guardar al final. <code>forward</code> es el <em>guion</em>: en qué orden actúa cada uno, es decir, en qué orden pasa el dato por las capas.</p>
-</div>
-<h3>La plantilla de una red</h3>
-<pre class="ascii">class Net(nn.Module):
-    def __init__(self, d_in, h, d_out):     # 1. qué piezas tiene
-        super().__init__()                  #    (esta línea es obligatoria)
-        self.linear1 = nn.Linear(d_in, h)
-        self.linear2 = nn.Linear(h, d_out)
+<header class="hero leccion">
+  <div class="hero-grid">
+    <div>
+      <p class="eyebrow">Curso 5 · Módulo 1 · Lección 5 de 8</p>
+      <h1>Entrenar es corregir hacia atrás, empezando por p − y</h1>
+      <p class="lead">Con una capa oculta, el bucle de entrenamiento no cambia: forward, pérdida, backward y paso. Aquí ves un paso entero a mano con un usuario que <strong>sí terminó la serie</strong>, y por qué a veces el entrenamiento no arranca.</p>
+      <p class="meta-line"><span class="read-time" data-render="read-time"></span><a href="../modulo-1.html">Índice del módulo</a></p>
+    </div>
+    <div class="hero-tile" aria-hidden="true"></div>
+  </div>
+</header>
 
-    def forward(self, x):                   # 2. en qué orden las usa
-        x = torch.sigmoid(self.linear1(x))
-        return self.linear2(x)</pre>
-<ol>
-<li><strong><code>class Net(nn.Module)</code></strong>: «mi red es un tipo especial de <code>nn.Module</code>»; hereda todo lo que PyTorch sabe hacer con redes.</li>
-<li><strong><code>__init__</code></strong>: se ejecuta <em>una vez</em>, al crear la red (<code>modelo = Net(2, 3, 1)</code>). Aquí se crean las capas y se asignan a <code>self.algo</code>. Al asignar una capa a un atributo de <code>self</code>, <code>nn.Module</code> la <strong>registra</strong>: gracias a eso <code>modelo.parameters()</code> devuelve sus pesos para el optimizador.</li>
-<li><strong><code>super().__init__()</code></strong>: llama al constructor de <code>nn.Module</code> para que prepare su contabilidad interna. Hay que hacerlo <em>antes</em> de asignar las capas; si se olvida, Python da <code>AttributeError: cannot assign module before Module.__init__() call</code> (fragmento 17).</li>
-<li><strong><code>forward</code></strong>: se ejecuta <em>cada vez</em> que pasas datos por la red. Recibe un lote <code>x</code> y devuelve la salida. Aquí va la activación (si es una función como <code>torch.sigmoid</code> o <code>F.relu</code>).</li>
-<li><strong>Se llama con <code>modelo(x)</code>, no con <code>modelo.forward(x)</code>.</strong> <code>nn.Module</code> define <code>__call__</code>, que ejecuta <code>forward</code> y además ejecuta ganchos (<em>hooks</em>) internos; saltarse eso con <code>.forward(x)</code> funciona en casos sencillos pero es una mala costumbre.</li>
-</ol>
-<h3>La misma red con nn.Sequential</h3>
-<p>Cuando la red es una cadena recta («sale de una capa y entra en la siguiente»), <code>nn.Sequential</code> te ahorra la clase:</p>
-<pre class="ascii">modelo = nn.Sequential(nn.Linear(2, 3), nn.Sigmoid(), nn.Linear(3, 1), nn.Sigmoid())</pre>
-<p>Es exactamente lo mismo (el <a href="#frag-5">fragmento 5</a> lo demuestra: misma salida). Regla práctica: <strong><code>nn.Sequential</code> para cadenas simples; clase <code>nn.Module</code> cuando necesitas algo que no sea una cadena</strong> (varias entradas o salidas, atajos como los de ResNet, bucles en el <code>forward</code>, imprimir valores intermedios, activaciones o capas que se eligen en tiempo de ejecución).</p>
-<h3>Qué guarda una red: parámetros y <code>state_dict</code></h3>
-<table>
-<thead><tr><th>Método</th><th>Qué devuelve</th><th>Para qué se usa</th></tr></thead>
-<tbody>
-<tr><td><code>modelo.parameters()</code></td><td>Los tensores aprendibles, sin nombre</td><td>Pasárselos al optimizador: <code>SGD(modelo.parameters(), lr=…)</code>; contar parámetros</td></tr>
-<tr><td><code>modelo.named_parameters()</code></td><td>Pares (nombre, tensor): <code>linear1.weight</code>…</td><td>Inspeccionar, congelar capas concretas (módulo 4)</td></tr>
-<tr><td><code>modelo.state_dict()</code></td><td>Diccionario nombre → tensor</td><td>Guardar con <code>torch.save</code> y cargar con <code>load_state_dict</code> (fragmento 16)</td></tr>
-<tr><td><code>print(modelo)</code></td><td>Resumen de las capas registradas</td><td>Ver la arquitectura de un vistazo</td></tr>
-</tbody>
-</table>
-<h3>Cuántos parámetros tiene una red \( D_{in}\text{-}H\text{-}D_{out} \)</h3>
-<div class="formula">\[ \underbrace{D_{in}\,H}_{W_1} + \underbrace{H}_{b_1} + \underbrace{H\,D_{out}}_{W_2} + \underbrace{D_{out}}_{b_2} \]</div>
-<p>donde \( D_{in}H \) es el número de pesos de la capa oculta (una fila por neurona, una columna por entrada), \( H \) los sesgos de la oculta, \( H\,D_{out} \) los pesos de la salida y \( D_{out} \) sus sesgos.</p>
+<details class="predice">
+  <summary>La red cree que este usuario terminará la serie con un 41 % (\( p = 0.4125 \)) y la terminó (\( y = 1 \)). Tras un paso de entrenamiento, ¿\( p \) sube, baja o se queda?<span class="hint"></span></summary>
+  <div>
+    <p><strong>Sube, y mucho: a 0.7249</strong> con \( \eta = 1 \). El error en la salida es \( p - y = -0.5875 \): negativo significa «te has quedado corta», y el paso empuja el logit hacia arriba.</p>
+  </div>
+</details>
+
+<section>
+<h2 id="idea">Del error de la salida hacia atrás</h2>
+<p>La última capa depende del problema. <strong>Binaria</strong> (¿terminará la serie?): 1 neurona que devuelve el <em>logit</em> \( z \) y <code>nn.BCEWithLogitsLoss</code>. <strong>\( K \) clases</strong>: \( K \) logits y <code>nn.CrossEntropyLoss</code>. <strong>Regresión</strong> (la nota del usuario): 1 salida y <code>nn.MSELoss</code>. Estas pérdidas aplican la sigmoide o la softmax por dentro, de forma más estable.</p>
+<p>Y una coincidencia feliz: con sigmoide (o softmax) y entropía cruzada, el gradiente respecto al logit es <strong>predicción menos realidad</strong>, \( p - y \). Desde ahí, la regla de la cadena lleva el error hacia atrás: por los pesos \( W_2 \) y por la derivada de la activación oculta. <code>loss.backward()</code> lo hace solo.</p>
+<ul class="flow">
+  <li class="a">FORWARD<small>p = modelo(X)</small></li>
+  <li class="b">PÉRDIDA<small>criterio(p, y)</small></li>
+  <li class="d">BACKWARD<small>zero_grad + backward</small></li>
+  <li class="c">PASO<small>opt.step()</small></li>
+</ul>
+<p>¿Por qué a veces no aprende? Por <strong>simetría</strong>: si las neuronas ocultas empiezan con pesos iguales, reciben el mismo gradiente y se quedan clónicas para siempre; por eso PyTorch los inicializa al azar. Y por las <strong>mesetas</strong>: zonas casi planas donde la pérdida apenas se mueve durante cientos de épocas.</p>
+</section>
+
+<figure class="demo" data-demo="curso5/c5m1-paso-entrenamiento" data-titulo="Un paso de entrenamiento, número a número">
+  <div class="haz">Con η = 1, pulsa «Dar un paso»: p debe pasar de 0.4125 a 0.7249. Pulsa varias veces más.</div>
+  <div class="observa">Cerca de 1, el error p − y se encoge y los gradientes con él: el aprendizaje frena solo.</div>
+</figure>
+
+<figure class="demo" data-demo="curso5/c5m1-capa-oculta-vivo" data-titulo="Una capa oculta entrenándose: rectas, miniaturas y simetría">
+  <div class="haz">Con XOR, H = 4 y tanh, pulsa «Entrenar». Luego activa «Pesos iniciales idénticos (simetría)» y repite.</div>
+  <div class="observa">Con simetría, el contador marca 1 neurona distinta de 4: las cuatro rectas son la misma.</div>
+</figure>
+
+<section>
+<h2 id="numeros">Con números: un paso de la red 2-2-1</h2>
 <div class="callout ejemplo">
-<span class="lbl">Ejemplo numérico · contar parámetros</span>
-<table>
-<thead><tr><th>Red</th><th>Cuenta</th><th>Total</th></tr></thead>
-<tbody>
-<tr><td>XOR, 2-2-1</td><td>\( 2\cdot 2 + 2 + 2\cdot 1 + 1 = 4 + 2 + 2 + 1 \)</td><td class="res">9</td></tr>
-<tr><td>Ejemplo del fragmento 5, 2-3-1</td><td>\( 2\cdot 3 + 3 + 3\cdot 1 + 1 = 6 + 3 + 3 + 1 \)</td><td class="res">13</td></tr>
-<tr><td>Dígitos, 64-16-10</td><td>\( 64\cdot 16 + 16 + 16\cdot 10 + 10 = 1024 + 16 + 160 + 10 \)</td><td class="res">1210</td></tr>
-<tr><td>MNIST, 784-100-10</td><td>\( 784\cdot 100 + 100 + 100\cdot 10 + 10 = 78400 + 100 + 1000 + 10 \)</td><td class="res">79510</td></tr>
-</tbody>
-</table>
-<p>Traducido a Netflix: la red 2-2-1 mira 2 rasgos del usuario (¿ha visto <em>Toy Story</em>?, ¿ha visto <em>Shrek</em>?), tiene 2 «ayudantes» ocultos y da 1 número (la probabilidad de avisarle). Fíjate en que casi todos los parámetros están en la <strong>primera capa</strong> (1024 de 1210; 78 400 de 79 510): crecen con \( D_{in}\cdot H \).</p>
+  <span class="lbl">Ejemplo numérico · backward</span>
+  <p>Del forward: \( \mathbf{h} = (0.3775,\ 0.7311) \), \( p = 0.4125 \), pérdida \( -\ln 0.4125 = 0.8854 \).</p>
+  <ol class="pasos">
+    <li>Salida: \( \delta_2 = p - y = -0.5875 \); \( \partial L/\partial W_2 = \delta_2\,\mathbf{h} = (-0.2218,\ -0.4295) \).</li>
+    <li>Hacia la capa oculta: \( W_2^\top\delta_2 = (-0.5875,\ +0.5875) \).</li>
+    <li>Por la sigmoide, \( h(1-h) = (0.2350,\ 0.1966) \): \( \boldsymbol{\delta}_1 = (-0.1381,\ +0.1155) \).</li>
+    <li>Paso con \( \eta = 1 \): \( W_2 \to (1.2218,\ -0.5705) \), y lo mismo en la oculta. Nueva \( p = \) <span class="res">0.7249</span>.</li>
+  </ol>
 </div>
-<div class="callout ojo">
-<span class="lbl">Ojo · tres errores de principiante con nn.Module</span>
-<p><strong>(1) Capas en una lista de Python.</strong> <code>self.capas = [nn.Linear(2,3), nn.Linear(3,1)]</code> <em>no</em> las registra: <code>parameters()</code> devuelve cero parámetros y el optimizador da <code>ValueError: optimizer got an empty parameter list</code> (fragmento 17). Para varias capas usa <code>nn.ModuleList</code> (módulo 2) o <code>nn.Sequential</code>. <strong>(2) Crear capas dentro de <code>forward</code>.</strong> Se crearían nuevas, con pesos aleatorios, en cada llamada: nada se aprendería. Las capas se crean en <code>__init__</code>. <strong>(3) Olvidar <code>super().__init__()</code>.</strong> Da el <code>AttributeError</code> de arriba.</p>
+</section>
+
+<details class="predice">
+  <summary>Tu pérdida binaria lleva 1000 épocas clavada en 0.693. ¿Seguro que hay un <em>bug</em>?<span class="hint"></span></summary>
+  <div>
+    <p><strong>No necesariamente.</strong> 0.693 = \( \ln 2 \) es «no sé nada», y puede ser una meseta. Con XOR y \( H = 2 \), la semilla 1 pasó mil épocas entre 0.6934 y 0.6930 y en la 3000 ya estaba en 0.0332. Prueba primero lo barato: otra semilla, más neuronas, otro lr o más épocas.</p>
+  </div>
+</details>
+
+<div class="resumen">
+  <h2 class="sin-num sin-toc">En tres líneas</h2>
+  <ul>
+    <li>Binaria → 1 logit + <code>BCEWithLogitsLoss</code>; \( K \) clases → \( K \) logits + <code>CrossEntropyLoss</code>; regresión → <code>MSELoss</code>.</li>
+    <li>El gradiente en la salida es \( p - y \); la regla de la cadena lo lleva hacia atrás capa a capa.</li>
+    <li>Pesos iniciales iguales = neuronas clónicas; una pérdida plana puede ser una meseta, no un error.</li>
+  </ul>
 </div>
-</section></div></details><details class="profundizar" id="codigo"><summary><span>Ver código explicado paso a paso<small>2 fragmento(s) original(es), con cada línea comentada y salida esperada.</small></span></summary><div class="prof-body"><article class="snippet" data-lang="python" id="frag-4">
-<header>
-<h3>4 · Activaciones y sus derivadas con autograd</h3>
-<p class="para-que"><strong>Para qué sirve</strong> Evaluar las cuatro activaciones del módulo en tres valores de <code>z</code> y pedirle a PyTorch su derivada con <code>backward()</code>, para comprobar a mano las fórmulas de la sección 4.</p>
-</header>
-<pre class="code"><code>import torch
-from torch import nn
-import torch.nn.functional as F
 
-z = torch.tensor([-2., 0., 2.], requires_grad=True)
-
-activaciones = {
-    "sigmoide": torch.sigmoid,
-    "tanh": torch.tanh,
-    "ReLU": torch.relu,
-    "LeakyReLU": nn.LeakyReLU(negative_slope=0.1),
+<section class="quiz mini">
+<script type="application/json" class="quiz-data">
+{
+ "titulo": "¿Lo tienes?",
+ "preguntas": [
+  {
+   "q": "En la red 2-2-1 del ejemplo hecho a mano (la que calcula si un usuario termina la serie), la salida es \\( p=0.4125 \\) y la etiqueta es \\( y=1 \\) (la terminó). Con sigmoide y entropía cruzada binaria, ¿cuánto vale \\( \\partial L/\\partial z_2 = p-y \\) en la neurona de salida?",
+   "opciones": [
+    "\\( +0.4125 \\)",
+    "\\( -0.4125 \\)",
+    "\\( +0.5875 \\)",
+    "\\( -0.5875 \\)"
+   ],
+   "correcta": 3,
+   "porque": "Con sigmoide + entropía cruzada binaria el gradiente respecto al logit es simplemente \\( p-y = 0.4125-1 = -0.5875 \\). Es negativo porque la red se queda corta: la actualización \\( z \\leftarrow z-\\eta\\cdot(-0.5875) \\) <em>sube</em> el logit y la probabilidad pasa de 0.4125 a 0.7249 tras el paso del fragmento 6."
+  },
+  {
+   "q": "Inicializas <em>todos</em> los pesos y biases de la capa oculta con el mismo valor. ¿Qué pasa al entrenar?",
+   "opciones": [
+    "Aprende más rápido, porque todas parten del mismo punto",
+    "Cada neurona se especializa en una zona distinta del plano",
+    "Todas las neuronas ocultas reciben el mismo gradiente en cada paso, siguen idénticas y la capa equivale a una sola neurona",
+    "El gradiente es 0 y la red no se mueve en absoluto"
+   ],
+   "correcta": 2,
+   "porque": "Con pesos iguales, las neuronas calculan lo mismo, reciben el mismo gradiente y se actualizan igual: nunca se diferencian (<em>simetría</em>). En el fragmento 8 la pérdida se queda en 0.5018 con pesos iguales frente a 0.1911 con los pesos aleatorios de PyTorch. La red sí se mueve (no es gradiente 0), pero solo como una neurona."
+  },
+  {
+   "q": "Le pasas logits (sin sigmoide) a <code>nn.BCELoss</code>. ¿Qué ocurre?",
+   "opciones": [
+    "Nada: funciona igual",
+    "<code>RuntimeError: all elements of input should be between 0 and 1</code>",
+    "<code>expected target dtype to be Long or Byte</code>"
+   ],
+   "correcta": 1,
+   "porque": "<code>BCELoss</code> espera probabilidades entre 0 y 1. Arreglo: añadir <code>nn.Sigmoid()</code> al final o, mejor, usar <code>BCEWithLogitsLoss</code>, que recibe el logit y aplica la sigmoide por dentro."
+  }
+ ]
 }
-for nombre, f in activaciones.items():
-    a = f(z)
-    a.sum().backward()
-    print(f"{nombre:9s} f(z) = {a.detach().numpy().round(4)}   f'(z) = {z.grad.numpy().round(4)}")
-    z.grad = None
+</script>
+</section>
 
-print("nn.ReLU()(z)   :", nn.ReLU()(z).detach().numpy())
-print("F.relu(z)      :", F.relu(z).detach().numpy())
-print("pendiente por defecto de nn.LeakyReLU():", nn.LeakyReLU().negative_slope)</code></pre>
-<details class="linea-a-linea" open="">
-<summary>Línea por línea</summary>
-<p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
-<table class="lineas">
-<thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
-<tbody>
-<tr data-lines="1-3"><td><code>import torch …</code></td><td><code>torch</code>, <code>nn</code> (las activaciones como módulos) y <code>torch.nn.functional as F</code> (las mismas como funciones sueltas).</td></tr>
-<tr data-lines="5"><td><code>z = torch.tensor([-2., 0., 2.], requires_grad=True)</code></td><td>Tres valores de <code>z</code>: −2, 0 y 2. <code>requires_grad=True</code> pide a PyTorch que recuerde las operaciones para poder derivar respecto a <code>z</code> (lo viste en el Curso 4).</td></tr>
-<tr data-lines="7-12"><td><code>activaciones = { …</code></td><td>Un diccionario <code>nombre → función</code>. Las tres primeras son funciones de <code>torch</code>; la cuarta es un módulo <code>nn.LeakyReLU</code> con pendiente negativa 0.1, que también se puede llamar como una función.</td></tr>
-<tr data-lines="13"><td><code>for nombre, f in activaciones.items():</code></td><td>Recorre el diccionario.</td></tr>
-<tr data-lines="14"><td><code>a = f(z)</code></td><td>Aplica la activación al vector <code>z</code>, elemento a elemento.</td></tr>
-<tr data-lines="15"><td><code>a.sum().backward()</code></td><td><code>a.sum().backward()</code>: sumamos las tres salidas para tener un solo número y derivamos. Como cada salida depende solo de su <code>z</code>, el gradiente de la suma respecto a cada <code>z</code> es la derivada de la activación en ese punto.</td></tr>
-<tr data-lines="16"><td><code>print(f"{nombre:9s} f(z) = {a.detach().numpy().round(4)}   f'(z) = {z.grad.numpy().round(4)}")</code></td><td>Imprime nombre, valores de <code>f(z)</code> y derivadas (<code>z.grad</code>).</td></tr>
-<tr data-lines="17"><td><code>z.grad = None</code></td><td><code>z.grad = None</code> borra el gradiente acumulado: si no, el siguiente <code>backward()</code> se <em>sumaría</em> al anterior.</td></tr>
-<tr data-lines="19"><td><code>print("nn.ReLU()(z)   :", nn.ReLU()(z).detach().numpy())</code></td><td>Las tres formas de usar ReLU dan lo mismo: aquí el módulo <code>nn.ReLU()</code> (se crea y se llama en una línea)…</td></tr>
-<tr data-lines="20"><td><code>print("F.relu(z)      :", F.relu(z).detach().numpy())</code></td><td>…y aquí la función <code>F.relu</code>.</td></tr>
-<tr data-lines="21"><td><code>print("pendiente por defecto de nn.LeakyReLU():", nn.LeakyReLU().negative_slope)</code></td><td>La pendiente que usa <code>nn.LeakyReLU()</code> si no se indica nada.</td></tr>
-</tbody>
-</table>
-</details>
-<div class="salida">
-<strong>Salida esperada</strong>
-<pre>sigmoide  f(z) = [0.1192 0.5    0.8808]   f'(z) = [0.105 0.25  0.105]
-tanh      f(z) = [-0.964  0.     0.964]   f'(z) = [0.0707 1.     0.0707]
-ReLU      f(z) = [0. 0. 2.]   f'(z) = [0. 0. 1.]
-LeakyReLU f(z) = [-0.2  0.   2. ]   f'(z) = [0.1 0.1 1. ]
-nn.ReLU()(z)   : [0. 0. 2.]
-F.relu(z)      : [0. 0. 2.]
-pendiente por defecto de nn.LeakyReLU(): 0.01</pre>
-<p>Sigmoide: 0.1192, 0.5, 0.8808 con derivadas 0.105, 0.25 y 0.105 (σ(1−σ) = 0.8808·0.1192 = 0.105). Tanh: −0.964, 0, 0.964 y derivadas 0.0707, 1, 0.0707. ReLU: 0, 0, 2 y derivadas 0, 0, 1: fíjate en que en <code>z = 0</code> PyTorch usa derivada <strong>0</strong>. LeakyReLU con 0.1: −0.2, 0, 2 y derivadas 0.1, 0.1, 1 (en <code>z = 0</code> usa la rama de la pendiente pequeña). <code>nn.ReLU()</code> y <code>F.relu</code> dan lo mismo. Y la pendiente por defecto de <code>nn.LeakyReLU()</code> en PyTorch es <strong>0.01</strong> (en Keras 3 es 0.3).</p>
+<details class="profundizar">
+  <summary><span>Profundizar: la explicación completa<small>La tabla de salida y pérdida para cada problema, por qué «con logits», las pérdidas con números, el bucle de cinco líneas, el backward completo, la meseta de XOR, la simetría y train() / eval().</small></span></summary>
+  <div class="prof-body">
+<h2 id="salida-perdida">La capa de salida y la pérdida: qué combinación para cada problema</h2>
+
+<p class="pregunta">Según lo que quiera predecir Netflix (¿terminará la serie?, ¿de qué género es el tráiler?, ¿qué nota pondrá el usuario?), ¿cuántas neuronas debe tener la última capa, con qué activación termina y qué función de pérdida se le pone? Es la decisión que más errores causa.</p>
+
+<div class="callout recuerda">
+  <span class="lbl">Recuerda (Curso 4)</span>
+  <p>La <a href="../../curso-4/modulo-4.html">regresión logística</a> usa sigmoide + entropía cruzada binaria (<code>nn.BCELoss</code> o <code>nn.BCEWithLogitsLoss</code>) y la <a href="../../curso-4/modulo-5.html">softmax</a> usa <code>nn.CrossEntropyLoss</code>, que <strong>espera logits</strong> (no probabilidades) y las clases como <em>índices enteros</em>. Una red con capa oculta termina igual que esos modelos: solo cambia lo que hay <em>antes</em>.</p>
 </div>
-</article><article class="snippet" data-lang="python" id="frag-5">
-<header>
-<h3>5 · La red como clase nn.Module (y su gemela con nn.Sequential)</h3>
-<p class="para-que"><strong>Para qué sirve</strong> Escribir la red 2-3-1 como una clase que hereda de <code>nn.Module</code>, inspeccionar sus parámetros y comprobar que <code>nn.Sequential</code> construye exactamente la misma red.</p>
-</header>
-<pre class="code"><code>import torch
+
+<table>
+  <caption>Qué poner en la salida según el problema</caption>
+  <thead><tr><th>Problema</th><th>Neuronas de salida</th><th>Activación final</th><th>Pérdida de PyTorch</th><th>Etiquetas \( y \)</th></tr></thead>
+  <tbody>
+    <tr><td><strong>Binaria</strong> (¿terminará la serie?; opción A)</td><td>1</td><td><code>nn.Sigmoid()</code> dentro de la red</td><td><code>nn.BCELoss()</code></td><td><code>float</code>, forma <code>(N, 1)</code>, valores 0.0 / 1.0</td></tr>
+    <tr><td><strong>Binaria</strong> (¿terminará la serie?; opción B, recomendada)</td><td>1</td><td>ninguna (devuelve el logit)</td><td><code>nn.BCEWithLogitsLoss()</code></td><td>igual que arriba</td></tr>
+    <tr><td><strong>Multiclase</strong> (\( K \) clases: p. ej. el género acción / comedia / terror)</td><td>\( K \)</td><td>ninguna (devuelve logits)</td><td><code>nn.CrossEntropyLoss()</code></td><td><code>long</code>, forma <code>(N,)</code>, valores 0 … K−1</td></tr>
+    <tr><td><strong>Regresión</strong> (la nota que pondrá el usuario)</td><td>1 (o las que tenga el objetivo)</td><td>ninguna</td><td><code>nn.MSELoss()</code></td><td><code>float</code>, misma forma que la salida</td></tr>
+  </tbody>
+</table>
+
+<p>Una predicción «de verdad» (probabilidades o clases) se obtiene <em>después</em>: <code>torch.sigmoid(logit)</code> o <code>torch.softmax(logits, dim=1)</code>, y las clases con <code>logit &gt; 0</code> o <code>argmax(dim=1)</code>.</p>
+
+<h3>¿Por qué «con logits»?</h3>
+<p>El <strong>logit</strong> es la salida lineal \( z \) <em>antes</em> de la sigmoide o de la softmax. <code>BCEWithLogitsLoss</code> y <code>CrossEntropyLoss</code> reciben \( z \) y calculan la sigmoide (o softmax) <strong>dentro</strong> de la pérdida con una fórmula numéricamente estable (el truco <em>log-sum-exp</em>), en lugar de calcular una probabilidad que puede redondearse a 0 o a 1 y luego hacer su logaritmo. Es más preciso y evita que una probabilidad redondeada a 0 o a 1 produzca un \( \ln 0 \). Además, <code>argmax</code> de los logits da la misma clase que <code>argmax</code> de las probabilidades (softmax conserva el orden), así que para decidir la clase ni siquiera hace falta aplicarla.</p>
+
+<div class="callout ejemplo">
+  <span class="lbl">Ejemplo numérico · las dos pérdidas con números</span>
+  <p><strong>Binaria.</strong> La red del forward anterior da \( p = 0.4125 \) (probabilidad de que el usuario termine la serie) y la etiqueta es \( y = 1 \) (la terminó): \( L = -[y\ln p + (1-y)\ln(1-p)] = -\ln 0.4125 = 0.8854 \). Si dijera \( p = 0.9 \) la pérdida sería \( -\ln 0.9 = 0.1054 \), y si dijera \( 0.01 \), \( 4.605 \): castiga duramente la seguridad equivocada («seguro que la abandona», y la terminó).</p>
+  <p><strong>Tres clases.</strong> Una red mira el tráiler de una película y da los logits \( \mathbf{z} = (2.0,\ 1.0,\ 0.1) \) para (acción, comedia, terror); la película es de acción (clase 0). Exponenciales: \( e^{2.0} = 7.389 \), \( e^{1.0} = 2.718 \), \( e^{0.1} = 1.105 \); suma 11.213. Softmax: \( p = (0.659,\ 0.242,\ 0.099) \). Pérdida: \( -\ln 0.659 = 0.417 \). Y el gradiente respecto a los logits es \( p - \text{one-hot} = (0.659-1,\ 0.242,\ 0.099) = (-0.341,\ 0.242,\ 0.099) \): empuja el logit correcto hacia arriba y los demás hacia abajo.</p>
+</div>
+
+<div class="formula">\[ \underbrace{\frac{\partial L}{\partial z}}_{\text{binaria}} = p - y \qquad\qquad \underbrace{\frac{\partial L}{\partial z_k}}_{\text{multiclase}} = p_k - y_k \]</div>
+<p>donde \( z \) es el logit, \( p = \sigma(z) \) (o \( p_k \) la probabilidad softmax de la clase \( k \)) e \( y \) la etiqueta (o \( y_k \) su codificación one-hot: 1 en la clase correcta y 0 en el resto). Es una de las coincidencias felices del aprendizaje automático: <strong>la derivada de «sigmoide + entropía cruzada» es simplemente «predicción menos realidad»</strong>. Lo usaremos en la sección siguiente.</p>
+
+<div class="callout ojo">
+  <span class="lbl">Ojo · los errores de este cuadro, con su mensaje</span>
+  <p><strong>(1)</strong> <code>BCELoss</code> con logits (sin sigmoide): <code>RuntimeError: all elements of input should be between 0 and 1</code>. <strong>(2)</strong> <code>CrossEntropyLoss</code> con softmax puesto en el <code>forward</code>: no da error, pero aplica softmax <em>dos veces</em> y el entrenamiento va peor sin avisar. <strong>(3)</strong> Etiquetas multiclase como <code>float</code>: <code>expected target dtype to be Long or Byte, but got Float</code>. <strong>(4)</strong> Etiquetas binarias de forma <code>(N,)</code> con salida <code>(N, 1)</code>: error de tamaño (en esta versión de PyTorch es <code>ValueError</code>; arréglalo con <code>y.view(-1, 1)</code>). Todos aparecen en el <a href="leccion-8.html#frag-17">fragmento 17</a>.</p>
+</div>
+
+<h2 id="entrenar">Entrenar la red: el bucle, un paso a mano y por qué a veces se atasca</h2>
+
+<p class="pregunta">Si la red que predice si un usuario termina la serie tiene una capa oculta, ¿cambia el bucle de entrenamiento? ¿Qué pasa por dentro cuando PyTorch calcula los gradientes de las dos capas? ¿Y por qué a veces el entrenamiento no arranca?</p>
+
+<div class="callout recuerda">
+  <span class="lbl">Recuerda (Curso 4, módulo 3)</span>
+  <p>El bucle de entrenamiento de PyTorch son cinco líneas que ya conoces: <code>p = modelo(X)</code> (forward), <code>loss = criterio(p, y)</code>, <code>opt.zero_grad()</code> (borra los gradientes de la vuelta anterior), <code>loss.backward()</code> (calcula los gradientes) y <code>opt.step()</code> (actualiza los parámetros). <strong>Con una capa oculta el bucle es idéntico</strong>: lo único que cambia es el <code>modelo</code>. El motor de gradientes (<code>autograd</code>) deriva solo, capa a capa.</p>
+</div>
+
+<h3>Un paso de entrenamiento con todas las cuentas</h3>
+<p>Seguimos con la red 2-2-1 (sigmoides) y el mismo usuario, \( \mathbf{x} = (1, 2) \), que <strong>sí terminó la serie</strong> (\( y = 1 \)). Ya tenemos el <em>forward</em>: \( \mathbf{h} = (0.3775,\ 0.7311) \), \( \hat y = 0.4125 \) y pérdida \( 0.8854 \). Ahora los gradientes, de derecha a izquierda (<em>backpropagation</em>). Los dos primeros son las fórmulas de la sección anterior; los siguientes aplican la <strong>regla de la cadena</strong> una capa más atrás:</p>
+<div class="callout ejemplo">
+  <span class="lbl">Ejemplo numérico · backward de la red 2-2-1</span>
+  <ol class="pasos">
+    <li><strong>Error en la salida.</strong> \( \delta_2 = \hat y - y = 0.4125 - 1 = -0.5875 \) (negativo: la red se quedó corta, hay que <em>subir</em> la probabilidad de que la termine).</li>
+    <li><strong>Pesos de la salida.</strong> \( \partial L/\partial W_2 = \delta_2\,\mathbf{h} = (-0.5875\cdot 0.3775,\ -0.5875\cdot 0.7311) = (-0.2218,\ -0.4295) \) y \( \partial L/\partial b_2 = \delta_2 = -0.5875 \).</li>
+    <li><strong>Error que llega a la capa oculta.</strong> El error se reparte hacia atrás con los pesos que unen cada neurona con la salida: \( \mathbf{dh} = W_2^\top \delta_2 = (1\cdot(-0.5875),\ -1\cdot(-0.5875)) = (-0.5875,\ +0.5875) \).</li>
+    <li><strong>Atravesar la sigmoide oculta.</strong> Multiplicar por su derivada \( h(1-h) \): \( 0.3775\cdot 0.6225 = 0.2350 \) y \( 0.7311\cdot 0.2689 = 0.1966 \). Así \( \boldsymbol{\delta}_1 = (-0.5875\cdot 0.2350,\ 0.5875\cdot 0.1966) = (-0.1381,\ +0.1155) \).</li>
+    <li><strong>Pesos de la capa oculta.</strong> Error de cada neurona por la entrada que recibe: \( \partial L/\partial W_1 = \boldsymbol{\delta}_1\,\mathbf{x}^\top = \begin{pmatrix} -0.1381\cdot 1 & -0.1381\cdot 2 \\ 0.1155\cdot 1 & 0.1155\cdot 2 \end{pmatrix} = \begin{pmatrix} -0.1381 & -0.2762 \\ 0.1155 & 0.2310 \end{pmatrix} \) y \( \partial L/\partial \mathbf{b}_1 = \boldsymbol{\delta}_1 \). (Sin redondear intermedios, el −0.2762 sale −0.2761, como imprime PyTorch.)</li>
+    <li><strong>Actualizar con \( \eta = 1 \).</strong> \( W_2 \leftarrow (1,-1) - 1\cdot(-0.2218,-0.4295) = (1.2218,\ -0.5705) \), \( b_2 \leftarrow 0.5875 \), y \( W_1,\mathbf{b}_1 \) igual con sus gradientes. Con estos pesos nuevos, la red da \( \hat y = 0.7249 \): subió de 0.4125 a 0.7249.</li>
+  </ol>
+</div>
+<p>Esos son los números exactos del <a href="#frag-6">fragmento 6</a>, comparados con los que da <code>loss.backward()</code>: son idénticos. Todo el entrenamiento es repetir ese paso con muchos datos. La derivación completa de la regla de la cadena para redes más profundas, y cómo se calcula esto «hacia atrás» de forma eficiente, es el tema del <a href="../modulo-2.html">módulo 2</a> (y el <a href="../../curso-2/modulo-1/leccion-6.html#backprop">backprop a mano del Curso 2</a> lo trata en detalle).</p>
+
+<div class="callout recuerda">
+  <span class="lbl">Experimento de arriba: «Un paso de entrenamiento, número a número», con todo detalle</span>
+  <p><strong>Haz esto.</strong> Es el usuario del ejemplo (gusto por la acción 1 y por la comedia 2) y p es la probabilidad de que termine la serie. Deja η = 1 y pulsa «Dar un paso»: la primera vez p debe pasar de 0.4125 a 0.7249. Pulsa varias veces y mira cómo cambian los gradientes de la tabla. Luego «Reiniciar pesos», sube η a 4 y repite; después elige y = 0.</p>
+  <p><strong>Fíjate en.</strong> Cada paso aplica las mismas fórmulas de la tabla. A medida que p se acerca a 1 el error dz₂ = p − y se hace pequeño y los gradientes se encogen: el aprendizaje frena solo cerca de la solución. Con η muy grande los pasos son bruscos. Con y = 0 (el usuario abandonó la serie) la red empuja p hacia 0 en vez de hacia 1: el mismo código, otro objetivo.</p>
+</div>
+
+<h3>Entrenar XOR de verdad (y la meseta)</h3>
+<p>Entrenar la red 2-H-1 con sigmoides sobre los cuatro tipos de usuario del aviso XOR (<em>Toy Story</em> / <em>Shrek</em>) parece trivial: la solución existe. Pero el <a href="leccion-8.html#frag-7">fragmento 7</a> enseña algo importante: con H = 2, <strong>no siempre sale</strong>. Con 10 semillas distintas (10 puntos de partida), 6 aciertan y 4 se quedan atascadas. Y la curva de pérdida de la semilla 1 muestra el motivo en directo:</p>
+<table>
+  <caption>Pérdida de XOR con H = 2, semilla 1 (SGD, lr = 0.5)</caption>
+  <thead><tr><th>Época</th><th>0</th><th>100</th><th>500</th><th>1000</th><th>3000</th></tr></thead>
+  <tbody><tr><th scope="row">Pérdida</th><td>0.7028</td><td>0.6934</td><td>0.6932</td><td>0.6930</td><td class="res">0.0332</td></tr></tbody>
+</table>
+<p>Durante mil épocas la pérdida apenas se mueve (de 0.6934 a 0.6930) y de pronto cae. Es una <strong>meseta</strong>: una zona del paisaje de la pérdida casi plana, donde los gradientes son minúsculos y el descenso va a paso de tortuga. Con una neurona sola, el punto \( w=0 \) era un mínimo; aquí, en las mesetas, hay puntos de silla o zonas planas que el optimizador cruza muy despacio. Con 2 neuronas ocultas hay pocos caminos para salir; con <strong>H = 4 se resuelve en 10 de 10 semillas</strong>. Más neuronas dan más «direcciones» por las que escapar.</p>
+
+<div class="callout ojo">
+  <span class="lbl">Ojo · «mi red no aprende» no siempre es un error de código</span>
+  <p>Si la pérdida se queda clavada en \( \ln 2 = 0.693 \) (clasificación binaria equilibrada) o en \( \ln K \) (con \( K \) clases: 1.099 para \( K=3 \)), la red está diciendo «no sé nada»: reparte la probabilidad por igual. Antes de buscar un <em>bug</em>, prueba lo más barato: otra semilla, más neuronas ocultas, otro <em>learning rate</em> o Adam en vez de SGD, o simplemente más épocas, para ver si es una meseta. Después sí: revisa que el <code>y</code> y la pérdida casan (<a href="#salida-perdida">más arriba</a>).</p>
+</div>
+
+<h3>El problema de la simetría: por qué los pesos iniciales no pueden ser iguales</h3>
+<p>Si todas las neuronas ocultas empiezan con los mismos pesos (por ejemplo, todo a 0.5, o todo a 0), reciben las mismas entradas, producen la misma salida y, en el <em>backward</em>, reciben <strong>el mismo gradiente</strong>: \( \boldsymbol{\delta}_1[j] = W_2[j]\cdot\delta_2\cdot h_j(1-h_j) \) es igual para todas las \( j \) si \( W_2[j] \) y \( h_j \) son iguales. Se actualizan igual y siguen siendo iguales para siempre. Una capa oculta de 3 neuronas «clónicas» es, en la práctica, <strong>una sola neurona</strong> repetida: el resto de la capacidad se desperdicia. Es como contratar a tres críticos que empiezan con exactamente las mismas opiniones y reciben siempre las mismas correcciones: acaban siendo el mismo crítico tres veces.</p>
+<p>El <a href="#frag-8">fragmento 8</a> lo mide: con pesos iniciales iguales, la pérdida final de XOR es 0.5018 y las tres filas de la matriz de pesos son idénticas (4.709 en todas partes); con los pesos aleatorios de PyTorch, la pérdida baja a 0.1911 y las tres neuronas son distintas. Por eso PyTorch inicializa con números <strong>aleatorios</strong> (la <em>ruptura de la simetría</em>). Qué rango y qué distribución son mejores (Xavier, He) lo estudia el módulo 2.</p>
+
+<div class="callout recuerda">
+  <span class="lbl">Experimento de arriba: «Una capa oculta entrenándose: rectas, miniaturas y simetría», con todo detalle</span>
+  <p><strong>Haz esto.</strong> Cada punto es un usuario en un mapa de gustos (x₁: acción, x₂: comedia) y su color dice si termina la serie o la abandona. Con XOR (cuatro nubes), H = 4 y tanh, pulsa «Entrenar» y mira cómo las rectas discontinuas se colocan y las miniaturas h1…h4 aprenden cada una un «trozo». Después activa «Pesos iniciales idénticos (simetría)» y vuelve a entrenar. Prueba también H = 1, 2 y 3 y otros datos (círculos, lunas).</p>
+  <p><strong>Fíjate en.</strong> Cada recta discontinua es z = 0 de una neurona oculta; la miniatura es lo que esa neurona «ve» en todo el plano; la última («salida») es la combinación. Con H = 1 solo hay una recta y la pérdida no baja de ≈ 0.4 en XOR; con la simetría activada, el contador «neuronas distintas» marca 1 de 4: las cuatro rectas son la misma y la miniatura de cada neurona es idéntica. Con círculos hacen falta al menos 3 neuronas para cerrar la región.</p>
+</div>
+
+<div class="callout regla">
+  <span class="lbl">Regla fácil</span>
+  <p>Entrenar una red es repetir: <strong>forward → pérdida → backward → paso</strong>. Si no baja, mira en este orden: (1) ¿pérdida y etiquetas casan en forma y tipo? (2) ¿hay <em>simetría</em> (pesos iguales) o una <em>meseta</em> (prueba otra semilla o más neuronas)? (3) ¿el <em>learning rate</em> es razonable? (4) ¿las entradas están escaladas?</p>
+</div>
+
+<div class="callout ojo">
+  <span class="lbl">Ojo · evaluar sin gradientes, y <code>train()</code> / <code>eval()</code></span>
+  <p>Para medir el acierto sin entrenar, envuelve el código en <code>with torch.no_grad():</code> (ahorra memoria y tiempo porque no se construye el grafo de derivadas) y pon el modelo en modo evaluación con <code>modelo.eval()</code>; antes de volver a entrenar, <code>modelo.train()</code>. Con las redes de este módulo (sin <em>dropout</em> ni <em>batch normalization</em>) los dos modos hacen lo mismo, pero es un hábito que en el <a href="../modulo-2.html">módulo 2</a> será imprescindible.</p>
+</div>
+  </div>
+</details>
+
+<section>
+<h2 class="sin-num">Código</h2>
+<article class="snippet" data-lang="python" id="frag-6">
+  <header>
+    <h3>6 · Un paso de entrenamiento a mano, comprobado con autograd</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Calcular el forward, la pérdida, los gradientes (con las fórmulas de la sección) y un paso de descenso del gradiente en la red 2-2-1 del ejemplo, y comprobar que coinciden con lo que calcula <code>backward()</code>.</p>
+  </header>
+  <pre class="code"><code>import torch
+
+x = torch.tensor([1., 2.])
+y = torch.tensor([1.])
+W1 = torch.tensor([[0.5, -0.5], [1.0, 0.5]], requires_grad=True)
+b1 = torch.tensor([0.0, -1.0], requires_grad=True)
+W2 = torch.tensor([[1.0, -1.0]], requires_grad=True)
+b2 = torch.tensor([0.0], requires_grad=True)
+
+# --- hacia delante ---
+z1 = W1 @ x + b1
+h = torch.sigmoid(z1)
+z2 = W2 @ h + b2
+p = torch.sigmoid(z2)
+loss = -(y * torch.log(p) + (1 - y) * torch.log(1 - p))
+print("z1 =", z1.detach().numpy(), " h =", h.detach().numpy().round(4))
+print(f"z2 = {z2.item():.4f}   p = {p.item():.4f}   pérdida = {loss.item():.4f}")
+
+# --- gradientes que da PyTorch ---
+loss.backward()
+
+# --- los mismos, con las fórmulas a mano ---
+dz2 = p.detach() - y
+dW2 = dz2 * h.detach()
+dh = W2.detach().T @ dz2
+dz1 = dh * h.detach() * (1 - h.detach())
+dW1 = torch.outer(dz1, x)
+print("dz2 =", dz2.numpy().round(4))
+print("dW2 a mano  :", dW2.numpy().round(4), "\ndW2 autograd:", W2.grad.numpy().round(4))
+print("dW1 a mano  :\n", dW1.numpy().round(4))
+print("dW1 autograd:\n", W1.grad.numpy().round(4))
+print("db1 autograd:", b1.grad.numpy().round(4), "  db2 autograd:", b2.grad.numpy().round(4))
+
+# --- un paso de descenso del gradiente con lr = 1 ---
+with torch.no_grad():
+    for param in (W1, b1, W2, b2):
+        param -= 1.0 * param.grad
+    p_nueva = torch.sigmoid(W2 @ torch.sigmoid(W1 @ x + b1) + b2)
+print("probabilidad antes:", round(p.item(), 4), " después:", round(p_nueva.item(), 4))</code></pre>
+  <details class="linea-a-linea" open>
+    <summary>Línea por línea</summary>
+    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+      <tbody>
+        <tr data-lines="1"><td><code>import torch</code></td><td>Solo necesitamos <code>torch</code>: aquí los parámetros se crean a mano, sin capas.</td></tr>
+        <tr data-lines="3-4"><td><code>x = torch.tensor([1., 2.])
+y = torch.tensor([1.])</code></td><td>Una muestra <code>x = (1, 2)</code> y su etiqueta <code>y = 1</code>.</td></tr>
+        <tr data-lines="5-6"><td><code>W1 = torch.tensor([[0.5, -0.5], [1.0, 0.5]], requires_grad=True)
+b1 = torch.tensor([0.0, -1.0], requires_grad=True)</code></td><td>Capa oculta: <code>W1</code> (2×2) y <code>b1</code>. <code>requires_grad=True</code> pide a PyTorch que calcule el gradiente respecto a estos tensores.</td></tr>
+        <tr data-lines="7-8"><td><code>W2 = torch.tensor([[1.0, -1.0]], requires_grad=True)
+b2 = torch.tensor([0.0], requires_grad=True)</code></td><td>Capa de salida: <code>W2</code> (1×2) y <code>b2</code>.</td></tr>
+        <tr data-lines="10-11"><td><code># --- hacia delante ---
+z1 = W1 @ x + b1</code></td><td>Comentario y primera operación: <code>z1 = W1 @ x + b1</code> son las dos sumas ponderadas de la capa oculta.</td></tr>
+        <tr data-lines="12"><td><code>h = torch.sigmoid(z1)</code></td><td><code>h = σ(z1)</code>: activaciones de las dos neuronas ocultas.</td></tr>
+        <tr data-lines="13"><td><code>z2 = W2 @ h + b2</code></td><td><code>z2 = W2 @ h + b2</code>: suma ponderada de la neurona de salida.</td></tr>
+        <tr data-lines="14"><td><code>p = torch.sigmoid(z2)</code></td><td><code>p = σ(z2)</code>: probabilidad de la clase 1.</td></tr>
+        <tr data-lines="15"><td><code>loss = -(y * torch.log(p) + (1 - y) * torch.log(1 - p))</code></td><td>La entropía cruzada binaria escrita a mano: <code>−[y·ln p + (1−y)·ln(1−p)]</code>.</td></tr>
+        <tr data-lines="16-17"><td><code>print("z1 =", z1.detach().numpy(), " h =", h.detach().numpy().round(4))
+print(f"z2 = {z2.item():.4f}   p = {p.item():.4f}   pérdida = {loss.item():.4f}")</code></td><td>Imprime <code>z1</code> y <code>h</code>, y luego <code>z2</code>, <code>p</code> y la pérdida con 4 decimales.</td></tr>
+        <tr data-lines="19-20"><td><code># --- gradientes que da PyTorch ---
+loss.backward()</code></td><td><code>loss.backward()</code> recorre el grafo hacia atrás y deja en cada <code>.grad</code> la derivada de la pérdida respecto a ese parámetro.</td></tr>
+        <tr data-lines="22-23"><td><code># --- los mismos, con las fórmulas a mano ---
+dz2 = p.detach() - y</code></td><td>Fórmulas a mano, paso 1: <code>dz2 = p − y</code> (la derivada de la BCE respecto a <code>z2</code> cuando la salida es una sigmoide). <code>detach()</code> trabaja con valores sin grafo.</td></tr>
+        <tr data-lines="24"><td><code>dW2 = dz2 * h.detach()</code></td><td><code>dW2 = dz2·h</code>: la derivada respecto a cada peso de salida es el error por la entrada de ese peso.</td></tr>
+        <tr data-lines="25"><td><code>dh = W2.detach().T @ dz2</code></td><td><code>dh = W2ᵀ·dz2</code>: el error se reparte hacia atrás entre las neuronas ocultas, proporcional a los pesos que las conectan con la salida.</td></tr>
+        <tr data-lines="26"><td><code>dz1 = dh * h.detach() * (1 - h.detach())</code></td><td><code>dz1 = dh · h(1−h)</code>: se atraviesa la sigmoide multiplicando por su derivada σ′ = h(1−h).</td></tr>
+        <tr data-lines="27"><td><code>dW1 = torch.outer(dz1, x)</code></td><td><code>dW1 = dz1 xᵀ</code> (producto exterior): el gradiente de cada peso de la capa 1 es el error de su neurona por la entrada que recibe. <code>torch.outer</code> lo calcula.</td></tr>
+        <tr data-lines="28-32"><td><code>print("dz2 =", dz2.numpy().round(4)) …</code></td><td>Imprime los gradientes a mano y los que dio <code>autograd</code> (<code>.grad</code>) uno junto al otro. Los gradientes de los sesgos son <code>dz1</code> y <code>dz2</code>.</td></tr>
+        <tr data-lines="34-35"><td><code># --- un paso de descenso del gradiente con lr = 1 ---
+with torch.no_grad():</code></td><td>Un paso de descenso del gradiente con <code>lr = 1</code>. Dentro de <code>torch.no_grad()</code> porque estamos editando parámetros, no calculando.</td></tr>
+        <tr data-lines="36-37"><td><code>for param in (W1, b1, W2, b2):
+    param -= 1.0 * param.grad</code></td><td>A cada parámetro se le resta <code>lr × gradiente</code> (<code>-=</code> lo modifica en el sitio).</td></tr>
+        <tr data-lines="38"><td><code>p_nueva = torch.sigmoid(W2 @ torch.sigmoid(W1 @ x + b1) + b2)</code></td><td>Recalcula la probabilidad con los pesos nuevos.</td></tr>
+        <tr data-lines="39"><td><code>print("probabilidad antes:", round(p.item(), 4), " después:", round(p_nueva.item(), 4))</code></td><td>Imprime la probabilidad antes y después.</td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>z1 = [-0.5  1. ]  h = [0.3775 0.7311]
+z2 = -0.3535   p = 0.4125   pérdida = 0.8854
+dz2 = [-0.5875]
+dW2 a mano  : [-0.2218 -0.4295] 
+dW2 autograd: [[-0.2218 -0.4295]]
+dW1 a mano  :
+ [[-0.1381 -0.2761]
+ [ 0.1155  0.231 ]]
+dW1 autograd:
+ [[-0.1381 -0.2761]
+ [ 0.1155  0.231 ]]
+db1 autograd: [-0.1381  0.1155]   db2 autograd: [-0.5875]
+probabilidad antes: 0.4125  después: 0.7249</pre>
+    <p>Forward: <code>z1 = [−0.5, 1.0]</code>, <code>h = [0.3775, 0.7311]</code>, <code>z2 = −0.3535</code>, <code>p = 0.4125</code> y pérdida <strong>0.8854</strong> (la red da solo un 41 % a la clase correcta). Gradientes: <code>dz2 = −0.5875</code>, <code>dW2 = [−0.2218, −0.4295]</code> y <code>dW1 = [[−0.1381, −0.2761], [0.1155, 0.2310]]</code>, <strong>idénticos</strong> a mano y con autograd; los de los sesgos valen <code>dz1</code> y <code>dz2</code>. Tras un paso de <code>lr = 1</code>, la probabilidad de la clase correcta sube de <strong>0.4125 a 0.7249</strong>. Todo el aprendizaje es repetir esto muchas veces.</p>
+  </div>
+</article>
+
+<article class="snippet" data-lang="python" id="frag-8">
+  <header>
+    <h3>8 · El problema de la simetría: pesos iniciales iguales</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Comprobar que si todas las neuronas ocultas empiezan con los mismos pesos, entrenar nunca las diferencia: las tres se convierten en copias de una sola.</p>
+  </header>
+  <pre class="code"><code>import torch
 from torch import nn
 
-class Net(nn.Module):
-    def __init__(self, d_in, h, d_out):
-        super().__init__()
-        self.linear1 = nn.Linear(d_in, h)
-        self.linear2 = nn.Linear(h, d_out)
+X = torch.tensor([[0., 0.], [0., 1.], [1., 0.], [1., 1.]])
+y = torch.tensor([[0.], [1.], [1.], [0.]])
 
-    def forward(self, x):
-        x = torch.sigmoid(self.linear1(x))
-        return torch.sigmoid(self.linear2(x))
+def crear(inicial_igual):
+    torch.manual_seed(0)
+    m = nn.Sequential(nn.Linear(2, 3), nn.Sigmoid(), nn.Linear(3, 1), nn.Sigmoid())
+    if inicial_igual:
+        with torch.no_grad():
+            m[0].weight.fill_(0.5)
+            m[0].bias.fill_(0.1)
+            m[2].weight.fill_(0.5)
+            m[2].bias.fill_(0.0)
+    return m
 
-torch.manual_seed(0)
-modelo = Net(2, 3, 1)
-print(modelo)
-for nombre, p in modelo.named_parameters():
-    print(f"{nombre:16s} forma {tuple(p.shape)}  ({p.numel()} elementos)")
-print("total:", sum(p.numel() for p in modelo.parameters()))
-print("claves del state_dict:", list(modelo.state_dict().keys()))
-
-torch.manual_seed(0)
-equivalente = nn.Sequential(nn.Linear(2, 3), nn.Sigmoid(), nn.Linear(3, 1), nn.Sigmoid())
-x = torch.tensor([[0.5, -1.0]])
-print(f"Net        : {modelo(x).item():.6f}")
-print(f"Sequential : {equivalente(x).item():.6f}")</code></pre>
-<details class="linea-a-linea" open="">
-<summary>Línea por línea</summary>
-<p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
-<table class="lineas">
-<thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
-<tbody>
-<tr data-lines="1-2"><td><code>import torch
+for igual in (True, False):
+    m = crear(igual)
+    opt = torch.optim.SGD(m.parameters(), lr=0.5)
+    for _ in range(2000):
+        loss = nn.functional.binary_cross_entropy(m(X), y)
+        opt.zero_grad()
+        loss.backward()
+        opt.step()
+    print("pesos iniciales", "IGUALES" if igual else "aleatorios", f"-&gt; pérdida final {loss.item():.4f}")
+    print(m[0].weight.data.numpy().round(3))</code></pre>
+  <details class="linea-a-linea" open>
+    <summary>Línea por línea</summary>
+    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+      <tbody>
+        <tr data-lines="1-2"><td><code>import torch
 from torch import nn</code></td><td>Importaciones.</td></tr>
-<tr data-lines="4"><td><code>class Net(nn.Module):</code></td><td><code>class Net(nn.Module)</code>: una clase nueva que <em>hereda</em> de <code>nn.Module</code>, la base de todos los modelos de PyTorch.</td></tr>
-<tr data-lines="5"><td><code>def __init__(self, d_in, h, d_out):</code></td><td>El <code>__init__</code> recibe el tamaño de entrada, el de la capa oculta y el de salida.</td></tr>
-<tr data-lines="6"><td><code>super().__init__()</code></td><td><code>super().__init__()</code> ejecuta el constructor de <code>nn.Module</code>. Sin esta línea PyTorch no puede llevar la cuenta de las capas (fragmento 17).</td></tr>
-<tr data-lines="7-8"><td><code>self.linear1 = nn.Linear(d_in, h)
-self.linear2 = nn.Linear(h, d_out)</code></td><td>Las dos capas lineales se guardan como atributos (<code>self.linear1</code>, <code>self.linear2</code>). Al asignarlas, <code>nn.Module</code> las <em>registra</em>: así <code>parameters()</code> y <code>state_dict()</code> sabrán encontrarlas.</td></tr>
-<tr data-lines="10"><td><code>def forward(self, x):</code></td><td><code>forward</code> describe qué le pasa a una entrada: es el «cableado» de la red.</td></tr>
-<tr data-lines="11"><td><code>x = torch.sigmoid(self.linear1(x))</code></td><td>Capa 1 y sigmoide encadenadas: <code>linear1</code> hace <code>W1·x + b1</code> y <code>torch.sigmoid</code> la activa.</td></tr>
-<tr data-lines="12"><td><code>return torch.sigmoid(self.linear2(x))</code></td><td>Capa 2 y sigmoide final: la salida es una probabilidad.</td></tr>
-<tr data-lines="14"><td><code>torch.manual_seed(0)</code></td><td>Semilla para que los pesos iniciales sean reproducibles.</td></tr>
-<tr data-lines="15"><td><code>modelo = Net(2, 3, 1)</code></td><td>Crea la red: 2 entradas, 3 neuronas ocultas, 1 salida.</td></tr>
-<tr data-lines="16"><td><code>print(modelo)</code></td><td><code>print(modelo)</code> enseña la lista de capas registradas (no muestra las activaciones de <code>forward</code>, porque son llamadas a función y no módulos).</td></tr>
-<tr data-lines="17-18"><td><code>for nombre, p in modelo.named_parameters():
-    print(f"{nombre:16s} forma {tuple(p.shape)}  ({p.numel()} elementos)")</code></td><td><code>named_parameters()</code> da cada tensor aprendible con su nombre. Imprimimos su forma y cuántos elementos tiene.</td></tr>
-<tr data-lines="19"><td><code>print("total:", sum(p.numel() for p in modelo.parameters()))</code></td><td>Total de parámetros: 6 + 3 + 3 + 1 = 13.</td></tr>
-<tr data-lines="20"><td><code>print("claves del state_dict:", list(modelo.state_dict().keys()))</code></td><td>Las claves del <code>state_dict</code>, el diccionario que se guarda en disco para conservar la red entrenada.</td></tr>
-<tr data-lines="22"><td><code>torch.manual_seed(0)</code></td><td>Misma semilla antes de construir la gemela: así sus pesos iniciales serán los mismos.</td></tr>
-<tr data-lines="23"><td><code>equivalente = nn.Sequential(nn.Linear(2, 3), nn.Sigmoid(), nn.Linear(3, 1), nn.Sigmoid())</code></td><td>La misma red con <code>nn.Sequential</code>: capa, activación, capa, activación. Aquí las activaciones sí son módulos (<code>nn.Sigmoid()</code>).</td></tr>
-<tr data-lines="24"><td><code>x = torch.tensor([[0.5, -1.0]])</code></td><td>Una entrada de ejemplo con una sola muestra y dos características.</td></tr>
-<tr data-lines="25-26"><td><code>print(f"Net        : {modelo(x).item():.6f}")
-print(f"Sequential : {equivalente(x).item():.6f}")</code></td><td>Pasamos la misma entrada por las dos redes y comparamos la salida.</td></tr>
-</tbody>
-</table>
-</details>
-<div class="salida">
-<strong>Salida esperada</strong>
-<pre>Net(
-  (linear1): Linear(in_features=2, out_features=3, bias=True)
-  (linear2): Linear(in_features=3, out_features=1, bias=True)
-)
-linear1.weight   forma (3, 2)  (6 elementos)
-linear1.bias     forma (3,)  (3 elementos)
-linear2.weight   forma (1, 3)  (3 elementos)
-linear2.bias     forma (1,)  (1 elementos)
-total: 13
-claves del state_dict: ['linear1.weight', 'linear1.bias', 'linear2.weight', 'linear2.bias']
-Net        : 0.341642
-Sequential : 0.341642</pre>
-<p><code>print(modelo)</code> lista las dos capas con sus tamaños. Los parámetros son <code>linear1.weight (3, 2)</code>, <code>linear1.bias (3,)</code>, <code>linear2.weight (1, 3)</code> y <code>linear2.bias (1,)</code>: 6 + 3 + 3 + 1 = <strong>13</strong>, el mismo número de la fórmula <code>D_in·H + H + H·D_out + D_out</code> con 2, 3, 1. Las claves del <code>state_dict</code> son esos mismos cuatro nombres. Y <code>Net</code> y <code>Sequential</code> dan la misma salida (0.341642) porque, con la misma semilla, crean las capas en el mismo orden y reciben los mismos pesos.</p>
+        <tr data-lines="4-5"><td><code>X = torch.tensor([[0., 0.], [0., 1.], [1., 0.], [1., 1.]])
+y = torch.tensor([[0.], [1.], [1.], [0.]])</code></td><td>Datos de XOR.</td></tr>
+        <tr data-lines="7"><td><code>def crear(inicial_igual):</code></td><td>Función que crea la red 2-3-1; el argumento dice si los pesos iniciales deben ser todos iguales.</td></tr>
+        <tr data-lines="8"><td><code>torch.manual_seed(0)</code></td><td>Misma semilla: lo único que cambia entre las dos redes es la inicialización.</td></tr>
+        <tr data-lines="9"><td><code>m = nn.Sequential(nn.Linear(2, 3), nn.Sigmoid(), nn.Linear(3, 1), nn.Sigmoid())</code></td><td>Red 2-3-1 con sigmoides: <code>m[0]</code> es la primera <code>Linear</code>, <code>m[2]</code> la segunda.</td></tr>
+        <tr data-lines="10-11"><td><code>if inicial_igual:
+    with torch.no_grad():</code></td><td>Si se pide inicialización igual, se editan los pesos sin registrar gradientes (<code>no_grad</code>).</td></tr>
+        <tr data-lines="12-13"><td><code>m[0].weight.fill_(0.5)
+m[0].bias.fill_(0.1)</code></td><td><code>fill_(valor)</code> rellena todo el tensor con un mismo número: todos los pesos de la capa oculta valen 0.5 y todos sus sesgos 0.1.</td></tr>
+        <tr data-lines="14-15"><td><code>m[2].weight.fill_(0.5)
+m[2].bias.fill_(0.0)</code></td><td>Y lo mismo en la capa de salida: pesos 0.5 y sesgo 0.</td></tr>
+        <tr data-lines="16"><td><code>return m</code></td><td>Devuelve la red.</td></tr>
+        <tr data-lines="18"><td><code>for igual in (True, False):</code></td><td>Se hace el experimento dos veces: primero con pesos iguales, después con los aleatorios de PyTorch.</td></tr>
+        <tr data-lines="19"><td><code>m = crear(igual)</code></td><td>Crea la red correspondiente.</td></tr>
+        <tr data-lines="20"><td><code>opt = torch.optim.SGD(m.parameters(), lr=0.5)</code></td><td>SGD con <code>lr = 0.5</code>.</td></tr>
+        <tr data-lines="21"><td><code>for _ in range(2000):</code></td><td>2000 épocas.</td></tr>
+        <tr data-lines="22"><td><code>loss = nn.functional.binary_cross_entropy(m(X), y)</code></td><td><code>nn.functional.binary_cross_entropy</code> es la versión «función» de <code>nn.BCELoss</code>.</td></tr>
+        <tr data-lines="23-25"><td><code>opt.zero_grad() …</code></td><td>Borrar gradientes, <code>backward</code> y <code>step</code>.</td></tr>
+        <tr data-lines="26"><td><code>print("pesos iniciales", "IGUALES" if igual else "aleatorios", f"-&gt; pérdida final {loss.item():.4f}")</code></td><td>Imprime qué tipo de inicialización era y la pérdida final.</td></tr>
+        <tr data-lines="27"><td><code>print(m[0].weight.data.numpy().round(3))</code></td><td>Imprime la matriz de pesos de la capa oculta (3 neuronas × 2 entradas) ya entrenada.</td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>pesos iniciales IGUALES -&gt; pérdida final 0.5018
+[[4.709 4.709]
+ [4.709 4.709]
+ [4.709 4.709]]
+pesos iniciales aleatorios -&gt; pérdida final 0.1911
+[[ 5.494  5.593]
+ [-2.358 -2.077]
+ [ 1.375  1.589]]</pre>
+    <p>Con los pesos iniciales iguales la pérdida final es <strong>0.5018</strong> y las tres filas de la matriz de pesos son <em>idénticas</em> (4.709 en todas partes: el primer valor de cada fila es el de <code>x1</code> y el segundo el de <code>x2</code>; XOR es simétrico en las dos entradas, de ahí que también sean iguales entre sí). Con los pesos aleatorios la pérdida baja a <strong>0.1911</strong> y las tres neuronas ocultas acaban siendo distintas (5.494 y 5.593; −2.358 y −2.077; 1.375 y 1.589). Las tres neuronas «simétricas» recibieron siempre el mismo gradiente y se movieron a la vez: es como tener una sola neurona oculta.</p>
+  </div>
+</article>
+
+</section>
+
 </div>
-</article></div></details></div></main></body></html>
+</main>
+</body>
+</html>

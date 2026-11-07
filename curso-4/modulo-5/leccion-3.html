@@ -1,33 +1,222 @@
-<!DOCTYPE html>
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lección 3 · Restar el máximo evita que la exponencial reviente · Módulo 5 · Curso 4 · Cuaderno de IA</title>
+<meta name="description" content="En float32 e^89 ya no cabe: con logits grandes la softmax ingenua da nan. Restar el máximo y log-sum-exp lo arreglan, y por eso CrossEntropyLoss recibe logits.">
+<script>try{var t=localStorage.getItem('cuaderno-ia:tema');if(t)document.documentElement.setAttribute('data-theme',t)}catch(e){}</script>
+<link rel="stylesheet" href="../../assets/css/style.css">
+<script src="../../assets/js/curriculum.js"></script>
+<script src="../../assets/js/lab.js"></script>
+<script src="../../assets/js/app.js" defer></script>
+</head>
+<body data-root="../../" data-course="4" data-module="5" data-lesson="3">
+<main>
+<div class="page">
 
-<html lang="es"><head><meta charset="utf-8"/><meta content="width=device-width,initial-scale=1" name="viewport"/><title>Lección 3 · Cuando la exponencial se desborda: restar el máximo y log-sum-exp · Curso 4 · Cuaderno de IA</title><meta content="Los números de float32 (los que usa PyTorch por defecto) llegan como máximo a unos \( 3{,}4\cdot 10^{38} \)." name="description"/><script>try{var t=localStorage.getItem('cuaderno-ia:tema');if(t)document.documentElement.setAttribute('data-theme',t)}catch(e){}</script><link href="../../assets/css/style.css" rel="stylesheet"/><script src="../../assets/js/curriculum.js"></script><script src="../../assets/js/lab.js"></script><script defer="" src="../../assets/js/app.js"></script><script defer="" src="../../assets/js/microanimations.js"></script></head><body data-course="4" data-lesson="3" data-module="5" data-root="../../"><main><div class="page" data-micro="3min"><header class="hero leccion"><div class="hero-grid"><div><p class="eyebrow">Curso 4 · Módulo 5 · Lección 3 de 13</p><h1>Cuando la exponencial se desborda: restar el máximo y log-sum-exp</h1><p class="lead">Los números de float32 (los que usa PyTorch por defecto) llegan como máximo a unos \( 3{,}4\cdot 10^{38} \).</p><p class="meta-line"><span class="read-time" data-render="read-time"></span><a href="../modulo-5.html">Índice del módulo</a></p></div><div aria-hidden="true" class="hero-tile"></div></div></header><details class="predice"><summary>Imagina que tu red, mal inicializada o con entradas enormes, da a acción, comedia y terror unas puntuaciones absurdas: 1000, 1001 y 1002. La fórmula de la softmax es correcta en matemáticas. ¿Qué pasa cuando la calcula un ordenador?<span class="hint"></span></summary><div><p>Los números de float32 (los que usa PyTorch por defecto) llegan como máximo a unos \( 3{,}4\cdot 10^{38} \).</p></div></details><section aria-label="Explicación breve" class="micro-core"><div class="micro-kicker">01 · ENTENDER <span>≈ 45 s</span></div><h2>La idea en palabras sencillas</h2><p>Los números de float32 (los que usa PyTorch por defecto) llegan como máximo a unos \( 3{,}4\cdot 10^{38} \).</p><div class="micro-example"><span aria-hidden="true" class="micro-example-icon">🐾</span><div><strong>Otro ejemplo · Mascotas</strong><p>El clasificador devuelve gato 70 %, perro 20 % y conejo 10 %. Las probabilidades suman 100 %.</p></div></div></section><div class="micro-kicker micro-checkpoint">02 · RESPONDER <span>≈ 15 s</span></div><section aria-label="Pregunta intercalada" class="quiz mini micro-check"><script class="quiz-data" type="application/json">{"titulo": "Pausa rápida · Comprueba la idea", "preguntas": [{"q": "El modelo asigna gato 70 %, perro 20 % y conejo 10 %. ¿Qué clase elegiría?", "opciones": ["Perro", "Conejo", "Gato"], "correcta": 2, "porque": "La clase con mayor probabilidad es gato."}]}</script></section><section aria-label="Animación interactiva" class="micro-viz" data-index="12" data-micro-viz="probability"><div class="micro-kicker">03 · EXPERIMENTAR <span>≈ 45 s</span></div><div class="micro-viz-title"><div><h2>De puntuaciones a probabilidades</h2><p>Modifica una puntuación y compara las tres probabilidades.</p></div><span aria-hidden="true" class="micro-viz-symbol">✦</span></div><div aria-live="polite" class="micro-viz-stage"><p>Animación interactiva: De puntuaciones a probabilidades</p></div></section><div class="micro-kicker micro-checkpoint">04 · APLICAR <span>≈ 15 s</span></div><section aria-label="Pregunta intercalada" class="quiz mini micro-check"><script class="quiz-data" type="application/json">{"titulo": "Pausa rápida · ¿Lo aplicarías?", "preguntas": [{"q": "En una softmax estándar, ¿cuánto suman las probabilidades de las clases?", "opciones": ["Puede ser cualquier número", "100 %", "50 %"], "correcta": 1, "porque": "Softmax normaliza las puntuaciones para que sumen 1 (100 %)."}]}</script></section><div class="micro-finish"><strong>Idea que te llevas</strong><span>Los números de float32 (los que usa PyTorch por defecto) llegan como máximo a unos \( 3{,}4\cdot 10^{38} \)</span><small>¿Quieres más ejemplos, fórmulas o código? Los tienes justo debajo, sin límite de tiempo.</small></div><details class="profundizar micro-legacy"><summary><span>Explorar más: explicación y simulaciones completas<small>Todo el texto original, tablas y demos avanzadas. Opcional.</small></span></summary><div class="prof-body"><section><h2>Cuando la exponencial se desborda: restar el máximo y log-sum-exp</h2>
-<p>Los números de <code>float32</code> (los que usa PyTorch por defecto) llegan como máximo a unos \( 3{,}4\cdot 10^{38} \). Como \( e^{88} \approx 1{,}65\cdot 10^{38} \) todavía cabe pero \( e^{89} \) no, <strong>a partir de un logit de 89 la exponencial da <code>inf</code></strong> (infinito). Y entonces \( \text{inf}/\text{inf} \) es <code>nan</code> (<em>not a number</em>). El <a href="leccion-6.html#frag-4">fragmento 4</a> lo muestra con los logits \( (1000, 1001, 1002) \): <code>exp</code> sale <code>[inf, inf, inf]</code> y la «softmax ingenua» <code>[nan, nan, nan]</code>.</p>
-<p>Ya sabes que <strong>sumar (o restar) una constante a todos los logits no cambia la softmax</strong>. Restemos el mayor, \( m = \max_j z_j \): el mayor pasa a valer 0 y todos los demás son negativos, así que todas las exponenciales están entre 0 y 1 y nada puede desbordar. Con \( (1000, 1001, 1002) \) y \( m = 1002 \):</p>
-<p>La entropía cruzada necesita \( -\ln p_y \). Si primero calculas \( p \) y luego su logaritmo puedes tener otra catástrofe: con logits \( (0, -200) \) la probabilidad de la clase 1 es \( e^{-200}/(1+e^{-200}) \approx 10^{-87} \), que en <code>float32</code> es un <strong>0 exacto</strong>, y \( \ln 0 = -\infty \). La pérdida sería infinita aunque la verdad es que es \( 200 \), un número normal. La solución es no pasar por la probabilidad y calcular el logaritmo de la softmax <strong>directamente</strong>:</p>
-<div class="callout ejemplo"><span class="lbl">Ejemplo tomado del módulo</span><p>· restar el máximo Restar: \( (1000-1002,\ 1001-1002,\ 1002-1002) = (-2,\ -1,\ 0) \).</p></div></section><figure class="demo" data-demo="curso4/c4m5-estabilidad" data-titulo="Dónde revienta la exponencial en float32">
-<div class="haz">Con c = 80 todo va bien. Sube c hasta 85, 86, 87 y 88, y lee las líneas de la softmax ingenua y la estable. Después pon c = 120. Con el segundo deslizador d, sube de 90 a 100, 104 y 200 y mira el logaritmo ingenuo y el correcto.</div>
-<div class="observa">La línea azul es log10(e^x); la franja roja es lo que no cabe en float32 (x ≈ 88,72). Con c = 87 los dos primeros valores caben pero e^89 no: salen <code>(0, 0, nan)</code>, probabilidades <strong>que ni siquiera suman 1</strong>. La versión que resta el máximo da siempre el mismo reparto (0,0900 · 0,2447 · 0,6652). En la parte 2, a partir de d = 104 la probabilidad pequeña se redondea a 0 y su logaritmo ingenuo es −inf, mientras que log_softmax sigue dando −d.</div>
-</figure><div class="resumen"><h2 class="sin-num sin-toc">En pocas líneas</h2><ul><li><strong>Cuando la exponencial se desborda: restar el máximo y log-sum-exp:</strong> Los números de float32 (los que usa PyTorch por defecto) llegan como máximo a unos \( 3{,}4\cdot 10^{38} \).</li><li>Antes de continuar, intenta explicar la demo sin mirar su resultado.</li></ul></div><section class="quiz mini"><script class="quiz-data" type="application/json">{"titulo": "¿Lo tienes?", "preguntas": [{"q": "¿Qué concepto estamos trabajando en esta lección?", "opciones": ["Evaluar: accuracy, matriz de confusión y mirar los errores", "Cuando la exponencial se desborda: restar el máximo y log-sum-exp", "El modelo: una sola capa nn.Linear(64, 10) y lo que aprende"], "correcta": 1, "porque": "Los números de float32 (los que usa PyTorch por defecto) llegan como máximo a unos \\( 3{,}4\\cdot 10^{38} \\)."}, {"q": "¿Cuál de estas afirmaciones recoge lo que acabas de estudiar?", "opciones": ["Siempre hay un único método que sirve para todos los problemas.", "Lo importante es comprender la idea y comprobarla con ejemplos, no memorizar términos.", "Los números de float32 (los que usa PyTorch por defecto) llegan como máximo a unos \\( 3{,}4\\cdot 10^{38} \\)."], "correcta": 2, "porque": "La explicación central es: Los números de float32 (los que usa PyTorch por defecto) llegan como máximo a unos \\( 3{,}4\\cdot 10^{38} \\)."}, {"q": "Si una demo o un ejemplo te desconcierta, ¿cuál es la mejor forma de aprenderlo?", "opciones": ["Ignorar los resultados que no coinciden con tu intuición.", "Memorizar el nombre sin entender la operación.", "Volver a los números, cambiar un valor y explicar qué ocurre."], "correcta": 2, "porque": "Explorar qué cambia y por qué ayuda a conectar el concepto con su resultado."}]}</script></section></div></details><details class="profundizar"><summary><span>Profundizar: explicación completa<small>Matices, fórmulas, tablas, otros ejemplos y experimentos del módulo original.</small></span></summary><div class="prof-body"><section>
+<header class="hero leccion">
+  <div class="hero-grid">
+    <div>
+      <p class="eyebrow">Curso 4 · Módulo 5 · Lección 3 de 8</p>
+      <h1>Restar el máximo evita que la exponencial reviente</h1>
+      <p class="lead">En <code>float32</code>, \( e^{89} \) ya no cabe: con logits grandes la softmax hecha a mano devuelve <code>nan</code>. Como solo importan las diferencias, se resta el mayor y todo vuelve a caber.</p>
+      <p class="meta-line"><span class="read-time" data-render="read-time"></span><a href="../modulo-5.html">Índice del módulo</a></p>
+    </div>
+    <div class="hero-tile" aria-hidden="true"></div>
+  </div>
+</header>
+
+<details class="predice">
+  <summary>Una red mal inicializada da a acción, comedia y terror 1000, 1001 y 1002. La fórmula de la softmax es correcta. ¿Qué devuelve el ordenador si la calculas tal cual?<span class="hint"></span></summary>
+  <div>
+    <p><strong><code>[nan, nan, nan]</code>.</strong> El mayor número de <code>float32</code> ronda \( 3{,}4\cdot 10^{38} \) y \( e^{89} \) ya se pasa: cada exponencial sale <code>inf</code> (infinito), e <code>inf/inf</code> es <code>nan</code> (<em>not a number</em>).</p>
+  </div>
+</details>
+
+<section>
+<h2 id="idea">Mismas diferencias, números pequeños</h2>
+<p>La fórmula es correcta en matemáticas, pero el ordenador tiene un techo: \( e^{88} \approx 1{,}65\cdot 10^{38} \) todavía cabe en <code>float32</code> y \( e^{89} \) no. <strong>A partir de un logit de unos 89, la exponencial da <code>inf</code></strong>.</p>
+<p>La solución sale de la lección anterior: <strong>sumar o restar una constante a todos los logits no cambia la softmax</strong>. Si restas el mayor, \( m = \max_j z_j \), el ganador pasa a valer 0 y los demás son negativos. Todas las exponenciales quedan entre 0 y 1 y nada desborda. Es como restar a cada crítico la nota del más entusiasta: nadie cambia de opinión, pero los números se quedan pequeños. <code>torch.softmax</code> lo hace siempre por dentro.</p>
+<p>Hay un segundo peligro: la pérdida necesita el <strong>logaritmo</strong> de una probabilidad. Si una probabilidad es diminuta, <code>float32</code> la redondea a 0 exacto y \( \ln 0 = -\infty \). Por eso se calcula el logaritmo directamente, sin pasar por \( p \):</p>
+<div class="formula">\[ \ln p_i = z_i - \ln\sum_{j} e^{z_j}, \qquad \ln\sum_j e^{z_j} = m + \ln\sum_j e^{z_j - m} \]</div>
+<p>El segundo término se llama <strong>log-sum-exp</strong>, y la misma resta del máximo lo hace estable. Es lo que hace <code>log_softmax</code>, y es la razón de que <code>nn.CrossEntropyLoss</code> <strong>reciba logits</strong>: dentro hace la cuenta estable. Nunca calcules «softmax y luego log» a mano.</p>
+</section>
+
+<figure class="demo" data-demo="curso4/c4m5-estabilidad" data-titulo="Dónde revienta la exponencial en float32">
+  <div class="haz">Sube c de 80 a 88 y después a 120. Luego sube d hasta 104.</div>
+  <div class="observa">La softmax ingenua se rompe al cruzar la franja roja (x ≈ 88,7); la que resta el máximo da siempre el mismo reparto.</div>
+</figure>
+
+<section>
+<h2 id="numeros">Con números: los logits (1000, 1001, 1002)</h2>
+<div class="callout ejemplo">
+  <span class="lbl">Ejemplo numérico · restar \( m = 1002 \)</span>
+  <ol class="pasos">
+    <li><strong>Restar:</strong> \( (1000, 1001, 1002) - 1002 = (-2,\ -1,\ 0) \).</li>
+    <li><strong>Exponenciales:</strong> \( e^{-2} = 0{,}1353 \), \( e^{-1} = 0{,}3679 \), \( e^{0} = 1 \). Suma: 1,5032.</li>
+    <li><strong>Dividir:</strong> <span class="res">(0,0900; 0,2447; 0,6652)</span>. Terror gana.</li>
+  </ol>
+  <p>Y el log-sum-exp: \( 1002 + \ln 1{,}5032 = 1002{,}4076 \), sin desbordar nada.</p>
+</div>
+</section>
+
+<details class="predice">
+  <summary>Con los logits \( (0, -200) \), ¿qué da <code>log(softmax(z))</code> y qué da <code>log_softmax(z)</code>?<span class="hint"></span></summary>
+  <div>
+    <p><strong><code>[0, -inf]</code> frente a <code>[0, -200]</code>.</strong> La primera redondea \( e^{-200}/(1+e^{-200}) \approx 10^{-87} \) a 0 y su logaritmo es \( -\infty \): una pérdida infinita. La segunda nunca calcula esa probabilidad diminuta y da el valor correcto, \( -200 \).</p>
+  </div>
+</details>
+
+<div class="resumen">
+  <h2 class="sin-num sin-toc">En tres líneas</h2>
+  <ul>
+    <li>En <code>float32</code>, \( e^{z} \) desborda a <code>inf</code> con \( z \gtrsim 89 \), e <code>inf/inf</code> es <code>nan</code>.</li>
+    <li>Restar el máximo no cambia la softmax y deja todas las exponenciales entre 0 y 1.</li>
+    <li><code>log_softmax</code> (log-sum-exp) evita el \( \ln 0 \): por eso <code>CrossEntropyLoss</code> recibe logits.</li>
+  </ul>
+</div>
+
+<section class="quiz mini">
+<script type="application/json" class="quiz-data">
+{
+ "titulo": "¿Lo tienes?",
+ "preguntas": [
+  {
+   "q": "Calculas a mano la softmax de los logits \\((1000;\\ 1001;\\ 1002)\\) como \\(e^z/\\sum e^z\\) en <code>float32</code> y sale <code>nan</code>. ¿Por qué y cómo se arregla?",
+   "opciones": [
+    "Porque la suma de probabilidades supera 1; se divide entre 3.",
+    "Porque los logits deben estar entre 0 y 1; hay que escalar los datos.",
+    "Porque la softmax no admite logits positivos; hay que usar la sigmoide.",
+    "Porque \\(e^{1000}\\) desborda a <code>inf</code> e <code>inf/inf</code> es <code>nan</code>; se arregla restando el máximo a los logits, que no cambia el resultado."
+   ],
+   "correcta": 3,
+   "porque": "En <code>float32</code> el máximo ronda \\(3{,}4\\cdot10^{38}\\), y \\(e^{89}\\) ya lo supera (fragmento 4). Como la softmax solo depende de las diferencias, restar el máximo da \\((e^{-2}, e^{-1}, e^{0})\\) normalizado, que es \\((0{,}09;\\ 0{,}24;\\ 0{,}67)\\), sin desbordar. <code>torch.softmax</code> y <code>CrossEntropyLoss</code> ya lo hacen por dentro. Los logits pueden ser cualquier número real, y sumar probabilidades 1 es justo lo que la softmax garantiza."
+  },
+  {
+   "q": "¿A partir de qué logit, más o menos, \\( e^{z} \\) da <code>inf</code> en <code>float32</code>?",
+   "opciones": [
+    "10",
+    "89",
+    "1000"
+   ],
+   "correcta": 1,
+   "porque": "El máximo de <code>float32</code> ronda \\( 3{,}4\\cdot 10^{38} \\). \\( e^{88} \\approx 1{,}65\\cdot 10^{38} \\) cabe y \\( e^{89} \\) no (el límite exacto es \\( x \\approx 88{,}72 \\))."
+  },
+  {
+   "q": "¿Por qué <code>nn.CrossEntropyLoss</code> recibe logits y no probabilidades?",
+   "opciones": [
+    "Porque así calcula <code>log_softmax</code> de forma estable, sin pasar por probabilidades diminutas",
+    "Porque las probabilidades ocupan más memoria",
+    "Porque los logits siempre son positivos"
+   ],
+   "correcta": 0,
+   "porque": "Si le dieras probabilidades, tendría que tomar su logaritmo y una probabilidad redondeada a 0 daría \\( -\\infty \\). Con logits usa log-sum-exp restando el máximo. Los logits pueden ser negativos."
+  }
+ ]
+}
+</script>
+</section>
+
+<details class="profundizar">
+  <summary><span>Profundizar: la explicación completa<small>El límite de float32 con cifras, la resta del máximo paso a paso, log-sum-exp con el caso (0, −200) y la regla de por qué la pérdida recibe logits.</small></span></summary>
+  <div class="prof-body">
 <h2 id="estabilidad">Cuando la exponencial se desborda: restar el máximo y log-sum-exp</h2>
+
 <p class="pregunta">Imagina que tu red, mal inicializada o con entradas enormes, da a acción, comedia y terror unas puntuaciones absurdas: 1000, 1001 y 1002. La fórmula de la softmax es correcta en matemáticas. ¿Qué pasa cuando la calcula un ordenador?</p>
-<p>Los números de <code>float32</code> (los que usa PyTorch por defecto) llegan como máximo a unos \( 3{,}4\cdot 10^{38} \). Como \( e^{88} \approx 1{,}65\cdot 10^{38} \) todavía cabe pero \( e^{89} \) no, <strong>a partir de un logit de 89 la exponencial da <code>inf</code></strong> (infinito). Y entonces \( \text{inf}/\text{inf} \) es <code>nan</code> (<em>not a number</em>). El <a href="leccion-6.html#frag-4">fragmento 4</a> lo muestra con los logits \( (1000, 1001, 1002) \): <code>exp</code> sale <code>[inf, inf, inf]</code> y la «softmax ingenua» <code>[nan, nan, nan]</code>.</p>
+
+<p>Los números de <code>float32</code> (los que usa PyTorch por defecto) llegan como máximo a unos \( 3{,}4\cdot 10^{38} \). Como \( e^{88} \approx 1{,}65\cdot 10^{38} \) todavía cabe pero \( e^{89} \) no, <strong>a partir de un logit de 89 la exponencial da <code>inf</code></strong> (infinito). Y entonces \( \text{inf}/\text{inf} \) es <code>nan</code> (<em>not a number</em>). El <a href="#frag-4">fragmento 4</a> lo muestra con los logits \( (1000, 1001, 1002) \): <code>exp</code> sale <code>[inf, inf, inf]</code> y la «softmax ingenua» <code>[nan, nan, nan]</code>.</p>
+
 <h3>La solución: restar el máximo</h3>
 <p>Ya sabes que <strong>sumar (o restar) una constante a todos los logits no cambia la softmax</strong>. Restemos el mayor, \( m = \max_j z_j \): el mayor pasa a valer 0 y todos los demás son negativos, así que todas las exponenciales están entre 0 y 1 y nada puede desbordar. Con \( (1000, 1001, 1002) \) y \( m = 1002 \):</p>
 <div class="callout ejemplo">
-<span class="lbl">Ejemplo numérico · restar el máximo</span>
-<ol class="pasos">
-<li><strong>Restar:</strong> \( (1000-1002,\ 1001-1002,\ 1002-1002) = (-2,\ -1,\ 0) \).</li>
-<li><strong>Exponenciales:</strong> \( e^{-2} = 0{,}1353 \), \( e^{-1} = 0{,}3679 \), \( e^{0} = 1 \). Suma: \( 1{,}5032 \).</li>
-<li><strong>Dividir:</strong> \( (0{,}1353;\ 0{,}3679;\ 1)/1{,}5032 = \) <span class="res">(0,0900; 0,2447; 0,6652)</span>.</li>
-</ol>
-<p>Es el resultado correcto, y es el que da <code>torch.softmax</code>: lo hace por dentro siempre. Observa que \( (-2, -1, 0) \) tiene las mismas diferencias que \( (1000, 1001, 1002) \): por eso la respuesta es la misma. Es como restarle a cada crítico la nota del más entusiasta: nadie cambia de opinión sobre quién gana, pero los números se quedan pequeños.</p>
+  <span class="lbl">Ejemplo numérico · restar el máximo</span>
+  <ol class="pasos">
+    <li><strong>Restar:</strong> \( (1000-1002,\ 1001-1002,\ 1002-1002) = (-2,\ -1,\ 0) \).</li>
+    <li><strong>Exponenciales:</strong> \( e^{-2} = 0{,}1353 \), \( e^{-1} = 0{,}3679 \), \( e^{0} = 1 \). Suma: \( 1{,}5032 \).</li>
+    <li><strong>Dividir:</strong> \( (0{,}1353;\ 0{,}3679;\ 1)/1{,}5032 = \) <span class="res">(0,0900; 0,2447; 0,6652)</span>.</li>
+  </ol>
+  <p>Es el resultado correcto, y es el que da <code>torch.softmax</code>: lo hace por dentro siempre. Observa que \( (-2, -1, 0) \) tiene las mismas diferencias que \( (1000, 1001, 1002) \): por eso la respuesta es la misma. Es como restarle a cada crítico la nota del más entusiasta: nadie cambia de opinión sobre quién gana, pero los números se quedan pequeños.</p>
 </div>
+
 <h3>El logaritmo: <em>log-sum-exp</em></h3>
 <p>La entropía cruzada necesita \( -\ln p_y \). Si primero calculas \( p \) y luego su logaritmo puedes tener otra catástrofe: con logits \( (0, -200) \) la probabilidad de la clase 1 es \( e^{-200}/(1+e^{-200}) \approx 10^{-87} \), que en <code>float32</code> es un <strong>0 exacto</strong>, y \( \ln 0 = -\infty \). La pérdida sería infinita aunque la verdad es que es \( 200 \), un número normal. La solución es no pasar por la probabilidad y calcular el logaritmo de la softmax <strong>directamente</strong>:</p>
 <div class="formula">\[ \ln p_i = z_i - \ln\sum_{j} e^{z_j}, \qquad \ln\sum_j e^{z_j} = m + \ln\sum_j e^{z_j - m} \quad\text{con } m = \max_j z_j \]</div>
 <p>El segundo término se llama <strong>log-sum-exp</strong> y la misma resta del máximo lo hace estable. Con los logits grandes: \( 1002 + \ln 1{,}5032 = 1002{,}4076 \), el valor que imprime <code>torch.logsumexp</code>. En el fragmento 4 verás la diferencia: <code>log(softmax([0, -200]))</code> da <code>[0, -inf]</code> pero <code>log_softmax</code> da <code>[0, -200]</code>.</p>
+
 <div class="callout regla">
-<span class="lbl">Regla fácil</span>
-<p>Por esto <code>nn.CrossEntropyLoss</code> <strong>recibe logits</strong> y no probabilidades: dentro hace <code>log_softmax</code> (estable) y de ahí saca la pérdida. Nunca calcules «softmax y luego log» a mano. Para <em>ver</em> probabilidades usa <code>torch.softmax</code> aparte, con <code>torch.no_grad()</code>, y no como parte del modelo que entrenas.</p>
+  <span class="lbl">Regla fácil</span>
+  <p>Por esto <code>nn.CrossEntropyLoss</code> <strong>recibe logits</strong> y no probabilidades: dentro hace <code>log_softmax</code> (estable) y de ahí saca la pérdida. Nunca calcules «softmax y luego log» a mano. Para <em>ver</em> probabilidades usa <code>torch.softmax</code> aparte, con <code>torch.no_grad()</code>, y no como parte del modelo que entrenas.</p>
 </div>
-</section></div></details><details class="profundizar" id="codigo"><summary><span>Ver código explicado paso a paso<small>0 fragmento(s) original(es), con cada línea comentada y salida esperada.</small></span></summary><div class="prof-body"><p>Esta lección se centra en la idea y la demo; no requiere código adicional.</p></div></details></div></main></body></html>
+
+<div class="callout recuerda">
+  <span class="lbl">Experimento de arriba: «Dónde revienta la exponencial en float32», con todo detalle</span>
+  <p><strong>Haz esto.</strong> Con c = 80 todo va bien. Sube c hasta 85, 86, 87 y 88, y lee las líneas de la softmax ingenua y la estable. Después pon c = 120. Con el segundo deslizador d, sube de 90 a 100, 104 y 200 y mira el logaritmo ingenuo y el correcto.</p>
+  <p><strong>Fíjate en.</strong> La línea azul es log10(e^x); la franja roja es lo que no cabe en float32 (x ≈ 88,72). Con c = 87 los dos primeros valores caben pero e^89 no: salen <code>(0, 0, nan)</code>, probabilidades <strong>que ni siquiera suman 1</strong>. La versión que resta el máximo da siempre el mismo reparto (0,0900 · 0,2447 · 0,6652). En la parte 2, a partir de d = 104 la probabilidad pequeña se redondea a 0 y su logaritmo ingenuo es −inf, mientras que log_softmax sigue dando −d.</p>
+</div>
+  </div>
+</details>
+
+<section>
+<h2 class="sin-num">Código</h2>
+<article class="snippet" id="frag-4" data-lang="python">
+  <header>
+    <h3>4 · Overflow y la forma estable de calcular la softmax</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Muestra qué pasa cuando los logits son grandes (la softmax ingenua da <code>nan</code>), cómo lo resuelve restar el máximo y por qué existen <code>log_softmax</code> y <code>logsumexp</code>.</p>
+  </header>
+  <pre class="code"><code>import torch
+
+grandes = torch.tensor([1000.0, 1001.0, 1002.0])
+
+e = torch.exp(grandes)
+print(&quot;exp(logits)             :&quot;, e)
+print(&quot;softmax ingenua         :&quot;, e / e.sum())
+
+e_est = torch.exp(grandes - grandes.max())
+print(&quot;restando el máximo      :&quot;, e_est / e_est.sum())
+print(&quot;torch.softmax           :&quot;, torch.softmax(grandes, dim=0))
+
+print(&quot;exp(88) =&quot;, torch.exp(torch.tensor(88.0)).item())
+print(&quot;exp(89) =&quot;, torch.exp(torch.tensor(89.0)).item())
+
+raros = torch.tensor([0.0, -200.0])
+print(&quot;log(softmax(.))         :&quot;, torch.log(torch.softmax(raros, dim=0)))
+print(&quot;log_softmax(.)          :&quot;, torch.log_softmax(raros, dim=0))
+print(&quot;logsumexp de los grandes:&quot;, torch.logsumexp(grandes, dim=0))</code></pre>
+  <details class="linea-a-linea" open>
+    <summary>Línea por línea</summary>
+    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+      <tbody>
+        <tr data-lines="1"><td><code>import torch</code></td><td>Importa PyTorch.</td></tr>
+        <tr data-lines="3"><td><code>grandes = torch.tensor([1000.0, 1001.0, 1002.0])</code></td><td>Tres logits enormes: 1000, 1001 y 1002. Su softmax verdadera es la misma que la de \( (0, 1, 2) \), porque solo importan las diferencias.</td></tr>
+        <tr data-lines="5-7"><td><code>e = torch.exp(grandes) …</code></td><td>La versión ingenua: \( e^{1000} \) no cabe en un <code>float32</code> (el máximo ronda \( 3{,}4\cdot10^{38} \)) y sale <code>inf</code>. Después <code>inf / inf</code> es <code>nan</code> (no es un número).</td></tr>
+        <tr data-lines="9-11"><td><code>e_est = torch.exp(grandes - grandes.max()) …</code></td><td>Restar el máximo deja los exponentes en \( (-2; -1; 0) \), todos manejables, y el resultado es el correcto. <code>torch.softmax</code> hace internamente ese truco, por eso da lo mismo.</td></tr>
+        <tr data-lines="13-14"><td><code>print(&quot;exp(88) =&quot;, torch.exp(torch.tensor(88.0)).item()) …</code></td><td>Busca el límite: \( e^{88} \approx 1{,}65\cdot10^{38} \) todavía cabe y \( e^{89} \) ya es <code>inf</code>.</td></tr>
+        <tr data-lines="16-18"><td><code>raros = torch.tensor([0.0, -200.0]) …</code></td><td>Otro problema: con logits \( (0; -200) \) la softmax da 0 exacto para la segunda clase y <code>log(0)</code> es <code>-inf</code>. <code>log_softmax</code> calcula el logaritmo sin pasar por la probabilidad y devuelve el valor correcto, \( -200 \).</td></tr>
+        <tr data-lines="19"><td><code>print(&quot;logsumexp de los grandes:&quot;, torch.logsumexp(grandes …</code></td><td><code>logsumexp</code> calcula \( \ln\sum e^{z_k} \) de forma estable (restando el máximo y sumándolo después): \( 1002 + \ln(1 + e^{-1} + e^{-2}) = 1002{,}4076 \). Es la pieza que usa la entropía cruzada.</td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>exp(logits)             : tensor([inf, inf, inf])
+softmax ingenua         : tensor([nan, nan, nan])
+restando el máximo      : tensor([0.0900, 0.2447, 0.6652])
+torch.softmax           : tensor([0.0900, 0.2447, 0.6652])
+exp(88) = 1.6516362661361307e+38
+exp(89) = inf
+log(softmax(.))         : tensor([0., -inf])
+log_softmax(.)          : tensor([   0., -200.])
+logsumexp de los grandes: tensor(1002.4076)</pre>
+    <p>La ingenua da <code>inf</code> y luego <code>nan</code>; las estables dan \( (0{,}0900;\ 0{,}2447;\ 0{,}6652) \), idéntico a la softmax de \( (0, 1, 2) \). El límite está justo entre 88 y 89. Y <code>log(softmax)</code> da \( -\infty \) donde <code>log_softmax</code> da \( -200 \). Conclusión práctica: usa siempre <code>log_softmax</code> o, mejor, <code>CrossEntropyLoss</code> sobre logits, que ya lo hace bien.</p>
+  </div>
+</article>
+
+</section>
+
+</div>
+</main>
+</body>
+</html>

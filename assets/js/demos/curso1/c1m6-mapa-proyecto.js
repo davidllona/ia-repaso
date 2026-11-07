@@ -27,6 +27,10 @@ Lab.register("curso1/c1m6-mapa-proyecto", function (root, api) {
     { t: "Producción y vigilancia", mod: "M1", links: [[1, "ciclo de vida de un modelo"]], sec: "produccion",
       txt: "Desplegar, monitorizar, detectar deriva (drift) y reentrenar: el modelo empieza a envejecer el día que sale a producción." }
   ];
+  // En las lecciones cortas (curso-1/modulo-6/leccion-N.html) cada sección vive en una lección distinta
+  var EN_LECCION = document.body.hasAttribute("data-lesson"), PRE = EN_LECCION ? "../" : "";
+  var LECCION = { "negocio-a-ml": 1, "lluvia-fuga": 2, "lluvia-balance": 3, "streamflix-datos": 4, "preparacion": 4,
+    "clasificacion": 5, "umbral": 5, "clustering": 7, "recomendador": 7, "produccion": 8 };
   var sel = 0;
   var ROWH = 34, TOP = 8;
   var view = api.view(root, { aspect: 0.9, minH: ST.length * ROWH + TOP * 2, maxH: ST.length * ROWH + TOP * 2, drag: false, label: "Mapa de doce etapas de un proyecto de Machine Learning; cada etapa indica el módulo donde se explica" });
@@ -61,8 +65,9 @@ Lab.register("curso1/c1m6-mapa-proyecto", function (root, api) {
   }
   function update() {
     view.redraw();
-    var s = ST[sel], l = s.links.map(function (q) { return "<a href='modulo-" + q[0] + ".html'>Módulo " + q[0] + "</a> (" + q[1] + ")"; }).join(" · ");
-    out.set("<b>Etapa " + (sel + 1) + ": " + s.t + "</b><br>" + s.txt + "<br><span class='good'>Dónde se explica a fondo:</span> " + l + " · <a href='#" + s.sec + "'>en este módulo ↓</a>");
+    var s = ST[sel], l = s.links.map(function (q) { return "<a href='" + PRE + "modulo-" + q[0] + ".html'>Módulo " + q[0] + "</a> (" + q[1] + ")"; }).join(" · ");
+    var aqui = EN_LECCION ? "<a href='leccion-" + LECCION[s.sec] + ".html#" + s.sec + "'>en este módulo: lección " + LECCION[s.sec] + " →</a>" : "<a href='#" + s.sec + "'>en este módulo ↓</a>";
+    out.set("<b>Etapa " + (sel + 1) + ": " + s.t + "</b><br>" + s.txt + "<br><span class='good'>Dónde se explica a fondo:</span> " + l + " · " + aqui);
   }
   view.canvas.addEventListener("click", function (e) {
     var r = view.canvas.getBoundingClientRect(), py = (e.clientY - r.top) * (view.h / r.height);

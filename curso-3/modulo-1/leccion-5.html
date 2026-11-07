@@ -1,122 +1,441 @@
-<!DOCTYPE html>
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lección 5 · Sequential es una fila; la API funcional, un grafo de capas · Módulo 1 · Curso 3 · Cuaderno de IA</title>
+<meta name="description" content="Las tres formas de construir un modelo en Keras y cuándo usar cada una; la API funcional con tensores simbólicos, atajos con Add y ramas con Concatenate.">
+<script>try{var t=localStorage.getItem('cuaderno-ia:tema');if(t)document.documentElement.setAttribute('data-theme',t)}catch(e){}</script>
+<link rel="stylesheet" href="../../assets/css/style.css">
+<script src="../../assets/js/curriculum.js"></script>
+<script src="../../assets/js/lab.js"></script>
+<script src="../../assets/js/app.js" defer></script>
+</head>
+<body data-root="../../" data-course="3" data-module="1" data-lesson="5">
+<main>
+<div class="page">
 
-<html lang="es"><head><meta charset="utf-8"/><meta content="width=device-width,initial-scale=1" name="viewport"/><title>Lección 5 · tf.function: de Python a un grafo rápido · Curso 3 · Cuaderno de IA</title><meta content="Si decoras una función con @tf.function (o la envuelves con tf.function(f) ), sucede esto:" name="description"/><script>try{var t=localStorage.getItem('cuaderno-ia:tema');if(t)document.documentElement.setAttribute('data-theme',t)}catch(e){}</script><link href="../../assets/css/style.css" rel="stylesheet"/><script src="../../assets/js/curriculum.js"></script><script src="../../assets/js/lab.js"></script><script defer="" src="../../assets/js/app.js"></script><script defer="" src="../../assets/js/microanimations.js"></script></head><body data-course="3" data-lesson="5" data-module="1" data-root="../../"><main><div class="page" data-micro="3min"><header class="hero leccion"><div class="hero-grid"><div><p class="eyebrow">Curso 3 · Módulo 1 · Lección 5 de 14</p><h1>tf.function: de Python a un grafo rápido</h1><p class="lead">Si decoras una función con @tf.function (o la envuelves con tf.function(f) ), sucede esto:</p><p class="meta-line"><span class="read-time" data-render="read-time"></span><a href="../modulo-1.html">Índice del módulo</a></p></div><div aria-hidden="true" class="hero-tile"></div></div></header><details class="predice"><summary>Antes de mirar el ejemplo: ¿qué crees que va a cambiar al mover los controles?</summary><div><p>Si decoras una función con @tf.function (o la envuelves con tf.function(f) ), sucede esto:</p></div></details><section aria-label="Explicación breve" class="micro-core"><div class="micro-kicker">01 · ENTENDER <span>≈ 45 s</span></div><h2>La idea en palabras sencillas</h2><p>Si decoras una función con @tf.function (o la envuelves con tf.function(f) ), sucede esto:</p><div class="micro-example"><span aria-hidden="true" class="micro-example-icon">🏠</span><div><strong>Otro ejemplo · Casa</strong><p>Una neurona combina metros y habitaciones; cada dato tiene un peso y produce una salida.</p></div></div></section><div class="micro-kicker micro-checkpoint">02 · RESPONDER <span>≈ 15 s</span></div><section aria-label="Pregunta intercalada" class="quiz mini micro-check"><script class="quiz-data" type="application/json">{"titulo": "Pausa rápida · Comprueba la idea", "preguntas": [{"q": "¿Qué aporta tf.function frente a ejecutar Python puro?", "opciones": ["Puede trazar operaciones como grafo optimizable", "Sustituye todos los datos", "Garantiza 100 % de accuracy"], "correcta": 0, "porque": "Construye y optimiza un grafo de operaciones de TensorFlow."}]}</script></section><section aria-label="Animación interactiva" class="micro-viz" data-index="9" data-micro-viz="neural"><div class="micro-kicker">03 · EXPERIMENTAR <span>≈ 45 s</span></div><div class="micro-viz-title"><div><h2>Señales que atraviesan una red</h2><p>Pulsa «Propagar» para seguir el recorrido de entradas a salida.</p></div><span aria-hidden="true" class="micro-viz-symbol">✦</span></div><div aria-live="polite" class="micro-viz-stage"><p>Animación interactiva: Señales que atraviesan una red</p></div></section><div class="micro-kicker micro-checkpoint">04 · APLICAR <span>≈ 15 s</span></div><section aria-label="Pregunta intercalada" class="quiz mini micro-check"><script class="quiz-data" type="application/json">{"titulo": "Pausa rápida · ¿Lo aplicarías?", "preguntas": [{"q": "¿Es correcto pensar que tf.function siempre mejora cualquier código sin límites?", "opciones": ["Sí, siempre", "Es un tipo de clustering", "No, depende de las operaciones y cómo se trace"], "correcta": 2, "porque": "Puede tener limitaciones con lógica dinámica de Python."}]}</script></section><div class="micro-finish"><strong>Idea que te llevas</strong><span>Si decoras una función con @tf</span><small>¿Quieres más ejemplos, fórmulas o código? Los tienes justo debajo, sin límite de tiempo.</small></div><details class="profundizar micro-legacy"><summary><span>Explorar más: explicación y simulaciones completas<small>Todo el texto original, tablas y demos avanzadas. Opcional.</small></span></summary><div class="prof-body"><section><h2>tf.function: de Python a un grafo rápido</h2>
-<p>Si decoras una función con <code>@tf.function</code> (o la envuelves con <code>tf.function(f)</code>), sucede esto:</p>
-<p>El <a href="#frag-8">fragmento 8</a> lo hace visible con un <code>print</code> dentro de la función. Estas son las llamadas, tal como salen:</p>
-<p>Como el código Python solo se ejecuta al trazar, <strong>un <code>print</code> de Python dentro de una <code>tf.function</code> solo sale cuando se traza</strong>. En cambio <code>tf.print</code> es una operación de TensorFlow más: forma parte del grafo y sale <strong>en cada ejecución</strong>. Lo ves en la segunda mitad del fragmento 8: <code>cuadrado(2.0)</code> imprime el <code>print</code> de Python y el <code>tf.print</code>; <code>cuadrado(3.0)</code> reutiliza el grafo y solo imprime el <code>tf.print</code>.</p>
-<div class="callout ejemplo"><span class="lbl">Con números</span><p>El fragmento 8 lo hace visible con un print dentro de la función.</p></div></section><figure class="demo" data-demo="curso3/c3m1-trazado" data-titulo="La caché de grafos de tf.function">
-<div class="haz">Pulsa, en este orden, <code>f(tf.constant(1.0))</code>, <code>f(tf.constant(5.0))</code>, <code>f(tf.constant([1., 2.]))</code> y los dos enteros de Python (<code>f(3)</code> y <code>f(4)</code>); luego repite <code>f(3)</code>. Después pulsa «Vaciar la caché», elige «con input_signature» y repite las llamadas, incluida la de <code>int32</code>.</div>
-<div class="observa">Cada caja de la caché es un grafo y se crea una por <strong>firma nueva</strong>: otra forma, otro tipo o <strong>otro valor de Python</strong>. Los números de Python se «graban» dentro del grafo, así que cada valor distinto fuerza un trazado: eso es el <em>retracing</em>, y si ocurre en un bucle de miles de valores, el programa va <em>más lento</em> que sin <code>tf.function</code>. Con <code>input_signature</code> (tipo <code>float32</code>, cualquier longitud) hay un único grafo y el <code>int32</code> se rechaza.</div>
-</figure><div class="resumen"><h2 class="sin-num sin-toc">En pocas líneas</h2><ul><li><strong>tf.function: de Python a un grafo rápido:</strong> Si decoras una función con @tf.function (o la envuelves con tf.function(f) ), sucede esto:</li><li>Antes de continuar, intenta explicar la demo sin mirar su resultado.</li></ul></div><section class="quiz mini"><script class="quiz-data" type="application/json">{"titulo": "¿Lo tienes?", "preguntas": [{"q": "¿Qué concepto estamos trabajando en esta lección?", "opciones": ["Tensores: el único tipo de dato de una red", "Derivadas automáticas: GradientTape", "tf.function: de Python a un grafo rápido"], "correcta": 2, "porque": "Si decoras una función con @tf.function (o la envuelves con tf.function(f) ), sucede esto:"}, {"q": "¿Cuál de estas afirmaciones recoge lo que acabas de estudiar?", "opciones": ["Si decoras una función con @tf.function (o la envuelves con tf.function(f) ), sucede esto:", "Siempre hay un único método que sirve para todos los problemas.", "Lo importante es comprender la idea y comprobarla con ejemplos, no memorizar términos."], "correcta": 0, "porque": "La explicación central es: Si decoras una función con @tf.function (o la envuelves con tf.function(f) ), sucede esto:"}, {"q": "Si una demo o un ejemplo te desconcierta, ¿cuál es la mejor forma de aprenderlo?", "opciones": ["Volver a los números, cambiar un valor y explicar qué ocurre.", "Ignorar los resultados que no coinciden con tu intuición.", "Memorizar el nombre sin entender la operación."], "correcta": 0, "porque": "Explorar qué cambia y por qué ayuda a conectar el concepto con su resultado."}]}</script></section></div></details><details class="profundizar"><summary><span>Profundizar: explicación completa<small>Matices, fórmulas, tablas, otros ejemplos y experimentos del módulo original.</small></span></summary><div class="prof-body"><section>
-<h2 id="tf-function">tf.function: de Python a un grafo rápido</h2>
-<p class="pregunta">Con la ejecución inmediata cada operación se lanza desde Python una a una. ¿Cómo consigue entonces TensorFlow ser rápido? Y, de paso: ¿por qué un <code>print</code> dentro de tu modelo sale solo un par de veces durante <code>fit</code>, en lugar de una por lote?</p>
-<div class="callout analogia">
-<span class="lbl">Analogía</span>
-<p>Ejecución inmediata es <strong>elegir a mano cada capítulo</strong>: terminas uno, vuelves al menú, buscas el siguiente y pulsas play, una vez por capítulo. Un <strong>grafo</strong> es <strong>montar una lista de reproducción</strong>: la preparas una vez y luego se encadena sola, sin que vuelvas a tocar nada. <code>tf.function</code> convierte tu función de Python en esa lista de reproducción. Montarla cuesta un rato (se hace solo la primera vez); después, reproducirla es barato.</p>
-</div>
-<h3>Qué ocurre al llamar a una función decorada</h3>
-<p>Si decoras una función con <code>@tf.function</code> (o la envuelves con <code>tf.function(f)</code>), sucede esto:</p>
-<ol class="pasos">
-<li><strong>Trazado (<em>tracing</em>).</strong> En la <strong>primera llamada</strong> TensorFlow ejecuta tu código Python <strong>una vez</strong>, pero en lugar de números reales le pasa <em>tensores simbólicos</em> (marcadores con una forma y un tipo). Cada operación de TensorFlow que encuentra se anota en un <strong>grafo</strong>.</li>
-<li><strong>Ejecución del grafo.</strong> A partir de ahí, las llamadas ya no ejecutan el código de Python: ejecutan el grafo anotado, que es mucho más rápido y puede optimizarse.</li>
-<li><strong>Caché por firma.</strong> El grafo se guarda para una «firma»: el <em>tipo y la forma</em> de los tensores recibidos y el <em>valor</em> de los argumentos que no son tensores (un <code>int</code> de Python, por ejemplo). Si llamas con otra firma, hay que <strong>trazar otra vez</strong> y guardar otro grafo.</li>
-</ol>
-<p>El <a href="#frag-8">fragmento 8</a> lo hace visible con un <code>print</code> dentro de la función. Estas son las llamadas, tal como salen:</p>
-<table>
-<thead><tr><th>Llamada</th><th>Firma</th><th>¿Traza?</th><th>Trazados hasta ahora</th></tr></thead>
-<tbody>
-<tr><td><code>f(tf.constant(1.0))</code></td><td>tensor <code>float32</code>, forma <code>()</code></td><td>Sí, es la primera</td><td>1</td></tr>
-<tr><td><code>f(tf.constant(5.0))</code></td><td>la misma</td><td>No, reutiliza el grafo</td><td>1</td></tr>
-<tr><td><code>f(tf.constant([1., 2.]))</code></td><td>tensor <code>float32</code>, forma <code>(2,)</code></td><td>Sí: forma distinta</td><td>2</td></tr>
-<tr><td><code>f(3)</code></td><td>entero de Python <code>3</code></td><td>Sí</td><td>3</td></tr>
-<tr><td><code>f(4)</code></td><td>entero de Python <code>4</code></td><td>Sí: otro valor</td><td>4</td></tr>
-<tr><td><code>f(3)</code> otra vez</td><td>entero de Python <code>3</code></td><td>No: ya estaba en la caché</td><td>4</td></tr>
-</tbody>
-</table>
-<h3><code>print</code> frente a <code>tf.print</code></h3>
-<p>Como el código Python solo se ejecuta al trazar, <strong>un <code>print</code> de Python dentro de una <code>tf.function</code> solo sale cuando se traza</strong>. En cambio <code>tf.print</code> es una operación de TensorFlow más: forma parte del grafo y sale <strong>en cada ejecución</strong>. Lo ves en la segunda mitad del fragmento 8: <code>cuadrado(2.0)</code> imprime el <code>print</code> de Python y el <code>tf.print</code>; <code>cuadrado(3.0)</code> reutiliza el grafo y solo imprime el <code>tf.print</code>.</p>
-<div class="callout ojo">
-<span class="lbl">Ojo · el <code>print</code> «que desaparece» en <code>fit</code></span>
-<p>Keras envuelve el paso de entrenamiento en una <code>tf.function</code>, así que un <code>print</code> dentro del método <code>call</code> de tu modelo se comporta como acabamos de ver. En el <a href="leccion-11.html#frag-10">fragmento 10</a> hay 12 pasos de entrenamiento (3 épocas × 4 lotes) y el <code>print</code> aparece <strong>solo 3 veces</strong>, no 12; el número exacto depende de la versión, pero nunca será «uno por lote». En cambio, una llamada directa al modelo con datos (<code>modelo(x)</code>) se ejecuta con la ejecución inmediata: dos llamadas, dos <code>print</code>. <strong>Para depurar valores dentro de un modelo usa <code>tf.print</code> (o <code>keras.ops</code> y un <code>callback</code>)</strong>, no <code>print</code>.</p>
-</div>
-<h3>AutoGraph: tus <code>if</code> y <code>for</code> dentro del grafo</h3>
-<p>Un grafo no puede «ejecutar Python», así que ¿qué pasa con un <code>if x &gt; 0:</code> cuando <code>x</code> es un tensor simbólico y no se sabe si será positivo? <strong>AutoGraph</strong> (se activa solo con <code>tf.function</code>) reescribe esos <code>if</code>, <code>while</code> y <code>for</code> a sus equivalentes de TensorFlow (<code>tf.cond</code>, <code>tf.while_loop</code>) <em>cuando la condición depende de un tensor</em>. En el <a href="leccion-7.html#frag-9">fragmento 9</a>:</p>
-<ul>
-<li>La función <code>signo</code> tiene un <code>if x &gt; 0</code> con <code>x</code> tensor y funciona: <code>signo(2.0)</code> da «positivo» y <code>signo(-2.0)</code> «no positivo» (con el mismo grafo, sin reescribir nada).</li>
-<li><code>for i in tf.range(n)</code> (con <code>tf.range</code>, no <code>range</code>) se convierte en un bucle <strong>dentro</strong> del grafo: <code>suma_hasta(5)</code> da 10 (0+1+2+3+4) y <code>suma_hasta(100)</code> da 4950, y solo hubo <strong>un trazado</strong> para los dos.</li>
-<li><code>input_signature=[tf.TensorSpec(shape=(None,), dtype=tf.float32)]</code> declara de antemano qué entradas acepta («vectores de <code>float32</code> de cualquier longitud»): se traza una sola vez y un tensor <code>int32</code> da <code>TypeError</code>.</li>
-</ul>
-<p>Y la razón de ser de todo esto, la velocidad: el fragmento mide una función que hace 100 pequeñas operaciones. El resultado es idéntico en modo inmediato y en grafo (1,0201029), pero <strong>el grafo es más de 3 veces más rápido</strong> (el fragmento lo comprueba con una comparación que sale <code>True</code>; no pegamos milisegundos porque cambian de un ordenador a otro).</p>
-<div class="callout regla">
-<span class="lbl">Regla fácil</span>
-<p>Tres hábitos con <code>tf.function</code>: (1) pasa <strong>tensores</strong>, no números de Python, como argumentos que cambian; (2) usa <code>tf.print</code> para ver valores y <code>tf.range</code> si el límite del bucle es un tensor; (3) si el programa va más lento de lo esperado, cuenta los trazados con <code>f.experimental_get_tracing_count()</code>: si crece sin parar, hay <em>retracing</em>. En Keras casi nunca la usarás explícitamente, porque <code>fit</code>, <code>predict</code> y <code>evaluate</code> ya lo hacen por ti.</p>
-</div>
-</section></div></details><details class="profundizar" id="codigo"><summary><span>Ver código explicado paso a paso<small>1 fragmento(s) original(es), con cada línea comentada y salida esperada.</small></span></summary><div class="prof-body"><article class="snippet" data-lang="python" id="frag-8">
-<header>
-<h3>8 · tf.function: trazado, caché de grafos y la diferencia entre <code>print</code> y <code>tf.print</code></h3>
-<p class="para-que"><strong>Para qué sirve</strong> Contar los trazados de una <code>tf.function</code> y ver con tus ojos cuándo se ejecuta el <code>print</code> de Python (solo al trazar) y cuándo el <code>tf.print</code> (siempre).</p>
+<header class="hero leccion">
+  <div class="hero-grid">
+    <div>
+      <p class="eyebrow">Curso 3 · Módulo 1 · Lección 5 de 8</p>
+      <h1>Sequential es una fila; la API funcional, un grafo de capas</h1>
+      <p class="lead">Keras tiene tres formas de construir un modelo. En cuanto aparece una rama, un atajo o una segunda entrada, necesitas la <strong>funcional</strong>: llamas a las capas como funciones sobre tensores simbólicos y Keras recoge el grafo.</p>
+      <p class="meta-line"><span class="read-time" data-render="read-time"></span><a href="../modulo-1.html">Índice del módulo</a></p>
+    </div>
+    <div class="hero-tile" aria-hidden="true"></div>
+  </div>
 </header>
-<pre class="code"><code>import tensorflow as tf
-
-def doblar(x):
-    print("  [Python] trazando con", x)
-    return x * 2 + 1
-
-f = tf.function(doblar)
-print(f(tf.constant(1.0)).numpy())
-print(f(tf.constant(5.0)).numpy())
-print(f(tf.constant([1.0, 2.0])).numpy())
-print(f(3).numpy())
-print(f(4).numpy())
-print(f(3).numpy())
-print("trazados:", f.experimental_get_tracing_count())
-
-@tf.function
-def cuadrado(x):
-    print("  [print] solo al trazar")
-    tf.print("  [tf.print] x =", x)
-    return x * x
-
-print(cuadrado(tf.constant(2.0)).numpy())
-print(cuadrado(tf.constant(3.0)).numpy())</code></pre>
-<details class="linea-a-linea">
-<summary>Línea por línea</summary>
-<p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
-<table class="lineas">
-<thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
-<tbody>
-<tr data-lines="1"><td><code>import tensorflow as tf</code></td><td>Importa TensorFlow.</td></tr>
-<tr data-lines="3-5"><td><code>def doblar(x): …</code></td><td>Una función normal de Python que imprime un mensaje (con el argumento que recibe) y devuelve <code>2x + 1</code>.</td></tr>
-<tr data-lines="7"><td><code>f = tf.function(doblar)</code></td><td><code>tf.function(doblar)</code> crea la versión «compilable». Todavía no ha ejecutado nada.</td></tr>
-<tr data-lines="8"><td><code>print(f(tf.constant(1.0)).numpy())</code></td><td>Primera llamada con un tensor escalar: <strong>traza</strong> (aparece el <code>print</code>) y calcula 2·1 + 1 = 3.</td></tr>
-<tr data-lines="9"><td><code>print(f(tf.constant(5.0)).numpy())</code></td><td>Otro escalar <code>float32</code> (5,0): misma firma, reutiliza el grafo; no hay <code>print</code>. Resultado 11.</td></tr>
-<tr data-lines="10"><td><code>print(f(tf.constant([1.0, 2.0])).numpy())</code></td><td>Un vector de dos elementos: forma nueva, así que <strong>traza otra vez</strong>.</td></tr>
-<tr data-lines="11-12"><td><code>print(f(3).numpy()) …</code></td><td>Pasar los enteros de Python <code>3</code> y <code>4</code>: cada <strong>valor</strong> de Python distinto es una firma distinta, y traza cada vez.</td></tr>
-<tr data-lines="13"><td><code>print(f(3).numpy())</code></td><td><code>f(3)</code> de nuevo: ya está en la caché, sin trazar.</td></tr>
-<tr data-lines="14"><td><code>print("trazados:", f.experimental_get_tracing_count( …</code></td><td><code>experimental_get_tracing_count()</code> da el <strong>número de trazados</strong> hechos hasta ahora.</td></tr>
-<tr data-lines="16-20"><td><code>@tf.function …</code></td><td>Una función decorada con <code>@tf.function</code> (la forma habitual): imprime con <code>print</code> de Python y con <code>tf.print</code>, y devuelve x al cuadrado.</td></tr>
-<tr data-lines="22-23"><td><code>print(cuadrado(tf.constant(2.0)).numpy()) …</code></td><td>Se llama con 2,0 y con 3,0, dos tensores con la misma firma.</td></tr>
-</tbody>
-</table>
+<details class="predice">
+  <summary>Quieres que la salida de una capa se sume con la de otra que está dos capas más allá (un <em>atajo</em>). ¿Lo puedes escribir con <code>Sequential</code>?<span class="hint"></span></summary>
+  <div>
+    <p><strong>No.</strong> <code>Sequential</code> es una cadena: cada capa lee solo de la anterior. Un atajo necesita que una capa lea de <em>dos</em> sitios, y eso es un grafo. Con la API funcional son cuatro líneas: dos capas, un <code>layers.Add()([a, b])</code> y la salida.</p>
+  </div>
 </details>
-<div class="salida">
-<strong>Salida esperada</strong>
-<pre>  [Python] trazando con Tensor("x:0", shape=(), dtype=float32)
-3.0
-11.0
-  [Python] trazando con Tensor("x:0", shape=(2,), dtype=float32)
-[3. 5.]
-  [Python] trazando con 3
-7
-  [Python] trazando con 4
-9
-7
-trazados: 4
-  [print] solo al trazar
-  [tf.print] x = 2
-4.0
-  [tf.print] x = 3
-9.0</pre>
-<p>Las líneas «<code>[Python] trazando con …</code>» aparecen cuatro veces (escalar, vector, <code>3</code> y <code>4</code>), y por eso el contador final es 4; <code>f(5.0)</code> y el segundo <code>f(3)</code> no trazan. Dentro del trazado, el argumento no es un número sino un tensor simbólico (<code>Tensor("x:0", shape=(), dtype=float32)</code>). Con <code>cuadrado</code>: la primera llamada imprime el <code>print</code> de Python <em>y</em> el <code>tf.print</code>; la segunda solo el <code>tf.print</code> (con <code>x = 3</code>), porque ya no ejecuta Python.</p>
+
+<section>
+<h2 id="idea">Tres APIs, una pregunta: ¿es una fila?</h2>
+<p><strong><code>Sequential</code></strong> es una serie que se ve capítulo tras capítulo: una lista de capas en fila. La <strong>API funcional</strong> es el mapa de la trama de <em>Stranger Things</em>: grupos que van por su lado y se juntan (ramas, atajos, varias entradas o salidas, una capa reutilizada). <strong>Subclassing</strong> es <em>Bandersnatch</em>: lo que pasa depende de los datos (un <code>if</code> de Python). Construidos con las tres, los 4 → 8 → 3 neuronas tienen los mismos 67 parámetros y, con los mismos pesos, dan la misma salida.</p>
+<p>La funcional funciona así: <code>keras.Input(shape=(8,))</code> crea un <strong>tensor simbólico</strong>, un enchufe sin datos que solo recuerda su forma <code>(None, 8)</code>. Llamar a una capa sobre él (<code>layers.Dense(16)(entrada)</code>) no calcula nada: devuelve otro tensor simbólico y <strong>anota la conexión</strong>. <code>keras.Model(entradas, salidas)</code> recoge todas las capas del camino. Como solo se dibuja el plano, los errores de forma saltan <strong>al conectar</strong>, no al entrenar.</p>
+<p>Para unir ramas: <code>Add</code> suma elemento a elemento y exige formas idénticas; <code>Concatenate</code> pega por el último eje y <strong>suma los anchos</strong> (16 y 10 → 26), así que la capa siguiente crece.</p>
+</section>
+
+<figure class="demo" data-demo="curso3/c3m1-tres-apis" data-titulo="¿Qué API necesito?">
+  <div class="haz">Marca uno a uno «Ramas o atajos», «Una misma capa usada en dos sitios» y «Un if / while de Python que depende de los datos».</div>
+  <div class="observa">Con una rama ya hace falta la funcional; subclassing solo compensa si necesitas Python que dependa de los datos.</div>
+</figure>
+
+<figure class="demo" data-demo="curso3/c3m1-grafo" data-titulo="Un grafo funcional: formas y parámetros al conectar">
+  <div class="haz">Con «Add (sumar)» pulsa «Hacer b ≠ a» y luego «Igualar b a a». Cambia a «Concatenate (pegar)».</div>
+  <div class="observa">Con Add los anchos deben coincidir; con Concatenate se suman y la capa de salida gana parámetros.</div>
+</figure>
+
+<section>
+<h2 id="numeros">Con números: el <code>summary()</code> de un modelo con atajo</h2>
+<div class="callout ejemplo">
+  <span class="lbl">Ejemplo numérico</span>
+  <p>8 datos de un usuario → <code>densa_a</code> (16) → <code>densa_b</code> (16) → <code>suma</code> de las dos → <code>salida</code> (3 géneros).</p>
+  <ol class="pasos">
+    <li><code>densa_a</code>: 8 · 16 + 16 = <strong>144</strong>.</li>
+    <li><code>densa_b</code>: 16 · 16 + 16 = <strong>272</strong>.</li>
+    <li><code>suma</code> (<code>Add</code>): solo suma, <strong>0</strong> parámetros. En la columna «Connected to» lee de <code>densa_a</code> <em>y</em> de <code>densa_b</code>: ese es el atajo.</li>
+    <li><code>salida</code>: 16 · 3 + 3 = <strong>51</strong>. Total: 144 + 272 + 51 = <strong>467</strong>.</li>
+  </ol>
 </div>
-</article></div></details></div></main></body></html>
+</section>
+
+<details class="predice">
+  <summary>Con <code>Add</code> unes una rama de 16 neuronas con otra de 10. ¿El error aparece al conectar, al entrenar o no hay error?<span class="hint"></span></summary>
+  <div>
+    <p><strong>Al conectar</strong>: <em>«Inputs have incompatible shapes. Received shapes (16,) and (10,)»</em>, antes de ver un solo dato. Es la ventaja de dibujar un plano: los tramos que no encajan se detectan al tenderlos. Con <code>Concatenate</code> sí funcionaría (ancho 26).</p>
+  </div>
+</details>
+
+<div class="resumen">
+  <h2 class="sin-num sin-toc">En tres líneas</h2>
+  <ul>
+    <li><code>Sequential</code> para una fila; funcional para ramas, atajos, varias entradas o salidas y capas compartidas.</li>
+    <li>En la funcional las capas se llaman sobre tensores simbólicos y <code>Model(entradas, salidas)</code> recoge el grafo.</li>
+    <li><code>Add</code> exige la misma forma; <code>Concatenate</code> suma los anchos y hace crecer la capa siguiente.</li>
+  </ul>
+</div>
+
+<section class="quiz mini">
+<script type="application/json" class="quiz-data">
+{
+ "titulo": "¿Lo tienes?",
+ "preguntas": [
+  {
+   "q": "Necesitas un modelo con dos entradas (la carátula de una película y una tabla con datos del usuario), un codificador compartido por las dos y poder dibujarlo con <code>plot_model</code>. ¿Qué API de Keras eliges?",
+   "opciones": [
+    "<code>Sequential</code>, porque es la más simple",
+    "Subclassing, porque es la más flexible",
+    "La API funcional",
+    "Cualquiera, da igual: las tres lo permiten con la misma facilidad"
+   ],
+   "correcta": 2,
+   "porque": "Varias entradas y capas compartidas exigen un grafo, y <code>Sequential</code> solo admite una cadena. El subclassing podría, pero perderías <code>plot_model</code> y el <code>summary()</code> con conexiones hasta que lo llames con datos. La funcional construye un grafo explícito que Keras puede inspeccionar y dibujar: es la elección natural."
+  },
+  {
+   "q": "Unes una capa de 16 neuronas con otra de 10 mediante <code>Concatenate</code> y encima pones <code>Dense(3)</code>. ¿Cuántos parámetros tiene esa <code>Dense(3)</code>?",
+   "opciones": [
+    "51",
+    "81",
+    "78",
+    "26"
+   ],
+   "correcta": 1,
+   "porque": "<code>Concatenate</code> suma los anchos: 16 + 10 = 26 entradas. La capa tiene 26 · 3 = 78 pesos más 3 sesgos = <strong>81</strong>. 51 sería con <code>Add</code> (16 entradas: 16 · 3 + 3, y además <code>Add</code> ni siquiera acepta 16 y 10); 78 olvida los sesgos; y 26 es el ancho, no un número de parámetros."
+  },
+  {
+   "q": "¿Qué contiene <code>keras.Input(shape=(8,))</code>?",
+   "opciones": [
+    "Ocho ceros",
+    "Los datos del primer lote",
+    "Ningún dato: es un tensor simbólico que solo recuerda su forma <code>(None, 8)</code> y su tipo",
+    "Una capa Dense de 8 neuronas"
+   ],
+   "correcta": 2,
+   "porque": "Es el enchufe de entrada del plano. Por eso <code>tf.reduce_sum</code> sobre él da error en Keras 3 (necesita datos) y hay que usar capas o <code>keras.ops</code>, que aceptan tensores simbólicos."
+  }
+ ]
+}
+</script>
+</section>
+
+<details class="profundizar">
+  <summary><span>Profundizar: la explicación completa<small>La tabla que compara las tres APIs, el plano del metro, el coste de Concatenate, por qué un atajo salva el gradiente (con su experimento), get_layer, extractores, plot_model y las funciones tf.* sobre tensores simbólicos.</small></span></summary>
+  <div class="prof-body">
+<h2 id="tres-apis">Tres formas de construir el mismo modelo</h2>
+
+<p class="pregunta">En el Curso 2 solo usaste <code>Sequential</code>. Si ya funcionaba, ¿por qué Keras ofrece otras dos formas de construir un modelo? Respuesta corta: porque una <strong>pila de capas en fila</strong> no puede expresar casi nada de lo que se hace hoy.</p>
+
+<div class="callout analogia">
+  <span class="lbl">Analogía</span>
+  <p>Piensa en cómo cuenta una historia Netflix. <code>Sequential</code> es <strong>una serie que se ve capítulo tras capítulo</strong>, siempre en el mismo orden, sin saltos. La <strong>API funcional</strong> es el <strong>mapa de la trama de <em>Stranger Things</em></strong>: varios grupos de personajes que van cada uno por su lado y se juntan al final (ramas que se unen, dos entradas, una salida que se parte en dos o una escena que se reutiliza). <strong>Subclassing</strong> es <strong><em>Bandersnatch</em></strong>, la película interactiva de Netflix: lo que ves depende de lo que decidas mientras la ves (un <code>if</code> que mira los datos). Máxima libertad, pero ya no hay un mapa que mirar y más cosas pueden salir mal.</p>
+</div>
+
+<h3>El mismo modelo con las tres</h3>
+<p>El <a href="#frag-11">fragmento 11</a> construye la misma red (4 entradas → 8 neuronas ReLU → 3 salidas softmax) de las tres maneras:</p>
+<table>
+  <thead><tr><th></th><th>Sequential</th><th>Funcional</th><th>Subclassing</th></tr></thead>
+  <tbody>
+    <tr><th scope="row">Cómo se escribe</th><td>Una lista de capas</td><td><code>Input</code> → capas llamadas como funciones → <code>Model(entradas, salidas)</code></td><td>Una clase con <code>__init__</code> y <code>call</code></td></tr>
+    <tr><th scope="row">Qué arquitecturas admite</th><td>Solo una cadena: una entrada, una salida</td><td>Cualquier <strong>grafo</strong> de capas: ramas, atajos, varias entradas y salidas, capas compartidas</td><td>Cualquier cosa, incluida lógica de Python dentro de <code>call</code></td></tr>
+    <tr><th scope="row">¿Los errores de forma salen al construir?</th><td>Sí (si defines <code>Input</code>)</td><td><strong>Sí</strong>: al conectar capas</td><td>No: al ejecutar</td></tr>
+    <tr><th scope="row"><code>summary()</code> y <code>plot_model</code></th><td>Sí</td><td>Sí, con la columna «Connected to»</td><td>Solo tras llamar al modelo con datos (antes muestra «?» y «unbuilt»)</td></tr>
+    <tr><th scope="row">Facilidad de guardar</th><td>Alta</td><td>Alta</td><td>Hay que escribir <code>get_config</code> si <code>__init__</code> tiene argumentos</td></tr>
+    <tr><th scope="row">Pesos de este ejemplo</th><td>67</td><td>67</td><td>67</td></tr>
+  </tbody>
+</table>
+<p>Y no son modelos distintos: al copiarle los pesos de uno a otro (<code>set_weights(secuencial.get_weights())</code>) los tres dan <strong>exactamente la misma salida</strong> (las dos comprobaciones del fragmento dan <code>True</code>). Cambia <em>cómo lo escribes</em>, no lo que calcula. Los 67 parámetros salen de las cuentas de siempre: 4·8 + 8 = 40 en la capa oculta y 8·3 + 3 = 27 en la de salida.</p>
+
+<div class="callout recuerda">
+  <span class="lbl">Experimento de arriba: «¿Qué API necesito?», con todo detalle</span>
+  <p><strong>Haz esto.</strong> Marca los requisitos de tu arquitectura (de un recomendador de películas), uno a uno: primero «Ramas o atajos», luego «Una misma capa usada en dos sitios» y finalmente «Un if / while de Python que depende de los datos». Mira cómo cambia el veredicto de cada API y el esqueleto de código recomendado.</p>
+  <p><strong>Fíjate en.</strong> Sin requisitos especiales, <code>Sequential</code> es lo más corto y lo mejor. En cuanto aparece una rama, una entrada o salida extra o una capa compartida, hace falta la <strong>API funcional</strong>. <strong>Subclassing</strong> solo compensa cuando necesitas Python completo dentro del modelo (un <code>if</code> que dependa de los datos): la funcional construye el grafo una única vez con tensores simbólicos y no puede decidir con los datos.</p>
+</div>
+
+<div class="callout regla">
+  <span class="lbl">Regla fácil · cuál elegir</span>
+  <p><strong>1.</strong> ¿Es una cadena de capas? → <code>Sequential</code>. <strong>2.</strong> ¿Tiene ramas, varias entradas o salidas, o capas compartidas? → <strong>funcional</strong>. <strong>3.</strong> ¿Necesitas <code>if</code>, <code>for</code> o <code>while</code> de Python que dependan de los datos, o un comportamiento que no es un grafo de capas? → <strong>subclassing</strong>. Empieza siempre por la más simple que sirva: pierdes inspección y ganas posibilidades de error cada vez que bajas un escalón.</p>
+</div>
+
+<h2 id="funcional">La API funcional: un modelo es un grafo de capas</h2>
+
+<p class="pregunta">¿Cómo dibujas una red en la que la salida de una capa se suma con la de otra dos capas más allá (una <em>conexión residual</em>)? Con <code>Sequential</code> no hay forma, pero con la API funcional son cuatro líneas.</p>
+
+<h3>La idea: las capas son funciones y los tensores, cables</h3>
+<p>Una capa de Keras es un objeto al que se «llama» como a una función: <code>y = capa(x)</code>. En la API funcional se hace eso, pero con tensores <strong>simbólicos</strong>:</p>
+<ol class="pasos">
+  <li><strong><code>keras.Input(shape=(8,))</code></strong> crea un tensor simbólico (un <code>KerasTensor</code>): <strong>no contiene datos</strong>, solo recuerda su forma (<code>(None, 8)</code>) y su tipo. Es el enchufe de entrada del modelo.</li>
+  <li><strong>Llamar a una capa sobre él</strong> (<code>a = layers.Dense(16)(entrada)</code>) no calcula nada con números: devuelve <strong>otro tensor simbólico</strong> (<code>(None, 16)</code>) y <strong>anota la conexión</strong> «esta capa lee de aquel tensor».</li>
+  <li><strong><code>keras.Model(entradas, salidas)</code></strong> recorre las anotaciones desde las salidas hacia las entradas y recoge todas las capas del camino. El resultado es el modelo completo, ya con sus formas conocidas.</li>
+</ol>
+<div class="callout analogia">
+  <span class="lbl">Analogía</span>
+  <p>Es como dibujar el plano del metro. <code>Input</code> es la estación de origen; cada capa que llamas es un tramo de vía que tiendes desde una estación hasta otra nueva. <code>Model(entradas, salidas)</code> es declarar «mi línea va de aquí a allí», y Keras recoge todos los tramos que hay entre las dos. Como <strong>solo se dibuja un plano</strong> (nadie viaja todavía), si unes dos vías que no encajan, el error salta al dibujarlas, no cuando ya hay viajeros.</p>
+</div>
+
+<h3>Un modelo con atajo, cuenta a cuenta</h3>
+<p>El modelo del <a href="#frag-12">fragmento 12</a> tiene 8 entradas (imagina 8 datos de un usuario: edad, horas vistas…), dos capas densas de 16 neuronas (<code>densa_a</code> y <code>densa_b</code>), una <strong>suma</strong> de las salidas de las dos (el atajo) y una capa de salida de 3 neuronas (por ejemplo, 3 géneros posibles). Su <code>summary()</code>, con los parámetros comprobados a mano:</p>
+<table>
+  <thead><tr><th>Capa</th><th>Salida</th><th>Cuenta de parámetros</th><th>Parámetros</th></tr></thead>
+  <tbody>
+    <tr><td><code>entrada</code></td><td><code>(None, 8)</code></td><td>no tiene pesos</td><td>0</td></tr>
+    <tr><td><code>densa_a</code></td><td><code>(None, 16)</code></td><td>8 · 16 pesos + 16 sesgos</td><td class="res">144</td></tr>
+    <tr><td><code>densa_b</code></td><td><code>(None, 16)</code></td><td>16 · 16 + 16</td><td class="res">272</td></tr>
+    <tr><td><code>suma</code> (Add)</td><td><code>(None, 16)</code></td><td>solo suma: no tiene pesos</td><td>0</td></tr>
+    <tr><td><code>salida</code></td><td><code>(None, 3)</code></td><td>16 · 3 + 3</td><td class="res">51</td></tr>
+    <tr><td colspan="3"><strong>Total</strong></td><td class="res">467</td></tr>
+  </tbody>
+</table>
+<p>467 parámetros de <code>float32</code> son 467 · 4 = 1.868 bytes, que Keras escribe como 1,82 KB (1.868 / 1.024). Fíjate en la última columna del <code>summary()</code>, <strong>«Connected to»</strong>: dice de qué capas lee cada una. <code>suma</code> lee de <code>densa_a</code> <em>y</em> de <code>densa_b</code>: eso es el atajo, y en un <code>Sequential</code> esa columna no existiría porque cada capa lee solo de la anterior.</p>
+
+<h3>Unir ramas: <code>Add</code> o <code>Concatenate</code></h3>
+<p>Para juntar dos caminos hay dos capas distintas y no son intercambiables:</p>
+<ul>
+  <li><strong><code>layers.Add()([a, b])</code></strong> suma elemento a elemento. Exige que <strong>las dos formas sean idénticas</strong> y la salida tiene esa misma forma: <code>(None, 16)</code> + <code>(None, 16)</code> → <code>(None, 16)</code>. Es lo que se usa en las conexiones residuales. (Hermanas suyas: <code>Subtract</code>, <code>Multiply</code>, <code>Average</code>, <code>Maximum</code>.)</li>
+  <li><strong><code>layers.Concatenate()([a, b])</code></strong> pega las dos salidas una a continuación de otra <strong>a lo largo del último eje</strong>. No exige que coincidan los anchos y <strong>suma los anchos</strong>: <code>(None, 16)</code> y <code>(None, 10)</code> → <code>(None, 26)</code>. La capa siguiente tendrá, por tanto, más entradas (26 en lugar de 16) y más parámetros.</li>
+</ul>
+<div class="callout ejemplo">
+  <span class="lbl">Ejemplo numérico · el coste de pegar en vez de sumar</span>
+  <p>Imagina dos «informes» sobre un usuario: uno de 16 números (lo que ha visto, <code>densa_a</code>) y otro de 10 (qué carátulas le llaman la atención, la rama). <code>Add</code> sería sumar dos informes casilla a casilla, y para eso tienen que medir lo mismo; <code>Concatenate</code> es pegarlos uno detrás de otro. Después de unirlos, añadimos una capa <code>Dense(3)</code>.</p>
+  <ol class="pasos">
+    <li><strong>Con <code>Add</code>:</strong> no se puede (16 ≠ 10): error <em>«Inputs have incompatible shapes. Received shapes (16,) and (10,)»</em>, que sale en el momento de conectar, en el <a href="#frag-12">fragmento 12</a>.</li>
+    <li><strong>Con <code>Concatenate</code>:</strong> el ancho es 16 + 10 = <strong>26</strong>, y <code>Dense(3)</code> tendría 26 · 3 + 3 = <strong>81</strong> parámetros.</li>
+    <li><strong>Si ambas ramas midieran 16 y usaras <code>Add</code>:</strong> el ancho se queda en 16, y <code>Dense(3)</code> tendría solo 16 · 3 + 3 = 51 (la capa <code>salida</code> de la tabla anterior).</li>
+  </ol>
+</div>
+
+<div class="callout recuerda">
+  <span class="lbl">Experimento de arriba: «Un grafo funcional: formas y parámetros al conectar», con todo detalle</span>
+  <p><strong>Haz esto.</strong> Elige «Add (sumar)» y pulsa «Hacer b ≠ a»: aparece el error. Pulsa «Igualar b a a» para arreglarlo. Cambia a «Concatenate (pegar)» y observa cómo crece la capa de salida. Activa «Añadir rama paralela» y mira la lista de capas.</p>
+  <p><strong>Fíjate en.</strong> Con <code>Add</code> hay que igualar anchos y el tensor sigue midiendo lo mismo; con <code>Concatenate</code> el ancho suma y la capa siguiente se hace más grande (más parámetros). La lista de abajo es la tabla del <code>summary()</code>, recalculada en vivo con la fórmula <em>entradas · neuronas + neuronas</em>.</p>
+</div>
+
+<h3>Por qué un atajo ayuda a entrenar</h3>
+<p>Una conexión residual (<code>h_siguiente = h + f(h)</code>) no se inventó por estética: resuelve el problema de los <strong>gradientes que se desvanecen</strong> que viste en el Curso 2. Al derivar \( h_{\text{sig}} = h + f(h) \) respecto a \( h \) sale \( 1 + f'(h) \): ese <strong>1</strong> es un camino por el que el gradiente pasa intacto.</p>
+<div class="callout ejemplo">
+  <span class="lbl">Ejemplo numérico · 10 capas con y sin atajo</span>
+  <p>Supón que la derivada local de la transformación de cada capa, \( f'(h) \), vale 0,1 (frecuente con sigmoide o tanh saturadas), y que hay 10 capas. Es como un chisme que pasa por 10 personas y cada una solo repite la décima parte de lo que oye: el aviso «te has equivocado» tiene que viajar desde la salida hasta la primera capa y, por el camino, se apaga.</p>
+  <ol class="pasos">
+    <li><strong>Sin atajo</strong> el gradiente que llega a la primera capa se multiplica por 0,1 diez veces: \( 0{,}1^{10} = 10^{-10} \). Prácticamente cero: las primeras capas no aprenden.</li>
+    <li><strong>Con atajo</strong> cada factor es \( 1 + 0{,}1 = 1{,}1 \): \( 1{,}1^{10} \approx 2{,}59 \). El gradiente llega vivo.</li>
+  </ol>
+</div>
+
+<figure class="demo" data-demo="curso3/c3m1-atajo" data-titulo="Gradiente en cada capa, con y sin atajo">
+  <div class="haz">Deja «Ambas» y sube las capas hasta 30–40. Mira a qué altura queda la línea naranja (sin atajo) y la verde (con atajo). Luego sube la escala de los pesos hasta el máximo y pulsa «Otros pesos al azar» varias veces.</div>
+  <div class="observa">La línea mide cuánto del aviso «te has equivocado» llega a cada capa. Sin atajo el gradiente cae <strong>exponencialmente</strong> al alejarse de la salida: el eje es logarítmico, así que cada línea recta descendente es un factor constante por capa. Con atajo la curva se mantiene cerca de 0 (gradiente ≈ 1). Con pesos muy grandes hasta el atajo puede crecer: el atajo ayuda, no es una garantía.</div>
+</figure>
+
+<h3>Inspeccionar el grafo: <code>get_layer</code>, extractores y dibujos</h3>
+<p>Tener un grafo explícito da herramientas que ningún otro estilo ofrece (<a href="#frag-12">fragmento 12</a>):</p>
+<ul>
+  <li><code>modelo.layers</code> lista las capas (<code>['entrada', 'densa_a', 'densa_b', 'suma', 'salida']</code>) y <code>modelo.get_layer("suma")</code> recupera una por su <em>nombre</em> (por eso conviene ponerles <code>name=</code>).</li>
+  <li><strong>Un extractor de características</strong>: <code>keras.Model(modelo.input, modelo.get_layer("suma").output)</code> es un modelo nuevo que comparte las capas y los pesos del original pero <strong>se detiene en la capa que elijas</strong>. Su salida mide <code>(None, 16)</code> y, alimentado con 2 filas, devuelve <code>(2, 16)</code>. Es la técnica para ver qué ha «entendido» la red a mitad de camino (en el Curso 2 hiciste algo parecido con el codificador del autoencoder).</li>
+  <li><code>keras.utils.plot_model(modelo, to_file="modelo.png", show_shapes=True)</code> dibuja el grafo (necesita los programas <code>pydot</code> y Graphviz instalados).</li>
+  <li>Si el grafo que declaras está <strong>desconectado</strong> (una salida que no sale de esa entrada), <code>Model</code> lo detecta: <em>«Output with path `` is not connected to `inputs`»</em>.</li>
+</ul>
+
+<div class="callout ojo">
+  <span class="lbl">Ojo · funciones de TensorFlow sobre tensores simbólicos</span>
+  <p>En tutoriales antiguos verás cosas como <code>h = tf.reduce_sum(h, axis=-1)</code> en mitad de un modelo funcional. En Keras 3 eso da <code>ValueError: A KerasTensor cannot be used as input to a TensorFlow function</code>, porque <code>h</code> es un marcador sin datos y <code>tf.reduce_sum</code> necesita datos. Las soluciones: usar <strong>una capa de Keras</strong> o una función de <strong><code>keras.ops</code></strong> (<code>ops.sum</code>, <code>ops.square</code>…), que sí aceptan tensores simbólicos y además funcionan con cualquier backend; o envolver el cálculo en <code>layers.Lambda(lambda t: ops.sum(t, axis=-1, keepdims=True))</code>. Los operadores de Python (<code>h ** 2</code>) también funcionan sobre el tensor simbólico. El <a href="leccion-8.html#frag-1">fragmento 1</a> muestra el error y la solución. (Más adelante verás por qué conviene evitar <code>Lambda</code> si vas a guardar el modelo.)</p>
+</div>
+  </div>
+</details>
+
+<section>
+<h2 class="sin-num">Código</h2>
+<!-- ---------- Fragmento 11 ---------- -->
+<article class="snippet" data-lang="python" id="frag-11">
+  <header>
+    <h3>11 · El mismo modelo con Sequential, API funcional y subclassing</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Construir la misma red de tres formas, comprobar que tiene los mismos parámetros y que, con los mismos pesos, da las mismas salidas. También ve cómo un modelo por subclases está «sin construir» hasta que se llama.</p>
+  </header>
+  <pre class="code"><code>import numpy as np
+import keras
+from keras import layers
+
+keras.utils.set_random_seed(0)
+
+secuencial = keras.Sequential([
+    keras.Input(shape=(4,)),
+    layers.Dense(8, activation="relu", name="oculta"),
+    layers.Dense(3, activation="softmax", name="salida"),
+], name="secuencial")
+
+entrada = keras.Input(shape=(4,))
+h = layers.Dense(8, activation="relu", name="oculta")(entrada)
+salida = layers.Dense(3, activation="softmax", name="salida")(h)
+funcional = keras.Model(entrada, salida, name="funcional")
+
+class MiRed(keras.Model):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.oculta = layers.Dense(8, activation="relu")
+        self.salida = layers.Dense(3, activation="softmax")
+
+    def call(self, x):
+        return self.salida(self.oculta(x))
+
+subclase = MiRed(name="subclase")
+print("construido antes de usarlo:", subclase.built)
+x = np.random.default_rng(0).normal(size=(2, 4)).astype("float32")
+subclase(x)
+print("construido después:", subclase.built)
+
+for m in (secuencial, funcional, subclase):
+    print(f"{m.name:10s} parámetros = {m.count_params()}")
+
+funcional.set_weights(secuencial.get_weights())
+subclase.set_weights(secuencial.get_weights())
+print("misma salida:", np.allclose(secuencial(x), funcional(x)), np.allclose(secuencial(x), subclase(x)))
+print(secuencial(x).numpy().round(3))</code></pre>
+  <details class="linea-a-linea">
+    <summary>Línea por línea</summary>
+    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+      <tbody>
+        <tr data-lines="1-3"><td><code>import numpy as np …</code></td><td>Importan NumPy, Keras y el módulo de capas.</td></tr>
+        <tr data-lines="5"><td><code>keras.utils.set_random_seed(0)</code></td><td>Fija la semilla aleatoria de Keras (de NumPy y del backend) para que los pesos iniciales sean siempre los mismos.</td></tr>
+        <tr data-lines="7-11"><td><code>secuencial = keras.Sequential([ …</code></td><td><strong>Sequential</strong>: una lista de capas en orden. <code>Input(shape=(4,))</code> declara 4 entradas; luego una capa oculta de 8 neuronas con ReLU y una de salida de 3 con softmax. Les damos <code>name</code> para identificarlas y un nombre al modelo.</td></tr>
+        <tr data-lines="13"><td><code>entrada = keras.Input(shape=(4,))</code></td><td><strong>Funcional, paso 1</strong>: <code>Input</code> crea el tensor simbólico de entrada, de forma <code>(None, 4)</code>.</td></tr>
+        <tr data-lines="14"><td><code>h = layers.Dense(8, activation="relu", name="oculta" …</code></td><td>Paso 2: llama a la capa oculta <em>como una función</em> sobre <code>entrada</code> (<code>capa(tensor)</code>) y guarda la salida simbólica en <code>h</code>.</td></tr>
+        <tr data-lines="15"><td><code>salida = layers.Dense(3, activation="softmax", name= …</code></td><td>Paso 3: lo mismo con la capa de salida.</td></tr>
+        <tr data-lines="16"><td><code>funcional = keras.Model(entrada, salida, name="funci …</code></td><td>Paso 4: <code>keras.Model(entrada, salida)</code> declara «el modelo va de aquí a allí»: Keras recoge las capas del camino.</td></tr>
+        <tr data-lines="18-25"><td><code>class MiRed(keras.Model): …</code></td><td><strong>Subclassing</strong>: una clase <code>MiRed</code> que hereda de <code>keras.Model</code>. <code>__init__</code> llama a <code>super().__init__</code> y crea las dos capas como atributos; <code>call</code> recibe los datos <code>x</code> y devuelve <code>salida(oculta(x))</code>: lo que calcula el modelo.</td></tr>
+        <tr data-lines="27"><td><code>subclase = MiRed(name="subclase")</code></td><td>Crea un modelo de esa clase.</td></tr>
+        <tr data-lines="28"><td><code>print("construido antes de usarlo:", subclase.built)</code></td><td>Pregunta si está construido (<code>built</code>): todavía <strong>no</strong> (<code>False</code>), porque Keras aún no ha visto datos.</td></tr>
+        <tr data-lines="29"><td><code>x = np.random.default_rng(0).normal(size=(2, 4)).ast …</code></td><td>Crea 2 filas de 4 valores aleatorios (<code>float32</code>).</td></tr>
+        <tr data-lines="30"><td><code>subclase(x)</code></td><td>Llama al modelo con esos datos: en esta primera llamada se crean los pesos.</td></tr>
+        <tr data-lines="31"><td><code>print("construido después:", subclase.built)</code></td><td>Ahora <code>built</code> es <code>True</code>.</td></tr>
+        <tr data-lines="33-34"><td><code>for m in (secuencial, funcional, subclase): …</code></td><td>Recorre los tres modelos e imprime su nombre y su número de parámetros (<code>count_params()</code>).</td></tr>
+        <tr data-lines="36-37"><td><code>funcional.set_weights(secuencial.get_weights()) …</code></td><td>Copia los pesos del Sequential (<code>get_weights()</code>) al funcional y al de subclases (<code>set_weights</code>). Los tres tienen las mismas capas con la misma forma, así que encajan.</td></tr>
+        <tr data-lines="38"><td><code>print("misma salida:", np.allclose(secuencial(x), fu …</code></td><td>Comprueba con <code>np.allclose</code> (¿son iguales hasta redondeos?) que las salidas coinciden.</td></tr>
+        <tr data-lines="39"><td><code>print(secuencial(x).numpy().round(3))</code></td><td>Imprime la salida del Sequential redondeada a 3 decimales: cada fila son 3 probabilidades.</td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>construido antes de usarlo: False
+construido después: True
+secuencial parámetros = 67
+funcional  parámetros = 67
+subclase   parámetros = 67
+misma salida: True True
+[[0.445 0.332 0.223]
+ [0.591 0.255 0.155]]</pre>
+    <p>Antes de la primera llamada el modelo por subclases no está construido (<code>False</code>) y después sí (<code>True</code>). Los tres tienen <strong>67 parámetros</strong>: 4·8 + 8 = 40 en la oculta y 8·3 + 3 = 27 en la salida. Con los mismos pesos, las salidas coinciden (<code>True True</code>). Cada fila de la salida son 3 probabilidades que suman 1 (0,445 + 0,332 + 0,223 = 1).</p>
+  </div>
+</article>
+
+<!-- ---------- Fragmento 12 ---------- -->
+<article class="snippet" data-lang="python" id="frag-12">
+  <header>
+    <h3>12 · API funcional: atajo con <code>Add</code>, <code>Concatenate</code>, extractor de capas y errores de grafo</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Construir un modelo con una conexión residual, leer su <code>summary()</code> con «Connected to», comparar <code>Add</code> y <code>Concatenate</code>, extraer una capa intermedia y ver el error de un grafo desconectado.</p>
+  </header>
+  <pre class="code"><code>import os
+import tempfile
+import numpy as np
+import keras
+from keras import layers
+
+keras.utils.set_random_seed(1)
+entrada = keras.Input(shape=(8,), name="entrada")
+a = layers.Dense(16, activation="relu", name="densa_a")(entrada)
+b = layers.Dense(16, activation="relu", name="densa_b")(a)
+suma = layers.Add(name="suma")([a, b])
+salida = layers.Dense(3, activation="softmax", name="salida")(suma)
+modelo = keras.Model(entrada, salida, name="con_atajo")
+modelo.summary()
+
+c = layers.Dense(10, activation="relu", name="densa_c")(a)
+try:
+    layers.Add()([a, c])
+except ValueError as e:
+    print("Add:", e)
+print("Concatenate:", layers.Concatenate()([a, c]).shape)
+
+extractor = keras.Model(modelo.input, modelo.get_layer("suma").output, name="extractor")
+print("extractor:", extractor.output_shape, extractor.predict(np.ones((2, 8), "float32"), verbose=0).shape)
+print([capa.name for capa in modelo.layers])
+
+try:
+    keras.Model(entrada, layers.Dense(2)(keras.Input(shape=(3,))))
+except ValueError as e:
+    print("Grafo desconectado:", e)
+
+ruta = os.path.join(tempfile.mkdtemp(), "modelo.png")
+keras.utils.plot_model(modelo, to_file=ruta, show_shapes=True)
+print("dibujo creado:", os.path.exists(ruta))</code></pre>
+  <details class="linea-a-linea">
+    <summary>Línea por línea</summary>
+    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+      <tbody>
+        <tr data-lines="1-3"><td><code>import os …</code></td><td>Importan <code>os</code>, <code>tempfile</code> y NumPy (el primero y el segundo, para dibujar el modelo en una carpeta temporal).</td></tr>
+        <tr data-lines="4-5"><td><code>import keras …</code></td><td>Importan Keras y las capas.</td></tr>
+        <tr data-lines="7"><td><code>keras.utils.set_random_seed(1)</code></td><td>Semilla aleatoria para que los pesos sean reproducibles.</td></tr>
+        <tr data-lines="8"><td><code>entrada = keras.Input(shape=(8,), name="entrada")</code></td><td>La entrada: 8 características, con nombre <code>"entrada"</code>.</td></tr>
+        <tr data-lines="9"><td><code>a = layers.Dense(16, activation="relu", name="densa_ …</code></td><td><code>densa_a</code>: 16 neuronas ReLU conectadas a la entrada.</td></tr>
+        <tr data-lines="10"><td><code>b = layers.Dense(16, activation="relu", name="densa_ …</code></td><td><code>densa_b</code>: otras 16 neuronas, conectadas a la salida de <code>densa_a</code>.</td></tr>
+        <tr data-lines="11"><td><code>suma = layers.Add(name="suma")([a, b])</code></td><td><code>Add</code> suma <strong>elemento a elemento</strong> la salida de <code>densa_a</code> y la de <code>densa_b</code>: el atajo.</td></tr>
+        <tr data-lines="12"><td><code>salida = layers.Dense(3, activation="softmax", name= …</code></td><td>La salida: 3 neuronas softmax conectadas a la suma.</td></tr>
+        <tr data-lines="13"><td><code>modelo = keras.Model(entrada, salida, name="con_ataj …</code></td><td>Declara el modelo, de la entrada a la salida.</td></tr>
+        <tr data-lines="14"><td><code>modelo.summary()</code></td><td><code>summary()</code> imprime la tabla de capas con la forma de salida, los parámetros y «Connected to».</td></tr>
+        <tr data-lines="16"><td><code>c = layers.Dense(10, activation="relu", name="densa_ …</code></td><td>Otra capa <code>densa_c</code> con 10 neuronas, conectada a <code>densa_a</code> (no forma parte del modelo, es para la prueba).</td></tr>
+        <tr data-lines="17-20"><td><code>try: …</code></td><td>Intenta sumar <code>a</code> (16) y <code>c</code> (10) con <code>Add</code>: no tienen la misma forma y falla con <code>ValueError</code>.</td></tr>
+        <tr data-lines="21"><td><code>print("Concatenate:", layers.Concatenate()([a, c]).s …</code></td><td><code>Concatenate</code> sí los admite y suma los anchos: 16 + 10 = 26.</td></tr>
+        <tr data-lines="23"><td><code>extractor = keras.Model(modelo.input, modelo.get_lay …</code></td><td><strong>Extractor</strong>: un modelo nuevo desde la entrada del original (<code>modelo.input</code>) hasta la salida de la capa <code>"suma"</code> (<code>get_layer("suma").output</code>).</td></tr>
+        <tr data-lines="24"><td><code>print("extractor:", extractor.output_shape, extracto …</code></td><td>Imprime la forma de su salida y la de lo que devuelve al darle 2 filas de unos (<code>np.ones</code>).</td></tr>
+        <tr data-lines="25"><td><code>print([capa.name for capa in modelo.layers])</code></td><td>Lista los nombres de las capas del modelo.</td></tr>
+        <tr data-lines="27-30"><td><code>try: …</code></td><td>Intenta crear un modelo con una salida construida a partir de <strong>otra</strong> <code>Input</code> distinta de la declarada: el grafo está desconectado y falla.</td></tr>
+        <tr data-lines="32"><td><code>ruta = os.path.join(tempfile.mkdtemp(), "modelo.png" …</code></td><td>Ruta de un archivo <code>modelo.png</code> en una carpeta temporal.</td></tr>
+        <tr data-lines="33"><td><code>keras.utils.plot_model(modelo, to_file=ruta, show_sh …</code></td><td><code>plot_model</code> dibuja el grafo en ese archivo (necesita <code>pydot</code> y Graphviz). <code>show_shapes=True</code> incluye las formas.</td></tr>
+        <tr data-lines="34"><td><code>print("dibujo creado:", os.path.exists(ruta))</code></td><td>Comprueba que el archivo se ha creado.</td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>Model: "con_atajo"
+┏━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━┓
+┃ Layer (type)        ┃ Output Shape      ┃    Param # ┃ Connected to      ┃
+┡━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━┩
+│ entrada             │ (None, 8)         │          0 │ -                 │
+│ (InputLayer)        │                   │            │                   │
+├─────────────────────┼───────────────────┼────────────┼───────────────────┤
+│ densa_a (Dense)     │ (None, 16)        │        144 │ entrada[0][0]     │
+├─────────────────────┼───────────────────┼────────────┼───────────────────┤
+│ densa_b (Dense)     │ (None, 16)        │        272 │ densa_a[0][0]     │
+├─────────────────────┼───────────────────┼────────────┼───────────────────┤
+│ suma (Add)          │ (None, 16)        │          0 │ densa_a[0][0],    │
+│                     │                   │            │ densa_b[0][0]     │
+├─────────────────────┼───────────────────┼────────────┼───────────────────┤
+│ salida (Dense)      │ (None, 3)         │         51 │ suma[0][0]        │
+└─────────────────────┴───────────────────┴────────────┴───────────────────┘
+ Total params: 467 (1.82 KB)
+ Trainable params: 467 (1.82 KB)
+ Non-trainable params: 0 (0.00 B)
+Add: Inputs have incompatible shapes. Received shapes (16,) and (10,)
+Concatenate: (None, 26)
+extractor: (None, 16) (2, 16)
+['entrada', 'densa_a', 'densa_b', 'suma', 'salida']
+Grafo desconectado: Output with path `` is not connected to `inputs`
+dibujo creado: True</pre>
+    <p>La tabla es la del <code>summary()</code> comentada en el texto: <code>densa_a</code> 144, <code>densa_b</code> 272, <code>suma</code> 0 (con «Connected to» <code>densa_a, densa_b</code>), <code>salida</code> 51; total <strong>467</strong> (1,82 KB). Después: el error de <code>Add</code> (<em>«Received shapes (16,) and (10,)»</em>), la forma de <code>Concatenate</code> (<code>(None, 26)</code>), el extractor (<code>(None, 16)</code> y <code>(2, 16)</code>), los nombres de capa y el error del grafo desconectado. Por último, el dibujo se creó (<code>True</code>).</p>
+  </div>
+</article>
+
+</section>
+
+</div>
+</main>
+</body>
+</html>

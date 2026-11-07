@@ -1,123 +1,317 @@
-<!DOCTYPE html>
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lección 4 · Para generar basta el decoder; para interpolar, caminar por el mapa · Módulo 4 · Curso 3 · Cuaderno de IA</title>
+<meta name="description" content="Generar con un VAE es sortear z de N(0, I) y decodificar; interpolar es recorrer la línea recta entre dos códigos.">
+<script>try{var t=localStorage.getItem('cuaderno-ia:tema');if(t)document.documentElement.setAttribute('data-theme',t)}catch(e){}</script>
+<link rel="stylesheet" href="../../assets/css/style.css">
+<script src="../../assets/js/curriculum.js"></script>
+<script src="../../assets/js/lab.js"></script>
+<script src="../../assets/js/app.js" defer></script>
+</head>
+<body data-root="../../" data-course="3" data-module="4" data-lesson="4">
+<main>
+<div class="page">
 
-<html lang="es"><head><meta charset="utf-8"/><meta content="width=device-width,initial-scale=1" name="viewport"/><title>Lección 4 · La pérdida del VAE: reconstrucción + KL · Curso 3 · Cuaderno de IA</title><meta content="Con \( \beta = 1 \) es, salvo constantes, la cota inferior de la evidencia o ELBO ( Evidence Lower BOund ): como no podemos calcular directamente lo bien que el modelo explica los datos, \( \log p(x) \), se…" name="description"/><script>try{var t=localStorage.getItem('cuaderno-ia:tema');if(t)document.documentElement.setAttribute('data-theme',t)}catch(e){}</script><link href="../../assets/css/style.css" rel="stylesheet"/><script src="../../assets/js/curriculum.js"></script><script src="../../assets/js/lab.js"></script><script defer="" src="../../assets/js/app.js"></script><script defer="" src="../../assets/js/microanimations.js"></script></head><body data-course="3" data-lesson="4" data-module="4" data-root="../../"><main><div class="page" data-micro="3min"><header class="hero leccion"><div class="hero-grid"><div><p class="eyebrow">Curso 3 · Módulo 4 · Lección 4 de 12</p><h1>La pérdida del VAE: reconstrucción + KL</h1><p class="lead">Con \( \beta = 1 \) es, salvo constantes, la cota inferior de la evidencia o ELBO ( Evidence Lower BOund ): como no podemos calcular directamente lo bien que el modelo explica los datos, \( \log p(x) \), se…</p><p class="meta-line"><span class="read-time" data-render="read-time"></span><a href="../modulo-4.html">Índice del módulo</a></p></div><div aria-hidden="true" class="hero-tile"></div></div></header><details class="predice"><summary>Hay dos deseos que chocan: que el decodificador reconstruya bien la imagen de entrada (la carátula, el dígito…), y que todas las nubes se parezcan a una \( \mathcal{N}(0, I) \). ¿Cómo se mide cada uno y cómo se combinan?<span class="hint"></span></summary><div><p>Con \( \beta = 1 \) es, salvo constantes, la cota inferior de la evidencia o ELBO ( Evidence Lower BOund ): como no podemos calcular directamente lo bien que el modelo explica los datos, \( \log p(x) \), se…</p></div></details><section aria-label="Explicación breve" class="micro-core"><div class="micro-kicker">01 · ENTENDER <span>≈ 45 s</span></div><h2>La idea en palabras sencillas</h2><p>Mide la diferencia entre la entrada y su reconstrucción. Con píxeles entre 0 y 1 se usa la entropía cruzada binaria (BCE) por píxel o el error cuadrático. Lo importante: se suma sobre los 64 píxeles, no se promedia.</p><div class="micro-example"><span aria-hidden="true" class="micro-example-icon">💡</span><div><strong>Otro ejemplo · Diseño</strong><p>Con ejemplos de diseños, un modelo puede crear variaciones nuevas sin copiar un ejemplo entero.</p></div></div></section><div class="micro-kicker micro-checkpoint">02 · RESPONDER <span>≈ 15 s</span></div><section aria-label="Pregunta intercalada" class="quiz mini micro-check"><script class="quiz-data" type="application/json">{"titulo": "Pausa rápida · Comprueba la idea", "preguntas": [{"q": "En un VAE, el encoder suele producir…", "opciones": ["Parámetros de una distribución latente", "Solo una etiqueta de spam", "Una tabla de temperaturas"], "correcta": 0, "porque": "Se aprende una distribución que permite muestrear valores latentes."}]}</script></section><section aria-label="Animación interactiva" class="micro-viz" data-index="11" data-micro-viz="generative"><div class="micro-kicker">03 · EXPERIMENTAR <span>≈ 45 s</span></div><div class="micro-viz-title"><div><h2>Del ruido a una estructura</h2><p>Avanza la transformación y observa cómo emerge un patrón.</p></div><span aria-hidden="true" class="micro-viz-symbol">✦</span></div><div aria-live="polite" class="micro-viz-stage"><p>Animación interactiva: Del ruido a una estructura</p></div></section><div class="micro-kicker micro-checkpoint">04 · APLICAR <span>≈ 15 s</span></div><section aria-label="Pregunta intercalada" class="quiz mini micro-check"><script class="quiz-data" type="application/json">{"titulo": "Pausa rápida · ¿Lo aplicarías?", "preguntas": [{"q": "¿Para qué sirve ese espacio latente?", "opciones": ["Hacer siempre bagging", "Eliminar la pérdida de reconstrucción", "Generar nuevas muestras próximas a patrones aprendidos"], "correcta": 2, "porque": "El espacio latente permite interpolar y generar."}]}</script></section><div class="micro-finish"><strong>Idea que te llevas</strong><span>Mide la diferencia entre la entrada y su reconstrucción</span><small>¿Quieres más ejemplos, fórmulas o código? Los tienes justo debajo, sin límite de tiempo.</small></div><details class="profundizar micro-legacy"><summary><span>Explorar más: explicación y simulaciones completas<small>Todo el texto original, tablas y demos avanzadas. Opcional.</small></span></summary><div class="prof-body"><section><h2>La pérdida del VAE: reconstrucción + KL</h2>
-<p>Con \( \beta = 1 \) es, salvo constantes, la <strong>cota inferior de la evidencia</strong> o <em>ELBO</em> (<em>Evidence Lower BOund</em>): como no podemos calcular directamente lo bien que el modelo explica los datos, \( \log p(x) \), se maximiza una cota inferior suya, que es exactamente «reconstrucción menos KL»; minimizar la pérdida de arriba equivale a maximizar esa cota. Aquí \( q(z \mid x) = \mathcal{N}(\mu, \sigma^2) \) es la nube que da el encoder y \( p(z) = \mathcal{N}(0, 1) \) es el prior.</p>
-<p>Mide la diferencia entre la entrada y su reconstrucción. Con píxeles entre 0 y 1 se usa la <strong>entropía cruzada binaria</strong> (BCE) por píxel o el error cuadrático. Lo importante: se <strong>suma sobre los 64 píxeles</strong>, no se promedia.</p>
-<p>La <strong>divergencia de Kullback-Leibler</strong> \( D_{KL}(q \,\|\, p) \) mide cuánto se parece una distribución \( q \) a otra \( p \): vale 0 si son idénticas y crece cuanto más se separan. No es una distancia simétrica, pero sirve para eso. Su definición es el <em>promedio, bajo \( q \), de la diferencia entre sus logaritmos</em>:</p>
-<div class="callout ejemplo"><span class="lbl">Ejemplo tomado del módulo</span><p>La nube de Titanic en un eje del mapa, con \( \mu = 1 \) y \( \sigma = 0{,}5 \) (cifras inventadas; así que \( \sigma^2 = 0{,}25 \) y \( \ln 0{,}25 = -1{,}3863 \)).</p></div></section><figure class="demo" data-demo="curso3/c3m4-kl-perdida" data-titulo="Reconstrucción contra KL, con la cuenta a la vista">
-<div class="haz">Mueve μ y σ a mano e intenta bajar la pérdida total. Luego pulsa «Ir al óptimo para este β», después «Solo reconstrucción (β = 0)» y «β grande (6)».</div>
-<div class="observa">Con β = 0 el óptimo es μ = x y σ → 0: un autoencoder normal, con la reconstrucción perfecta y un KL altísimo. Con β grande gana el KL: μ → 0,5 y σ → 0,87, la nube casi no sabe nada de x. Con β = 1 hay un punto intermedio: μ cerca de x, nube de anchura razonable. El readout muestra el KL con todos sus sumandos.</div>
-</figure><div class="resumen"><h2 class="sin-num sin-toc">En pocas líneas</h2><ul><li><strong>La pérdida del VAE: reconstrucción + KL:</strong> Con \( \beta = 1 \) es, salvo constantes, la cota inferior de la evidencia o ELBO ( Evidence Lower BOund ): como no podemos calcular…</li><li>Antes de continuar, intenta explicar la demo sin mirar su resultado.</li></ul></div><section class="quiz mini"><script class="quiz-data" type="application/json">{"titulo": "¿Lo tienes?", "preguntas": [{"q": "¿Qué concepto estamos trabajando en esta lección?", "opciones": ["La pérdida del VAE: reconstrucción + KL", "Cuándo falla una GAN", "De comprimir a crear: los modelos generativos"], "correcta": 0, "porque": "Con \\( \\beta = 1 \\) es, salvo constantes, la cota inferior de la evidencia o ELBO ( Evidence Lower BOund ): como no podemos calcular directamente lo bien que el modelo explica los datos, \\( \\log p(x) \\), se…"}, {"q": "¿Cuál de estas afirmaciones recoge lo que acabas de estudiar?", "opciones": ["Lo importante es comprender la idea y comprobarla con ejemplos, no memorizar términos.", "Con \\( \\beta = 1 \\) es, salvo constantes, la cota inferior de la evidencia o ELBO ( Evidence Lower BOund ): como no podemos calcular directamente lo bien que el modelo explica los datos, \\( \\log p(x) \\), se…", "Siempre hay un único método que sirve para todos los problemas."], "correcta": 1, "porque": "La explicación central es: Con \\( \\beta = 1 \\) es, salvo constantes, la cota inferior de la evidencia o ELBO ( Evidence Lower BOund ): como no podemos calcular directamente lo bien que el modelo explica los datos, \\( \\log p(x) \\), se…"}, {"q": "Si una demo o un ejemplo te desconcierta, ¿cuál es la mejor forma de aprenderlo?", "opciones": ["Memorizar el nombre sin entender la operación.", "Volver a los números, cambiar un valor y explicar qué ocurre.", "Ignorar los resultados que no coinciden con tu intuición."], "correcta": 1, "porque": "Explorar qué cambia y por qué ayuda a conectar el concepto con su resultado."}]}</script></section></div></details><details class="profundizar"><summary><span>Profundizar: explicación completa<small>Matices, fórmulas, tablas, otros ejemplos y experimentos del módulo original.</small></span></summary><div class="prof-body"><section>
-<h2 id="perdida-vae">La pérdida del VAE: reconstrucción + KL</h2>
-<p class="pregunta">Hay dos deseos que chocan: que el decodificador reconstruya bien la imagen de entrada (la carátula, el dígito…), y que todas las nubes se parezcan a una \( \mathcal{N}(0, I) \). ¿Cómo se mide cada uno y cómo se combinan?</p>
-<div class="formula">\[ L_{\text{VAE}} \;=\; \underbrace{\text{reconstrucción}(x, \hat{x})}_{\text{se parece a la entrada}} \;+\; \beta\cdot\underbrace{D_{KL}\big(\,q(z\mid x)\;\|\;p(z)\,\big)}_{\text{la nube se parece al prior}} \]</div>
-<p>Con \( \beta = 1 \) es, salvo constantes, la <strong>cota inferior de la evidencia</strong> o <em>ELBO</em> (<em>Evidence Lower BOund</em>): como no podemos calcular directamente lo bien que el modelo explica los datos, \( \log p(x) \), se maximiza una cota inferior suya, que es exactamente «reconstrucción menos KL»; minimizar la pérdida de arriba equivale a maximizar esa cota. Aquí \( q(z \mid x) = \mathcal{N}(\mu, \sigma^2) \) es la nube que da el encoder y \( p(z) = \mathcal{N}(0, 1) \) es el prior.</p>
-<h3>Término 1: reconstrucción</h3>
-<p>Mide la diferencia entre la entrada y su reconstrucción. Con píxeles entre 0 y 1 se usa la <strong>entropía cruzada binaria</strong> (BCE) por píxel o el error cuadrático. Lo importante: se <strong>suma sobre los 64 píxeles</strong>, no se promedia.</p>
-<div class="callout ojo">
-<span class="lbl">Ojo</span>
-<p>Suma frente a media. La entropía cruzada de un píxel vale del orden de 0,3; la de la imagen, sumando 64, ronda 22 (en nuestro entrenamiento, 22,74). El KL se suma sobre las <em>dimensiones latentes</em> (2 en nuestro caso) y vale unos 2,3. Si promedias la reconstrucción sobre los píxeles la dividirías entre 64 (≈ 0,36) y el KL pasaría a ser 6 veces mayor que ella: el modelo preferiría ignorar la entrada y dejar todas las nubes en el prior (el <em>posterior collapse</em> de más abajo). El equilibrio entre términos depende de las escalas, así que cuida cómo agregas.</p>
-</div>
-<h3>Término 2: el KL, derivado con números</h3>
-<p>La <strong>divergencia de Kullback-Leibler</strong> \( D_{KL}(q \,\|\, p) \) mide cuánto se parece una distribución \( q \) a otra \( p \): vale 0 si son idénticas y crece cuanto más se separan. No es una distancia simétrica, pero sirve para eso. Su definición es el <em>promedio, bajo \( q \), de la diferencia entre sus logaritmos</em>:</p>
-<div class="formula">\[ D_{KL}(q\,\|\,p) \;=\; \mathbb{E}_{z\sim q}\big[\log q(z) - \log p(z)\big] \]</div>
-<p>Para nuestras dos normales en una dimensión se puede calcular a mano. Con \( q = \mathcal{N}(\mu, \sigma^2) \) y \( p = \mathcal{N}(0, 1) \):</p>
-<ol class="pasos">
-<li><strong>El logaritmo de \( q \).</strong> \( \log q(z) = -\tfrac{1}{2}\ln(2\pi) - \ln\sigma - \dfrac{(z-\mu)^2}{2\sigma^2} \).</li>
-<li><strong>Su promedio bajo \( q \).</strong> Como \( \mathbb{E}[(z-\mu)^2] = \sigma^2 \), el último término promedia \( \tfrac{1}{2} \): \( \mathbb{E}_q[\log q] = -\tfrac{1}{2}\ln(2\pi) - \ln\sigma - \tfrac{1}{2} \).</li>
-<li><strong>El logaritmo de \( p \).</strong> \( \log p(z) = -\tfrac{1}{2}\ln(2\pi) - \tfrac{z^2}{2} \). Su promedio bajo \( q \) usa \( \mathbb{E}_q[z^2] = \mu^2 + \sigma^2 \): \( \mathbb{E}_q[\log p] = -\tfrac{1}{2}\ln(2\pi) - \tfrac{1}{2}(\mu^2+\sigma^2) \).</li>
-<li><strong>Restar.</strong> Las constantes \( -\tfrac{1}{2}\ln(2\pi) \) se cancelan y queda el resultado:</li>
-</ol>
-<div class="formula">\[ D_{KL}\big(\mathcal{N}(\mu,\sigma^2)\,\|\,\mathcal{N}(0,1)\big) \;=\; \tfrac{1}{2}\left(\mu^2 + \sigma^2 - 1 - \ln\sigma^2\right) \]</div>
-<div class="callout ejemplo">
-<span class="lbl">Ejemplo numérico</span>
-<p>La nube de Titanic en un eje del mapa, con \( \mu = 1 \) y \( \sigma = 0{,}5 \) (cifras inventadas; así que \( \sigma^2 = 0{,}25 \) y \( \ln 0{,}25 = -1{,}3863 \)).</p>
-<table>
-<thead><tr><th>Pieza</th><th>Cuenta</th><th>Valor</th></tr></thead>
-<tbody>
-<tr><td>\( \mathbb{E}_q[\log q] + \tfrac{1}{2}\ln 2\pi \)</td><td>\( -\ln 0{,}5 - 0{,}5 = 0{,}6931 - 0{,}5 \)</td><td>0,1931</td></tr>
-<tr><td>\( \mathbb{E}_q[\log p] + \tfrac{1}{2}\ln 2\pi \)</td><td>\( -\tfrac{1}{2}(1 + 0{,}25) \)</td><td>−0,6250</td></tr>
-<tr><td>Diferencia = KL</td><td>\( 0{,}1931 - (-0{,}6250) \)</td><td class="res">0,8181</td></tr>
-<tr><td>Con la fórmula cerrada</td><td>\( \tfrac{1}{2}(1 + 0{,}25 - 1 + 1{,}3863) = \tfrac{1}{2}\cdot 1{,}6363 \)</td><td class="res">0,8181</td></tr>
-</tbody>
-</table>
-<p>El fragmento 2 comprueba el valor 0,8181 integrando numéricamente \( q\log(q/p) \) y obtiene lo mismo. Con más dimensiones latentes (más ejes del mapa, por ejemplo «comedia ↔ drama» y «ritmo lento ↔ rápido»), como las dimensiones son independientes, el KL total <strong>se suma</strong>: para \( \mu = (1{,}2;\,-0{,}4) \) y \( \sigma = (0{,}5;\,1{,}0) \) sale \( 1{,}0381 + 0{,}0800 = 1{,}1181 \).</p>
-</div>
-<h3>Qué significa cada trozo de la fórmula</h3>
-<ul>
-<li>\( \mu^2 \) empuja el centro de la nube hacia 0 (el centro del prior): cuanto más lejos del origen, más cuesta.</li>
-<li>\( \sigma^2 - 1 - \ln\sigma^2 \) es 0 solo cuando \( \sigma = 1 \). Si la nube se encoge (\( \sigma \to 0 \)) el término \( -\ln\sigma^2 \) se dispara hacia infinito; si se ensancha mucho, crece \( \sigma^2 \). Es decir, <strong>penaliza que la nube sea un punto</strong>, y por eso evita el autoencoder normal disfrazado.</li>
-<li>En el código de Keras se escribe con el log-varianza: \( -\tfrac{1}{2}\left(1 + \text{z\_log\_var} - \text{z\_mean}^2 - e^{\text{z\_log\_var}}\right) \), idéntico a la fórmula (el fragmento 2 lo confirma: 0,8181).</li>
-</ul>
-<h3>La pelea entre los dos términos</h3>
-<p>Para verlo con una sola neurona latente usamos un modelo de juguete: un dato \( x \) (el sitio del eje del mapa donde está de verdad una película), un encoder que da \( (\mu,\sigma) \) y un decodificador que devuelve \( \hat{x} = z \). La reconstrucción esperada es \( \mathbb{E}[(x-z)^2] = (x-\mu)^2 + \sigma^2 \). Con \( x = 2 \) y \( \beta = 1 \), el mínimo de \( (x-\mu)^2 + \sigma^2 + \beta\cdot\text{KL} \) se encuentra derivando: \( \mu^* = \tfrac{2x}{2+\beta} = 1{,}333 \) y \( \sigma^{*2} = \tfrac{\beta}{2+\beta} = \tfrac{1}{3} \), con reconstrucción 0,778, KL 1,105 y pérdida total 1,883 (en el experimento puedes comprobarlo con el botón «Ir al óptimo»).</p>
-<h3>Lo que pasa en un entrenamiento real</h3>
-<p>En el fragmento 5 entrenamos un VAE de 2 dimensiones latentes con \( \beta = 1 \): tras 60 epochs la pérdida total es 25,02, de los cuales 22,74 son reconstrucción y 2,28 son KL. Ese KL pequeño es el <em>coste informativo</em> del código: el modelo ha «gastado» 2,28 nats por dígito para describir su posición en el mapa.</p>
-<div class="callout regla">
-<span class="lbl">Regla fácil</span>
-<p>Reconstrucción empuja a <strong>aprender cada dato</strong> (nubes estrechas, separadas). KL empuja a <strong>ordenar el mapa</strong> (nubes anchas, centradas, solapadas). El VAE es el compromiso entre ambas, y \( \beta \) es el regulador.</p>
-</div>
-<ul>
-<li><strong>β-VAE:</strong> subir \( \beta \) por encima de 1 ordena más el espacio y tiende a que cada dimensión latente controle un factor distinto (más «desenredado», <em>disentangled</em>), a costa de imágenes más borrosas.</li>
-<li><strong><abbr class="t" data-def="El decodificador es tan potente que ignora z; el encoder deja todas las nubes en el prior (KL ≈ 0) y el VAE no aprende nada útil.">Posterior collapse</abbr>:</strong> si el KL gana demasiado, el posterior se pega al prior y el VAE ignora la entrada. Se combate con un <em>KL annealing</em> (empezar con \( \beta \) pequeño y subirlo poco a poco), con \( \beta &lt; 1 \) o limitando cuánto KL «cobra» por dimensión (<em>free bits</em>).</li>
-</ul>
-</section></div></details><details class="profundizar" id="codigo"><summary><span>Ver código explicado paso a paso<small>1 fragmento(s) original(es), con cada línea comentada y salida esperada.</small></span></summary><div class="prof-body"><article class="snippet" data-lang="python">
-<header>
-<h3>13 · Gradientes de la pérdida minimax frente a la no saturante</h3>
-<p class="para-que"><strong>Para qué sirve</strong> Ver con <code>GradientTape</code> por qué el generador casi no aprende al principio con la pérdida original \( \log(1-D(G(z))) \) y sí con la variante \( -\log D(G(z)) \); y comprobar las dos pérdidas del discriminador en sus casos extremos.</p>
+<header class="hero leccion">
+  <div class="hero-grid">
+    <div>
+      <p class="eyebrow">Curso 3 · Módulo 4 · Lección 4 de 8</p>
+      <h1>Para generar basta el decoder; para interpolar, caminar por el mapa</h1>
+      <p class="lead">Con el mapa ordenado, crear es sortear dos números de \( \mathcal{N}(0, I) \) y decodificarlos. Y pasar de Toy Story a Shrek es recorrer la línea recta entre sus códigos.</p>
+      <p class="meta-line"><span class="read-time" data-render="read-time"></span><a href="../modulo-4.html">Índice del módulo</a></p>
+    </div>
+    <div class="hero-tile" aria-hidden="true"></div>
+  </div>
 </header>
-<pre class="code"><code>import numpy as np
-import tensorflow as tf
-
-# Salidas del discriminador sobre muestras FALSAS: logit s = log(D / (1 - D))
-D_fake = np.array([0.01, 0.10, 0.50, 0.90], dtype="float32")
-s = tf.Variable(np.log(D_fake / (1 - D_fake)))
-
-with tf.GradientTape(persistent=True) as tape:
-    p = tf.sigmoid(s)                      # D(G(z)), la probabilidad de "real"
-    perdida_minimax = tf.math.log(1 - p)   # lo que G minimiza en el juego original
-    perdida_no_sat = -tf.math.log(p)       # la versión "no saturante" que se usa en la práctica
-g_minimax = tape.gradient(perdida_minimax, s).numpy()
-g_no_sat = tape.gradient(perdida_no_sat, s).numpy()
-
-print(" D(G(z)) | grad minimax | grad no saturante")
-for d, a, b in zip(D_fake, g_minimax, g_no_sat):
-    print(f"   {d:4.2f}  |    {a:7.3f}   |      {b:7.3f}")
-
-# Pérdida del discriminador con entropía cruzada binaria: reales -&gt; 1, falsas -&gt; 0
-bce = tf.keras.losses.BinaryCrossentropy()
-print("D perfecto  :", round(float(bce([1., 0.], [0.99, 0.01])), 3))
-print("D indeciso  :", round(float(bce([1., 0.], [0.5, 0.5])), 3), "(= ln 2 =", round(float(np.log(2)), 3), ")")</code></pre>
-<details class="linea-a-linea" open="">
-<summary>Línea por línea</summary>
-<p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
-<table class="lineas">
-<thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
-<tbody>
-<tr data-lines="1-2"><td><code>import numpy as np</code> y <code>import tensorflow as tf</code></td><td>NumPy y TensorFlow.</td></tr>
-<tr data-lines="4-5"><td><code>D_fake = np.array([0.01, 0.10, 0.50, 0.90], …)</code></td><td>Cuatro situaciones: lo que dice el discriminador (probabilidad de «real») sobre muestras falsas. 0,01 = D tiene clarísimo que es falsa; 0,90 = el generador casi lo ha engañado.</td></tr>
-<tr data-lines="6"><td><code>s = tf.Variable(np.log(D_fake / (1 - D_fake)))</code></td><td>El <strong>logit</strong> que daría la red: s = ln(D/(1−D)). Es lo que sale antes de la sigmoide. Se trabaja con él porque en la red real los gradientes pasan por ahí.</td></tr>
-<tr data-lines="8"><td><code>with tf.GradientTape(persistent=True) as tape:</code></td><td>La cinta <code>persistent=True</code> permite pedir varios gradientes de la misma grabación.</td></tr>
-<tr data-lines="9"><td><code>p = tf.sigmoid(s)</code></td><td>Recupera D(G(z)) = σ(s).</td></tr>
-<tr data-lines="10"><td><code>perdida_minimax = tf.math.log(1 - p)</code></td><td>Lo que el generador minimiza en el juego minimax original: ln(1 − D(G(z))).</td></tr>
-<tr data-lines="11"><td><code>perdida_no_sat = -tf.math.log(p)</code></td><td>La versión «no saturante»: −ln D(G(z)).</td></tr>
-<tr data-lines="12-13"><td><code>g_minimax = tape.gradient(perdida_minimax, s).numpy()</code> y la siguiente</td><td>Las derivadas de las dos pérdidas respecto al logit, para los cuatro casos.</td></tr>
-<tr data-lines="15-17"><td><code>print(…)</code> y el bucle <code>for d, a, b in zip(…)</code></td><td>Escribe una tabla: para cada D, los dos gradientes con 3 decimales (<code>:7.3f</code>).</td></tr>
-<tr data-lines="19-20"><td><code>bce = tf.keras.losses.BinaryCrossentropy()</code></td><td>La entropía cruzada binaria, que es la pérdida del discriminador.</td></tr>
-<tr data-lines="21"><td><code>print("D perfecto  :", …)</code></td><td>Reales con etiqueta 1 y falsas con etiqueta 0; el discriminador acierta con 0,99 y 0,01.</td></tr>
-<tr data-lines="22"><td><code>print("D indeciso  :", …)</code></td><td>El discriminador dice 0,5 a todo: la pérdida es ln 2 ≈ 0,693.</td></tr>
-</tbody>
-</table>
+<details class="predice">
+  <summary>Mezclas píxel a píxel, al 50 %, las carátulas de Toy Story y de Shrek. ¿Sale una carátula «a medio camino»?<span class="hint"></span></summary>
+  <div>
+    <p><strong>No: sale una doble exposición</strong>, las dos carátulas superpuestas a medias. Mezclar píxeles mezcla <em>imágenes</em>; para mezclar <em>conceptos</em> hay que moverse por el espacio latente.</p>
+  </div>
 </details>
-<div class="salida">
-<strong>Salida esperada</strong>
-<pre> D(G(z)) | grad minimax | grad no saturante
-   0.01  |     -0.010   |       -0.990
-   0.10  |     -0.100   |       -0.900
-   0.50  |     -0.500   |       -0.500
-   0.90  |     -0.900   |       -0.100
-D perfecto  : 0.01
-D indeciso  : 0.693 (= ln 2 = 0.693 )</pre>
-<p>La derivada de ln(1−p) respecto al logit es exactamente −p, y la de −ln p es −(1−p). Cuando D rechaza con seguridad (D = 0,01) el generador sufre: con minimax el gradiente es −0,010, casi nulo (<em>desvanecido</em>), pero con la no saturante es −0,990, enorme. Cuando D(G(z)) = 0,5 ambas valen −0,5, y cuando G ya engaña a D (0,90) es la minimax la que tiene el gradiente fuerte (−0,900 frente a −0,100). Por eso se usa la no saturante: da la mayor señal justo cuando más falta hace. El discriminador perfecto tiene pérdida 0,01 y el indeciso 0,693 = ln 2.</p>
+
+<section>
+<h2 id="idea">El encoder solo hacía falta para entrenar</h2>
+<p>El KL ha moldeado el espacio latente para que se parezca a \( \mathcal{N}(0, I) \). Así que para <strong>generar</strong> basta con sortear un \( z \) de esa normal y pasarlo por el decoder:</p>
+<ul class="flow">
+  <li class="d">z ~ N(0, I)<small>2 números al azar</small></li>
+  <li class="b">DECODER<small>solo esta mitad</small></li>
+  <li class="c">dígito nuevo<small>64 píxeles</small></li>
+</ul>
+<p>Salen algo borrosos: con 2 dimensiones latentes hay poco detalle, y el decoder devuelve el <em>promedio</em> de las imágenes que podrían corresponder a ese \( z \).</p>
+<p>Para <strong>interpolar</strong> entre A y B se codifican los dos (con la media \( \mu \) de cada nube), se recorre el segmento que los une y se decodifica cada punto:</p>
+<div class="formula">\[ z(t) = (1-t)\,z_A + t\,z_B, \qquad t \in [0, 1] \]</div>
+<p>En un VAE los puntos intermedios tienen sentido porque el KL rellenó el espacio. Y si al generar quieres elegir <em>qué</em> dígito sale, se le pasa la etiqueta al encoder y al decoder: un VAE condicional, como marcar el filtro «Comedias».</p>
+</section>
+
+<figure class="demo" data-demo="curso3/c3m4-interpolacion" data-titulo="Interpolación en el espacio latente">
+  <div class="haz">Elige dos dígitos A y B y mueve el slider. Compara la fila de arriba con la de abajo. Luego cambia a «Autoencoder normal».</div>
+  <div class="observa">Abajo, la mezcla de píxeles es una doble exposición; arriba, la forma cambia poco a poco porque se mueve el código.</div>
+</figure>
+
+<section>
+<h2 id="numeros">Con números: un cuarto del camino de Toy Story a Shrek</h2>
+<div class="callout ejemplo">
+  <span class="lbl">Ejemplo numérico</span>
+  <p>Toy Story en \( z_A = (1;\,-1) \) y Shrek en \( z_B = (-1;\,3) \) (posiciones inventadas del mapa).</p>
+  <ol class="pasos">
+    <li>\( t = 0{,}25 \): \( 0{,}75\cdot(1;\,-1) + 0{,}25\cdot(-1;\,3) = (0{,}75 - 0{,}25;\ -0{,}75 + 0{,}75) = \) <strong>(0,5; 0)</strong>.</li>
+    <li>\( t = 0{,}5 \): \( 0{,}5\cdot(1;\,-1) + 0{,}5\cdot(-1;\,3) = \) <strong>(0; 1)</strong>, el punto medio.</li>
+  </ol>
+  <p>Con dígitos reales, de un «1» a un «3» en siete pasos, un clasificador ve: 1, 1, 7, 5, 3, 3, 3. La forma cambia poco a poco pasando por cosas que parecen dígitos.</p>
 </div>
-</article></div></details></div></main></body></html>
+</section>
+
+<details class="predice">
+  <summary>Sorteas \( z = (8;\,8) \) en vez de sacarlo de \( \mathcal{N}(0, I) \) y lo decodificas con el VAE. ¿Sale un dígito razonable?<span class="hint"></span></summary>
+  <div>
+    <p><strong>Probablemente no.</strong> (8; 8) está a 8 desviaciones del origen, muy fuera del disco que el KL llenó (los códigos del VAE caen entre −2,6 y 2,5). Allí el decoder nunca vio nada: has vuelto al océano. Por eso se sortea del prior.</p>
+  </div>
+</details>
+
+<div class="resumen">
+  <h2 class="sin-num sin-toc">En tres líneas</h2>
+  <ul>
+    <li>Generar = sortear \( z \sim \mathcal{N}(0, I) \) y decodificar; el encoder no hace falta.</li>
+    <li>Interpolar = decodificar \( (1-t)\,z_A + t\,z_B \): mezcla conceptos, no píxeles.</li>
+    <li>Funciona porque el KL dejó el espacio lleno; en un autoencoder normal el camino cruza huecos.</li>
+  </ul>
+</div>
+
+<section class="quiz mini">
+<script type="application/json" class="quiz-data">
+{
+ "titulo": "¿Lo tienes?",
+ "preguntas": [
+  {
+   "q": "Tienes un VAE ya entrenado y quieres un dígito nuevo. ¿Qué necesitas?",
+   "opciones": [
+    "El encoder y una imagen real.",
+    "Solo el decoder y un \\( z \\) sorteado de \\( \\mathcal{N}(0, I) \\).",
+    "El encoder, el decoder y la etiqueta.",
+    "Volver a entrenar con β = 0."
+   ],
+   "correcta": 1,
+   "porque": "El encoder solo se usa para entrenar y para codificar datos reales. Generar es sortear del prior y decodificar."
+  },
+  {
+   "q": "Con \\( z_A = (2;\\,0) \\) y \\( z_B = (0;\\,4) \\), ¿cuánto vale \\( z(0{,}5) \\)?",
+   "opciones": [
+    "(2; 4)",
+    "(1; 2)",
+    "(0,5; 0,5)",
+    "(1; 4)"
+   ],
+   "correcta": 1,
+   "porque": "\\( 0{,}5\\cdot(2;0) + 0{,}5\\cdot(0;4) = (1;\\,2) \\): el punto medio del segmento."
+  },
+  {
+   "q": "¿Por qué los dígitos generados por nuestro VAE salen borrosos?",
+   "opciones": [
+    "Porque el decoder tiene demasiados parámetros.",
+    "Porque el KL vale 0.",
+    "Porque con 2 dimensiones latentes hay poco detalle y el decoder devuelve el promedio de las imágenes posibles para ese z.",
+    "Porque se interpola en línea recta."
+   ],
+   "correcta": 2,
+   "porque": "Con BCE o MSE el decoder aprende a devolver la media de lo que podría corresponder a ese código, y los promedios son borrosos: un defecto conocido de los VAE."
+  }
+ ]
+}
+</script>
+</section>
+
+<details class="profundizar">
+  <summary><span>Profundizar: la explicación completa<small>Por qué salen borrosos, el experimento del «1» al «3», slerp, aritmética latente y el VAE condicional.</small></span></summary>
+  <div class="prof-body">
+<h2 id="muestreo-interpolacion">Generar e interpolar con un VAE</h2>
+
+<p class="pregunta">Una vez entrenado, ¿cómo se crea una imagen que nadie dibujó (aquí un dígito; piensa en una carátula nueva)? ¿Y qué hay «entre» dos imágenes, por ejemplo entre las carátulas de Toy Story y de Shrek?</p>
+
+<h3>Generar: el encoder ya no hace falta</h3>
+<p>Como el KL ha moldeado el espacio latente para que se parezca a \( \mathcal{N}(0, I) \), basta con <strong>sacar un \( z \) de esa normal estándar y pasarlo por el decoder</strong>. El encoder solo se necesita durante el entrenamiento y para codificar datos reales.</p>
+<ul class="flow">
+  <li class="d">z ~ N(0, I)<small>2 números al azar</small></li>
+  <li class="b">DECODER<small>solo esta mitad</small></li>
+  <li class="c">dígito nuevo<small>64 píxeles</small></li>
+</ul>
+<p>En el fragmento 6 se generan tres dígitos así. Salen algo borrosos por dos razones: el espacio latente tiene solo 2 dimensiones, y con BCE o MSE el decodificador devuelve el <em>promedio</em> de las imágenes que podrían corresponder a ese \( z \), y los promedios son borrosos (un defecto conocido de los VAE).</p>
+
+<h3>Interpolar: moverse de un dato a otro</h3>
+<p>Para pasar de un dígito A a otro B se codifican los dos (se usa la media \( \mu \) de cada nube), se recorre el segmento recto que los une y se decodifica cada punto:</p>
+<div class="formula">\[ z(t) = (1-t)\,z_A + t\,z_B, \qquad t \in [0, 1] \]</div>
+<p>Con \( t = 0 \) tienes \( z_A \), con \( t = 1 \) tienes \( z_B \) y con \( t = 0{,}5 \) el punto medio. Si Toy Story está en \( z_A = (1{,}0;\,-1{,}0) \) y Shrek en \( z_B = (-1{,}0;\,3{,}0) \) (posiciones inventadas del mapa), el punto a un cuarto del camino de Toy Story hacia Shrek es \( z(0{,}25) = 0{,}75\cdot(1;-1) + 0{,}25\cdot(-1;3) = (0{,}5;\,0) \). En un VAE esos puntos intermedios <em>sí</em> tienen sentido porque el KL ha rellenado el espacio; en un autoencoder normal pueden caer en huecos. En el fragmento 7 se hace con un «1» y un «3» reales: un clasificador que mira las siete imágenes decodificadas ve un 1, un 1, un 7, un 5, un 3, un 3 y un 3, es decir, el trazo cambia de forma poco a poco pasando por formas que parecen dígitos. Puedes recorrerlo tú con pesos reales:</p>
+
+<div class="callout recuerda">
+  <span class="lbl">Experimento de arriba: «Interpolación en el espacio latente», con todo detalle</span>
+  <p><strong>Haz esto.</strong> Elige dos dígitos A y B y recorre el camino con el slider. Compara la fila de arriba (interpolación latente) con la de abajo (mezclar píxeles). Luego cambia el modelo a «Autoencoder normal».</p>
+  <p><strong>Fíjate en.</strong> La mezcla de píxeles es una doble exposición: se ven los dos dígitos superpuestos a medias. La interpolación latente cambia la <em>forma</em> poco a poco, porque se mueve el código y no los píxeles. En el autoencoder normal los códigos están tan dispersos que el camino atraviesa zonas desconocidas y los intermedios son menos fiables. (Con 2 dimensiones el parecido siempre es modesto.)</p>
+</div>
+
+<div class="callout regla">
+  <span class="lbl">Regla fácil</span>
+  <p>Interpolar en el espacio de entrada (píxeles) mezcla <em>imágenes</em>; interpolar en el espacio latente mezcla <em>conceptos</em> (mezclar píxel a píxel las carátulas de Toy Story y Shrek da una doble exposición; moverte por el mapa de una a otra da «algo de animación a medio camino»). En espacios latentes de muchas dimensiones se suele interpolar sobre un arco (<em>slerp</em>) en vez de la línea recta, porque en alta dimensión los puntos de una normal viven en una cáscara y la línea recta se mete por el centro, donde nunca cayó ninguna muestra.</p>
+</div>
+<ul>
+  <li><strong>Aritmética latente:</strong> restar y sumar vectores latentes («cara sonriente − cara seria + hombre») produce transformaciones semánticas en espacios latentes bien entrenados.</li>
+  <li><strong>VAE condicional (CVAE):</strong> se concatena la etiqueta (por ejemplo, el dígito en one-hot) al encoder y al decoder; así, al generar, eliges <em>qué</em> dígito quieres (como marcar el filtro «Comedias» en Netflix en vez de pedir «una peli cualquiera») y el \( z \) controla el estilo. Es la misma idea que en las cGAN de más abajo.</li>
+</ul>
+  </div>
+</details>
+
+<section>
+<h2 class="sin-num">Código</h2>
+<!-- ---------- Fragmento 5 ---------- -->
+<article class="snippet" data-lang="python">
+  <header>
+    <h3>5 · Entrenar el VAE con un <code>train_step</code> propio</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Unir encoder y decoder en un <code>keras.Model</code> cuya pérdida es reconstrucción + KL, y entrenarlo con el <code>fit</code> de siempre. Usa <code>encoder</code>, <code>decoder</code>, <code>keras</code>, <code>ops</code> y <code>X</code> del fragmento 3.</p>
+  </header>
+  <pre class="code"><code>import tensorflow as tf
+
+
+class VAE(keras.Model):
+    def __init__(self, encoder, decoder, beta=1.0, **kwargs):
+        super().__init__(**kwargs)
+        self.encoder = encoder
+        self.decoder = decoder
+        self.beta = beta
+        self.loss_tracker = keras.metrics.Mean(name="loss")
+        self.recon_tracker = keras.metrics.Mean(name="recon")
+        self.kl_tracker = keras.metrics.Mean(name="kl")
+
+    @property
+    def metrics(self):
+        return [self.loss_tracker, self.recon_tracker, self.kl_tracker]
+
+    def train_step(self, data):
+        with tf.GradientTape() as tape:
+            z_mean, z_log_var, z = self.encoder(data, training=True)
+            recon_img = self.decoder(z, training=True)
+            bce = keras.losses.binary_crossentropy(data[..., None], recon_img[..., None])
+            recon = ops.mean(ops.sum(bce, axis=1))
+            kl = ops.mean(ops.sum(-0.5 * (1 + z_log_var - ops.square(z_mean) - ops.exp(z_log_var)), axis=1))
+            total = recon + self.beta * kl
+        grads = tape.gradient(total, self.trainable_weights)
+        self.optimizer.apply_gradients(zip(grads, self.trainable_weights))
+        self.loss_tracker.update_state(total)
+        self.recon_tracker.update_state(recon)
+        self.kl_tracker.update_state(kl)
+        return {m.name: m.result() for m in self.metrics}
+
+
+vae = VAE(encoder, decoder)
+vae.compile(optimizer=keras.optimizers.Adam(1e-2))
+hist = vae.fit(X, epochs=60, batch_size=64, verbose=0)
+
+print("época |  pérdida | reconstr. |   KL")
+for e in (0, 9, 29, 59):
+    h = hist.history
+    print(f"{e + 1:5d} | {h['loss'][e]:8.2f} | {h['recon'][e]:9.2f} | {h['kl'][e]:5.2f}")</code></pre>
+  <details class="linea-a-linea" open>
+    <summary>Línea por línea</summary>
+    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+      <tbody>
+        <tr data-lines="1"><td><code>import tensorflow as tf</code></td><td>Se necesita para <code>tf.GradientTape</code>, la cinta que graba las operaciones y permite derivar (módulo 5).</td></tr>
+        <tr data-lines="4"><td><code>class VAE(keras.Model):</code></td><td>Un modelo propio que hereda de <code>keras.Model</code> (subclassing, módulo 1).</td></tr>
+        <tr data-lines="5-9"><td><code>def __init__(self, encoder, decoder, beta=1.0, **kwargs)</code> y sus cuatro líneas</td><td>Guarda el encoder, el decoder y el peso <code>beta</code> del término KL (con 1,0 es el VAE estándar).</td></tr>
+        <tr data-lines="10-12"><td><code>self.loss_tracker = keras.metrics.Mean(name="loss")</code> y los otros dos</td><td>Tres «promediadores» de Keras: llevan la media, a lo largo de un epoch, de la pérdida total, de la reconstrucción y del KL.</td></tr>
+        <tr data-lines="14-16"><td><code>@property def metrics(self): return [...]</code></td><td>Le dice a Keras qué métricas debe reiniciar al empezar cada epoch y mostrar en el historial.</td></tr>
+        <tr data-lines="18"><td><code>def train_step(self, data):</code></td><td>Lo que <code>fit</code> ejecuta con cada lote. Al no pasar etiquetas, <code>data</code> es el lote de imágenes.</td></tr>
+        <tr data-lines="19"><td><code>with tf.GradientTape() as tape:</code></td><td>Empieza a grabar para poder derivar la pérdida respecto a los pesos.</td></tr>
+        <tr data-lines="20"><td><code>z_mean, z_log_var, z = self.encoder(data, training=True)</code></td><td>El encoder devuelve los tres resultados. <code>training=True</code> activa el comportamiento de entrenamiento de las capas.</td></tr>
+        <tr data-lines="21"><td><code>recon_img = self.decoder(z, training=True)</code></td><td>Reconstruye desde el punto muestreado.</td></tr>
+        <tr data-lines="22"><td><code>bce = keras.losses.binary_crossentropy(data[..., None], recon_img[..., None])</code></td><td>Entropía cruzada por píxel. <code>[..., None]</code> añade un último eje de tamaño 1 para que la función calcule el error de cada píxel por separado en vez de promediar la imagen. El resultado tiene forma (lote, 64).</td></tr>
+        <tr data-lines="23"><td><code>recon = ops.mean(ops.sum(bce, axis=1))</code></td><td><strong>Suma</strong> sobre los 64 píxeles (<code>axis=1</code>) y luego promedia sobre las imágenes del lote.</td></tr>
+        <tr data-lines="24"><td><code>kl = ops.mean(ops.sum(-0.5 * (1 + z_log_var - ops.square(z_mean) - ops.exp(z_log_var)), axis=1))</code></td><td>El KL con la fórmula del log-varianza, sumado sobre las 2 dimensiones latentes y promediado sobre el lote.</td></tr>
+        <tr data-lines="25"><td><code>total = recon + self.beta * kl</code></td><td>La pérdida del VAE: reconstrucción + β·KL.</td></tr>
+        <tr data-lines="26"><td><code>grads = tape.gradient(total, self.trainable_weights)</code></td><td>Calcula cuánto debe cambiar cada peso (de encoder <em>y</em> decoder) para reducir la pérdida.</td></tr>
+        <tr data-lines="27"><td><code>self.optimizer.apply_gradients(zip(grads, self.trainable_weights))</code></td><td>El optimizador (Adam) aplica el cambio. <code>zip</code> empareja cada gradiente con su peso.</td></tr>
+        <tr data-lines="28-30"><td><code>self.loss_tracker.update_state(total)</code> y las otras dos</td><td>Alimentan los promediadores con los valores de este lote.</td></tr>
+        <tr data-lines="31"><td><code>return {m.name: m.result() for m in self.metrics}</code></td><td>Devuelve un diccionario nombre → valor medio: es lo que <code>fit</code> guarda en el historial.</td></tr>
+        <tr data-lines="34"><td><code>vae = VAE(encoder, decoder)</code></td><td>Crea el VAE con las dos mitades del fragmento 3.</td></tr>
+        <tr data-lines="35"><td><code>vae.compile(optimizer=keras.optimizers.Adam(1e-2))</code></td><td>Solo se indica el optimizador (learning rate 0,01); la pérdida ya está dentro de <code>train_step</code>.</td></tr>
+        <tr data-lines="36"><td><code>hist = vae.fit(X, epochs=60, batch_size=64, verbose=0)</code></td><td>Entrena 60 epochs con lotes de 64 imágenes, sin etiquetas (por eso solo <code>X</code>). <code>verbose=0</code> evita imprimir cada epoch.</td></tr>
+        <tr data-lines="38-41"><td><code>print(...)</code> + <code>for e in (0, 9, 29, 59): ...</code></td><td>Imprime una tabla con la pérdida total, la reconstrucción y el KL en los epochs 1, 10, 30 y 60 (los índices empiezan en 0).</td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>época |  pérdida | reconstr. |   KL
+    1 |    33.43 |     32.21 |  1.22
+   10 |    25.78 |     24.19 |  1.59
+   30 |    25.14 |     23.12 |  2.02
+   60 |    25.02 |     22.74 |  2.28</pre>
+    <p>La pérdida total baja de 33,43 a 25,02 y, en cada fila, es la suma de las otras dos columnas (22,74 + 2,28 = 25,02). La reconstrucción baja mucho; el KL <em>sube</em> de 1,22 a 2,28: el encoder va usando más «información» para colocar cada dígito. Un KL de 2,28 nats por dígito es pequeño: con 2 dimensiones latentes el modelo no puede describir mucho más, y por eso las imágenes generadas son borrosas.</p>
+  </div>
+</article>
+
+<!-- ---------- Fragmento 7 ---------- -->
+<article class="snippet" data-lang="python">
+  <header>
+    <h3>7 · Interpolar en el espacio latente entre un «1» y un «3»</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Recorrer en línea recta el espacio latente entre los códigos de dos dígitos reales y decodificar siete puntos del camino. Usa <code>X</code>, <code>y</code>, <code>encoder</code>, <code>decoder</code>, <code>arte</code> y <code>np</code> del fragmento 6.</p>
+  </header>
+  <pre class="code"><code># Interpolar entre dos dígitos reales (usa X, y, encoder, decoder y arte() de los fragmentos anteriores)
+clf = LogisticRegression(max_iter=2000).fit(X, y)
+
+mu_a = encoder.predict(X[1:2], verbose=0)[0][0]    # código del dígito X[1], un "1"
+mu_b = encoder.predict(X[3:4], verbose=0)[0][0]    # código del dígito X[3], un "3"
+print("extremos:", mu_a.round(2), "-&gt;", mu_b.round(2), "| clases reales:", y[1], "y", y[3])
+
+ts = np.linspace(0, 1, 7)
+camino = np.array([(1 - t) * mu_a + t * mu_b for t in ts], dtype="float32")
+imagenes = decoder.predict(camino, verbose=0)
+
+print("t     :", "  ".join(f"{t:.2f}" for t in ts))
+print("clase :", "     ".join(str(c) for c in clf.predict(imagenes)))
+for filas in zip(*[arte(img) for img in imagenes]):
+    print(" ".join(filas))</code></pre>
+  <details class="linea-a-linea" open>
+    <summary>Línea por línea</summary>
+    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+      <tbody>
+        <tr data-lines="1"><td>Comentario de la línea 1</td><td>Recuerda de qué variables depende el fragmento.</td></tr>
+        <tr data-lines="2"><td><code>clf = LogisticRegression(max_iter=2000).fit(X, y)</code></td><td>Entrena una regresión logística (curso 1) que reconoce dígitos a partir de sus 64 píxeles. La usaremos de «juez» para decir qué número parece cada imagen interpolada. <code>max_iter=2000</code> le da iteraciones suficientes para converger.</td></tr>
+        <tr data-lines="4"><td><code>mu_a = encoder.predict(X[1:2], verbose=0)[0][0]</code></td><td>Codifica el dígito número 1 del dataset. <code>X[1:2]</code> es un lote de una imagen; el primer <code>[0]</code> elige la salida <code>z_mean</code> y el segundo la única fila. Es un «1».</td></tr>
+        <tr data-lines="5"><td><code>mu_b = encoder.predict(X[3:4], verbose=0)[0][0]</code></td><td>Lo mismo con el dígito número 3 del dataset, que es un «3».</td></tr>
+        <tr data-lines="6"><td><code>print("extremos:", …)</code></td><td>Escribe las dos posiciones en el plano latente y las clases reales (<code>y[1]</code> y <code>y[3]</code>).</td></tr>
+        <tr data-lines="8"><td><code>ts = np.linspace(0, 1, 7)</code></td><td>Siete valores de t entre 0 y 1 (pasos de 1/6).</td></tr>
+        <tr data-lines="9"><td><code>camino = np.array([(1 - t) * mu_a + t * mu_b for t in ts], dtype="float32")</code></td><td>La fórmula de interpolación z(t) = (1−t)·z<sub>A</sub> + t·z<sub>B</sub> para cada t. Resultado: 7 puntos de 2 coordenadas.</td></tr>
+        <tr data-lines="10"><td><code>imagenes = decoder.predict(camino, verbose=0)</code></td><td>Decodifica los siete puntos: siete imágenes de 64 píxeles.</td></tr>
+        <tr data-lines="12-13"><td><code>print("t     :", …)</code> y <code>print("clase :", …)</code></td><td>Imprime los valores de t y la clase que predice el clasificador para cada imagen. <code>"  ".join(...)</code> pega textos con separador.</td></tr>
+        <tr data-lines="14-15"><td><code>for filas in zip(*[arte(img) …]): print(" ".join(filas))</code></td><td>Dibuja las siete imágenes una al lado de otra, línea a línea, como en el fragmento anterior.</td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>extremos: [-1.14 -0.77] -&gt; [1.43 0.17] | clases reales: 1 y 3
+t     : 0.00  0.17  0.33  0.50  0.67  0.83  1.00
+clase : 1     1     7     5     3     3     3
+    ..**%%--         ..**%%==         --##%%**::       ==##%%**::       ++%%%%**..       ++%%%%==         ++%%##--    
+    ::%%%%==         --####**         **##**##::     ..####++**::     ::%%**++**..     ::%%****++       ::%%++**++    
+    --%%%%==         ==**##++       ..++--==**..     ::**::--++..     ::**::--==       ::++--++==       ..==--**==    
+    ++##%%--..     ..==**##++..     ..++++**++::     ::++++**==..     ..++**##--       ..==**%%--         --**%%==    
+  ..**%%%%==..     ..**%%%%==..     ..++##%%++..       ==**##==..       ::++##++..       ..--##**..         ::**##..  
+  ..++%%%%::       ..++####::         ==**##--         ::==**==         ....==**..           ::##--           ..**==  
+    --####::         ::##**..         ::****::         --++**--         --==++**..       ----++##--       ==--==##==  
+    ..++**::         ::**==..         --##--..         ==%%==..         ++%%##--         ++%%%%==..       ++%%%%++..  </pre>
+    <p>El camino va de (−1,14; −0,77) a (1,43; 0,17). En el extremo izquierdo el clasificador ve un 1 y en el derecho un 3, como debe ser. Entre medias, las clases son 1, 1, <strong>7</strong>, <strong>5</strong>, 3, 3, 3: no es un fundido de grises, el decoder atraviesa formas que son dígitos plausibles (un 7 y un 5 pasan por ahí) y el trazo cambia de forma poco a poco. Es la prueba de que el espacio latente tiene estructura: moverse un poco produce un cambio pequeño y «con sentido».</p>
+  </div>
+</article>
+
+</section>
+
+</div>
+</main>
+</body>
+</html>

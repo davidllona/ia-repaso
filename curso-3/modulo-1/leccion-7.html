@@ -1,346 +1,388 @@
-<!DOCTYPE html>
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lección 7 · Subclassing: el modelo es un programa, y training cambia lo que hace · Módulo 1 · Curso 3 · Cuaderno de IA</title>
+<meta name="description" content="Modelos por subclases con __init__ y call, modelos sin construir y el argumento training: Dropout y BatchNormalization se comportan distinto al entrenar y al predecir.">
+<script>try{var t=localStorage.getItem('cuaderno-ia:tema');if(t)document.documentElement.setAttribute('data-theme',t)}catch(e){}</script>
+<link rel="stylesheet" href="../../assets/css/style.css">
+<script src="../../assets/js/curriculum.js"></script>
+<script src="../../assets/js/lab.js"></script>
+<script src="../../assets/js/app.js" defer></script>
+</head>
+<body data-root="../../" data-course="3" data-module="1" data-lesson="7">
+<main>
+<div class="page">
 
-<html lang="es"><head><meta charset="utf-8"/><meta content="width=device-width,initial-scale=1" name="viewport"/><title>Lección 7 · La API funcional: un modelo es un grafo de capas · Curso 3 · Cuaderno de IA</title><meta content="Una capa de Keras es un objeto al que se «llama» como a una función: y = capa(x) ." name="description"/><script>try{var t=localStorage.getItem('cuaderno-ia:tema');if(t)document.documentElement.setAttribute('data-theme',t)}catch(e){}</script><link href="../../assets/css/style.css" rel="stylesheet"/><script src="../../assets/js/curriculum.js"></script><script src="../../assets/js/lab.js"></script><script defer="" src="../../assets/js/app.js"></script><script defer="" src="../../assets/js/microanimations.js"></script></head><body data-course="3" data-lesson="7" data-module="1" data-root="../../"><main><div class="page" data-micro="3min"><header class="hero leccion"><div class="hero-grid"><div><p class="eyebrow">Curso 3 · Módulo 1 · Lección 7 de 14</p><h1>La API funcional: un modelo es un grafo de capas</h1><p class="lead">Una capa de Keras es un objeto al que se «llama» como a una función: y = capa(x) .</p><p class="meta-line"><span class="read-time" data-render="read-time"></span><a href="../modulo-1.html">Índice del módulo</a></p></div><div aria-hidden="true" class="hero-tile"></div></div></header><details class="predice"><summary>¿Cómo dibujas una red en la que la salida de una capa se suma con la de otra dos capas más allá (una conexión residual )? Con Sequential no hay forma, pero con la API funcional son cuatro líneas.<span class="hint"></span></summary><div><p>Una capa de Keras es un objeto al que se «llama» como a una función: y = capa(x) .</p></div></details><section aria-label="Explicación breve" class="micro-core"><div class="micro-kicker">01 · ENTENDER <span>≈ 45 s</span></div><h2>La idea en palabras sencillas</h2><p>Una capa de Keras es un objeto al que se «llama» como a una función: y = capa(x).</p><div class="micro-example"><span aria-hidden="true" class="micro-example-icon">💡</span><div><strong>Otro ejemplo · Gimnasio</strong><p>Una red recibe horas de sueño y actividad; combina señales antes de calcular su predicción.</p></div></div></section><div class="micro-kicker micro-checkpoint">02 · RESPONDER <span>≈ 15 s</span></div><section aria-label="Pregunta intercalada" class="quiz mini micro-check"><script class="quiz-data" type="application/json">{"titulo": "Pausa rápida · Comprueba la idea", "preguntas": [{"q": "Una neurona recibe dos entradas. ¿Qué hace con los pesos?", "opciones": ["Elige siempre la entrada mayor", "Borra las entradas al entrenar", "Multiplica cada entrada por su peso y combina resultados"], "correcta": 2, "porque": "La suma ponderada combina entradas, pesos y bias antes de la activación."}]}</script></section><section aria-label="Animación interactiva" class="micro-viz" data-index="11" data-micro-viz="neural"><div class="micro-kicker">03 · EXPERIMENTAR <span>≈ 45 s</span></div><div class="micro-viz-title"><div><h2>Señales que atraviesan una red</h2><p>Pulsa «Propagar» para seguir el recorrido de entradas a salida.</p></div><span aria-hidden="true" class="micro-viz-symbol">✦</span></div><div aria-live="polite" class="micro-viz-stage"><p>Animación interactiva: Señales que atraviesan una red</p></div></section><div class="micro-kicker micro-checkpoint">04 · APLICAR <span>≈ 15 s</span></div><section aria-label="Pregunta intercalada" class="quiz mini micro-check"><script class="quiz-data" type="application/json">{"titulo": "Pausa rápida · ¿Lo aplicarías?", "preguntas": [{"q": "¿Cuándo se actualizan los pesos de una red?", "opciones": ["Nunca: los pesos son fijos", "Al aplicar el optimizador durante el entrenamiento", "Cada vez que se abre la página"], "correcta": 1, "porque": "El optimizador utiliza los gradientes para ajustar parámetros durante el aprendizaje."}]}</script></section><div class="micro-finish"><strong>Idea que te llevas</strong><span>Una capa de Keras es un objeto al que se «llama» como a una función: y = capa(x)</span><small>¿Quieres más ejemplos, fórmulas o código? Los tienes justo debajo, sin límite de tiempo.</small></div><details class="profundizar micro-legacy"><summary><span>Explorar más: explicación y simulaciones completas<small>Todo el texto original, tablas y demos avanzadas. Opcional.</small></span></summary><div class="prof-body"><section><h2>La API funcional: un modelo es un grafo de capas</h2>
-<p>Una capa de Keras es un objeto al que se «llama» como a una función: <code>y = capa(x)</code>. En la API funcional se hace eso, pero con tensores <strong>simbólicos</strong>:</p>
-<p>El modelo del <a href="#frag-12">fragmento 12</a> tiene 8 entradas (imagina 8 datos de un usuario: edad, horas vistas…), dos capas densas de 16 neuronas (<code>densa_a</code> y <code>densa_b</code>), una <strong>suma</strong> de las salidas de las dos (el atajo) y una capa de salida de 3 neuronas (por ejemplo, 3 géneros posibles). Su <code>summary()</code>, con los parámetros comprobados a mano:</p>
-<p>467 parámetros de <code>float32</code> son 467 · 4 = 1.868 bytes, que Keras escribe como 1,82 KB (1.868 / 1.024). Fíjate en la última columna del <code>summary()</code>, <strong>«Connected to»</strong>: dice de qué capas lee cada una. <code>suma</code> lee de <code>densa_a</code> <em>y</em> de <code>densa_b</code>: eso es el atajo, y en un <code>Sequential</code> esa columna no existiría porque cada capa lee solo de la anterior.</p>
-<div class="callout ejemplo"><span class="lbl">Ejemplo tomado del módulo</span><p>· el coste de pegar en vez de sumar Imagina dos «informes» sobre un usuario: uno de 16 números (lo que ha visto, densa_a ) y otro de 10 (qué carátulas le llaman la atención, la rama).</p></div></section><figure class="demo" data-demo="curso3/c3m1-grafo" data-titulo="Un grafo funcional: formas y parámetros al conectar">
-<div class="haz">Elige «Add (sumar)» y pulsa «Hacer b ≠ a»: aparece el error. Pulsa «Igualar b a a» para arreglarlo. Cambia a «Concatenate (pegar)» y observa cómo crece la capa de salida. Activa «Añadir rama paralela» y mira la lista de capas.</div>
-<div class="observa">Con <code>Add</code> hay que igualar anchos y el tensor sigue midiendo lo mismo; con <code>Concatenate</code> el ancho suma y la capa siguiente se hace más grande (más parámetros). La lista de abajo es la tabla del <code>summary()</code>, recalculada en vivo con la fórmula <em>entradas · neuronas + neuronas</em>.</div>
-</figure><div class="resumen"><h2 class="sin-num sin-toc">En pocas líneas</h2><ul><li><strong>La API funcional: un modelo es un grafo de capas:</strong> Una capa de Keras es un objeto al que se «llama» como a una función: y = capa(x) .</li><li>Antes de continuar, intenta explicar la demo sin mirar su resultado.</li></ul></div><section class="quiz mini"><script class="quiz-data" type="application/json">{"titulo": "¿Lo tienes?", "preguntas": [{"q": "¿Qué concepto estamos trabajando en esta lección?", "opciones": ["La API funcional: un modelo es un grafo de capas", "TensorFlow 2.x, Keras 3 y por qué un tutorial antiguo falla", "Broadcasting: sumar tensores de formas distintas"], "correcta": 0, "porque": "Una capa de Keras es un objeto al que se «llama» como a una función: y = capa(x) ."}, {"q": "¿Cuál de estas afirmaciones recoge lo que acabas de estudiar?", "opciones": ["Lo importante es comprender la idea y comprobarla con ejemplos, no memorizar términos.", "Una capa de Keras es un objeto al que se «llama» como a una función: y = capa(x) .", "Siempre hay un único método que sirve para todos los problemas."], "correcta": 1, "porque": "La explicación central es: Una capa de Keras es un objeto al que se «llama» como a una función: y = capa(x) ."}, {"q": "Si una demo o un ejemplo te desconcierta, ¿cuál es la mejor forma de aprenderlo?", "opciones": ["Memorizar el nombre sin entender la operación.", "Volver a los números, cambiar un valor y explicar qué ocurre.", "Ignorar los resultados que no coinciden con tu intuición."], "correcta": 1, "porque": "Explorar qué cambia y por qué ayuda a conectar el concepto con su resultado."}]}</script></section></div></details><details class="profundizar"><summary><span>Profundizar: explicación completa<small>Matices, fórmulas, tablas, otros ejemplos y experimentos del módulo original.</small></span></summary><div class="prof-body"><section>
-<h2 id="funcional">La API funcional: un modelo es un grafo de capas</h2>
-<p class="pregunta">¿Cómo dibujas una red en la que la salida de una capa se suma con la de otra dos capas más allá (una <em>conexión residual</em>)? Con <code>Sequential</code> no hay forma, pero con la API funcional son cuatro líneas.</p>
-<h3>La idea: las capas son funciones y los tensores, cables</h3>
-<p>Una capa de Keras es un objeto al que se «llama» como a una función: <code>y = capa(x)</code>. En la API funcional se hace eso, pero con tensores <strong>simbólicos</strong>:</p>
-<ol class="pasos">
-<li><strong><code>keras.Input(shape=(8,))</code></strong> crea un tensor simbólico (un <code>KerasTensor</code>): <strong>no contiene datos</strong>, solo recuerda su forma (<code>(None, 8)</code>) y su tipo. Es el enchufe de entrada del modelo.</li>
-<li><strong>Llamar a una capa sobre él</strong> (<code>a = layers.Dense(16)(entrada)</code>) no calcula nada con números: devuelve <strong>otro tensor simbólico</strong> (<code>(None, 16)</code>) y <strong>anota la conexión</strong> «esta capa lee de aquel tensor».</li>
-<li><strong><code>keras.Model(entradas, salidas)</code></strong> recorre las anotaciones desde las salidas hacia las entradas y recoge todas las capas del camino. El resultado es el modelo completo, ya con sus formas conocidas.</li>
-</ol>
-<div class="callout analogia">
-<span class="lbl">Analogía</span>
-<p>Es como dibujar el plano del metro. <code>Input</code> es la estación de origen; cada capa que llamas es un tramo de vía que tiendes desde una estación hasta otra nueva. <code>Model(entradas, salidas)</code> es declarar «mi línea va de aquí a allí», y Keras recoge todos los tramos que hay entre las dos. Como <strong>solo se dibuja un plano</strong> (nadie viaja todavía), si unes dos vías que no encajan, el error salta al dibujarlas, no cuando ya hay viajeros.</p>
-</div>
-<h3>Un modelo con atajo, cuenta a cuenta</h3>
-<p>El modelo del <a href="#frag-12">fragmento 12</a> tiene 8 entradas (imagina 8 datos de un usuario: edad, horas vistas…), dos capas densas de 16 neuronas (<code>densa_a</code> y <code>densa_b</code>), una <strong>suma</strong> de las salidas de las dos (el atajo) y una capa de salida de 3 neuronas (por ejemplo, 3 géneros posibles). Su <code>summary()</code>, con los parámetros comprobados a mano:</p>
-<table>
-<thead><tr><th>Capa</th><th>Salida</th><th>Cuenta de parámetros</th><th>Parámetros</th></tr></thead>
-<tbody>
-<tr><td><code>entrada</code></td><td><code>(None, 8)</code></td><td>no tiene pesos</td><td>0</td></tr>
-<tr><td><code>densa_a</code></td><td><code>(None, 16)</code></td><td>8 · 16 pesos + 16 sesgos</td><td class="res">144</td></tr>
-<tr><td><code>densa_b</code></td><td><code>(None, 16)</code></td><td>16 · 16 + 16</td><td class="res">272</td></tr>
-<tr><td><code>suma</code> (Add)</td><td><code>(None, 16)</code></td><td>solo suma: no tiene pesos</td><td>0</td></tr>
-<tr><td><code>salida</code></td><td><code>(None, 3)</code></td><td>16 · 3 + 3</td><td class="res">51</td></tr>
-<tr><td colspan="3"><strong>Total</strong></td><td class="res">467</td></tr>
-</tbody>
-</table>
-<p>467 parámetros de <code>float32</code> son 467 · 4 = 1.868 bytes, que Keras escribe como 1,82 KB (1.868 / 1.024). Fíjate en la última columna del <code>summary()</code>, <strong>«Connected to»</strong>: dice de qué capas lee cada una. <code>suma</code> lee de <code>densa_a</code> <em>y</em> de <code>densa_b</code>: eso es el atajo, y en un <code>Sequential</code> esa columna no existiría porque cada capa lee solo de la anterior.</p>
-<h3>Unir ramas: <code>Add</code> o <code>Concatenate</code></h3>
-<p>Para juntar dos caminos hay dos capas distintas y no son intercambiables:</p>
+<header class="hero leccion">
+  <div class="hero-grid">
+    <div>
+      <p class="eyebrow">Curso 3 · Módulo 1 · Lección 7 de 8</p>
+      <h1>Subclassing: el modelo es un programa, y training cambia lo que hace</h1>
+      <p class="lead">Con subclassing escribes el modelo como una clase de Python: capas en <code>__init__</code>, cálculo en <code>call</code>. Keras le pasa <code>training=True</code> al entrenar y <code>False</code> al predecir, y dos capas cambian de comportamiento según ese valor.</p>
+      <p class="meta-line"><span class="read-time" data-render="read-time"></span><a href="../modulo-1.html">Índice del módulo</a></p>
+    </div>
+    <div class="hero-tile" aria-hidden="true"></div>
+  </div>
+</header>
+<details class="predice">
+  <summary>Repites exactamente la misma predicción dos veces con el mismo usuario y salen números distintos. ¿Qué sospechas?<span class="hint"></span></summary>
+  <div>
+    <p>Un <strong><code>training=True</code> que no debería estar</strong>. Con <code>training=True</code>, Dropout apaga unidades al azar distintas en cada llamada; con <code>training=False</code> no hace nada y dos llamadas dan lo mismo.</p>
+  </div>
+</details>
+
+<section>
+<h2 id="idea">Un programa en lugar de un plano</h2>
+<p>Un modelo por subclases hereda de <code>keras.Model</code> y rellena dos métodos: <code>__init__</code>, donde <strong>se crean las capas</strong> (siempre empezando por <code>super().__init__(**kwargs)</code>), y <code>call(self, x, training=False)</code>, donde se escribe <strong>el cálculo</strong> en Python normal. La funcional entrega un mapa que Keras puede leer; subclassing entrega un programa, como <em>Bandersnatch</em>, y Keras solo sabe qué hay dentro <strong>ejecutándolo</strong>. Por eso el modelo está «sin construir» (<code>built = False</code>, 0 parámetros) hasta que lo llamas una vez con datos.</p>
+<p>El argumento <code>training</code> lo recibe tu <code>call</code> y se lo pasas a las capas que lo necesitan (<code>self.bn(h, training=training)</code>):</p>
 <ul>
-<li><strong><code>layers.Add()([a, b])</code></strong> suma elemento a elemento. Exige que <strong>las dos formas sean idénticas</strong> y la salida tiene esa misma forma: <code>(None, 16)</code> + <code>(None, 16)</code> → <code>(None, 16)</code>. Es lo que se usa en las conexiones residuales. (Hermanas suyas: <code>Subtract</code>, <code>Multiply</code>, <code>Average</code>, <code>Maximum</code>.)</li>
-<li><strong><code>layers.Concatenate()([a, b])</code></strong> pega las dos salidas una a continuación de otra <strong>a lo largo del último eje</strong>. No exige que coincidan los anchos y <strong>suma los anchos</strong>: <code>(None, 16)</code> y <code>(None, 10)</code> → <code>(None, 26)</code>. La capa siguiente tendrá, por tanto, más entradas (26 en lugar de 16) y más parámetros.</li>
+  <li><strong>Dropout(p)</strong>: al entrenar apaga al azar una fracción <code>p</code> y multiplica las supervivientes por \( 1/(1-p) \) para que la media no cambie. Al predecir, no hace nada.</li>
+  <li><strong>BatchNormalization</strong>: normaliza a media 0 y desviación 1. Al entrenar usa la media y la varianza <strong>del lote</strong> y va actualizando unas medias móviles; al predecir usa <strong>las móviles</strong>, que es lo que permite predecir una sola muestra.</li>
 </ul>
-<div class="callout ejemplo">
-<span class="lbl">Ejemplo numérico · el coste de pegar en vez de sumar</span>
-<p>Imagina dos «informes» sobre un usuario: uno de 16 números (lo que ha visto, <code>densa_a</code>) y otro de 10 (qué carátulas le llaman la atención, la rama). <code>Add</code> sería sumar dos informes casilla a casilla, y para eso tienen que medir lo mismo; <code>Concatenate</code> es pegarlos uno detrás de otro. Después de unirlos, añadimos una capa <code>Dense(3)</code>.</p>
-<ol class="pasos">
-<li><strong>Con <code>Add</code>:</strong> no se puede (16 ≠ 10): error <em>«Inputs have incompatible shapes. Received shapes (16,) and (10,)»</em>, que sale en el momento de conectar, en el <a href="#frag-12">fragmento 12</a>.</li>
-<li><strong>Con <code>Concatenate</code>:</strong> el ancho es 16 + 10 = <strong>26</strong>, y <code>Dense(3)</code> tendría 26 · 3 + 3 = <strong>81</strong> parámetros.</li>
-<li><strong>Si ambas ramas midieran 16 y usaras <code>Add</code>:</strong> el ancho se queda en 16, y <code>Dense(3)</code> tendría solo 16 · 3 + 3 = 51 (la capa <code>salida</code> de la tabla anterior).</li>
-</ol>
-</div>
-<h3>Por qué un atajo ayuda a entrenar</h3>
-<p>Una conexión residual (<code>h_siguiente = h + f(h)</code>) no se inventó por estética: resuelve el problema de los <strong>gradientes que se desvanecen</strong> que viste en el Curso 2. Al derivar \( h_{\text{sig}} = h + f(h) \) respecto a \( h \) sale \( 1 + f'(h) \): ese <strong>1</strong> es un camino por el que el gradiente pasa intacto.</p>
-<div class="callout ejemplo">
-<span class="lbl">Ejemplo numérico · 10 capas con y sin atajo</span>
-<p>Supón que la derivada local de la transformación de cada capa, \( f'(h) \), vale 0,1 (frecuente con sigmoide o tanh saturadas), y que hay 10 capas. Es como un chisme que pasa por 10 personas y cada una solo repite la décima parte de lo que oye: el aviso «te has equivocado» tiene que viajar desde la salida hasta la primera capa y, por el camino, se apaga.</p>
-<ol class="pasos">
-<li><strong>Sin atajo</strong> el gradiente que llega a la primera capa se multiplica por 0,1 diez veces: \( 0{,}1^{10} = 10^{-10} \). Prácticamente cero: las primeras capas no aprenden.</li>
-<li><strong>Con atajo</strong> cada factor es \( 1 + 0{,}1 = 1{,}1 \): \( 1{,}1^{10} \approx 2{,}59 \). El gradiente llega vivo.</li>
-</ol>
-</div>
-<figure class="demo" data-demo="curso3/c3m1-atajo" data-titulo="Gradiente en cada capa, con y sin atajo">
-<div class="haz">Deja «Ambas» y sube las capas hasta 30–40. Mira a qué altura queda la línea naranja (sin atajo) y la verde (con atajo). Luego sube la escala de los pesos hasta el máximo y pulsa «Otros pesos al azar» varias veces.</div>
-<div class="observa">La línea mide cuánto del aviso «te has equivocado» llega a cada capa. Sin atajo el gradiente cae <strong>exponencialmente</strong> al alejarse de la salida: el eje es logarítmico, así que cada línea recta descendente es un factor constante por capa. Con atajo la curva se mantiene cerca de 0 (gradiente ≈ 1). Con pesos muy grandes hasta el atajo puede crecer: el atajo ayuda, no es una garantía.</div>
+<p>Úsalo solo cuando necesites Python dentro del modelo; para un grafo de capas, la funcional da lo mismo con inspección y menos riesgo.</p>
+</section>
+
+<figure class="demo" data-demo="curso3/c3m1-training" data-titulo="El argumento training en Dropout y BatchNormalization">
+  <div class="haz">Con «Dropout» y <code>training = True</code>, pulsa «otra máscara» varias veces y pasa a <code>False</code>. Luego prueba «BatchNormalization».</div>
+  <div class="observa">Dropout reescala ×2 al entrenar y no toca nada al predecir; BatchNorm al predecir usa medias móviles que tardan en acercarse a la realidad.</div>
 </figure>
-<h3>Inspeccionar el grafo: <code>get_layer</code>, extractores y dibujos</h3>
-<p>Tener un grafo explícito da herramientas que ningún otro estilo ofrece (<a href="#frag-12">fragmento 12</a>):</p>
+
+<section>
+<h2 id="numeros">Con números: diez críticos y una media que aprende</h2>
+<div class="callout ejemplo">
+  <span class="lbl">Ejemplo numérico</span>
+  <p>Diez críticos puntúan una película con un 1 cada uno, y pasan por <code>Dropout(0,5)</code>.</p>
+  <ol class="pasos">
+    <li>Factor: \( 1/(1-0{,}5) = 2 \). Con <code>training=True</code> sale <code>[2, 0, 2, 0, 0, 0, 0, 2, 2, 0]</code>.</li>
+    <li>En media cada unidad vale 0,5 · 2 + 0,5 · 0 = <strong>1</strong>, igual que la entrada. Con <code>training=False</code>: diez unos.</li>
+  </ol>
+  <p>BatchNorm: lotes que de media han visto 5 capítulos, media móvil que empieza en 0 y momentum 0,9.</p>
+  <ol class="pasos">
+    <li>Lote 1: 0,9 · 0 + 0,1 · 5 = 0,5. Lote 2: 0,95. Lote 3: <strong>1,355</strong>.</li>
+    <li>Si predices ya, normalizas con 1,355 en vez de 5: le falta entrenar.</li>
+  </ol>
+</div>
+</section>
+
+<details class="predice">
+  <summary>Creas tu modelo por subclases y llamas a <code>summary()</code> antes de pasarle ningún dato. ¿Qué ves?<span class="hint"></span></summary>
+  <div>
+    <p>Formas «?» y <strong>«0 (unbuilt)»</strong> parámetros. Keras no sabe cuántas columnas tendrán los datos hasta ejecutar <code>call</code>. Llamarlo una vez con un lote (aunque sea de ceros) lo construye; <code>build((None, 3))</code> no basta si tu clase no define su propio <code>build</code>.</p>
+  </div>
+</details>
+
+<div class="resumen">
+  <h2 class="sin-num sin-toc">En tres líneas</h2>
+  <ul>
+    <li>Subclassing: capas en <code>__init__</code>, cálculo en <code>call</code>; el modelo se construye al llamarlo con datos.</li>
+    <li>Dropout apaga y reescala ×1/(1−p) al entrenar; al predecir no hace nada.</li>
+    <li>BatchNorm usa el lote al entrenar y las medias móviles al predecir.</li>
+  </ul>
+</div>
+
+<section class="quiz mini">
+<script type="application/json" class="quiz-data">
+{
+ "titulo": "¿Lo tienes?",
+ "preguntas": [
+  {
+   "q": "Una capa <code>Dropout(0.5)</code> recibe un lote de unos. Con <code>training=True</code>, ¿qué valores salen y por qué?",
+   "opciones": [
+    "Unos 1.0 y otros 0.0: simplemente apaga la mitad",
+    "Valores entre 0 y 1 al azar",
+    "Unos 2.0 y otros 0.0: las que sobreviven se multiplican por 1/(1−0,5) para conservar la media",
+    "Siempre 1.0: Dropout solo actúa en la capa de salida"
+   ],
+   "correcta": 2,
+   "porque": "Dropout apaga unidades al azar y <strong>reescala</strong> las que quedan por 1/(1−p) = 2, de modo que la media (0,5 · 2 + 0,5 · 0 = 1) sea la misma que la de la entrada. Con <code>training=False</code> sí saldrían todo 1.0. Por eso dos llamadas con <code>training=True</code> no dan lo mismo."
+  },
+  {
+   "q": "En un modelo por subclases, ¿dónde se crean las capas y dónde se usan?",
+   "opciones": [
+    "Las dos cosas en <code>call</code>",
+    "Se crean en <code>__init__</code> y se usan en <code>call</code>",
+    "Se crean en <code>compile</code> y se usan en <code>fit</code>",
+    "Se crean en <code>call</code> y se usan en <code>__init__</code>"
+   ],
+   "correcta": 1,
+   "porque": "<code>__init__</code> crea las capas y las guarda como atributos (<code>self.oculta = layers.Dense(6)</code>); <code>call</code> pasa los datos por ellas en cada llamada. Crear capas dentro de <code>call</code> crearía pesos nuevos en cada ejecución."
+  },
+  {
+   "q": "Una <code>BatchNormalization</code> recibe un lote con <code>training=False</code>. ¿Con qué media normaliza?",
+   "opciones": [
+    "Con la media de ese lote",
+    "Con la media móvil guardada durante el entrenamiento",
+    "Con 0 siempre",
+    "Con la media del primer lote que vio"
+   ],
+   "correcta": 1,
+   "porque": "Al predecir se usan las estadísticas móviles, que se fueron actualizando lote a lote durante el entrenamiento (media móvil = m · media móvil + (1 − m) · media del lote). Así una predicción no depende de qué otras muestras vengan en el lote."
+  }
+ ]
+}
+</script>
+</section>
+
+<details class="profundizar">
+  <summary><span>Profundizar: la explicación completa<small>La estructura y la analogía de Bandersnatch, la tabla de los 55 parámetros (43 entrenables), el aviso de build(), Dropout y BatchNormalization con todas sus cuentas y la puerta a train_step.</small></span></summary>
+  <div class="prof-body">
+<h2 id="subclassing">Subclassing: tu propio modelo como una clase de Python</h2>
+
+<p class="pregunta">¿Qué haces si la forma de calcular de tu modelo no es un grafo fijo de capas, por ejemplo si quieres que haga una cosa en entrenamiento y otra distinta al predecir, o repetir un bloque un número de veces que depende de los datos? Para eso existe el <strong>subclassing</strong>: escribir el modelo como una clase de Python.</p>
+
+<h3>La estructura</h3>
+<p>Un modelo por subclases hereda de <code>keras.Model</code> y rellena <strong>dos métodos</strong>:</p>
 <ul>
-<li><code>modelo.layers</code> lista las capas (<code>['entrada', 'densa_a', 'densa_b', 'suma', 'salida']</code>) y <code>modelo.get_layer("suma")</code> recupera una por su <em>nombre</em> (por eso conviene ponerles <code>name=</code>).</li>
-<li><strong>Un extractor de características</strong>: <code>keras.Model(modelo.input, modelo.get_layer("suma").output)</code> es un modelo nuevo que comparte las capas y los pesos del original pero <strong>se detiene en la capa que elijas</strong>. Su salida mide <code>(None, 16)</code> y, alimentado con 2 filas, devuelve <code>(2, 16)</code>. Es la técnica para ver qué ha «entendido» la red a mitad de camino (en el Curso 2 hiciste algo parecido con el codificador del autoencoder).</li>
-<li><code>keras.utils.plot_model(modelo, to_file="modelo.png", show_shapes=True)</code> dibuja el grafo (necesita los programas <code>pydot</code> y Graphviz instalados).</li>
-<li>Si el grafo que declaras está <strong>desconectado</strong> (una salida que no sale de esa entrada), <code>Model</code> lo detecta: <em>«Output with path `` is not connected to `inputs`»</em>.</li>
+  <li><strong><code>__init__</code></strong>: aquí <em>se crean las capas</em> y se guardan como atributos (<code>self.oculta = layers.Dense(6)</code>). Siempre empieza con <code>super().__init__(**kwargs)</code>, que prepara la maquinaria de Keras (es obligatoria: sin ella Keras no puede inicializar el modelo).</li>
+  <li><strong><code>call(self, x, training=False)</code></strong>: aquí se escribe <em>el cálculo hacia delante</em>, en Python normal: recibe los datos, los pasa por las capas en el orden que quieras y devuelve la salida. Es el equivalente a «dibujar el plano», pero ejecutándolo de verdad en cada llamada.</li>
 </ul>
+
+<div class="callout analogia">
+  <span class="lbl">Analogía</span>
+  <p>La API funcional te entrega un <strong>mapa de la trama</strong> que Keras puede leer: qué escenas hay, de dónde a dónde y con qué tamaño. El subclassing te entrega <strong>un programa</strong>, como <em>Bandersnatch</em>: lo que ocurre depende de lo que hagas con los datos dentro, y Keras solo puede saber qué hay dentro <strong>ejecutándolo</strong>. Por eso un modelo por subclases no sabe sus formas ni cuántos parámetros tiene hasta que lo llamas con datos por primera vez.</p>
+</div>
+
+<h3>Un modelo «sin construir»</h3>
+<p>Fíjate en la primera mitad del <a href="#frag-15">fragmento 15</a>. La clase <code>RedConRuido</code> tiene una capa densa de 6 neuronas, una <code>BatchNormalization</code>, un <code>Dropout</code> del 50 % y una capa de salida. Al crear el objeto, <code>modelo.built</code> es <code>False</code>: todavía no existen los pesos, porque Keras no sabe cuántas columnas tendrán los datos. Tras llamarlo con un lote de 4 filas × 3 columnas (4 usuarios con 3 datos cada uno) pasa a <code>True</code>, y ahí aparecen los parámetros: 55, de los cuales 43 se entrenan. (Si miras <code>summary()</code> de un modelo por subclases sin construir, verás «?» como forma de salida y «0 (unbuilt)» como número de parámetros; tras llamarlo con datos, las formas y las cifras reales.) Las cuentas:</p>
+<table>
+  <thead><tr><th>Parte</th><th>Cuenta</th><th>Entrenables</th><th>No entrenables</th></tr></thead>
+  <tbody>
+    <tr><td><code>oculta</code> (3 → 6)</td><td>3 · 6 + 6</td><td>24</td><td>0</td></tr>
+    <tr><td><code>bn</code> (6 neuronas)</td><td>γ (6) + β (6) entrenables; media y varianza móviles (6 + 6) no</td><td>12</td><td>12</td></tr>
+    <tr><td><code>drop</code></td><td>no tiene parámetros</td><td>0</td><td>0</td></tr>
+    <tr><td><code>salida</code> (6 → 1)</td><td>6 · 1 + 1</td><td>7</td><td>0</td></tr>
+    <tr><td colspan="2"><strong>Total</strong> 55</td><td class="res">43</td><td class="res">12</td></tr>
+  </tbody>
+</table>
+
 <div class="callout ojo">
-<span class="lbl">Ojo · funciones de TensorFlow sobre tensores simbólicos</span>
-<p>En tutoriales antiguos verás cosas como <code>h = tf.reduce_sum(h, axis=-1)</code> en mitad de un modelo funcional. En Keras 3 eso da <code>ValueError: A KerasTensor cannot be used as input to a TensorFlow function</code>, porque <code>h</code> es un marcador sin datos y <code>tf.reduce_sum</code> necesita datos. Las soluciones: usar <strong>una capa de Keras</strong> o una función de <strong><code>keras.ops</code></strong> (<code>ops.sum</code>, <code>ops.square</code>…), que sí aceptan tensores simbólicos y además funcionan con cualquier backend; o envolver el cálculo en <code>layers.Lambda(lambda t: ops.sum(t, axis=-1, keepdims=True))</code>. Los operadores de Python (<code>h ** 2</code>) también funcionan sobre el tensor simbólico. El <a href="leccion-1.html#frag-1">fragmento 1</a> muestra el error y la solución. (Más adelante verás por qué conviene evitar <code>Lambda</code> si vas a guardar el modelo.)</p>
+  <span class="lbl">Ojo · <code>build()</code> sin definirlo no hace nada</span>
+  <p>Algún material antiguo construye un modelo por subclases con <code>modelo.build((None, 3))</code>. Si tu clase <strong>no define</strong> su propio método <code>build</code>, esa llamada no crea los pesos de las capas internas: en el fragmento, tras <code>otro.build((None, 3))</code> el modelo sigue con <strong>0 parámetros</strong> (y Keras emite un aviso que el fragmento silencia). La forma fiable de construir un modelo por subclases es <strong>llamarlo una vez con datos</strong> (o con un lote de ceros de la forma correcta).</p>
 </div>
-</section></div></details><details class="profundizar" id="codigo"><summary><span>Ver código explicado paso a paso<small>3 fragmento(s) original(es), con cada línea comentada y salida esperada.</small></span></summary><div class="prof-body"><article class="snippet" data-lang="python" id="frag-9">
-<header>
-<h3>9 · AutoGraph, <code>input_signature</code> y la ganancia de velocidad del grafo</h3>
-<p class="para-que"><strong>Para qué sirve</strong> Ver cómo <code>tf.function</code> convierte <code>if</code> y <code>for</code> de Python en operaciones de grafo, cómo fijar la firma con <code>input_signature</code> y comprobar que el grafo es más rápido.</p>
-</header>
-<pre class="code"><code>import time
-import tensorflow as tf
 
-@tf.function
-def signo(x):
-    if x &gt; 0:
-        return "positivo"
-    return "no positivo"
-print(signo(tf.constant(2.0)).numpy(), signo(tf.constant(-2.0)).numpy())
+<h3>El argumento <code>training</code>: dos comportamientos en una misma capa</h3>
+<p>Algunas capas hacen cosas distintas al entrenar y al predecir. Keras se lo indica con el argumento booleano <code>training</code>: <code>fit</code> llama al modelo con <code>training=True</code>; <code>predict</code> y <code>evaluate</code> con <code>training=False</code>. Cuando escribes tu propio <code>call</code>, lo recibes y se lo pasas a esas capas (<code>self.bn(h, training=training)</code>). Las dos que importan:</p>
 
-@tf.function
-def suma_hasta(n):
-    s = tf.constant(0)
-    for i in tf.range(n):
-        s += i
-    return s
-print(suma_hasta(tf.constant(5)).numpy(), suma_hasta(tf.constant(100)).numpy())
-print("trazados de suma_hasta:", suma_hasta.experimental_get_tracing_count())
+<h3>Dropout</h3>
+<p>Durante el entrenamiento, <strong>apaga al azar</strong> una fracción <code>p</code> de las unidades (las pone a 0) y <strong>multiplica las que sobreviven por \( 1/(1-p) \)</strong>, para que la suma esperada no cambie. Al predecir no hace nada.</p>
+<div class="callout ejemplo">
+  <span class="lbl">Ejemplo numérico · Dropout(0,5) sobre diez unos</span>
+  <p>Imagina diez críticos de cine que puntúan una película con un 1 cada uno. Dropout manda a casa, al azar, a la mitad (su voto pasa a valer 0) y los que se quedan votan con más fuerza para que el total no cambie.</p>
+  <ol class="pasos">
+    <li><strong>Factor de reescalado:</strong> \( 1/(1-0{,}5) = 2 \).</li>
+    <li><strong>Con <code>training=True</code>:</strong> cada unidad se apaga con probabilidad 0,5; las que sobreviven valen 1 · 2 = 2. El <a href="#frag-15">fragmento 15</a> da <code>[2.0, 0.0, 2.0, 0.0, 0.0, 0.0, 0.0, 2.0, 2.0, 0.0]</code>: cuatro unidades en 2 y seis en 0.</li>
+    <li><strong>Por qué reescalar:</strong> en media, cada unidad vale 0,5 · 2 + 0,5 · 0 = <strong>1</strong>, igual que la entrada. Así la red no ve «señales más pequeñas» al entrenar que al predecir.</li>
+    <li><strong>Con <code>training=False</code>:</strong> la salida son diez 1.0, idéntica a la entrada.</li>
+  </ol>
+</div>
 
-@tf.function(input_signature=[tf.TensorSpec(shape=(None,), dtype=tf.float32)])
-def suma(x):
-    return tf.reduce_sum(x)
-print(suma(tf.constant([1., 2.])).numpy(), suma(tf.constant([1., 2., 3.])).numpy())
-print("trazados de suma:", suma.experimental_get_tracing_count())
-try:
-    suma(tf.constant([1, 2, 3]))
-except TypeError:
-    print("TypeError: un tensor int32 no encaja en la firma float32")
+<h3>BatchNormalization</h3>
+<p>Normaliza la salida de la capa anterior para que tenga media 0 y desviación 1: \( \hat{x} = \dfrac{x - \mu}{\sqrt{\sigma^2 + \varepsilon}} \) y luego \( y = \gamma\,\hat{x} + \beta \) (\( \gamma \) y \( \beta \) son dos números por neurona que <em>se aprenden</em>; \( \varepsilon \) es un número minúsculo, 0,001 en Keras, que evita dividir por cero). Es como unificar las notas de varios medios de cine: uno puntúa sobre 5 y otro sobre 100, y para compararlas restas la media y divides por la dispersión. La pregunta clave es <strong>¿de dónde salen \( \mu \) y \( \sigma^2 \)?</strong></p>
+<ul>
+  <li><strong>Con <code>training=True</code>:</strong> se calculan <strong>con el lote actual</strong>. Además, la capa va guardando unas <strong>medias móviles</strong> de esas estadísticas: \( \mu_{\text{móvil}} \leftarrow m\,\mu_{\text{móvil}} + (1-m)\,\mu_{\text{lote}} \), con \( m \) el <em>momentum</em>.</li>
+  <li><strong>Con <code>training=False</code>:</strong> se usan <strong>las medias móviles guardadas</strong>, no el lote. Es lo que permite predecir una sola muestra: un lote de una fila no tiene media ni varianza útiles.</li>
+</ul>
+<div class="callout ejemplo">
+  <span class="lbl">Ejemplo numérico · cómo se actualiza la media móvil</span>
+  <p>Cada noche llega un lote de usuarios que, de media, han visto 5 capítulos (siempre 5, para simplificar). La media móvil es lo que «recuerda» la capa de esa media: empieza en 0 (no sabe nada) y el momentum es 0,9.</p>
+  <ol class="pasos">
+    <li><strong>Lote 1:</strong> 0,9 · 0 + 0,1 · 5 = <strong>0,5</strong>.</li>
+    <li><strong>Lote 2:</strong> 0,9 · 0,5 + 0,1 · 5 = <strong>0,95</strong>.</li>
+    <li><strong>Lote 3:</strong> 0,9 · 0,95 + 0,1 · 5 = <strong>1,355</strong>.</li>
+  </ol>
+  <p>La media móvil se acerca a 5 poco a poco (con el valor por defecto de Keras, <code>momentum=0,99</code>, mucho más despacio). Si predijeras tras solo 3 lotes con <code>training=False</code>, normalizarías con 1,355 en lugar de 5: los datos saldrían descentrados. Por eso a BatchNormalization le hace falta entrenar un buen rato antes de que su modo de predicción sea fiable.</p>
+</div>
+<p>Y los parámetros: BatchNorm tiene 4 números por neurona: \( \gamma \) y \( \beta \) (entrenables, los ajusta el optimizador) y la media y la varianza móviles (<strong>no entrenables</strong>: no se actualizan con gradientes, sino con la fórmula de arriba). Por eso salen 12 + 12 en la tabla anterior.</p>
 
-def muchas(x):
-    for _ in range(100):
-        x = x * 1.0001 + 0.0001
-    return x
+<div class="callout recuerda">
+  <span class="lbl">Experimento de arriba: «El argumento training en Dropout y BatchNormalization», con todo detalle</span>
+  <p><strong>Haz esto.</strong> Con «Dropout» y <code>training = True</code>, pulsa «otra máscara» varias veces: mira qué críticos (unidades) se apagan y cuánto valen las que quedan. Pasa a <code>False</code>. Después elige «BatchNormalization», <code>training = True</code> y pulsa «procesar un lote nuevo» unas 15 veces; cambia a <code>False</code> en distintos momentos (también justo tras «Reiniciar medias móviles»).</p>
+  <p><strong>Fíjate en.</strong> Dropout con <code>True</code> reescala (×2 con p = 0,5): la media sobre muchas máscaras queda ≈ igual que la suma de la entrada. Con <code>False</code> no toca nada. BatchNorm con <code>True</code> deja la salida con media ≈ 0 usando el <em>lote</em> y actualiza las medias móviles; con <code>False</code> usa las móviles, que al principio están lejos de la realidad (media 0, varianza 1): la salida sale mal normalizada hasta que se hayan visto suficientes lotes.</p>
+</div>
 
-muchas_grafo = tf.function(muchas)
-x0 = tf.constant(1.0)
-print("mismo resultado:", muchas(x0).numpy(), muchas_grafo(x0).numpy())
+<p>El <a href="#frag-15">fragmento 15</a> lo confirma con el modelo real: dos llamadas con <code>training=False</code> dan <strong>lo mismo</strong> (<code>True</code>), dos con <code>training=True</code> <strong>no</strong> (<code>False</code>: el Dropout apaga unidades distintas cada vez) y una con cada valor tampoco coinciden. De ahí una regla práctica: <strong>una predicción que cambia cada vez que la repites suele indicar un <code>training=True</code> que no debería estar</strong>.</p>
 
-def tiempo(fn):
-    fn(x0)
-    t0 = time.perf_counter()
-    for _ in range(50):
-        fn(x0)
-    return time.perf_counter() - t0
+<div class="callout regla">
+  <span class="lbl">Regla fácil</span>
+  <p>Subclassing = <strong>capas en <code>__init__</code>, cálculo en <code>call</code>, y <code>training</code> pasado a las capas que se comportan distinto</strong> (Dropout, BatchNormalization). Úsalo cuando necesites Python dentro del modelo; si lo que quieres es un grafo de capas, la API funcional te da lo mismo con inspección y menos riesgo. Y no te saltes el <code>super().__init__(**kwargs)</code>.</p>
+</div>
 
-print("el grafo es más de 3 veces más rápido:", tiempo(muchas) &gt; 3 * tiempo(muchas_grafo))</code></pre>
-<details class="linea-a-linea">
-<summary>Línea por línea</summary>
-<p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
-<table class="lineas">
-<thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
-<tbody>
-<tr data-lines="1-2"><td><code>import time …</code></td><td>Importan <code>time</code> (para medir tiempos) y TensorFlow.</td></tr>
-<tr data-lines="4-8"><td><code>@tf.function …</code></td><td>Función decorada con un <code>if x &gt; 0</code> donde <code>x</code> es un tensor. AutoGraph lo reescribe como una condición de TensorFlow, y devuelve un texto u otro.</td></tr>
-<tr data-lines="9"><td><code>print(signo(tf.constant(2.0)).numpy(), signo(tf.cons …</code></td><td>La llamamos con 2,0 y con −2,0, que usan el <strong>mismo grafo</strong>. (TensorFlow devuelve los textos como <code>bytes</code>: <code>b'positivo'</code>.)</td></tr>
-<tr data-lines="11-16"><td><code>@tf.function …</code></td><td>Una suma de 0 a n−1 con <code>for i in tf.range(n)</code>: al usar <code>tf.range</code> con un tensor, el bucle se queda <strong>dentro del grafo</strong>. <code>s += i</code> acumula.</td></tr>
-<tr data-lines="17"><td><code>print(suma_hasta(tf.constant(5)).numpy(), suma_hasta …</code></td><td>Se llama con <code>n = 5</code> (0+1+2+3+4 = 10) y con <code>n = 100</code> (4950).</td></tr>
-<tr data-lines="18"><td><code>print("trazados de suma_hasta:", suma_hasta.experime …</code></td><td>Cuenta los trazados: 1, el mismo grafo sirvió para ambos valores de <code>n</code>.</td></tr>
-<tr data-lines="20-22"><td><code>@tf.function(input_signature=[tf.TensorSpec(shape=(N …</code></td><td><code>input_signature</code> declara la entrada: un <code>TensorSpec</code> de forma <code>(None,)</code> (un vector de cualquier longitud) y tipo <code>float32</code>. La función suma sus elementos.</td></tr>
-<tr data-lines="23"><td><code>print(suma(tf.constant([1., 2.])).numpy(), suma(tf.c …</code></td><td>La llamamos con vectores de 2 y de 3 elementos.</td></tr>
-<tr data-lines="24"><td><code>print("trazados de suma:", suma.experimental_get_tra …</code></td><td>Un único trazado: cubre todas las longitudes.</td></tr>
-<tr data-lines="25-28"><td><code>try: …</code></td><td>Llamarla con un tensor de enteros no encaja con la firma <code>float32</code>: <code>TypeError</code>.</td></tr>
-<tr data-lines="30-33"><td><code>def muchas(x): …</code></td><td>Una función con 100 pequeñas operaciones (el bucle de Python se ejecuta una vez, al trazar, y las 100 operaciones quedan en el grafo).</td></tr>
-<tr data-lines="35"><td><code>muchas_grafo = tf.function(muchas)</code></td><td>Su versión en grafo.</td></tr>
-<tr data-lines="36"><td><code>x0 = tf.constant(1.0)</code></td><td>Un escalar de prueba, <code>x0 = 1,0</code>.</td></tr>
-<tr data-lines="37"><td><code>print("mismo resultado:", muchas(x0).numpy(), muchas …</code></td><td>Comprueba que el resultado es el mismo en las dos versiones (1,0201029).</td></tr>
-<tr data-lines="39-44"><td><code>def tiempo(fn): …</code></td><td>Una pequeña función para medir: llama una vez para «calentar» (y trazar, si hace falta), arranca el cronómetro, llama 50 veces y devuelve los segundos transcurridos (<code>time.perf_counter()</code>).</td></tr>
-<tr data-lines="46"><td><code>print("el grafo es más de 3 veces más rápido:", tiem …</code></td><td>Imprime si el modo inmediato tarda más de 3 veces lo que el grafo. Es un booleano (<code>True</code>/<code>False</code>), porque los milisegundos dependen del ordenador.</td></tr>
-</tbody>
-</table>
+<h3>Y para personalizar el entrenamiento</h3>
+<p>Una clase que hereda de <code>keras.Model</code> puede también <strong>redefinir qué hace cada paso de <code>fit</code></strong> (el método <code>train_step</code>), por ejemplo para entrenar dos redes a la vez como en las GAN. Es la puerta a los bucles de entrenamiento propios; lo desarrollamos en el <a href="../modulo-5.html">módulo 5</a>, con la cinta de este módulo como ingrediente principal.</p>
+  </div>
 </details>
-<div class="salida">
-<strong>Salida esperada</strong>
-<pre>b'positivo' b'no positivo'
-10 4950
-trazados de suma_hasta: 1
-3.0 6.0
-trazados de suma: 1
-TypeError: un tensor int32 no encaja en la firma float32
-mismo resultado: 1.0201029 1.0201029
-el grafo es más de 3 veces más rápido: True</pre>
-<p><code>signo</code> da «positivo» y «no positivo» (como <code>bytes</code>, con la <code>b</code> delante). <code>suma_hasta</code> da 10 y 4950 con un único trazado. <code>suma</code> da 3,0 y 6,0 con un único trazado, y rechaza el <code>int32</code>. Las dos versiones de <code>muchas</code> dan el mismo número (1,0201029), y la última línea es <code>True</code>: el grafo es más de 3 veces más rápido que el modo inmediato en esta máquina.</p>
-</div>
-</article><article class="snippet" data-lang="python" id="frag-11">
-<header>
-<h3>11 · El mismo modelo con Sequential, API funcional y subclassing</h3>
-<p class="para-que"><strong>Para qué sirve</strong> Construir la misma red de tres formas, comprobar que tiene los mismos parámetros y que, con los mismos pesos, da las mismas salidas. También ve cómo un modelo por subclases está «sin construir» hasta que se llama.</p>
-</header>
-<pre class="code"><code>import numpy as np
-import keras
-from keras import layers
 
-keras.utils.set_random_seed(0)
-
-secuencial = keras.Sequential([
-    keras.Input(shape=(4,)),
-    layers.Dense(8, activation="relu", name="oculta"),
-    layers.Dense(3, activation="softmax", name="salida"),
-], name="secuencial")
-
-entrada = keras.Input(shape=(4,))
-h = layers.Dense(8, activation="relu", name="oculta")(entrada)
-salida = layers.Dense(3, activation="softmax", name="salida")(h)
-funcional = keras.Model(entrada, salida, name="funcional")
-
-class MiRed(keras.Model):
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-        self.oculta = layers.Dense(8, activation="relu")
-        self.salida = layers.Dense(3, activation="softmax")
-
-    def call(self, x):
-        return self.salida(self.oculta(x))
-
-subclase = MiRed(name="subclase")
-print("construido antes de usarlo:", subclase.built)
-x = np.random.default_rng(0).normal(size=(2, 4)).astype("float32")
-subclase(x)
-print("construido después:", subclase.built)
-
-for m in (secuencial, funcional, subclase):
-    print(f"{m.name:10s} parámetros = {m.count_params()}")
-
-funcional.set_weights(secuencial.get_weights())
-subclase.set_weights(secuencial.get_weights())
-print("misma salida:", np.allclose(secuencial(x), funcional(x)), np.allclose(secuencial(x), subclase(x)))
-print(secuencial(x).numpy().round(3))</code></pre>
-<details class="linea-a-linea">
-<summary>Línea por línea</summary>
-<p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
-<table class="lineas">
-<thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
-<tbody>
-<tr data-lines="1-3"><td><code>import numpy as np …</code></td><td>Importan NumPy, Keras y el módulo de capas.</td></tr>
-<tr data-lines="5"><td><code>keras.utils.set_random_seed(0)</code></td><td>Fija la semilla aleatoria de Keras (de NumPy y del backend) para que los pesos iniciales sean siempre los mismos.</td></tr>
-<tr data-lines="7-11"><td><code>secuencial = keras.Sequential([ …</code></td><td><strong>Sequential</strong>: una lista de capas en orden. <code>Input(shape=(4,))</code> declara 4 entradas; luego una capa oculta de 8 neuronas con ReLU y una de salida de 3 con softmax. Les damos <code>name</code> para identificarlas y un nombre al modelo.</td></tr>
-<tr data-lines="13"><td><code>entrada = keras.Input(shape=(4,))</code></td><td><strong>Funcional, paso 1</strong>: <code>Input</code> crea el tensor simbólico de entrada, de forma <code>(None, 4)</code>.</td></tr>
-<tr data-lines="14"><td><code>h = layers.Dense(8, activation="relu", name="oculta" …</code></td><td>Paso 2: llama a la capa oculta <em>como una función</em> sobre <code>entrada</code> (<code>capa(tensor)</code>) y guarda la salida simbólica en <code>h</code>.</td></tr>
-<tr data-lines="15"><td><code>salida = layers.Dense(3, activation="softmax", name= …</code></td><td>Paso 3: lo mismo con la capa de salida.</td></tr>
-<tr data-lines="16"><td><code>funcional = keras.Model(entrada, salida, name="funci …</code></td><td>Paso 4: <code>keras.Model(entrada, salida)</code> declara «el modelo va de aquí a allí»: Keras recoge las capas del camino.</td></tr>
-<tr data-lines="18-25"><td><code>class MiRed(keras.Model): …</code></td><td><strong>Subclassing</strong>: una clase <code>MiRed</code> que hereda de <code>keras.Model</code>. <code>__init__</code> llama a <code>super().__init__</code> y crea las dos capas como atributos; <code>call</code> recibe los datos <code>x</code> y devuelve <code>salida(oculta(x))</code>: lo que calcula el modelo.</td></tr>
-<tr data-lines="27"><td><code>subclase = MiRed(name="subclase")</code></td><td>Crea un modelo de esa clase.</td></tr>
-<tr data-lines="28"><td><code>print("construido antes de usarlo:", subclase.built)</code></td><td>Pregunta si está construido (<code>built</code>): todavía <strong>no</strong> (<code>False</code>), porque Keras aún no ha visto datos.</td></tr>
-<tr data-lines="29"><td><code>x = np.random.default_rng(0).normal(size=(2, 4)).ast …</code></td><td>Crea 2 filas de 4 valores aleatorios (<code>float32</code>).</td></tr>
-<tr data-lines="30"><td><code>subclase(x)</code></td><td>Llama al modelo con esos datos: en esta primera llamada se crean los pesos.</td></tr>
-<tr data-lines="31"><td><code>print("construido después:", subclase.built)</code></td><td>Ahora <code>built</code> es <code>True</code>.</td></tr>
-<tr data-lines="33-34"><td><code>for m in (secuencial, funcional, subclase): …</code></td><td>Recorre los tres modelos e imprime su nombre y su número de parámetros (<code>count_params()</code>).</td></tr>
-<tr data-lines="36-37"><td><code>funcional.set_weights(secuencial.get_weights()) …</code></td><td>Copia los pesos del Sequential (<code>get_weights()</code>) al funcional y al de subclases (<code>set_weights</code>). Los tres tienen las mismas capas con la misma forma, así que encajan.</td></tr>
-<tr data-lines="38"><td><code>print("misma salida:", np.allclose(secuencial(x), fu …</code></td><td>Comprueba con <code>np.allclose</code> (¿son iguales hasta redondeos?) que las salidas coinciden.</td></tr>
-<tr data-lines="39"><td><code>print(secuencial(x).numpy().round(3))</code></td><td>Imprime la salida del Sequential redondeada a 3 decimales: cada fila son 3 probabilidades.</td></tr>
-</tbody>
-</table>
-</details>
-<div class="salida">
-<strong>Salida esperada</strong>
-<pre>construido antes de usarlo: False
-construido después: True
-secuencial parámetros = 67
-funcional  parámetros = 67
-subclase   parámetros = 67
-misma salida: True True
-[[0.445 0.332 0.223]
- [0.591 0.255 0.155]]</pre>
-<p>Antes de la primera llamada el modelo por subclases no está construido (<code>False</code>) y después sí (<code>True</code>). Los tres tienen <strong>67 parámetros</strong>: 4·8 + 8 = 40 en la oculta y 8·3 + 3 = 27 en la salida. Con los mismos pesos, las salidas coinciden (<code>True True</code>). Cada fila de la salida son 3 probabilidades que suman 1 (0,445 + 0,332 + 0,223 = 1).</p>
-</div>
-</article><article class="snippet" data-lang="python" id="frag-12">
-<header>
-<h3>12 · API funcional: atajo con <code>Add</code>, <code>Concatenate</code>, extractor de capas y errores de grafo</h3>
-<p class="para-que"><strong>Para qué sirve</strong> Construir un modelo con una conexión residual, leer su <code>summary()</code> con «Connected to», comparar <code>Add</code> y <code>Concatenate</code>, extraer una capa intermedia y ver el error de un grafo desconectado.</p>
-</header>
-<pre class="code"><code>import os
-import tempfile
+<section>
+<h2 class="sin-num">Código</h2>
+<!-- ---------- Fragmento 15 ---------- -->
+<article class="snippet" data-lang="python" id="frag-15">
+  <header>
+    <h3>15 · Modelo por subclases con <code>training</code>: Dropout, BatchNormalization y <code>build</code></h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Escribir un modelo por subclases con Dropout y BatchNormalization, ver que está «sin construir» hasta la primera llamada, y comprobar con números el efecto de <code>training=True</code> y <code>training=False</code>.</p>
+  </header>
+  <pre class="code"><code>import warnings
 import numpy as np
 import keras
 from keras import layers
 
-keras.utils.set_random_seed(1)
-entrada = keras.Input(shape=(8,), name="entrada")
-a = layers.Dense(16, activation="relu", name="densa_a")(entrada)
-b = layers.Dense(16, activation="relu", name="densa_b")(a)
-suma = layers.Add(name="suma")([a, b])
-salida = layers.Dense(3, activation="softmax", name="salida")(suma)
-modelo = keras.Model(entrada, salida, name="con_atajo")
-modelo.summary()
+class RedConRuido(keras.Model):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.oculta = layers.Dense(6, activation="relu", name="oculta")
+        self.bn = layers.BatchNormalization(name="bn")
+        self.drop = layers.Dropout(0.5, name="drop")
+        self.salida = layers.Dense(1, name="salida")
 
-c = layers.Dense(10, activation="relu", name="densa_c")(a)
-try:
-    layers.Add()([a, c])
-except ValueError as e:
-    print("Add:", e)
-print("Concatenate:", layers.Concatenate()([a, c]).shape)
+    def call(self, x, training=False):
+        h = self.oculta(x)
+        h = self.bn(h, training=training)
+        h = self.drop(h, training=training)
+        return self.salida(h)
 
-extractor = keras.Model(modelo.input, modelo.get_layer("suma").output, name="extractor")
-print("extractor:", extractor.output_shape, extractor.predict(np.ones((2, 8), "float32"), verbose=0).shape)
-print([capa.name for capa in modelo.layers])
+keras.utils.set_random_seed(11)
+modelo = RedConRuido(name="red")
+x = np.random.default_rng(0).normal(size=(4, 3)).astype("float32")
+print("construido:", modelo.built)
+modelo(x)
+entrenables = sum(int(np.prod(w.shape)) for w in modelo.trainable_weights)
+print("construido:", modelo.built, "| parámetros:", modelo.count_params(), "| entrenables:", entrenables)
 
-try:
-    keras.Model(entrada, layers.Dense(2)(keras.Input(shape=(3,))))
-except ValueError as e:
-    print("Grafo desconectado:", e)
+a1 = modelo(x, training=False).numpy()
+a2 = modelo(x, training=False).numpy()
+t1 = modelo(x, training=True).numpy()
+t2 = modelo(x, training=True).numpy()
+print("inferencia repetida, igual:", np.allclose(a1, a2))
+print("entrenamiento repetido, igual:", np.allclose(t1, t2))
+print("entrenamiento frente a inferencia, igual:", np.allclose(a1, t1))
 
-ruta = os.path.join(tempfile.mkdtemp(), "modelo.png")
-keras.utils.plot_model(modelo, to_file=ruta, show_shapes=True)
-print("dibujo creado:", os.path.exists(ruta))</code></pre>
-<details class="linea-a-linea">
-<summary>Línea por línea</summary>
-<p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
-<table class="lineas">
-<thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
-<tbody>
-<tr data-lines="1-3"><td><code>import os …</code></td><td>Importan <code>os</code>, <code>tempfile</code> y NumPy (el primero y el segundo, para dibujar el modelo en una carpeta temporal).</td></tr>
-<tr data-lines="4-5"><td><code>import keras …</code></td><td>Importan Keras y las capas.</td></tr>
-<tr data-lines="7"><td><code>keras.utils.set_random_seed(1)</code></td><td>Semilla aleatoria para que los pesos sean reproducibles.</td></tr>
-<tr data-lines="8"><td><code>entrada = keras.Input(shape=(8,), name="entrada")</code></td><td>La entrada: 8 características, con nombre <code>"entrada"</code>.</td></tr>
-<tr data-lines="9"><td><code>a = layers.Dense(16, activation="relu", name="densa_ …</code></td><td><code>densa_a</code>: 16 neuronas ReLU conectadas a la entrada.</td></tr>
-<tr data-lines="10"><td><code>b = layers.Dense(16, activation="relu", name="densa_ …</code></td><td><code>densa_b</code>: otras 16 neuronas, conectadas a la salida de <code>densa_a</code>.</td></tr>
-<tr data-lines="11"><td><code>suma = layers.Add(name="suma")([a, b])</code></td><td><code>Add</code> suma <strong>elemento a elemento</strong> la salida de <code>densa_a</code> y la de <code>densa_b</code>: el atajo.</td></tr>
-<tr data-lines="12"><td><code>salida = layers.Dense(3, activation="softmax", name= …</code></td><td>La salida: 3 neuronas softmax conectadas a la suma.</td></tr>
-<tr data-lines="13"><td><code>modelo = keras.Model(entrada, salida, name="con_ataj …</code></td><td>Declara el modelo, de la entrada a la salida.</td></tr>
-<tr data-lines="14"><td><code>modelo.summary()</code></td><td><code>summary()</code> imprime la tabla de capas con la forma de salida, los parámetros y «Connected to».</td></tr>
-<tr data-lines="16"><td><code>c = layers.Dense(10, activation="relu", name="densa_ …</code></td><td>Otra capa <code>densa_c</code> con 10 neuronas, conectada a <code>densa_a</code> (no forma parte del modelo, es para la prueba).</td></tr>
-<tr data-lines="17-20"><td><code>try: …</code></td><td>Intenta sumar <code>a</code> (16) y <code>c</code> (10) con <code>Add</code>: no tienen la misma forma y falla con <code>ValueError</code>.</td></tr>
-<tr data-lines="21"><td><code>print("Concatenate:", layers.Concatenate()([a, c]).s …</code></td><td><code>Concatenate</code> sí los admite y suma los anchos: 16 + 10 = 26.</td></tr>
-<tr data-lines="23"><td><code>extractor = keras.Model(modelo.input, modelo.get_lay …</code></td><td><strong>Extractor</strong>: un modelo nuevo desde la entrada del original (<code>modelo.input</code>) hasta la salida de la capa <code>"suma"</code> (<code>get_layer("suma").output</code>).</td></tr>
-<tr data-lines="24"><td><code>print("extractor:", extractor.output_shape, extracto …</code></td><td>Imprime la forma de su salida y la de lo que devuelve al darle 2 filas de unos (<code>np.ones</code>).</td></tr>
-<tr data-lines="25"><td><code>print([capa.name for capa in modelo.layers])</code></td><td>Lista los nombres de las capas del modelo.</td></tr>
-<tr data-lines="27-30"><td><code>try: …</code></td><td>Intenta crear un modelo con una salida construida a partir de <strong>otra</strong> <code>Input</code> distinta de la declarada: el grafo está desconectado y falla.</td></tr>
-<tr data-lines="32"><td><code>ruta = os.path.join(tempfile.mkdtemp(), "modelo.png" …</code></td><td>Ruta de un archivo <code>modelo.png</code> en una carpeta temporal.</td></tr>
-<tr data-lines="33"><td><code>keras.utils.plot_model(modelo, to_file=ruta, show_sh …</code></td><td><code>plot_model</code> dibuja el grafo en ese archivo (necesita <code>pydot</code> y Graphviz). <code>show_shapes=True</code> incluye las formas.</td></tr>
-<tr data-lines="34"><td><code>print("dibujo creado:", os.path.exists(ruta))</code></td><td>Comprueba que el archivo se ha creado.</td></tr>
-</tbody>
-</table>
-</details>
-<div class="salida">
-<strong>Salida esperada</strong>
-<pre>Model: "con_atajo"
-┏━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━┓
-┃ Layer (type)        ┃ Output Shape      ┃    Param # ┃ Connected to      ┃
-┡━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━┩
-│ entrada             │ (None, 8)         │          0 │ -                 │
-│ (InputLayer)        │                   │            │                   │
-├─────────────────────┼───────────────────┼────────────┼───────────────────┤
-│ densa_a (Dense)     │ (None, 16)        │        144 │ entrada[0][0]     │
-├─────────────────────┼───────────────────┼────────────┼───────────────────┤
-│ densa_b (Dense)     │ (None, 16)        │        272 │ densa_a[0][0]     │
-├─────────────────────┼───────────────────┼────────────┼───────────────────┤
-│ suma (Add)          │ (None, 16)        │          0 │ densa_a[0][0],    │
-│                     │                   │            │ densa_b[0][0]     │
-├─────────────────────┼───────────────────┼────────────┼───────────────────┤
-│ salida (Dense)      │ (None, 3)         │         51 │ suma[0][0]        │
-└─────────────────────┴───────────────────┴────────────┴───────────────────┘
- Total params: 467 (1.82 KB)
- Trainable params: 467 (1.82 KB)
- Non-trainable params: 0 (0.00 B)
-Add: Inputs have incompatible shapes. Received shapes (16,) and (10,)
-Concatenate: (None, 26)
-extractor: (None, 16) (2, 16)
-['entrada', 'densa_a', 'densa_b', 'suma', 'salida']
-Grafo desconectado: Output with path `` is not connected to `inputs`
-dibujo creado: True</pre>
-<p>La tabla es la del <code>summary()</code> comentada en el texto: <code>densa_a</code> 144, <code>densa_b</code> 272, <code>suma</code> 0 (con «Connected to» <code>densa_a, densa_b</code>), <code>salida</code> 51; total <strong>467</strong> (1,82 KB). Después: el error de <code>Add</code> (<em>«Received shapes (16,) and (10,)»</em>), la forma de <code>Concatenate</code> (<code>(None, 26)</code>), el extractor (<code>(None, 16)</code> y <code>(2, 16)</code>), los nombres de capa y el error del grafo desconectado. Por último, el dibujo se creó (<code>True</code>).</p>
+drop = layers.Dropout(0.5)
+unos = np.ones((1, 10), dtype="float32")
+print(drop(unos, training=False).numpy().tolist())
+print(drop(unos, training=True).numpy().tolist())
+
+warnings.simplefilter("ignore")
+otro = RedConRuido(name="otro")
+otro.build((None, 3))
+print("tras build() sin definirlo, parámetros:", otro.count_params())</code></pre>
+  <details class="linea-a-linea">
+    <summary>Línea por línea</summary>
+    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+      <tbody>
+        <tr data-lines="1-2"><td><code>import warnings …</code></td><td>Importan <code>warnings</code> (para silenciar un aviso) y NumPy.</td></tr>
+        <tr data-lines="3-4"><td><code>import keras …</code></td><td>Importan Keras y las capas.</td></tr>
+        <tr data-lines="6"><td><code>class RedConRuido(keras.Model):</code></td><td>Define la clase <code>RedConRuido</code>, que hereda de <code>keras.Model</code>.</td></tr>
+        <tr data-lines="7-8"><td><code>def __init__(self, **kwargs): …</code></td><td><code>__init__</code> con la llamada obligatoria a <code>super().__init__(**kwargs)</code>.</td></tr>
+        <tr data-lines="9-12"><td><code>self.oculta = layers.Dense(6, activation="relu", nam …</code></td><td>Crea las cuatro capas y las guarda como atributos: densa de 6 neuronas ReLU, <code>BatchNormalization</code>, <code>Dropout(0.5)</code> (apaga el 50 %) y la salida de 1 neurona.</td></tr>
+        <tr data-lines="14"><td><code>def call(self, x, training=False):</code></td><td><code>call</code> recibe los datos <code>x</code> y el argumento <code>training</code> (por defecto <code>False</code>).</td></tr>
+        <tr data-lines="15"><td><code>h = self.oculta(x)</code></td><td>Pasa los datos por la capa densa.</td></tr>
+        <tr data-lines="16"><td><code>h = self.bn(h, training=training)</code></td><td>Por BatchNorm, <strong>pasándole <code>training</code></strong> para que sepa si usar el lote o las medias móviles.</td></tr>
+        <tr data-lines="17"><td><code>h = self.drop(h, training=training)</code></td><td>Por Dropout, también con <code>training</code>.</td></tr>
+        <tr data-lines="18"><td><code>return self.salida(h)</code></td><td>Devuelve la salida de la capa final.</td></tr>
+        <tr data-lines="20"><td><code>keras.utils.set_random_seed(11)</code></td><td>Semilla para que Dropout apague siempre las mismas unidades.</td></tr>
+        <tr data-lines="21"><td><code>modelo = RedConRuido(name="red")</code></td><td>Crea el modelo.</td></tr>
+        <tr data-lines="22"><td><code>x = np.random.default_rng(0).normal(size=(4, 3)).ast …</code></td><td>4 filas de 3 valores aleatorios.</td></tr>
+        <tr data-lines="23"><td><code>print("construido:", modelo.built)</code></td><td><code>built</code>: <code>False</code>, aún no hay pesos.</td></tr>
+        <tr data-lines="24"><td><code>modelo(x)</code></td><td>Primera llamada con datos: Keras construye las capas.</td></tr>
+        <tr data-lines="25"><td><code>entrenables = sum(int(np.prod(w.shape)) for w in mod …</code></td><td>Suma el número de elementos de los pesos <strong>entrenables</strong> (<code>np.prod</code> multiplica la forma de cada uno).</td></tr>
+        <tr data-lines="26"><td><code>print("construido:", modelo.built, "| parámetros:", …</code></td><td>Imprime <code>built</code>, el total de parámetros y los entrenables.</td></tr>
+        <tr data-lines="28-29"><td><code>a1 = modelo(x, training=False).numpy() …</code></td><td>Dos llamadas con <code>training=False</code> (modo predicción).</td></tr>
+        <tr data-lines="30-31"><td><code>t1 = modelo(x, training=True).numpy() …</code></td><td>Dos llamadas con <code>training=True</code> (modo entrenamiento).</td></tr>
+        <tr data-lines="32"><td><code>print("inferencia repetida, igual:", np.allclose(a1, …</code></td><td>¿Son iguales las dos de predicción? (<code>np.allclose</code>).</td></tr>
+        <tr data-lines="33"><td><code>print("entrenamiento repetido, igual:", np.allclose( …</code></td><td>¿Son iguales las dos de entrenamiento?</td></tr>
+        <tr data-lines="34"><td><code>print("entrenamiento frente a inferencia, igual:", n …</code></td><td>¿Es igual una de predicción y una de entrenamiento?</td></tr>
+        <tr data-lines="36"><td><code>drop = layers.Dropout(0.5)</code></td><td>Una capa <code>Dropout(0.5)</code> suelta.</td></tr>
+        <tr data-lines="37"><td><code>unos = np.ones((1, 10), dtype="float32")</code></td><td>Un lote de una fila de diez unos.</td></tr>
+        <tr data-lines="38"><td><code>print(drop(unos, training=False).numpy().tolist())</code></td><td>La capa con <code>training=False</code>: devuelve lo mismo.</td></tr>
+        <tr data-lines="39"><td><code>print(drop(unos, training=True).numpy().tolist())</code></td><td>La capa con <code>training=True</code>: apaga unos y duplica los que quedan.</td></tr>
+        <tr data-lines="41"><td><code>warnings.simplefilter("ignore")</code></td><td>Silencia los avisos de Python para que no ensucien la salida.</td></tr>
+        <tr data-lines="42"><td><code>otro = RedConRuido(name="otro")</code></td><td>Otro modelo nuevo, sin llamar.</td></tr>
+        <tr data-lines="43"><td><code>otro.build((None, 3))</code></td><td>Llama a <code>build((None, 3))</code>, que en una clase que no define su propio <code>build</code> <strong>no crea</strong> los pesos de las capas internas.</td></tr>
+        <tr data-lines="44"><td><code>print("tras build() sin definirlo, parámetros:", otr …</code></td><td>Imprime los parámetros: <code>0</code>.</td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>construido: False
+construido: True | parámetros: 55 | entrenables: 43
+inferencia repetida, igual: True
+entrenamiento repetido, igual: False
+entrenamiento frente a inferencia, igual: False
+[[1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0]]
+[[2.0, 0.0, 2.0, 0.0, 0.0, 0.0, 0.0, 2.0, 2.0, 0.0]]
+tras build() sin definirlo, parámetros: 0</pre>
+    <p>El modelo pasa de <code>built = False</code> a <code>True</code> tras la primera llamada, con <strong>55 parámetros y 43 entrenables</strong> (los 12 restantes son las medias y varianzas móviles de BatchNorm). Las dos llamadas con <code>training=False</code> dan lo mismo (<code>True</code>); las dos con <code>training=True</code> no (<code>False</code>, el Dropout apaga unidades distintas); y una de cada tampoco coinciden. El Dropout suelto devuelve diez 1.0 con <code>training=False</code> y, con <code>training=True</code>, cuatro 2.0 y seis 0.0 (cada unidad que sobrevive se multiplica por 1/(1−0,5) = 2). Por último <code>build()</code> sin definirlo deja <strong>0</strong> parámetros.</p>
+  </div>
+</article>
+
+<!-- ---------- Fragmento 10 ---------- -->
+<article class="snippet" data-lang="python" id="frag-10">
+  <header>
+    <h3>10 · El <code>print</code> dentro de <code>call</code> durante <code>fit</code></h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Comprobar que Keras traza el modelo una sola vez (o unas pocas) en <code>fit</code>, de modo que un <code>print</code> de Python dentro de <code>call</code> no sale una vez por lote.</p>
+  </header>
+  <pre class="code"><code>import numpy as np
+import keras
+from keras import layers
+
+class Espia(keras.Model):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.densa = layers.Dense(1)
+
+    def call(self, x):
+        print("  [print dentro de call] forma de x:", x.shape)
+        return self.densa(x)
+
+rng = np.random.default_rng(0)
+x = rng.normal(size=(64, 3)).astype("float32")
+y = rng.normal(size=(64, 1)).astype("float32")
+
+modelo = Espia()
+modelo.compile(optimizer="sgd", loss="mse")
+print("fit: 3 épocas x 4 lotes = 12 pasos")
+modelo.fit(x, y, epochs=3, batch_size=16, verbose=0)
+print("dos llamadas directas con datos:")
+modelo(x[:2])
+modelo(x[:2])</code></pre>
+  <details class="linea-a-linea">
+    <summary>Línea por línea</summary>
+    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+      <tbody>
+        <tr data-lines="1-3"><td><code>import numpy as np …</code></td><td>Importan NumPy, Keras y las capas.</td></tr>
+        <tr data-lines="5-12"><td><code>class Espia(keras.Model): …</code></td><td>Un modelo mínimo por subclases (<code>Espia</code>) con una capa <code>Dense(1)</code>. Su <code>call</code> imprime la forma de la entrada antes de calcular. <code>__init__</code> crea la capa y <code>super().__init__(**kwargs)</code> prepara el modelo.</td></tr>
+        <tr data-lines="14-16"><td><code>rng = np.random.default_rng(0) …</code></td><td>Datos aleatorios: 64 filas con 3 columnas (<code>x</code>) y 64 objetivos (<code>y</code>), con semilla 0.</td></tr>
+        <tr data-lines="18"><td><code>modelo = Espia()</code></td><td>Crea el modelo.</td></tr>
+        <tr data-lines="19"><td><code>modelo.compile(optimizer="sgd", loss="mse")</code></td><td><code>compile</code> con el optimizador <code>sgd</code> y la pérdida <code>mse</code>.</td></tr>
+        <tr data-lines="20"><td><code>print("fit: 3 épocas x 4 lotes = 12 pasos")</code></td><td>Un mensaje que recuerda las cuentas: 3 épocas × 4 lotes (64 filas / 16) = 12 pasos.</td></tr>
+        <tr data-lines="21"><td><code>modelo.fit(x, y, epochs=3, batch_size=16, verbose=0)</code></td><td>Entrena 3 épocas con lotes de 16, sin barra de progreso (<code>verbose=0</code>).</td></tr>
+        <tr data-lines="22"><td><code>print("dos llamadas directas con datos:")</code></td><td>Otro mensaje, para separar las dos partes.</td></tr>
+        <tr data-lines="23-24"><td><code>modelo(x[:2]) …</code></td><td>Dos llamadas directas al modelo con 2 filas: se ejecutan en modo inmediato.</td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>fit: 3 épocas x 4 lotes = 12 pasos
+  [print dentro de call] forma de x: (16, 3)
+  [print dentro de call] forma de x: (16, 3)
+  [print dentro de call] forma de x: (16, 3)
+dos llamadas directas con datos:
+  [print dentro de call] forma de x: (2, 3)
+  [print dentro de call] forma de x: (2, 3)</pre>
+    <p>Durante el <code>fit</code>, con 12 pasos, el <code>print</code> sale <strong>solo 3 veces</strong> (siempre con el lote de 16 filas): el código de <code>call</code> se ejecuta al trazar, no en cada lote. En cambio las dos llamadas directas imprimen cada una su mensaje (forma <code>(2, 3)</code>). El número exacto de trazados durante <code>fit</code> depende de la versión de Keras; lo que importa es que no es uno por lote.</p>
+  </div>
+</article>
+
+</section>
+
 </div>
-</article></div></details></div></main></body></html>
+</main>
+</body>
+</html>

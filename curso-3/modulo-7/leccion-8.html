@@ -1,132 +1,571 @@
-<!DOCTYPE html>
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lección 8 · La exactitud esconde dónde falla: matriz de confusión y un predecir() que sabe dudar · Módulo 7 · Curso 3 · Cuaderno de IA</title>
+<meta name="description" content="Matriz de confusión, precisión, exhaustividad y F1 por clase, análisis de errores, guardar el modelo en .keras y una función predecir() con umbral de confianza.">
+<script>try{var t=localStorage.getItem('cuaderno-ia:tema');if(t)document.documentElement.setAttribute('data-theme',t)}catch(e){}</script>
+<link rel="stylesheet" href="../../assets/css/style.css">
+<script src="../../assets/js/curriculum.js"></script>
+<script src="../../assets/js/lab.js"></script>
+<script src="../../assets/js/app.js" defer></script>
+</head>
+<body data-root="../../" data-course="3" data-module="7" data-lesson="8">
+<main>
+<div class="page">
 
-<html lang="es"><head><meta charset="utf-8"/><meta content="width=device-width,initial-scale=1" name="viewport"/><title>Lección 8 · El veredicto: ¿gana la red a la regresión lineal y al random forest? · Curso 3 · Cuaderno de IA</title><meta content="El fragmento 9 evalúa la red entrenada con callbacks (la del fragmento 8 , con los hiperparámetros por defecto, no los del tuner) y los dos baselines en las 800 filas del test:" name="description"/><script>try{var t=localStorage.getItem('cuaderno-ia:tema');if(t)document.documentElement.setAttribute('data-theme',t)}catch(e){}</script><link href="../../assets/css/style.css" rel="stylesheet"/><script src="../../assets/js/curriculum.js"></script><script src="../../assets/js/lab.js"></script><script defer="" src="../../assets/js/app.js"></script><script defer="" src="../../assets/js/microanimations.js"></script></head><body data-course="3" data-lesson="8" data-module="7" data-root="../../"><main><div class="page" data-micro="3min"><header class="hero leccion"><div class="hero-grid"><div><p class="eyebrow">Curso 3 · Módulo 7 · Lección 8 de 18</p><h1>El veredicto: ¿gana la red a la regresión lineal y al random forest?</h1><p class="lead">El fragmento 9 evalúa la red entrenada con callbacks (la del fragmento 8 , con los hiperparámetros por defecto, no los del tuner) y los dos baselines en las 800 filas del test:</p><p class="meta-line"><span class="read-time" data-render="read-time"></span><a href="../modulo-7.html">Índice del módulo</a></p></div><div aria-hidden="true" class="hero-tile"></div></div></header><details class="predice"><summary>Has construido una red con BatchNorm, Dropout, L2 y callbacks, y la has afinado con un tuner. ¿Ha valido la pena? ¿Cómo se comprueba, sin engañarte, que supera a un modelo de cinco líneas?<span class="hint"></span></summary><div><p>El fragmento 9 evalúa la red entrenada con callbacks (la del fragmento 8 , con los hiperparámetros por defecto, no los del tuner) y los dos baselines en las 800 filas del test:</p></div></details><section aria-label="Explicación breve" class="micro-core"><div class="micro-kicker">01 · ENTENDER <span>≈ 45 s</span></div><h2>La idea en palabras sencillas</h2><p>El fragmento 9 evalúa la red entrenada con callbacks (la del fragmento 8, con los hiperparámetros por defecto, no los del tuner) y los dos baselines en las 800 filas del test:</p><div class="micro-example"><span aria-hidden="true" class="micro-example-icon">💡</span><div><strong>Otro ejemplo · Riego</strong><p>Un sensor decide: si la tierra está seca, regar; si está húmeda, esperar. Cada pregunta abre una rama.</p></div></div></section><div class="micro-kicker micro-checkpoint">02 · RESPONDER <span>≈ 15 s</span></div><section aria-label="Pregunta intercalada" class="quiz mini micro-check"><script class="quiz-data" type="application/json">{"titulo": "Pausa rápida · Comprueba la idea", "preguntas": [{"q": "¿Cómo obtiene la respuesta un Random Forest de clasificación?", "opciones": ["Combina los votos de muchos árboles", "Usa un único vecino", "Siempre devuelve la media de todos los textos"], "correcta": 0, "porque": "El bosque combina las predicciones de varios árboles."}]}</script></section><section aria-label="Animación interactiva" class="micro-viz" data-index="18" data-micro-viz="tree"><div class="micro-kicker">03 · EXPERIMENTAR <span>≈ 45 s</span></div><div class="micro-viz-title"><div><h2>Una decisión, paso a paso</h2><p>Prueba distintos valores y sigue el camino de la decisión.</p></div><span aria-hidden="true" class="micro-viz-symbol">✦</span></div><div aria-live="polite" class="micro-viz-stage"><p>Animación interactiva: Una decisión, paso a paso</p></div></section><div class="micro-kicker micro-checkpoint">04 · APLICAR <span>≈ 15 s</span></div><section aria-label="Pregunta intercalada" class="quiz mini micro-check"><script class="quiz-data" type="application/json">{"titulo": "Pausa rápida · ¿Lo aplicarías?", "preguntas": [{"q": "¿Qué busca reducir al diversificar los árboles?", "opciones": ["La cantidad de features a cero siempre", "La necesidad de test", "La varianza respecto a un árbol individual"], "correcta": 2, "porque": "Promediar árboles diversos suele reducir varianza."}]}</script></section><div class="micro-finish"><strong>Idea que te llevas</strong><span>El fragmento 9 evalúa la red entrenada con callbacks (la del fragmento 8, con los hiperparámetros por defecto, no los del tuner) y los dos baselines e</span><small>¿Quieres más ejemplos, fórmulas o código? Los tienes justo debajo, sin límite de tiempo.</small></div><details class="profundizar micro-legacy"><summary><span>Explorar más: explicación y simulaciones completas<small>Todo el texto original, tablas y demos avanzadas. Opcional.</small></span></summary><div class="prof-body"><section><h2>El veredicto: ¿gana la red a la regresión lineal y al random forest?</h2>
-<p>El <a href="#frag-9">fragmento 9</a> evalúa la red entrenada con callbacks (la del <a href="leccion-6.html#frag-8">fragmento 8</a>, con los hiperparámetros por defecto, no los del tuner) y los dos baselines en las 800 filas del test:</p>
-<p>Por zonas, el error medio absoluto (miles de €) es:</p>
-<p>La regresión lineal es la peor en las cuatro zonas. En la Periferia (pisos baratos y sencillos) el random forest y la red casi empatan (6,6 y 6,1), la ventaja de la red es pequeña en el Ensanche (11,3 frente a 12,1) y algo mayor en el Centro (11,3 frente a 13,3), y es muy clara en la <strong>Playa</strong> (11,0 frente a 16,1), la zona con una interacción extra en la fórmula (el plus por superficie). Es coherente con que una red, que es suave, capte mejor esa interacción que un árbol, que aproxima por trozos, aunque aquí no lo hemos comprobado por separado.</p>
-<div class="callout ejemplo"><span class="lbl">Ejemplo tomado del módulo</span><p>· cuánto mejor es «mejor» Frente a la regresión lineal: \( 1 - 9{,}543/23{,}900 = 0{,}601 \).</p></div></section><figure class="demo" data-demo="curso3/c3m7-red-vs-lineal" data-titulo="Recta frente a red neuronal">
-<div class="haz">Cada punto gris es una película: en horizontal su duración y en vertical la nota que le pone el público (las dos ya estandarizadas). Deja los valores iniciales: la recta (azul) no ve la relación y la red (naranja) sí. Baja «Cuánto se curva la relación real» a 0: ahora los datos siguen una recta y las dos empatan. Vuelve a 0,70 y sube el ruido hasta 1,50: los dos modelos se hunden. Pon 8 ejemplos de entrenamiento y mira qué pasa con la red.</div>
-<div class="observa">Con la relación curva, la recta da un R² cercano a 0 (como predecir la media) y la red recupera casi todo lo que el ruido permite (el «techo» de la lectura inferior es el R² máximo posible con ese ruido). Con la relación recta, <strong>empatan</strong>: la recta consigue lo mismo con una fracción de los recursos, y ahí una red solo añade complejidad. Con mucho ruido o con 8 ejemplos, la red no tiene de dónde aprender: queda por debajo del techo. La red gana cuando hay curvatura que aprender <em>y</em> datos suficientes para aprenderla.</div>
-</figure><div class="resumen"><h2 class="sin-num sin-toc">En pocas líneas</h2><ul><li><strong>El veredicto: ¿gana la red a la regresión lineal y al random forest?:</strong> El fragmento 9 evalúa la red entrenada con callbacks (la del fragmento 8 , con los hiperparámetros por defecto, no los del tuner) y…</li><li>Antes de continuar, intenta explicar la demo sin mirar su resultado.</li></ul></div><section class="quiz mini"><script class="quiz-data" type="application/json">{"titulo": "¿Lo tienes?", "preguntas": [{"q": "¿Qué concepto estamos trabajando en esta lección?", "opciones": ["La red con la API funcional: BatchNorm, Dropout y L2", "Keras Tuner: dejar que el ordenador pruebe", "El veredicto: ¿gana la red a la regresión lineal y al random forest?"], "correcta": 2, "porque": "El fragmento 9 evalúa la red entrenada con callbacks (la del fragmento 8 , con los hiperparámetros por defecto, no los del tuner) y los dos baselines en las 800 filas del test:"}, {"q": "¿Cuál de estas afirmaciones recoge lo que acabas de estudiar?", "opciones": ["El fragmento 9 evalúa la red entrenada con callbacks (la del fragmento 8 , con los hiperparámetros por defecto, no los del tuner) y los dos baselines en las 800 filas del test:", "Siempre hay un único método que sirve para todos los problemas.", "Lo importante es comprender la idea y comprobarla con ejemplos, no memorizar términos."], "correcta": 0, "porque": "La explicación central es: El fragmento 9 evalúa la red entrenada con callbacks (la del fragmento 8 , con los hiperparámetros por defecto, no los del tuner) y los dos baselines en las 800 filas del test:"}, {"q": "Si una demo o un ejemplo te desconcierta, ¿cuál es la mejor forma de aprenderlo?", "opciones": ["Volver a los números, cambiar un valor y explicar qué ocurre.", "Ignorar los resultados que no coinciden con tu intuición.", "Memorizar el nombre sin entender la operación."], "correcta": 0, "porque": "Explorar qué cambia y por qué ayuda a conectar el concepto con su resultado."}]}</script></section></div></details><details class="profundizar"><summary><span>Profundizar: explicación completa<small>Matices, fórmulas, tablas, otros ejemplos y experimentos del módulo original.</small></span></summary><div class="prof-body"><section>
-<h2 id="veredicto">El veredicto: ¿gana la red a la regresión lineal y al random forest?</h2>
-<p class="pregunta">Has construido una red con BatchNorm, Dropout, L2 y callbacks, y la has afinado con un tuner. ¿Ha valido la pena? ¿Cómo se comprueba, sin engañarte, que supera a un modelo de cinco líneas?</p>
-<div class="callout analogia">
-<span class="lbl">Analogía</span>
-<p>Netflix estrena un recomendador nuevo, carísimo, y quiere saber si acierta más que el algoritmo sencillo de siempre. Para compararlos tienen que recomendar <strong>a los mismos usuarios, sobre las mismas películas y con el mismo juez</strong> (las mismas métricas). Si el nuevo se prueba con usuarios cuyos gustos ya conocía, o si solo miras el día en que más acertó, la comparación no vale nada.</p>
-</div>
-<h3>Las reglas de una comparación honesta</h3>
-<ul>
-<li><strong>Mismos datos y mismo reparto</strong>: los tres modelos ven el mismo train y se evalúan en el mismo test.</li>
-<li><strong>Mismo preprocesado</strong>, ajustado solo con el train (<code>pre</code> del <a href="leccion-3.html#frag-3">fragmento 3</a>).</li>
-<li><strong>Mismas métricas</strong>, en las unidades del problema (MAE y RMSE en miles de euros) y R².</li>
-<li><strong>El test se mira una vez</strong>, cuando el modelo ya está decidido.</li>
-<li><strong>Varias semillas</strong> si el modelo tiene azar (la red y el random forest lo tienen), para saber si una diferencia es real o es ruido.</li>
-<li><strong>Mirar por subgrupos</strong>: una media puede esconder que un modelo falla en una zona concreta.</li>
-</ul>
-<h3>Los tres modelos en el test</h3>
-<p>El <a href="#frag-9">fragmento 9</a> evalúa la red entrenada con callbacks (la del <a href="leccion-6.html#frag-8">fragmento 8</a>, con los hiperparámetros por defecto, no los del tuner) y los dos baselines en las 800 filas del test:</p>
-<table>
-<thead><tr><th>Modelo</th><th>MAE (miles €)</th><th>RMSE (miles €)</th><th>R²</th></tr></thead>
-<tbody>
-<tr><th scope="row">Regresión lineal</th><td>23,900</td><td>34,697</td><td>0,851</td></tr>
-<tr><th scope="row">Random forest</th><td>11,383</td><td>18,096</td><td>0,960</td></tr>
-<tr><th scope="row">Red neuronal</th><td>9,543</td><td>15,351</td><td>0,971</td></tr>
-</tbody>
-</table>
-<div class="callout ejemplo">
-<span class="lbl">Ejemplo numérico · cuánto mejor es «mejor»</span>
-<ol class="pasos">
-<li>Frente a la regresión lineal: \( 1 - 9{,}543/23{,}900 = 0{,}601 \). El error medio baja un <strong>60 %</strong>: de 23.900 € a 9.543 €.</li>
-<li>Frente al random forest: \( 1 - 9{,}543/11{,}383 = 0{,}162 \). Baja un <strong>16,2 %</strong>: 1.840 € menos de error medio. Es mucho menos espectacular.</li>
-<li>En RMSE, la red baja de 18,096 a 15,351 (un 15,2 %) frente al random forest. RMSE y MAE cuentan la misma historia.</li>
-<li>En R² la diferencia parece minúscula (0,971 frente a 0,960) porque R² se aprieta contra 1; en euros la diferencia se ve mejor.</li>
-</ol>
-</div>
-<p>Por zonas, el error medio absoluto (miles de €) es:</p>
-<table>
-<thead><tr><th>Zona</th><th>Regresión lineal</th><th>Random forest</th><th>Red neuronal</th></tr></thead>
-<tbody>
-<tr><th scope="row">Centro</th><td>24,1</td><td>13,3</td><td>11,3</td></tr>
-<tr><th scope="row">Ensanche</th><td>17,5</td><td>12,1</td><td>11,3</td></tr>
-<tr><th scope="row">Periferia</th><td>30,5</td><td>6,6</td><td>6,1</td></tr>
-<tr><th scope="row">Playa</th><td>22,0</td><td>16,1</td><td>11,0</td></tr>
-</tbody>
-</table>
-<p>La regresión lineal es la peor en las cuatro zonas. En la Periferia (pisos baratos y sencillos) el random forest y la red casi empatan (6,6 y 6,1), la ventaja de la red es pequeña en el Ensanche (11,3 frente a 12,1) y algo mayor en el Centro (11,3 frente a 13,3), y es muy clara en la <strong>Playa</strong> (11,0 frente a 16,1), la zona con una interacción extra en la fórmula (el plus por superficie). Es coherente con que una red, que es suave, capte mejor esa interacción que un árbol, que aproxima por trozos, aunque aquí no lo hemos comprobado por separado.</p>
-<h3>¿Por qué gana la red en los pisos?</h3>
-<p>Un modelo lineal suma efectos: «cada metro cuadrado añade tanto, cada año resta tanto». Pero en nuestros pisos los efectos se <strong>multiplican</strong>: el precio es \( \text{precio por m}^2_{\text{zona}} \cdot \text{m}^2 \cdot e^{-0{,}015\cdot\text{años}} \cdot e^{-0{,}05\cdot\text{distancia}}\cdots \). Un piso viejo y lejano pierde un porcentaje de su valor, no una cantidad fija (como los cupones de descuento de antes), y esa estructura no se parece a una suma. La red y el random forest pueden representar esas interacciones; la recta, no. Con la demo puedes ver la idea en una sola dimensión:</p>
-<h3>¿Y las piezas de la red? BatchNorm, Dropout y L2 a prueba</h3>
-<p>Poner BatchNorm, Dropout y L2 «porque sí» es una costumbre. El <a href="leccion-5.html#frag-11">fragmento 11</a> las mide quitando cada una (varias semillas, R² en validación):</p>
-<table>
-<thead><tr><th>Variante</th><th>150 filas (3 semillas)</th><th>2.400 filas (2 semillas)</th></tr></thead>
-<tbody>
-<tr><th scope="row">Completa</th><td>0,854 ± 0,062</td><td>0,973 ± 0,000</td></tr>
-<tr><th scope="row">Sin BatchNorm</th><td>0,938 ± 0,005</td><td>—</td></tr>
-<tr><th scope="row">Sin Dropout</th><td>0,866 ± 0,024</td><td>—</td></tr>
-<tr><th scope="row">Sin L2</th><td>0,854 ± 0,062</td><td>—</td></tr>
-<tr><th scope="row">Sin nada</th><td>0,940 ± 0,005</td><td>0,973 ± 0,000</td></tr>
-</tbody>
-</table>
-<p>El resultado es incómodo: <strong>con 2.400 filas, la red con todo y la red sin nada dan lo mismo</strong>; y con 150 filas, la red completa es la peor y la más irregular. Aquí estas piezas no aportan. Dos lecciones: (1) no las des por buenas, mídelas; (2) con una tabla pequeña y sin sobreajuste, los «seguros» sobran. Eso no significa que no sirvan en otras redes: con redes grandes y pocos datos, Dropout y L2 son de los remedios más usados. Pero siempre con una medición detrás.</p>
-<h3>El contrapunto: un caso donde la red no gana</h3>
-<p>Para no sacar una conclusión demasiado optimista de un solo problema, el <a href="#frag-12">fragmento 12</a> repite la comparación con la <strong>tabla de diabetes</strong> de scikit-learn (442 pacientes, 10 columnas, una relación casi lineal). Resultado en el test, con cinco semillas para la red: regresión lineal, R² 0,359; random forest, 0,253; red neuronal, 0,351 ± 0,021. <strong>La red no gana</strong>: empata con la lineal y el random forest queda por detrás. Con pocos datos y una relación casi lineal, el modelo más sencillo basta, y es más rápido, más fácil de explicar y no depende de la semilla.</p>
-<div class="callout ojo">
-<span class="lbl">Ojo · una regla práctica, no una ley</span>
-<p>Ante una tabla de datos, <strong>prueba primero la regresión lineal y un random forest</strong>; si una red gana, que sea con varias semillas y con una diferencia mayor que su dispersión. Las redes suelen ser la mejor opción cuando hay muchos datos y estructura compleja o <em>no tabular</em> (imágenes, texto, audio, series largas), que es lo que veremos a continuación. Y recuerda que el resultado de los pisos solo vale para los pisos: los datos son <strong>sintéticos</strong> y con una fórmula multiplicativa que nosotros mismos pusimos, así que favorecen a los modelos que captan interacciones.</p>
-</div>
-</section></div></details><details class="profundizar" id="codigo"><summary><span>Ver código explicado paso a paso<small>2 fragmento(s) original(es), con cada línea comentada y salida esperada.</small></span></summary><div class="prof-body"><article class="snippet" data-lang="python" id="frag-9">
-<header>
-<h3>9 · El veredicto: la red, el random forest y la regresión lineal en el test</h3>
-<p class="para-que"><strong>Para qué sirve</strong> Evaluar los tres modelos en el test (una sola vez), con las tres métricas, y desglosar el error absoluto medio por zona para ver dónde falla cada uno. Continúa los fragmentos 5 y 8.</p>
+<header class="hero leccion">
+  <div class="hero-grid">
+    <div>
+      <p class="eyebrow">Curso 3 · Módulo 7 · Lección 8 de 8</p>
+      <h1>La exactitud esconde dónde falla: matriz de confusión y un predecir() que sabe dudar</h1>
+      <p class="lead">Un 88 % de acierto esconde que el 8 se escapa casi la mitad de las veces. La matriz de confusión lo enseña; después se guarda el modelo y <code>predecir()</code> aplica el mismo preprocesado y un umbral de confianza.</p>
+      <p class="meta-line"><span class="read-time" data-render="read-time"></span><a href="../modulo-7.html">Índice del módulo</a></p>
+    </div>
+    <div class="hero-tile" aria-hidden="true"></div>
+  </div>
 </header>
-<pre class="code"><code>tubo_lineal = make_pipeline(pre, LinearRegression()).fit(X_train, y_train)
-tubo_rf = make_pipeline(pre, RandomForestRegressor(n_estimators=200, random_state=0, n_jobs=1)).fit(X_train, y_train)
-pred_red = modelo.predict(Z_test, verbose=0).ravel() * y_sd + y_mu
-preds = {"regresión lineal": tubo_lineal.predict(X_test),
-         "random forest": tubo_rf.predict(X_test),
-         "red neuronal": pred_red}
-tabla_test = pd.DataFrame({n: evaluar(y_test, p) for n, p in preds.items()}).T.round(3)
-print(tabla_test.to_string())
 
-error_abs = pd.DataFrame({n: np.abs(p - y_test.to_numpy()) for n, p in preds.items()})
-error_abs["zona"] = X_test["zona"].to_numpy()
-print(error_abs.groupby("zona").mean().round(1).to_string())</code></pre>
-<details class="linea-a-linea">
-<summary>Línea por línea</summary>
-<p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
-<table class="lineas">
-<thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
-<tbody>
-<tr data-lines="1-2"><td><code>tubo_lineal = make_pipeline(pre, LinearRegression()).fi…</code></td><td>Entrena de nuevo la regresión lineal y el random forest con el train (ya sabes que la red también se entrenó solo con el train).</td></tr>
-<tr data-lines="3"><td><code>pred_red = modelo.predict(Z_test, verbose=0).ravel() *…</code></td><td>Predice los pisos del test con la red: <code>predict</code> da valores estandarizados, <code>.ravel()</code> aplana la matriz columna a vector, y <code>* y_sd + y_mu</code> los devuelve a miles de euros.</td></tr>
-<tr data-lines="4-6"><td><code>preds = {"regresión lineal": tubo_lineal.predict(X_test…</code></td><td>Un diccionario con las predicciones de cada modelo sobre el test.</td></tr>
-<tr data-lines="7-8"><td><code>tabla_test = pd.DataFrame({n: evaluar(y_test, p) for n,…</code></td><td>Tabla de métricas del test: una columna por modelo, traspuesta para que sea una fila por modelo.</td></tr>
-<tr data-lines="10"><td><code>error_abs = pd.DataFrame({n: np.abs(p - y_test.to_numpy…</code></td><td>Tabla con el error absoluto de cada piso del test y de cada modelo (<code>np.abs(p - y_test)</code>).</td></tr>
-<tr data-lines="11"><td><code>error_abs["zona"] = X_test["zona"].to_numpy()</code></td><td>Añade la columna con la zona de cada piso.</td></tr>
-<tr data-lines="12"><td><code>print(error_abs.groupby("zona").mean().round(1).to_stri…</code></td><td>Agrupa por zona y promedia: el MAE de cada modelo en cada zona.</td></tr>
-</tbody>
-</table>
+<details class="predice">
+  <summary>El etiquetador de géneros acierta el 88 % de las carátulas del test. ¿Puede haber un género en el que falle casi la mitad de las veces?<span class="hint"></span></summary>
+  <div>
+    <p>Sí. En el proyecto, el 8 se reconoce solo en 78 de 145 imágenes (0,538), mientras las otras cifras pasan de 0,9. La media lo diluye; la matriz de confusión lo enseña fila a fila.</p>
+  </div>
 </details>
-<div class="salida">
-<strong>Salida esperada</strong>
-<pre>                     MAE    RMSE     R2
-regresión lineal  23.900  34.697  0.851
-random forest     11.383  18.096  0.960
-red neuronal       9.543  15.351  0.971
-           regresión lineal  random forest  red neuronal
-zona                                                    
-Centro                 24.1           13.3          11.3
-Ensanche               17.5           12.1          11.3
-Periferia              30.5            6.6           6.1
-Playa                  22.0           16.1          11.0</pre>
-<p>En el test, la <strong>red</strong> consigue MAE 9,543, RMSE 15,351 y R² 0,971; el <strong>random forest</strong>, 11,383, 18,096 y 0,960; la <strong>regresión lineal</strong>, 23,900, 34,697 y 0,851. La red gana, y por poco al random forest (1,8 miles de € de MAE), pero gana. Por zonas, la lineal falla mucho en todas (de 17,5 a 30,5); la red y el random forest se parecen en la Periferia (6,1 y 6,6, pisos baratos) y la red es mejor en el Centro (11,3 frente a 13,3), el Ensanche (11,3 frente a 12,1) y la Playa (11,0 frente a 16,1), donde la fórmula tiene más interacciones.</p>
+
+<section>
+<h2 id="idea">Mirar los errores por clase, y después entregar</h2>
+<p>La <strong>matriz de confusión</strong> es una tabla donde cada fila es lo que la carátula era de verdad y cada columna, lo que dijo el modelo. Para una clase hay cuatro casos: TP (dijo X y era X), FP (dijo X y no lo era), FN (era X y no lo dijo) y TN. La <strong>precisión</strong>, TP/(TP+FP), responde «de las que marco como X, ¿cuántas lo son?»; la <strong>exhaustividad</strong>, TP/(TP+FN), «de las X que hay, ¿cuántas encuentro?»; el <strong>F1</strong> es su media armónica.</p>
+<p>Para entregar, <code>modelo.save("x.keras")</code> guarda arquitectura y pesos; se recarga y se comprueba que da las mismas probabilidades. <code>predecir()</code> aplica <strong>el mismo preprocesado</strong> que el entrenamiento (8×8 → 32×32×3, escala 0–255) y, si la probabilidad máxima no llega a 0,6, responde «no estoy seguro».</p>
+</section>
+
+<figure class="demo" data-demo="curso3/c3m7-confusion" data-titulo="Umbral de decisión y matriz de confusión">
+  <div class="haz">Arrastra el umbral sobre el histograma y mira los cuatro cuadros. Baja las películas que gustan al 5 %.</div>
+  <div class="observa">Umbral bajo: no se escapa nada, pero hay muchas falsas alarmas. Umbral alto: lo contrario. Con clases raras, la exactitud engaña.</div>
+</figure>
+<figure class="demo" data-demo="curso3/c3m7-despliegue" data-titulo="Un predecir() con umbral de confianza">
+  <div class="haz">Carga un «7» y luego un «8» con el umbral al 60 %. Después baja el umbral al 50 %.</div>
+  <div class="observa">El 8 se queda en un 53 % y la función se abstiene. El umbral decide entre contestar y callar.</div>
+</figure>
+
+<section>
+<h2 id="numeros">Con números: el 8, cifra a cifra</h2>
+<div class="callout ejemplo">
+  <span class="lbl">Ejemplo numérico</span>
+<p>De las 145 imágenes de un 8 del test, el modelo dijo: 78 veces «8», 39 «9», 20 «5», 7 «7» y 1 «6». Ninguna otra cifra se tomó por un 8.</p>
+  <ol class="pasos">
+    <li>TP = 78; FN = 39 + 20 + 7 + 1 = <strong>67</strong>; FP = 0.</li>
+    <li>Precisión = 78 / (78 + 0) = <strong>1,000</strong>: cuando dice «8», acierta siempre.</li>
+    <li>Exhaustividad = 78 / 145 = <strong>0,538</strong>: deja escapar casi la mitad.</li>
+    <li>F1 = 2 · 1 · 0,538 / (1 + 0,538) = <strong>0,700</strong>.</li>
+  </ol>
+  <p>La base se preentrenó con las cifras 0 a 4, sin ningún 8: no «conoce» el bucle cerrado que lo separa del 9. Qué hacer: más ejemplos de 8 o descongelar más capas.</p>
 </div>
-</article><article class="snippet" data-lang="python" id="frag-12">
-<header>
-<h3>12 · Un caso donde la red no gana: la diabetes</h3>
-<p class="para-que"><strong>Para qué sirve</strong> Repetir la comparación con <code>load_diabetes</code> (442 pacientes, 10 columnas): regresión lineal y random forest frente a la misma red con cinco semillas. Es el contrapunto honesto al fragmento 9. Usa <code>construir_modelo</code> del fragmento 6.</p>
-</header>
-<pre class="code"><code>from sklearn.datasets import load_diabetes
+</section>
+
+<details class="predice">
+  <summary>Le pasas a <code>predecir()</code> una imagen completamente negra, que no es ninguna cifra. Con umbral 0,6, ¿qué responde? ¿Y con 0,5?<span class="hint"></span></summary>
+  <div>
+    <p>Con 0,6 dice «no estoy seguro»: su probabilidad máxima es 0,585. Con 0,5 habría contestado «5» con total aplomo, una respuesta absurda. El umbral reduce errores, pero no los elimina: una red puede equivocarse con mucha confianza.</p>
+  </div>
+</details>
+
+<div class="resumen">
+  <h2 class="sin-num sin-toc">En tres líneas</h2>
+  <ul>
+    <li>La exactitud global esconde clases que fallan: matriz, precisión, exhaustividad y F1 por clase.</li>
+    <li>El 8: precisión 1,000 y exhaustividad 0,538. Los errores dicen qué mejorar.</li>
+    <li>Guardar en <code>.keras</code>, recargar y comprobar; <code>predecir()</code> con el mismo preprocesado y un umbral.</li>
+  </ul>
+</div>
+
+<section class="quiz mini">
+<script type="application/json" class="quiz-data">
+{
+ "titulo": "¿Lo tienes?",
+ "preguntas": [
+  {
+   "q": "Netflix decide si avisar a un usuario de 100 estrenos, y a 50 de ellos les habría gustado de verdad. El sistema da esta matriz para «avisar»: 40 verdaderos positivos, 10 falsos negativos, 20 falsos positivos y 30 verdaderos negativos. ¿Cuánto valen la exhaustividad (recall) y la precisión?",
+   "opciones": [
+    "Recall 0,67 y precisión 0,80",
+    "Recall 0,70 y precisión 0,80",
+    "Recall 0,80 y precisión 0,80",
+    "Recall 0,80 y precisión 0,67"
+   ],
+   "correcta": 3,
+   "porque": "Recall = VP/(VP+FN) = 40/50 = 0,80: de las 50 películas que le gustarían, avisa de 40. Precisión = VP/(VP+FP) = 40/60 = 0,667: de los 60 avisos que manda, acierta 40. Las dos usan el mismo numerador y distinto denominador; recordar «recall = de los reales» y «precisión = de los marcados» evita confundirlas."
+  },
+  {
+   "q": "Escribes <code>predecir(imagen)</code> para tu modelo guardado. La función recibe una imagen de 8×8 con valores de 0 a 16 y devuelve probabilidades casi siempre absurdas. ¿Cuál es la causa más probable?",
+   "opciones": [
+    "La imagen no pasa por el mismo preprocesado que se usó en el entrenamiento (ampliación a 32×32, escala 0 a 255, tres canales)",
+    "Guardar el modelo en formato .keras estropea los pesos",
+    "<code>predict()</code> solo funciona con lotes de más de 32 imágenes",
+    "El modelo debe recompilarse tras cargarlo para que prediga"
+   ],
+   "correcta": 0,
+   "porque": "El modelo espera exactamente lo que vio al entrenar: forma (32, 32, 3) y píxeles entre 0 y 255 (su capa <code>Rescaling</code> lo lleva a −1…1). Si le das otra forma o otra escala, o falla con un error de forma o, peor, funciona sin error y da basura. Guardar en .keras conserva los pesos (el fragmento comprueba que las probabilidades salen iguales) y cargar para predecir no exige recompilar."
+  },
+  {
+   "q": "Quieres que la red devuelva «no estoy seguro» cuando dude. ¿Qué es lo más razonable?",
+   "opciones": [
+    "Devolver siempre la clase con mayor probabilidad: es lo que hace <code>argmax</code>",
+    "Dividir las probabilidades entre dos para que sean más prudentes",
+    "Aplicar un umbral a la probabilidad máxima (por ejemplo 0,6) y, si no lo supera, no dar clase; ajustar el umbral con datos de validación, sabiendo que una red puede equivocarse con mucha confianza",
+    "Entrenar más épocas hasta que las probabilidades sean siempre 1"
+   ],
+   "correcta": 2,
+   "porque": "La probabilidad máxima de un <code>softmax</code> es una señal útil pero no perfecta: sirve para descartar casos dudosos, y el umbral sale del equilibrio entre rechazar demasiado (menos errores, más respuestas vacías) y rechazar poco. Aun así, una red puede dar un 0,95 a una imagen que no tiene nada que ver con sus clases; el umbral no sustituye a comprobar los errores. Dividir probabilidades las rompe (ya no suman 1) y entrenar más no garantiza confianzas fiables."
+  },
+  {
+   "q": "La pérdida se queda en el nivel de «predecir la media» y no baja, con cualquier learning rate. ¿Qué compruebas primero?",
+   "opciones": [
+    "Que los datos y las etiquetas estén alineados (la fila 0 tiene la etiqueta que debe)",
+    "Añadir más capas a la red",
+    "Cambiar el optimizador por otro más moderno",
+    "Entrenar el doble de épocas"
+   ],
+   "correcta": 0,
+   "porque": "Si el modelo no aprende nada, lo probable es que no haya nada que aprender: etiquetas barajadas por separado o un fallo en la tubería de datos. Primero lo aburrido: datos, tubería, entrenamiento y, al final, la arquitectura."
+  }
+ ]
+}
+</script>
+</section>
+
+
+<details class="profundizar">
+  <summary><span>Profundizar: la explicación completa<small>Los cuatro casos y sus fórmulas, la matriz del 8 completa, el análisis de errores, guardar y predecir() paso a paso, la tabla de errores típicos con su demo, la checklist interactiva, el cierre del Curso 3 y el resumen de todo el módulo.</small></span></summary>
+  <div class="prof-body">
+<h2 id="evaluar">Evaluar de verdad: matriz de confusión y análisis de errores</h2>
+
+<p class="pregunta">Imagina que el etiquetador de géneros de Netflix acierta el 88 % de las carátulas del test. ¿Es suficiente? ¿Acierta igual en todos los géneros, o hay alguno (terror, comedia…) que se le da fatal y el promedio lo esconde? (En nuestro proyecto, los «géneros» son las cifras 5 a 9.)</p>
+
+<div class="callout analogia">
+  <span class="lbl">Analogía</span>
+  <p>Decir que el etiquetador de Netflix acierta el 88 % no dice si confunde thrillers con terror o comedias con dramas. La <strong>matriz de confusión</strong> es el informe que sí lo dice: una tabla donde cada fila es lo que la carátula era de verdad y cada columna lo que el modelo dijo. Mirándola ves <strong>qué géneros se fallan más y con cuáles se confunden</strong>.</p>
+</div>
+
+<h3>Los cuatro casos de una clase</h3>
+<p>Para una clase concreta (por ejemplo, «Netflix avisa a un usuario de que un estreno le va a gustar») hay cuatro posibilidades:</p>
+<ul>
+  <li><strong>TP</strong> (verdadero positivo): avisó y a la persona le gustó.</li>
+  <li><strong>FP</strong> (falso positivo): avisó y no le gustó (falsa alarma).</li>
+  <li><strong>FN</strong> (falso negativo): no avisó y le habría encantado (se escapó).</li>
+  <li><strong>TN</strong> (verdadero negativo): no avisó y tampoco le gustaba.</li>
+</ul>
+<p>Con ellos se definen las métricas que más se usan:</p>
+<div class="formula">\[ \text{precisión}=\frac{TP}{TP+FP} \qquad \text{exhaustividad}=\frac{TP}{TP+FN} \qquad F_1=\frac{2\cdot\text{precisión}\cdot\text{exhaustividad}}{\text{precisión}+\text{exhaustividad}} \]</div>
+<p>La <strong>precisión</strong> responde a «de las que marco como X, ¿cuántas lo son?» (de los avisos que mandas, ¿a cuántos les gusta de verdad?); la <strong>exhaustividad</strong> (<em>recall</em>) a «de las X que hay, ¿cuántas encuentro?» (de las películas que le gustarían, ¿de cuántas le avisas?); el <strong>F1</strong> es la media armónica de ambas: solo es alto si las dos lo son. La <strong>exactitud</strong> (<em>accuracy</em>) es la fracción total de aciertos, \( (TP+TN)/N \).</p>
+
+<div class="callout recuerda">
+  <span class="lbl">Experimento de arriba: «Umbral de decisión y matriz de confusión», con todo detalle</span>
+  <p><strong>Haz esto.</strong> Son 600 películas; el modelo da a cada una la probabilidad de que le guste a un usuario y Netflix le avisa si pasa del umbral. En la matriz, las filas son lo que pasa de verdad (le gusta o no) y las columnas lo que hace Netflix (avisa o no). Arrastra la línea vertical sobre el histograma (o usa el deslizador de umbral): mira cómo cambian los cuatro cuadros y las métricas. Baja las películas que le gustan al 5 % y pulsa «Poner el umbral que maximiza F1». Después reduce la separación de las clases a 0,5.</p>
+  <p><strong>Fíjate en.</strong> Un umbral bajo avisa de casi todo el catálogo: no se escapa ninguna película que le guste (exhaustividad alta) pero hay muchas falsas alarmas (precisión baja). Un umbral alto hace lo contrario: avisa de pocas y casi todas aciertan, pero se te escapan muchas que le habrían encantado. <strong>No existe un umbral «correcto» en abstracto</strong>: depende de qué es peor, un aviso inútil o un estreno perdido. Si solo le gusta una de cada veinte, la exactitud engaña: el modelo «no avisar nunca» ya tiene una exactitud altísima y no encuentra nada.</p>
+</div>
+
+<h3>Una matriz de varias clases, a mano</h3>
+<p>Con cinco cifras la matriz es de 5 × 5. Cada fila suma las imágenes reales de esa cifra; la diagonal son los aciertos. Estas son las filas de las cifras 8 y 9 del modelo final (resultado del <a href="#frag-20">fragmento 20</a>) y las cuentas que salen de ellas:</p>
+
+<div class="callout ejemplo">
+  <span class="lbl">Ejemplo numérico · precisión y exhaustividad de la cifra 8</span>
+  <table>
+    <thead><tr><th></th><th>pred 5</th><th>pred 6</th><th>pred 7</th><th>pred 8</th><th>pred 9</th><th>suma</th></tr></thead>
+    <tbody>
+      <tr><th scope="row">real 8</th><td>20</td><td>1</td><td>7</td><td><strong>78</strong></td><td>39</td><td>145</td></tr>
+      <tr><th scope="row">otras cifras que el modelo llamó «8»</th><td colspan="5">ninguna de las cifras 5, 6, 7 ni 9</td><td>0</td></tr>
+    </tbody>
+  </table>
+  <ol class="pasos">
+    <li><strong>TP</strong> = 78 (imágenes de un 8 que se clasificaron como 8).</li>
+    <li><strong>FN</strong> = 20 + 1 + 7 + 39 = <strong>67</strong> (un 8 que se tomó por otra cifra).</li>
+    <li><strong>FP</strong> = 0 (ninguna otra cifra se clasificó como 8).</li>
+    <li>Precisión = 78 / (78 + 0) = <strong>1,000</strong>. Exhaustividad = 78 / (78 + 67) = 78 / 145 = <strong>0,538</strong>.</li>
+    <li>F1 = 2 · 1 · 0,538 / (1 + 0,538) = <strong>0,700</strong>.</li>
+  </ol>
+  <p>Cuando el modelo dice «8», casi siempre acierta; pero <strong>deja escapar casi la mitad de los 8 reales</strong> (67 de 145). La exactitud global (88 %) no deja ver este contraste. Es como un etiquetador que, cuando dice «comedia», casi siempre acierta, pero deja sin etiquetar casi la mitad de las comedias.</p>
+</div>
+
+<h3>Lo que muestra el análisis de errores</h3>
+<p>El <a href="#frag-20">fragmento 20</a> saca el informe completo (<code>classification_report</code>) y las tres confusiones más frecuentes. Lo que cuenta:</p>
+<ul>
+  <li>El 8 se toma por un <strong>9 (39 veces)</strong> y por un <strong>5 (20 veces)</strong>. Tiene sentido: el 8 comparte con el 9 el bucle superior y con el 5 buena parte del trazo. Y recuerda de dónde viene la base: se entrenó con las cifras 0 a 4, <strong>que no tienen ningún 8</strong>. Sus características congeladas no «conocen» la forma cerrada del 8 que lo separa de un 9.</li>
+  <li>Las demás cifras van bien: el 5, el 6 y el 7 tienen una exhaustividad de 0,974, 0,974 y 1,000, y el 9 de 0,913 (aunque con una precisión de 0,761 porque recibe los 8 mal clasificados). El fallo está concentrado en una cifra.</li>
+  <li>La <strong>confianza</strong> media del modelo es 0,96 cuando acierta y 0,73 cuando se equivoca: no sabe con certeza cuándo falla, pero duda más. Eso es lo que aprovechará el umbral de <code>predecir()</code>.</li>
+</ul>
+<p>Esa información dice qué hacer a continuación: conseguir más ejemplos de 8 (que es lo que falta) o descongelar más capas de la base para que aprenda esa forma. Mejorar «a ciegas» (más épocas, otra arquitectura) sin haber mirado los errores sería disparar en la oscuridad.</p>
+
+<div class="callout ojo">
+  <span class="lbl">Ojo · el test se mira una vez, con la decisión ya tomada</span>
+  <p>Todo lo que has decidido (fases, learning rates, qué bloques descongelar) debe decidirse con la <strong>validación</strong>. Este análisis y las cifras del test son el informe final. Si, tras ver la matriz del test, cambias algo y vuelves a mirar el test, el test ha pasado a ser validación y ya no vale como examen final. En los fragmentos de este módulo se imprimen cifras de test para que veas el efecto de cada decisión, pero en un proyecto real las decisiones se toman con la validación.</p>
+</div>
+
+<h2 id="despliegue">Guardar el modelo y escribir <code>predecir()</code></h2>
+
+<p class="pregunta">Has entrenado un modelo en un cuaderno. Mañana otra persona (u otro programa) quiere pasarle una imagen y que le diga qué cifra es (como si la app de Netflix subiera una carátula nueva y pidiera su género), sin reentrenar nada. ¿Qué hay que guardar y qué hay que escribir?</p>
+
+<h3>Guardar en formato <code>.keras</code></h3>
+<p><code>modelo.save("archivo.keras")</code> guarda en un solo archivo la <strong>arquitectura</strong> (cómo están conectadas las capas), los <strong>pesos</strong> y la configuración de entrenamiento. <code>keras.models.load_model</code> lo reconstruye. Para comprobar que se guardó bien no basta con que el archivo exista: el <a href="#frag-21">fragmento 21</a> vuelve a cargarlo y comprueba que produce <strong>las mismas probabilidades</strong> que el original sobre las 746 imágenes del test.</p>
+
+<h3>La función <code>predecir()</code> y su trampa principal</h3>
+<p>El modelo espera exactamente el tipo de entrada con el que se entrenó: imágenes de 32 × 32 × 3 con valores de 0 a 255 y un eje extra de lote. Quien lo use mañana quizá tenga una imagen de 8 × 8 con valores de 0 a 16 (como las de <code>load_digits</code>). La función <code>predecir</code> hace la traducción:</p>
+<ol>
+  <li>Si la imagen es de 8 × 8, la divide entre 16, la amplía ×4 y la pasa a 0–255, <strong>igual que en el entrenamiento</strong>.</li>
+  <li>Añade el canal (32 × 32 → 32 × 32 × 3) y el eje del lote (→ 1 × 32 × 32 × 3).</li>
+  <li>Llama a <code>predict</code> y se queda con las tres clases más probables.</li>
+  <li>Si la probabilidad máxima no llega a un <strong>umbral de confianza</strong> (0,6), responde «no estoy seguro» en lugar de inventarse una clase.</li>
+</ol>
+
+<div class="callout ojo">
+  <span class="lbl">Ojo · el preprocesado es parte del modelo</span>
+  <p>El error más frecuente al desplegar no está en la red, sino en que <strong>los datos de producción pasan por un preprocesado distinto</strong> del de entrenamiento: otra escala (0–1 en vez de 0–255), otro orden de canales, otro tamaño. El modelo no dará error; dará basura con aspecto de respuesta. Por eso conviene meter lo que se pueda dentro del propio modelo (aquí, la capa <code>Rescaling</code>) y probar <code>predecir</code> con casos de los que conoces la respuesta.</p>
+</div>
+
+<div class="callout recuerda">
+  <span class="lbl">Experimento de arriba: «Un predecir() con umbral de confianza», con todo detalle</span>
+  <p><strong>Haz esto.</strong> Carga un «7» de ejemplo y lee la cadena de formas. Sube el umbral hasta el 95 %: ¿sigue respondiendo? Carga ahora un «8»: el clasificador duda y responde «no estoy seguro». Baja el umbral al 50 % y mira que ya contesta. Después pulsa «Añadir ruido» varias veces y observa cómo cambian la confianza y la respuesta. Por último, borra todo y pinta algo que no sea un dígito.</p>
+  <p><strong>Fíjate en.</strong> Este es un clasificador de juguete sobre las diez cifras (no el modelo del proyecto, que solo distingue 5–9), pero la mecánica de <code>predecir()</code> es idéntica: los mismos pasos de preprocesado, un vector de probabilidades que suma 100 % y una decisión con umbral. Un 7 limpio sale con un 90 % de confianza, y el ruido la hace bajar y subir. El 8 queda en un 53 %: justo por debajo del umbral del 60 %. <strong>El umbral decide entre contestar y abstenerse</strong>: con uno alto contestas menos veces y te equivocas menos; con uno bajo contestas siempre y te equivocas más. Y no es una garantía: una red puede equivocarse con mucha confianza, así que el umbral reduce los errores pero no los elimina.</p>
+</div>
+
+<p>El <a href="#frag-21">fragmento 21</a> prueba <code>predecir</code> con dos entradas: una imagen de 8 × 8 que sale del propio test (la reduce, como si viniera de un sensor) y una imagen completamente negra, que no es ninguna cifra. La primera se reconoce como un 7 con 0,993 de confianza; la segunda recibe una probabilidad máxima de solo 0,585, por debajo del umbral de 0,6, y la función responde <code>«no estoy seguro»</code>. Fíjate en lo ajustado: 0,585 frente a 0,6. Con un umbral de 0,5 habría contestado «5» con total aplomo, y habría sido una respuesta absurda.</p>
+
+<h2 id="errores">Errores típicos de un proyecto de Deep Learning</h2>
+
+<p class="pregunta">Cuando algo va mal, ¿cómo distingues un fallo del modelo de un fallo de los datos, del código o de la forma de evaluar? Casi todos los fallos de un proyecto dejan una huella reconocible en las curvas o en las cifras.</p>
+
+<figure class="demo" data-demo="curso3/c3m7-errores" data-titulo="Rompe el entrenamiento y reconoce la huella">
+  <div class="haz">Empieza en «Todo bien» y observa la curva. Pulsa «Sin escalar»: explota. Baja entonces el learning rate a 0,0001 y comprueba que ya no explota pero apenas avanza. Prueba «lr muy alto», «lr muy bajo» y «Notas desalineadas» (las películas y lo que ve cada usuario se barajan por separado). Los datos son películas con su duración y su antigüedad, y se predicen los minutos que ve un usuario.</div>
+  <div class="observa">Cada fallo tiene una huella distinta. <strong>Explota</strong>: learning rate demasiado grande para la escala de los datos. <strong>Casi plana desde el principio</strong>: learning rate demasiado pequeño. <strong>Se queda en 1</strong> (el nivel de predecir la media): el modelo no tiene nada que aprender, y eso apunta a los datos (la nota de Titanic acaba en la fila de Matrix), no a la arquitectura. Con las variables sin escalar, ningún learning rate sirve bien a las dos columnas a la vez.</div>
+</figure>
+
+<table>
+  <thead><tr><th>Síntoma</th><th>Causa probable</th><th>Qué hacer</th></tr></thead>
+  <tbody>
+    <tr><th scope="row">Resultados «demasiado buenos» en validación cruzada</th><td>Fuga de datos: algo se ajustó con todos los datos antes de repartir (escalar, elegir variables, codificar el target)</td><td>Todo lo que tiene <code>fit</code> va dentro de un <code>Pipeline</code> o se ajusta solo con el train (<a href="leccion-2.html#fuga">sección sobre fugas</a>)</td></tr>
+    <tr><th scope="row">Train muy bueno, validación mucho peor; la validación sube mientras train baja</th><td>Sobreajuste</td><td>Más datos o <em>augmentation</em>, Dropout, L2, red más pequeña, <code>EarlyStopping</code></td></tr>
+    <tr><th scope="row">Las dos curvas altas y planas</th><td>Infraajuste o learning rate demasiado bajo</td><td>Más capacidad, más épocas, subir el learning rate, revisar el escalado</td></tr>
+    <tr><th scope="row"><code>loss = nan</code> o pérdida que explota</th><td>Learning rate demasiado alto, variables sin escalar, objetivo con valores enormes</td><td>Escalar entradas y objetivo, bajar el learning rate, recortar gradientes (<code>clipnorm</code>, <a href="../modulo-5.html">módulo 5</a>)</td></tr>
+    <tr><th scope="row">La pérdida se queda en el nivel de «predecir la media» y no baja</th><td>Datos y etiquetas desalineados (barajar mal), características sin información, error en la tubería de datos</td><td>Comprobar a mano que la fila 0 tiene la etiqueta que debe; probar con un conjunto diminuto que la red sea capaz de memorizar</td></tr>
+    <tr><th scope="row">Exactitud de train alta y de validación igual al azar (0,20 con 5 clases) <em>solo en inferencia</em></th><td>Medias móviles de BatchNorm sin converger (<code>momentum</code> alto con pocos pasos de entrenamiento)</td><td>Entrenar más pasos, bajar <code>momentum</code> (0,99 en lugar de 0,999) o evaluar con más datos de calibración (<a href="#frag-16">fragmento 16</a>)</td></tr>
+    <tr><th scope="row"><code>ValueError: dtype='string' is not a valid dtype</code> al hacer <code>compile</code></th><td>Se pasaron las métricas como <strong>tercer argumento posicional</strong>: en Keras el tercero es <code>loss_weights</code>, no <code>metrics</code></td><td>Escribe siempre <code>metrics=["accuracy"]</code> con su nombre</td></tr>
+    <tr><th scope="row">Descongelas la base y los resultados no cambian</th><td>No se recompiló, o se descongeló mal (capa a capa frente a <code>base.trainable</code>)</td><td>Recompilar siempre tras cambiar <code>trainable</code>; poner <code>base.trainable = True</code> primero y luego ajustar capa a capa (<a href="leccion-7.html#frag-18">fragmento 18</a>)</td></tr>
+    <tr><th scope="row">El fine-tuning estropea lo que la cabeza ya había aprendido</th><td>Learning rate demasiado alto en la fase 2, o cabeza inicializada al azar descongelando a la vez</td><td>Dos fases: primero la cabeza, luego la base con learning rate 10 a 100 veces menor (<a href="#frag-22">fragmento 22</a>)</td></tr>
+    <tr><th scope="row"><code>ImportError … 'ImageDataGenerator'</code></th><td>Keras 3 ya no lo trae en <code>keras.preprocessing.image</code></td><td><code>image_dataset_from_directory</code> y capas de preprocesado (<a href="../../curso-2/modulo-5.html">Curso 2, módulo 5</a>)</td></tr>
+    <tr><th scope="row">La exactitud es 95 % y el modelo no sirve</th><td>Clases desequilibradas: «predecir siempre la mayoritaria» ya da 95 % (si solo el 5 % de los usuarios cancela Netflix, «nadie cancela» ya acierta el 95 %)</td><td>Comparar con el baseline de la clase mayoritaria; matriz de confusión, precisión, exhaustividad y F1</td></tr>
+    <tr><th scope="row">En producción rinde mucho peor que en el test</th><td>Preprocesado distinto al del entrenamiento, datos que han cambiado, test reutilizado muchas veces</td><td>Empaquetar el preprocesado con el modelo; función <code>predecir()</code> probada con los mismos ejemplos; vigilar el modelo en uso</td></tr>
+    <tr><th scope="row">Una serie temporal sale casi perfecta</th><td>Reparto al azar: el modelo ha visto el futuro</td><td>Repartir por tiempo: pasado para entrenar, futuro para validar y probar</td></tr>
+  </tbody>
+</table>
+
+<div class="callout regla">
+  <span class="lbl">Regla fácil · primero lo aburrido</span>
+  <p>Cuando un modelo falla, comprueba por este orden: <strong>(1) los datos</strong> (¿están alineados? ¿escalados? ¿el reparto es honesto?), <strong>(2) la tubería</strong> (formas, tipos, preprocesado igual en entrenamiento y en predicción), <strong>(3) el entrenamiento</strong> (learning rate, curvas) y solo al final <strong>(4) la arquitectura</strong>. En la práctica, la inmensa mayoría de los problemas están en los tres primeros.</p>
+</div>
+
+<h2 id="checklist">Qué hacer ante un problema nuevo: la checklist</h2>
+
+<p class="pregunta">Dentro de un mes Netflix te da un conjunto de datos que nunca has visto (reseñas, carátulas, visionados día a día…). No hay un módulo del curso que se llame igual. ¿Cuál es tu primer paso, el segundo y el décimo?</p>
+
+<p>No hay una receta única, pero sí un orden que evita casi todas las trampas de este módulo. Pruébalo en la herramienta de abajo: elige el tipo de datos, cuántas etiquetas tienes y qué predices, y te devuelve el orden de trabajo, los baselines adecuados y los avisos propios de tu caso. Marca los pasos según los vayas haciendo.</p>
+
+<figure class="demo" data-demo="curso3/c3m7-checklist" data-titulo="Tu checklist para un problema nuevo">
+  <div class="haz">Piensa en un problema de Netflix para cada caso (una ficha por película, sus carátulas, el visionado día a día). Prueba tres combinaciones: «Tabla · pocos datos · número», «Imágenes · pocos datos · categoría» y «Serie temporal · bastantes datos · número». Fíjate en cómo cambia el segundo y el tercer paso. Marca los pasos que ya hayas hecho y mira cómo avanza la barra.</div>
+  <div class="observa">Los pasos generales no cambian: <strong>decidir la métrica, repartir antes de mirar, empezar por un baseline, evaluar el test una sola vez</strong>. Lo que cambia es qué baselines pruebas, qué modelo merece la pena y de qué trampa te avisa la herramienta. Con pocos datos tabulares la recomendación es desconfiar de la red; con pocas imágenes, usar transfer learning; con series, repartir por el tiempo.</div>
+</figure>
+
+<h3>La versión corta, para pegar en la pared</h3>
+<div class="cards">
+  <div class="card"><h4>Antes de modelar</h4><p>¿Qué decisión se toma con la predicción? ¿Cómo se mide el éxito? <strong>Reparto en tres antes de mirar</strong>; el test se guarda. Mira los datos: huecos, rangos, desbalance, duplicados.</p></div>
+  <div class="card"><h4>Primero lo simple</h4><p><strong>Baseline tonto</strong> (media o clase mayoritaria), <strong>modelo lineal</strong> y un <strong>random forest</strong> (tablas). Para imágenes y texto, un modelo preentrenado. Si lo simple basta, para.</p></div>
+  <div class="card"><h4>El modelo</h4><p>Preprocesado <strong>dentro del flujo</strong>, sin fugas. Red pequeña con la API funcional; <code>EarlyStopping</code> y <code>ReduceLROnPlateau</code>; curvas a la vista. Después Keras Tuner, con presupuesto razonable.</p></div>
+  <div class="card"><h4>Evaluar con honestidad</h4><p>Compara con los baselines con <strong>varias semillas</strong>. Test <strong>una sola vez</strong>. Matriz de confusión y errores uno a uno. Ten el hábito de preguntar «¿y si fuera suerte?».</p></div>
+  <div class="card"><h4>Entregar</h4><p>Guarda en <code>.keras</code>, recárgalo y comprueba que predice igual. Una función <code>predecir()</code> con el <strong>mismo preprocesado</strong>, un umbral de confianza y un mensaje cuando no se sabe. Documenta y vigila el modelo en uso.</p></div>
+</div>
+
+<div class="callout regla">
+  <span class="lbl">Regla fácil · las tres preguntas que valen más que cualquier arquitectura</span>
+  <p>(1) <strong>¿Contra qué estoy comparando?</strong> Sin baseline, una cifra no significa nada. (2) <strong>¿Podría ser suerte o trampa?</strong> Varias semillas, test único, preprocesado sin fugas. (3) <strong>¿Qué haría con este modelo en la vida real?</strong> Si no cambia ninguna decisión, no hace falta entrenarlo.</p>
+</div>
+
+<h2 id="cierre-curso">Cierre del Curso 3: lo que has construido</h2>
+
+<p>Este módulo cierra el curso <em>Deep Learning con Keras y TensorFlow</em>. Mira la secuencia completa y cómo cada pieza ha entrado en este proyecto:</p>
+
+<table>
+  <thead><tr><th>Módulo</th><th>Lo que aprendiste</th><th>Dónde lo has usado hoy</th></tr></thead>
+  <tbody>
+    <tr><th scope="row"><a href="../modulo-1.html">1 · Funcionalidades avanzadas de Keras</a></th><td>Tensores, <code>GradientTape</code>, <code>tf.function</code>, API funcional y de subclases, capas y modelos propios, guardado</td><td><code>construir_modelo</code> con la API funcional, modelos anidados (base + cabeza), guardar y recargar en <code>.keras</code></td></tr>
+    <tr><th scope="row"><a href="../modulo-2.html">2 · CNN avanzadas</a></th><td>Arquitecturas, data augmentation, transfer learning bien hecho, convolución transpuesta</td><td>Base convolucional con BatchNorm, capas de aumento, las dos fases del transfer learning</td></tr>
+    <tr><th scope="row"><a href="../modulo-3.html">3 · Transformers en Keras</a></th><td>Atención, atención multi-cabeza, codificación posicional, series temporales y generación de texto</td><td>La receta de la checklist para series y texto (repartir por tiempo, modelo preentrenado)</td></tr>
+    <tr><th scope="row"><a href="../modulo-4.html">4 · Aprendizaje no supervisado y modelos generativos</a></th><td>Autoencoders variacionales, difusión y GANs</td><td>Aquí no han hecho falta: no todo problema es generativo, y saber elegir la herramienta es parte del oficio</td></tr>
+    <tr><th scope="row"><a href="../modulo-5.html">5 · Técnicas avanzadas de Keras</a></th><td>Bucles propios, callbacks, Keras Tuner, optimizadores y regularización</td><td><code>EarlyStopping</code>, <code>ReduceLROnPlateau</code>, <code>ModelCheckpoint</code>, <code>RandomSearch</code>, learning rate bajo en el fine-tuning</td></tr>
+    <tr><th scope="row"><a href="../modulo-6.html">6 · Aprendizaje por refuerzo</a></th><td>Agente, recompensa, Q-learning, Bellman y DQN</td><td>Otro tipo de problema, sin conjunto de datos fijo: la checklist sigue valiendo para el «contra qué comparo» y el «cómo mido»</td></tr>
+  </tbody>
+</table>
+
+<p>La lección de fondo del curso, y de este proyecto, es que <strong>el modelo es la parte fácil</strong>. Lo difícil es formular bien el problema, repartir los datos sin hacer trampas, tener una referencia honesta, leer las curvas, aceptar que a veces la red no gana y comprobar que lo que has entrenado funciona fuera de tu ordenador. Con esas costumbres, las arquitecturas nuevas que vayan apareciendo son variaciones de lo que ya sabes hacer.</p>
+
+<h2 class="sin-num" id="resumen-modulo">Resumen del módulo</h2>
+<ul>
+  <li><strong>Las ideas con Netflix</strong>: el baseline es «recomendar a todos la película más vista»; la fuga de datos, ojear el final de la serie antes de predecirlo; la validación son los pases de prueba y el test, el estreno (una sola vez); L2 evita que un solo rasgo (el actor) lo decida todo; el transfer learning es fichar a quien ya clasifica carátulas; la matriz de confusión dice qué géneros se confunden. Las cifras de los fragmentos, en cambio, son las de los pisos y los dígitos ejecutados.</li>
+  <li><strong>Orden de un proyecto</strong>: problema y métrica → reparto en train / validación / test → preprocesado ajustado solo con el train → baselines → modelo → entrenar con callbacks → ajustar hiperparámetros con la validación → test <em>una sola vez</em> → guardar y <code>predecir()</code>.</li>
+  <li><strong>Fuga de datos</strong>: todo lo que se aprende de los datos (media, mediana, categorías, columnas elegidas) es parte del modelo y debe ajustarse solo con el train. Elegir variables antes de repartir convierte ruido puro en un acierto del 83 %. <code>ColumnTransformer</code> con <code>SimpleImputer</code>, <code>StandardScaler</code> y <code>OneHotEncoder(handle_unknown="ignore")</code> dentro de un <code>Pipeline</code> lo evita.</li>
+  <li><strong>Métricas de regresión</strong>: \( \text{MAE}=\tfrac1n\sum|e_i| \), \( \text{RMSE}=\sqrt{\tfrac1n\sum e_i^2} \), \( R^2=1-\text{SSE}/\text{SST} \) (negativo si el modelo es peor que predecir la media). Un número solo vale comparado con un baseline: la media, una regresión lineal, un random forest.</li>
+  <li><strong>Red de regresión</strong>: API funcional con bloques <code>Dense → BatchNormalization → ReLU → Dropout</code> y L2. La BatchNorm tiene 4 parámetros por neurona (2 entrenables y 2 que no se entrenan por gradiente). <code>EarlyStopping(restore_best_weights=True)</code>, <code>ReduceLROnPlateau</code> y <code>ModelCheckpoint</code> vigilan el entrenamiento; las curvas de entrenamiento y validación diagnostican sobreajuste e infraajuste.</li>
+  <li><strong>Keras Tuner</strong>: <code>build_model(hp)</code> con <code>hp.Int</code> y <code>hp.Float(..., sampling="log")</code>; <code>RandomSearch</code> suele explorar mejor que una cuadrícula con el mismo presupuesto. El mejor valor de validación del tuner es optimista: la cifra real sale del test.</li>
+  <li><strong>¿Gana la red?</strong> Se decide con varias semillas y el mismo reparto. En los pisos sintéticos (efectos multiplicativos) la red gana al random forest y claramente a la regresión lineal; en la tabla de diabetes (442 filas, casi lineal) no gana a la lineal. La red es una herramienta, no una obligación.</li>
+  <li><strong>Transfer learning en dos fases</strong>: (1) base congelada y cabeza nueva con learning rate normal; (2) descongelar los últimos bloques, <strong>recompilar</strong> y afinar con un learning rate 10 a 100 veces menor. La base se llama con <code>training=False</code> para que sus BatchNorm no se contaminen. Keras 3: <code>base.trainable = True</code> primero y después el bucle por capas.</li>
+  <li><strong>Aumento de datos</strong>: solo transformaciones que conserven la etiqueta (con dígitos, ni espejo ni giros grandes). Solo actúa con <code>training=True</code>; <code>ImageDataGenerator</code> se sustituye por capas <code>Random…</code> y <code>image_dataset_from_directory</code>.</li>
+  <li><strong>Evaluar un clasificador</strong>: matriz de confusión, precisión \( TP/(TP+FP) \), exhaustividad \( TP/(TP+FN) \) y F1 por clase; la exactitud global esconde las clases que fallan. El análisis de errores dice qué mejorar. Con 75 imágenes y una base pequeña, el transfer learning no ganó en media a entrenar desde cero, aunque sí fue más estable: hay que medirlo siempre.</li>
+  <li><strong>Despliegue</strong>: <code>modelo.save("x.keras")</code> y comprobar que al recargarlo da las mismas probabilidades; <code>predecir()</code> aplica el <strong>mismo preprocesado</strong> que el entrenamiento y puede devolver «no estoy seguro» con un umbral de confianza.</li>
+  <li><strong>Ante un problema nuevo</strong>: pregunta qué se decide y cómo se mide, reparte antes de mirar, empieza por un baseline, pon a prueba el modelo con varias semillas, lee las curvas, mira los errores y guarda el preprocesado junto al modelo. La checklist de este módulo lo resume.</li>
+</ul>
+<p><strong>Has terminado el Curso 3.</strong> Este es el último módulo: no hay uno siguiente. Vuelve a la <a href="../index.html">página del Curso 3</a> para repasar cualquier módulo, o regresa al <a href="../../index.html">índice del cuaderno</a> si quieres elegir otro curso.</p>
+  </div>
+</details>
+
+
+<section>
+<h2 class="sin-num">Código</h2>
+<article class="snippet" data-lang="python" id="frag-20">
+  <header>
+    <h3>20 · Evaluar de verdad: matriz de confusión, precisión, exhaustividad y errores</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Pasar el test de la tarea B por el modelo final, construir la matriz de confusión, sacar precisión, exhaustividad y F1 por clase, localizar las confusiones más frecuentes y comparar la confianza de los aciertos con la de los errores. Continúa el fragmento 18 (usa <code>modelo_final</code>).</p>
+  </header>
+  <pre class="code"><code>from sklearn.metrics import confusion_matrix, classification_report
+
+probs = modelo_final.predict(XB_test, verbose=0)
+pred = probs.argmax(axis=1)
+nombres = [str(c) for c in range(5, 10)]
+cm = confusion_matrix(yB_test, pred)
+print(pd.DataFrame(cm, index=["real " + n for n in nombres], columns=["pred " + n for n in nombres]).to_string())
+print(classification_report(yB_test, pred, target_names=nombres, digits=3))
+
+fuera = cm.copy()
+np.fill_diagonal(fuera, 0)
+orden = np.dstack(np.unravel_index(np.argsort(-fuera, axis=None), fuera.shape))[0][:3]
+for real_, pred_ in orden:
+    print(f"confunde {nombres[real_]} con {nombres[pred_]}: {fuera[real_, pred_]} veces")
+confianza = probs.max(axis=1)
+print(f"confianza media: aciertos {confianza[pred == yB_test].mean():.2f} | errores {confianza[pred != yB_test].mean():.2f}")</code></pre>
+  <details class="linea-a-linea">
+    <summary>Línea por línea</summary>
+    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+      <tbody>
+        <tr data-lines="1"><td><code>from sklearn.metrics import confusion_matrix, classific…</code></td><td>Importa <code>confusion_matrix</code> y <code>classification_report</code> de scikit-learn.</td></tr>
+        <tr data-lines="3-4"><td><code>probs = modelo_final.predict(XB_test, verbose=0) …</code></td><td><code>predict</code> devuelve una fila de 5 probabilidades por imagen; <code>argmax(axis=1)</code> se queda con la clase más probable de cada una.</td></tr>
+        <tr data-lines="5"><td><code>nombres = [str(c) for c in range(5, 10)]</code></td><td>Los nombres de las clases: las cifras 5 a 9 (recuerda que restamos 5 a las etiquetas).</td></tr>
+        <tr data-lines="6-7"><td><code>cm = confusion_matrix(yB_test, pred) …</code></td><td><code>confusion_matrix(real, predicho)</code> cuenta, en cada fila (cifra real), cuántas veces se predijo cada columna. Se imprime como tabla de pandas con etiquetas legibles.</td></tr>
+        <tr data-lines="8"><td><code>print(classification_report(yB_test, pred, target_names…</code></td><td><code>classification_report</code> calcula por clase la precisión (de las que marco como X, cuántas lo son), la exhaustividad o <em>recall</em> (de las X reales, cuántas encuentro) y el F1 (su media armónica).</td></tr>
+        <tr data-lines="10-11"><td><code>fuera = cm.copy() …</code></td><td>Copia la matriz y pone a 0 su diagonal para quedarse solo con los errores.</td></tr>
+        <tr data-lines="12"><td><code>orden = np.dstack(np.unravel_index(np.argsort(-fuera, a…</code></td><td>Ordena de mayor a menor las celdas de error (<code>argsort</code> de los negativos) y se queda con las coordenadas de las tres primeras.</td></tr>
+        <tr data-lines="13-14"><td><code>for real_, pred_ in orden: …</code></td><td>Imprime esas tres confusiones: qué cifra real se tomó por cuál y cuántas veces.</td></tr>
+        <tr data-lines="15"><td><code>confianza = probs.max(axis=1)</code></td><td>La confianza de cada imagen es la probabilidad máxima que dio el modelo.</td></tr>
+        <tr data-lines="16"><td><code>print(f"confianza media: aciertos {confianza[pred == yB…</code></td><td>Compara la confianza media de los aciertos con la de los errores. Si fuera parecida, el modelo no sabría cuándo se equivoca.</td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>        pred 5  pred 6  pred 7  pred 8  pred 9
+real 5     147       0       0       0       4
+real 6       4     147       0       0       0
+real 7       0       0     149       0       0
+real 8      20       1       7      78      39
+real 9       3       0      10       0     137
+              precision    recall  f1-score   support
+
+           5      0.845     0.974     0.905       151
+           6      0.993     0.974     0.983       151
+           7      0.898     1.000     0.946       149
+           8      1.000     0.538     0.700       145
+           9      0.761     0.913     0.830       150
+
+    accuracy                          0.882       746
+   macro avg      0.899     0.880     0.873       746
+weighted avg      0.899     0.882     0.874       746
+
+confunde 8 con 9: 39 veces
+confunde 8 con 5: 20 veces
+confunde 9 con 7: 10 veces
+confianza media: aciertos 0.96 | errores 0.73</pre>
+    <p>El modelo acierta el 88,2 % del test (0,882). La matriz muestra <strong>dónde</strong>: las cifras 5, 6 y 7 se reconocen casi siempre (exhaustividad 0,974, 0,974 y 1,000), la 9 bastante bien (0,913), pero el <strong>8 solo se reconoce el 53,8 %</strong> de las veces (78 de 145): se confunde con un 9 en 39 ocasiones y con un 5 en 20. Su precisión es perfecta (1,000): cuando dice «8» acierta siempre, pero dice «8» pocas veces. La confianza media del modelo es 0,96 en los aciertos y 0,73 en los errores: duda más cuando se equivoca.</p>
+  </div>
+</article>
+
+<article class="snippet" data-lang="python" id="frag-21">
+  <header>
+    <h3>21 · Guardar el modelo y escribir predecir(imagen)</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Guardar el modelo final en un archivo <code>.keras</code>, volver a cargarlo y comprobar que predice lo mismo, y escribir una función <code>predecir</code> que reciba una imagen de 8×8 o de 32×32, aplique el mismo preprocesado y devuelva la clase, la confianza y las tres mejores candidatas (o «no estoy seguro» si la confianza no llega a un umbral).</p>
+  </header>
+  <pre class="code"><code>modelo_final.save("clasificador_digitos.keras")
+cargado = keras.models.load_model("clasificador_digitos.keras")
+mismas = np.allclose(cargado.predict(XB_test, verbose=0), probs, atol=1e-5)
+print("mismas probabilidades tras guardar y cargar:", bool(mismas))
+
+def predecir(imagen, umbral=0.6):
+    img = np.asarray(imagen, dtype="float32")
+    if img.shape == (8, 8):
+        img = np.kron(img / 16.0, np.ones((4, 4))) * 255.0
+    if img.shape == (32, 32):
+        img = np.repeat(img[..., None], 3, axis=-1)
+    p = cargado.predict(img[None, ...].astype("float32"), verbose=0)[0]
+    top = np.argsort(-p)[:3]
+    clase = nombres[top[0]] if p[top[0]] &gt;= umbral else "no estoy seguro"
+    return {"clase": clase, "confianza": round(float(p[top[0]]), 3),
+            "top3": [(nombres[i], round(float(p[i]), 3)) for i in top]}
+
+sensor = XB_test[0][::4, ::4, 0] / 255 * 16
+print("imagen del sensor:", sensor.shape, "| etiqueta real:", nombres[yB_test[0]])
+print(predecir(sensor))
+print(predecir(np.zeros((8, 8))))</code></pre>
+  <details class="linea-a-linea">
+    <summary>Línea por línea</summary>
+    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+      <tbody>
+        <tr data-lines="1"><td><code>modelo_final.save("clasificador_digitos.keras")</code></td><td>Guarda arquitectura, pesos y configuración de entrenamiento en un único archivo <code>.keras</code>.</td></tr>
+        <tr data-lines="2"><td><code>cargado = keras.models.load_model("clasificador_digitos…</code></td><td>Lo vuelve a cargar con <code>load_model</code>: esto es lo que haría otro programa que quisiera usar el modelo.</td></tr>
+        <tr data-lines="3-4"><td><code>mismas = np.allclose(cargado.predict(XB_test, verbose=0…</code></td><td>Comprueba que las probabilidades del modelo cargado coinciden con las del original (<code>np.allclose</code> con tolerancia 1e-5) sobre todo el test.</td></tr>
+        <tr data-lines="6"><td><code>def predecir(imagen, umbral=0.6):</code></td><td>La función recibe la imagen y un umbral de confianza (0,6 por defecto).</td></tr>
+        <tr data-lines="7"><td><code>img = np.asarray(imagen, dtype="float32")</code></td><td>Convierte la entrada en un array de números decimales.</td></tr>
+        <tr data-lines="8-9"><td><code>if img.shape == (8, 8): …</code></td><td>Si la imagen es de 8×8 (como las de <code>load_digits</code>, con valores de 0 a 16), aplica <strong>el mismo preprocesado que en el entrenamiento</strong>: divide entre 16, la amplía a 32×32 con <code>np.kron</code> y la pasa a la escala 0–255.</td></tr>
+        <tr data-lines="10-11"><td><code>if img.shape == (32, 32): …</code></td><td>Si es de 32×32 sin canales, repite el canal tres veces para obtener 32×32×3.</td></tr>
+        <tr data-lines="12"><td><code>p = cargado.predict(img[None, ...].astype("float32"), v…</code></td><td><code>img[None, ...]</code> añade el eje del lote (1, 32, 32, 3) y <code>predict</code> devuelve las 5 probabilidades; <code>[0]</code> se queda con la única fila.</td></tr>
+        <tr data-lines="13"><td><code>top = np.argsort(-p)[:3]</code></td><td>Ordena las clases de mayor a menor probabilidad y toma las tres mejores.</td></tr>
+        <tr data-lines="14"><td><code>clase = nombres[top[0]] if p[top[0]] &gt;= umbral else "no…</code></td><td>Si la mejor probabilidad alcanza el umbral devuelve la clase; si no, el texto «no estoy seguro».</td></tr>
+        <tr data-lines="15-16"><td><code>return {"clase": clase, "confianza": round(float(p[top[…</code></td><td>Devuelve un diccionario con la clase, la confianza redondeada y las tres mejores candidatas con sus probabilidades.</td></tr>
+        <tr data-lines="18"><td><code>sensor = XB_test[0][::4, ::4, 0] / 255 * 16</code></td><td>Simula una imagen que llegara de un «sensor» de 8×8: submuestrea una imagen de test (cada 4 píxeles) y la devuelve a la escala 0–16.</td></tr>
+        <tr data-lines="19-21"><td><code>print("imagen del sensor:", sensor.shape, "| etiqueta r…</code></td><td>Imprime su forma y su etiqueta real, y llama a <code>predecir</code> con ella y con una imagen completamente negra, que no es ninguna cifra.</td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>mismas probabilidades tras guardar y cargar: True
+imagen del sensor: (8, 8) | etiqueta real: 7
+{'clase': '7', 'confianza': 0.993, 'top3': [('7', 0.993), ('5', 0.006), ('8', 0.0)]}
+{'clase': 'no estoy seguro', 'confianza': 0.585, 'top3': [('5', 0.585), ('7', 0.198), ('6', 0.165)]}</pre>
+    <p>Las probabilidades tras guardar y recargar son idénticas (<code>True</code>): el archivo <code>.keras</code> conserva el modelo. Con la imagen del «sensor» (un 7 de 8×8), <code>predecir</code> responde «7» con una confianza de 0,993 y como alternativas un 5 (0,006) y un 8 (0,000). Con la imagen en negro, la probabilidad máxima es 0,585 (un 5), por debajo del umbral de 0,6, y la función responde «no estoy seguro» en lugar de inventar una cifra.</p>
+  </div>
+</article>
+</section>
+
+
+<section>
+<h2 class="sin-num">Código: el resto del módulo</h2>
+<p>Estos fragmentos completan los de cada lección y siguen la misma numeración. Comparten variables con los anteriores: del 1 al 12 son el cuaderno de los pisos y del 13 al 22, el de las imágenes, y cada cuaderno se ejecuta en orden.</p>
+<article class="snippet" data-lang="python" id="frag-7">
+  <header>
+    <h3>7 · L2: la penalización se suma a la pérdida</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Comprobar con una capa de solo 3 pesos que la penalización L2 se suma al MSE: la pérdida que devuelve <code>evaluate()</code> es el error de los datos <em>más</em> \( \lambda\sum w^2 \). Es independiente de los demás fragmentos (necesita solo los imports del fragmento 6).</p>
+  </header>
+  <pre class="code"><code>keras.utils.set_random_seed(0)
+entrada = keras.Input(shape=(3,))
+capa = layers.Dense(1, kernel_regularizer=regularizers.l2(0.1))
+mini = keras.Model(entrada, capa(entrada))
+mini.compile(optimizer="sgd", loss="mse")
+x = np.random.default_rng(0).normal(size=(50, 3)).astype("float32")
+y0 = np.zeros(50, "float32")
+mse = float(np.mean((mini.predict(x, verbose=0).ravel() - y0) ** 2))
+penal = 0.1 * float(np.sum(capa.kernel.numpy() ** 2))
+print(f"MSE de los datos     : {mse:.4f}")
+print(f"penalización 0.1·Σw² : {penal:.4f}   (pesos: {capa.kernel.numpy().ravel().round(3)})")
+print(f"suma a mano          : {mse + penal:.4f}")
+print(f"evaluate() de Keras  : {mini.evaluate(x, y0, verbose=0):.4f}")</code></pre>
+  <details class="linea-a-linea">
+    <summary>Línea por línea</summary>
+    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+      <tbody>
+        <tr data-lines="1"><td><code>keras.utils.set_random_seed(0)</code></td><td>Fija la semilla para que los pesos iniciales sean siempre los mismos.</td></tr>
+        <tr data-lines="2"><td><code>entrada = keras.Input(shape=(3,))</code></td><td>Entrada de 3 números.</td></tr>
+        <tr data-lines="3"><td><code>capa = layers.Dense(1, kernel_regularizer=regularizers.…</code></td><td>Una capa <code>Dense</code> de una neurona con L2 muy fuerte (λ = 0,1) para que el efecto se vea.</td></tr>
+        <tr data-lines="4"><td><code>mini = keras.Model(entrada, capa(entrada))</code></td><td>Modelo de una sola capa: <code>capa(entrada)</code> aplica la capa.</td></tr>
+        <tr data-lines="5"><td><code>mini.compile(optimizer="sgd", loss="mse")</code></td><td>Compila con SGD y pérdida MSE (no importa el optimizador: no entrenaremos).</td></tr>
+        <tr data-lines="6-7"><td><code>x = np.random.default_rng(0).normal(size=(50, 3)).astyp…</code></td><td>50 filas de datos al azar y objetivo todo ceros (así el error de cada fila es simplemente la predicción).</td></tr>
+        <tr data-lines="8"><td><code>mse = float(np.mean((mini.predict(x, verbose=0).ravel()…</code></td><td>MSE «a mano»: predice, resta el objetivo, eleva al cuadrado y promedia.</td></tr>
+        <tr data-lines="9"><td><code>penal = 0.1 * float(np.sum(capa.kernel.numpy() ** 2))</code></td><td>Penalización a mano: λ (0,1) por la suma de los pesos al cuadrado (<code>capa.kernel</code> son los pesos).</td></tr>
+        <tr data-lines="10-11"><td><code>print(f"MSE de los datos     : {mse:.4f}") …</code></td><td>Imprime el MSE y la penalización, con los pesos usados.</td></tr>
+        <tr data-lines="12"><td><code>print(f"suma a mano          : {mse + penal:.4f}")</code></td><td>Imprime su suma.</td></tr>
+        <tr data-lines="13"><td><code>print(f"evaluate() de Keras  : {mini.evaluate(x, y0, ve…</code></td><td>Imprime lo que da <code>evaluate()</code> de Keras con los mismos datos.</td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>MSE de los datos     : 0.7276
+penalización 0.1·Σw² : 0.0909   (pesos: [ 0.038 -0.468  0.83 ])
+suma a mano          : 0.8185
+evaluate() de Keras  : 0.8185</pre>
+    <p>El MSE de los datos es 0,7276 y la penalización 0,1 · Σw² = 0,0909; la suma, 0,8185, es <strong>exactamente</strong> lo que devuelve <code>evaluate()</code>. Moraleja: en Keras, <code>loss</code> y <code>val_loss</code> incluyen la penalización L2; para el error «limpio» del modelo hay que calcular las métricas aparte.</p>
+  </div>
+</article>
+
+<article class="snippet" data-lang="python" id="frag-11">
+  <header>
+    <h3>11 · ¿Qué aportan BatchNorm, Dropout y L2? Un experimento con varias semillas</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Entrenar la red con y sin cada pieza de regularización, repitiendo con varias semillas para ver la media y la desviación del R² en validación, primero con pocos datos (150 filas) y luego con todos. Continúa el fragmento 6.</p>
+  </header>
+  <pre class="code"><code>def entrenar_variante(semilla, n_train, **kw):
+    keras.utils.set_random_seed(semilla)
+    m = construir_modelo(Z_train.shape[1], **kw)
+    m.fit(Z_train[:n_train], t_train[:n_train], validation_data=(Z_val, t_val), epochs=100, batch_size=64, verbose=0,
+          callbacks=[keras.callbacks.EarlyStopping(patience=10, restore_best_weights=True)])
+    return r2_score(y_val, m.predict(Z_val, verbose=0).ravel() * y_sd + y_mu)
+
+variantes = {"completa": {}, "sin BatchNorm": {"bn": False}, "sin Dropout": {"dropout": 0},
+             "sin L2": {"l2": 0}, "sin nada": {"bn": False, "dropout": 0, "l2": 0}}
+for n_train, semillas in [(150, range(3)), (len(Z_train), range(2))]:
+    print("--- filas de entrenamiento:", n_train, "| semillas:", len(semillas))
+    for nombre, kw in variantes.items():
+        if n_train == len(Z_train) and nombre not in ("completa", "sin nada"):
+            continue
+        r2s = [entrenar_variante(s, n_train, **kw) for s in semillas]
+        print(f"{nombre:14s} R2 val = {np.mean(r2s):.3f} ± {np.std(r2s):.3f}")</code></pre>
+  <details class="linea-a-linea">
+    <summary>Línea por línea</summary>
+    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+      <tbody>
+        <tr data-lines="1"><td><code>def entrenar_variante(semilla, n_train, **kw):</code></td><td>Función que entrena una variante y devuelve su R² en validación. Recibe la semilla, cuántas filas usar y ajustes extra de <code>construir_modelo</code> (<code>**kw</code>: cualquier argumento con nombre que reciba, se lo pasa).</td></tr>
+        <tr data-lines="2-3"><td><code>keras.utils.set_random_seed(semilla) …</code></td><td>Fija la semilla y construye la red con esos ajustes.</td></tr>
+        <tr data-lines="4-5"><td><code>m.fit(Z_train[:n_train], t_train[:n_train], validation_…</code></td><td>Entrena con las primeras <code>n_train</code> filas (<code>Z_train[:n_train]</code>) y para pronto con <code>EarlyStopping</code> (paciencia 10, quedándose con los mejores pesos); como mucho 100 épocas, lotes de 64.</td></tr>
+        <tr data-lines="6"><td><code>return r2_score(y_val, m.predict(Z_val, verbose=0).rave…</code></td><td>Predice la validación, deshace la estandarización y devuelve el R² en miles de euros.</td></tr>
+        <tr data-lines="8-9"><td><code>variantes = {"completa": {}, "sin BatchNorm": {"bn": Fa…</code></td><td>Las cinco variantes: completa, sin BatchNorm (<code>bn=False</code>), sin Dropout (<code>dropout=0</code>), sin L2 (<code>l2=0</code>) y sin nada.</td></tr>
+        <tr data-lines="10-11"><td><code>for n_train, semillas in [(150, range(3)), (len(Z_train…</code></td><td>Dos regímenes: 150 filas con 3 semillas, y todas las filas (2.400) con 2 semillas. Imprime una cabecera para cada uno.</td></tr>
+        <tr data-lines="12-14"><td><code>for nombre, kw in variantes.items(): …</code></td><td>Para cada variante (en el régimen grande solo la completa y la «sin nada», para ahorrar tiempo)…</td></tr>
+        <tr data-lines="15-16"><td><code>r2s = [entrenar_variante(s, n_train, **kw) for s in sem…</code></td><td>…entrena una vez por semilla (comprensión de lista) e imprime la media y la desviación del R².</td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>--- filas de entrenamiento: 150 | semillas: 3
+completa       R2 val = 0.854 ± 0.062
+sin BatchNorm  R2 val = 0.938 ± 0.005
+sin Dropout    R2 val = 0.866 ± 0.024
+sin L2         R2 val = 0.854 ± 0.062
+sin nada       R2 val = 0.940 ± 0.005
+--- filas de entrenamiento: 2400 | semillas: 2
+completa       R2 val = 0.973 ± 0.000
+sin nada       R2 val = 0.973 ± 0.000</pre>
+    <p>Con <strong>150 filas</strong> y 3 semillas, la red completa saca un R² de validación de 0,854 ± 0,062; sin BatchNorm, 0,938 ± 0,005; sin Dropout, 0,866 ± 0,024; sin L2, 0,854 ± 0,062 (idéntico a la completa: con λ = 1e-4 la penalización es demasiado pequeña para notarse) y sin nada, 0,940 ± 0,005. Con las <strong>2.400 filas</strong> y 2 semillas, la completa y la «sin nada» dan exactamente lo mismo: 0,973 ± 0,000. <strong>BatchNorm, Dropout y L2 no aportan nada aquí</strong>, y con 150 filas incluso empeoran el resultado (la completa es la peor y la más irregular). Una explicación probable, que no hemos comprobado, es que con 3 pasos por época las medias móviles de BatchNorm van muy retrasadas (la trampa del fragmento 16); lo seguro es lo que muestran las cifras: estas piezas no son gratis ni obligatorias, y hay que medirlas.</p>
+  </div>
+</article>
+
+<article class="snippet" data-lang="python" id="frag-12">
+  <header>
+    <h3>12 · Un caso donde la red no gana: la diabetes</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Repetir la comparación con <code>load_diabetes</code> (442 pacientes, 10 columnas): regresión lineal y random forest frente a la misma red con cinco semillas. Es el contrapunto honesto al fragmento 9. Usa <code>construir_modelo</code> del fragmento 6.</p>
+  </header>
+  <pre class="code"><code>from sklearn.datasets import load_diabetes
 
 Xd, yd = load_diabetes(return_X_y=True)
 Xd_tv, Xd_te, yd_tv, yd_te = train_test_split(Xd, yd, test_size=0.25, random_state=0)
@@ -147,33 +586,273 @@ for semilla in range(5):
 for nombre, v in resultados.items():
     print(f"{nombre:18s} R2 test = {v:.3f}")
 print(f"red neuronal (5 semillas) R2 test = {np.mean(r2_red):.3f} ± {np.std(r2_red):.3f}")</code></pre>
-<details class="linea-a-linea">
-<summary>Línea por línea</summary>
-<p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
-<table class="lineas">
-<thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
-<tbody>
-<tr data-lines="1"><td><code>from sklearn.datasets import load_diabetes</code></td><td>Importa el cargador de datos incluido en scikit-learn.</td></tr>
-<tr data-lines="3"><td><code>Xd, yd = load_diabetes(return_X_y=True)</code></td><td>Carga los datos ya como matriz (<code>Xd</code>, 442 × 10) y vector objetivo (<code>yd</code>, una medida de la evolución de la enfermedad).</td></tr>
-<tr data-lines="4"><td><code>Xd_tv, Xd_te, yd_tv, yd_te = train_test_split(Xd, yd, t…</code></td><td>Reparte en train (75 %) y test (25 %); validaremos dentro del train.</td></tr>
-<tr data-lines="5-6"><td><code>esc = StandardScaler().fit(Xd_tv) …</code></td><td>Estandariza las columnas con el escalador ajustado <strong>solo con el train</strong> y transforma train y test.</td></tr>
-<tr data-lines="7"><td><code>m_d, s_d = yd_tv.mean(), yd_tv.std()</code></td><td>Media y desviación del objetivo del train, para estandarizarlo.</td></tr>
-<tr data-lines="8"><td><code>print("filas:", Xd.shape[0], "| columnas:", Xd.shape[1]…</code></td><td>Imprime el tamaño de los conjuntos.</td></tr>
-<tr data-lines="10-11"><td><code>resultados = {"regresión lineal": r2_score(yd_te, Linea…</code></td><td>R² en el test de la regresión lineal y del random forest (cada uno ajustado en una sola línea con <code>.fit(…).predict(…)</code>).</td></tr>
-<tr data-lines="12"><td><code>r2_red = []</code></td><td>Lista para guardar el R² de la red en cada semilla.</td></tr>
-<tr data-lines="13-15"><td><code>for semilla in range(5): …</code></td><td>Para cada una de las 5 semillas, construye una red más pequeña (32 y 16 neuronas), con más Dropout (0,2) y L2 más fuerte (1e-3), porque hay muy pocos datos.</td></tr>
-<tr data-lines="16-17"><td><code>red.fit(Zd_tv, ((yd_tv - m_d) / s_d).astype("float32"),…</code></td><td>Entrena con el objetivo estandarizado; <code>validation_split=0.2</code> aparta el 20 % del train como validación; <code>EarlyStopping</code> con paciencia 20.</td></tr>
-<tr data-lines="18"><td><code>r2_red.append(r2_score(yd_te, red.predict(Zd_te, verbos…</code></td><td>Guarda su R² en el test (en las unidades originales).</td></tr>
-<tr data-lines="19-21"><td><code>for nombre, v in resultados.items(): …</code></td><td>Imprime el R² de los modelos clásicos y la media ± desviación de la red.</td></tr>
-</tbody>
-</table>
-</details>
-<div class="salida">
-<strong>Salida esperada</strong>
-<pre>filas: 442 | columnas: 10 | train: 331 | test: 111
+  <details class="linea-a-linea">
+    <summary>Línea por línea</summary>
+    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+      <tbody>
+        <tr data-lines="1"><td><code>from sklearn.datasets import load_diabetes</code></td><td>Importa el cargador de datos incluido en scikit-learn.</td></tr>
+        <tr data-lines="3"><td><code>Xd, yd = load_diabetes(return_X_y=True)</code></td><td>Carga los datos ya como matriz (<code>Xd</code>, 442 × 10) y vector objetivo (<code>yd</code>, una medida de la evolución de la enfermedad).</td></tr>
+        <tr data-lines="4"><td><code>Xd_tv, Xd_te, yd_tv, yd_te = train_test_split(Xd, yd, t…</code></td><td>Reparte en train (75 %) y test (25 %); validaremos dentro del train.</td></tr>
+        <tr data-lines="5-6"><td><code>esc = StandardScaler().fit(Xd_tv) …</code></td><td>Estandariza las columnas con el escalador ajustado <strong>solo con el train</strong> y transforma train y test.</td></tr>
+        <tr data-lines="7"><td><code>m_d, s_d = yd_tv.mean(), yd_tv.std()</code></td><td>Media y desviación del objetivo del train, para estandarizarlo.</td></tr>
+        <tr data-lines="8"><td><code>print("filas:", Xd.shape[0], "| columnas:", Xd.shape[1]…</code></td><td>Imprime el tamaño de los conjuntos.</td></tr>
+        <tr data-lines="10-11"><td><code>resultados = {"regresión lineal": r2_score(yd_te, Linea…</code></td><td>R² en el test de la regresión lineal y del random forest (cada uno ajustado en una sola línea con <code>.fit(…).predict(…)</code>).</td></tr>
+        <tr data-lines="12"><td><code>r2_red = []</code></td><td>Lista para guardar el R² de la red en cada semilla.</td></tr>
+        <tr data-lines="13-15"><td><code>for semilla in range(5): …</code></td><td>Para cada una de las 5 semillas, construye una red más pequeña (32 y 16 neuronas), con más Dropout (0,2) y L2 más fuerte (1e-3), porque hay muy pocos datos.</td></tr>
+        <tr data-lines="16-17"><td><code>red.fit(Zd_tv, ((yd_tv - m_d) / s_d).astype("float32"),…</code></td><td>Entrena con el objetivo estandarizado; <code>validation_split=0.2</code> aparta el 20 % del train como validación; <code>EarlyStopping</code> con paciencia 20.</td></tr>
+        <tr data-lines="18"><td><code>r2_red.append(r2_score(yd_te, red.predict(Zd_te, verbos…</code></td><td>Guarda su R² en el test (en las unidades originales).</td></tr>
+        <tr data-lines="19-21"><td><code>for nombre, v in resultados.items(): …</code></td><td>Imprime el R² de los modelos clásicos y la media ± desviación de la red.</td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>filas: 442 | columnas: 10 | train: 331 | test: 111
 regresión lineal   R2 test = 0.359
 random forest      R2 test = 0.253
 red neuronal (5 semillas) R2 test = 0.351 ± 0.021</pre>
-<p>Con 331 pacientes de entrenamiento y 111 de test: la <strong>regresión lineal saca un R² de 0,359, el random forest 0,253 y la red 0,351 ± 0,021</strong> (cinco semillas). La red <strong>no gana</strong>: empata con la regresión lineal (0,008 de diferencia, menos que la dispersión entre semillas de la propia red) y el random forest queda peor que los dos. Con pocos datos y una relación casi lineal, el modelo más simple basta. Es el contrapunto del fragmento 9, donde la estructura multiplicativa y las 4.000 filas sí daban ventaja a la red.</p>
+    <p>Con 331 pacientes de entrenamiento y 111 de test: la <strong>regresión lineal saca un R² de 0,359, el random forest 0,253 y la red 0,351 ± 0,021</strong> (cinco semillas). La red <strong>no gana</strong>: empata con la regresión lineal (0,008 de diferencia, menos que la dispersión entre semillas de la propia red) y el random forest queda peor que los dos. Con pocos datos y una relación casi lineal, el modelo más simple basta. Es el contrapunto del fragmento 9, donde la estructura multiplicativa y las 4.000 filas sí daban ventaja a la red.</p>
+  </div>
+</article>
+
+<article class="snippet" data-lang="python" id="frag-15">
+  <header>
+    <h3>15 · Una base convolucional propia y su preentrenamiento en la tarea A</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Construir una base convolucional pequeña (tres bloques de convolución, BatchNorm, ReLU y pooling), entrenarla con las cifras 0 a 4 y guardarla en un archivo <code>.keras</code>. Hace el papel de «MobileNetV2 entrenada con ImageNet» pero con datos que sí podemos usar sin internet.</p>
+  </header>
+  <pre class="code"><code>def construir_base(momentum=0.99):
+    entrada = keras.Input(shape=(32, 32, 3))
+    x = layers.Rescaling(1 / 127.5, offset=-1)(entrada)
+    for i, filtros in enumerate([16, 32, 64], start=1):
+        x = layers.Conv2D(filtros, 3, padding="same", use_bias=False, name=f"bloque{i}_conv")(x)
+        x = layers.BatchNormalization(momentum=momentum, name=f"bloque{i}_bn")(x)
+        x = layers.Activation("relu", name=f"bloque{i}_relu")(x)
+        x = layers.MaxPooling2D(name=f"bloque{i}_pool")(x)
+    return keras.Model(entrada, x, name="base")
+
+keras.utils.set_random_seed(0)
+base = construir_base()
+entrada = keras.Input(shape=(32, 32, 3))
+x = layers.Flatten()(base(entrada))
+salida = layers.Dense(5, activation="softmax")(x)
+modelo_A = keras.Model(entrada, salida)
+modelo_A.compile(optimizer="adam", loss="sparse_categorical_crossentropy", metrics=["accuracy"])
+modelo_A.fit(XA_train, yA_train, validation_data=(XA_val, yA_val), epochs=40, batch_size=32, verbose=0)
+print("parámetros de la base:", base.count_params(), "| salida de la base:", base.output_shape)
+print("precisión de validación en la tarea A: %.3f" % modelo_A.evaluate(XA_val, yA_val, verbose=0)[1])
+base.save("base_digitos_0a4.keras")</code></pre>
+  <details class="linea-a-linea">
+    <summary>Línea por línea</summary>
+    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+      <tbody>
+        <tr data-lines="1"><td><code>def construir_base(momentum=0.99):</code></td><td>Define una función para construir la base. El argumento <code>momentum</code> controla la media móvil de BatchNorm (lo usaremos en el fragmento siguiente).</td></tr>
+        <tr data-lines="2"><td><code>entrada = keras.Input(shape=(32, 32, 3))</code></td><td>La entrada son imágenes de 32×32 con 3 canales.</td></tr>
+        <tr data-lines="3"><td><code>x = layers.Rescaling(1 / 127.5, offset=-1)(entrada)</code></td><td><code>Rescaling(1/127.5, offset=-1)</code> lleva los píxeles de 0–255 a −1–1: es el preprocesado <em>incrustado en el modelo</em>, igual que <code>preprocess_input</code> en las bases reales.</td></tr>
+        <tr data-lines="4"><td><code>for i, filtros in enumerate([16, 32, 64], start=1):</code></td><td>Recorre tres bloques con 16, 32 y 64 filtros (<code>enumerate(..., start=1)</code> numera los bloques desde 1).</td></tr>
+        <tr data-lines="5"><td><code>x = layers.Conv2D(filtros, 3, padding="same", use_bias=…</code></td><td>Convolución 3×3 sin sesgo (<code>use_bias=False</code>, porque BatchNorm ya añade su propio desplazamiento) y <code>padding="same"</code> para conservar el tamaño. El nombre <code>bloque1_conv</code>, … permitirá congelar bloques concretos después.</td></tr>
+        <tr data-lines="6"><td><code>x = layers.BatchNormalization(momentum=momentum, name=f…</code></td><td>BatchNormalization: normaliza las salidas de la convolución con la media y la varianza del lote.</td></tr>
+        <tr data-lines="7"><td><code>x = layers.Activation("relu", name=f"bloque{i}_relu")(x)</code></td><td>ReLU, la activación que deja pasar solo lo positivo.</td></tr>
+        <tr data-lines="8"><td><code>x = layers.MaxPooling2D(name=f"bloque{i}_pool")(x)</code></td><td><code>MaxPooling2D</code> reduce a la mitad el tamaño: 32 → 16 → 8 → 4.</td></tr>
+        <tr data-lines="9"><td><code>return keras.Model(entrada, x, name="base")</code></td><td>Devuelve un <code>Model</code> que va de la entrada al último bloque, sin cabeza clasificadora: es una <strong>base</strong>.</td></tr>
+        <tr data-lines="11-12"><td><code>keras.utils.set_random_seed(0) …</code></td><td>Semilla fija y construcción de la base.</td></tr>
+        <tr data-lines="13-16"><td><code>entrada = keras.Input(shape=(32, 32, 3)) …</code></td><td>Para preentrenarla le pegamos una cabeza provisional: <code>Flatten</code> (aplana el mapa 4×4×64 en 1.024 números) y una <code>Dense</code> de 5 salidas con softmax, una por cifra.</td></tr>
+        <tr data-lines="17"><td><code>modelo_A.compile(optimizer="adam", loss="sparse_categor…</code></td><td>Compila con Adam, la entropía cruzada para etiquetas enteras y la exactitud como métrica.</td></tr>
+        <tr data-lines="18"><td><code>modelo_A.fit(XA_train, yA_train, validation_data=(XA_va…</code></td><td>Entrena 40 épocas con la tarea A, vigilando la validación.</td></tr>
+        <tr data-lines="19"><td><code>print("parámetros de la base:", base.count_params(), "|…</code></td><td>Imprime los parámetros de la base y la forma de su salida: (4, 4, 64).</td></tr>
+        <tr data-lines="20"><td><code>print("precisión de validación en la tarea A: %.3f" % m…</code></td><td>Evalúa en la validación de la tarea A. <code>evaluate</code> devuelve [pérdida, exactitud]; <code>[1]</code> se queda con la exactitud.</td></tr>
+        <tr data-lines="21"><td><code>base.save("base_digitos_0a4.keras")</code></td><td>Guarda <strong>solo la base</strong> (sin la cabeza provisional) en <code>base_digitos_0a4.keras</code>. Es el archivo que reutilizaremos.</td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>parámetros de la base: 23920 | salida de la base: (None, 4, 4, 64)
+precisión de validación en la tarea A: 1.000</pre>
+    <p>La base tiene <strong>23.920 parámetros</strong>: 432 + 64 del bloque 1, 4.608 + 128 del 2 y 18.432 + 256 del 3 (convolución + BatchNorm). Produce un mapa de 4×4×64 por imagen. En la tarea A alcanza una exactitud de validación casi perfecta, prueba de que ha aprendido a ver trazos de cifras.</p>
+  </div>
+</article>
+
+<article class="snippet" data-lang="python" id="frag-16">
+  <header>
+    <h3>16 · La trampa de BatchNorm: medias móviles que no han tenido tiempo de converger</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Entrenar tres veces la misma base solo dos épocas con tres valores de <code>momentum</code> distintos y comparar la exactitud en modo inferencia (con las medias móviles) con la de modo entrenamiento (con las medias de cada lote). Usa <code>construir_base</code> y los datos de la tarea A.</p>
+  </header>
+  <pre class="code"><code>def probar_momentum(momentum):
+    keras.utils.set_random_seed(0)
+    b = construir_base(momentum)
+    ent = keras.Input(shape=(32, 32, 3))
+    m = keras.Model(ent, layers.Dense(5, activation="softmax")(layers.Flatten()(b(ent))))
+    m.compile(optimizer="adam", loss="sparse_categorical_crossentropy", metrics=["accuracy"])
+    m.fit(XA_train, yA_train, epochs=2, batch_size=32, verbose=0)
+    acc_inferencia = m.evaluate(XA_val, yA_val, verbose=0)[1]
+    acc_modo_train = float((m(XA_val, training=True).numpy().argmax(axis=1) == yA_val).mean())
+    return acc_inferencia, acc_modo_train
+
+for momentum in [0.9, 0.99, 0.999]:
+    inferencia, modo_train = probar_momentum(momentum)
+    print(f"momentum={momentum}: acierto en inferencia = {inferencia:.3f} | con training=True = {modo_train:.3f}")</code></pre>
+  <details class="linea-a-linea">
+    <summary>Línea por línea</summary>
+    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+      <tbody>
+        <tr data-lines="1"><td><code>def probar_momentum(momentum):</code></td><td>Función que entrena una base con un <code>momentum</code> dado y devuelve dos exactitudes.</td></tr>
+        <tr data-lines="2-3"><td><code>keras.utils.set_random_seed(0) …</code></td><td>Semilla fija (mismo punto de partida en las tres pruebas) y construcción de la base con ese momentum.</td></tr>
+        <tr data-lines="4-6"><td><code>ent = keras.Input(shape=(32, 32, 3)) …</code></td><td>Le pega una cabeza <code>Flatten</code> + <code>Dense(5)</code> y compilar, como en el fragmento 15.</td></tr>
+        <tr data-lines="7"><td><code>m.fit(XA_train, yA_train, epochs=2, batch_size=32, verb…</code></td><td>Entrena solo 2 épocas: unos 46 pasos (720 imágenes en lotes de 32 son 23 pasos por época), pocos para que las medias móviles se acerquen a las reales.</td></tr>
+        <tr data-lines="8"><td><code>acc_inferencia = m.evaluate(XA_val, yA_val, verbose=0)[…</code></td><td>Exactitud en validación llamando al modelo en modo inferencia (<code>evaluate</code>): BatchNorm usa sus medias y varianzas móviles.</td></tr>
+        <tr data-lines="9"><td><code>acc_modo_train = float((m(XA_val, training=True).numpy(…</code></td><td>Exactitud llamando al modelo con <code>training=True</code>: BatchNorm usa la media y la varianza del propio lote de validación. <code>.numpy().argmax(axis=1)</code> toma la clase más probable y se compara con las etiquetas.</td></tr>
+        <tr data-lines="10"><td><code>return acc_inferencia, acc_modo_train</code></td><td>Devuelve las dos exactitudes.</td></tr>
+        <tr data-lines="12-14"><td><code>for momentum in [0.9, 0.99, 0.999]: …</code></td><td>Repite para 0,9; 0,99 y 0,999 e imprime las dos exactitudes de cada una.</td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>momentum=0.9: acierto en inferencia = 0.978 | con training=True = 0.989
+momentum=0.99: acierto en inferencia = 0.917 | con training=True = 0.989
+momentum=0.999: acierto en inferencia = 0.746 | con training=True = 0.989</pre>
+    <p>Con <code>training=True</code> la exactitud es 0,989 en los tres casos: la red es buena. En <strong>inferencia</strong> depende del <code>momentum</code>: 0,978 con 0,9, 0,917 con 0,99 y solo 0,746 con 0,999. Tras 46 pasos queda un peso de 0,9<sup>46</sup> ≈ 0,008, 0,99<sup>46</sup> ≈ 0,63 y 0,999<sup>46</sup> ≈ 0,955 del valor inicial en la media móvil: cuanto más lenta es, peor refleja los datos reales. Con más épocas el desfase desaparece (la base del fragmento anterior, con 40 épocas y momentum 0,99, llega al 100 %).</p>
+  </div>
+</article>
+
+<article class="snippet" data-lang="python" id="frag-19">
+  <header>
+    <h3>19 · La pregunta incómoda: ¿gana el transfer learning a entrenar desde cero?</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Entrenar la tarea B de cuatro maneras (desde cero, solo fase 1, fases 1 y 2 con el bloque 3 y fases 1 y 2 con toda la base) con tres semillas cada una, para ver la media y la dispersión. Usa <code>construir_base</code> y las funciones auxiliares de los fragmentos 15 y 17.</p>
+  </header>
+  <pre class="code"><code>def entrenar_en_B(modo, semilla):
+    keras.utils.set_random_seed(semilla)
+    if modo == "desde cero":
+        b = construir_base()
+    else:
+        b = keras.models.load_model("base_digitos_0a4.keras")
+        b.trainable = False
+    m = modelo_con_cabeza(b, 5)
+    if modo == "desde cero":
+        compilar(m, 1e-3)
+        ajustar(m, 90)
+        return acierto_test(m)
+    compilar(m, 1e-3)
+    ajustar(m, 60)
+    if modo == "solo fase 1":
+        return acierto_test(m)
+    b.trainable = True
+    for capa in b.layers:
+        capa.trainable = capa.name.startswith("bloque3") or modo == "fase 1 + 2 (todo)"
+    compilar(m, 1e-4)
+    ajustar(m, 30)
+    return acierto_test(m)
+
+modos = ["desde cero", "solo fase 1", "fase 1 + 2 (bloque 3)", "fase 1 + 2 (todo)"]
+for modo in modos:
+    accs = [entrenar_en_B(modo, semilla) for semilla in range(3)]
+    print(f"{modo:22s} test = {np.mean(accs):.3f} ± {np.std(accs):.3f}   {[round(a, 3) for a in accs]}")</code></pre>
+  <details class="linea-a-linea">
+    <summary>Línea por línea</summary>
+    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+      <tbody>
+        <tr data-lines="1-2"><td><code>def entrenar_en_B(modo, semilla): …</code></td><td>Función que entrena un modo concreto con una semilla y devuelve la exactitud en el test.</td></tr>
+        <tr data-lines="3-4"><td><code>if modo == "desde cero": …</code></td><td><strong>Desde cero</strong>: una base nueva con pesos al azar.</td></tr>
+        <tr data-lines="5-7"><td><code>else: …</code></td><td>En los demás modos, carga la base preentrenada y la congela.</td></tr>
+        <tr data-lines="8"><td><code>m = modelo_con_cabeza(b, 5)</code></td><td>Monta el modelo con su cabeza nueva (aumento incluido).</td></tr>
+        <tr data-lines="9-12"><td><code>if modo == "desde cero": …</code></td><td>Desde cero: compila con 1e-3, entrena 90 épocas (tantas como las dos fases juntas, para que la comparación sea justa) y devuelve el resultado.</td></tr>
+        <tr data-lines="13-14"><td><code>compilar(m, 1e-3) …</code></td><td>Fase 1: compila con 1e-3 y entrena 60 épocas con la base congelada.</td></tr>
+        <tr data-lines="15-16"><td><code>if modo == "solo fase 1": …</code></td><td>Si el modo es «solo fase 1», se detiene aquí.</td></tr>
+        <tr data-lines="17-19"><td><code>b.trainable = True …</code></td><td>Fase 2: descongela la base y deja entrenables solo el bloque 3 (o todos los bloques en el modo «todo»; <code>or</code> hace verdadera la condición para todas las capas).</td></tr>
+        <tr data-lines="20-22"><td><code>compilar(m, 1e-4) …</code></td><td>Recompila con 1e-4, entrena 30 épocas más y devuelve la exactitud de test.</td></tr>
+        <tr data-lines="24-27"><td><code>modos = ["desde cero", "solo fase 1", "fase 1 + 2 (bloq…</code></td><td>Para cada modo, entrena con las semillas 0, 1 y 2 e imprime la media, la desviación y los tres valores.</td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>desde cero             test = 0.946 ± 0.019   [0.969, 0.922, 0.946]
+solo fase 1            test = 0.871 ± 0.007   [0.878, 0.874, 0.861]
+fase 1 + 2 (bloque 3)  test = 0.894 ± 0.011   [0.878, 0.898, 0.905]
+fase 1 + 2 (todo)      test = 0.917 ± 0.004   [0.913, 0.922, 0.917]</pre>
+    <p>Con tres semillas, <strong>entrenar desde cero gana</strong> (0,946 ± 0,019) a todas las variantes de transfer learning: solo fase 1 (0,871 ± 0,007), fases 1 y 2 con el bloque 3 (0,894 ± 0,011) y con toda la base (0,917 ± 0,004). Entre las tres, cuanto más se descongela, mejor. No es un fallo del código sino un hallazgo: esta base preentrenada con 720 imágenes de cinco cifras ayuda poco a distinguir cinco cifras distintas, y la tarea es lo bastante fácil como para aprenderla desde cero. Con ImageNet y fotos reales el resultado podría ser otro, pero aquí no lo hemos medido.</p>
+  </div>
+</article>
+
+<article class="snippet" data-lang="python" id="frag-22">
+  <header>
+    <h3>22 · Barrido de la fase 2: cuántos bloques descongelar y con qué learning rate</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Para tres semillas, entrenar la fase 1 una vez, guardar sus pesos y, a partir de ellos, probar nueve configuraciones de la fase 2 (descongelar el bloque 3, los bloques 2 y 3 o todos, con learning rate 1e-5, 1e-4 y 1e-3). Imprime la media y la desviación de cada una. Es el experimento más largo del módulo.</p>
+  </header>
+  <pre class="code"><code>def barrido(semilla):
+    keras.utils.set_random_seed(semilla)
+    b = keras.models.load_model("base_digitos_0a4.keras")
+    b.trainable = False
+    m = modelo_con_cabeza(b, 5)
+    compilar(m, 1e-3)
+    ajustar(m, 60)
+    m.save_weights("fase1.weights.h5")
+    filas = {"solo fase 1": acierto_test(m)}
+    for nombre, bloques in [("bloque 3", ("bloque3",)), ("bloques 2-3", ("bloque2", "bloque3")), ("todo", ("bloque",))]:
+        for lr in [1e-5, 1e-4, 1e-3]:
+            keras.utils.set_random_seed(semilla)
+            b2 = keras.models.load_model("base_digitos_0a4.keras")
+            m2 = modelo_con_cabeza(b2, 5)
+            m2.load_weights("fase1.weights.h5")
+            b2.trainable = True
+            for capa in b2.layers:
+                capa.trainable = capa.name.startswith(bloques)
+            compilar(m2, lr)
+            ajustar(m2, 30)
+            filas[f"{nombre} | lr {lr:g}"] = acierto_test(m2)
+    return filas
+
+todas = [barrido(semilla) for semilla in range(3)]
+for clave in todas[0]:
+    valores = [t[clave] for t in todas]
+    print(f"{clave:20s} test = {np.mean(valores):.3f} ± {np.std(valores):.3f}")</code></pre>
+  <details class="linea-a-linea">
+    <summary>Línea por línea</summary>
+    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+      <tbody>
+        <tr data-lines="1-2"><td><code>def barrido(semilla): …</code></td><td>Función que hace el barrido completo para una semilla.</td></tr>
+        <tr data-lines="3-7"><td><code>b = keras.models.load_model("base_digitos_0a4.keras") …</code></td><td>Fase 1 como siempre: carga la base, la congela, monta la cabeza y entrena 60 épocas con learning rate 1e-3.</td></tr>
+        <tr data-lines="8"><td><code>m.save_weights("fase1.weights.h5")</code></td><td>Guarda los pesos del modelo tras la fase 1 (<code>save_weights</code>). Así todas las variantes de la fase 2 parten <strong>exactamente del mismo punto</strong> y se comparan en igualdad de condiciones.</td></tr>
+        <tr data-lines="9"><td><code>filas = {"solo fase 1": acierto_test(m)}</code></td><td>Guarda en un diccionario el resultado de «solo fase 1», como referencia.</td></tr>
+        <tr data-lines="10-11"><td><code>for nombre, bloques in [("bloque 3", ("bloque3",)), ("b…</code></td><td>Recorre las tres opciones de capas a descongelar (cada una es una tupla de prefijos de nombre) y los tres learning rates.</td></tr>
+        <tr data-lines="12-15"><td><code>keras.utils.set_random_seed(semilla) …</code></td><td>Reconstruye el modelo desde cero, con la misma semilla, y carga encima los pesos de la fase 1 (<code>load_weights</code>).</td></tr>
+        <tr data-lines="16-18"><td><code>b2.trainable = True …</code></td><td>Descongela la base y deja entrenables solo las capas cuyo nombre empieza por alguno de los prefijos de la tupla (<code>startswith</code> acepta una tupla).</td></tr>
+        <tr data-lines="19-20"><td><code>compilar(m2, lr) …</code></td><td>Recompila con el learning rate de esta variante y entrena 30 épocas.</td></tr>
+        <tr data-lines="21-22"><td><code>filas[f"{nombre} | lr {lr:g}"] = acierto_test(m2) …</code></td><td>Anota la exactitud de test en el diccionario y lo devuelve.</td></tr>
+        <tr data-lines="24"><td><code>todas = [barrido(semilla) for semilla in range(3)]</code></td><td>Ejecuta el barrido para las semillas 0, 1 y 2.</td></tr>
+        <tr data-lines="25-27"><td><code>for clave in todas[0]: …</code></td><td>Para cada configuración, calcula la media y la desviación de las tres semillas y las imprime.</td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>solo fase 1          test = 0.871 ± 0.009
+bloque 3 | lr 1e-05  test = 0.876 ± 0.004
+bloque 3 | lr 0.0001 test = 0.886 ± 0.013
+bloque 3 | lr 0.001  test = 0.910 ± 0.023
+bloques 2-3 | lr 1e-05 test = 0.874 ± 0.011
+bloques 2-3 | lr 0.0001 test = 0.902 ± 0.016
+bloques 2-3 | lr 0.001 test = 0.870 ± 0.032
+todo | lr 1e-05      test = 0.868 ± 0.013
+todo | lr 0.0001     test = 0.905 ± 0.007
+todo | lr 0.001      test = 0.889 ± 0.028</pre>
+    <p>Con tres semillas, el learning rate de la fase 2 importa más que cuántos bloques se descongelan. Con <strong>1e-5</strong> no mejora nada (0,868 a 0,876, como la fase 1 sola: 0,871). Con <strong>1e-4</strong> mejora de forma consistente (0,886 a 0,905). Con <strong>1e-3</strong> da el mejor valor de la tabla (0,910 con el bloque 3) y también uno de los peores (0,870 con los bloques 2 y 3), con desviaciones de 0,023 a 0,032: es poco fiable. Las diferencias entre configuraciones son del tamaño del ruido: la misma configuración (toda la base, 1e-4) dio 0,917 en el fragmento 19 y 0,905 aquí.</p>
+  </div>
+</article>
+</section>
+
+
 </div>
-</article></div></details></div></main></body></html>
+</main>
+</body>
+</html>

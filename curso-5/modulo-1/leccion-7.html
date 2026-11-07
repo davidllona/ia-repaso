@@ -1,158 +1,282 @@
-<!DOCTYPE html>
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lección 7 · K clases, K neuronas: la red da logits y la pérdida pone la softmax · Módulo 1 · Curso 5 · Cuaderno de IA</title>
+<meta name="description" content="Clasificación en varias clases con una capa oculta: nn.Linear(H, K) devuelve logits, CrossEntropyLoss aplica la softmax por dentro y argmax da la clase.">
+<script>try{var t=localStorage.getItem('cuaderno-ia:tema');if(t)document.documentElement.setAttribute('data-theme',t)}catch(e){}</script>
+<link rel="stylesheet" href="../../assets/css/style.css">
+<script src="../../assets/js/curriculum.js"></script>
+<script src="../../assets/js/lab.js"></script>
+<script src="../../assets/js/app.js" defer></script>
+</head>
+<body data-root="../../" data-course="5" data-module="1" data-lesson="7">
+<main>
+<div class="page">
 
-<html lang="es"><head><meta charset="utf-8"/><meta content="width=device-width,initial-scale=1" name="viewport"/><title>Lección 7 · Entrenar la red: el bucle, un paso a mano y por qué a veces se atasca · Curso 5 · Cuaderno de IA</title><meta content="Seguimos con la red 2-2-1 (sigmoides) y el mismo usuario, \( \mathbf{x} = (1, 2) \), que sí terminó la serie (\( y = 1 \))." name="description"/><script>try{var t=localStorage.getItem('cuaderno-ia:tema');if(t)document.documentElement.setAttribute('data-theme',t)}catch(e){}</script><link href="../../assets/css/style.css" rel="stylesheet"/><script src="../../assets/js/curriculum.js"></script><script src="../../assets/js/lab.js"></script><script defer="" src="../../assets/js/app.js"></script><script defer="" src="../../assets/js/microanimations.js"></script></head><body data-course="5" data-lesson="7" data-module="1" data-root="../../"><main><div class="page" data-micro="3min"><header class="hero leccion"><div class="hero-grid"><div><p class="eyebrow">Curso 5 · Módulo 1 · Lección 7 de 12</p><h1>Entrenar la red: el bucle, un paso a mano y por qué a veces se atasca</h1><p class="lead">Seguimos con la red 2-2-1 (sigmoides) y el mismo usuario, \( \mathbf{x} = (1, 2) \), que sí terminó la serie (\( y = 1 \)).</p><p class="meta-line"><span class="read-time" data-render="read-time"></span><a href="../modulo-1.html">Índice del módulo</a></p></div><div aria-hidden="true" class="hero-tile"></div></div></header><details class="predice"><summary>Si la red que predice si un usuario termina la serie tiene una capa oculta, ¿cambia el bucle de entrenamiento? ¿Qué pasa por dentro cuando PyTorch calcula los gradientes de las dos capas? ¿Y por qué a veces el entrenamiento no arranca?<span class="hint"></span></summary><div><p>Seguimos con la red 2-2-1 (sigmoides) y el mismo usuario, \( \mathbf{x} = (1, 2) \), que sí terminó la serie (\( y = 1 \)).</p></div></details><section aria-label="Explicación breve" class="micro-core"><div class="micro-kicker">01 · ENTENDER <span>≈ 45 s</span></div><h2>La idea en palabras sencillas</h2><p>Esos son los números exactos del fragmento 6, comparados con los que da loss.backward(): son idénticos. Todo el entrenamiento es repetir ese paso con muchos datos.</p><div class="micro-example"><span aria-hidden="true" class="micro-example-icon">🐾</span><div><strong>Otro ejemplo · Mascotas</strong><p>Una aplicación estima 70 % de probabilidad de que una imagen sea de perro: clasifica como «perro» si el umbral es 50 %.</p></div></div></section><div class="micro-kicker micro-checkpoint">02 · RESPONDER <span>≈ 15 s</span></div><section aria-label="Pregunta intercalada" class="quiz mini micro-check"><script class="quiz-data" type="application/json">{"titulo": "Pausa rápida · Comprueba la idea", "preguntas": [{"q": "¿Cuál de estas salidas es una clasificación?", "opciones": ["Temperatura de mañana: 23,5 °C", "Factura estimada: 42 €", "¿El mensaje es spam?: sí / no"], "correcta": 2, "porque": "Clasificar significa decidir entre clases, por ejemplo spam y no spam."}]}</script></section><section aria-label="Animación interactiva" class="micro-viz" data-index="13" data-micro-viz="classification"><div class="micro-kicker">03 · EXPERIMENTAR <span>≈ 45 s</span></div><div class="micro-viz-title"><div><h2>Del número a la decisión</h2><p>Modifica la confianza y observa qué cambia al cruzar el umbral.</p></div><span aria-hidden="true" class="micro-viz-symbol">✦</span></div><div aria-live="polite" class="micro-viz-stage"><p>Animación interactiva: Del número a la decisión</p></div></section><div class="micro-kicker micro-checkpoint">04 · APLICAR <span>≈ 15 s</span></div><section aria-label="Pregunta intercalada" class="quiz mini micro-check"><script class="quiz-data" type="application/json">{"titulo": "Pausa rápida · ¿Lo aplicarías?", "preguntas": [{"q": "Un sistema marca positivo si la probabilidad es al menos 50 %. Recibe 80 %. ¿Qué decide?", "opciones": ["Negativo", "No puede decidir porque es un porcentaje", "Positivo"], "correcta": 2, "porque": "80 % supera el umbral de 50 %."}]}</script></section><div class="micro-finish"><strong>Idea que te llevas</strong><span>Esos son los números exactos del fragmento 6, comparados con los que da loss</span><small>¿Quieres más ejemplos, fórmulas o código? Los tienes justo debajo, sin límite de tiempo.</small></div><details class="profundizar micro-legacy"><summary><span>Explorar más: explicación y simulaciones completas<small>Todo el texto original, tablas y demos avanzadas. Opcional.</small></span></summary><div class="prof-body"><section><h2>Entrenar la red: el bucle, un paso a mano y por qué a veces se atasca</h2>
-<p>Seguimos con la red 2-2-1 (sigmoides) y el mismo usuario, \( \mathbf{x} = (1, 2) \), que <strong>sí terminó la serie</strong> (\( y = 1 \)). Ya tenemos el <em>forward</em>: \( \mathbf{h} = (0.3775,\ 0.7311) \), \( \hat y = 0.4125 \) y pérdida \( 0.8854 \). Ahora los gradientes, de derecha a izquierda (<em>backpropagation</em>). Los dos primeros son las fórmulas de la sección anterior; los siguientes aplican la <strong>regla de la cadena</strong> una capa más atrás:</p>
-<p>Esos son los números exactos del <a href="#frag-6">fragmento 6</a>, comparados con los que da <code>loss.backward()</code>: son idénticos. Todo el entrenamiento es repetir ese paso con muchos datos. La derivación completa de la regla de la cadena para redes más profundas, y cómo se calcula esto «hacia atrás» de forma eficiente, es el tema del <a href="../modulo-2.html">módulo 2</a> (y el <a href="../../curso-2/modulo-1.html#backprop">backprop a mano del Curso 2</a> lo trata en detalle).</p>
-<p>Entrenar la red 2-H-1 con sigmoides sobre los cuatro tipos de usuario del aviso XOR (<em>Toy Story</em> / <em>Shrek</em>) parece trivial: la solución existe. Pero el <a href="leccion-9.html#frag-7">fragmento 7</a> enseña algo importante: con H = 2, <strong>no siempre sale</strong>. Con 10 semillas distintas (10 puntos de partida), 6 aciertan y 4 se quedan atascadas. Y la curva de pérdida de la semilla 1 muestra el motivo en directo:</p>
-<div class="callout ejemplo"><span class="lbl">Ejemplo tomado del módulo</span><p>· backward de la red 2-2-1 Error en la salida. \( \delta_2 = \hat y - y = 0.4125 - 1 = -0.5875 \) (negativo: la red se quedó corta, hay que subir la probabilidad de que la termine).</p></div></section><figure class="demo" data-demo="curso5/c5m1-paso-entrenamiento" data-titulo="Un paso de entrenamiento, número a número">
-<div class="haz">Es el usuario del ejemplo (gusto por la acción 1 y por la comedia 2) y p es la probabilidad de que termine la serie. Deja η = 1 y pulsa «Dar un paso»: la primera vez p debe pasar de 0.4125 a 0.7249. Pulsa varias veces y mira cómo cambian los gradientes de la tabla. Luego «Reiniciar pesos», sube η a 4 y repite; después elige y = 0.</div>
-<div class="observa">Cada paso aplica las mismas fórmulas de la tabla. A medida que p se acerca a 1 el error dz₂ = p − y se hace pequeño y los gradientes se encogen: el aprendizaje frena solo cerca de la solución. Con η muy grande los pasos son bruscos. Con y = 0 (el usuario abandonó la serie) la red empuja p hacia 0 en vez de hacia 1: el mismo código, otro objetivo.</div>
-</figure><div class="resumen"><h2 class="sin-num sin-toc">En pocas líneas</h2><ul><li><strong>Entrenar la red: el bucle, un paso a mano y por qué a veces se atasca:</strong> Seguimos con la red 2-2-1 (sigmoides) y el mismo usuario, \( \mathbf{x} = (1, 2) \), que sí terminó la serie (\( y = 1 \)).</li><li>Antes de continuar, intenta explicar la demo sin mirar su resultado.</li></ul></div><section class="quiz mini"><script class="quiz-data" type="application/json">{"titulo": "¿Lo tienes?", "preguntas": [{"q": "¿Qué concepto estamos trabajando en esta lección?", "opciones": ["Entrenar la red: el bucle, un paso a mano y por qué a veces se atasca", "Dígitos: una red 64-16-10 de verdad", "Una neurona dibuja una recta (y eso no basta)"], "correcta": 0, "porque": "Seguimos con la red 2-2-1 (sigmoides) y el mismo usuario, \\( \\mathbf{x} = (1, 2) \\), que sí terminó la serie (\\( y = 1 \\))."}, {"q": "¿Cuál de estas afirmaciones recoge lo que acabas de estudiar?", "opciones": ["Lo importante es comprender la idea y comprobarla con ejemplos, no memorizar términos.", "Seguimos con la red 2-2-1 (sigmoides) y el mismo usuario, \\( \\mathbf{x} = (1, 2) \\), que sí terminó la serie (\\( y = 1 \\)).", "Siempre hay un único método que sirve para todos los problemas."], "correcta": 1, "porque": "La explicación central es: Seguimos con la red 2-2-1 (sigmoides) y el mismo usuario, \\( \\mathbf{x} = (1, 2) \\), que sí terminó la serie (\\( y = 1 \\))."}, {"q": "Si una demo o un ejemplo te desconcierta, ¿cuál es la mejor forma de aprenderlo?", "opciones": ["Memorizar el nombre sin entender la operación.", "Volver a los números, cambiar un valor y explicar qué ocurre.", "Ignorar los resultados que no coinciden con tu intuición."], "correcta": 1, "porque": "Explorar qué cambia y por qué ayuda a conectar el concepto con su resultado."}]}</script></section></div></details><details class="profundizar"><summary><span>Profundizar: explicación completa<small>Matices, fórmulas, tablas, otros ejemplos y experimentos del módulo original.</small></span></summary><div class="prof-body"><section>
-<h2 id="entrenar">Entrenar la red: el bucle, un paso a mano y por qué a veces se atasca</h2>
-<p class="pregunta">Si la red que predice si un usuario termina la serie tiene una capa oculta, ¿cambia el bucle de entrenamiento? ¿Qué pasa por dentro cuando PyTorch calcula los gradientes de las dos capas? ¿Y por qué a veces el entrenamiento no arranca?</p>
-<div class="callout recuerda">
-<span class="lbl">Recuerda (Curso 4, módulo 3)</span>
-<p>El bucle de entrenamiento de PyTorch son cinco líneas que ya conoces: <code>p = modelo(X)</code> (forward), <code>loss = criterio(p, y)</code>, <code>opt.zero_grad()</code> (borra los gradientes de la vuelta anterior), <code>loss.backward()</code> (calcula los gradientes) y <code>opt.step()</code> (actualiza los parámetros). <strong>Con una capa oculta el bucle es idéntico</strong>: lo único que cambia es el <code>modelo</code>. El motor de gradientes (<code>autograd</code>) deriva solo, capa a capa.</p>
-</div>
-<h3>Un paso de entrenamiento con todas las cuentas</h3>
-<p>Seguimos con la red 2-2-1 (sigmoides) y el mismo usuario, \( \mathbf{x} = (1, 2) \), que <strong>sí terminó la serie</strong> (\( y = 1 \)). Ya tenemos el <em>forward</em>: \( \mathbf{h} = (0.3775,\ 0.7311) \), \( \hat y = 0.4125 \) y pérdida \( 0.8854 \). Ahora los gradientes, de derecha a izquierda (<em>backpropagation</em>). Los dos primeros son las fórmulas de la sección anterior; los siguientes aplican la <strong>regla de la cadena</strong> una capa más atrás:</p>
-<div class="callout ejemplo">
-<span class="lbl">Ejemplo numérico · backward de la red 2-2-1</span>
-<ol class="pasos">
-<li><strong>Error en la salida.</strong> \( \delta_2 = \hat y - y = 0.4125 - 1 = -0.5875 \) (negativo: la red se quedó corta, hay que <em>subir</em> la probabilidad de que la termine).</li>
-<li><strong>Pesos de la salida.</strong> \( \partial L/\partial W_2 = \delta_2\,\mathbf{h} = (-0.5875\cdot 0.3775,\ -0.5875\cdot 0.7311) = (-0.2218,\ -0.4295) \) y \( \partial L/\partial b_2 = \delta_2 = -0.5875 \).</li>
-<li><strong>Error que llega a la capa oculta.</strong> El error se reparte hacia atrás con los pesos que unen cada neurona con la salida: \( \mathbf{dh} = W_2^\top \delta_2 = (1\cdot(-0.5875),\ -1\cdot(-0.5875)) = (-0.5875,\ +0.5875) \).</li>
-<li><strong>Atravesar la sigmoide oculta.</strong> Multiplicar por su derivada \( h(1-h) \): \( 0.3775\cdot 0.6225 = 0.2350 \) y \( 0.7311\cdot 0.2689 = 0.1966 \). Así \( \boldsymbol{\delta}_1 = (-0.5875\cdot 0.2350,\ 0.5875\cdot 0.1966) = (-0.1381,\ +0.1155) \).</li>
-<li><strong>Pesos de la capa oculta.</strong> Error de cada neurona por la entrada que recibe: \( \partial L/\partial W_1 = \boldsymbol{\delta}_1\,\mathbf{x}^\top = \begin{pmatrix} -0.1381\cdot 1 &amp; -0.1381\cdot 2 \\ 0.1155\cdot 1 &amp; 0.1155\cdot 2 \end{pmatrix} = \begin{pmatrix} -0.1381 &amp; -0.2762 \\ 0.1155 &amp; 0.2310 \end{pmatrix} \) y \( \partial L/\partial \mathbf{b}_1 = \boldsymbol{\delta}_1 \). (Sin redondear intermedios, el −0.2762 sale −0.2761, como imprime PyTorch.)</li>
-<li><strong>Actualizar con \( \eta = 1 \).</strong> \( W_2 \leftarrow (1,-1) - 1\cdot(-0.2218,-0.4295) = (1.2218,\ -0.5705) \), \( b_2 \leftarrow 0.5875 \), y \( W_1,\mathbf{b}_1 \) igual con sus gradientes. Con estos pesos nuevos, la red da \( \hat y = 0.7249 \): subió de 0.4125 a 0.7249.</li>
-</ol>
-</div>
-<p>Esos son los números exactos del <a href="#frag-6">fragmento 6</a>, comparados con los que da <code>loss.backward()</code>: son idénticos. Todo el entrenamiento es repetir ese paso con muchos datos. La derivación completa de la regla de la cadena para redes más profundas, y cómo se calcula esto «hacia atrás» de forma eficiente, es el tema del <a href="../modulo-2.html">módulo 2</a> (y el <a href="../../curso-2/modulo-1.html#backprop">backprop a mano del Curso 2</a> lo trata en detalle).</p>
-<h3>Entrenar XOR de verdad (y la meseta)</h3>
-<p>Entrenar la red 2-H-1 con sigmoides sobre los cuatro tipos de usuario del aviso XOR (<em>Toy Story</em> / <em>Shrek</em>) parece trivial: la solución existe. Pero el <a href="leccion-9.html#frag-7">fragmento 7</a> enseña algo importante: con H = 2, <strong>no siempre sale</strong>. Con 10 semillas distintas (10 puntos de partida), 6 aciertan y 4 se quedan atascadas. Y la curva de pérdida de la semilla 1 muestra el motivo en directo:</p>
-<table>
-<caption>Pérdida de XOR con H = 2, semilla 1 (SGD, lr = 0.5)</caption>
-<thead><tr><th>Época</th><th>0</th><th>100</th><th>500</th><th>1000</th><th>3000</th></tr></thead>
-<tbody><tr><th scope="row">Pérdida</th><td>0.7028</td><td>0.6934</td><td>0.6932</td><td>0.6930</td><td class="res">0.0332</td></tr></tbody>
-</table>
-<p>Durante mil épocas la pérdida apenas se mueve (de 0.6934 a 0.6930) y de pronto cae. Es una <strong>meseta</strong>: una zona del paisaje de la pérdida casi plana, donde los gradientes son minúsculos y el descenso va a paso de tortuga. Con una neurona sola, el punto \( w=0 \) era un mínimo; aquí, en las mesetas, hay puntos de silla o zonas planas que el optimizador cruza muy despacio. Con 2 neuronas ocultas hay pocos caminos para salir; con <strong>H = 4 se resuelve en 10 de 10 semillas</strong>. Más neuronas dan más «direcciones» por las que escapar.</p>
-<div class="callout ojo">
-<span class="lbl">Ojo · «mi red no aprende» no siempre es un error de código</span>
-<p>Si la pérdida se queda clavada en \( \ln 2 = 0.693 \) (clasificación binaria equilibrada) o en \( \ln K \) (con \( K \) clases: 1.099 para \( K=3 \)), la red está diciendo «no sé nada»: reparte la probabilidad por igual. Antes de buscar un <em>bug</em>, prueba lo más barato: otra semilla, más neuronas ocultas, otro <em>learning rate</em> o Adam en vez de SGD, o simplemente más épocas, para ver si es una meseta. Después sí: revisa que el <code>y</code> y la pérdida casan (sección 6).</p>
-</div>
-<h3>El problema de la simetría: por qué los pesos iniciales no pueden ser iguales</h3>
-<p>Si todas las neuronas ocultas empiezan con los mismos pesos (por ejemplo, todo a 0.5, o todo a 0), reciben las mismas entradas, producen la misma salida y, en el <em>backward</em>, reciben <strong>el mismo gradiente</strong>: \( \boldsymbol{\delta}_1[j] = W_2[j]\cdot\delta_2\cdot h_j(1-h_j) \) es igual para todas las \( j \) si \( W_2[j] \) y \( h_j \) son iguales. Se actualizan igual y siguen siendo iguales para siempre. Una capa oculta de 3 neuronas «clónicas» es, en la práctica, <strong>una sola neurona</strong> repetida: el resto de la capacidad se desperdicia. Es como contratar a tres críticos que empiezan con exactamente las mismas opiniones y reciben siempre las mismas correcciones: acaban siendo el mismo crítico tres veces.</p>
-<p>El <a href="leccion-6.html#frag-8">fragmento 8</a> lo mide: con pesos iniciales iguales, la pérdida final de XOR es 0.5018 y las tres filas de la matriz de pesos son idénticas (4.709 en todas partes); con los pesos aleatorios de PyTorch, la pérdida baja a 0.1911 y las tres neuronas son distintas. Por eso PyTorch inicializa con números <strong>aleatorios</strong> (la <em>ruptura de la simetría</em>). Qué rango y qué distribución son mejores (Xavier, He) lo estudia el módulo 2.</p>
-<figure class="demo" data-demo="curso5/c5m1-capa-oculta-vivo" data-titulo="Una capa oculta entrenándose: rectas, miniaturas y simetría">
-<div class="haz">Cada punto es un usuario en un mapa de gustos (x₁: acción, x₂: comedia) y su color dice si termina la serie o la abandona. Con XOR (cuatro nubes), H = 4 y tanh, pulsa «Entrenar» y mira cómo las rectas discontinuas se colocan y las miniaturas h1…h4 aprenden cada una un «trozo». Después activa «Pesos iniciales idénticos (simetría)» y vuelve a entrenar. Prueba también H = 1, 2 y 3 y otros datos (círculos, lunas).</div>
-<div class="observa">Cada recta discontinua es z = 0 de una neurona oculta; la miniatura es lo que esa neurona «ve» en todo el plano; la última («salida») es la combinación. Con H = 1 solo hay una recta y la pérdida no baja de ≈ 0.4 en XOR; con la simetría activada, el contador «neuronas distintas» marca 1 de 4: las cuatro rectas son la misma y la miniatura de cada neurona es idéntica. Con círculos hacen falta al menos 3 neuronas para cerrar la región.</div>
-</figure>
-<div class="callout regla">
-<span class="lbl">Regla fácil</span>
-<p>Entrenar una red es repetir: <strong>forward → pérdida → backward → paso</strong>. Si no baja, mira en este orden: (1) ¿pérdida y etiquetas casan en forma y tipo? (2) ¿hay <em>simetría</em> (pesos iguales) o una <em>meseta</em> (prueba otra semilla o más neuronas)? (3) ¿el <em>learning rate</em> es razonable? (4) ¿las entradas están escaladas?</p>
-</div>
-<div class="callout ojo">
-<span class="lbl">Ojo · evaluar sin gradientes, y <code>train()</code> / <code>eval()</code></span>
-<p>Para medir el acierto sin entrenar, envuelve el código en <code>with torch.no_grad():</code> (ahorra memoria y tiempo porque no se construye el grafo de derivadas) y pon el modelo en modo evaluación con <code>modelo.eval()</code>; antes de volver a entrenar, <code>modelo.train()</code>. Con las redes de este módulo (sin <em>dropout</em> ni <em>batch normalization</em>) los dos modos hacen lo mismo, pero es un hábito que en el <a href="../modulo-2.html">módulo 2</a> será imprescindible.</p>
-</div>
-</section></div></details><details class="profundizar" id="codigo"><summary><span>Ver código explicado paso a paso<small>1 fragmento(s) original(es), con cada línea comentada y salida esperada.</small></span></summary><div class="prof-body"><article class="snippet" data-lang="python" id="frag-6">
-<header>
-<h3>6 · Un paso de entrenamiento a mano, comprobado con autograd</h3>
-<p class="para-que"><strong>Para qué sirve</strong> Calcular el forward, la pérdida, los gradientes (con las fórmulas de la sección) y un paso de descenso del gradiente en la red 2-2-1 del ejemplo, y comprobar que coinciden con lo que calcula <code>backward()</code>.</p>
+<header class="hero leccion">
+  <div class="hero-grid">
+    <div>
+      <p class="eyebrow">Curso 5 · Módulo 1 · Lección 7 de 8</p>
+      <h1>K clases, K neuronas: la red da logits y la pérdida pone la softmax</h1>
+      <p class="lead">¿Este tráiler es de acción, de comedia o de terror? La última capa tiene <strong>una neurona por género</strong> y devuelve logits; <code>CrossEntropyLoss</code> los convierte en probabilidades por dentro.</p>
+      <p class="meta-line"><span class="read-time" data-render="read-time"></span><a href="../modulo-1.html">Índice del módulo</a></p>
+    </div>
+    <div class="hero-tile" aria-hidden="true"></div>
+  </div>
 </header>
-<pre class="code"><code>import torch
 
-x = torch.tensor([1., 2.])
-y = torch.tensor([1.])
-W1 = torch.tensor([[0.5, -0.5], [1.0, 0.5]], requires_grad=True)
-b1 = torch.tensor([0.0, -1.0], requires_grad=True)
-W2 = torch.tensor([[1.0, -1.0]], requires_grad=True)
-b2 = torch.tensor([0.0], requires_grad=True)
-
-# --- hacia delante ---
-z1 = W1 @ x + b1
-h = torch.sigmoid(z1)
-z2 = W2 @ h + b2
-p = torch.sigmoid(z2)
-loss = -(y * torch.log(p) + (1 - y) * torch.log(1 - p))
-print("z1 =", z1.detach().numpy(), " h =", h.detach().numpy().round(4))
-print(f"z2 = {z2.item():.4f}   p = {p.item():.4f}   pérdida = {loss.item():.4f}")
-
-# --- gradientes que da PyTorch ---
-loss.backward()
-
-# --- los mismos, con las fórmulas a mano ---
-dz2 = p.detach() - y
-dW2 = dz2 * h.detach()
-dh = W2.detach().T @ dz2
-dz1 = dh * h.detach() * (1 - h.detach())
-dW1 = torch.outer(dz1, x)
-print("dz2 =", dz2.numpy().round(4))
-print("dW2 a mano  :", dW2.numpy().round(4), "\ndW2 autograd:", W2.grad.numpy().round(4))
-print("dW1 a mano  :\n", dW1.numpy().round(4))
-print("dW1 autograd:\n", W1.grad.numpy().round(4))
-print("db1 autograd:", b1.grad.numpy().round(4), "  db2 autograd:", b2.grad.numpy().round(4))
-
-# --- un paso de descenso del gradiente con lr = 1 ---
-with torch.no_grad():
-    for param in (W1, b1, W2, b2):
-        param -= 1.0 * param.grad
-    p_nueva = torch.sigmoid(W2 @ torch.sigmoid(W1 @ x + b1) + b2)
-print("probabilidad antes:", round(p.item(), 4), " después:", round(p_nueva.item(), 4))</code></pre>
-<details class="linea-a-linea" open="">
-<summary>Línea por línea</summary>
-<p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
-<table class="lineas">
-<thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
-<tbody>
-<tr data-lines="1"><td><code>import torch</code></td><td>Solo necesitamos <code>torch</code>: aquí los parámetros se crean a mano, sin capas.</td></tr>
-<tr data-lines="3-4"><td><code>x = torch.tensor([1., 2.])
-y = torch.tensor([1.])</code></td><td>Una muestra <code>x = (1, 2)</code> y su etiqueta <code>y = 1</code>.</td></tr>
-<tr data-lines="5-6"><td><code>W1 = torch.tensor([[0.5, -0.5], [1.0, 0.5]], requires_grad=True)
-b1 = torch.tensor([0.0, -1.0], requires_grad=True)</code></td><td>Capa oculta: <code>W1</code> (2×2) y <code>b1</code>. <code>requires_grad=True</code> pide a PyTorch que calcule el gradiente respecto a estos tensores.</td></tr>
-<tr data-lines="7-8"><td><code>W2 = torch.tensor([[1.0, -1.0]], requires_grad=True)
-b2 = torch.tensor([0.0], requires_grad=True)</code></td><td>Capa de salida: <code>W2</code> (1×2) y <code>b2</code>.</td></tr>
-<tr data-lines="10-11"><td><code># --- hacia delante ---
-z1 = W1 @ x + b1</code></td><td>Comentario y primera operación: <code>z1 = W1 @ x + b1</code> son las dos sumas ponderadas de la capa oculta.</td></tr>
-<tr data-lines="12"><td><code>h = torch.sigmoid(z1)</code></td><td><code>h = σ(z1)</code>: activaciones de las dos neuronas ocultas.</td></tr>
-<tr data-lines="13"><td><code>z2 = W2 @ h + b2</code></td><td><code>z2 = W2 @ h + b2</code>: suma ponderada de la neurona de salida.</td></tr>
-<tr data-lines="14"><td><code>p = torch.sigmoid(z2)</code></td><td><code>p = σ(z2)</code>: probabilidad de la clase 1.</td></tr>
-<tr data-lines="15"><td><code>loss = -(y * torch.log(p) + (1 - y) * torch.log(1 - p))</code></td><td>La entropía cruzada binaria escrita a mano: <code>−[y·ln p + (1−y)·ln(1−p)]</code>.</td></tr>
-<tr data-lines="16-17"><td><code>print("z1 =", z1.detach().numpy(), " h =", h.detach().numpy().round(4))
-print(f"z2 = {z2.item():.4f}   p = {p.item():.4f}   pérdida = {loss.item():.4f}")</code></td><td>Imprime <code>z1</code> y <code>h</code>, y luego <code>z2</code>, <code>p</code> y la pérdida con 4 decimales.</td></tr>
-<tr data-lines="19-20"><td><code># --- gradientes que da PyTorch ---
-loss.backward()</code></td><td><code>loss.backward()</code> recorre el grafo hacia atrás y deja en cada <code>.grad</code> la derivada de la pérdida respecto a ese parámetro.</td></tr>
-<tr data-lines="22-23"><td><code># --- los mismos, con las fórmulas a mano ---
-dz2 = p.detach() - y</code></td><td>Fórmulas a mano, paso 1: <code>dz2 = p − y</code> (la derivada de la BCE respecto a <code>z2</code> cuando la salida es una sigmoide). <code>detach()</code> trabaja con valores sin grafo.</td></tr>
-<tr data-lines="24"><td><code>dW2 = dz2 * h.detach()</code></td><td><code>dW2 = dz2·h</code>: la derivada respecto a cada peso de salida es el error por la entrada de ese peso.</td></tr>
-<tr data-lines="25"><td><code>dh = W2.detach().T @ dz2</code></td><td><code>dh = W2ᵀ·dz2</code>: el error se reparte hacia atrás entre las neuronas ocultas, proporcional a los pesos que las conectan con la salida.</td></tr>
-<tr data-lines="26"><td><code>dz1 = dh * h.detach() * (1 - h.detach())</code></td><td><code>dz1 = dh · h(1−h)</code>: se atraviesa la sigmoide multiplicando por su derivada σ′ = h(1−h).</td></tr>
-<tr data-lines="27"><td><code>dW1 = torch.outer(dz1, x)</code></td><td><code>dW1 = dz1 xᵀ</code> (producto exterior): el gradiente de cada peso de la capa 1 es el error de su neurona por la entrada que recibe. <code>torch.outer</code> lo calcula.</td></tr>
-<tr data-lines="28-32"><td><code>print("dz2 =", dz2.numpy().round(4)) …</code></td><td>Imprime los gradientes a mano y los que dio <code>autograd</code> (<code>.grad</code>) uno junto al otro. Los gradientes de los sesgos son <code>dz1</code> y <code>dz2</code>.</td></tr>
-<tr data-lines="34-35"><td><code># --- un paso de descenso del gradiente con lr = 1 ---
-with torch.no_grad():</code></td><td>Un paso de descenso del gradiente con <code>lr = 1</code>. Dentro de <code>torch.no_grad()</code> porque estamos editando parámetros, no calculando.</td></tr>
-<tr data-lines="36-37"><td><code>for param in (W1, b1, W2, b2):
-    param -= 1.0 * param.grad</code></td><td>A cada parámetro se le resta <code>lr × gradiente</code> (<code>-=</code> lo modifica en el sitio).</td></tr>
-<tr data-lines="38"><td><code>p_nueva = torch.sigmoid(W2 @ torch.sigmoid(W1 @ x + b1) + b2)</code></td><td>Recalcula la probabilidad con los pesos nuevos.</td></tr>
-<tr data-lines="39"><td><code>print("probabilidad antes:", round(p.item(), 4), " después:", round(p_nueva.item(), 4))</code></td><td>Imprime la probabilidad antes y después.</td></tr>
-</tbody>
-</table>
+<details class="predice">
+  <summary>La red da a un tráiler los números (2.0, 1.0, 0.1) para acción, comedia y terror. Sin hacer cuentas: ¿qué género predice? ¿Suman 1 esos números?<span class="hint"></span></summary>
+  <div>
+    <p><strong>Acción, el mayor. Y no suman 1:</strong> son <em>logits</em>, puntuaciones libres que pueden ser negativas. La softmax los convierte en probabilidades (0.659, 0.242, 0.099), pero conserva el orden, así que <code>argmax</code> da la misma clase con ella o sin ella.</p>
+  </div>
 </details>
-<div class="salida">
-<strong>Salida esperada</strong>
-<pre>z1 = [-0.5  1. ]  h = [0.3775 0.7311]
-z2 = -0.3535   p = 0.4125   pérdida = 0.8854
-dz2 = [-0.5875]
-dW2 a mano  : [-0.2218 -0.4295] 
-dW2 autograd: [[-0.2218 -0.4295]]
-dW1 a mano  :
- [[-0.1381 -0.2761]
- [ 0.1155  0.231 ]]
-dW1 autograd:
- [[-0.1381 -0.2761]
- [ 0.1155  0.231 ]]
-db1 autograd: [-0.1381  0.1155]   db2 autograd: [-0.5875]
-probabilidad antes: 0.4125  después: 0.7249</pre>
-<p>Forward: <code>z1 = [−0.5, 1.0]</code>, <code>h = [0.3775, 0.7311]</code>, <code>z2 = −0.3535</code>, <code>p = 0.4125</code> y pérdida <strong>0.8854</strong> (la red da solo un 41 % a la clase correcta). Gradientes: <code>dz2 = −0.5875</code>, <code>dW2 = [−0.2218, −0.4295]</code> y <code>dW1 = [[−0.1381, −0.2761], [0.1155, 0.2310]]</code>, <strong>idénticos</strong> a mano y con autograd; los de los sesgos valen <code>dz1</code> y <code>dz2</code>. Tras un paso de <code>lr = 1</code>, la probabilidad de la clase correcta sube de <strong>0.4125 a 0.7249</strong>. Todo el aprendizaje es repetir esto muchas veces.</p>
+
+<section>
+<h2 id="idea">Una neurona de salida por clase</h2>
+<p>Con \( K \) clases la red es \( D_{in}\text{-}H\text{-}K \): la capa oculta es la de siempre y la última es <code>nn.Linear(H, K)</code>, con pesos \( (K, H) \), una fila por clase. Es una regresión softmax que mira la descripción \( \mathbf{h} \) fabricada por la capa oculta en lugar de los datos originales.</p>
+<ul class="flow">
+  <li class="a">ENTRADA<small>(N, D_in)</small></li>
+  <li class="b">LINEAR + ACTIVACIÓN<small>(N, H)</small></li>
+  <li class="c">LINEAR(H, K)<small>logits (N, K)</small></li>
+  <li class="d">CrossEntropyLoss<small>softmax + log + media</small></li>
+</ul>
+<p>La <strong>softmax</strong>, \( p_k = e^{z_k}/\sum_j e^{z_j} \), convierte los \( K \) logits en probabilidades que suman 1. <code>nn.CrossEntropyLoss</code> ya la incluye: la red devuelve logits y las etiquetas son un entero por muestra (<code>long</code>, forma <code>(N,)</code>, de 0 a \( K-1 \)), sin one-hot. Para ver probabilidades, <code>torch.softmax(logits, dim=1)</code> después; <code>dim=1</code> es «a lo largo de las clases».</p>
+<p>Una comprobación gratis: una red sin entrenar reparte \( 1/K \) a cada clase, así que su pérdida inicial es \( \ln K \) (1.099 con 3 clases).</p>
+</section>
+
+<figure class="demo" data-demo="curso5/c5m1-multiclase" data-titulo="Tres clases: logits, softmax y argmax en vivo">
+  <div class="haz">Pulsa «Entrenar» con tres espirales y mueve la cruz por el mapa, sobre todo cerca de una frontera.</div>
+  <div class="observa">Lejos de las fronteras un género se lleva casi el 100 %; sobre una frontera, dos se reparten la probabilidad.</div>
+</figure>
+
+<section>
+<h2 id="numeros">Con números: de los logits a la clase</h2>
+<div class="callout ejemplo">
+  <span class="lbl">Ejemplo numérico · red 2-24-3 del fragmento 13</span>
+  <p>Para el tráiler (0.5, 0.5) la red da \( \mathbf{z} = (7.629,\ 3.354,\ 10.425) \) para (acción, comedia, terror).</p>
+  <ol class="pasos">
+    <li>Resta el máximo: \( (-2.796,\ -7.071,\ 0) \).</li>
+    <li>Exponenciales: \( 0.0610,\ 0.00085,\ 1 \); suma \( 1.0618 \).</li>
+    <li>Divide: \( p = (0.057,\ 0.001,\ 0.942) \), que suman 1.</li>
+    <li><code>argmax</code> = 2: <span class="res">terror</span>.</li>
+  </ol>
 </div>
-</article></div></details></div></main></body></html>
+</section>
+
+<details class="predice">
+  <summary>Pones <code>nn.Softmax()</code> al final del <code>forward</code> y entrenas con <code>CrossEntropyLoss</code>. ¿Salta un error?<span class="hint"></span></summary>
+  <div>
+    <p><strong>No, y eso es lo malo.</strong> La softmax se aplica dos veces y la red entrena peor sin avisar. <code>CrossEntropyLoss</code> ya la lleva dentro: la red debe acabar en los logits.</p>
+  </div>
+</details>
+
+<div class="resumen">
+  <h2 class="sin-num sin-toc">En tres líneas</h2>
+  <ul>
+    <li>\( K \) clases → <code>nn.Linear(H, K)</code>: \( K \) logits por muestra, sin softmax en el <code>forward</code>.</li>
+    <li><code>CrossEntropyLoss</code> aplica la softmax; las etiquetas son <code>long</code> de forma <code>(N,)</code>.</li>
+    <li>Clase = <code>argmax(dim=1)</code>; la pérdida inicial debe rondar \( \ln K \).</li>
+  </ul>
+</div>
+
+<section class="quiz mini">
+<script type="application/json" class="quiz-data">
+{
+ "titulo": "¿Lo tienes?",
+ "preguntas": [
+  {
+   "q": "Quieres clasificar películas en 10 géneros con <code>nn.CrossEntropyLoss</code>. ¿Cuál es la configuración correcta?",
+   "opciones": [
+    "La red devuelve 10 logits por muestra, sin softmax, y las etiquetas son enteros <code>long</code> de forma <code>(N,)</code>",
+    "La red termina en <code>nn.Softmax</code> y las etiquetas son decimales <code>float</code> de forma <code>(N,)</code>",
+    "La red devuelve una sola salida con sigmoide",
+    "La red devuelve 10 probabilidades y tú aplicas el logaritmo a mano"
+   ],
+   "correcta": 0,
+   "porque": "<code>CrossEntropyLoss</code> ya aplica la softmax y el logaritmo por dentro, así que la red debe devolver <em>logits</em> \\( (N, 10) \\) y las etiquetas deben ser índices de clase <code>long</code> \\( (N,) \\). Con etiquetas decimales da «expected target dtype to be Long or Byte, but got Float» (fragmento 17)."
+  },
+  {
+   "q": "Una red que reparte las películas en 4 géneros acaba de crearse (pesos aleatorios pequeños, sin entrenar). ¿Qué pérdida de entropía cruzada esperas en el primer lote?",
+   "opciones": [
+    "Cerca de 0.25",
+    "Cerca de 0.693",
+    "Cerca de 1.386",
+    "Cerca de 4"
+   ],
+   "correcta": 2,
+   "porque": "Sin haber aprendido nada, la red reparte la probabilidad casi a partes iguales: \\( 1/4 \\) para cada clase, y la pérdida es \\( -\\ln(1/4) = \\ln 4 = 1.386 \\). Para 2 clases sería \\( \\ln 2 = 0.693 \\) y para 10, \\( \\ln 10 = 2.303 \\). Si empiezas con un valor muy distinto, revisa la red o las etiquetas."
+  },
+  {
+   "q": "<code>logits</code> tiene forma <code>(N, 3)</code>. ¿Cómo obtienes la clase predicha de cada muestra?",
+   "opciones": [
+    "<code>logits.argmax(dim=0)</code>",
+    "<code>logits.argmax(dim=1)</code>",
+    "<code>logits.max()</code>"
+   ],
+   "correcta": 1,
+   "porque": "<code>dim=1</code> recorre las columnas, las clases, y da un índice por fila (muestra): forma <code>(N,)</code>. <code>dim=0</code> compararía muestras entre sí, y <code>max()</code> sin <code>dim</code> devuelve un único número de todo el tensor."
+  }
+ ]
+}
+</script>
+</section>
+
+<details class="profundizar">
+  <summary><span>Profundizar: la explicación completa<small>El recordatorio de la softmax del Curso 4, la arquitectura D_in-H-K, el ejemplo de logits paso a paso, la pérdida inicial ln K y los tres errores de etiquetas, softmax y dim.</small></span></summary>
+  <div class="prof-body">
+<h2 id="multiclase">Más de dos clases: K neuronas de salida</h2>
+
+<p class="pregunta">Si la red tiene que decidir el género de un tráiler entre tres opciones (acción, comedia o terror; o entre diez), ¿qué cambia en la arquitectura? ¿Dónde pasa la softmax?</p>
+
+<div class="callout recuerda">
+  <span class="lbl">Recuerda (Curso 4, módulo 5)</span>
+  <p>Con \( K \) clases, la salida es un vector de \( K \) <strong>logits</strong>, y la <strong>softmax</strong> \( p_k = e^{z_k}/\sum_j e^{z_j} \) los convierte en \( K \) probabilidades que suman 1. <code>nn.CrossEntropyLoss</code> ya incluye la softmax, así que <strong>la red devuelve logits</strong> y las etiquetas son un entero por muestra (<code>torch.long</code>). Lo viste con la <a href="../../curso-4/modulo-5.html">regresión softmax</a>: un solo <code>nn.Linear(D_in, K)</code>.</p>
+</div>
+
+<p>Con una capa oculta, la red es \( D_{in}\text{-}H\text{-}K \): la capa oculta es igual que siempre y <strong>la última capa tiene una neurona por clase</strong> (<code>nn.Linear(H, K)</code>: pesos de forma \( (K, H) \), una fila por clase). Esa última capa es una regresión softmax que, en lugar de mirar los datos originales, mira la nueva descripción \( \mathbf{h} \) que ha fabricado la capa oculta.</p>
+<ul class="flow">
+  <li class="a">ENTRADA<small>(N, D_in)</small></li>
+  <li class="b">LINEAR + ACTIVACIÓN<small>(N, H)</small></li>
+  <li class="c">LINEAR(H, K)<small>logits (N, K)</small></li>
+  <li class="d">CrossEntropyLoss<small>softmax + log + media</small></li>
+</ul>
+
+<div class="callout ejemplo">
+  <span class="lbl">Ejemplo numérico · de los logits a la clase</span>
+  <p>El <a href="#frag-13">fragmento 13</a> entrena una red 2-24-3 con tres espirales. Para ponerles nombre a las clases: 0 = acción, 1 = comedia, 2 = terror, y cada punto del mapa es un tráiler descrito por dos números. Para el punto (0.5, 0.5) la red devuelve los logits \( \mathbf{z} = (7.629,\ 3.354,\ 10.425) \):</p>
+  <ol class="pasos">
+    <li><strong>Restar el máximo</strong> (para que las exponenciales no se desborden; no cambia el resultado): \( (7.629-10.425,\ 3.354-10.425,\ 0) = (-2.796,\ -7.071,\ 0) \).</li>
+    <li><strong>Exponenciales.</strong> \( e^{-2.796} = 0.0610 \), \( e^{-7.071} = 0.00085 \), \( e^{0} = 1 \). Suma: \( 1.0618 \).</li>
+    <li><strong>Probabilidades.</strong> \( (0.0610,\ 0.00085,\ 1)/1.0618 = (0.057,\ 0.001,\ 0.942) \): suman 1.</li>
+    <li><strong>Clase.</strong> <code>argmax</code> = 2, terror (el logit más alto y la probabilidad más alta coinciden).</li>
+  </ol>
+</div>
+
+<p>Otro detalle útil: con la red recién creada, todos los logits son casi iguales y la probabilidad de cada clase es \( \approx 1/K \). La pérdida inicial debe ser \( \ln K \): para \( K=3 \), \( \ln 3 = 1.099 \), justo lo que imprime el fragmento 13 en la época 1 (1.099). Si tu red de \( K \) clases empieza con una pérdida muy distinta de \( \ln K \), algo anda mal.</p>
+
+<div class="callout recuerda">
+  <span class="lbl">Experimento de arriba: «Tres clases: logits, softmax y argmax en vivo», con todo detalle</span>
+  <p><strong>Haz esto.</strong> Cada punto es un tráiler de acción (azul), comedia (rojo) o terror (verde). Pulsa «Entrenar» con tres espirales y mira cómo el mapa se reparte en tres colores. Haz clic o toca (o arrastra con el ratón) sobre el mapa para mover la cruz, que es un tráiler nuevo, y fíjate en los logits y probabilidades de ese punto, sobre todo cerca de una frontera. Prueba H = 2 y H = 24 y «Tres nubes».</p>
+  <p><strong>Fíjate en.</strong> Los logits (barras de la izquierda) pueden ser cualquier número, también negativos; la softmax (derecha) los convierte en probabilidades que suman 100 %. Lejos de las fronteras, una clase se lleva casi el 100 %; sobre una frontera dos clases se reparten la probabilidad. La pérdida empieza cerca de ln 3 = 1.099 (la línea de puntos). Con las espirales hace falta una capa oculta bastante ancha; con las tres nubes, que son casi separables con rectas, basta con H = 2 o 3.</p>
+</div>
+
+<div class="callout ojo">
+  <span class="lbl">Ojo</span>
+  <p><strong>Etiquetas:</strong> un entero 0…K−1 por muestra, tipo <code>long</code>, forma <code>(N,)</code> — no hace falta one-hot, y con decimales (<code>float</code>) falla con el error del <a href="leccion-8.html#frag-17">fragmento 17</a>. <strong>Softmax:</strong> no la pongas en el <code>forward</code> si usas <code>CrossEntropyLoss</code> (la pérdida ya la aplica). Para ver probabilidades usa <code>torch.softmax(logits, dim=1)</code> <em>después</em> y con <code>no_grad</code>. <strong><code>dim</code>:</strong> en <code>softmax</code> y <code>argmax</code>, <code>dim=1</code> es «a lo largo de las clases» (columnas); <code>dim=0</code> mezclaría muestras entre sí.</p>
+</div>
+  </div>
+</details>
+
+<section>
+<h2 class="sin-num">Código</h2>
+<article class="snippet" data-lang="python" id="frag-13">
+  <header>
+    <h3>13 · Tres clases: salida con K neuronas, softmax y CrossEntropyLoss</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Clasificar tres espirales con una red 2-24-3: etiquetas como índices (<code>long</code>), <code>CrossEntropyLoss</code> sobre logits, y convertir los logits de un punto en probabilidades con <code>softmax</code>.</p>
+  </header>
+  <pre class="code"><code>import numpy as np
+import torch
+from torch import nn
+
+def espirales(n=60, k=3, ruido=0.15, semilla=0):
+    rng = np.random.default_rng(semilla)
+    puntos, etiquetas = [], []
+    for c in range(k):
+        r = np.linspace(0.1, 1.0, n)
+        ang = np.linspace(c * 2 * np.pi / k, c * 2 * np.pi / k + 3.0, n) + rng.normal(0, ruido, n)
+        puntos.append(np.c_[r * np.sin(ang), r * np.cos(ang)])
+        etiquetas += [c] * n
+    return np.vstack(puntos), np.array(etiquetas)
+
+X, y = espirales()
+X = torch.tensor(X, dtype=torch.float32)
+y = torch.tensor(y, dtype=torch.long)
+print("X:", tuple(X.shape), X.dtype, "   y:", tuple(y.shape), y.dtype, "   clases:", y.unique().tolist())
+
+torch.manual_seed(0)
+modelo = nn.Sequential(nn.Linear(2, 24), nn.Tanh(), nn.Linear(24, 3))
+criterio = nn.CrossEntropyLoss()
+opt = torch.optim.Adam(modelo.parameters(), lr=0.02)
+
+for epoca in range(1, 801):
+    logits = modelo(X)
+    loss = criterio(logits, y)
+    opt.zero_grad()
+    loss.backward()
+    opt.step()
+    if epoca in (1, 100, 300, 800):
+        acc = (logits.argmax(dim=1) == y).float().mean().item()
+        print(f"época {epoca:4d}  pérdida {loss.item():.3f}  accuracy {acc:.3f}")
+
+punto = torch.tensor([[0.5, 0.5]])
+with torch.no_grad():
+    z = modelo(punto)
+    p = torch.softmax(z, dim=1)
+print("logits       :", z.numpy().round(3))
+print("probabilidades:", p.numpy().round(3), " suma =", round(p.sum().item(), 3))
+print("clase elegida :", p.argmax(dim=1).item())
+print("forma de la última capa:", tuple(modelo[2].weight.shape), "-&gt; una fila por clase")</code></pre>
+  <details class="linea-a-linea" open>
+    <summary>Línea por línea</summary>
+    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+      <tbody>
+        <tr data-lines="1-3"><td><code>import numpy as np …</code></td><td><code>numpy</code> (para generar los datos), <code>torch</code> y <code>nn</code>.</td></tr>
+        <tr data-lines="5"><td><code>def espirales(n=60, k=3, ruido=0.15, semilla=0):</code></td><td>Función que genera <code>k</code> espirales de <code>n</code> puntos cada una, con un poco de ruido.</td></tr>
+        <tr data-lines="6"><td><code>rng = np.random.default_rng(semilla)</code></td><td>Generador aleatorio de NumPy con semilla.</td></tr>
+        <tr data-lines="7"><td><code>puntos, etiquetas = [], []</code></td><td>Listas donde iremos guardando puntos y etiquetas.</td></tr>
+        <tr data-lines="8"><td><code>for c in range(k):</code></td><td>Un bucle por clase <code>c</code> (0, 1, 2).</td></tr>
+        <tr data-lines="9"><td><code>r = np.linspace(0.1, 1.0, n)</code></td><td>El radio crece de 0.1 a 1.0 a lo largo de la espiral.</td></tr>
+        <tr data-lines="10"><td><code>ang = np.linspace(c * 2 * np.pi / k, c * 2 * np.pi / k + 3.0, n) + rng.normal(0, ruido, n)</code></td><td>El ángulo gira 3 radianes; cada clase empieza en un ángulo distinto (un tercio de vuelta de separación), más ruido gaussiano.</td></tr>
+        <tr data-lines="11"><td><code>puntos.append(np.c_[r * np.sin(ang), r * np.cos(ang)])</code></td><td>Convierte (radio, ángulo) en coordenadas (x, y) con seno y coseno; <code>np.c_</code> junta las dos columnas.</td></tr>
+        <tr data-lines="12"><td><code>etiquetas += [c] * n</code></td><td>Etiqueta de esa clase repetida <code>n</code> veces.</td></tr>
+        <tr data-lines="13"><td><code>return np.vstack(puntos), np.array(etiquetas)</code></td><td>Une todo: una matriz de puntos y un vector de etiquetas.</td></tr>
+        <tr data-lines="15"><td><code>X, y = espirales()</code></td><td>Genera los datos: 3 × 60 = 180 puntos.</td></tr>
+        <tr data-lines="16"><td><code>X = torch.tensor(X, dtype=torch.float32)</code></td><td>Las entradas, como <code>float32</code>.</td></tr>
+        <tr data-lines="17"><td><code>y = torch.tensor(y, dtype=torch.long)</code></td><td>Las etiquetas, como <code>torch.long</code> (enteros de 64 bits): <code>CrossEntropyLoss</code> los exige así, <strong>un entero por muestra</strong> (no one-hot).</td></tr>
+        <tr data-lines="18"><td><code>print("X:", tuple(X.shape), X.dtype, "   y:", tuple(y.shape), y.dtype, "   clases:", y.unique().tolist())</code></td><td>Comprobación de formas y tipos: <code>X</code> (180, 2) float32 e <code>y</code> (180,) int64, y las clases que contiene (<code>unique()</code>).</td></tr>
+        <tr data-lines="20"><td><code>torch.manual_seed(0)</code></td><td>Semilla.</td></tr>
+        <tr data-lines="21"><td><code>modelo = nn.Sequential(nn.Linear(2, 24), nn.Tanh(), nn.Linear(24, 3))</code></td><td>Red 2-24-3: la <strong>última capa tiene una neurona por clase</strong> y no lleva activación (devuelve logits).</td></tr>
+        <tr data-lines="22"><td><code>criterio = nn.CrossEntropyLoss()</code></td><td><code>nn.CrossEntropyLoss</code> aplica <em>softmax + logaritmo + media</em> en un solo paso.</td></tr>
+        <tr data-lines="23"><td><code>opt = torch.optim.Adam(modelo.parameters(), lr=0.02)</code></td><td>Optimizador Adam.</td></tr>
+        <tr data-lines="25"><td><code>for epoca in range(1, 801):</code></td><td>800 iteraciones de entrenamiento con todos los datos.</td></tr>
+        <tr data-lines="26"><td><code>logits = modelo(X)</code></td><td>Los logits de las 180 muestras: forma <code>(180, 3)</code>.</td></tr>
+        <tr data-lines="27"><td><code>loss = criterio(logits, y)</code></td><td>La pérdida recibe los logits y las etiquetas enteras.</td></tr>
+        <tr data-lines="28-30"><td><code>opt.zero_grad() …</code></td><td>Borrar gradientes, <code>backward</code>, <code>step</code>.</td></tr>
+        <tr data-lines="31"><td><code>if epoca in (1, 100, 300, 800):</code></td><td>Imprime solo en ciertas épocas.</td></tr>
+        <tr data-lines="32"><td><code>acc = (logits.argmax(dim=1) == y).float().mean().item()</code></td><td>Accuracy: <code>argmax(dim=1)</code> da, para cada fila, el índice del logit más alto (la clase elegida).</td></tr>
+        <tr data-lines="33"><td><code>print(f"época {epoca:4d}  pérdida {loss.item():.3f}  accuracy {acc:.3f}")</code></td><td>Imprime época, pérdida y accuracy.</td></tr>
+        <tr data-lines="35"><td><code>punto = torch.tensor([[0.5, 0.5]])</code></td><td>Un punto nuevo, (0.5, 0.5), con forma <code>(1, 2)</code> (un lote de una muestra).</td></tr>
+        <tr data-lines="36-38"><td><code>with torch.no_grad(): …</code></td><td>Sin gradientes: logits del punto y <code>softmax</code> a lo largo de la dimensión de las clases (<code>dim=1</code>), que los convierte en probabilidades que suman 1.</td></tr>
+        <tr data-lines="39"><td><code>print("logits       :", z.numpy().round(3))</code></td><td>Imprime los logits.</td></tr>
+        <tr data-lines="40"><td><code>print("probabilidades:", p.numpy().round(3), " suma =", round(p.sum().item(), 3))</code></td><td>Imprime las probabilidades y comprueba que suman 1.</td></tr>
+        <tr data-lines="41"><td><code>print("clase elegida :", p.argmax(dim=1).item())</code></td><td>La clase elegida (<code>argmax</code>).</td></tr>
+        <tr data-lines="42"><td><code>print("forma de la última capa:", tuple(modelo[2].weight.shape), "-&gt; una fila por clase")</code></td><td>La forma de los pesos de la última capa: <code>(3, 24)</code>, una fila por clase.</td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>X: (180, 2) torch.float32    y: (180,) torch.int64    clases: [0, 1, 2]
+época    1  pérdida 1.099  accuracy 0.172
+época  100  pérdida 0.196  accuracy 0.950
+época  300  pérdida 0.008  accuracy 1.000
+época  800  pérdida 0.001  accuracy 1.000
+logits       : [[ 7.629  3.354 10.425]]
+probabilidades: [[0.057 0.001 0.942]]  suma = 1.0
+clase elegida : 2
+forma de la última capa: (3, 24) -&gt; una fila por clase</pre>
+    <p>Los datos son 180 puntos (<code>float32</code>) con etiquetas <code>int64</code> 0, 1, 2. En la época 1 la pérdida es <strong>1.099 = ln 3</strong>: la red todavía reparte la probabilidad casi a partes iguales (1/3 cada clase) y la entropía cruzada de adivinar al azar entre 3 clases es ln 3. Después baja a 0.196 (época 100), 0.008 (300) y 0.001 (800), con accuracy 0.950 → 1.000 (datos de entrenamiento: esta red memoriza los 180 puntos). El punto (0.5, 0.5) tiene logits <code>[7.629, 3.354, 10.425]</code> y probabilidades <code>[0.057, 0.001, 0.942]</code>, que suman 1: clase 2. La última capa tiene forma <code>(3, 24)</code>.</p>
+  </div>
+</article>
+
+</section>
+
+</div>
+</main>
+</body>
+</html>

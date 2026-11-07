@@ -87,11 +87,16 @@
     var D = api.d;
     var S = { inp: "d16", layers: [] };
     function fmt(n) { return String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, "."); }
+    function compact(code) { return code.replace(/^nn\./, "").replace("kernel_size=", "k=").replace("padding=", "p=").replace("stride=", "s=").replace(", bias=False", ", sin bias").replace(/, /g, ","); }
+    function shapeShort(st) { return st.dim === 4 ? st.C + "×" + st.H + "×" + st.W : String(st.F); }
     function clone(a) { return a.map(function (o) { return Object.assign({}, o); }); }
 
     var view = api.view(root, { aspect: 1.9, minH: 190, maxH: 300, label: "Parámetros y multiplicaciones de cada capa de la red" });
-    var tb = api.table(root, ["#", "<span style='display:block;text-align:left'>capa</span>", "forma", "param.", "mult."]);
-    if (window.matchMedia && window.matchMedia("(max-width:520px)").matches) tb.el.querySelector("table").style.fontSize = ".64rem";
+    /* En pantallas estrechas: sin columna «#», capa en forma compacta y forma sin la «N» (C×H×W), para que quepa a 375 px */
+    var narrow = !!(window.matchMedia && window.matchMedia("(max-width:520px)").matches);
+    var tb = api.table(root, narrow ? ["<span style='display:block;text-align:left'>capa</span>", "C×H×W", "param.", "mult."]
+                                    : ["#", "<span style='display:block;text-align:left'>capa</span>", "forma", "param.", "mult."]);
+    if (narrow) tb.el.querySelector("table").style.fontSize = ".66rem";
     var ui = api.controls(root), out = api.readout(root);
     var selIn = ui.select({ label: "Miniatura de entrada (N, C, H, W)", value: S.inp, options: Object.keys(INPUTS).map(function (k) { return [k, INPUTS[k][3]]; }), onChange: function (v) { S.inp = v; update(); } });
     var selT = ui.select({ label: "Capa a añadir", value: "conv", options: [["conv", "nn.Conv2d"], ["pool", "nn.MaxPool2d"], ["bn", "nn.BatchNorm (2d o 1d)"], ["relu", "nn.ReLU"], ["drop", "nn.Dropout"], ["gap", "nn.AdaptiveAvgPool2d(1)"], ["flat", "nn.Flatten"], ["lin", "nn.Linear"]] });
@@ -121,12 +126,13 @@
       var res = analyze(INPUTS[S.inp], S.layers), rows = res.rows, n = rows.length;
       if (!n) { D.text(ctx, "Añade capas o carga un ejemplo", w / 2, h / 2, { size: 13, align: "center", color: C.muted }); return; }
       var mp = 0, mm = 0; rows.forEach(function (r) { mp = Math.max(mp, r.params); mm = Math.max(mm, r.macs); });
-      var labW = Math.min(150, w * 0.4), top = 20, rh = Math.min(22, (h - top - 6) / n), bx = labW + 6, bw = w - bx - 8;
-      D.text(ctx, "azul: parámetros · naranja: multiplicaciones (cada barra respecto a su máximo)", 4, 11, { size: 10, color: C.muted });
+      var labW = Math.min(170, w * 0.5), top = 20, rh = Math.min(22, (h - top - 6) / n), bx = labW + 6, bw = w - bx - 8;
+      var fs = Math.min(11, rh * 0.55), maxCh = Math.max(8, Math.floor((labW - 6) / (fs * 0.62)));
+      D.text(ctx, w < 460 ? "azul: parámetros · naranja: multiplicaciones" : "azul: parámetros · naranja: multiplicaciones (cada barra respecto a su máximo)", 4, 11, { size: 10, color: C.muted });
       rows.forEach(function (r, i) {
-        var y = top + i * rh, short = r.code.replace("nn.", "").replace("kernel_size=", "k=");
-        if (short.length > 23 && labW < 170) short = short.slice(0, 22) + "…";
-        D.text(ctx, short, 4, y + rh * 0.62, { size: Math.min(11, rh * 0.55), mono: true, color: r.err ? C.terracotaInk : C.ink2 });
+        var y = top + i * rh, short = compact(r.code);
+        if (short.length > maxCh) short = short.slice(0, maxCh - 1) + "…";
+        D.text(ctx, short, 4, y + rh * 0.62, { size: fs, mono: true, color: r.err ? C.terracotaInk : C.ink2 });
         if (r.err) { D.text(ctx, "ERROR", bx, y + rh * 0.62, { size: 11, mono: true, weight: 700, color: C.terracotaInk }); return; }
         var bh = rh * 0.36;
         if (mp) D.rect(ctx, bx, y + rh * 0.1, Math.max(r.params ? 2 : 0, bw * r.params / mp), bh, C.cobalto, null);
@@ -137,12 +143,17 @@
 
     function update() {
       var res = analyze(INPUTS[S.inp], S.layers), rows = res.rows, tp = 0, tm = 0, i, errRow = null;
-      var trs = [["0", "<span style='display:block;text-align:left'>entrada</span>", "<span style='white-space:nowrap'>" + shapeStr(res.start) + "</span>", "0", "0"]];
+      var trs = [["0", "<span style='display:block;text-align:left'>entrada</span>", "<span style='white-space:nowrap'>" + (narrow ? shapeShort(res.start) : shapeStr(res.start)) + "</span>", "0", "0"]];
       rows.forEach(function (r, i) {
         tp += r.params; tm += r.macs; if (r.err && !errRow) errRow = { i: i + 1, msg: r.err };
-        trs.push([String(i + 1), "<span style='display:block;text-align:left;overflow-wrap:anywhere'><code style='white-space:normal'>" + r.code.replace(/^nn\./, "").replace("kernel_size=", "k=") + "</code></span>", r.err ? "<span class='bad'>ERROR</span>" : "<span style='white-space:nowrap'>" + r.shape + "</span>", fmt(r.params), fmt(r.macs)]);
+        var m = /^\(N, (.*)\)$/.exec(r.shape), sh = narrow && m ? m[1].split(", ").join("×") : r.shape;
+        var cc = compact(r.code), cut = cc.indexOf("(");
+        var lab = narrow ? "<code style='white-space:nowrap;display:inline-block;line-height:1.25'>" + (cc.length > 12 && cut > 0 ? cc.slice(0, cut) + "<br>" + cc.slice(cut) : cc) + "</code>"
+                         : "<span style='display:block;text-align:left;overflow-wrap:anywhere'><code style='white-space:normal'>" + r.code.replace(/^nn\./, "").replace("kernel_size=", "k=") + "</code></span>";
+        trs.push([String(i + 1), lab, r.err ? "<span class='bad'>ERROR</span>" : "<span style='white-space:nowrap'>" + sh + "</span>", fmt(r.params), fmt(r.macs)]);
       });
       trs.push(["", "<span style='display:block;text-align:left'><b>Total</b></span>", "", "<b>" + fmt(tp) + "</b>", "<b>" + fmt(tm) + "</b>"]);
+      if (narrow) trs = trs.map(function (t) { return t.slice(1); });
       tb.set(trs);
       var t = rows.length ? "Parámetros entrenables: <b>" + fmt(tp) + "</b> (" + fmt(tp * 4) + " bytes en float32) · multiplicaciones por imagen: <b>" + fmt(tm) + "</b>" : "Red vacía: añade una <code>nn.Conv2d</code> para empezar.";
       if (errRow) t += "<br><span class='bad'>Capa " + errRow.i + ": " + errRow.msg + "</span>";

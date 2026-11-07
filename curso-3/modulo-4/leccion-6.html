@@ -1,83 +1,440 @@
-<!DOCTYPE html>
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lección 6 · La red solo adivina el ruido; generar es quitarlo poco a poco · Módulo 4 · Curso 3 · Cuaderno de IA</title>
+<meta name="description" content="Entrenar una difusión es enseñar a una red a predecir el ruido ε; generar es partir de ruido puro y restar un poco en cada paso (DDPM y DDIM).">
+<script>try{var t=localStorage.getItem('cuaderno-ia:tema');if(t)document.documentElement.setAttribute('data-theme',t)}catch(e){}</script>
+<link rel="stylesheet" href="../../assets/css/style.css">
+<script src="../../assets/js/curriculum.js"></script>
+<script src="../../assets/js/lab.js"></script>
+<script src="../../assets/js/app.js" defer></script>
+</head>
+<body data-root="../../" data-course="3" data-module="4" data-lesson="6">
+<main>
+<div class="page">
 
-<html lang="es"><head><meta charset="utf-8"/><meta content="width=device-width,initial-scale=1" name="viewport"/><title>Lección 6 · Modelos de difusión: destruir es fácil · Curso 3 · Cuaderno de IA</title><meta content="La flecha de izquierda a derecha es el proceso hacia delante ( forward process ): no se aprende, es una receta fija." name="description"/><script>try{var t=localStorage.getItem('cuaderno-ia:tema');if(t)document.documentElement.setAttribute('data-theme',t)}catch(e){}</script><link href="../../assets/css/style.css" rel="stylesheet"/><script src="../../assets/js/curriculum.js"></script><script src="../../assets/js/lab.js"></script><script defer="" src="../../assets/js/app.js"></script><script defer="" src="../../assets/js/microanimations.js"></script></head><body data-course="3" data-lesson="6" data-module="4" data-root="../../"><main><div class="page" data-micro="3min"><header class="hero leccion"><div class="hero-grid"><div><p class="eyebrow">Curso 3 · Módulo 4 · Lección 6 de 12</p><h1>Modelos de difusión: destruir es fácil</h1><p class="lead">La flecha de izquierda a derecha es el proceso hacia delante ( forward process ): no se aprende, es una receta fija.</p><p class="meta-line"><span class="read-time" data-render="read-time"></span><a href="../modulo-4.html">Índice del módulo</a></p></div><div aria-hidden="true" class="hero-tile"></div></div></header><details class="predice"><summary>¿Y si en vez de aprender a crear una imagen de golpe, aprendemos a quitar un poquito de ruido, y lo repetimos muchas veces empezando desde ruido puro?<span class="hint"></span></summary><div><p>La flecha de izquierda a derecha es el proceso hacia delante ( forward process ): no se aprende, es una receta fija.</p></div></details><section aria-label="Explicación breve" class="micro-core"><div class="micro-kicker">01 · ENTENDER <span>≈ 45 s</span></div><h2>La idea en palabras sencillas</h2><p>La flecha de izquierda a derecha es el proceso hacia delante ( forward process ): no se aprende, es una receta fija.</p><div class="micro-example"><span aria-hidden="true" class="micro-example-icon">💡</span><div><strong>Otro ejemplo · Texto</strong><p>Un modelo puede generar la siguiente palabra a partir de palabras anteriores, una decisión detrás de otra.</p></div></div></section><div class="micro-kicker micro-checkpoint">02 · RESPONDER <span>≈ 15 s</span></div><section aria-label="Pregunta intercalada" class="quiz mini micro-check"><script class="quiz-data" type="application/json">{"titulo": "Pausa rápida · Comprueba la idea", "preguntas": [{"q": "¿Qué ocurre en el proceso directo de difusión?", "opciones": ["Se añade ruido progresivamente", "Se hace un árbol de decisión", "Se calcula recall únicamente"], "correcta": 0, "porque": "El proceso directo va degradando los datos con ruido."}]}</script></section><section aria-label="Animación interactiva" class="micro-viz" data-index="13" data-micro-viz="generative"><div class="micro-kicker">03 · EXPERIMENTAR <span>≈ 45 s</span></div><div class="micro-viz-title"><div><h2>Del ruido a una estructura</h2><p>Avanza la transformación y observa cómo emerge un patrón.</p></div><span aria-hidden="true" class="micro-viz-symbol">✦</span></div><div aria-live="polite" class="micro-viz-stage"><p>Animación interactiva: Del ruido a una estructura</p></div></section><div class="micro-kicker micro-checkpoint">04 · APLICAR <span>≈ 15 s</span></div><section aria-label="Pregunta intercalada" class="quiz mini micro-check"><script class="quiz-data" type="application/json">{"titulo": "Pausa rápida · ¿Lo aplicarías?", "preguntas": [{"q": "¿Qué aprende el modelo para generar datos?", "opciones": ["Cómo ordenar archivos por extensión", "Cómo dividir una red en clases", "Cómo revertir gradualmente el ruido"], "correcta": 2, "porque": "La red aprende a realizar la parte inversa."}]}</script></section><div class="micro-finish"><strong>Idea que te llevas</strong><span>La flecha de izquierda a derecha es el proceso hacia delante ( forward process ): no se aprende, es una receta fija</span><small>¿Quieres más ejemplos, fórmulas o código? Los tienes justo debajo, sin límite de tiempo.</small></div><details class="profundizar micro-legacy"><summary><span>Explorar más: explicación y simulaciones completas<small>Todo el texto original, tablas y demos avanzadas. Opcional.</small></span></summary><div class="prof-body"><section><h2>Modelos de difusión: destruir es fácil</h2>
-<p>La flecha de izquierda a derecha es el <strong>proceso hacia delante</strong> (<em>forward process</em>): no se aprende, es una receta fija. Aprender es hacerlo <em>al revés</em>, de derecha a izquierda.</p>
-<p>En cada paso \( t \) se encoge un pelín el dato anterior y se le suma ruido gaussiano:</p>
-<p>\( \beta_t \) («beta») es un número pequeño y positivo que fija <em>cuánto ruido</em> se añade en el paso \( t \); la lista de todos los \( \beta_t \) es el <abbr class="t" data-def="La lista de valores β_1, …, β_T (o equivalentemente ᾱ_1, …, ᾱ_T) que decide cuánto ruido se añade en cada paso del proceso.">schedule</abbr> de ruido. \( \varepsilon_t \) es ruido nuevo de una normal estándar. El factor \( \sqrt{1-\beta_t} \) no es capricho: si \( x_{t-1} \) tiene varianza 1, entonces \( x_t \) tiene varianza \( (1-\beta_t)\cdot 1 + \beta_t = 1 \). La señal se apaga a la vez que el ruido crece y la varianza total se mantiene en 1 (por eso a este proceso se le llama <em>variance preserving</em>) y los números nunca explotan.</p>
-<ul class="flow">
-<li class="a">x₀<small>dato real</small></li>
-<li>x₁<small>un poco de ruido</small></li>
-<li>…</li>
-<li>x_{T−1}</li>
-<li class="d">x_T<small>ruido puro N(0, I)</small></li>
-</ul>
-<div class="callout ejemplo"><span class="lbl">Ejemplo tomado del módulo</span><p>Un píxel del fotograma de Titanic con brillo \( x_0 = 2 \) (escala inventada para el ejemplo) y tres pasadas de nieve con \( \beta = 0{,}1;\;0{,}2;\;0{,}3 \).</p></div></section><figure class="demo" data-demo="curso3/c3m4-difusion-adelante" data-titulo="El proceso hacia delante, paso a paso y de un salto">
-<div class="haz">Mueve el slider de t de 0 a 40 (o pulsa «Animar»). Cambia entre «Fórmula cerrada» y «Paso a paso», y mira el dígito de la derecha (un fotograma cada vez más lleno de nieve) y el punto marcado con su rastro. Cada punto de las lunas es una película colocada en un mapa de dos rasgos; las dos lunas son dos familias de películas (por ejemplo, thrillers y comedias).</div>
-<div class="observa">Las lunas se hinchan hacia una nube redonda y la desviación de x se mantiene en 1: el proceso conserva la varianza. En «paso a paso» el punto marcado da un paseo aleatorio; con la fórmula cerrada va en línea recta desde x₀. Las dos maneras producen nubes igual de redondas aunque cada punto concreto acabe en un sitio distinto. La correlación con la posición inicial cae como √ᾱ.</div>
-</figure><div class="resumen"><h2 class="sin-num sin-toc">En pocas líneas</h2><ul><li><strong>Modelos de difusión: destruir es fácil:</strong> La flecha de izquierda a derecha es el proceso hacia delante ( forward process ): no se aprende, es una receta fija.</li><li>Antes de continuar, intenta explicar la demo sin mirar su resultado.</li></ul></div><section class="quiz mini"><script class="quiz-data" type="application/json">{"titulo": "¿Lo tienes?", "preguntas": [{"q": "¿Qué concepto estamos trabajando en esta lección?", "opciones": ["Generar: el muestreo inverso", "Modelos de difusión: destruir es fácil", "Generar e interpolar con un VAE"], "correcta": 1, "porque": "La flecha de izquierda a derecha es el proceso hacia delante ( forward process ): no se aprende, es una receta fija."}, {"q": "¿Cuál de estas afirmaciones recoge lo que acabas de estudiar?", "opciones": ["Siempre hay un único método que sirve para todos los problemas.", "Lo importante es comprender la idea y comprobarla con ejemplos, no memorizar términos.", "La flecha de izquierda a derecha es el proceso hacia delante ( forward process ): no se aprende, es una receta fija."], "correcta": 2, "porque": "La explicación central es: La flecha de izquierda a derecha es el proceso hacia delante ( forward process ): no se aprende, es una receta fija."}, {"q": "Si una demo o un ejemplo te desconcierta, ¿cuál es la mejor forma de aprenderlo?", "opciones": ["Ignorar los resultados que no coinciden con tu intuición.", "Memorizar el nombre sin entender la operación.", "Volver a los números, cambiar un valor y explicar qué ocurre."], "correcta": 2, "porque": "Explorar qué cambia y por qué ayuda a conectar el concepto con su resultado."}]}</script></section></div></details><details class="profundizar"><summary><span>Profundizar: explicación completa<small>Matices, fórmulas, tablas, otros ejemplos y experimentos del módulo original.</small></span></summary><div class="prof-body"><section>
-<h2 id="difusion-adelante">Modelos de difusión: destruir es fácil</h2>
-<p class="pregunta">¿Y si en vez de aprender a crear una imagen de golpe, aprendemos a quitar un poquito de ruido, y lo repetimos muchas veces empezando desde ruido puro?</p>
-<div class="callout analogia">
-<span class="lbl">Analogía</span>
-<p>La tele sin señal. Pones un fotograma de Titanic en pantalla y lo vas llenando de «nieve» (esas motas de las teles antiguas): cada pasada de nieve lo emborrona un poco más, y tras muchas pasadas solo queda nieve pura, sin rastro del barco. <em>Destruir</em> la imagen así es trivial y siempre igual. <em>Reconstruirla</em> (ver la nieve y devolver el fotograma) parece imposible… pero si fueras capaz de dar solo <em>un pasito atrás</em> cada vez («en esta nieve, la imagen venía de aquí»), repitiéndolo muchas veces recuperarías el fotograma. Los modelos de difusión (<em>diffusion models</em>) hacen justo eso: ensucian con ruido (la nieve) de forma fija y aprenden a limpiar un paso cada vez.</p>
-</div>
-<ul class="flow">
-<li class="a">x₀<small>dato real</small></li>
-<li>x₁<small>un poco de ruido</small></li>
-<li>…</li>
-<li>x_{T−1}</li>
-<li class="d">x_T<small>ruido puro N(0, I)</small></li>
-</ul>
-<p>La flecha de izquierda a derecha es el <strong>proceso hacia delante</strong> (<em>forward process</em>): no se aprende, es una receta fija. Aprender es hacerlo <em>al revés</em>, de derecha a izquierda.</p>
-<h3>Un paso: añadir un poco de ruido</h3>
-<p>En cada paso \( t \) se encoge un pelín el dato anterior y se le suma ruido gaussiano:</p>
-<div class="formula">\[ x_t \;=\; \sqrt{1-\beta_t}\;x_{t-1} \;+\; \sqrt{\beta_t}\;\varepsilon_t, \qquad \varepsilon_t \sim \mathcal{N}(0, I) \]</div>
-<p>\( \beta_t \) («beta») es un número pequeño y positivo que fija <em>cuánto ruido</em> se añade en el paso \( t \); la lista de todos los \( \beta_t \) es el <abbr class="t" data-def="La lista de valores β_1, …, β_T (o equivalentemente ᾱ_1, …, ᾱ_T) que decide cuánto ruido se añade en cada paso del proceso.">schedule</abbr> de ruido. \( \varepsilon_t \) es ruido nuevo de una normal estándar. El factor \( \sqrt{1-\beta_t} \) no es capricho: si \( x_{t-1} \) tiene varianza 1, entonces \( x_t \) tiene varianza \( (1-\beta_t)\cdot 1 + \beta_t = 1 \). La señal se apaga a la vez que el ruido crece y la varianza total se mantiene en 1 (por eso a este proceso se le llama <em>variance preserving</em>) y los números nunca explotan.</p>
-<p>Para simplificar las fórmulas se definen \( \alpha_t = 1 - \beta_t \) y el producto acumulado \( \bar\alpha_t = \alpha_1\alpha_2\cdots\alpha_t \) («alfa barra»), que mide <strong>cuánta señal original queda</strong> después de \( t \) pasos.</p>
-<div class="callout ejemplo">
-<span class="lbl">Ejemplo numérico</span>
-<p>Un píxel del fotograma de Titanic con brillo \( x_0 = 2 \) (escala inventada para el ejemplo) y tres pasadas de nieve con \( \beta = 0{,}1;\;0{,}2;\;0{,}3 \). La media del dato se multiplica por \( \sqrt{\alpha_t} \) en cada paso, y la varianza que ha acumulado el ruido sigue \( \text{Var}_t = \alpha_t\,\text{Var}_{t-1} + \beta_t \).</p>
-<table>
-<thead><tr><th>t</th><th>\( \beta_t \)</th><th>\( \alpha_t \)</th><th>Media de \( x_t \)</th><th>Varianza de \( x_t \) dado \( x_0 \)</th><th>\( \bar\alpha_t \)</th></tr></thead>
-<tbody>
-<tr><td>1</td><td>0,1</td><td>0,9</td><td>\( \sqrt{0{,}9}\cdot 2 = 1{,}8974 \)</td><td>\( 0{,}9\cdot 0 + 0{,}1 = 0{,}1 \)</td><td>0,9</td></tr>
-<tr><td>2</td><td>0,2</td><td>0,8</td><td>\( \sqrt{0{,}8}\cdot 1{,}8974 = 1{,}6971 \)</td><td>\( 0{,}8\cdot 0{,}1 + 0{,}2 = 0{,}28 \)</td><td>0,72</td></tr>
-<tr><td>3</td><td>0,3</td><td>0,7</td><td>\( \sqrt{0{,}7}\cdot 1{,}6971 = 1{,}4199 \)</td><td>\( 0{,}7\cdot 0{,}28 + 0{,}3 = 0{,}496 \)</td><td class="res">0,504</td></tr>
-</tbody>
-</table>
-<p>Fíjate en dos cosas. La media final, 1,4199, coincide con \( \sqrt{\bar\alpha_3}\cdot x_0 = \sqrt{0{,}504}\cdot 2 \). Y la varianza, 0,496, es exactamente \( 1 - \bar\alpha_3 = 1 - 0{,}504 \). Eso no es casualidad: es la fórmula cerrada.</p>
-</div>
-<h3>La fórmula cerrada: saltar directamente al paso t</h3>
-<p>Para entrenar no queremos dar \( t \) pasos cada vez (con \( T = 1000 \) sería carísimo). Por suerte las sumas de gaussianas independientes son gaussianas, y se puede saltar de \( x_0 \) a \( x_t \) en un solo paso. Lo vemos con dos pasos:</p>
-<ol class="pasos">
-<li>\( x_1 = \sqrt{\alpha_1}\,x_0 + \sqrt{1-\alpha_1}\,\varepsilon_1 \).</li>
-<li>\( x_2 = \sqrt{\alpha_2}\,x_1 + \sqrt{1-\alpha_2}\,\varepsilon_2 = \sqrt{\alpha_1\alpha_2}\,x_0 + \sqrt{\alpha_2(1-\alpha_1)}\,\varepsilon_1 + \sqrt{1-\alpha_2}\,\varepsilon_2 \).</li>
-<li>Los dos últimos términos son gaussianas independientes de media 0; su suma es una gaussiana con varianza \( \alpha_2(1-\alpha_1) + (1-\alpha_2) = 1 - \alpha_1\alpha_2 \). Con los números anteriores: \( 0{,}8\cdot 0{,}1 + 0{,}2 = 0{,}28 = 1 - 0{,}72 \).</li>
-<li>Por inducción, para cualquier \( t \):</li>
-</ol>
-<div class="formula">\[ x_t \;=\; \sqrt{\bar\alpha_t}\;x_0 \;+\; \sqrt{1-\bar\alpha_t}\;\varepsilon, \qquad \varepsilon \sim \mathcal{N}(0, I) \]</div>
-<p>\( x_0 \) es el dato limpio; \( \varepsilon \) un único ruido nuevo; \( \sqrt{\bar\alpha_t} \) la <strong>cantidad de señal</strong> y \( \sqrt{1-\bar\alpha_t} \) la <strong>cantidad de ruido</strong>. Sus cuadrados suman 1, así que es una mezcla señal/ruido que se desliza de «todo señal» (\( \bar\alpha \approx 1 \), al principio) a «todo ruido» (\( \bar\alpha \approx 0 \), al final). El fragmento 9 lo comprueba con un millón de simulaciones: paso a paso la media es 1,42 y la desviación 0,704; saltando de golpe, 1,419 y 0,704; la teoría dice 1,42 y 0,704 (la diferencia en la tercera cifra es ruido de muestreo).</p>
-<div class="callout ojo">
-<span class="lbl">Ojo</span>
-<p>Tres detalles que se olvidan: (1) los datos deben estar <strong>normalizados</strong> (media 0, desviación ≈ 1; las imágenes, en \( [-1, 1] \)) para que el ruido gaussiano \( \mathcal{N}(0,I) \) tenga una escala comparable; (2) \( \varepsilon \) en la fórmula cerrada es <em>un solo</em> ruido, no la suma de los \( \varepsilon_t \); (3) la fórmula cerrada y el proceso paso a paso dan la misma <em>distribución</em>, no los mismos números punto a punto.</p>
-</div>
-<h3>El schedule: cuánto ruido en cada paso</h3>
-<p>Es la receta de «cuánta nieve echar en cada pasada»: con una receta mal repartida, el fotograma desaparece enseguida y las últimas pasadas solo añaden nieve a una pantalla que ya era pura nieve.</p>
-<p>El artículo original (DDPM, Ho et al. 2020) usa \( T = 1000 \) pasos y un \( \beta_t \) que crece <strong>linealmente</strong> de 0,0001 a 0,02. Un trabajo posterior (Nichol y Dhariwal, 2021) propuso un schedule de <strong>coseno</strong> definido directamente sobre \( \bar\alpha_t \). Calculados en el fragmento 8:</p>
-<table>
-<thead><tr><th>t</th><th>\( \beta_t \) (lineal)</th><th>\( \bar\alpha_t \) lineal</th><th>\( \bar\alpha_t \) coseno</th><th>Señal \( \sqrt{\bar\alpha_t} \) (lineal)</th><th>Ruido \( \sqrt{1-\bar\alpha_t} \) (lineal)</th></tr></thead>
-<tbody>
-<tr><td>1</td><td>0,00010</td><td>0,99990</td><td>0,99996</td><td>0,9999</td><td>0,0100</td></tr>
-<tr><td>100</td><td>0,00207</td><td>0,89702</td><td>0,97209</td><td>0,9471</td><td>0,3209</td></tr>
-<tr><td>250</td><td>0,00506</td><td>0,52409</td><td>0,84701</td><td>0,7239</td><td>0,6899</td></tr>
-<tr><td>500</td><td>0,01004</td><td>0,07859</td><td>0,49384</td><td>0,2803</td><td>0,9599</td></tr>
-<tr><td>750</td><td>0,01502</td><td>0,00335</td><td>0,14427</td><td>0,0579</td><td>0,9983</td></tr>
-<tr><td>1000</td><td>0,02000</td><td class="res">0,00004</td><td>0,00000</td><td>0,0064</td><td>1,0000</td></tr>
-</tbody>
-</table>
-<p>Con el lineal, \( \bar\alpha \) baja de 0,5 ya en \( t = 260 \) (a un 26 % del camino) y a partir de \( t = 750 \) vale \( \bar\alpha &lt; 0{,}004 \): casi un cuarto del proceso se gasta en ruido casi puro, pasos en los que la red tiene poco que aprender. El coseno cruza 0,5 en \( t = 497 \) y destruye la imagen de forma más repartida. A veces se mide con la <abbr class="t" data-def="Signal-to-noise ratio: ᾱ_t / (1 − ᾱ_t). Cuánta señal hay por cada unidad de ruido en el paso t.">SNR</abbr> \( = \bar\alpha_t/(1-\bar\alpha_t) \).</p>
-<figure class="demo" data-demo="curso3/c3m4-schedule" data-titulo="Schedule lineal frente a coseno">
-<div class="haz">Alterna «Lineal» y «Coseno», cambia T y el β final del lineal, y observa la fila de seis dígitos con «nieve» (como un fotograma con la tele cada vez peor sintonizada).</div>
-<div class="observa">La curva azul (lineal) cae rápido y se pega a 0 mucho antes del final; la naranja (coseno) baja de forma más pausada. Con un β final grande el lineal desperdicia aún más pasos. Fíjate en que a mitad de proceso (t/T = 0,5) el lineal ya es ruido casi puro y el coseno aún conserva la silueta del 3.</div>
+<header class="hero leccion">
+  <div class="hero-grid">
+    <div>
+      <p class="eyebrow">Curso 3 · Módulo 4 · Lección 6 de 8</p>
+      <h1>La red solo adivina el ruido; generar es quitarlo poco a poco</h1>
+      <p class="lead">Para deshacer la nieve, la red no dibuja el fotograma: solo adivina qué ruido le echaron. Y para generar se parte de nieve pura y se resta un poco, muchas veces.</p>
+      <p class="meta-line"><span class="read-time" data-render="read-time"></span><a href="../modulo-4.html">Índice del módulo</a></p>
+    </div>
+    <div class="hero-tile" aria-hidden="true"></div>
+  </div>
+</header>
+<details class="predice">
+  <summary>A la red le enseñas un fotograma lleno de nieve. ¿Qué le pides: que dibuje el fotograma limpio o que adivine la nieve que le echaron?<span class="hint"></span></summary>
+  <div>
+    <p><strong>Se le pide la nieve, el ruido \( \varepsilon \).</strong> Es lo mismo disfrazado: sabiendo \( \varepsilon \) se despeja \( x_0 \). Pero \( \varepsilon \) siempre tiene media 0 y varianza 1 en cualquier paso: un objetivo bien escalado, y una regresión estable.</p>
+  </div>
+</details>
+
+<section>
+<h2 id="idea">Una regresión de ruido y un camino de vuelta</h2>
+<p><strong>Entrenar</strong> (DDPM): coge un dato \( x_0 \), sortea un paso \( t \) y un ruido \( \varepsilon \), fabrica \( x_t \) con la fórmula de un salto y pide a la red \( \varepsilon_\theta(x_t, t) \) que adivine \( \varepsilon \). Pérdida: \( \|\varepsilon - \hat\varepsilon\|^2 \). La red recibe también \( t \) (como senos y cosenos), porque limpiar \( x_1 \) y \( x_T \) son problemas muy distintos.</p>
+<p><strong>Generar</strong>: empieza con \( x_T \sim \mathcal{N}(0, I) \) y, de \( t = T \) a 1, resta una fracción del ruido estimado y añade una pizca de ruido fresco:</p>
+<div class="formula">\[ x_{t-1} = \frac{1}{\sqrt{\alpha_t}}\left(x_t - \frac{\beta_t}{\sqrt{1-\bar\alpha_t}}\,\hat\varepsilon\right) + \sigma_t\, z \]</div>
+<p>El ruido fresco reparte las trayectorias por toda la distribución; en el último paso no se añade. El <strong>DDIM</strong> usa la misma red con un muestreo determinista que se salta pasos: lo mismo con muchas menos pasadas.</p>
+</section>
+
+<figure class="demo" data-demo="curso3/c3m4-estimar-x0" data-titulo="Qué estima la red de un solo golpe (red real)">
+  <div class="haz">Mueve t de 1 a 40.</div>
+  <div class="observa">Con t pequeño, el x̂₀ naranja cae sobre las lunas; con t grande se amontona en el centro: de un golpe no basta.</div>
 </figure>
-</section></div></details><details class="profundizar" id="codigo"><summary><span>Ver código explicado paso a paso<small>0 fragmento(s) original(es), con cada línea comentada y salida esperada.</small></span></summary><div class="prof-body"><p>Esta lección se centra en la idea y la demo; no requiere código adicional.</p></div></details></div></main></body></html>
+
+<figure class="demo" data-demo="curso3/c3m4-difusion-inversa" data-titulo="Muestreo inverso con la red real, paso a paso">
+  <div class="haz">Pulsa «Un paso hacia atrás» varias veces y luego «Animar hasta el final». Prueba el DDIM con 10 y con 3 pasos.</div>
+  <div class="observa">La nube redonda se pliega en dos lunas: la distancia al dato real baja de 0,199 a 0,044. El DDIM con 10 pasos casi lo iguala.</div>
+</figure>
+
+<section>
+<h2 id="numeros">Con números: el píxel de Titanic, ida y vuelta</h2>
+<div class="callout ejemplo">
+  <span class="lbl">Ejemplo numérico</span>
+  <p>\( x_0 = 2 \), \( t = 3 \), \( \bar\alpha_3 = 0{,}504 \), ruido sorteado \( \varepsilon = 0{,}5 \).</p>
+  <ol class="pasos">
+    <li><strong>Ensuciar:</strong> \( x_3 = 0{,}7099\cdot 2 + 0{,}7043\cdot 0{,}5 = 1{,}7720 \).</li>
+    <li><strong>Entrenar:</strong> la red dice \( \hat\varepsilon = 0{,}2 \); pérdida \( (0{,}5-0{,}2)^2 = 0{,}09 \).</li>
+    <li><strong>Volver</strong> (red perfecta, \( \hat\varepsilon = 0{,}5 \)): \( (1{,}7720 - 0{,}4260\cdot 0{,}5)/0{,}8367 = 1{,}8634 \), la media exacta.</li>
+    <li>Con \( \sigma_3 = 0{,}4115 \) y ruido fresco \( z = -0{,}6 \): \( x_2 = 1{,}6165 \).</li>
+  </ol>
+</div>
+</section>
+
+<details class="predice">
+  <summary>En el DDPM decides no añadir nunca el ruido fresco \( \sigma_t z \), solo seguir la media. ¿Qué les pasa a las muestras?<span class="hint"></span></summary>
+  <div>
+    <p><strong>Pierden diversidad.</strong> La red da la media de dónde pudo estar el dato; siguiendo solo la media, todos los puntos de una zona acaban en el mismo sitio, como pedir «una peli de acción» y recibir siempre la «peli de acción media». El DDIM es determinista, pero con una fórmula pensada para ello.</p>
+  </div>
+</details>
+
+<div class="resumen">
+  <h2 class="sin-num sin-toc">En tres líneas</h2>
+  <ul>
+    <li>Entrenar = sortear \( t \) y \( \varepsilon \), ensuciar y minimizar \( \|\varepsilon - \hat\varepsilon\|^2 \).</li>
+    <li>Generar = partir de ruido y restar \( \hat\varepsilon \) poco a poco, con ruido fresco salvo en el último paso.</li>
+    <li>Entrenar es fácil y estable; generar es lento (T pasadas), y el DDIM lo acelera.</li>
+  </ul>
+</div>
+
+<section class="quiz mini">
+<script type="application/json" class="quiz-data">
+{
+ "titulo": "¿Lo tienes?",
+ "preguntas": [
+  {
+   "q": "¿Qué compara exactamente la pérdida de entrenamiento de un modelo de difusión tipo DDPM?",
+   "opciones": [
+    "La imagen generada con la imagen real, píxel a píxel.",
+    "La imagen con ruido x<sub>t</sub> con la imagen limpia x<sub>0</sub>.",
+    "Un discriminador que dice si la imagen es real o falsa.",
+    "El ruido real ε que se añadió con el ruido ε̂ que predice la red, mediante el error cuadrático medio."
+   ],
+   "correcta": 3,
+   "porque": "Se sortea un t y un ε, se construye x<sub>t</sub> con la fórmula cerrada, y la red recibe (x<sub>t</sub>, t) y debe adivinar ε. La pérdida es el MSE entre ε y ε̂ (fragmento 11). No hace falta ningún discriminador, y como se conoce ε exactamente, el entrenamiento es una regresión estable."
+  },
+  {
+   "q": "En el muestreo inverso del DDPM, en cada paso se calcula la media y se le suma un ruido σ<sub>t</sub>·z. ¿Por qué <strong>no</strong> se suma en el último paso (t = 1)?",
+   "opciones": [
+    "Porque en el último paso la red ya no predice ruido.",
+    "Porque σ<sub>t</sub> vale siempre 1 al final.",
+    "Porque lo que queremos obtener es el dato limpio, y añadir ruido al final solo lo ensuciaría.",
+    "Porque la fórmula cerrada solo funciona hasta t = 2."
+   ],
+   "correcta": 2,
+   "porque": "El ruido σ<sub>t</sub>·z da variedad durante el camino (sin él, todos los caminos colapsarían hacia las zonas más densas). Pero la salida del último paso es el resultado final: sumarle ruido lo degradaría. Por eso el código del fragmento 12 hace <code>x = media</code> cuando <code>t == 0</code>."
+  },
+  {
+   "q": "En un paso de entrenamiento el ruido verdadero es \\( \\varepsilon = 0{,}5 \\) y la red responde \\( \\hat\\varepsilon = 0{,}2 \\). ¿Cuánto vale la pérdida?",
+   "opciones": [
+    "0,3",
+    "0,09",
+    "0,7",
+    "0,25"
+   ],
+   "correcta": 1,
+   "porque": "Es el error cuadrático: \\( (0{,}5 - 0{,}2)^2 = 0{,}3^2 = 0{,}09 \\). El gradiente empuja a la red a responder más cerca de 0,5 la próxima vez."
+  }
+ ]
+}
+</script>
+</section>
+
+<details class="profundizar">
+  <summary><span>Profundizar: la explicación completa<small>El algoritmo de entrenamiento paso a paso, por qué predecir el ruido, la U-Net, la cuenta completa del paso inverso, el DDIM con números y cómo se condiciona con texto.</small></span></summary>
+  <div class="prof-body">
+<h2 id="difusion-entrenar">La red que predice el ruido</h2>
+
+<p class="pregunta">Sabemos destruir. ¿Qué tiene que aprender exactamente la red para poder deshacerlo?</p>
+
+<p>La idea más usada (DDPM) es sorprendentemente simple: dar a la red un dato con ruido \( x_t \) y <strong>pedirle que adivine el ruido \( \varepsilon \) que se le añadió</strong>. Esa es la única tarea. Es como un restaurador de películas antiguas al que enseñas un fotograma lleno de nieve y le pides que adivine cuánta nieve le echaron: si lo adivina bien, basta restarla para ver el fotograma. Se llama \( \varepsilon_\theta(x_t, t) \) a la red (\( \theta \) son sus pesos) y la pérdida es el error cuadrático medio entre el ruido verdadero y el estimado:</p>
+<div class="formula">\[ L \;=\; \mathbb{E}_{x_0,\;t,\;\varepsilon}\Big[\,\big\|\,\varepsilon - \varepsilon_\theta(x_t,\,t)\,\big\|^2\,\Big], \qquad x_t = \sqrt{\bar\alpha_t}\,x_0 + \sqrt{1-\bar\alpha_t}\,\varepsilon \]</div>
+
+<p>El algoritmo de entrenamiento es el mismo bucle de siempre con un dato y un ruido fabricados al vuelo:</p>
+<ol class="pasos">
+  <li>Coge un dato real \( x_0 \) del conjunto de entrenamiento.</li>
+  <li>Elige un paso \( t \) <strong>al azar</strong> entre 1 y \( T \) (uno distinto para cada ejemplo del <em>batch</em>).</li>
+  <li>Saca un ruido \( \varepsilon \sim \mathcal{N}(0, I) \).</li>
+  <li>Fabrica \( x_t \) con la fórmula cerrada.</li>
+  <li>La red recibe \( (x_t, t) \) y devuelve \( \hat\varepsilon \).</li>
+  <li>Pérdida \( = (\varepsilon - \hat\varepsilon)^2 \); gradiente; actualizar pesos.</li>
+</ol>
+
+<div class="callout ejemplo">
+  <span class="lbl">Ejemplo numérico</span>
+  <p>Una sola muestra, el mismo píxel del fotograma de Titanic: \( x_0 = 2 \), \( t = 3 \) (con el schedule de 3 pasos de antes, \( \bar\alpha_3 = 0{,}504 \)) y el ruido sorteado \( \varepsilon = 0{,}5 \).</p>
+  <ol class="pasos">
+    <li><strong>Fabricar x_t.</strong> \( x_3 = \sqrt{0{,}504}\cdot 2 + \sqrt{0{,}496}\cdot 0{,}5 = 0{,}7099\cdot 2 + 0{,}7043\cdot 0{,}5 = 1{,}4199 + 0{,}3521 = 1{,}7720 \).</li>
+    <li><strong>La red mira (1,7720; t = 3)</strong> y responde, digamos, \( \hat\varepsilon = 0{,}2 \) (aún no está entrenada).</li>
+    <li><strong>Pérdida.</strong> \( (0{,}5 - 0{,}2)^2 = 0{,}09 \). El gradiente empuja los pesos para que la próxima vez responda más cerca de 0,5.</li>
+    <li><strong>Qué x₀ deduciría de eso.</strong> De la fórmula cerrada se despeja \( \hat{x}_0 = \dfrac{x_t - \sqrt{1-\bar\alpha_t}\,\hat\varepsilon}{\sqrt{\bar\alpha_t}} = \dfrac{1{,}7720 - 0{,}7043\cdot 0{,}2}{0{,}7099} = 2{,}2975 \). Con el \( \varepsilon \) exacto habría salido 2,0000. El error en x₀ (0,2975) es el error en \( \varepsilon \) (0,3) multiplicado por \( \sqrt{1-\bar\alpha}/\sqrt{\bar\alpha} = 0{,}992 \): cuanto más ruido hay, más se amplifica.</li>
+  </ol>
+</div>
+
+<h3>Por qué «predecir el ruido» y no «predecir la imagen»</h3>
+<ul>
+  <li><strong>Es lo mismo, con otro disfraz.</strong> Conocer \( \varepsilon \) equivale a conocer \( x_0 \) por la fórmula de arriba, y también equivale a conocer la dirección hacia datos más probables (el <em>score</em>, \( \nabla\log p(x_t) \propto -\varepsilon/\sqrt{1-\bar\alpha_t} \)). Las tres parametrizaciones se usan; la del ruido funciona muy bien en la práctica.</li>
+  <li><strong>El objetivo está bien escalado.</strong> \( \varepsilon \) siempre tiene media 0 y varianza 1 sea cual sea \( t \); si predijeras \( x_0 \), el objetivo no cambia pero la dificultad sí lo hace mucho de un paso a otro.</li>
+</ul>
+
+<div class="callout recuerda">
+  <span class="lbl">Experimento de arriba: «Qué estima la red de un solo golpe (red real)», con todo detalle</span>
+  <p><strong>Haz esto.</strong> Con la red entrenada en Keras (fragmento 11), mueve t de 1 a 40. Cada punto es una película colocada en un mapa de dos rasgos. Cada punto gris es un x_t; el naranja es \( \hat{x}_0 \) calculado con la fórmula del paso 4.</p>
+  <p><strong>Fíjate en.</strong> Con t pequeño, \( \hat{x}_0 \) casi coincide con el original y el error es mínimo. Con t grande, x_t es casi ruido y la red no puede saber de qué luna venía: contesta la <em>media</em> de todas las posibilidades y los puntos naranjas se amontonan en el centro, entre las lunas. Por eso no basta una estimación «de un golpe» y el muestreo se hace en muchos pasitos.</p>
+</div>
+
+<h3>La red recibe también el paso t</h3>
+<p>La misma red tiene que limpiar \( x_1 \) (casi sin ruido) y \( x_T \) (casi todo ruido), que son problemas muy distintos, así que necesita saber en qué \( t \) está. Se le pasa como una entrada más, normalmente transformada en un vector de senos y cosenos de varias frecuencias, igual que la <a href="../../curso-2/modulo-4.html">codificación posicional</a> de un Transformer. En nuestra mini-red: \( \big[\tau,\ \sin(\pi 2^k\tau),\ \cos(\pi 2^k\tau)\big] \) con \( \tau = t/T \) y \( k = 0, 1, 2 \): 7 números.</p>
+<p>Para imágenes de verdad la red es una <strong>U-Net</strong>: una pila de convoluciones que reduce la resolución y luego la recupera con <a href="../modulo-2.html">convoluciones transpuestas o upsampling</a>, con <em>skip connections</em> que pasan los detalles de la bajada a la subida (como en las redes residuales del módulo 2), capas de atención en las resoluciones pequeñas y el vector del paso \( t \) inyectado en cada bloque. Aquí, con puntos 2D, basta un MLP pequeño de 9 090 parámetros.</p>
+
+<h2 id="difusion-muestreo">Generar: el muestreo inverso</h2>
+
+<p class="pregunta">Con la red entrenada, ¿cómo se pasa del ruido puro a un dato nuevo?</p>
+
+<p>Empezamos con \( x_T \sim \mathcal{N}(0, I) \), ruido recién sacado, y repetimos desde \( t = T \) hasta \( t = 1 \): preguntamos a la red qué ruido hay en \( x_t \), lo quitamos «un poquito» y añadimos una pizca de ruido fresco. La fórmula del paso (DDPM) es:</p>
+<div class="formula">\[ x_{t-1} \;=\; \frac{1}{\sqrt{\alpha_t}}\left(x_t - \frac{\beta_t}{\sqrt{1-\bar\alpha_t}}\;\hat\varepsilon\right) \;+\; \sigma_t\, z, \qquad z\sim\mathcal{N}(0,I),\quad \hat\varepsilon = \varepsilon_\theta(x_t, t) \]</div>
+<p>El primer sumando es la <strong>media</strong> del paso: se resta del \( x_t \) una fracción del ruido estimado \( \hat\varepsilon \) (la fracción es \( \beta_t/\sqrt{1-\bar\alpha_t} \)) y se reescala por \( 1/\sqrt{\alpha_t} \) para deshacer el encogimiento del paso hacia delante. El segundo sumando es ruido nuevo de desviación \( \sigma_t \); una elección habitual es \( \sigma_t^2 = \beta_t\,\dfrac{1-\bar\alpha_{t-1}}{1-\bar\alpha_t} \) (también se usa \( \beta_t \) a secas). En el último paso (\( t = 1 \)) no se añade ruido.</p>
+
+<div class="callout ejemplo">
+  <span class="lbl">Ejemplo numérico</span>
+  <p>Seguimos con el schedule de 3 pasos y la muestra del apartado anterior (el píxel de Titanic): estamos en \( t = 3 \) con \( x_3 = 1{,}7720 \). Supón que la red es perfecta y estima \( \hat\varepsilon = 0{,}5 \). Valores: \( \beta_3 = 0{,}3 \), \( \alpha_3 = 0{,}7 \), \( \bar\alpha_3 = 0{,}504 \), \( \bar\alpha_2 = 0{,}72 \).</p>
+  <ol class="pasos">
+    <li><strong>Coeficiente del ruido.</strong> \( \beta_3/\sqrt{1-\bar\alpha_3} = 0{,}3/0{,}7043 = 0{,}4260 \).</li>
+    <li><strong>Media.</strong> \( (1{,}7720 - 0{,}4260\cdot 0{,}5)/\sqrt{0{,}7} = (1{,}7720 - 0{,}2130)/0{,}8367 = 1{,}8634 \).</li>
+    <li><strong>Desviación del ruido nuevo.</strong> \( \sigma_3^2 = 0{,}3\cdot(1 - 0{,}72)/(1 - 0{,}504) = 0{,}3\cdot 0{,}28/0{,}496 = 0{,}1694 \), \( \sigma_3 = 0{,}4115 \).</li>
+    <li><strong>Con un ruido fresco \( z = -0{,}6 \).</strong> \( x_2 = 1{,}8634 + 0{,}4115\cdot(-0{,}6) = 1{,}6165 \).</li>
+  </ol>
+  <p>Comprobación: si se calcula directamente la media exacta de \( x_2 \) sabiendo \( x_0 = 2 \) y \( x_3 = 1{,}7720 \) (la «posterior» del proceso hacia delante), sale también 1,8634. Es decir, con un \( \hat\varepsilon \) perfecto el paso inverso da <em>exactamente</em> el centro correcto; los errores de la red lo desvían de ahí.</p>
+</div>
+
+<div class="callout recuerda">
+  <span class="lbl">Experimento de arriba: «Muestreo inverso con la red real, paso a paso», con todo detalle</span>
+  <p><strong>Haz esto.</strong> Pulsa «Un paso hacia atrás» varias veces y luego «Animar hasta el final». Mira el rastro del punto marcado y el cálculo completo en el readout. Después prueba el DDIM con 10 pasos y con solo 3.</p>
+  <p><strong>Fíjate en.</strong> Las flechas grises muestran el campo que aprende la red: en cada punto, hacia dónde hay que moverse para parecerse a los datos. Los 500 puntos naranjas, que empezaban como una nube redonda, se pliegan en las dos lunas, y la distancia media al dato real baja de 0,199 (el ruido inicial) a 0,044 con el DDPM de 40 pasos, igual que los datos reales nuevos (0,049; la demo usa menos puntos de referencia que el fragmento 12, por eso las cifras son algo mayores). El DDIM, determinista, consigue casi lo mismo con 10 pasos (0,053), se degrada con 3 (0,104) y con 2 apenas mejora (0,159). Con otro ruido inicial las cifras cambian un poco.</p>
+</div>
+
+<h3>Por qué se añade ruido en cada paso</h3>
+<p>Parece contradictorio quitar ruido y volver a añadirlo. Pero la red solo da la <em>media</em> de dónde puede haber estado el dato; si siguieras sólo la media, todos los puntos de una zona acabarían en el mismo sitio (el centro de la zona) y perderías diversidad (sería como pedirle a Netflix «una peli de acción» y que siempre te diera la «peli de acción media»). El ruido fresco hace que cada trayectoria decida, con pequeñas sacudidas, a qué luna va, y por eso lo que sale se reparte por toda la distribución. En el último paso no hay que decidir nada más y se omite.</p>
+
+<h3>DDIM: menos pasos, sin ruido</h3>
+<p>Generar con 1000 pasos significa 1000 evaluaciones de la red por cada imagen: lento. <strong>DDIM</strong> (<em>Denoising Diffusion Implicit Models</em>) usa la misma red entrenada pero un muestreo <em>determinista</em> que puede <strong>saltarse pasos</strong>: primero estima el dato limpio con la fórmula de antes, \( \hat{x}_0 = (x_t - \sqrt{1-\bar\alpha_t}\,\hat\varepsilon)/\sqrt{\bar\alpha_t} \), y luego recoloca el ruido para el instante anterior (elegido a saltos):</p>
+<div class="formula">\[ x_{t'} \;=\; \sqrt{\bar\alpha_{t'}}\;\hat{x}_0 \;+\; \sqrt{1-\bar\alpha_{t'}}\;\hat\varepsilon \]</div>
+<p>Con los números de antes (\( t = 3 \), \( \hat\varepsilon = 0{,}5 \) y destino \( t' = 2 \)): \( \hat{x}_0 = (1{,}7720 - 0{,}7043\cdot 0{,}5)/0{,}7099 = 2{,}0000 \) y \( x_2 = \sqrt{0{,}72}\cdot 2 + \sqrt{0{,}28}\cdot 0{,}5 = 1{,}6971 + 0{,}2646 \approx 1{,}962 \). Como no hay ruido nuevo, el mismo \( x_T \) produce siempre la misma salida.</p>
+
+<div class="callout regla">
+  <span class="lbl">Regla fácil</span>
+  <p>Entrenar una difusión es sencillo y estable (una regresión de ruido). El precio se paga al generar: hay que ejecutar la red muchas veces. De ahí los trucos para acelerar: DDIM, menos pasos, destilación, y trabajar en el espacio latente de un autoencoder en lugar de en píxeles (<em>latent diffusion</em>, la base de Stable Diffusion).</p>
+</div>
+<ul>
+  <li><strong>Condicionar:</strong> para «generar la imagen que describe este texto» se le da a la red el texto (como embedding) además de \( x_t \) y \( t \). Con <em>classifier-free guidance</em> se entrena a veces sin el texto y al generar se exagera la diferencia entre «con texto» y «sin texto» para obedecer más al prompt.</li>
+  <li><strong>En el fragmento 12</strong> se genera con 1 000 puntos y se mide que la distancia media al dato real más cercano es 0,026, prácticamente la de datos reales nuevos (0,024) y mucho menor que la del ruido puro (0,159).</li>
+</ul>
+  </div>
+</details>
+
+<section>
+<h2 class="sin-num">Código</h2>
+<!-- ---------- Fragmento 11 ---------- -->
+<article class="snippet" data-lang="python">
+  <header>
+    <h3>11 · Entrenar una red que predice el ruido (difusión sobre dos lunas)</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> La mini-implementación completa del entrenamiento DDPM: sortear un t y un ruido ε por ejemplo, ensuciar con la fórmula cerrada y enseñar a una red a adivinar ε. Usa puntos 2D (dos lunas) para que entrene en un minuto y medio en CPU; la receta es la misma que con imágenes, solo cambia la red.</p>
+  </header>
+  <pre class="code"><code>import numpy as np
+import tensorflow as tf
+import keras
+from keras import layers, ops
+from sklearn.datasets import make_moons
+
+keras.utils.set_random_seed(0)
+
+# Datos: dos lunas, normalizadas a media 0 y desviación 1
+X, _ = make_moons(4000, noise=0.1, random_state=0)
+X = ((X - X.mean(0)) / X.std(0)).astype("float32")
+
+# Schedule: T = 40 pasos con beta lineal
+T = 40
+betas = np.linspace(1e-3, 0.2, T).astype("float32")
+alphas = 1 - betas
+abar = np.cumprod(alphas).astype("float32")
+print("abar en t=1, 20 y 40:", abar[[0, 19, 39]].round(3))
+
+# El paso t entra a la red como un vector de senos y cosenos
+FREQ = np.pi * 2.0 ** np.arange(3)
+def embed_t(tau):                        # tau = t / T, entre 0 y 1
+    a = ops.expand_dims(tau, 1) * FREQ.astype("float32")
+    return ops.concatenate([ops.expand_dims(tau, 1), ops.sin(a), ops.cos(a)], axis=1)
+
+# Red que predice el ruido: entra (x_t, t) y sale eps_hat
+x_in = keras.Input(shape=(2,))
+t_in = keras.Input(shape=(7,))
+h = layers.Concatenate()([x_in, t_in])
+for _ in range(3):
+    h = layers.Dense(64, activation="swish")(h)
+eps_net = keras.Model([x_in, t_in], layers.Dense(2)(h), name="eps_net")
+print("parámetros de la red:", eps_net.count_params())
+
+
+class Difusion(keras.Model):
+    def __init__(self, red, **kwargs):
+        super().__init__(**kwargs)
+        self.red = red
+        self.abar = tf.constant(abar)
+        self.semilla = keras.random.SeedGenerator(7)
+        self.loss_tracker = keras.metrics.Mean(name="loss")
+
+    @property
+    def metrics(self):
+        return [self.loss_tracker]
+
+    def train_step(self, x0):
+        n = ops.shape(x0)[0]
+        t = keras.random.randint((n,), 0, T, seed=self.semilla)        # un t al azar por ejemplo
+        eps = keras.random.normal(ops.shape(x0), seed=self.semilla)    # el ruido verdadero
+        ab = ops.expand_dims(ops.take(self.abar, t), 1)
+        xt = ops.sqrt(ab) * x0 + ops.sqrt(1 - ab) * eps                # fórmula cerrada
+        emb = embed_t((ops.cast(t, "float32") + 1) / T)
+        with tf.GradientTape() as tape:
+            eps_hat = self.red([xt, emb], training=True)
+            loss = ops.mean(ops.square(eps - eps_hat))
+        grads = tape.gradient(loss, self.red.trainable_weights)
+        self.optimizer.apply_gradients(zip(grads, self.red.trainable_weights))
+        self.loss_tracker.update_state(loss)
+        return {"loss": self.loss_tracker.result()}
+
+
+modelo = Difusion(eps_net)
+modelo.compile(optimizer=keras.optimizers.Adam(keras.optimizers.schedules.CosineDecay(1e-2, 5000)))
+hist = modelo.fit(X[:3000], epochs=5000 // (3000 // 512), batch_size=512, verbose=0)
+perd = hist.history["loss"]
+print("pérdida (media del epoch) en los epochs 1, 100, 300 y último:",
+      [round(perd[i], 3) for i in (0, 99, 299, -1)])</code></pre>
+  <details class="linea-a-linea" open>
+    <summary>Línea por línea</summary>
+    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+      <tbody>
+        <tr data-lines="1-5"><td><code>import numpy as np</code>, <code>tensorflow</code>, <code>keras</code>, <code>layers, ops</code>, <code>make_moons</code></td><td>Las librerías de siempre más <code>make_moons</code>, que fabrica puntos en forma de dos medias lunas.</td></tr>
+        <tr data-lines="7"><td><code>keras.utils.set_random_seed(0)</code></td><td>Semilla global para reproducir el resultado.</td></tr>
+        <tr data-lines="9-11"><td><code>X, _ = make_moons(4000, noise=0.1, random_state=0)</code> y la normalización</td><td>4 000 puntos con un poco de ruido; <code>_</code> ignora las etiquetas. Después se resta la media y se divide entre la desviación de cada columna (<code>X.mean(0)</code>, <code>X.std(0)</code>) para que los datos tengan media 0 y desviación 1, la escala del ruido gaussiano.</td></tr>
+        <tr data-lines="13-15"><td><code>T = 40</code> y <code>betas = np.linspace(1e-3, 0.2, T)</code></td><td>Una difusión de solo 40 pasos con β de 0,001 a 0,2 (mucho más rápida que la de 1 000 pasos, porque nuestros datos son de 2 números).</td></tr>
+        <tr data-lines="16-17"><td><code>alphas = 1 - betas</code> y <code>abar = np.cumprod(alphas)</code></td><td>α y su producto acumulado ᾱ, como en el fragmento 8.</td></tr>
+        <tr data-lines="18"><td><code>print("abar en t=1, 20 y 40:", …)</code></td><td>Escribe ᾱ en tres instantes (los índices 0, 19 y 39, por empezar en 0) para comprobar que acabamos en ruido casi puro.</td></tr>
+        <tr data-lines="20-21"><td><code>FREQ = np.pi * 2.0 ** np.arange(3)</code></td><td>Tres frecuencias π, 2π y 4π para codificar el tiempo con senos y cosenos. <code>2.0 ** np.arange(3)</code> es [1, 2, 4].</td></tr>
+        <tr data-lines="22-24"><td><code>def embed_t(tau): …</code></td><td>Convierte el tiempo normalizado τ = t/T (entre 0 y 1) en un vector de 7 números: τ, tres senos y tres cosenos. <code>ops.expand_dims(tau, 1)</code> pasa de forma (n,) a (n, 1) para multiplicar por las 3 frecuencias de golpe; <code>ops.concatenate</code> los junta. La red recibirá así «qué hora es» sin tener que descubrirlo.</td></tr>
+        <tr data-lines="26-29"><td><code>x_in</code>, <code>t_in</code>, <code>h = layers.Concatenate()([x_in, t_in])</code></td><td>La red tiene dos entradas: el punto ruidoso (2 números) y el embedding del tiempo (7). Se pegan en un vector de 9.</td></tr>
+        <tr data-lines="30-31"><td><code>for _ in range(3): h = layers.Dense(64, activation="swish")(h)</code></td><td>Tres capas ocultas de 64 neuronas con la activación swish (parecida a ReLU pero suave). El <code>_</code> es una variable que no se usa.</td></tr>
+        <tr data-lines="32"><td><code>eps_net = keras.Model([x_in, t_in], layers.Dense(2)(h), name="eps_net")</code></td><td>La capa final lineal produce 2 números: el ruido estimado ε̂ (uno por coordenada).</td></tr>
+        <tr data-lines="33"><td><code>print("parámetros de la red:", …)</code></td><td>9·64 + 64 = 640; 2 × (64·64 + 64) = 8 320; 64·2 + 2 = 130; en total 9 090.</td></tr>
+        <tr data-lines="36-39"><td><code>class Difusion(keras.Model): def __init__(self, red, **kwargs)</code></td><td>Un modelo propio que envuelve a la red. Guarda <code>red</code> y los ᾱ como constante de TensorFlow.</td></tr>
+        <tr data-lines="40-41"><td><code>self.abar = tf.constant(abar)</code> y <code>self.semilla = keras.random.SeedGenerator(7)</code></td><td>La tabla de ᾱ dentro del modelo y un generador de semillas para sortear t y ε de forma reproducible.</td></tr>
+        <tr data-lines="42"><td><code>self.loss_tracker = keras.metrics.Mean(name="loss")</code></td><td>El promediador de la pérdida del epoch.</td></tr>
+        <tr data-lines="44-46"><td><code>@property def metrics(self)</code></td><td>Registra el promediador para que Keras lo reinicie en cada epoch.</td></tr>
+        <tr data-lines="48"><td><code>def train_step(self, x0):</code></td><td>Cada lote son puntos limpios x<sub>0</sub> (no hay etiquetas).</td></tr>
+        <tr data-lines="49"><td><code>n = ops.shape(x0)[0]</code></td><td>Cuántos ejemplos hay en el lote.</td></tr>
+        <tr data-lines="50"><td><code>t = keras.random.randint((n,), 0, T, seed=self.semilla)</code></td><td>Un instante t al azar (0 a 39) <strong>por ejemplo</strong>: así la red aprende todos los niveles de ruido a la vez.</td></tr>
+        <tr data-lines="51"><td><code>eps = keras.random.normal(ops.shape(x0), seed=self.semilla)</code></td><td>El ruido verdadero ε ~ N(0, 1) de la misma forma que el lote. Es el <em>objetivo</em> que la red debe adivinar.</td></tr>
+        <tr data-lines="52"><td><code>ab = ops.expand_dims(ops.take(self.abar, t), 1)</code></td><td>Busca el ᾱ<sub>t</sub> de cada ejemplo (<code>ops.take</code> indexa con el vector <code>t</code>) y lo deja en forma (n, 1) para poder multiplicarlo por los puntos.</td></tr>
+        <tr data-lines="53"><td><code>xt = ops.sqrt(ab) * x0 + ops.sqrt(1 - ab) * eps</code></td><td>La fórmula cerrada: el punto ensuciado hasta el instante t.</td></tr>
+        <tr data-lines="54"><td><code>emb = embed_t((ops.cast(t, "float32") + 1) / T)</code></td><td>El tiempo como número real entre 0 y 1 (el +1 convierte el índice 0–39 en el t verdadero 1–40) y su codificación de 7 números.</td></tr>
+        <tr data-lines="55"><td><code>with tf.GradientTape() as tape:</code></td><td>Graba para derivar.</td></tr>
+        <tr data-lines="56"><td><code>eps_hat = self.red([xt, emb], training=True)</code></td><td>La red recibe el punto ruidoso y el tiempo, y devuelve su apuesta sobre el ruido.</td></tr>
+        <tr data-lines="57"><td><code>loss = ops.mean(ops.square(eps - eps_hat))</code></td><td>El error cuadrático medio entre el ruido real y el estimado: la pérdida de la difusión, \( \| \varepsilon - \hat\varepsilon \|^2 \).</td></tr>
+        <tr data-lines="58-59"><td><code>grads = tape.gradient(...)</code> y <code>self.optimizer.apply_gradients(...)</code></td><td>Calcula los gradientes respecto a los pesos de la red y da el paso del optimizador.</td></tr>
+        <tr data-lines="60-61"><td><code>self.loss_tracker.update_state(loss)</code> y <code>return {...}</code></td><td>Acumula la pérdida del lote y devuelve la media corriente.</td></tr>
+        <tr data-lines="64"><td><code>modelo = Difusion(eps_net)</code></td><td>Crea el modelo.</td></tr>
+        <tr data-lines="65"><td><code>modelo.compile(optimizer=keras.optimizers.Adam(CosineDecay(1e-2, 5000)))</code></td><td>Adam con una tasa de aprendizaje que arranca en 0,01 y baja en forma de coseno hasta 0 en 5 000 pasos: aprende rápido al principio y afina al final.</td></tr>
+        <tr data-lines="66"><td><code>hist = modelo.fit(X[:3000], epochs=5000 // (3000 // 512), batch_size=512, verbose=0)</code></td><td>Entrena con los primeros 3 000 puntos (los otros 1 000 se reservan para evaluar). 3 000 // 512 = 5 y 5 000 // 5 = 1 000 epochs de 6 lotes: unos 6 000 pasos (el coseno llega a 0 en el 5 000).</td></tr>
+        <tr data-lines="67"><td><code>perd = hist.history["loss"]</code></td><td>La lista de pérdidas medias, una por epoch.</td></tr>
+        <tr data-lines="68-69"><td><code>print("pérdida … ", [round(perd[i], 3) for i in (0, 99, 299, -1)])</code></td><td>Muestra la pérdida en los epochs 1, 100, 300 y el último (índice −1).</td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>abar en t=1, 20 y 40: [0.999 0.359 0.013]
+parámetros de la red: 9090
+pérdida (media del epoch) en los epochs 1, 100, 300 y último: [0.661, 0.372, 0.35, 0.365]</pre>
+    <p>Con β de 0,001 a 0,2, ᾱ vale 0,999 en t = 1, 0,359 en t = 20 y 0,013 en t = 40: al final queda solo un 1,3 % de la varianza de la señal. La red tiene 9 090 parámetros. La pérdida baja de 0,661 a 0,372 y se queda cerca de 0,35–0,37; <strong>no llega a 0</strong> y eso es normal: con t pequeño casi todo lo que se ve es el dato limpio y adivinar un ruido diminuto es difícil, así que siempre queda algo de error. Esa pequeña variación entre 0,350 y 0,365 es solo el azar de los t y ε sorteados en cada lote.</p>
+  </div>
+</article>
+
+<!-- ---------- Fragmento 12 ---------- -->
+<article class="snippet" data-lang="python">
+  <header>
+    <h3>12 · Generar: el muestreo inverso paso a paso</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Partir de ruido puro y aplicar 40 veces la regla del DDPM, usando la red del fragmento 11 (necesita <code>T</code>, <code>betas</code>, <code>alphas</code>, <code>abar</code>, <code>embed_t</code>, <code>eps_net</code> y <code>X</code>). Al final mide numéricamente si lo generado se parece a los datos reales.</p>
+  </header>
+  <pre class="code"><code># Muestreo inverso (usa T, betas, alphas, abar, embed_t, eps_net y X del fragmento anterior)
+def muestrear(n, seed=1):
+    rng = np.random.default_rng(seed)
+    x = rng.normal(size=(n, 2)).astype("float32")                 # empezamos con ruido puro x_T
+    for t in range(T - 1, -1, -1):
+        emb = ops.convert_to_numpy(embed_t(np.full(n, (t + 1) / T, dtype="float32")))
+        eps_hat = ops.convert_to_numpy(eps_net([x, emb], training=False))
+        media = (x - betas[t] / np.sqrt(1 - abar[t]) * eps_hat) / np.sqrt(alphas[t])
+        if t &gt; 0:
+            sigma = np.sqrt(betas[t] * (1 - abar[t - 1]) / (1 - abar[t]))
+            x = media + sigma * rng.normal(size=x.shape).astype("float32")
+        else:
+            x = media                                              # en el último paso no se añade ruido
+    return x
+
+generados = muestrear(1000)
+
+def dist_media(A, B):
+    d = np.sqrt(((A[:, None, :] - B[None, :, :]) ** 2).sum(-1))
+    return d.min(axis=1).mean()
+
+train, test = X[:3000], X[3000:]
+ruido = np.random.default_rng(5).normal(size=(1000, 2))
+print("distancia media al dato real más cercano:")
+print("  ruido puro        :", round(float(dist_media(ruido, train)), 3))
+print("  muestras generadas:", round(float(dist_media(generados, train)), 3))
+print("  datos reales nuevos:", round(float(dist_media(test, train)), 3))
+
+def mapa(P, filas=12, cols=30):
+    h, _, _ = np.histogram2d(P[:, 1], P[:, 0], bins=[filas, cols], range=[[-2.2, 2.2], [-2.2, 2.2]])
+    return ["".join(" .:*#"[min(4, int(v / 4))] for v in fila) for fila in h[::-1]]
+
+for a, b in zip(mapa(test), mapa(generados)):
+    print(a, "|", b)</code></pre>
+  <details class="linea-a-linea" open>
+    <summary>Línea por línea</summary>
+    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+      <tbody>
+        <tr data-lines="1"><td>Comentario de la línea 1</td><td>Recuerda las variables que se necesitan del fragmento anterior.</td></tr>
+        <tr data-lines="2-3"><td><code>def muestrear(n, seed=1): rng = np.random.default_rng(seed)</code></td><td>Función que genera <code>n</code> puntos nuevos. Su propio generador aleatorio (NumPy) con semilla.</td></tr>
+        <tr data-lines="4"><td><code>x = rng.normal(size=(n, 2)).astype("float32")</code></td><td>Punto de partida: <code>n</code> puntos de ruido puro, x<sub>T</sub> ~ N(0, I).</td></tr>
+        <tr data-lines="5"><td><code>for t in range(T - 1, -1, -1):</code></td><td>Cuenta hacia atrás de 39 a 0 (<code>range(inicio, fin, paso)</code> con paso −1; el 0 sí entra porque el final −1 es exclusivo).</td></tr>
+        <tr data-lines="6"><td><code>emb = ops.convert_to_numpy(embed_t(np.full(n, (t + 1) / T, dtype="float32")))</code></td><td>El tiempo actual repetido para los <code>n</code> puntos, codificado con senos y cosenos. <code>convert_to_numpy</code> pasa el tensor a NumPy para poder mezclarlo con arrays de NumPy.</td></tr>
+        <tr data-lines="7"><td><code>eps_hat = ops.convert_to_numpy(eps_net([x, emb], training=False))</code></td><td>La red estima el ruido que contiene cada punto en este instante.</td></tr>
+        <tr data-lines="8"><td><code>media = (x - betas[t] / np.sqrt(1 - abar[t]) * eps_hat) / np.sqrt(alphas[t])</code></td><td>La fórmula del DDPM: \( \frac{1}{\sqrt{\alpha_t}} \left( x_t - \frac{\beta_t}{\sqrt{1-\bar\alpha_t}} \hat\varepsilon \right) \). Resta ruido y corrige la escala. Es la <em>media</em> del paso anterior.</td></tr>
+        <tr data-lines="9-11"><td><code>if t &gt; 0: sigma = …; x = media + sigma * rng.normal(…)</code></td><td>Salvo en el último paso, se añade un poco de ruido nuevo de desviación σ<sub>t</sub> = √(β<sub>t</sub>(1−ᾱ<sub>t−1</sub>)/(1−ᾱ<sub>t</sub>)). Sin ese ruido todos los caminos colapsarían en las zonas más densas.</td></tr>
+        <tr data-lines="12-13"><td><code>else: x = media</code></td><td>En el paso final (t = 0) se devuelve la media sin añadir ruido: queremos el dato limpio.</td></tr>
+        <tr data-lines="14"><td><code>return x</code></td><td>Devuelve los puntos generados.</td></tr>
+        <tr data-lines="16"><td><code>generados = muestrear(1000)</code></td><td>Genera 1 000 puntos nuevos.</td></tr>
+        <tr data-lines="18-20"><td><code>def dist_media(A, B): …</code></td><td>Para cada punto de A, la distancia al punto más cercano de B, y la media de esas distancias. Es el mismo cálculo con broadcasting del fragmento 6.</td></tr>
+        <tr data-lines="22"><td><code>train, test = X[:3000], X[3000:]</code></td><td>Separa los 3 000 puntos de entrenamiento y los 1 000 que la red no ha visto.</td></tr>
+        <tr data-lines="23"><td><code>ruido = np.random.default_rng(5).normal(size=(1000, 2))</code></td><td>1 000 puntos de ruido sin procesar, como referencia «mala».</td></tr>
+        <tr data-lines="24-27"><td><code>print(...)</code> × 4</td><td>Distancia media al dato de entrenamiento más cercano para: ruido, puntos generados y datos reales nuevos (la referencia «buena»).</td></tr>
+        <tr data-lines="29-31"><td><code>def mapa(P, filas=12, cols=30): …</code></td><td>Dibuja un histograma 2D en texto. <code>np.histogram2d</code> cuenta cuántos puntos caen en cada casilla de una rejilla de 12 × 30; cada casilla se traduce a uno de cinco caracteres <code>" .:*#"</code> según su cuenta (<code>int(v / 4)</code>, máximo 4). <code>h[::-1]</code> invierte las filas para que el eje vertical crezca hacia arriba.</td></tr>
+        <tr data-lines="33-34"><td><code>for a, b in zip(mapa(test), mapa(generados)): print(a, "|", b)</code></td><td>Imprime los dos mapas lado a lado: a la izquierda datos reales, a la derecha los generados.</td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>distancia media al dato real más cercano:
+  ruido puro        : 0.159
+  muestras generadas: 0.026
+  datos reales nuevos: 0.024
+                               |                               
+        *....:.                |          ::.:.                
+     .##*:*:***:.              |       .:*..::###.             
+   .:#.       :.::             |     :*:....   .:**            
+   :#.     :    **.       :    |    :#:    ..     **           
+  .*:     .#.    .#.     .:.   |   .*:     .*     :#.     .*.  
+  :#.     .#:    .*.     :#    |   .:.      #:.    :.     ::   
+   :      .:#.    .    .::*    |            *#..         :#.   
+            :**.     :.:*.     |             :#:    ....##     
+             .:#*.*.**::.      |              .:#**::*:#:.     
+               .:*:::.         |                 :.*#.         
+                               |                               </pre>
+    <p>El ruido puro queda a 0,159 de un punto real; las muestras generadas, a 0,026; y datos reales que la red no vio, a 0,024. Es decir, <strong>lo generado se parece tanto a los datos como se parecen los datos entre sí</strong>. Los dos mapas dibujan las mismas dos medias lunas entrelazadas, una abierta hacia arriba y otra hacia abajo, y las zonas vacías coinciden. La difusión ha aprendido la forma sin que nadie se la describiera.</p>
+  </div>
+</article>
+
+</section>
+
+</div>
+</main>
+</body>
+</html>

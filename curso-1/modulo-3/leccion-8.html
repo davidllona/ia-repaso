@@ -1,312 +1,354 @@
-<!DOCTYPE html>
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lección 8 · El boosting encadena árboles que corrigen al anterior · Módulo 3 · Curso 1 · Cuaderno de IA</title>
+<meta name="description" content="Boosting: AdaBoost repesa las películas mal acertadas, Gradient Boosting entrena cada árbol sobre los residuos, XGBoost lo regulariza; y cómo elegir algoritmo midiendo.">
+<script>try{var t=localStorage.getItem('cuaderno-ia:tema');if(t)document.documentElement.setAttribute('data-theme',t)}catch(e){}</script>
+<link rel="stylesheet" href="../../assets/css/style.css">
+<script src="../../assets/js/curriculum.js"></script>
+<script src="../../assets/js/lab.js"></script>
+<script src="../../assets/js/app.js" defer></script>
+</head>
+<body data-root="../../" data-course="1" data-module="3" data-lesson="8">
+<main>
+<div class="page">
 
-<html lang="es"><head><meta charset="utf-8"/><meta content="width=device-width,initial-scale=1" name="viewport"/><title>Lección 8 · Ensembles: muchos modelos mejor que uno · Curso 1 · Cuaderno de IA</title><meta content="Un ensemble («conjunto», «comité») combina las predicciones de varios modelos en una sola." name="description"/><script>try{var t=localStorage.getItem('cuaderno-ia:tema');if(t)document.documentElement.setAttribute('data-theme',t)}catch(e){}</script><link href="../../assets/css/style.css" rel="stylesheet"/><script src="../../assets/js/curriculum.js"></script><script src="../../assets/js/lab.js"></script><script defer="" src="../../assets/js/app.js"></script><script defer="" src="../../assets/js/microanimations.js"></script></head><body data-course="1" data-lesson="8" data-module="3" data-root="../../"><main><div class="page" data-micro="3min"><header class="hero leccion"><div class="hero-grid"><div><p class="eyebrow">Curso 1 · Módulo 3 · Lección 8 de 9</p><h1>Ensembles: muchos modelos mejor que uno</h1><p class="lead">Un ensemble («conjunto», «comité») combina las predicciones de varios modelos en una sola.</p><p class="meta-line"><span class="read-time" data-render="read-time"></span><a href="../modulo-3.html">Índice del módulo</a></p></div><div aria-hidden="true" class="hero-tile"></div></div></header><details class="predice"><summary>Un árbol de decisión sobreajusta y es inestable. ¿Y si en vez de uno entrenas cien y dejas que voten?<span class="hint"></span></summary><div><p>Un ensemble («conjunto», «comité») combina las predicciones de varios modelos en una sola.</p></div></details><section aria-label="Explicación breve" class="micro-core"><div class="micro-kicker">01 · ENTENDER <span>≈ 45 s</span></div><h2>La idea en palabras sencillas</h2><p>Un ensemble («conjunto», «comité») combina las predicciones de varios modelos en una sola.</p><div class="micro-example"><span aria-hidden="true" class="micro-example-icon">💡</span><div><strong>Otro ejemplo · Riego</strong><p>Un sensor decide: si la tierra está seca, regar; si está húmeda, esperar. Cada pregunta abre una rama.</p></div></div></section><div class="micro-kicker micro-checkpoint">02 · RESPONDER <span>≈ 15 s</span></div><section aria-label="Pregunta intercalada" class="quiz mini micro-check"><script class="quiz-data" type="application/json">{"titulo": "Pausa rápida · Comprueba la idea", "preguntas": [{"q": "Un árbol pregunta «¿temperatura mayor de 30 °C?». Con 34 °C, ¿qué rama toma?", "opciones": ["La rama del sí", "La rama del no", "Ambas a la vez"], "correcta": 0, "porque": "34 supera 30; sigue la rama afirmativa."}]}</script></section><section aria-label="Animación interactiva" class="micro-viz" data-index="12" data-micro-viz="tree"><div class="micro-kicker">03 · EXPERIMENTAR <span>≈ 45 s</span></div><div class="micro-viz-title"><div><h2>Una decisión, paso a paso</h2><p>Prueba distintos valores y sigue el camino de la decisión.</p></div><span aria-hidden="true" class="micro-viz-symbol">✦</span></div><div aria-live="polite" class="micro-viz-stage"><p>Animación interactiva: Una decisión, paso a paso</p></div></section><div class="micro-kicker micro-checkpoint">04 · APLICAR <span>≈ 15 s</span></div><section aria-label="Pregunta intercalada" class="quiz mini micro-check"><script class="quiz-data" type="application/json">{"titulo": "Pausa rápida · ¿Lo aplicarías?", "preguntas": [{"q": "¿Qué cambia al hacer un árbol mucho más profundo?", "opciones": ["Elimina automáticamente el overfitting", "Deja de necesitar datos", "Puede representar reglas más específicas"], "correcta": 2, "porque": "Más profundidad permite reglas más detalladas, aunque puede aumentar el sobreajuste."}]}</script></section><div class="micro-finish"><strong>Idea que te llevas</strong><span>Un ensemble («conjunto», «comité») combina las predicciones de varios modelos en una sola</span><small>¿Quieres más ejemplos, fórmulas o código? Los tienes justo debajo, sin límite de tiempo.</small></div><details class="profundizar micro-legacy"><summary><span>Explorar más: explicación y simulaciones completas<small>Todo el texto original, tablas y demos avanzadas. Opcional.</small></span></summary><div class="prof-body"><section><h2>Ensembles: muchos modelos mejor que uno</h2>
-<p>Un <strong>ensemble</strong> («conjunto», «comité») combina las predicciones de varios modelos en una sola. Los más usados en datos de tabla (como las hojas de cálculo de clientes, ventas o pacientes) son ensembles de árboles, y han destacado durante años en muchas competiciones de Machine Learning con ese tipo de datos. Entender por qué funcionan es entender un solo truco de aritmética.</p>
-<p>Antes de los comités de árboles, el caso más simple: juntar modelos <em>de tipos distintos</em> (una regresión logística, un KNN, un árbol) con <code>VotingClassifier</code>. Hay dos formas de contar:</p>
-<p>Por ejemplo, si para un punto tres modelos dan 0,696; 1,000 y 0,957 de probabilidad de la clase 1, el voto suave promedia \( (0{,}696+1{,}000+0{,}957)/3 = 0{,}884 \) y predice la clase 1. El fragmento 17 lo prueba con honestidad: el comité iguala al mejor de sus miembros y supera a la media, pero no lo derrota siempre. Su valor es que no necesitas saber de antemano cuál es el mejor miembro.</p>
-<div class="callout ejemplo"><span class="lbl">Ejemplo tomado del módulo</span><p>Tres amigos independientes adivinan si te va a gustar una película, y cada uno acierta el 70 % de las veces (cifra inventada).</p></div></section><figure class="demo" data-demo="curso1/c1m3-bosque" data-titulo="Un bosque de árboles: cada uno se equivoca distinto y el voto lo arregla">
-<div class="haz">Cada punto es una película (infantil o thriller, según su violencia y su suspense). Sube «Número de árboles» de 1 a 40 y mira la frontera. Desactiva «Muestras bootstrap» y después «Una variable al azar por pregunta». Prueba a desactivar las dos.</div>
-<div class="observa">En el cuadro de números, compara el acierto de los árboles individuales (media, mínimo y máximo) con el del bosque: casi siempre el bosque supera a la media. Los seis mini-paneles muestran que cada árbol dibuja una frontera distinta. Con las dos opciones apagadas, todos los árboles son idénticos y votar no aporta nada: la diversidad es lo que hace funcionar al comité. El acierto OOB estima el test sin usarlo.</div>
-</figure><div class="resumen"><h2 class="sin-num sin-toc">En pocas líneas</h2><ul><li><strong>Ensembles: muchos modelos mejor que uno:</strong> Un ensemble («conjunto», «comité») combina las predicciones de varios modelos en una sola.</li><li>Antes de continuar, intenta explicar la demo sin mirar su resultado.</li></ul></div><section class="quiz mini"><script class="quiz-data" type="application/json">{"titulo": "¿Lo tienes?", "preguntas": [{"q": "¿Qué concepto estamos trabajando en esta lección?", "opciones": ["Más de dos clases: One-vs-Rest y One-vs-One", "Cuándo usar cada algoritmo", "Ensembles: muchos modelos mejor que uno"], "correcta": 2, "porque": "Un ensemble («conjunto», «comité») combina las predicciones de varios modelos en una sola."}, {"q": "¿Cuál de estas afirmaciones recoge lo que acabas de estudiar?", "opciones": ["Un ensemble («conjunto», «comité») combina las predicciones de varios modelos en una sola.", "Siempre hay un único método que sirve para todos los problemas.", "Lo importante es comprender la idea y comprobarla con ejemplos, no memorizar términos."], "correcta": 0, "porque": "La explicación central es: Un ensemble («conjunto», «comité») combina las predicciones de varios modelos en una sola."}, {"q": "Si una demo o un ejemplo te desconcierta, ¿cuál es la mejor forma de aprenderlo?", "opciones": ["Volver a los números, cambiar un valor y explicar qué ocurre.", "Ignorar los resultados que no coinciden con tu intuición.", "Memorizar el nombre sin entender la operación."], "correcta": 0, "porque": "Explorar qué cambia y por qué ayuda a conectar el concepto con su resultado."}]}</script></section></div></details><details class="profundizar"><summary><span>Profundizar: explicación completa<small>Matices, fórmulas, tablas, otros ejemplos y experimentos del módulo original.</small></span></summary><div class="prof-body"><section>
-<h2 id="ensembles">Ensembles: muchos modelos mejor que uno</h2>
-<p class="pregunta">Un árbol de decisión sobreajusta y es inestable. ¿Y si en vez de uno entrenas cien y dejas que voten?</p>
-<p>Un <strong>ensemble</strong> («conjunto», «comité») combina las predicciones de varios modelos en una sola. Los más usados en datos de tabla (como las hojas de cálculo de clientes, ventas o pacientes) son ensembles de árboles, y han destacado durante años en muchas competiciones de Machine Learning con ese tipo de datos. Entender por qué funcionan es entender un solo truco de aritmética.</p>
-<h3 id="ens-por-que">Por qué un comité acierta más que sus miembros</h3>
-<div class="callout analogia">
-<span class="lbl">Analogía</span>
-<p>Para elegir qué serie ver, preguntar a diez amigos funciona mejor que fiarte de uno solo: aunque cada uno acierte a medias, sus fallos son distintos y se compensan, mientras que los aciertos coinciden.</p>
-</div>
-<div class="callout ejemplo">
-<span class="lbl">Ejemplo numérico</span>
-<p>Tres amigos independientes adivinan si te va a gustar una película, y cada uno acierta el 70 % de las veces (cifra inventada). Votan por mayoría. El comité acierta si <strong>al menos 2 de los 3</strong> aciertan:</p>
-<ol class="pasos">
-<li>Exactamente 2 aciertan y 1 falla: hay 3 formas de elegir cuál falla. Probabilidad = \( 3\cdot0{,}7^2\cdot0{,}3 = 3\cdot0{,}49\cdot0{,}3 = 0{,}441 \).</li>
-<li>Aciertan los 3: \( 0{,}7^3 = 0{,}343 \).</li>
-<li>Suma: \( 0{,}441 + 0{,}343 = \mathbf{0{,}784} \). El comité (78,4 %) supera a cada miembro (70 %).</li>
-</ol>
-<p>Con más miembros la mejora continúa: 5 amigos → 83,7 %; 11 → 92,2 %; 101 → 99,999 %.</p>
-</div>
-<div class="callout ojo">
-<span class="lbl">Ojo</span>
-<p>La magia exige dos condiciones: cada modelo debe ser <strong>mejor que el azar</strong> y sus <strong>errores no deben ser siempre los mismos</strong> (diversidad). Cien copias idénticas de un mismo árbol votan lo mismo y el comité acierta igual que uno solo. Toda la ingeniería de los ensembles consiste en fabricar modelos distintos entre sí. Hay dos grandes familias de recetas, más una tercera menos habitual.</p>
-</div>
-<table>
-<caption>Las familias de ensembles</caption>
-<thead><tr><th>Familia</th><th>Cómo fabrica la diversidad</th><th>Se entrenan…</th><th>Ataca sobre todo…</th><th>Ejemplos</th></tr></thead>
-<tbody>
-<tr><th scope="row">Bagging</th><td>Cada modelo ve una muestra distinta de los datos (bootstrap)</td><td>en paralelo, independientes</td><td>la <strong>varianza</strong></td><td><code>BaggingClassifier</code>, <code>RandomForestClassifier</code></td></tr>
-<tr><th scope="row">Boosting</th><td>Cada modelo se centra en lo que los anteriores hicieron mal</td><td>en secuencia, cada uno depende del anterior</td><td>el <strong>sesgo</strong></td><td><code>AdaBoostClassifier</code>, <code>GradientBoostingClassifier</code>, XGBoost</td></tr>
-<tr><th scope="row">Stacking</th><td>Un modelo final aprende a combinar las predicciones de modelos de tipos distintos</td><td>dos niveles</td><td>ambos</td><td><code>StackingClassifier</code></td></tr>
-</tbody>
-</table>
-<h3 id="voting">Voting: el comité más sencillo</h3>
-<p>Antes de los comités de árboles, el caso más simple: juntar modelos <em>de tipos distintos</em> (una regresión logística, un KNN, un árbol) con <code>VotingClassifier</code>. Hay dos formas de contar:</p>
+<header class="hero leccion">
+  <div class="hero-grid">
+    <div>
+      <p class="eyebrow">Curso 1 · Módulo 3 · Lección 8 de 8</p>
+      <h1>El boosting encadena árboles que corrigen al anterior</h1>
+      <p class="lead">Un recomendador que aprende de sus fallos: cada ronda se fija en lo que la anterior hizo mal. Muchos árboles diminutos sumados acaban acertando mucho. Y para elegir algoritmo: medir antes de decidir.</p>
+      <p class="meta-line"><span class="read-time" data-render="read-time"></span><a href="../modulo-3.html">Índice del módulo</a></p>
+    </div>
+    <div class="hero-tile" aria-hidden="true"></div>
+  </div>
+</header>
+
+<details class="predice">
+  <summary>Un modelo predice 7,6 horas de series para todos los usuarios. Uno de ellos ve 14. Si el siguiente árbol aprende a predecir el <em>error</em> (14 − 7,6) y sumas la mitad de lo que dice, ¿cuánto predecirás ahora para ese usuario?<span class="hint"></span></summary>
+  <div>
+    <p>10,8. El error (residuo) es 6,4; sumas la mitad: 7,6 + 0,5 · 6,4 = 10,8. Aún faltan 3,2, y el siguiente árbol se encargará de eso. Esa es toda la idea del <strong>Gradient Boosting</strong>: cada árbol predice lo que le falta al modelo actual.</p>
+  </div>
+</details>
+
+<section>
+<h2 id="idea">Árboles pequeños en cadena</h2>
+<p>El bagging entrena árboles por separado y los promedia. El <strong>boosting</strong> los entrena <strong>uno detrás de otro</strong>, y cada uno se concentra en lo que los anteriores hacen mal. Usa <em>aprendices débiles</em>: árboles de una sola pregunta (<em>stumps</em>) o poco profundos. Hay dos formas de «concentrarse en los errores»:</p>
 <ul>
-<li><strong>Voto duro</strong> (<code>voting="hard"</code>): cada modelo emite una clase y gana la mayoría, como en el ejemplo de arriba.</li>
-<li><strong>Voto suave</strong> (<code>voting="soft"</code>): se promedian las <em>probabilidades</em> que da cada modelo y gana la clase con mayor media. Suele ser mejor porque un modelo muy seguro pesa más que uno dudoso (necesita que todos los miembros puedan dar <code>predict_proba</code>).</li>
+  <li><strong>AdaBoost</strong>: las películas mal acertadas <strong>ganan peso</strong> y el siguiente stump tiene que tratarlas mejor. Cada stump vota con un peso \( \alpha=\tfrac12\ln\frac{1-\varepsilon}{\varepsilon} \), mayor cuanto menor es su error \( \varepsilon \).</li>
+  <li><strong>Gradient Boosting</strong>: cada árbol aprende los <strong>residuos</strong> (\( y - F \)) y se suma con una tasa de aprendizaje \( \eta \): \( F \leftarrow F + \eta\cdot\text{árbol} \).</li>
 </ul>
-<p>Por ejemplo, si para un punto tres modelos dan 0,696; 1,000 y 0,957 de probabilidad de la clase 1, el voto suave promedia \( (0{,}696+1{,}000+0{,}957)/3 = 0{,}884 \) y predice la clase 1. El fragmento 17 lo prueba con honestidad: el comité iguala al mejor de sus miembros y supera a la media, pero no lo derrota siempre. Su valor es que no necesitas saber de antemano cuál es el mejor miembro.</p>
-<h3 id="bootstrap">Bootstrap y bagging</h3>
-<p>Para que modelos entrenados con los <em>mismos</em> datos salgan distintos hace falta variar los datos. El <strong>bootstrap</strong> consiste en fabricar un conjunto nuevo del mismo tamaño que el original <strong>sacando datos con reposición</strong>: se extrae un dato al azar, se anota y se <em>devuelve</em> al montón, de modo que puede salir otra vez.</p>
+<p><strong>XGBoost</strong> es Gradient Boosting con regularización (\( \lambda \) encoge las hojas, \( \gamma \) evita divisiones que aportan poco), datos faltantes de serie y <em>early stopping</em>. A diferencia del Random Forest, el boosting <strong>sí puede sobreajustar</strong> si añades rondas sin control.</p>
+</section>
+
+<figure class="demo" data-demo="curso1/c1m3-adaboost" data-titulo="AdaBoost: las películas difíciles de acertar engordan ronda a ronda">
+  <div class="haz">Pulsa «Siguiente ronda» varias veces mirando el tamaño de los puntos y el fondo.</div>
+  <div class="observa">Las películas mal clasificadas engordan (más peso). Varias fronteras rectas ponderadas dibujan una escalera que se ajusta mucho mejor que una sola.</div>
+</figure>
+
+<section>
+<h2 id="con-numeros">Con números: dos árboles sobre los residuos</h2>
 <div class="callout ejemplo">
-<span class="lbl">Ejemplo numérico</span>
-<p>Imagina cinco películas del historial de un usuario: A = <em>Titanic</em>, B = <em>Matrix</em>, C = <em>Shrek</em>, D = <em>Toy Story</em>, E = <em>El Rey León</em>. Cinco extracciones con reposición dan, por ejemplo, <strong>E, D, C, B, B</strong> (<em>El Rey León</em>, <em>Toy Story</em>, <em>Shrek</em>, <em>Matrix</em>, <em>Matrix</em>): la B sale dos veces y la A no sale. Cada árbol del comité recibe una muestra así, distinta de las demás. Los datos que un árbol no vio (aquí, el A) se llaman <strong>out-of-bag</strong> (OOB, «fuera de la bolsa»).</p>
-<p>¿Cuántos datos distintos entran? La probabilidad de que un dato concreto <em>no</em> salga en una extracción es \( 1-\tfrac1n \); en las \( n \) extracciones, \( (1-\tfrac1n)^n \). Con \( n=5 \): \( 0{,}8^5 = 0{,}328 \), así que entra el \( 67{,}2\,\% \) de los datos distintos. Cuando \( n \) es grande, \( (1-\tfrac1n)^n \to e^{-1}=0{,}368 \): <strong>entra el 63,2 % y queda fuera el 36,8 %</strong>. El fragmento 15 lo simula.</p>
+  <span class="lbl">Ejemplo numérico</span>
+  <p>Cinco usuarios: series que siguen \( x = 1..5 \), horas a la semana \( y = 3, 5, 4, 12, 14 \). Stumps con corte en 3,5 y \( \eta = 0{,}5 \).</p>
+  <ol class="pasos">
+    <li>\( F_0 \) = media = 7,6. Residuos: −4,6, −2,6, −3,6, 4,4, 6,4. Error cuadrático medio: <strong>20,24</strong>.</li>
+    <li>Árbol 1: hojas = media de residuos: \( -3{,}6 \) (izquierda) y \( 5{,}4 \) (derecha). \( F_1 = 7{,}6 + 0{,}5\cdot(-3{,}6) = 5{,}8 \) y \( 7{,}6 + 0{,}5\cdot5{,}4 = 10{,}3 \). Error: <strong>5,66</strong>.</li>
+    <li>Árbol 2 sobre los nuevos residuos: \( F_2 = 4{,}9 \) y \( 11{,}65 \). Error: <strong>2,015</strong>.</li>
+  </ol>
+  <p>Dos árboles diminutos y el error baja de 20,24 a 2,015. Con XGBoost y \( \lambda = 1 \), la hoja derecha valdría \( 10{,}8/(2+1) = 3{,}6 \) en vez de 5,4: \( \lambda \) frena las hojas decididas por pocos puntos.</p>
 </div>
-<p><strong>Bagging</strong> (<em>Bootstrap AGGregatING</em>) es entrenar un modelo en cada muestra bootstrap y agregar: <em>voto</em> en clasificación, <em>media</em> en regresión. Funciona sobre todo con modelos de varianza alta y poco sesgo (árboles profundos), porque promediar cancela las rarezas de cada uno.</p>
-<p>¿Cuánto ayuda promediar? Si cada modelo tiene varianza \( \sigma^2 \) y la <em>correlación</em> entre las predicciones de dos modelos cualesquiera es \( \rho \), la varianza de la media de \( B \) modelos es:</p>
-<div class="formula">\[ \operatorname{Var}\big(\bar f\big)\;=\;\rho\,\sigma^2\;+\;\frac{1-\rho}{B}\,\sigma^2 \]</div>
-<table>
-<caption>Varianza de la media con σ² = 1</caption>
-<thead><tr><th>Correlación ρ</th><th>B = 1</th><th>B = 10</th><th>B = 100</th><th>B = 1000</th></tr></thead>
-<tbody>
-<tr><th scope="row">0 (independientes)</th><td>1</td><td>0,1</td><td>0,01</td><td>0,001</td></tr>
-<tr><th scope="row">0,2</th><td>1</td><td>0,28</td><td>0,208</td><td>0,2008</td></tr>
-<tr><th scope="row">0,8 (muy parecidos)</th><td>1</td><td>0,82</td><td>0,802</td><td>0,8002</td></tr>
-</tbody>
-</table>
-<p>Dos conclusiones: (1) con modelos independientes, la varianza baja a la \( B \)-ésima parte; (2) si los modelos están correlacionados, hay un <strong>suelo</strong> \( \rho\sigma^2 \) que no se baja añadiendo árboles: con \( \rho=0{,}8 \) pasar de 100 a 1000 árboles no mejora nada. Los árboles de un bagging se parecen mucho entre sí (si hay una variable muy buena, todos la eligen en la raíz), así que hace falta bajar \( \rho \). Eso es lo que hace el Random Forest.</p>
-<p>Y hay un regalo: cada árbol deja fuera de su muestra el 36,8 % de los datos. Para cada dato de entrenamiento se pueden preguntar solo los árboles que <em>no lo vieron</em>, y comparar su voto con la etiqueta real. Ese acierto se llama <strong>puntuación OOB</strong> (<code>oob_score=True</code>) y es una estimación de test «gratis», sin reservar datos. El fragmento 16 la compara con la del test.</p>
-<h3 id="random-forest">Random Forest</h3>
-<p>Un <strong>Random Forest</strong> («bosque aleatorio») es bagging de árboles con un añadido: en <em>cada pregunta</em> de <em>cada árbol</em>, solo se considera un <strong>subconjunto aleatorio de variables</strong> (<code>max_features</code>), no todas. Así, aunque haya una variable estrella, hay árboles que no pueden usarla en la raíz y deben apoyarse en otras: los árboles se vuelven distintos entre sí (baja \( \rho \)) y al promediarlos la varianza baja mucho más.</p>
-<div class="callout ejemplo">
-<span class="lbl">Ejemplo numérico</span>
-<p>Bosque de 5 árboles que opinan si a Ana le gustará <em>Stranger Things</em>: sí, no, sí, sí, no. Votos: 3 «sí», 2 «no» → predicción <strong>le gustará</strong>, con una probabilidad estimada de \( 3/5 = 0{,}6 \). (En scikit-learn <code>predict_proba</code> promedia las probabilidades de cada hoja, que es una versión más fina del mismo voto.) En regresión, el bosque devuelve la <strong>media</strong> de las predicciones de los árboles.</p>
+</section>
+
+<figure class="demo" data-demo="curso1/c1m3-boosting" data-titulo="Gradient Boosting: cada árbol aprende lo que le falta al anterior">
+  <div class="haz">Pulsa «+1 árbol» y mira cómo se achican los residuos. Elige «Profundidad 2» y deja correr hasta 80 árboles.</div>
+  <div class="observa">El error de train baja siempre; el de test baja y luego puede subir. Ese mínimo es el que busca el <em>early stopping</em>.</div>
+</figure>
+
+<section>
+<h2 id="cual-elegir">¿Y cuál elijo?</h2>
+<p>No hay un algoritmo mejor para todo. Receta: un modelo sencillo de referencia (logística o árbol pequeño), luego un Random Forest, luego un boosting con early stopping; compara con el <strong>mismo reparto</strong> y quédate con el más simple que rinda casi igual. KNN y SVM necesitan escalar; los árboles y sus comités, no.</p>
+</section>
+
+<details class="predice">
+  <summary>Comparas nueve modelos con 569 tumores reales: logística, KNN, SVM, Naive Bayes, árbol, Random Forest, AdaBoost, Gradient Boosting y XGBoost. ¿Quién gana en test?<span class="hint"></span></summary>
+  <div>
+    <p>La <strong>regresión logística</strong> (0,986). Los comités llegan a 1,000 en train pero entre 0,958 y 0,972 en test: en un conjunto pequeño y casi separable con una recta, la capacidad extra se gasta en memorizar. Con 143 pacientes de test, la diferencia son 7 pacientes. La lección no es «la logística gana», sino <strong>medir antes de elegir</strong>.</p>
+  </div>
+</details>
+
+<div class="resumen">
+  <h2 class="sin-num sin-toc">En tres líneas</h2>
+  <ul>
+    <li>Boosting = aprendices débiles en cadena; ataca el sesgo y puede sobreajustar.</li>
+    <li>AdaBoost repesa los errores; Gradient Boosting suma árboles sobre residuos (\( F \leftarrow F+\eta\cdot\text{árbol} \)); XGBoost regulariza.</li>
+    <li>Empieza simple, prueba un bosque y un boosting, mide con el mismo reparto y elige el más simple.</li>
+  </ul>
 </div>
-<table>
-<caption>Hiperparámetros de <code>RandomForestClassifier</code></caption>
-<thead><tr><th>Hiperparámetro</th><th>Qué controla</th><th>Consejo</th></tr></thead>
-<tbody>
-<tr><td><code>n_estimators</code></td><td>Número de árboles</td><td>Más árboles nunca sobreajustan más; la mejora se estabiliza y cuesta tiempo. 100–500 es habitual.</td></tr>
-<tr><td><code>max_features</code></td><td>Variables que se consideran en cada pregunta</td><td>Por defecto <code>"sqrt"</code> en clasificación (la raíz del número de variables) y todas en regresión. Probar valores menores y mayores.</td></tr>
-<tr><td><code>max_depth</code>, <code>min_samples_leaf</code></td><td>Tamaño de cada árbol</td><td>Se dejan crecer bastante: promediar ya reduce la varianza.</td></tr>
-<tr><td><code>bootstrap</code>, <code>oob_score</code></td><td>Usar muestras bootstrap y calcular el acierto fuera de bolsa</td><td>Activa <code>oob_score=True</code> para obtener una estimación sin tocar el test.</td></tr>
-<tr><td><code>class_weight</code></td><td>Pesar más una clase minoritaria</td><td>Útil con clases desequilibradas.</td></tr>
-<tr><td><code>n_jobs</code>, <code>random_state</code></td><td>Núcleos de CPU y semilla</td><td><code>n_jobs=-1</code> usa todos; fija la semilla para repetir resultados.</td></tr>
-</tbody>
-</table>
-<p>Un Random Forest también calcula <code>feature_importances_</code>, promediando las importancias de todos sus árboles (más estable que la de un árbol solo, aunque con las mismas cautelas: correlación entre variables y preferencia por las que tienen muchos valores).</p>
-<div class="cards">
-<div class="card">
-<h4>Lo bueno</h4>
-<p>Muy buen rendimiento «de fábrica» con poco ajuste. No necesita escalar. Robusto frente a ruido y valores atípicos. Da importancias y un OOB gratis. Fácil de paralelizar.</p>
-</div>
-<div class="card">
-<h4>Lo malo</h4>
-<p>Más lento y pesado que un árbol. Difícil de explicar (centenares de árboles). No extrapola. A menudo un boosting bien ajustado lo supera en datos de tabla.</p>
-</div>
-</div>
+
+<section class="quiz mini">
+<script type="application/json" class="quiz-data">
+{"titulo":"¿Lo tienes?","preguntas":[
+ {"q":"En Gradient Boosting con error cuadrático, la predicción inicial es F₀ = 7,6 horas (la media de lo que ven los usuarios). Para un usuario que ve y = 14 horas a la semana y una tasa de aprendizaje η = 0,5, si el árbol 1 acierta exactamente su residuo, ¿cuánto vale F₁ para ese punto?","opciones":["10,8","14","14,6","7,6"],"correcta":0,"porque":"El residuo es 14 − 7,6 = 6,4. El árbol lo predice y se suma multiplicado por η: F₁ = 7,6 + 0,5 · 6,4 = 10,8. Con η = 1 llegaría a 14 de golpe; con η < 1 avanza solo una fracción y deja trabajo a los árboles siguientes (que corrigen lo que queda: 14 − 10,8 = 3,2). El 14,6 sale de sumar η · y en vez de η · residuo. Esa es la diferencia con un Random Forest: allí los árboles se entrenan por separado y se promedian."},
+ {"q":"En AdaBoost, un stump tiene error ponderado ε = 0,2. ¿Cuánto vale su peso de voto α = ½ ln((1 − ε)/ε)?","opciones":["0,2","0,6931","1,3863","0"],"correcta":1,"porque":"(1 − 0,2)/0,2 = 4 y ½ ln 4 = 0,6931. El 1,3863 es lo que muestra scikit-learn (variante SAMME, sin el ½). Con ε = 0,5 (azar) el peso sería 0."},
+ {"q":"¿Qué diferencia principal hay entre bagging y boosting?","opciones":["Bagging entrena en paralelo y reduce la varianza; boosting entrena en cadena y reduce el sesgo","Son lo mismo con otro nombre","Boosting usa árboles profundos y bagging stumps"],"correcta":0,"porque":"Bagging promedia árboles profundos e independientes (menos varianza). Boosting suma árboles pequeños, cada uno corrigiendo al anterior (menos sesgo). Por eso un boosting sin control sí puede sobreajustar."}
+]}
+</script>
+</section>
+
+<details class="profundizar">
+  <summary><span>Profundizar: la explicación completa<small>AdaBoost con tres rondas calculadas a mano, Gradient Boosting y por qué se llama «gradient», sus hiperparámetros, XGBoost por dentro (objetivo, hojas, ganancia, ingeniería e hiperparámetros), la tabla comparativa de todos los algoritmos, la guía para decidir y el resumen del módulo.</small></span></summary>
+  <div class="prof-body">
 <h3 id="boosting">Boosting: aprender de los errores</h3>
 <p>El bagging entrena los modelos por separado y los promedia. El <strong>boosting</strong> hace algo muy distinto: los entrena <strong>uno detrás de otro</strong>, y cada nuevo modelo se concentra en lo que los anteriores hacen mal. Los modelos que se encadenan son deliberadamente débiles.</p>
+
 <div class="callout analogia">
-<span class="lbl">Analogía</span>
-<p>Un recomendador de películas que aprende de sus fallos. Te sugiere unas cuantas, tú dices cuáles no te gustaron, y en la siguiente ronda se fija más en el tipo de películas donde falló; en la siguiente, en lo que aún le sale mal. Cada ronda por sí sola enseña poco, pero la suma de rondas acaba acertando mucho. Un <strong>aprendiz débil</strong> (<em>weak learner</em>) es un modelo apenas mejor que el azar (por ejemplo, un árbol de una sola pregunta, llamado <em>stump</em>, «tocón»). Un conjunto de aprendices débiles bien encadenado es un aprendiz fuerte.</p>
+  <span class="lbl">Analogía</span>
+  <p>Un recomendador de películas que aprende de sus fallos. Te sugiere unas cuantas, tú dices cuáles no te gustaron, y en la siguiente ronda se fija más en el tipo de películas donde falló; en la siguiente, en lo que aún le sale mal. Cada ronda por sí sola enseña poco, pero la suma de rondas acaba acertando mucho. Un <strong>aprendiz débil</strong> (<em>weak learner</em>) es un modelo apenas mejor que el azar (por ejemplo, un árbol de una sola pregunta, llamado <em>stump</em>, «tocón»). Un conjunto de aprendices débiles bien encadenado es un aprendiz fuerte.</p>
 </div>
+
 <p>Hay dos formas principales de «concentrarse en los errores»: cambiar el <strong>peso de los datos</strong> (AdaBoost) o entrenar sobre los <strong>residuos</strong> (Gradient Boosting).</p>
+
 <h3 id="adaboost">AdaBoost: los datos mal clasificados ganan peso</h3>
 <p>En <strong>AdaBoost</strong> (<em>Adaptive Boosting</em>) todos los datos empiezan con el mismo peso. En cada ronda:</p>
 <ol class="pasos">
-<li>Entrena un stump dando más importancia a los datos de más peso y calcula su <strong>error ponderado</strong> \( \varepsilon \): la suma de los pesos de los datos que clasifica mal.</li>
-<li>Calcula su peso de voto: \( \alpha=\tfrac12\ln\dfrac{1-\varepsilon}{\varepsilon} \). Cuanto menor el error, más manda (con \( \varepsilon=0{,}5 \), un modelo que no sabe más que el azar, \( \alpha=0 \)).</li>
-<li>Actualiza los pesos: \( w_i \leftarrow w_i\cdot e^{-\alpha\,y_i\,h(x_i)} \), con \( y_i \) y \( h(x_i) \) valiendo ±1. Si acertó, \( y_ih(x_i)=+1 \) y el peso se <em>multiplica por \( e^{-\alpha} \)</em> (baja). Si falló, vale −1 y el peso se <em>multiplica por \( e^{\alpha} \)</em> (sube).</li>
-<li>Normaliza los pesos para que sumen 1 y pasa a la ronda siguiente.</li>
+  <li>Entrena un stump dando más importancia a los datos de más peso y calcula su <strong>error ponderado</strong> \( \varepsilon \): la suma de los pesos de los datos que clasifica mal.</li>
+  <li>Calcula su peso de voto: \( \alpha=\tfrac12\ln\dfrac{1-\varepsilon}{\varepsilon} \). Cuanto menor el error, más manda (con \( \varepsilon=0{,}5 \), un modelo que no sabe más que el azar, \( \alpha=0 \)).</li>
+  <li>Actualiza los pesos: \( w_i \leftarrow w_i\cdot e^{-\alpha\,y_i\,h(x_i)} \), con \( y_i \) y \( h(x_i) \) valiendo ±1. Si acertó, \( y_ih(x_i)=+1 \) y el peso se <em>multiplica por \( e^{-\alpha} \)</em> (baja). Si falló, vale −1 y el peso se <em>multiplica por \( e^{\alpha} \)</em> (sube).</li>
+  <li>Normaliza los pesos para que sumen 1 y pasa a la ronda siguiente.</li>
 </ol>
 <p>La predicción final es una votación ponderada: \( H(x)=\operatorname{signo}\Big(\sum_t \alpha_t\,h_t(x)\Big) \).</p>
+
 <div class="callout ejemplo">
-<span class="lbl">Ejemplo numérico</span>
-<p>Diez películas ordenadas de la más corta (\( x=1 \)) a la más larga (\( x=10 \)), y lo que opina Ana de cada una: \( y=+1 \) si le gustó y \( y=-1 \) si no, \( y = +1,+1,+1,-1,-1,-1,+1,+1,-1,-1 \) (cifras inventadas). Pesos iniciales: 0,1 cada una. Ninguna pregunta única separa bien las que le gustan de las que no. <strong>Ronda 1:</strong> el mejor stump es «\( x\le3{,}5 \) → le gusta (+1), si no → no le gusta (−1)», o sea, «le gustan las tres más cortas».</p>
-<table>
-<thead><tr><th>x</th><th>1</th><th>2</th><th>3</th><th>4</th><th>5</th><th>6</th><th>7</th><th>8</th><th>9</th><th>10</th></tr></thead>
-<tbody>
-<tr><th scope="row">Opinión real de Ana (y)</th><td>+1</td><td>+1</td><td>+1</td><td>−1</td><td>−1</td><td>−1</td><td>+1</td><td>+1</td><td>−1</td><td>−1</td></tr>
-<tr><th scope="row">Predice el stump</th><td>+1</td><td>+1</td><td>+1</td><td>−1</td><td>−1</td><td>−1</td><td>−1</td><td>−1</td><td>−1</td><td>−1</td></tr>
-<tr><th scope="row">¿Acierta?</th><td>sí</td><td>sí</td><td>sí</td><td>sí</td><td>sí</td><td>sí</td><td>no</td><td>no</td><td>sí</td><td>sí</td></tr>
-<tr><th scope="row">Peso × factor</th><td>0,1 × 0,5 = 0,05</td><td>0,05</td><td>0,05</td><td>0,05</td><td>0,05</td><td>0,05</td><td>0,1 × 2 = 0,2</td><td>0,2</td><td>0,05</td><td>0,05</td></tr>
-<tr><th scope="row">Peso nuevo (÷ 0,8)</th><td>0,0625</td><td>0,0625</td><td>0,0625</td><td>0,0625</td><td>0,0625</td><td>0,0625</td><td class="res">0,25</td><td class="res">0,25</td><td>0,0625</td><td>0,0625</td></tr>
-</tbody>
-</table>
-<ol class="pasos">
-<li>Error ponderado: los dos fallos (x=7 y x=8) pesan \( 0{,}1+0{,}1 \), luego \( \varepsilon_1=0{,}2 \).</li>
-<li>Peso de voto: \( \alpha_1=\tfrac12\ln\frac{0{,}8}{0{,}2}=\tfrac12\ln4=\mathbf{0{,}6931} \). Factores: \( e^{-\alpha_1}=0{,}5 \) (aciertos) y \( e^{\alpha_1}=2 \) (fallos).</li>
-<li>Suma de los pesos sin normalizar: \( 8\cdot0{,}05+2\cdot0{,}2=0{,}8 \). Se divide todo entre 0,8. Los dos puntos mal clasificados pasan a pesar <strong>0,25</strong> cada uno (el 50 % del total entre los dos); los demás, 0,0625.</li>
-<li><strong>Ronda 2:</strong> con esos pesos, el mejor stump es «\( x\le8{,}5 \) → +1, si no → −1»; falla en x=4, 5 y 6, que suman \( 3\cdot0{,}0625=0{,}1875 \) → \( \alpha_2=\tfrac12\ln\frac{0{,}8125}{0{,}1875}=\mathbf{0{,}7332} \). Nuevos pesos: x=4, 5, 6 pasan a 0,1667 cada uno; x=7, 8 bajan a 0,1538; los demás a 0,0385.</li>
-<li><strong>Ronda 3:</strong> el mejor stump es «\( x\le6{,}5 \) → −1, si no → +1» con error 0,1923 → \( \alpha_3=\mathbf{0{,}7175} \).</li>
-<li><strong>Voto final</strong> \( F(x)=0{,}6931\,h_1+0{,}7332\,h_2+0{,}7175\,h_3 \). Por ejemplo, para x=4: \( h_1=-1,\ h_2=+1,\ h_3=-1 \) → \( F=-0{,}6931+0{,}7332-0{,}7175=-0{,}6775 \) → clase −1 ✓. Para x=7: \( h_1=-1,\ h_2=+1,\ h_3=+1 \) → \( F=+0{,}7576 \) → clase +1 ✓. Para x=1: \( F=+0{,}7088 \) (+1 ✓) y para x=9: \( F=-0{,}7088 \) (−1 ✓). Tres stumps que fallaban 2, 3 y 5 puntos acaban clasificando los diez bien.</li>
-</ol>
+  <span class="lbl">Ejemplo numérico</span>
+  <p>Diez películas ordenadas de la más corta (\( x=1 \)) a la más larga (\( x=10 \)), y lo que opina Ana de cada una: \( y=+1 \) si le gustó y \( y=-1 \) si no, \( y = +1,+1,+1,-1,-1,-1,+1,+1,-1,-1 \) (cifras inventadas). Pesos iniciales: 0,1 cada una. Ninguna pregunta única separa bien las que le gustan de las que no. <strong>Ronda 1:</strong> el mejor stump es «\( x\le3{,}5 \) → le gusta (+1), si no → no le gusta (−1)», o sea, «le gustan las tres más cortas».</p>
+  <table>
+    <thead><tr><th>x</th><th>1</th><th>2</th><th>3</th><th>4</th><th>5</th><th>6</th><th>7</th><th>8</th><th>9</th><th>10</th></tr></thead>
+    <tbody>
+      <tr><th scope="row">Opinión real de Ana (y)</th><td>+1</td><td>+1</td><td>+1</td><td>−1</td><td>−1</td><td>−1</td><td>+1</td><td>+1</td><td>−1</td><td>−1</td></tr>
+      <tr><th scope="row">Predice el stump</th><td>+1</td><td>+1</td><td>+1</td><td>−1</td><td>−1</td><td>−1</td><td>−1</td><td>−1</td><td>−1</td><td>−1</td></tr>
+      <tr><th scope="row">¿Acierta?</th><td>sí</td><td>sí</td><td>sí</td><td>sí</td><td>sí</td><td>sí</td><td>no</td><td>no</td><td>sí</td><td>sí</td></tr>
+      <tr><th scope="row">Peso × factor</th><td>0,1 × 0,5 = 0,05</td><td>0,05</td><td>0,05</td><td>0,05</td><td>0,05</td><td>0,05</td><td>0,1 × 2 = 0,2</td><td>0,2</td><td>0,05</td><td>0,05</td></tr>
+      <tr><th scope="row">Peso nuevo (÷ 0,8)</th><td>0,0625</td><td>0,0625</td><td>0,0625</td><td>0,0625</td><td>0,0625</td><td>0,0625</td><td class="res">0,25</td><td class="res">0,25</td><td>0,0625</td><td>0,0625</td></tr>
+    </tbody>
+  </table>
+  <ol class="pasos">
+    <li>Error ponderado: los dos fallos (x=7 y x=8) pesan \( 0{,}1+0{,}1 \), luego \( \varepsilon_1=0{,}2 \).</li>
+    <li>Peso de voto: \( \alpha_1=\tfrac12\ln\frac{0{,}8}{0{,}2}=\tfrac12\ln4=\mathbf{0{,}6931} \). Factores: \( e^{-\alpha_1}=0{,}5 \) (aciertos) y \( e^{\alpha_1}=2 \) (fallos).</li>
+    <li>Suma de los pesos sin normalizar: \( 8\cdot0{,}05+2\cdot0{,}2=0{,}8 \). Se divide todo entre 0,8. Los dos puntos mal clasificados pasan a pesar <strong>0,25</strong> cada uno (el 50 % del total entre los dos); los demás, 0,0625.</li>
+    <li><strong>Ronda 2:</strong> con esos pesos, el mejor stump es «\( x\le8{,}5 \) → +1, si no → −1»; falla en x=4, 5 y 6, que suman \( 3\cdot0{,}0625=0{,}1875 \) → \( \alpha_2=\tfrac12\ln\frac{0{,}8125}{0{,}1875}=\mathbf{0{,}7332} \). Nuevos pesos: x=4, 5, 6 pasan a 0,1667 cada uno; x=7, 8 bajan a 0,1538; los demás a 0,0385.</li>
+    <li><strong>Ronda 3:</strong> el mejor stump es «\( x\le6{,}5 \) → −1, si no → +1» con error 0,1923 → \( \alpha_3=\mathbf{0{,}7175} \).</li>
+    <li><strong>Voto final</strong> \( F(x)=0{,}6931\,h_1+0{,}7332\,h_2+0{,}7175\,h_3 \). Por ejemplo, para x=4: \( h_1=-1,\ h_2=+1,\ h_3=-1 \) → \( F=-0{,}6931+0{,}7332-0{,}7175=-0{,}6775 \) → clase −1 ✓. Para x=7: \( h_1=-1,\ h_2=+1,\ h_3=+1 \) → \( F=+0{,}7576 \) → clase +1 ✓. Para x=1: \( F=+0{,}7088 \) (+1 ✓) y para x=9: \( F=-0{,}7088 \) (−1 ✓). Tres stumps que fallaban 2, 3 y 5 puntos acaban clasificando los diez bien.</li>
+  </ol>
 </div>
-<figure class="demo" data-demo="curso1/c1m3-adaboost" data-titulo="AdaBoost: las películas difíciles de acertar engordan ronda a ronda">
-<div class="haz">Cada punto es una película (nivel de acción y de humor): naranja = le gusta a Ana, azul = no le gusta. Pulsa «Siguiente ronda» varias veces mirando el tamaño de los puntos (su peso) y el fondo (la decisión del conjunto). Luego mueve el slider de rondas hacia atrás y hacia delante. Pulsa «Generar otros datos».</div>
-<div class="observa">Tras cada ronda, los puntos que el último stump clasificó mal aumentan de tamaño: el siguiente stump los tiene que tratar mejor. Una sola frontera recta es pobre; la combinación de varias, ponderadas por su alfa, dibuja una frontera en escalera que se ajusta mucho mejor. Con demasiadas rondas y datos ruidosos, AdaBoost empieza a dar tanto peso a los puntos atípicos que se ajusta al ruido. En la tabla, «humor ≤ 3.20 ⇒ −1» se lee: si cumple la condición, el stump dice −1; si no, dice lo contrario (+1).</div>
-</figure>
+
+<div class="callout regla">
+  <span class="lbl">Guía completa de la animación «AdaBoost: las películas difíciles de acertar engordan ronda a ronda» (está arriba)</span>
+  <p><strong>Haz esto:</strong> Cada punto es una película (nivel de acción y de humor): naranja = le gusta a Ana, azul = no le gusta. Pulsa «Siguiente ronda» varias veces mirando el tamaño de los puntos (su peso) y el fondo (la decisión del conjunto). Luego mueve el slider de rondas hacia atrás y hacia delante. Pulsa «Generar otros datos».</p>
+  <p><strong>Fíjate en:</strong> Tras cada ronda, los puntos que el último stump clasificó mal aumentan de tamaño: el siguiente stump los tiene que tratar mejor. Una sola frontera recta es pobre; la combinación de varias, ponderadas por su alfa, dibuja una frontera en escalera que se ajusta mucho mejor. Con demasiadas rondas y datos ruidosos, AdaBoost empieza a dar tanto peso a los puntos atípicos que se ajusta al ruido. En la tabla, «humor ≤ 3.20 ⇒ −1» se lee: si cumple la condición, el stump dice −1; si no, dice lo contrario (+1).</p>
+</div>
+
 <div class="callout ojo">
-<span class="lbl">Ojo</span>
-<p>En scikit-learn, <code>estimator_weights_</code> de un <code>AdaBoostClassifier</code> vale el <strong>doble</strong> de nuestro \( \alpha \) (verás 1,3863 donde nuestra cuenta da 0,6931): usa la variante SAMME, cuya fórmula no lleva el ½. Como todos los pesos se duplican, el voto ponderado da las mismas decisiones. También: AdaBoost es sensible a los datos con etiquetas erróneas, porque les va dando más y más peso.</p>
+  <span class="lbl">Ojo</span>
+  <p>En scikit-learn, <code>estimator_weights_</code> de un <code>AdaBoostClassifier</code> vale el <strong>doble</strong> de nuestro \( \alpha \) (verás 1,3863 donde nuestra cuenta da 0,6931): usa la variante SAMME, cuya fórmula no lleva el ½. Como todos los pesos se duplican, el voto ponderado da las mismas decisiones. También: AdaBoost es sensible a los datos con etiquetas erróneas, porque les va dando más y más peso.</p>
 </div>
+
 <h3 id="gradient-boosting">Gradient Boosting: cada árbol aprende los residuos</h3>
 <p>La segunda forma de concentrarse en los errores es la más usada hoy. La idea cabe en una frase: <strong>el nuevo árbol no predice la respuesta, predice el error que todavía comete el modelo actual</strong>, y su resultado se suma.</p>
 <ol class="pasos">
-<li>Empieza con una predicción muy simple \( F_0 \): la media de \( y \).</li>
-<li>Calcula los <strong>residuos</strong>: \( r_i = y_i - F(x_i) \), lo que aún falta para llegar a la respuesta correcta.</li>
-<li>Entrena un árbol pequeño que <strong>predice esos residuos</strong>.</li>
-<li>Actualiza: \( F \leftarrow F + \eta\cdot(\text{árbol}) \), donde \( \eta \) es la <strong>tasa de aprendizaje</strong> (<em>learning rate</em>, entre 0 y 1).</li>
-<li>Repite los pasos 2–4 durante \( M \) rondas.</li>
+  <li>Empieza con una predicción muy simple \( F_0 \): la media de \( y \).</li>
+  <li>Calcula los <strong>residuos</strong>: \( r_i = y_i - F(x_i) \), lo que aún falta para llegar a la respuesta correcta.</li>
+  <li>Entrena un árbol pequeño que <strong>predice esos residuos</strong>.</li>
+  <li>Actualiza: \( F \leftarrow F + \eta\cdot(\text{árbol}) \), donde \( \eta \) es la <strong>tasa de aprendizaje</strong> (<em>learning rate</em>, entre 0 y 1).</li>
+  <li>Repite los pasos 2–4 durante \( M \) rondas.</li>
 </ol>
+
 <div class="callout ejemplo">
-<span class="lbl">Ejemplo numérico</span>
-<p>Cinco usuarios de Netflix (cifras inventadas): \( x \) es el número de series que siguen a la vez (\( x=1,2,3,4,5 \)) e \( y \) las horas a la semana que ven (\( y=3,5,4,12,14 \)). Usamos stumps y \( \eta=0{,}5 \).</p>
-<table>
-<thead><tr><th>x</th><th>1</th><th>2</th><th>3</th><th>4</th><th>5</th><th>MSE</th></tr></thead>
-<tbody>
-<tr><th scope="row">y real</th><td>3</td><td>5</td><td>4</td><td>12</td><td>14</td><td></td></tr>
-<tr><th scope="row">F₀ = media = 7,6</th><td>7,6</td><td>7,6</td><td>7,6</td><td>7,6</td><td>7,6</td><td>20,24</td></tr>
-<tr><th scope="row">Residuos r₀ = y − F₀</th><td>−4,6</td><td>−2,6</td><td>−3,6</td><td>4,4</td><td>6,4</td><td></td></tr>
-<tr><th scope="row">Árbol 1 (corte 3,5): media de residuos por hoja</th><td>−3,6</td><td>−3,6</td><td>−3,6</td><td>5,4</td><td>5,4</td><td></td></tr>
-<tr><th scope="row">F₁ = F₀ + 0,5 · árbol 1</th><td>5,8</td><td>5,8</td><td>5,8</td><td>10,3</td><td>10,3</td><td>5,66</td></tr>
-<tr><th scope="row">Residuos r₁ = y − F₁</th><td>−2,8</td><td>−0,8</td><td>−1,8</td><td>1,7</td><td>3,7</td><td></td></tr>
-<tr><th scope="row">Árbol 2 (corte 3,5): media de residuos por hoja</th><td>−1,8</td><td>−1,8</td><td>−1,8</td><td>2,7</td><td>2,7</td><td></td></tr>
-<tr><th scope="row">F₂ = F₁ + 0,5 · árbol 2</th><td>4,9</td><td>4,9</td><td>4,9</td><td>11,65</td><td>11,65</td><td class="res">2,015</td></tr>
-</tbody>
-</table>
-<p>Cuentas de las hojas: izquierda \( (-4{,}6-2{,}6-3{,}6)/3=-3{,}6 \), derecha \( (4{,}4+6{,}4)/2=5{,}4 \); \( 7{,}6+0{,}5\cdot(-3{,}6)=5{,}8 \) y \( 7{,}6+0{,}5\cdot5{,}4=10{,}3 \). MSE de \( F_1 \): \( (2{,}8^2+0{,}8^2+1{,}8^2+1{,}7^2+3{,}7^2)/5=28{,}3/5=5{,}66 \). El error medio cuadrático ha pasado de 20,24 a 5,66 y a 2,015 en dos árboles diminutos, y seguiría bajando.</p>
+  <span class="lbl">Ejemplo numérico</span>
+  <p>Cinco usuarios de Netflix (cifras inventadas): \( x \) es el número de series que siguen a la vez (\( x=1,2,3,4,5 \)) e \( y \) las horas a la semana que ven (\( y=3,5,4,12,14 \)). Usamos stumps y \( \eta=0{,}5 \).</p>
+  <table>
+    <thead><tr><th>x</th><th>1</th><th>2</th><th>3</th><th>4</th><th>5</th><th>MSE</th></tr></thead>
+    <tbody>
+      <tr><th scope="row">y real</th><td>3</td><td>5</td><td>4</td><td>12</td><td>14</td><td></td></tr>
+      <tr><th scope="row">F₀ = media = 7,6</th><td>7,6</td><td>7,6</td><td>7,6</td><td>7,6</td><td>7,6</td><td>20,24</td></tr>
+      <tr><th scope="row">Residuos r₀ = y − F₀</th><td>−4,6</td><td>−2,6</td><td>−3,6</td><td>4,4</td><td>6,4</td><td></td></tr>
+      <tr><th scope="row">Árbol 1 (corte 3,5): media de residuos por hoja</th><td>−3,6</td><td>−3,6</td><td>−3,6</td><td>5,4</td><td>5,4</td><td></td></tr>
+      <tr><th scope="row">F₁ = F₀ + 0,5 · árbol 1</th><td>5,8</td><td>5,8</td><td>5,8</td><td>10,3</td><td>10,3</td><td>5,66</td></tr>
+      <tr><th scope="row">Residuos r₁ = y − F₁</th><td>−2,8</td><td>−0,8</td><td>−1,8</td><td>1,7</td><td>3,7</td><td></td></tr>
+      <tr><th scope="row">Árbol 2 (corte 3,5): media de residuos por hoja</th><td>−1,8</td><td>−1,8</td><td>−1,8</td><td>2,7</td><td>2,7</td><td></td></tr>
+      <tr><th scope="row">F₂ = F₁ + 0,5 · árbol 2</th><td>4,9</td><td>4,9</td><td>4,9</td><td>11,65</td><td>11,65</td><td class="res">2,015</td></tr>
+    </tbody>
+  </table>
+  <p>Cuentas de las hojas: izquierda \( (-4{,}6-2{,}6-3{,}6)/3=-3{,}6 \), derecha \( (4{,}4+6{,}4)/2=5{,}4 \); \( 7{,}6+0{,}5\cdot(-3{,}6)=5{,}8 \) y \( 7{,}6+0{,}5\cdot5{,}4=10{,}3 \). MSE de \( F_1 \): \( (2{,}8^2+0{,}8^2+1{,}8^2+1{,}7^2+3{,}7^2)/5=28{,}3/5=5{,}66 \). El error medio cuadrático ha pasado de 20,24 a 5,66 y a 2,015 en dos árboles diminutos, y seguiría bajando.</p>
 </div>
+
 <p><strong>¿Por qué se llama «gradient»?</strong> Con el error cuadrático \( L=\tfrac12(y-F)^2 \), la derivada respecto a la predicción es \( \partial L/\partial F = -(y-F) \): el residuo es exactamente el <strong>gradiente negativo</strong> de la pérdida. Entrenar un árbol sobre los residuos equivale a dar un paso de <em>descenso de gradiente</em> (el mismo método del módulo 2), pero en lugar de ajustar los números de una recta, <em>se añade una función entera</em> (un árbol) que apunta en la dirección en que la pérdida baja más. Esa observación permite usar cualquier pérdida derivable: para clasificar con <em>log-loss</em>, el árbol aprende la diferencia entre la etiqueta y la probabilidad actual (\( y-p \)).</p>
+
 <table>
-<caption>Los controles de un Gradient Boosting</caption>
-<thead><tr><th>Hiperparámetro</th><th>Qué hace</th><th>Compromiso</th></tr></thead>
-<tbody>
-<tr><td><code>n_estimators</code></td><td>Número de árboles (rondas)</td><td>Más rondas = menos sesgo, pero a diferencia del Random Forest <strong>sí puede sobreajustar</strong></td></tr>
-<tr><td><code>learning_rate</code> (η)</td><td>Cuánto de cada árbol se acepta</td><td>η pequeño necesita más árboles pero generaliza mejor (<em>shrinkage</em>, «encogimiento»)</td></tr>
-<tr><td><code>max_depth</code></td><td>Profundidad de cada árbol</td><td>Árboles pequeños (stumps o profundidad 3–5): son los aprendices débiles</td></tr>
-<tr><td><code>subsample</code></td><td>Fracción de filas que ve cada árbol</td><td>Menos de 1 añade azar y reduce la varianza (<em>stochastic gradient boosting</em>)</td></tr>
-</tbody>
+  <caption>Los controles de un Gradient Boosting</caption>
+  <thead><tr><th>Hiperparámetro</th><th>Qué hace</th><th>Compromiso</th></tr></thead>
+  <tbody>
+    <tr><td><code>n_estimators</code></td><td>Número de árboles (rondas)</td><td>Más rondas = menos sesgo, pero a diferencia del Random Forest <strong>sí puede sobreajustar</strong></td></tr>
+    <tr><td><code>learning_rate</code> (η)</td><td>Cuánto de cada árbol se acepta</td><td>η pequeño necesita más árboles pero generaliza mejor (<em>shrinkage</em>, «encogimiento»)</td></tr>
+    <tr><td><code>max_depth</code></td><td>Profundidad de cada árbol</td><td>Árboles pequeños (stumps o profundidad 3–5): son los aprendices débiles</td></tr>
+    <tr><td><code>subsample</code></td><td>Fracción de filas que ve cada árbol</td><td>Menos de 1 añade azar y reduce la varianza (<em>stochastic gradient boosting</em>)</td></tr>
+  </tbody>
 </table>
-<figure class="demo" data-demo="curso1/c1m3-boosting" data-titulo="Gradient Boosting: cada árbol aprende lo que le falta al anterior">
-<div class="haz">Cada punto azul es un usuario: su edad y las horas de series que ve a la semana. Pulsa «+1 árbol» o «▶ Entrenar solo» y mira cómo los residuos (panel central) se achican. Cambia la «Tasa de aprendizaje» y el tipo de árbol. Vigila la curva de error de train y de test del panel inferior. Después elige «Profundidad 2» y deja correr hasta 80 árboles.</div>
-<div class="observa">La línea de predicción se va acercando a los puntos escalón a escalón. Con η=1 aprende rapidísimo pero se vuelve nervioso; con η pequeño avanza despacio y suave. El error de train baja siempre; el de test baja y luego puede volver a subir cuando el modelo empieza a memorizar el ruido (con «Profundidad 2» ocurre en pocas decenas de árboles; con stumps y η pequeño casi no se nota): ese punto mínimo es el que busca el <em>early stopping</em>.</div>
-</figure>
+
 <div class="callout regla">
-<span class="lbl">Regla fácil</span>
-<p><strong>Bagging / Random Forest:</strong> muchos árboles <em>profundos y distintos</em>, entrenados por separado, que se promedian. Reduce la varianza. <strong>Boosting:</strong> muchos árboles <em>pequeños</em>, entrenados en cadena, que se suman. Reduce el sesgo. Random Forest casi no necesita ajuste; el boosting rinde más, pero hay que ajustarlo con cuidado.</p>
+  <span class="lbl">Guía completa de la animación «Gradient Boosting: cada árbol aprende lo que le falta al anterior» (está arriba)</span>
+  <p><strong>Haz esto:</strong> Cada punto azul es un usuario: su edad y las horas de series que ve a la semana. Pulsa «+1 árbol» o «▶ Entrenar solo» y mira cómo los residuos (panel central) se achican. Cambia la «Tasa de aprendizaje» y el tipo de árbol. Vigila la curva de error de train y de test del panel inferior. Después elige «Profundidad 2» y deja correr hasta 80 árboles.</p>
+  <p><strong>Fíjate en:</strong> La línea de predicción se va acercando a los puntos escalón a escalón. Con η=1 aprende rapidísimo pero se vuelve nervioso; con η pequeño avanza despacio y suave. El error de train baja siempre; el de test baja y luego puede volver a subir cuando el modelo empieza a memorizar el ruido (con «Profundidad 2» ocurre en pocas decenas de árboles; con stumps y η pequeño casi no se nota): ese punto mínimo es el que busca el <em>early stopping</em>.</p>
 </div>
+
+<div class="callout regla">
+  <span class="lbl">Regla fácil</span>
+  <p><strong>Bagging / Random Forest:</strong> muchos árboles <em>profundos y distintos</em>, entrenados por separado, que se promedian. Reduce la varianza. <strong>Boosting:</strong> muchos árboles <em>pequeños</em>, entrenados en cadena, que se suman. Reduce el sesgo. Random Forest casi no necesita ajuste; el boosting rinde más, pero hay que ajustarlo con cuidado.</p>
+</div>
+
 <h3 id="xgboost">XGBoost: Gradient Boosting llevado al extremo</h3>
 <p><strong>XGBoost</strong> (<em>eXtreme Gradient Boosting</em>) es una librería externa que implementa Gradient Boosting con mejoras matemáticas y de ingeniería. Se instala con <code>pip install xgboost</code> y tiene una API compatible con scikit-learn (<code>XGBClassifier</code>, <code>XGBRegressor</code>), así que se usa igual que los demás modelos. Lo que añade:</p>
+
 <h4>1. Un objetivo con regularización</h4>
 <p>Además de la pérdida, XGBoost penaliza la complejidad de cada árbol:</p>
 <div class="formula">\[ \text{Objetivo}=\sum_i L\big(y_i,\hat y_i\big)+\sum_{\text{árboles}}\Omega(f),\qquad \Omega(f)=\gamma\,T+\tfrac12\lambda\sum_j w_j^2 \]</div>
 <p>\( T \) es el número de hojas del árbol; \( w_j \) el valor de la hoja \( j \); \( \gamma \) (<code>gamma</code>) el coste de añadir una hoja; \( \lambda \) (<code>reg_lambda</code>) la fuerza de la penalización L2 sobre los valores de las hojas (existe también <code>reg_alpha</code> para L1). Resultado: árboles más pequeños y con hojas «más tímidas», lo que reduce el sobreajuste.</p>
+
 <h4>2. Valor de las hojas con información de segundo orden</h4>
 <p>En lugar de usar solo el gradiente (el residuo), XGBoost usa también la curvatura (la segunda derivada, «hessiana»). Con \( G=\sum g_i \) la suma de gradientes de los datos de una hoja y \( H=\sum h_i \) la de hessianas, el valor óptimo de la hoja es:</p>
 <div class="formula">\[ w^{*}=-\frac{G}{H+\lambda} \]</div>
 <p>Para el error cuadrático, \( g_i = -(\text{residuo}_i) \) y \( h_i = 1 \), así que \( w^*=\dfrac{\sum \text{residuos}}{n+\lambda} \): <strong>la media del residuo, encogida por \( \lambda \)</strong>. Con \( \lambda=0 \) es exactamente el Gradient Boosting clásico.</p>
+
 <div class="callout ejemplo">
-<span class="lbl">Ejemplo numérico</span>
-<p>Los mismos cinco usuarios, con \( F_0=7{,}6 \) horas y el corte 3,5. Hoja izquierda: residuos −4,6, −2,6, −3,6 → suma −10,8, \( n=3 \). Hoja derecha: residuos 4,4 y 6,4 → suma 10,8, \( n=2 \). Con \( \eta=1 \):</p>
-<table>
-<thead><tr><th>λ</th><th>Hoja izquierda: −10,8 / (3 + λ)</th><th>Hoja derecha: 10,8 / (2 + λ)</th><th>Predicciones finales</th></tr></thead>
-<tbody>
-<tr><td>0</td><td>−10,8 / 3 = −3,6</td><td>10,8 / 2 = 5,4</td><td>4,000 y 13,000</td></tr>
-<tr><td>1</td><td>−10,8 / 4 = −2,7</td><td>10,8 / 3 = 3,6</td><td>4,900 y 11,200</td></tr>
-<tr><td>5</td><td>−10,8 / 8 = −1,35</td><td>10,8 / 7 = 1,543</td><td>6,250 y 9,143</td></tr>
-</tbody>
-</table>
-<p>Cuanto mayor es \( \lambda \), más se acercan las hojas a la predicción inicial (7,6). Las hojas con pocos usuarios (la derecha tiene 2) se encogen más que las grandes: \( \lambda \) frena justo las hojas decididas por muy pocos puntos. El fragmento 22 reproduce estas cifras con la librería.</p>
+  <span class="lbl">Ejemplo numérico</span>
+  <p>Los mismos cinco usuarios, con \( F_0=7{,}6 \) horas y el corte 3,5. Hoja izquierda: residuos −4,6, −2,6, −3,6 → suma −10,8, \( n=3 \). Hoja derecha: residuos 4,4 y 6,4 → suma 10,8, \( n=2 \). Con \( \eta=1 \):</p>
+  <table>
+    <thead><tr><th>λ</th><th>Hoja izquierda: −10,8 / (3 + λ)</th><th>Hoja derecha: 10,8 / (2 + λ)</th><th>Predicciones finales</th></tr></thead>
+    <tbody>
+      <tr><td>0</td><td>−10,8 / 3 = −3,6</td><td>10,8 / 2 = 5,4</td><td>4,000 y 13,000</td></tr>
+      <tr><td>1</td><td>−10,8 / 4 = −2,7</td><td>10,8 / 3 = 3,6</td><td>4,900 y 11,200</td></tr>
+      <tr><td>5</td><td>−10,8 / 8 = −1,35</td><td>10,8 / 7 = 1,543</td><td>6,250 y 9,143</td></tr>
+    </tbody>
+  </table>
+  <p>Cuanto mayor es \( \lambda \), más se acercan las hojas a la predicción inicial (7,6). Las hojas con pocos usuarios (la derecha tiene 2) se encogen más que las grandes: \( \lambda \) frena justo las hojas decididas por muy pocos puntos. El fragmento 22 reproduce estas cifras con la librería.</p>
 </div>
+
 <h4>3. Cuándo merece la pena dividir</h4>
 <p>La mejora que aporta una división (la «ganancia» de XGBoost) se calcula con esos mismos \( G \) y \( H \):</p>
 <div class="formula">\[ \text{Ganancia}=\tfrac12\left[\frac{G_L^2}{H_L+\lambda}+\frac{G_R^2}{H_R+\lambda}-\frac{(G_L+G_R)^2}{H_L+H_R+\lambda}\right]-\gamma \]</div>
 <p>Con nuestro ejemplo y \( \lambda=1 \): \( G_L=10{,}8 \), \( H_L=3 \), \( G_R=-10{,}8 \), \( H_R=2 \), y la parte restada vale 0 porque \( G_L+G_R=0 \). Entonces \( \tfrac12\big[10{,}8^2/4+10{,}8^2/3\big]=\tfrac12[29{,}16+38{,}88]=34{,}02 \). Si \( \gamma \) fuese mayor que 34,02, la ganancia sería negativa y XGBoost <strong>no haría</strong> esa división (poda). Así \( \gamma \) funciona como umbral de «¿merece la pena?». (La librería muestra el corchete sin el ½: con \( \lambda=1 \) verías 68,04; es el mismo criterio a otra escala.)</p>
+
 <h4>4. Ingeniería para ir rápido y manejar datos reales</h4>
 <ul>
-<li><strong>Valores faltantes de serie:</strong> aprende, en cada división, hacia qué lado enviar los <code>NaN</code>; no hace falta imputar.</li>
-<li><strong>Búsqueda de cortes eficiente:</strong> por defecto agrupa los valores en histogramas (<code>tree_method="hist"</code>) en vez de probar todos los umbrales; construye con varios hilos y aprovecha la memoria caché.</li>
-<li><strong>Submuestreo de filas y columnas</strong> (<code>subsample</code>, <code>colsample_bytree</code>), como en un Random Forest, para reducir la varianza.</li>
-<li><strong>Parada temprana</strong> (<code>early_stopping_rounds</code>): vigila una métrica en un conjunto de validación y detiene el entrenamiento cuando lleva N rondas sin mejorar. Así no hace falta adivinar <code>n_estimators</code>: pones un máximo grande y XGBoost para solo.</li>
+  <li><strong>Valores faltantes de serie:</strong> aprende, en cada división, hacia qué lado enviar los <code>NaN</code>; no hace falta imputar.</li>
+  <li><strong>Búsqueda de cortes eficiente:</strong> por defecto agrupa los valores en histogramas (<code>tree_method="hist"</code>) en vez de probar todos los umbrales; construye con varios hilos y aprovecha la memoria caché.</li>
+  <li><strong>Submuestreo de filas y columnas</strong> (<code>subsample</code>, <code>colsample_bytree</code>), como en un Random Forest, para reducir la varianza.</li>
+  <li><strong>Parada temprana</strong> (<code>early_stopping_rounds</code>): vigila una métrica en un conjunto de validación y detiene el entrenamiento cuando lleva N rondas sin mejorar. Así no hace falta adivinar <code>n_estimators</code>: pones un máximo grande y XGBoost para solo.</li>
 </ul>
+
 <table>
-<caption>Hiperparámetros más importantes de XGBoost</caption>
-<thead><tr><th>Hiperparámetro</th><th>Significado</th><th>Efecto de subirlo</th></tr></thead>
-<tbody>
-<tr><td><code>n_estimators</code></td><td>Máximo de árboles</td><td>Más capacidad (con <code>early_stopping_rounds</code> es solo un tope)</td></tr>
-<tr><td><code>learning_rate</code></td><td>Cuánto aporta cada árbol (η)</td><td>Aprende más rápido, pero generaliza peor</td></tr>
-<tr><td><code>max_depth</code></td><td>Profundidad de cada árbol</td><td>Más capacidad y más riesgo de sobreajuste (típico 3–8)</td></tr>
-<tr><td><code>min_child_weight</code></td><td>Mínimo de «peso» (hessiana) por hoja</td><td>Más alto: hojas más grandes, modelo más prudente</td></tr>
-<tr><td><code>subsample</code>, <code>colsample_bytree</code></td><td>Fracción de filas / columnas por árbol</td><td>Más bajas: más azar, menos varianza</td></tr>
-<tr><td><code>reg_lambda</code>, <code>reg_alpha</code></td><td>Penalización L2 / L1 sobre las hojas</td><td>Más altas: hojas más encogidas</td></tr>
-<tr><td><code>gamma</code></td><td>Ganancia mínima para dividir</td><td>Más alto: árboles más pequeños</td></tr>
-<tr><td><code>early_stopping_rounds</code></td><td>Paciencia antes de detenerse</td><td>Más alto: tolera más rondas sin mejora</td></tr>
-</tbody>
+  <caption>Hiperparámetros más importantes de XGBoost</caption>
+  <thead><tr><th>Hiperparámetro</th><th>Significado</th><th>Efecto de subirlo</th></tr></thead>
+  <tbody>
+    <tr><td><code>n_estimators</code></td><td>Máximo de árboles</td><td>Más capacidad (con <code>early_stopping_rounds</code> es solo un tope)</td></tr>
+    <tr><td><code>learning_rate</code></td><td>Cuánto aporta cada árbol (η)</td><td>Aprende más rápido, pero generaliza peor</td></tr>
+    <tr><td><code>max_depth</code></td><td>Profundidad de cada árbol</td><td>Más capacidad y más riesgo de sobreajuste (típico 3–8)</td></tr>
+    <tr><td><code>min_child_weight</code></td><td>Mínimo de «peso» (hessiana) por hoja</td><td>Más alto: hojas más grandes, modelo más prudente</td></tr>
+    <tr><td><code>subsample</code>, <code>colsample_bytree</code></td><td>Fracción de filas / columnas por árbol</td><td>Más bajas: más azar, menos varianza</td></tr>
+    <tr><td><code>reg_lambda</code>, <code>reg_alpha</code></td><td>Penalización L2 / L1 sobre las hojas</td><td>Más altas: hojas más encogidas</td></tr>
+    <tr><td><code>gamma</code></td><td>Ganancia mínima para dividir</td><td>Más alto: árboles más pequeños</td></tr>
+    <tr><td><code>early_stopping_rounds</code></td><td>Paciencia antes de detenerse</td><td>Más alto: tolera más rondas sin mejora</td></tr>
+  </tbody>
 </table>
+
 <div class="callout ojo">
-<span class="lbl">Ojo</span>
-<p>Con <code>early_stopping_rounds</code> hay que pasar un <strong>conjunto de validación</strong> (<code>eval_set</code>) distinto del test. Si paras mirando el test, estás eligiendo el modelo con él y el acierto que obtengas será optimista. En el fragmento 21 se reserva un trozo del train solo para eso. Además, la forma exacta de indicar la parada temprana (en el constructor o en <code>fit</code>) ha cambiado entre versiones de XGBoost: este módulo usa XGBoost 3.</p>
+  <span class="lbl">Ojo</span>
+  <p>Con <code>early_stopping_rounds</code> hay que pasar un <strong>conjunto de validación</strong> (<code>eval_set</code>) distinto del test. Si paras mirando el test, estás eligiendo el modelo con él y el acierto que obtengas será optimista. En el fragmento 21 se reserva un trozo del train solo para eso. Además, la forma exacta de indicar la parada temprana (en el constructor o en <code>fit</code>) ha cambiado entre versiones de XGBoost: este módulo usa XGBoost 3.</p>
 </div>
+
 <div class="callout recuerda">
-<span class="lbl">Por qué XGBoost se hizo tan popular</span>
-<p>Dio muy buenos resultados en datos tabulares en competiciones de Machine Learning, es rápido, regulariza por defecto, maneja datos faltantes y funciona bien con pocos ajustes. Eso no significa que sea siempre lo mejor: en el fragmento 23, con un conjunto pequeño y casi lineal, la regresión logística le gana. Existen alternativas muy parecidas (LightGBM, CatBoost, y <code>HistGradientBoostingClassifier</code> dentro de scikit-learn). Para imágenes, audio o texto largo, las redes neuronales de los cursos siguientes dominan.</p>
+  <span class="lbl">Por qué XGBoost se hizo tan popular</span>
+  <p>Dio muy buenos resultados en datos tabulares en competiciones de Machine Learning, es rápido, regulariza por defecto, maneja datos faltantes y funciona bien con pocos ajustes. Eso no significa que sea siempre lo mejor: en el fragmento 23, con un conjunto pequeño y casi lineal, la regresión logística le gana. Existen alternativas muy parecidas (LightGBM, CatBoost, y <code>HistGradientBoostingClassifier</code> dentro de scikit-learn). Para imágenes, audio o texto largo, las redes neuronales de los cursos siguientes dominan.</p>
 </div>
-</section></div></details><details class="profundizar" id="codigo"><summary><span>Ver código explicado paso a paso<small>4 fragmento(s) original(es), con cada línea comentada y salida esperada.</small></span></summary><div class="prof-body"><article class="snippet" data-lang="python">
-<header>
-<h3>16 · BaggingClassifier: muchos árboles sobre muestras bootstrap</h3>
-<p class="para-que"><strong>Para qué sirve</strong> Montar un comité de 50 árboles, cada uno entrenado con una muestra bootstrap distinta, y compararlo con un solo árbol; además, estimar el acierto sin tocar el test con la puntuación OOB.</p>
-</header>
-<pre class="code"><code>from sklearn.datasets import load_breast_cancer
-from sklearn.ensemble import BaggingClassifier
-from sklearn.model_selection import train_test_split
-from sklearn.tree import DecisionTreeClassifier
 
-X, y = load_breast_cancer(return_X_y=True)
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, stratify=y, random_state=0)
+<h2 id="elegir">Cuándo usar cada algoritmo</h2>
 
-un_arbol = DecisionTreeClassifier(random_state=0).fit(X_train, y_train)
+<p class="pregunta">Tienes un problema nuevo y una tabla de datos. ¿Con qué algoritmo empiezas, y cómo decides si merece la pena complicarte?</p>
 
-bagging = BaggingClassifier(
-    estimator=DecisionTreeClassifier(),
-    n_estimators=50,
-    max_samples=1.0,
-    bootstrap=True,
-    oob_score=True,
-    random_state=0,
-).fit(X_train, y_train)
+<p>No existe un algoritmo mejor en todos los problemas (a veces se le llama el teorema del <em>No Free Lunch</em>, «no hay almuerzo gratis»): cada uno hace unas suposiciones sobre cómo son los datos, y rinde cuando esas suposiciones se parecen a la realidad. Esta tabla resume todo lo que has visto:</p>
 
-print("un solo árbol  -&gt; test =", round(un_arbol.score(X_test, y_test), 3))
-print("bagging (50)   -&gt; test =", round(bagging.score(X_test, y_test), 3), "| OOB =", round(bagging.oob_score_, 3))
-print("árboles en el comité:", len(bagging.estimators_))
-print("datos distintos que vio el árbol 0:", len(set(bagging.estimators_samples_[0])), "de", len(X_train))</code></pre>
-<details class="linea-a-linea" open="">
-<summary>Línea por línea</summary>
-<p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
-<table class="lineas">
-<thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
-<tbody>
-<tr data-lines="1"><td><code>from sklearn.datasets import load_breast_cancer</code></td><td>El conjunto de tumores usado antes.</td></tr>
-<tr data-lines="2"><td><code>from sklearn.ensemble import BaggingClassifier</code></td><td>El comité que entrena varias copias de un modelo con muestras bootstrap.</td></tr>
-<tr data-lines="3"><td><code>from sklearn.model_selection import train_test_split</code></td><td>Reparto train/test.</td></tr>
-<tr data-lines="4"><td><code>from sklearn.tree import DecisionTreeClassifier</code></td><td>El modelo base que se va a repetir.</td></tr>
-<tr data-lines="6"><td><code>X, y = load_breast_cancer(return_X_y=True)</code></td><td>Variables y etiquetas.</td></tr>
-<tr data-lines="7"><td><code>X_train, X_test, y_train, y_test = train_test_split(...)</code></td><td>70/30 estratificado con semilla (el mismo reparto que en el apartado de árboles).</td></tr>
-<tr data-lines="9"><td><code>un_arbol = DecisionTreeClassifier(random_state=0).fit(X_train, y_train)</code></td><td>El punto de comparación: un único árbol sin límites de profundidad.</td></tr>
-<tr data-lines="11-18"><td><code>bagging = BaggingClassifier(estimator=..., n_estimators=50, ...).fit(...)</code></td><td>El comité. <code>estimator</code> es el modelo base (un árbol sin límites, que tiene mucha varianza: justo lo que el bagging reduce); <code>n_estimators=50</code> número de árboles; <code>max_samples=1.0</code> cada árbol recibe una muestra del mismo tamaño que el train; <code>bootstrap=True</code> la muestra es con reposición; <code>oob_score=True</code> calcula el acierto con los datos que cada árbol no vio; <code>random_state</code> fija el azar.</td></tr>
-<tr data-lines="20"><td><code>print("un solo árbol -&gt; test =", ...)</code></td><td>Acierto en test del árbol solo.</td></tr>
-<tr data-lines="21"><td><code>print("bagging (50) -&gt; test =", ..., "| OOB =", bagging.oob_score_)</code></td><td>Acierto en test del comité y su puntuación OOB: cada dato de train lo votan solo los árboles que <strong>no</strong> lo vieron.</td></tr>
-<tr data-lines="22"><td><code>print("árboles en el comité:", len(bagging.estimators_))</code></td><td><code>estimators_</code> es la lista de árboles entrenados.</td></tr>
-<tr data-lines="23"><td><code>print("datos distintos que vio el árbol 0:", len(set(bagging.estimators_samples_[0])), ...)</code></td><td><code>estimators_samples_[0]</code> son las posiciones de datos que usó el árbol 0; con <code>set</code> contamos los distintos.</td></tr>
-</tbody>
+<table>
+  <caption>Comparativa de los algoritmos del módulo</caption>
+  <thead><tr><th>Algoritmo</th><th>Cómo decide</th><th>¿Hay que escalar?</th><th>Puntos fuertes</th><th>Puntos débiles</th></tr></thead>
+  <tbody>
+    <tr><th scope="row">Regresión logística (módulo 2)</th><td>Frontera lineal + sigmoide</td><td>Sí (recomendado)</td><td>Rápida, interpretable, da probabilidades, buen punto de partida</td><td>Solo fronteras rectas (salvo que crees variables nuevas)</td></tr>
+    <tr><th scope="row">Árbol de decisión</th><td>Cadena de preguntas «variable ≤ umbral»</td><td>No</td><td>Se puede dibujar y explicar; relaciones no lineales; predicción rápida</td><td>Sobreajusta; inestable; fronteras en rectángulos; no extrapola</td></tr>
+    <tr><th scope="row">KNN</th><td>Vota con los K datos más parecidos</td><td><strong>Sí, imprescindible</strong></td><td>Cero entrenamiento; fronteras muy flexibles; sirve para regresión</td><td>Predicción lenta y memoria alta con muchos datos; sufre con muchas variables</td></tr>
+    <tr><th scope="row">SVM</th><td>Margen máximo (con kernel si hace falta)</td><td><strong>Sí</strong></td><td>Muy buena con pocos datos y muchas variables; fronteras curvas con RBF</td><td>Lenta con muchos datos; sensible a C y gamma; sin probabilidades de serie</td></tr>
+    <tr><th scope="row">Naive Bayes</th><td>Teorema de Bayes + independencia</td><td>No</td><td>Muy rápido; funciona con muy pocos datos; excelente base para texto</td><td>La independencia casi nunca se cumple; probabilidades extremas</td></tr>
+    <tr><th scope="row">Random Forest</th><td>Voto de muchos árboles independientes</td><td>No</td><td>Robusto, rinde bien sin ajustar; importancias y OOB</td><td>Pesado y poco interpretable; no extrapola</td></tr>
+    <tr><th scope="row">AdaBoost</th><td>Stumps en cadena, repesando los errores</td><td>No</td><td>Sencillo; buena demostración de la idea de boosting</td><td>Sensible a ruido y a etiquetas erróneas</td></tr>
+    <tr><th scope="row">Gradient Boosting / XGBoost</th><td>Árboles en cadena que predicen residuos</td><td>No</td><td>Suele dar la mejor precisión en datos de tabla; regulariza (XGBoost); admite datos faltantes</td><td>Más hiperparámetros; puede sobreajustar si no se controla; más lento de ajustar</td></tr>
+  </tbody>
 </table>
-</details>
-<div class="salida">
-<strong>Salida esperada</strong>
-<pre>un solo árbol  -&gt; test = 0.906
-bagging (50)   -&gt; test = 0.936 | OOB = 0.945
-árboles en el comité: 50
-datos distintos que vio el árbol 0: 249 de 398</pre>
-<p>Un solo árbol saca 0,906 en test; el comité de 50 árboles, <strong>0,936</strong> (+0,030, unos 5 pacientes más de 171). La puntuación OOB es 0,945, calculada sin usar el test: está en la misma zona, así que sirve para estimar el rendimiento. El árbol 0 solo vio 249 pacientes distintos de los 398 de train: 249/398 = 0,626, justo el 63 % que predice la teoría del bootstrap.</p>
+
+<div class="callout ojo">
+  <span class="lbl">Ojo</span>
+  <p>La columna «¿Hay que escalar?» sale de cómo trabaja cada algoritmo. Los que miden <strong>distancias</strong> o usan <strong>un margen</strong> (KNN, SVM) o regularizan coeficientes (regresión logística) se estropean si una variable tiene números enormes. Los que preguntan «¿es mayor que X?» <strong>variable a variable</strong> (árboles y todos los ensembles de árboles) no notan el cambio de escala. Naive Bayes modela cada variable por separado, así que tampoco lo necesita.</p>
 </div>
-</article><article class="snippet" data-lang="python">
-<header>
-<h3>19 · AdaBoost: pesos de los datos, error y alfa calculados a mano</h3>
-<p class="para-que"><strong>Para qué sirve</strong> Ejecutar tres rondas de AdaBoost con cuentas propias (error ponderado, peso del voto, actualización de pesos) y verificar que <code>AdaBoostClassifier</code> obtiene los mismos errores.</p>
-</header>
-<pre class="code"><code>import numpy as np
+
+<h3 id="guia-eleccion">Una guía para decidir</h3>
+<ul>
+  <li><strong>¿Necesitas explicar la decisión a alguien que no es técnico?</strong> Un árbol pequeño (3–4 niveles) o una regresión logística.</li>
+  <li><strong>¿Pocos datos (cientos) y muchas variables?</strong> SVM con kernel lineal o RBF, regresión logística; Naive Bayes si son recuentos de texto.</li>
+  <li><strong>¿Texto (reseñas de películas, comentarios)?</strong> Naive Bayes o regresión logística sobre recuentos de palabras: rápidos y sorprendentemente buenos.</li>
+  <li><strong>¿Una tabla con variables mezcladas, relaciones no lineales y bastantes datos?</strong> Empieza con un Random Forest (rinde bien casi sin ajustar) y, si necesitas exprimir precisión, pasa a XGBoost o Gradient Boosting con early stopping.</li>
+  <li><strong>¿Necesitas predecir en tiempo real con millones de ejemplos guardados?</strong> Evita KNN: cada predicción recorre todos los datos.</li>
+  <li><strong>¿Imágenes, audio o texto largo?</strong> Estos algoritmos clásicos se quedan cortos: es el territorio de las redes neuronales (cursos 2 y 3).</li>
+</ul>
+
+<div class="callout ejemplo">
+  <span class="lbl">Una receta de trabajo</span>
+  <ol class="pasos">
+    <li><strong>Un modelo de referencia sencillo</strong> (regresión logística o un árbol pequeño) con un único reparto train/test. Te da una cifra mínima que superar.</li>
+    <li><strong>Un Random Forest</strong> sin ajustar casi nada. Mide su acierto y su OOB.</li>
+    <li><strong>Un boosting</strong> (Gradient Boosting o XGBoost) con early stopping.</li>
+    <li><strong>Compara con la misma partición</strong> (como en el fragmento 23) y, cuando las cifras estén cerca, con validación cruzada (módulo 5). Quédate con el más sencillo que rinda casi igual.</li>
+  </ol>
+</div>
+
+<p>El fragmento 23 hace justo eso con nueve modelos y un conjunto real (569 tumores). El resultado sorprende al principio: la <strong>regresión logística</strong> con variables escaladas ocupa el primer puesto (0,986), por delante de todos los ensembles; los comités llegan a 1,000 en train pero entre 0,958 y 0,972 en test, y el Naive Bayes cierra la lista con 0,937. No es una anomalía: en un conjunto pequeño y casi separable con una recta, un modelo sencillo es suficiente, y la capacidad extra de los comités se gasta en memorizar el entrenamiento. Dos advertencias: con solo 143 pacientes de test, la diferencia entre el primero y el último son 7 pacientes (no concluyente), y no debes generalizar «la logística gana»: con datos de otro tipo la lista se reordena. La lección no es qué algoritmo gana, sino <strong>medir antes de elegir</strong>.</p>
+
+<h2 id="resumen-modulo">Resumen del módulo</h2>
+<div class="resumen">
+<ul>
+  <li><strong>Cinco formas de decidir:</strong> probabilidades (Naive Bayes), vecinos (KNN), fronteras (SVM, regresión logística), preguntas (árboles) y comités (ensembles). Casi todos tienen versión de clasificación y de regresión.</li>
+  <li><strong>Árboles:</strong> eligen la pregunta «variable ≤ umbral» que más <strong>impureza</strong> quita. Gini = \( 1-\sum p_k^2 \); entropía = \( -\sum p_k\log_2 p_k \); ganancia = impureza del padre − impureza ponderada de los hijos. Sin límites sobreajustan (<code>max_depth</code>, <code>min_samples_leaf</code>). En regresión minimizan el SSE y predicen la media de la hoja. No necesitan escalar.</li>
+  <li><strong>KNN:</strong> guarda los datos y, al predecir, vota con los K más cercanos (distancia euclídea). K pequeño = varianza; K grande = sesgo. <strong>Necesita escalar</strong>, sufre con muchas variables y es lento al predecir.</li>
+  <li><strong>SVM:</strong> máxima calle entre clases (ancho \( 2/\lVert\mathbf{w}\rVert \)); solo cuentan los vectores de soporte. <strong>C</strong> controla la multa por violar el margen; el <strong>kernel RBF</strong> con <strong>gamma</strong> permite fronteras curvas; SVR usa un tubo de ancho \( \varepsilon \). Necesita escalar.</li>
+  <li><strong>Naive Bayes:</strong> \( P(\text{clase}\mid\text{datos})\propto P(\text{clase})\prod P(x_i\mid\text{clase}) \) suponiendo independencia; el <strong>suavizado de Laplace</strong> evita los ceros. Variantes Multinomial, Bernoulli y Gaussiana.</li>
+  <li><strong>Multiclase:</strong> One-vs-Rest entrena \( k \) modelos; One-vs-One, \( k(k-1)/2 \).</li>
+  <li><strong>Sesgo y varianza:</strong> error = sesgo² + varianza + ruido. Train y test malos y parecidos → sesgo; train bueno y test malo → varianza. Más complejidad baja el sesgo y sube la varianza.</li>
+  <li><strong>Ensembles:</strong> un comité acierta más si sus miembros son mejores que el azar y distintos. <strong>Bagging / Random Forest</strong>: árboles independientes sobre muestras bootstrap (63,2 % de datos distintos) y variables al azar; reducen la varianza y dan OOB. <strong>Boosting</strong>: modelos débiles en cadena; <strong>AdaBoost</strong> repesa los datos mal clasificados (\( \alpha=\tfrac12\ln\frac{1-\varepsilon}{\varepsilon} \)), <strong>Gradient Boosting</strong> ajusta cada árbol a los residuos (\( F\leftarrow F+\eta\cdot\text{árbol} \)); reducen el sesgo.</li>
+  <li><strong>XGBoost:</strong> Gradient Boosting con regularización (\( \lambda \), \( \gamma \)), hojas \( w^*=-G/(H+\lambda) \), datos faltantes, histogramas y <code>early_stopping_rounds</code>.</li>
+  <li><strong>Elegir:</strong> empieza por un modelo sencillo, prueba un Random Forest y luego un boosting; compara con el mismo reparto y quédate con el más simple que rinda casi igual. No existe un algoritmo mejor para todo.</li>
+</ul>
+<p>Siguiente paso: en el <a href="../modulo-4.html">módulo 4</a> dejamos de tener respuestas conocidas y entramos en el aprendizaje no supervisado (clustering, reducción de dimensiones). Cómo comparar modelos de forma fiable (precision, recall, F1, validación cruzada y regularización) lo verás en el <a href="../modulo-5.html">módulo 5</a>. Si algo de las fronteras lineales o de la sigmoide se te ha olvidado, está en el <a href="../modulo-2.html">módulo 2</a>.</p>
+</div>
+  </div>
+</details>
+
+<section>
+<h2 class="sin-num">Código</h2>
+<article class="snippet" data-lang="python">
+  <header>
+    <h3>19 · AdaBoost: pesos de los datos, error y alfa calculados a mano</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Ejecutar tres rondas de AdaBoost con cuentas propias (error ponderado, peso del voto, actualización de pesos) y verificar que <code>AdaBoostClassifier</code> obtiene los mismos errores.</p>
+  </header>
+  <pre class="code"><code>import numpy as np
 from sklearn.ensemble import AdaBoostClassifier
 from sklearn.tree import DecisionTreeClassifier
 
@@ -337,43 +379,43 @@ ada.fit(x.reshape(-1, 1), y)
 print("sklearn errores:", ada.estimator_errors_.round(4))
 print("sklearn pesos de voto:", ada.estimator_weights_.round(4), "(= 2 x alfa)")
 print("predicciones:", ada.predict(x.reshape(-1, 1)))</code></pre>
-<details class="linea-a-linea" open="">
-<summary>Línea por línea</summary>
-<p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
-<table class="lineas">
-<thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
-<tbody>
-<tr data-lines="1"><td><code>import numpy as np</code></td><td>NumPy.</td></tr>
-<tr data-lines="2"><td><code>from sklearn.ensemble import AdaBoostClassifier</code></td><td>El AdaBoost de scikit-learn.</td></tr>
-<tr data-lines="3"><td><code>from sklearn.tree import DecisionTreeClassifier</code></td><td>Los «stumps» (árboles de una sola pregunta) que usará de modelo débil.</td></tr>
-<tr data-lines="5"><td><code>x = np.arange(1, 11)</code></td><td>Diez puntos en una recta: 1, 2, …, 10.</td></tr>
-<tr data-lines="6"><td><code>y = np.array([1, 1, 1, -1, -1, -1, 1, 1, -1, -1])</code></td><td>Su clase (+1 o −1). Ninguna pregunta simple los separa del todo: hay que combinar varias.</td></tr>
-<tr data-lines="7"><td><code>pesos = np.full(10, 0.1)</code></td><td>Al principio los 10 datos pesan igual: 0,1 cada uno (suman 1).</td></tr>
-<tr data-lines="9"><td><code>def mejor_stump(pesos):</code></td><td>Función que busca el mejor stump <em>teniendo en cuenta los pesos</em>.</td></tr>
-<tr data-lines="10"><td><code>mejor = None</code></td><td>Todavía no hay ningún candidato.</td></tr>
-<tr data-lines="11"><td><code>for umbral in np.arange(0.5, 10.6, 1.0):</code></td><td>Prueba los umbrales 0,5; 1,5; …; 10,5 (entre un punto y el siguiente).</td></tr>
-<tr data-lines="12"><td><code>for signo in (1, -1):</code></td><td>Para cada umbral prueba las dos orientaciones: «a la izquierda +1» o «a la izquierda −1».</td></tr>
-<tr data-lines="13"><td><code>pred = np.where(x &lt;= umbral, signo, -signo)</code></td><td>Predicción del stump: <code>np.where(condición, a, b)</code> da <code>a</code> donde se cumple la condición y <code>b</code> donde no.</td></tr>
-<tr data-lines="14"><td><code>error = pesos[pred != y].sum()</code></td><td><strong>Error ponderado</strong>: suma los pesos de los datos mal clasificados (<code>pred != y</code> marca los fallos).</td></tr>
-<tr data-lines="15-16"><td><code>if mejor is None or error &lt; mejor[0] - 1e-12: mejor = (...)</code></td><td>Se queda con el candidato de menor error (la resta de <code>1e-12</code> evita que un empate por redondeo cambie la elección).</td></tr>
-<tr data-lines="17"><td><code>return mejor</code></td><td>Devuelve el mejor: su error, umbral, signo y predicciones.</td></tr>
-<tr data-lines="19"><td><code>for ronda in (1, 2, 3):</code></td><td>Tres rondas de boosting.</td></tr>
-<tr data-lines="20"><td><code>error, umbral, signo, pred = mejor_stump(pesos)</code></td><td>Entrena el stump de esta ronda con los pesos actuales.</td></tr>
-<tr data-lines="21"><td><code>alfa = 0.5 * np.log((1 - error) / error)</code></td><td>El <strong>peso del voto</strong> del stump: \(\alpha=\tfrac12\ln\frac{1-\varepsilon}{\varepsilon}\). Un stump casi perfecto manda mucho; uno que acierta como el azar (\(\varepsilon=0{,}5\)) vale 0.</td></tr>
-<tr data-lines="22"><td><code>pesos = pesos * np.exp(-alfa * y * pred)</code></td><td>Actualiza los pesos. Si el stump acertó, <code>y * pred</code> vale +1 y el peso se multiplica por \(e^{-\alpha}\) (baja); si falló vale −1 y se multiplica por \(e^{\alpha}\) (sube).</td></tr>
-<tr data-lines="23"><td><code>pesos = pesos / pesos.sum()</code></td><td>Normaliza para que los pesos vuelvan a sumar 1.</td></tr>
-<tr data-lines="24-25"><td><code>print(f"ronda ...") / print("   pesos nuevos:", ...)</code></td><td>Muestra el stump elegido, su error, su alfa y los pesos que usará la siguiente ronda.</td></tr>
-<tr data-lines="27"><td><code>ada = AdaBoostClassifier(estimator=DecisionTreeClassifier(max_depth=1), n_estimators=3, ...)</code></td><td>El AdaBoost de scikit-learn con las mismas piezas: stumps (<code>max_depth=1</code>) y 3 rondas.</td></tr>
-<tr data-lines="28"><td><code>ada.fit(x.reshape(-1, 1), y)</code></td><td>Lo entrena (hay que dar <code>x</code> como columna).</td></tr>
-<tr data-lines="29"><td><code>print("sklearn errores:", ada.estimator_errors_.round(4))</code></td><td>El error ponderado que obtuvo en cada ronda.</td></tr>
-<tr data-lines="30"><td><code>print("sklearn pesos de voto:", ada.estimator_weights_.round(4), "(= 2 x alfa)")</code></td><td>El peso de voto de cada stump. scikit-learn usa una variante de AdaBoost (SAMME) cuya fórmula no lleva el factor \(\tfrac12\), así que sus pesos son el <strong>doble</strong> de nuestros alfa.</td></tr>
-<tr data-lines="31"><td><code>print("predicciones:", ada.predict(x.reshape(-1, 1)))</code></td><td>Predicción final del conjunto de 3 stumps sobre los mismos 10 puntos.</td></tr>
-</tbody>
-</table>
-</details>
-<div class="salida">
-<strong>Salida esperada</strong>
-<pre>ronda 1: x&lt;=3.5 -&gt; +1 | error=0.2000 | alfa=0.6931
+  <details class="linea-a-linea" open>
+    <summary>Línea por línea</summary>
+    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+      <tbody>
+        <tr data-lines="1"><td><code>import numpy as np</code></td><td>NumPy.</td></tr>
+        <tr data-lines="2"><td><code>from sklearn.ensemble import AdaBoostClassifier</code></td><td>El AdaBoost de scikit-learn.</td></tr>
+        <tr data-lines="3"><td><code>from sklearn.tree import DecisionTreeClassifier</code></td><td>Los «stumps» (árboles de una sola pregunta) que usará de modelo débil.</td></tr>
+        <tr data-lines="5"><td><code>x = np.arange(1, 11)</code></td><td>Diez puntos en una recta: 1, 2, …, 10.</td></tr>
+        <tr data-lines="6"><td><code>y = np.array([1, 1, 1, -1, -1, -1, 1, 1, -1, -1])</code></td><td>Su clase (+1 o −1). Ninguna pregunta simple los separa del todo: hay que combinar varias.</td></tr>
+        <tr data-lines="7"><td><code>pesos = np.full(10, 0.1)</code></td><td>Al principio los 10 datos pesan igual: 0,1 cada uno (suman 1).</td></tr>
+        <tr data-lines="9"><td><code>def mejor_stump(pesos):</code></td><td>Función que busca el mejor stump <em>teniendo en cuenta los pesos</em>.</td></tr>
+        <tr data-lines="10"><td><code>mejor = None</code></td><td>Todavía no hay ningún candidato.</td></tr>
+        <tr data-lines="11"><td><code>for umbral in np.arange(0.5, 10.6, 1.0):</code></td><td>Prueba los umbrales 0,5; 1,5; …; 10,5 (entre un punto y el siguiente).</td></tr>
+        <tr data-lines="12"><td><code>for signo in (1, -1):</code></td><td>Para cada umbral prueba las dos orientaciones: «a la izquierda +1» o «a la izquierda −1».</td></tr>
+        <tr data-lines="13"><td><code>pred = np.where(x &lt;= umbral, signo, -signo)</code></td><td>Predicción del stump: <code>np.where(condición, a, b)</code> da <code>a</code> donde se cumple la condición y <code>b</code> donde no.</td></tr>
+        <tr data-lines="14"><td><code>error = pesos[pred != y].sum()</code></td><td><strong>Error ponderado</strong>: suma los pesos de los datos mal clasificados (<code>pred != y</code> marca los fallos).</td></tr>
+        <tr data-lines="15-16"><td><code>if mejor is None or error &lt; mejor[0] - 1e-12: mejor = (...)</code></td><td>Se queda con el candidato de menor error (la resta de <code>1e-12</code> evita que un empate por redondeo cambie la elección).</td></tr>
+        <tr data-lines="17"><td><code>return mejor</code></td><td>Devuelve el mejor: su error, umbral, signo y predicciones.</td></tr>
+        <tr data-lines="19"><td><code>for ronda in (1, 2, 3):</code></td><td>Tres rondas de boosting.</td></tr>
+        <tr data-lines="20"><td><code>error, umbral, signo, pred = mejor_stump(pesos)</code></td><td>Entrena el stump de esta ronda con los pesos actuales.</td></tr>
+        <tr data-lines="21"><td><code>alfa = 0.5 * np.log((1 - error) / error)</code></td><td>El <strong>peso del voto</strong> del stump: \(\alpha=\tfrac12\ln\frac{1-\varepsilon}{\varepsilon}\). Un stump casi perfecto manda mucho; uno que acierta como el azar (\(\varepsilon=0{,}5\)) vale 0.</td></tr>
+        <tr data-lines="22"><td><code>pesos = pesos * np.exp(-alfa * y * pred)</code></td><td>Actualiza los pesos. Si el stump acertó, <code>y * pred</code> vale +1 y el peso se multiplica por \(e^{-\alpha}\) (baja); si falló vale −1 y se multiplica por \(e^{\alpha}\) (sube).</td></tr>
+        <tr data-lines="23"><td><code>pesos = pesos / pesos.sum()</code></td><td>Normaliza para que los pesos vuelvan a sumar 1.</td></tr>
+        <tr data-lines="24-25"><td><code>print(f"ronda ...") / print("   pesos nuevos:", ...)</code></td><td>Muestra el stump elegido, su error, su alfa y los pesos que usará la siguiente ronda.</td></tr>
+        <tr data-lines="27"><td><code>ada = AdaBoostClassifier(estimator=DecisionTreeClassifier(max_depth=1), n_estimators=3, ...)</code></td><td>El AdaBoost de scikit-learn con las mismas piezas: stumps (<code>max_depth=1</code>) y 3 rondas.</td></tr>
+        <tr data-lines="28"><td><code>ada.fit(x.reshape(-1, 1), y)</code></td><td>Lo entrena (hay que dar <code>x</code> como columna).</td></tr>
+        <tr data-lines="29"><td><code>print("sklearn errores:", ada.estimator_errors_.round(4))</code></td><td>El error ponderado que obtuvo en cada ronda.</td></tr>
+        <tr data-lines="30"><td><code>print("sklearn pesos de voto:", ada.estimator_weights_.round(4), "(= 2 x alfa)")</code></td><td>El peso de voto de cada stump. scikit-learn usa una variante de AdaBoost (SAMME) cuya fórmula no lleva el factor \(\tfrac12\), así que sus pesos son el <strong>doble</strong> de nuestros alfa.</td></tr>
+        <tr data-lines="31"><td><code>print("predicciones:", ada.predict(x.reshape(-1, 1)))</code></td><td>Predicción final del conjunto de 3 stumps sobre los mismos 10 puntos.</td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>ronda 1: x&lt;=3.5 -&gt; +1 | error=0.2000 | alfa=0.6931
    pesos nuevos: [0.062 0.062 0.062 0.062 0.062 0.062 0.25  0.25  0.062 0.062]
 ronda 2: x&lt;=8.5 -&gt; +1 | error=0.1875 | alfa=0.7332
    pesos nuevos: [0.038 0.038 0.038 0.167 0.167 0.167 0.154 0.154 0.038 0.038]
@@ -382,14 +424,16 @@ ronda 3: x&lt;=6.5 -&gt; -1 | error=0.1923 | alfa=0.7175
 sklearn errores: [0.2    0.1875 0.1923]
 sklearn pesos de voto: [1.3863 1.4663 1.4351] (= 2 x alfa)
 predicciones: [ 1  1  1 -1 -1 -1  1  1 -1 -1]</pre>
-<p>Ronda 1: el mejor stump es «x ≤ 3,5 → +1, el resto → −1»; falla en los puntos 7 y 8 (dos pesos de 0,1) → error 0,2 y \(\alpha=\tfrac12\ln(0{,}8/0{,}2)=0{,}6931\). Los dos fallos pasan de pesar 0,1 a <strong>0,25</strong> y los demás bajan a 0,0625. Ronda 2: ahora el mejor stump («x ≤ 8,5 → +1») falla en 4, 5 y 6, que suman 3 × 0,0625 = 0,1875 de error → \(\alpha=0{,}7332\). Ronda 3: error 0,1923 y \(\alpha=0{,}7175\). scikit-learn obtiene los mismos errores (0,2; 0,1875; 0,1923) y pesos de voto 1,3863; 1,4663 y 1,4351, que son exactamente el doble de nuestros alfa. Con los tres stumps votando, los 10 puntos quedan bien clasificados, algo que ningún stump consigue solo (fallan 2, 3 y 5 puntos respectivamente).</p>
-</div>
-</article><article class="snippet" data-lang="python">
-<header>
-<h3>20 · Gradient Boosting: residuos a mano, GradientBoostingRegressor y GradientBoostingClassifier</h3>
-<p class="para-que"><strong>Para qué sirve</strong> Entrenar dos etapas de boosting con cuentas propias (cada árbol aprende los errores del anterior), comprobar que scikit-learn da lo mismo y ver cómo mejora un clasificador a medida que se añaden árboles.</p>
-</header>
-<pre class="code"><code>import numpy as np
+    <p>Ronda 1: el mejor stump es «x ≤ 3,5 → +1, el resto → −1»; falla en los puntos 7 y 8 (dos pesos de 0,1) → error 0,2 y \(\alpha=\tfrac12\ln(0{,}8/0{,}2)=0{,}6931\). Los dos fallos pasan de pesar 0,1 a <strong>0,25</strong> y los demás bajan a 0,0625. Ronda 2: ahora el mejor stump («x ≤ 8,5 → +1») falla en 4, 5 y 6, que suman 3 × 0,0625 = 0,1875 de error → \(\alpha=0{,}7332\). Ronda 3: error 0,1923 y \(\alpha=0{,}7175\). scikit-learn obtiene los mismos errores (0,2; 0,1875; 0,1923) y pesos de voto 1,3863; 1,4663 y 1,4351, que son exactamente el doble de nuestros alfa. Con los tres stumps votando, los 10 puntos quedan bien clasificados, algo que ningún stump consigue solo (fallan 2, 3 y 5 puntos respectivamente).</p>
+  </div>
+</article>
+
+<article class="snippet" data-lang="python">
+  <header>
+    <h3>20 · Gradient Boosting: residuos a mano, GradientBoostingRegressor y GradientBoostingClassifier</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Entrenar dos etapas de boosting con cuentas propias (cada árbol aprende los errores del anterior), comprobar que scikit-learn da lo mismo y ver cómo mejora un clasificador a medida que se añaden árboles.</p>
+  </header>
+  <pre class="code"><code>import numpy as np
 from sklearn.datasets import load_breast_cancer
 from sklearn.ensemble import GradientBoostingClassifier, GradientBoostingRegressor
 from sklearn.model_selection import train_test_split
@@ -419,43 +463,43 @@ print("clasificador -&gt; test =", round(clf.score(X_test, y_test), 3))
 for n, pred in enumerate(clf.staged_predict(X_test), start=1):
     if n in (1, 10, 50, 100):
         print(f"  con {n:3d} árboles -&gt; test = {np.mean(pred == y_test):.3f}")</code></pre>
-<details class="linea-a-linea" open="">
-<summary>Línea por línea</summary>
-<p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
-<table class="lineas">
-<thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
-<tbody>
-<tr data-lines="1"><td><code>import numpy as np</code></td><td>NumPy.</td></tr>
-<tr data-lines="2"><td><code>from sklearn.datasets import load_breast_cancer</code></td><td>Datos reales para la última parte.</td></tr>
-<tr data-lines="3"><td><code>from sklearn.ensemble import GradientBoostingClassifier, GradientBoostingRegressor</code></td><td>Las versiones para clasificar y para predecir números.</td></tr>
-<tr data-lines="4"><td><code>from sklearn.model_selection import train_test_split</code></td><td>Reparto train/test.</td></tr>
-<tr data-lines="6"><td><code># Gradient Boosting a mano ...</code></td><td>Comentario.</td></tr>
-<tr data-lines="7"><td><code>x = np.array([1, 2, 3, 4, 5])</code></td><td>Cinco puntos en una recta.</td></tr>
-<tr data-lines="8"><td><code>y = np.array([3, 5, 4, 12, 14.0])</code></td><td>Su valor a predecir (el <code>.0</code> hace que NumPy los trate como decimales).</td></tr>
-<tr data-lines="9"><td><code>eta = 0.5</code></td><td>La <strong>tasa de aprendizaje</strong> η: cuánto de lo que propone cada árbol nuevo se acepta.</td></tr>
-<tr data-lines="10"><td><code>F = np.full(5, y.mean())</code></td><td>Predicción inicial \(F_0\): la media de y (7,6) para todos los puntos. Es el mejor modelo posible sin mirar x.</td></tr>
-<tr data-lines="11"><td><code>print("F0 =", F[0], "| residuos =", (y - F).round(2))</code></td><td>Muestra \(F_0\) y los <strong>residuos</strong> (valor real − predicción): lo que aún no sabemos explicar.</td></tr>
-<tr data-lines="13"><td><code>for etapa in (1, 2):</code></td><td>Dos etapas de boosting.</td></tr>
-<tr data-lines="14"><td><code>residuos = y - F</code></td><td>Residuos actuales.</td></tr>
-<tr data-lines="15"><td><code>izq, der = x &lt;= 3, x &gt; 3</code></td><td>El stump de esta etapa: reparte los puntos en dos grupos con el corte 3,5. Hemos elegido a mano el corte que mejor separa los residuos.</td></tr>
-<tr data-lines="16"><td><code>F = F + eta * np.where(izq, residuos[izq].mean(), residuos[der].mean())</code></td><td>Corazón del algoritmo: el árbol predice, en cada hoja, la <strong>media de los residuos</strong> de sus puntos. Se multiplica por η y se <strong>suma</strong> a la predicción anterior.</td></tr>
-<tr data-lines="17"><td><code>print(f"etapa {etapa}: F = ... | MSE = ...")</code></td><td>Muestra las nuevas predicciones y el error cuadrático medio.</td></tr>
-<tr data-lines="19"><td><code>gb = GradientBoostingRegressor(n_estimators=2, learning_rate=0.5, max_depth=1, ...)</code></td><td>El mismo experimento con scikit-learn: 2 árboles de una pregunta y η = 0,5.</td></tr>
-<tr data-lines="20"><td><code>gb.fit(x.reshape(-1, 1), y)</code></td><td>Entrena (x como columna).</td></tr>
-<tr data-lines="21"><td><code>print("sklearn (2 árboles):", ...)</code></td><td>Sus predicciones: deben coincidir con nuestro <code>F</code> final.</td></tr>
-<tr data-lines="23"><td><code># Uso normal: ...</code></td><td>Comentario.</td></tr>
-<tr data-lines="24"><td><code>X, yc = load_breast_cancer(return_X_y=True)</code></td><td>Datos reales; llamamos <code>yc</code> a la etiqueta para no pisar la <code>y</code> de arriba.</td></tr>
-<tr data-lines="25"><td><code>X_train, X_test, y_train, y_test = train_test_split(...)</code></td><td>70/30 estratificado con semilla 0.</td></tr>
-<tr data-lines="26"><td><code>clf = GradientBoostingClassifier(n_estimators=100, learning_rate=0.1, max_depth=2, ...).fit(...)</code></td><td>100 árboles pequeños (profundidad 2), cada uno aporta el 10 % de lo que propone.</td></tr>
-<tr data-lines="27"><td><code>print("clasificador -&gt; test = ...")</code></td><td>Acierto final en test.</td></tr>
-<tr data-lines="28"><td><code>for n, pred in enumerate(clf.staged_predict(X_test), start=1):</code></td><td><code>staged_predict</code> devuelve las predicciones del modelo tras 1 árbol, tras 2, tras 3… <code>enumerate(..., start=1)</code> numera esas etapas empezando en 1.</td></tr>
-<tr data-lines="29-30"><td><code>if n in (1, 10, 50, 100): print(...)</code></td><td>Muestra el acierto solo en las etapas 1, 10, 50 y 100.</td></tr>
-</tbody>
-</table>
-</details>
-<div class="salida">
-<strong>Salida esperada</strong>
-<pre>F0 = 7.6 | residuos = [-4.6 -2.6 -3.6  4.4  6.4]
+  <details class="linea-a-linea" open>
+    <summary>Línea por línea</summary>
+    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+      <tbody>
+        <tr data-lines="1"><td><code>import numpy as np</code></td><td>NumPy.</td></tr>
+        <tr data-lines="2"><td><code>from sklearn.datasets import load_breast_cancer</code></td><td>Datos reales para la última parte.</td></tr>
+        <tr data-lines="3"><td><code>from sklearn.ensemble import GradientBoostingClassifier, GradientBoostingRegressor</code></td><td>Las versiones para clasificar y para predecir números.</td></tr>
+        <tr data-lines="4"><td><code>from sklearn.model_selection import train_test_split</code></td><td>Reparto train/test.</td></tr>
+        <tr data-lines="6"><td><code># Gradient Boosting a mano ...</code></td><td>Comentario.</td></tr>
+        <tr data-lines="7"><td><code>x = np.array([1, 2, 3, 4, 5])</code></td><td>Cinco puntos en una recta.</td></tr>
+        <tr data-lines="8"><td><code>y = np.array([3, 5, 4, 12, 14.0])</code></td><td>Su valor a predecir (el <code>.0</code> hace que NumPy los trate como decimales).</td></tr>
+        <tr data-lines="9"><td><code>eta = 0.5</code></td><td>La <strong>tasa de aprendizaje</strong> η: cuánto de lo que propone cada árbol nuevo se acepta.</td></tr>
+        <tr data-lines="10"><td><code>F = np.full(5, y.mean())</code></td><td>Predicción inicial \(F_0\): la media de y (7,6) para todos los puntos. Es el mejor modelo posible sin mirar x.</td></tr>
+        <tr data-lines="11"><td><code>print("F0 =", F[0], "| residuos =", (y - F).round(2))</code></td><td>Muestra \(F_0\) y los <strong>residuos</strong> (valor real − predicción): lo que aún no sabemos explicar.</td></tr>
+        <tr data-lines="13"><td><code>for etapa in (1, 2):</code></td><td>Dos etapas de boosting.</td></tr>
+        <tr data-lines="14"><td><code>residuos = y - F</code></td><td>Residuos actuales.</td></tr>
+        <tr data-lines="15"><td><code>izq, der = x &lt;= 3, x &gt; 3</code></td><td>El stump de esta etapa: reparte los puntos en dos grupos con el corte 3,5. Hemos elegido a mano el corte que mejor separa los residuos.</td></tr>
+        <tr data-lines="16"><td><code>F = F + eta * np.where(izq, residuos[izq].mean(), residuos[der].mean())</code></td><td>Corazón del algoritmo: el árbol predice, en cada hoja, la <strong>media de los residuos</strong> de sus puntos. Se multiplica por η y se <strong>suma</strong> a la predicción anterior.</td></tr>
+        <tr data-lines="17"><td><code>print(f"etapa {etapa}: F = ... | MSE = ...")</code></td><td>Muestra las nuevas predicciones y el error cuadrático medio.</td></tr>
+        <tr data-lines="19"><td><code>gb = GradientBoostingRegressor(n_estimators=2, learning_rate=0.5, max_depth=1, ...)</code></td><td>El mismo experimento con scikit-learn: 2 árboles de una pregunta y η = 0,5.</td></tr>
+        <tr data-lines="20"><td><code>gb.fit(x.reshape(-1, 1), y)</code></td><td>Entrena (x como columna).</td></tr>
+        <tr data-lines="21"><td><code>print("sklearn (2 árboles):", ...)</code></td><td>Sus predicciones: deben coincidir con nuestro <code>F</code> final.</td></tr>
+        <tr data-lines="23"><td><code># Uso normal: ...</code></td><td>Comentario.</td></tr>
+        <tr data-lines="24"><td><code>X, yc = load_breast_cancer(return_X_y=True)</code></td><td>Datos reales; llamamos <code>yc</code> a la etiqueta para no pisar la <code>y</code> de arriba.</td></tr>
+        <tr data-lines="25"><td><code>X_train, X_test, y_train, y_test = train_test_split(...)</code></td><td>70/30 estratificado con semilla 0.</td></tr>
+        <tr data-lines="26"><td><code>clf = GradientBoostingClassifier(n_estimators=100, learning_rate=0.1, max_depth=2, ...).fit(...)</code></td><td>100 árboles pequeños (profundidad 2), cada uno aporta el 10 % de lo que propone.</td></tr>
+        <tr data-lines="27"><td><code>print("clasificador -&gt; test = ...")</code></td><td>Acierto final en test.</td></tr>
+        <tr data-lines="28"><td><code>for n, pred in enumerate(clf.staged_predict(X_test), start=1):</code></td><td><code>staged_predict</code> devuelve las predicciones del modelo tras 1 árbol, tras 2, tras 3… <code>enumerate(..., start=1)</code> numera esas etapas empezando en 1.</td></tr>
+        <tr data-lines="29-30"><td><code>if n in (1, 10, 50, 100): print(...)</code></td><td>Muestra el acierto solo en las etapas 1, 10, 50 y 100.</td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>F0 = 7.6 | residuos = [-4.6 -2.6 -3.6  4.4  6.4]
 etapa 1: F = [ 5.8  5.8  5.8 10.3 10.3] | MSE = 5.660
 etapa 2: F = [ 4.9   4.9   4.9  11.65 11.65] | MSE = 2.015
 sklearn (2 árboles): [ 4.9   4.9   4.9  11.65 11.65]
@@ -464,14 +508,350 @@ clasificador -&gt; test = 0.936
   con  10 árboles -&gt; test = 0.930
   con  50 árboles -&gt; test = 0.930
   con 100 árboles -&gt; test = 0.936</pre>
-<p>Empezamos con \(F_0=7{,}6\) y residuos [−4,6; −2,6; −3,6; 4,4; 6,4]. Etapa 1: la hoja izquierda promedia los residuos −3,6 y la derecha +5,4; con η = 0,5 las predicciones pasan a 5,8 (izquierda) y 10,3 (derecha) y el MSE baja de 20,24 a 5,66. Etapa 2: nuevos residuos, nuevas medias (−1,8 y +2,7) y predicciones 4,9 y 11,65, MSE = 2,015. <code>GradientBoostingRegressor</code> devuelve exactamente [4,9; 4,9; 4,9; 11,65; 11,65]. Con el clasificador real, un solo árbol pequeño (que aporta solo un 10 % de su propuesta) acierta apenas 0,626, que coincide con la proporción de la clase más frecuente en el test (107 de 171 pacientes son «benignos»): es lo que acertaría un modelo que respondiera siempre «benigno». Con 10 árboles ya hay 0,930 y con 100, <strong>0,936</strong>: cada árbol corrige un poco lo que dejaron los anteriores.</p>
-</div>
-</article><article class="snippet" data-lang="python">
-<header>
-<h3>21 · XGBClassifier: regularización, submuestreo y early stopping</h3>
-<p class="para-que"><strong>Para qué sirve</strong> Entrenar un XGBoost con sus hiperparámetros más importantes y dejar que pare solo cuando el error en un conjunto de validación deja de mejorar (early stopping).</p>
-</header>
-<pre class="code"><code>import numpy as np
+    <p>Empezamos con \(F_0=7{,}6\) y residuos [−4,6; −2,6; −3,6; 4,4; 6,4]. Etapa 1: la hoja izquierda promedia los residuos −3,6 y la derecha +5,4; con η = 0,5 las predicciones pasan a 5,8 (izquierda) y 10,3 (derecha) y el MSE baja de 20,24 a 5,66. Etapa 2: nuevos residuos, nuevas medias (−1,8 y +2,7) y predicciones 4,9 y 11,65, MSE = 2,015. <code>GradientBoostingRegressor</code> devuelve exactamente [4,9; 4,9; 4,9; 11,65; 11,65]. Con el clasificador real, un solo árbol pequeño (que aporta solo un 10 % de su propuesta) acierta apenas 0,626, que coincide con la proporción de la clase más frecuente en el test (107 de 171 pacientes son «benignos»): es lo que acertaría un modelo que respondiera siempre «benigno». Con 10 árboles ya hay 0,930 y con 100, <strong>0,936</strong>: cada árbol corrige un poco lo que dejaron los anteriores.</p>
+  </div>
+</article>
+</section>
+
+<section>
+<h2 class="sin-num" id="resto">Código: el resto del módulo</h2>
+<p class="codigo-intro">Aquí tienes el código de todo el módulo: 23 fragmentos que se pueden ejecutar uno a uno, <strong>todos ya ejecutados de verdad</strong> (con Python 3.13, scikit-learn 1.9.1, NumPy 2.5 y XGBoost 3.4.1). Cada uno trae una tabla <strong>línea por línea</strong>: pasa el ratón (o toca) una fila y se iluminan las líneas del código a las que se refiere; también funciona al revés, pasando el ratón por el código. Los fragmentos son independientes entre sí: cada uno incluye sus propios <code>import</code> y sus datos.</p>
+<p class="codigo-intro">Para ejecutarlos necesitas Python con <code>numpy</code>, <code>scikit-learn</code> y <code>xgboost</code> (<code>pip install numpy scikit-learn xgboost</code>), por ejemplo en Jupyter Notebook o Google Colab.</p>
+<p class="codigo-intro"><strong>Sobre los datos.</strong> Los ejercicios originales del curso usan, además de los conjuntos incluidos en scikit-learn, otros que se descargan de internet (como MNIST o California Housing). Este entorno no tenía internet, así que aquí todo corre <strong>sin descargas</strong>, con conjuntos que vienen con scikit-learn (<code>load_iris</code>, <code>load_wine</code>, <code>load_breast_cancer</code>), datos sintéticos con semilla (<code>make_moons</code>, generadores propios) o diez reseñas de películas escritas a mano. Las salidas pueden variar en el último decimal con otras versiones de las librerías, sobre todo en los árboles y en XGBoost.</p>
+<p class="codigo-intro"><strong>Mapa de fragmentos.</strong> Árboles: 1–4 · KNN: 5–7 · SVM: 8–10 · Naive Bayes: 11–12 · Multiclase: 13 · Sesgo y varianza: 14 · Bootstrap, bagging y voting: 15–17 · Random Forest: 18 · AdaBoost: 19 · Gradient Boosting: 20 · XGBoost: 21–22 · Comparación final: 23.</p>
+
+<article class="snippet" data-lang="python">
+  <header>
+    <h3>6 · KNeighborsRegressor: predecir un número promediando vecinos</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Usar KNN para predecir un valor numérico (la media de los vecinos) y ver el efecto de K y de ponderar los vecinos según su cercanía.</p>
+  </header>
+  <pre class="code"><code>import numpy as np
+from sklearn.neighbors import KNeighborsRegressor
+
+x = np.array([[1], [2], [3], [4], [5], [6]])
+y = np.array([10, 12, 11, 30, 32, 31])
+
+for k in (1, 2, 3):
+    knn = KNeighborsRegressor(n_neighbors=k).fit(x, y)
+    print(f"K={k}: predicción para x=3.6 -&gt;", knn.predict([[3.6]]))
+
+ponderado = KNeighborsRegressor(n_neighbors=3, weights="distance").fit(x, y)
+print("K=3 con weights='distance' -&gt;", ponderado.predict([[3.6]]).round(3))</code></pre>
+  <details class="linea-a-linea" open>
+    <summary>Línea por línea</summary>
+    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+      <tbody>
+        <tr data-lines="1"><td><code>import numpy as np</code></td><td>NumPy.</td></tr>
+        <tr data-lines="2"><td><code>from sklearn.neighbors import KNeighborsRegressor</code></td><td>La versión de KNN que predice números en lugar de clases.</td></tr>
+        <tr data-lines="4"><td><code>x = np.array([[1], [2], ...])</code></td><td>Los mismos seis puntos del árbol de regresión (una columna de entrada).</td></tr>
+        <tr data-lines="5"><td><code>y = np.array([10, 12, 11, 30, 32, 31])</code></td><td>El valor a predecir en cada punto.</td></tr>
+        <tr data-lines="7"><td><code>for k in (1, 2, 3):</code></td><td>Probamos tres valores de K.</td></tr>
+        <tr data-lines="8"><td><code>knn = KNeighborsRegressor(n_neighbors=k).fit(x, y)</code></td><td>Crea y «entrena» (guarda los datos) un KNN con K vecinos.</td></tr>
+        <tr data-lines="9"><td><code>print(f"K={k}: predicción para x=3.6 -&gt;", knn.predict([[3.6]]))</code></td><td>Predice para x = 3,6: busca sus K vecinos más cercanos en <code>x</code> y devuelve la <strong>media</strong> de sus valores de <code>y</code>.</td></tr>
+        <tr data-lines="11"><td><code>ponderado = KNeighborsRegressor(n_neighbors=3, weights="distance").fit(x, y)</code></td><td>Con <code>weights="distance"</code> cada vecino pesa proporcionalmente a \(1/\text{distancia}\): los más cercanos mandan más. Por defecto (<code>"uniform"</code>) todos pesan igual.</td></tr>
+        <tr data-lines="12"><td><code>print("K=3 con weights='distance' -&gt;", ....round(3))</code></td><td>Muestra la predicción ponderada con 3 decimales.</td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>K=1: predicción para x=3.6 -&gt; [30.]
+K=2: predicción para x=3.6 -&gt; [20.5]
+K=3: predicción para x=3.6 -&gt; [24.33333333]
+K=3 con weights='distance' -&gt; [23.805]</pre>
+    <p>Los vecinos de 3,6 por orden son x=4 (distancia 0,4; y=30), x=3 (0,6; y=11), x=5 (1,4; y=32) y x=2 (1,6; y=12). <strong>K=1</strong> → 30. <strong>K=2</strong> → (30 + 11) / 2 = 20,5. <strong>K=3</strong> → (30 + 11 + 32) / 3 = 24,33. Con pesos \(1/d\): (2,5·30 + 1,667·11 + 0,714·32) / (2,5 + 1,667 + 0,714) = 23,805. Fíjate en que 3,6 está del lado «alto» (los puntos 4, 5, 6 valen ≈ 30), pero K=3 arrastra el 11 del lado bajo y la predicción queda en el medio de los dos grupos: un K demasiado grande para la zona difumina el salto.</p>
+  </div>
+</article>
+
+<article class="snippet" data-lang="python">
+  <header>
+    <h3>10 · SVR: regresión con SVM y el tubo de epsilon</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Ajustar una curva con una SVM de regresión y ver cómo el parámetro <code>epsilon</code> (el ancho del «tubo» donde los errores no cuestan nada) cambia cuántos puntos sostienen el modelo.</p>
+  </header>
+  <pre class="code"><code>import numpy as np
+from sklearn.svm import SVR
+
+rng = np.random.default_rng(0)
+x_train = np.sort(rng.uniform(0, 6, 60)).reshape(-1, 1)
+y_train = np.sin(x_train).ravel() + rng.normal(0, 0.2, 60)
+x_test = np.sort(rng.uniform(0, 6, 200)).reshape(-1, 1)
+y_test = np.sin(x_test).ravel() + rng.normal(0, 0.2, 200)
+
+print("epsilon | vectores de soporte | MSE train | MSE test")
+for epsilon in (0.01, 0.2, 0.5, 1.0):
+    svr = SVR(kernel="rbf", C=10, gamma=1, epsilon=epsilon).fit(x_train, y_train)
+    mse_tr = np.mean((svr.predict(x_train) - y_train) ** 2)
+    mse_te = np.mean((svr.predict(x_test) - y_test) ** 2)
+    print(f"{epsilon:7.2f} | {len(svr.support_):19d} | {mse_tr:9.3f} | {mse_te:8.3f}")
+
+# Pérdida insensible a epsilon: los errores menores que epsilon no cuestan nada
+errores = np.array([0.1, 0.5, 1.2, -0.3, -0.9])
+epsilon = 0.5
+print("pérdida con epsilon=0.5:", np.maximum(0, np.abs(errores) - epsilon))</code></pre>
+  <details class="linea-a-linea" open>
+    <summary>Línea por línea</summary>
+    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+      <tbody>
+        <tr data-lines="1"><td><code>import numpy as np</code></td><td>NumPy.</td></tr>
+        <tr data-lines="2"><td><code>from sklearn.svm import SVR</code></td><td><code>SVR</code> (Support Vector Regression) es la SVM que predice números.</td></tr>
+        <tr data-lines="4"><td><code>rng = np.random.default_rng(0)</code></td><td>Generador de números aleatorios con semilla 0, para que los datos sean siempre los mismos.</td></tr>
+        <tr data-lines="5"><td><code>x_train = np.sort(rng.uniform(0, 6, 60)).reshape(-1, 1)</code></td><td>60 valores de x al azar entre 0 y 6, ordenados; <code>reshape(-1, 1)</code> los convierte en una columna (la forma que pide scikit-learn).</td></tr>
+        <tr data-lines="6"><td><code>y_train = np.sin(x_train).ravel() + rng.normal(0, 0.2, 60)</code></td><td>El valor real es un seno, al que se le suma ruido gaussiano de desviación 0,2 (medidas imperfectas). <code>ravel()</code> deja el resultado como lista simple.</td></tr>
+        <tr data-lines="7-8"><td><code>x_test, y_test = ...</code></td><td>Otros 200 puntos generados igual, que nunca ve el modelo: servirán de test.</td></tr>
+        <tr data-lines="10"><td><code>print("epsilon | vectores de soporte | MSE train | MSE test")</code></td><td>Cabecera.</td></tr>
+        <tr data-lines="11"><td><code>for epsilon in (0.01, 0.2, 0.5, 1.0):</code></td><td>Cuatro anchos de tubo, de casi cero a muy ancho.</td></tr>
+        <tr data-lines="12"><td><code>svr = SVR(kernel="rbf", C=10, gamma=1, epsilon=epsilon).fit(...)</code></td><td>SVR con kernel RBF y el <code>epsilon</code> elegido. <code>C=10</code> permite que se ajuste con bastante libertad.</td></tr>
+        <tr data-lines="13-14"><td><code>mse_tr / mse_te = np.mean((... - ...) ** 2)</code></td><td>Error cuadrático medio (MSE) en train y en test: la media de (predicción − valor real) al cuadrado.</td></tr>
+        <tr data-lines="15"><td><code>print(f"{epsilon:7.2f} | {len(svr.support_):19d} | ...")</code></td><td><code>svr.support_</code> es la lista de los puntos que sostienen el modelo; su longitud es el número de vectores de soporte.</td></tr>
+        <tr data-lines="17"><td><code># Pérdida insensible a epsilon ...</code></td><td>Comentario.</td></tr>
+        <tr data-lines="18"><td><code>errores = np.array([0.1, 0.5, 1.2, -0.3, -0.9])</code></td><td>Cinco errores inventados (predicción − real) para ver la pérdida a mano.</td></tr>
+        <tr data-lines="19"><td><code>epsilon = 0.5</code></td><td>Un tubo de medio punto a cada lado.</td></tr>
+        <tr data-lines="20"><td><code>print("pérdida con epsilon=0.5:", np.maximum(0, np.abs(errores) - epsilon))</code></td><td>La pérdida del SVR: <code>np.abs</code> quita el signo del error, se resta <code>epsilon</code> y <code>np.maximum(0, ...)</code> deja en 0 lo que quede negativo. Es decir, \(\max(0,\,|e|-\varepsilon)\).</td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>epsilon | vectores de soporte | MSE train | MSE test
+   0.01 |                  57 |     0.037 |    0.053
+   0.20 |                  26 |     0.036 |    0.044
+   0.50 |                   4 |     0.065 |    0.053
+   1.00 |                   3 |     0.279 |    0.245
+pérdida con epsilon=0.5: [0.  0.  0.7 0.  0.4]</pre>
+    <p>Con <code>epsilon=0.01</code> casi cualquier error cuesta y 57 de los 60 puntos acaban siendo vectores de soporte; con <code>0.2</code> (casi el nivel del ruido, 0,2) bastan 26 y el MSE de test es el mejor (0,044); con <code>0.5</code> solo quedan 4 y el error empieza a subir (0,065 train); con <code>1.0</code> quedan 3 y el tubo es tan ancho que la curva se aplana (MSE 0,279 / 0,245). Es decir, epsilon más ancho = modelo más simple y disperso. En la cuenta a mano con epsilon = 0,5: los errores 0,1; 0,5 y −0,3 caen dentro del tubo (0, 0 y 0); 1,2 paga \(1{,}2-0{,}5=0{,}7\) y −0,9 paga \(0{,}9-0{,}5=0{,}4\).</p>
+  </div>
+</article>
+
+<article class="snippet" data-lang="python">
+  <header>
+    <h3>13 · OneVsRestClassifier y OneVsOneClassifier: de binario a multiclase</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Convertir un clasificador que solo sabe distinguir entre dos clases (la regresión logística) en uno de tres clases con las dos estrategias estándar, y ver cuántos modelos binarios hay dentro.</p>
+  </header>
+  <pre class="code"><code>from sklearn.datasets import load_wine
+from sklearn.linear_model import LogisticRegression
+from sklearn.model_selection import train_test_split
+from sklearn.multiclass import OneVsOneClassifier, OneVsRestClassifier
+from sklearn.pipeline import make_pipeline
+from sklearn.preprocessing import StandardScaler
+
+X, y = load_wine(return_X_y=True)                    # 3 tipos de vino, 13 variables
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, stratify=y, random_state=42)
+
+ovr = make_pipeline(StandardScaler(), OneVsRestClassifier(LogisticRegression(max_iter=1000)))
+ovo = make_pipeline(StandardScaler(), OneVsOneClassifier(LogisticRegression(max_iter=1000)))
+ovr.fit(X_train, y_train)
+ovo.fit(X_train, y_train)
+
+modelo_ovr = ovr[-1]
+modelo_ovo = ovo[-1]
+print("OvR -&gt; modelos binarios:", len(modelo_ovr.estimators_), "| test =", round(ovr.score(X_test, y_test), 3))
+print("OvO -&gt; modelos binarios:", len(modelo_ovo.estimators_), "| test =", round(ovo.score(X_test, y_test), 3))
+
+caso = X_test[:1]
+print("puntuaciones OvR (una por clase):", ovr.decision_function(caso).round(2))
+print("puntuaciones OvO (votos + desempate, por clase):", ovo.decision_function(caso).round(2), "-&gt; predicción:", ovo.predict(caso))
+print("con 10 clases haría falta: OvR =", 10, "modelos | OvO =", 10 * 9 // 2, "modelos")</code></pre>
+  <details class="linea-a-linea" open>
+    <summary>Línea por línea</summary>
+    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+      <tbody>
+        <tr data-lines="1"><td><code>from sklearn.datasets import load_wine</code></td><td>Los 178 vinos: 3 variedades, 13 medidas químicas.</td></tr>
+        <tr data-lines="2"><td><code>from sklearn.linear_model import LogisticRegression</code></td><td>La regresión logística del módulo 2: un clasificador binario por naturaleza (en las versiones recientes de scikit-learn ya resuelve multiclase por sí sola; aquí la envolvemos a propósito para ver el mecanismo).</td></tr>
+        <tr data-lines="3"><td><code>from sklearn.model_selection import train_test_split</code></td><td>Reparto train/test.</td></tr>
+        <tr data-lines="4"><td><code>from sklearn.multiclass import OneVsOneClassifier, OneVsRestClassifier</code></td><td>Las dos estrategias. Son «envoltorios»: reciben un clasificador binario y lo repiten las veces necesarias.</td></tr>
+        <tr data-lines="5"><td><code>from sklearn.pipeline import make_pipeline</code></td><td>Para encadenar escalado y modelo.</td></tr>
+        <tr data-lines="6"><td><code>from sklearn.preprocessing import StandardScaler</code></td><td>La regresión logística aprende mejor con las variables escaladas.</td></tr>
+        <tr data-lines="8"><td><code>X, y = load_wine(return_X_y=True)</code></td><td>Variables y etiquetas (0, 1 o 2).</td></tr>
+        <tr data-lines="9"><td><code>X_train, X_test, y_train, y_test = train_test_split(...)</code></td><td>70/30 estratificado con semilla.</td></tr>
+        <tr data-lines="11"><td><code>ovr = make_pipeline(StandardScaler(), OneVsRestClassifier(LogisticRegression(max_iter=1000)))</code></td><td>Pipeline: escala y luego aplica One-vs-Rest. Dentro habrá <strong>un modelo por clase</strong> («esta clase contra todas las demás»). <code>max_iter=1000</code> da más iteraciones al algoritmo de optimización por si necesita más de las predeterminadas.</td></tr>
+        <tr data-lines="12"><td><code>ovo = make_pipeline(StandardScaler(), OneVsOneClassifier(LogisticRegression(max_iter=1000)))</code></td><td>Lo mismo con One-vs-One: <strong>un modelo por cada pareja de clases</strong>, entrenado solo con los datos de esas dos clases.</td></tr>
+        <tr data-lines="13-14"><td><code>ovr.fit(...) / ovo.fit(...)</code></td><td>Entrena los dos pipelines.</td></tr>
+        <tr data-lines="16-17"><td><code>modelo_ovr = ovr[-1] / modelo_ovo = ovo[-1]</code></td><td>Un pipeline se puede indexar como una lista: <code>[-1]</code> es su último paso, es decir, el envoltorio One-vs-Rest o One-vs-One.</td></tr>
+        <tr data-lines="18-19"><td><code>print("OvR -&gt; modelos binarios:", len(modelo_ovr.estimators_), ...)</code></td><td><code>estimators_</code> es la lista de modelos binarios que hay dentro; contamos cuántos son y mostramos el acierto en test.</td></tr>
+        <tr data-lines="21"><td><code>caso = X_test[:1]</code></td><td>Un único vino del test (<code>[:1]</code> deja una tabla de una fila, no una lista suelta).</td></tr>
+        <tr data-lines="22"><td><code>print("puntuaciones OvR ...", ovr.decision_function(caso).round(2))</code></td><td>La puntuación que da cada uno de los tres modelos «clase contra el resto» a ese vino. La mayor gana.</td></tr>
+        <tr data-lines="23"><td><code>print("puntuaciones OvO ...", ovo.decision_function(caso).round(2), "-&gt; predicción:", ovo.predict(caso))</code></td><td>En OvO la puntuación de cada clase son sus <strong>votos</strong> (entre las 3 parejas) más un pequeño término de desempate basado en la confianza de cada modelo.</td></tr>
+        <tr data-lines="24"><td><code>print("con 10 clases haría falta: ...")</code></td><td>Cuenta cuántos modelos pide cada estrategia con 10 clases: \(k\) en OvR y \(k(k-1)/2\) en OvO.</td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>OvR -&gt; modelos binarios: 3 | test = 0.981
+OvO -&gt; modelos binarios: 3 | test = 1.0
+puntuaciones OvR (una por clase): [[ 3.95 -3.86 -7.36]]
+puntuaciones OvO (votos + desempate, por clase): [[ 2.3   1.18 -0.3 ]] -&gt; predicción: [0]
+con 10 clases haría falta: OvR = 10 modelos | OvO = 45 modelos</pre>
+    <p>Con 3 clases las dos estrategias usan 3 modelos binarios (OvR: A-resto, B-resto, C-resto; OvO: A-B, A-C, B-C) y acaban con 0,981 y 1,000 de acierto en test (una diferencia de 1 vino sobre 54). Las puntuaciones OvR del vino de ejemplo son [3,95; −3,86; −7,36]: la clase 0 gana de calle. En OvO sale [2,30; 1,18; −0,30]: la parte entera son los votos (la clase 0 gana sus dos duelos, la 1 gana uno y la 2 ninguno) y la decimal es el desempate. La diferencia grande se ve con muchas clases: con 10 clases OvR necesita 10 modelos y OvO 45 (\(10\cdot 9/2\)), aunque cada modelo OvO se entrena con muchos menos datos.</p>
+  </div>
+</article>
+
+<article class="snippet" data-lang="python">
+  <header>
+    <h3>16 · BaggingClassifier: muchos árboles sobre muestras bootstrap</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Montar un comité de 50 árboles, cada uno entrenado con una muestra bootstrap distinta, y compararlo con un solo árbol; además, estimar el acierto sin tocar el test con la puntuación OOB.</p>
+  </header>
+  <pre class="code"><code>from sklearn.datasets import load_breast_cancer
+from sklearn.ensemble import BaggingClassifier
+from sklearn.model_selection import train_test_split
+from sklearn.tree import DecisionTreeClassifier
+
+X, y = load_breast_cancer(return_X_y=True)
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, stratify=y, random_state=0)
+
+un_arbol = DecisionTreeClassifier(random_state=0).fit(X_train, y_train)
+
+bagging = BaggingClassifier(
+    estimator=DecisionTreeClassifier(),
+    n_estimators=50,
+    max_samples=1.0,
+    bootstrap=True,
+    oob_score=True,
+    random_state=0,
+).fit(X_train, y_train)
+
+print("un solo árbol  -&gt; test =", round(un_arbol.score(X_test, y_test), 3))
+print("bagging (50)   -&gt; test =", round(bagging.score(X_test, y_test), 3), "| OOB =", round(bagging.oob_score_, 3))
+print("árboles en el comité:", len(bagging.estimators_))
+print("datos distintos que vio el árbol 0:", len(set(bagging.estimators_samples_[0])), "de", len(X_train))</code></pre>
+  <details class="linea-a-linea" open>
+    <summary>Línea por línea</summary>
+    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+      <tbody>
+        <tr data-lines="1"><td><code>from sklearn.datasets import load_breast_cancer</code></td><td>El conjunto de tumores usado antes.</td></tr>
+        <tr data-lines="2"><td><code>from sklearn.ensemble import BaggingClassifier</code></td><td>El comité que entrena varias copias de un modelo con muestras bootstrap.</td></tr>
+        <tr data-lines="3"><td><code>from sklearn.model_selection import train_test_split</code></td><td>Reparto train/test.</td></tr>
+        <tr data-lines="4"><td><code>from sklearn.tree import DecisionTreeClassifier</code></td><td>El modelo base que se va a repetir.</td></tr>
+        <tr data-lines="6"><td><code>X, y = load_breast_cancer(return_X_y=True)</code></td><td>Variables y etiquetas.</td></tr>
+        <tr data-lines="7"><td><code>X_train, X_test, y_train, y_test = train_test_split(...)</code></td><td>70/30 estratificado con semilla (el mismo reparto que en el apartado de árboles).</td></tr>
+        <tr data-lines="9"><td><code>un_arbol = DecisionTreeClassifier(random_state=0).fit(X_train, y_train)</code></td><td>El punto de comparación: un único árbol sin límites de profundidad.</td></tr>
+        <tr data-lines="11-18"><td><code>bagging = BaggingClassifier(estimator=..., n_estimators=50, ...).fit(...)</code></td><td>El comité. <code>estimator</code> es el modelo base (un árbol sin límites, que tiene mucha varianza: justo lo que el bagging reduce); <code>n_estimators=50</code> número de árboles; <code>max_samples=1.0</code> cada árbol recibe una muestra del mismo tamaño que el train; <code>bootstrap=True</code> la muestra es con reposición; <code>oob_score=True</code> calcula el acierto con los datos que cada árbol no vio; <code>random_state</code> fija el azar.</td></tr>
+        <tr data-lines="20"><td><code>print("un solo árbol -&gt; test =", ...)</code></td><td>Acierto en test del árbol solo.</td></tr>
+        <tr data-lines="21"><td><code>print("bagging (50) -&gt; test =", ..., "| OOB =", bagging.oob_score_)</code></td><td>Acierto en test del comité y su puntuación OOB: cada dato de train lo votan solo los árboles que <strong>no</strong> lo vieron.</td></tr>
+        <tr data-lines="22"><td><code>print("árboles en el comité:", len(bagging.estimators_))</code></td><td><code>estimators_</code> es la lista de árboles entrenados.</td></tr>
+        <tr data-lines="23"><td><code>print("datos distintos que vio el árbol 0:", len(set(bagging.estimators_samples_[0])), ...)</code></td><td><code>estimators_samples_[0]</code> son las posiciones de datos que usó el árbol 0; con <code>set</code> contamos los distintos.</td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>un solo árbol  -&gt; test = 0.906
+bagging (50)   -&gt; test = 0.936 | OOB = 0.945
+árboles en el comité: 50
+datos distintos que vio el árbol 0: 249 de 398</pre>
+    <p>Un solo árbol saca 0,906 en test; el comité de 50 árboles, <strong>0,936</strong> (+0,030, unos 5 pacientes más de 171). La puntuación OOB es 0,945, calculada sin usar el test: está en la misma zona, así que sirve para estimar el rendimiento. El árbol 0 solo vio 249 pacientes distintos de los 398 de train: 249/398 = 0,626, justo el 63 % que predice la teoría del bootstrap.</p>
+  </div>
+</article>
+
+<article class="snippet" data-lang="python">
+  <header>
+    <h3>17 · VotingClassifier: voto duro (hard) y voto suave (soft)</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Combinar tres modelos de familias distintas (una regresión logística, un KNN y un árbol) en un único comité que vota, y comprobar con honestidad cuánto mejora sobre sus miembros.</p>
+  </header>
+  <pre class="code"><code>import numpy as np
+from sklearn.datasets import make_moons
+from sklearn.ensemble import VotingClassifier
+from sklearn.linear_model import LogisticRegression
+from sklearn.model_selection import train_test_split
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.tree import DecisionTreeClassifier
+
+miembros = [
+    ("logistica", LogisticRegression()),
+    ("knn", KNeighborsClassifier(n_neighbors=7)),
+    ("arbol", DecisionTreeClassifier(max_depth=4, random_state=1)),
+]
+
+# Un reparto: cada miembro por separado y los dos tipos de voto
+X, y = make_moons(n_samples=400, noise=0.35, random_state=1)
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, stratify=y, random_state=1)
+for nombre, modelo in miembros:
+    print(f"{nombre:10s} solo   -&gt; test = {modelo.fit(X_train, y_train).score(X_test, y_test):.3f}")
+duro = VotingClassifier(miembros, voting="hard").fit(X_train, y_train)
+suave = VotingClassifier(miembros, voting="soft").fit(X_train, y_train)
+print(f"voto duro   (hard) -&gt; test = {duro.score(X_test, y_test):.3f}")
+print(f"voto suave  (soft) -&gt; test = {suave.score(X_test, y_test):.3f}")
+
+caso = X_test[:1]
+print("probabilidad de clase 1 de cada miembro:",
+      [round(float(m.predict_proba(caso)[0, 1]), 3) for m in suave.estimators_])
+print("media de probabilidades:", suave.predict_proba(caso)[0].round(3), "-&gt; predice", suave.predict(caso))
+
+# Un solo reparto engaña: repetimos con 20 conjuntos de datos distintos y promediamos
+puntuaciones = {"logistica": [], "knn": [], "arbol": [], "voto suave": []}
+for semilla in range(20):
+    X, y = make_moons(n_samples=400, noise=0.35, random_state=semilla)
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, stratify=y, random_state=semilla)
+    for nombre, modelo in miembros:
+        puntuaciones[nombre].append(modelo.fit(X_train, y_train).score(X_test, y_test))
+    puntuaciones["voto suave"].append(VotingClassifier(miembros, voting="soft").fit(X_train, y_train).score(X_test, y_test))
+for nombre, lista in puntuaciones.items():
+    print(f"media de 20 repartos | {nombre:10s} = {np.mean(lista):.3f}")</code></pre>
+  <details class="linea-a-linea" open>
+    <summary>Línea por línea</summary>
+    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+      <tbody>
+        <tr data-lines="1"><td><code>import numpy as np</code></td><td>NumPy, para promediar al final.</td></tr>
+        <tr data-lines="2"><td><code>from sklearn.datasets import make_moons</code></td><td>Fabrica el problema de las dos lunas (con ruido, para que haya errores inevitables).</td></tr>
+        <tr data-lines="3"><td><code>from sklearn.ensemble import VotingClassifier</code></td><td>El comité por votación: recibe una lista de modelos distintos y combina sus respuestas.</td></tr>
+        <tr data-lines="4"><td><code>from sklearn.linear_model import LogisticRegression</code></td><td>Primer miembro: frontera recta.</td></tr>
+        <tr data-lines="5"><td><code>from sklearn.model_selection import train_test_split</code></td><td>Reparto train/test.</td></tr>
+        <tr data-lines="6"><td><code>from sklearn.neighbors import KNeighborsClassifier</code></td><td>Segundo miembro: decide por vecinos.</td></tr>
+        <tr data-lines="7"><td><code>from sklearn.tree import DecisionTreeClassifier</code></td><td>Tercer miembro: decide con preguntas.</td></tr>
+        <tr data-lines="9-13"><td><code>miembros = [("logistica", ...), ("knn", ...), ("arbol", ...)]</code></td><td>La lista de miembros: parejas (nombre, modelo sin entrenar). Los nombres sirven para identificarlos dentro del comité. Son tres formas distintas de pensar (frontera recta, vecinos, preguntas): eso da <strong>diversidad</strong>, la materia prima de cualquier comité.</td></tr>
+        <tr data-lines="15"><td><code># Un reparto: ...</code></td><td>Comentario.</td></tr>
+        <tr data-lines="16"><td><code>X, y = make_moons(n_samples=400, noise=0.35, random_state=1)</code></td><td>400 puntos con ruido 0,35 y semilla 1.</td></tr>
+        <tr data-lines="17"><td><code>X_train, X_test, y_train, y_test = train_test_split(...)</code></td><td>70/30 estratificado con semilla.</td></tr>
+        <tr data-lines="18-19"><td><code>for nombre, modelo in miembros: print(...)</code></td><td>Entrena cada miembro por separado (<code>fit</code> devuelve el propio modelo, por eso se puede encadenar <code>.score</code>) y muestra su acierto en test.</td></tr>
+        <tr data-lines="20"><td><code>duro = VotingClassifier(miembros, voting="hard").fit(X_train, y_train)</code></td><td>Comité de <strong>voto duro</strong>: cada miembro emite una clase y gana la clase con más votos (con tres miembros y dos clases nunca hay empate).</td></tr>
+        <tr data-lines="21"><td><code>suave = VotingClassifier(miembros, voting="soft").fit(X_train, y_train)</code></td><td>Comité de <strong>voto suave</strong>: se promedian las <em>probabilidades</em> que da cada miembro y gana la clase con mayor probabilidad media. Exige que todos los miembros sepan dar probabilidades (<code>predict_proba</code>).</td></tr>
+        <tr data-lines="22-23"><td><code>print(f"voto duro ...") / print(f"voto suave ...")</code></td><td>Acierto en test de los dos comités.</td></tr>
+        <tr data-lines="25"><td><code>caso = X_test[:1]</code></td><td>Un solo punto del test para ver el voto suave por dentro.</td></tr>
+        <tr data-lines="26-27"><td><code>print("probabilidad de clase 1 de cada miembro:", [...])</code></td><td><code>suave.estimators_</code> son los miembros ya entrenados; a cada uno se le pide la probabilidad de la clase 1 de ese punto (<code>[0, 1]</code>: primera fila, segunda columna).</td></tr>
+        <tr data-lines="28"><td><code>print("media de probabilidades:", ...)</code></td><td>La probabilidad que da el comité: la media de las de sus miembros, y la clase predicha.</td></tr>
+        <tr data-lines="30"><td><code># Un solo reparto engaña: ...</code></td><td>Comentario: un único reparto de datos puede favorecer o perjudicar a alguien por casualidad.</td></tr>
+        <tr data-lines="31"><td><code>puntuaciones = {"logistica": [], ...}</code></td><td>Un diccionario con una lista vacía por modelo para guardar los resultados.</td></tr>
+        <tr data-lines="32"><td><code>for semilla in range(20):</code></td><td>Veinte repeticiones, cada una con unos datos y un reparto distintos.</td></tr>
+        <tr data-lines="33-34"><td><code>X, y = make_moons(...) / X_train, ... = train_test_split(...)</code></td><td>Genera unos datos nuevos y los reparte; la semilla cambia en cada vuelta.</td></tr>
+        <tr data-lines="35-36"><td><code>for nombre, modelo in miembros: ... append(...)</code></td><td>Entrena cada miembro con ese reparto y guarda su acierto en test.</td></tr>
+        <tr data-lines="37"><td><code>puntuaciones["voto suave"].append(VotingClassifier(...).fit(...).score(...))</code></td><td>Hace lo mismo con el comité de voto suave.</td></tr>
+        <tr data-lines="38-39"><td><code>for nombre, lista in puntuaciones.items(): print(...)</code></td><td>Muestra la media de los 20 aciertos de cada modelo (<code>np.mean</code>).</td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>logistica  solo   -&gt; test = 0.817
+knn        solo   -&gt; test = 0.825
+arbol      solo   -&gt; test = 0.825
+voto duro   (hard) -&gt; test = 0.825
+voto suave  (soft) -&gt; test = 0.825
+probabilidad de clase 1 de cada miembro: [0.696, 1.0, 0.957]
+media de probabilidades: [0.116 0.884] -&gt; predice [1]
+media de 20 repartos | logistica  = 0.854
+media de 20 repartos | knn        = 0.876
+media de 20 repartos | arbol      = 0.866
+media de 20 repartos | voto suave = 0.875</pre>
+    <p>En este reparto los tres miembros sacan 0,817; 0,825 y 0,825, y los dos comités <strong>0,825</strong>: empatan con el mejor, no lo superan. Un reparto es poca evidencia, así que repetimos con 20: la regresión logística promedia 0,854, el KNN 0,876, el árbol 0,866 y el <strong>voto suave 0,875</strong>. Conclusión honesta: el comité queda en el nivel del mejor miembro y por encima de la media de los miembros (0,865); su valor no es «ganar siempre» sino que <em>no hace falta saber de antemano cuál es el mejor miembro</em>. Para un punto concreto, los tres miembros dan 0,696; 1,0 y 0,957 de probabilidad de clase 1 y el comité promedia (0,696 + 1,0 + 0,957) / 3 = 0,884, de modo que predice la clase 1. Si los miembros cometen los mismos errores, votar no arregla nada: por eso el bagging fabrica diversidad.</p>
+  </div>
+</article>
+
+<article class="snippet" data-lang="python">
+  <header>
+    <h3>21 · XGBClassifier: regularización, submuestreo y early stopping</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Entrenar un XGBoost con sus hiperparámetros más importantes y dejar que pare solo cuando el error en un conjunto de validación deja de mejorar (early stopping).</p>
+  </header>
+  <pre class="code"><code>import numpy as np
 from sklearn.datasets import load_breast_cancer
 from sklearn.model_selection import train_test_split
 from xgboost import XGBClassifier
@@ -502,37 +882,192 @@ print("P(clase 1) de los 3 primeros:", modelo.predict_proba(X_test[:3])[:, 1].ro
 orden = np.argsort(modelo.feature_importances_)[::-1][:3]
 for i in orden:
     print(f"{datos.feature_names[i]:25s} {modelo.feature_importances_[i]:.3f}")</code></pre>
-<details class="linea-a-linea" open="">
-<summary>Línea por línea</summary>
-<p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
-<table class="lineas">
-<thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
-<tbody>
-<tr data-lines="1"><td><code>import numpy as np</code></td><td>NumPy.</td></tr>
-<tr data-lines="2"><td><code>from sklearn.datasets import load_breast_cancer</code></td><td>Datos reales.</td></tr>
-<tr data-lines="3"><td><code>from sklearn.model_selection import train_test_split</code></td><td>Reparto de datos.</td></tr>
-<tr data-lines="4"><td><code>from xgboost import XGBClassifier</code></td><td>Importa el clasificador de la librería XGBoost (se instala aparte: <code>pip install xgboost</code>). Se usa igual que los modelos de scikit-learn: <code>fit</code>, <code>predict</code>, <code>score</code>.</td></tr>
-<tr data-lines="6"><td><code>datos = load_breast_cancer()</code></td><td>Carga los datos.</td></tr>
-<tr data-lines="7-9"><td><code>X_train, X_test, y_train, y_test = train_test_split(...)</code></td><td>Reserva el 30 % como test final que no se toca.</td></tr>
-<tr data-lines="10"><td><code>X_fit, X_val, y_fit, y_val = train_test_split(X_train, y_train, ...)</code></td><td>Del train sale otro trozo del 20 %: el conjunto de <strong>validación</strong>, con el que XGBoost vigilará si sigue mejorando. Así el test queda intacto.</td></tr>
-<tr data-lines="12-23"><td><code>modelo = XGBClassifier(...)</code></td><td><code>n_estimators=500</code> máximo de árboles; <code>learning_rate=0.05</code> cada árbol aporta un 5 %; <code>max_depth=3</code> árboles pequeños; <code>subsample=0.8</code> cada árbol se entrena con un 80 % de las filas; <code>colsample_bytree=0.8</code> y con un 80 % de las columnas; <code>reg_lambda=1.0</code> penalización L2 sobre el valor de las hojas; <code>eval_metric="logloss"</code> métrica que vigila en validación; <code>early_stopping_rounds=20</code> para si en 20 rondas seguidas no mejora; <code>n_jobs=1</code> un solo núcleo; <code>random_state=0</code> semilla.</td></tr>
-<tr data-lines="24"><td><code>modelo.fit(X_fit, y_fit, eval_set=[(X_val, y_val)], verbose=False)</code></td><td>Entrena con los datos de <code>fit</code> y le pasa la validación en <code>eval_set</code>. <code>verbose=False</code> evita que escriba una línea por ronda.</td></tr>
-<tr data-lines="26"><td><code>print("rondas ejecutadas:", ..., "| mejor iteración:", modelo.best_iteration)</code></td><td>Cuántas rondas hizo antes de parar (<code>num_boosted_rounds()</code>) y cuál fue la mejor según la validación (<code>best_iteration</code>).</td></tr>
-<tr data-lines="27"><td><code>print("test =", round(modelo.score(X_test, y_test), 3))</code></td><td>Acierto en el test final.</td></tr>
-<tr data-lines="28"><td><code>print("P(clase 1) de los 3 primeros:", modelo.predict_proba(X_test[:3])[:, 1].round(3))</code></td><td>Probabilidad de la clase 1 de los tres primeros pacientes del test (<code>[:, 1]</code> es la segunda columna: la de la clase 1).</td></tr>
-<tr data-lines="29"><td><code>orden = np.argsort(modelo.feature_importances_)[::-1][:3]</code></td><td>Las posiciones de las 3 variables más importantes.</td></tr>
-<tr data-lines="30-31"><td><code>for i in orden: print(...)</code></td><td>Su nombre y su importancia.</td></tr>
-</tbody>
-</table>
-</details>
-<div class="salida">
-<strong>Salida esperada</strong>
-<pre>rondas ejecutadas: 178 | mejor iteración: 157
+  <details class="linea-a-linea" open>
+    <summary>Línea por línea</summary>
+    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+      <tbody>
+        <tr data-lines="1"><td><code>import numpy as np</code></td><td>NumPy.</td></tr>
+        <tr data-lines="2"><td><code>from sklearn.datasets import load_breast_cancer</code></td><td>Datos reales.</td></tr>
+        <tr data-lines="3"><td><code>from sklearn.model_selection import train_test_split</code></td><td>Reparto de datos.</td></tr>
+        <tr data-lines="4"><td><code>from xgboost import XGBClassifier</code></td><td>Importa el clasificador de la librería XGBoost (se instala aparte: <code>pip install xgboost</code>). Se usa igual que los modelos de scikit-learn: <code>fit</code>, <code>predict</code>, <code>score</code>.</td></tr>
+        <tr data-lines="6"><td><code>datos = load_breast_cancer()</code></td><td>Carga los datos.</td></tr>
+        <tr data-lines="7-9"><td><code>X_train, X_test, y_train, y_test = train_test_split(...)</code></td><td>Reserva el 30 % como test final que no se toca.</td></tr>
+        <tr data-lines="10"><td><code>X_fit, X_val, y_fit, y_val = train_test_split(X_train, y_train, ...)</code></td><td>Del train sale otro trozo del 20 %: el conjunto de <strong>validación</strong>, con el que XGBoost vigilará si sigue mejorando. Así el test queda intacto.</td></tr>
+        <tr data-lines="12-23"><td><code>modelo = XGBClassifier(...)</code></td><td><code>n_estimators=500</code> máximo de árboles; <code>learning_rate=0.05</code> cada árbol aporta un 5 %; <code>max_depth=3</code> árboles pequeños; <code>subsample=0.8</code> cada árbol se entrena con un 80 % de las filas; <code>colsample_bytree=0.8</code> y con un 80 % de las columnas; <code>reg_lambda=1.0</code> penalización L2 sobre el valor de las hojas; <code>eval_metric="logloss"</code> métrica que vigila en validación; <code>early_stopping_rounds=20</code> para si en 20 rondas seguidas no mejora; <code>n_jobs=1</code> un solo núcleo; <code>random_state=0</code> semilla.</td></tr>
+        <tr data-lines="24"><td><code>modelo.fit(X_fit, y_fit, eval_set=[(X_val, y_val)], verbose=False)</code></td><td>Entrena con los datos de <code>fit</code> y le pasa la validación en <code>eval_set</code>. <code>verbose=False</code> evita que escriba una línea por ronda.</td></tr>
+        <tr data-lines="26"><td><code>print("rondas ejecutadas:", ..., "| mejor iteración:", modelo.best_iteration)</code></td><td>Cuántas rondas hizo antes de parar (<code>num_boosted_rounds()</code>) y cuál fue la mejor según la validación (<code>best_iteration</code>).</td></tr>
+        <tr data-lines="27"><td><code>print("test =", round(modelo.score(X_test, y_test), 3))</code></td><td>Acierto en el test final.</td></tr>
+        <tr data-lines="28"><td><code>print("P(clase 1) de los 3 primeros:", modelo.predict_proba(X_test[:3])[:, 1].round(3))</code></td><td>Probabilidad de la clase 1 de los tres primeros pacientes del test (<code>[:, 1]</code> es la segunda columna: la de la clase 1).</td></tr>
+        <tr data-lines="29"><td><code>orden = np.argsort(modelo.feature_importances_)[::-1][:3]</code></td><td>Las posiciones de las 3 variables más importantes.</td></tr>
+        <tr data-lines="30-31"><td><code>for i in orden: print(...)</code></td><td>Su nombre y su importancia.</td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>rondas ejecutadas: 178 | mejor iteración: 157
 test = 0.947
 P(clase 1) de los 3 primeros: [0.004 0.996 0.003]
 worst perimeter           0.311
 mean concave points       0.158
 worst concave points      0.102</pre>
-<p>Aunque se permitían 500 árboles, el modelo paró en la ronda 178: la mejor fue la iteración 157 (se numeran desde 0, así que es el árbol número 158) y, tras 20 rondas más sin mejorar en validación, <code>early_stopping_rounds</code> cortó el entrenamiento: 158 + 20 = 178 rondas ejecutadas. El acierto en test es 0,947. Las probabilidades de los tres primeros pacientes (0,004; 0,996; 0,003) son muy decididas. La variable más importante es <code>worst perimeter</code> (0,311), seguida de <code>mean concave points</code> (0,158). Nota: las importancias de XGBoost y las de Random Forest se calculan distinto y no son comparables entre sí.</p>
+    <p>Aunque se permitían 500 árboles, el modelo paró en la ronda 178: la mejor fue la iteración 157 (se numeran desde 0, así que es el árbol número 158) y, tras 20 rondas más sin mejorar en validación, <code>early_stopping_rounds</code> cortó el entrenamiento: 158 + 20 = 178 rondas ejecutadas. El acierto en test es 0,947. Las probabilidades de los tres primeros pacientes (0,004; 0,996; 0,003) son muy decididas. La variable más importante es <code>worst perimeter</code> (0,311), seguida de <code>mean concave points</code> (0,158). Nota: las importancias de XGBoost y las de Random Forest se calculan distinto y no son comparables entre sí.</p>
+  </div>
+</article>
+
+<article class="snippet" data-lang="python">
+  <header>
+    <h3>22 · XGBoost por dentro: el efecto de lambda en el valor de las hojas</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Ver con números que la regularización \(\lambda\) de XGBoost «encoge» el valor de cada hoja hacia la predicción inicial, y reproducir a mano el valor exacto de las hojas.</p>
+  </header>
+  <pre class="code"><code>import numpy as np
+from xgboost import XGBRegressor
+
+x = np.array([[1], [2], [3], [4], [5]])
+y = np.array([3, 5, 4, 12, 14.0])                   # los 5 puntos de Gradient Boosting; la media es 7.6
+
+for lam in (0, 1, 5):
+    modelo = XGBRegressor(n_estimators=1, learning_rate=1.0, max_depth=1, reg_lambda=lam,
+                          base_score=y.mean(), min_child_weight=0, n_jobs=1, random_state=0)
+    modelo.fit(x, y)
+    hoja_izq, hoja_dcha = modelo.predict(x)[[0, 4]]
+    print(f"lambda={lam} -&gt; hoja izquierda = {hoja_izq:.3f} | hoja derecha = {hoja_dcha:.3f}")
+
+# A mano: valor de la hoja = media del residuo * n / (n + lambda)
+residuos = y - y.mean()
+for lam in (0, 1, 5):
+    izq = residuos[:3].sum() / (3 + lam)
+    dcha = residuos[3:].sum() / (2 + lam)
+    print(f"a mano lambda={lam}: {y.mean() + izq:.3f} | {y.mean() + dcha:.3f}")</code></pre>
+  <details class="linea-a-linea" open>
+    <summary>Línea por línea</summary>
+    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+      <tbody>
+        <tr data-lines="1"><td><code>import numpy as np</code></td><td>NumPy.</td></tr>
+        <tr data-lines="2"><td><code>from xgboost import XGBRegressor</code></td><td>La versión de XGBoost para predecir números.</td></tr>
+        <tr data-lines="4"><td><code>x = np.array([[1], [2], [3], [4], [5]])</code></td><td>Los cinco puntos del ejemplo de Gradient Boosting.</td></tr>
+        <tr data-lines="5"><td><code>y = np.array([3, 5, 4, 12, 14.0])</code></td><td>Su valor a predecir; la media es 7,6.</td></tr>
+        <tr data-lines="7"><td><code>for lam in (0, 1, 5):</code></td><td>Probamos tres valores de lambda: sin regularización, moderada y fuerte.</td></tr>
+        <tr data-lines="8-9"><td><code>modelo = XGBRegressor(n_estimators=1, learning_rate=1.0, max_depth=1, reg_lambda=lam, base_score=y.mean(), min_child_weight=0, ...)</code></td><td>Un único árbol de una pregunta con <code>learning_rate=1.0</code> (el árbol entero se acepta, sin reducirlo) para ver sus hojas sin disfraz. <code>reg_lambda=lam</code> es la regularización L2; <code>base_score=y.mean()</code> fija la predicción inicial en la media (7,6); <code>min_child_weight=0</code> permite hojas pequeñas, que por defecto se prohíben.</td></tr>
+        <tr data-lines="10"><td><code>modelo.fit(x, y)</code></td><td>Entrena.</td></tr>
+        <tr data-lines="11"><td><code>hoja_izq, hoja_dcha = modelo.predict(x)[[0, 4]]</code></td><td>Predice los 5 puntos y se queda con el primero y el último: uno de cada hoja. <code>[[0, 4]]</code> selecciona varias posiciones a la vez.</td></tr>
+        <tr data-lines="12"><td><code>print(f"lambda={lam} -&gt; hoja izquierda = ... | hoja derecha = ...")</code></td><td>Valor que predice cada hoja.</td></tr>
+        <tr data-lines="14"><td><code># A mano: ...</code></td><td>Comentario con la fórmula: valor de la hoja = suma de residuos / (n + λ).</td></tr>
+        <tr data-lines="15"><td><code>residuos = y - y.mean()</code></td><td>Residuos respecto a la predicción inicial.</td></tr>
+        <tr data-lines="16"><td><code>for lam in (0, 1, 5):</code></td><td>Los mismos tres valores de lambda.</td></tr>
+        <tr data-lines="17"><td><code>izq = residuos[:3].sum() / (3 + lam)</code></td><td>Hoja izquierda (tres primeros puntos): suma de sus residuos dividida entre \(n+\lambda\), con n = 3.</td></tr>
+        <tr data-lines="18"><td><code>dcha = residuos[3:].sum() / (2 + lam)</code></td><td>Hoja derecha (los dos últimos puntos), con n = 2.</td></tr>
+        <tr data-lines="19"><td><code>print(f"a mano lambda={lam}: {y.mean() + izq:.3f} | {y.mean() + dcha:.3f}")</code></td><td>Predicción final = predicción inicial + valor de la hoja.</td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>lambda=0 -&gt; hoja izquierda = 4.000 | hoja derecha = 13.000
+lambda=1 -&gt; hoja izquierda = 4.900 | hoja derecha = 11.200
+lambda=5 -&gt; hoja izquierda = 6.250 | hoja derecha = 9.143
+a mano lambda=0: 4.000 | 13.000
+a mano lambda=1: 4.900 | 11.200
+a mano lambda=5: 6.250 | 9.143</pre>
+    <p>Con \(\lambda=0\) las hojas valen 4,000 y 13,000: la media de los puntos de cada lado (3, 5, 4 → 4; 12, 14 → 13). Al subir lambda las dos hojas se <strong>acercan a la media global 7,6</strong>: con \(\lambda=1\) valen 4,900 y 11,200; con \(\lambda=5\), 6,250 y 9,143. El cálculo a mano coincide en las seis cifras. Mira la hoja derecha con \(\lambda=1\): suma de residuos \(4{,}4+6{,}4=10{,}8\), dividida entre \(2+1=3\) da 3,6 y \(7{,}6+3{,}6=11{,}2\). Las hojas con pocos datos (la derecha tiene solo 2) se encogen más: lambda frena justo lo que provoca sobreajuste, las hojas decididas por muy pocos puntos.</p>
+  </div>
+</article>
+
+<article class="snippet" data-lang="python">
+  <header>
+    <h3>23 · Comparación final: nueve modelos, un conjunto de datos, un mismo reparto</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Poner a competir todos los algoritmos del módulo sobre los mismos datos y el mismo reparto, para comparar con equidad y sin sacar conclusiones exageradas.</p>
+  </header>
+  <pre class="code"><code>from sklearn.datasets import load_breast_cancer
+from sklearn.ensemble import AdaBoostClassifier, GradientBoostingClassifier, RandomForestClassifier
+from sklearn.linear_model import LogisticRegression
+from sklearn.model_selection import train_test_split
+from sklearn.naive_bayes import GaussianNB
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.pipeline import make_pipeline
+from sklearn.preprocessing import StandardScaler
+from sklearn.svm import SVC
+from sklearn.tree import DecisionTreeClassifier
+from xgboost import XGBClassifier
+
+X, y = load_breast_cancer(return_X_y=True)
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.25, stratify=y, random_state=42)
+
+modelos = {
+    "Regresión logística": make_pipeline(StandardScaler(), LogisticRegression(max_iter=1000)),
+    "KNN (K=5)": make_pipeline(StandardScaler(), KNeighborsClassifier(n_neighbors=5)),
+    "SVM (RBF)": make_pipeline(StandardScaler(), SVC(kernel="rbf", C=1)),
+    "Naive Bayes": GaussianNB(),
+    "Árbol (depth=4)": DecisionTreeClassifier(max_depth=4, random_state=42),
+    "Random Forest": RandomForestClassifier(n_estimators=300, random_state=42),
+    "AdaBoost": AdaBoostClassifier(n_estimators=200, random_state=42),
+    "Gradient Boosting": GradientBoostingClassifier(random_state=42),
+    "XGBoost": XGBClassifier(n_estimators=300, learning_rate=0.1, max_depth=3, n_jobs=1, random_state=42),
+}
+
+print(f"{'modelo':20s} | train | test")
+for nombre, modelo in modelos.items():
+    modelo.fit(X_train, y_train)
+    print(f"{nombre:20s} | {modelo.score(X_train, y_train):.3f} | {modelo.score(X_test, y_test):.3f}")</code></pre>
+  <details class="linea-a-linea" open>
+    <summary>Línea por línea</summary>
+    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+      <tbody>
+        <tr data-lines="1"><td><code>from sklearn.datasets import load_breast_cancer</code></td><td>Los datos: 569 tumores, 30 variables, 2 clases.</td></tr>
+        <tr data-lines="2"><td><code>from sklearn.ensemble import AdaBoostClassifier, GradientBoostingClassifier, RandomForestClassifier</code></td><td>Los tres comités de scikit-learn.</td></tr>
+        <tr data-lines="3"><td><code>from sklearn.linear_model import LogisticRegression</code></td><td>La regresión logística del módulo 2, como referencia sencilla.</td></tr>
+        <tr data-lines="4"><td><code>from sklearn.model_selection import train_test_split</code></td><td>Reparto de datos.</td></tr>
+        <tr data-lines="5"><td><code>from sklearn.naive_bayes import GaussianNB</code></td><td>Naive Bayes gaussiano.</td></tr>
+        <tr data-lines="6"><td><code>from sklearn.neighbors import KNeighborsClassifier</code></td><td>KNN.</td></tr>
+        <tr data-lines="7"><td><code>from sklearn.pipeline import make_pipeline</code></td><td>Para encadenar escalado + modelo.</td></tr>
+        <tr data-lines="8"><td><code>from sklearn.preprocessing import StandardScaler</code></td><td>El escalador.</td></tr>
+        <tr data-lines="9"><td><code>from sklearn.svm import SVC</code></td><td>La SVM.</td></tr>
+        <tr data-lines="10"><td><code>from sklearn.tree import DecisionTreeClassifier</code></td><td>El árbol.</td></tr>
+        <tr data-lines="11"><td><code>from xgboost import XGBClassifier</code></td><td>XGBoost.</td></tr>
+        <tr data-lines="13"><td><code>X, y = load_breast_cancer(return_X_y=True)</code></td><td>Variables y etiquetas.</td></tr>
+        <tr data-lines="14"><td><code>X_train, X_test, y_train, y_test = train_test_split(..., test_size=0.25, ...)</code></td><td><strong>Un único reparto</strong> 75/25 estratificado y con semilla para todos los modelos: es lo que hace justa la comparación.</td></tr>
+        <tr data-lines="16"><td><code>modelos = {</code></td><td>Un diccionario «nombre → modelo» con los nueve competidores.</td></tr>
+        <tr data-lines="17"><td><code>"Regresión logística": make_pipeline(StandardScaler(), LogisticRegression(max_iter=1000)),</code></td><td>Regresión logística con escalado.</td></tr>
+        <tr data-lines="18"><td><code>"KNN (K=5)": make_pipeline(StandardScaler(), KNeighborsClassifier(n_neighbors=5)),</code></td><td>KNN con escalado y 5 vecinos.</td></tr>
+        <tr data-lines="19"><td><code>"SVM (RBF)": make_pipeline(StandardScaler(), SVC(kernel="rbf", C=1)),</code></td><td>SVM de kernel RBF con escalado.</td></tr>
+        <tr data-lines="20"><td><code>"Naive Bayes": GaussianNB(),</code></td><td>Naive Bayes sin escalar (no usa distancias).</td></tr>
+        <tr data-lines="21"><td><code>"Árbol (depth=4)": DecisionTreeClassifier(max_depth=4, random_state=42),</code></td><td>Un árbol limitado a 4 niveles, sin escalar.</td></tr>
+        <tr data-lines="22"><td><code>"Random Forest": RandomForestClassifier(n_estimators=300, random_state=42),</code></td><td>Bosque de 300 árboles.</td></tr>
+        <tr data-lines="23"><td><code>"AdaBoost": AdaBoostClassifier(n_estimators=200, random_state=42),</code></td><td>AdaBoost con 200 rondas (stumps por defecto).</td></tr>
+        <tr data-lines="24"><td><code>"Gradient Boosting": GradientBoostingClassifier(random_state=42),</code></td><td>Gradient Boosting con sus valores por defecto (100 árboles de profundidad 3, η = 0,1).</td></tr>
+        <tr data-lines="25"><td><code>"XGBoost": XGBClassifier(n_estimators=300, learning_rate=0.1, max_depth=3, ...),</code></td><td>XGBoost con 300 árboles.</td></tr>
+        <tr data-lines="26"><td><code>}</code></td><td>Cierra el diccionario.</td></tr>
+        <tr data-lines="28"><td><code>print(f"{'modelo':20s} | train | test")</code></td><td>Cabecera de la tabla.</td></tr>
+        <tr data-lines="29"><td><code>for nombre, modelo in modelos.items():</code></td><td>Recorre el diccionario: <code>items()</code> da cada pareja (nombre, modelo).</td></tr>
+        <tr data-lines="30"><td><code>modelo.fit(X_train, y_train)</code></td><td>Entrena el modelo con el mismo train.</td></tr>
+        <tr data-lines="31"><td><code>print(f"{nombre:20s} | {modelo.score(X_train, y_train):.3f} | {modelo.score(X_test, y_test):.3f}")</code></td><td>Acierto en train y en test.</td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>modelo               | train | test
+Regresión logística  | 0.988 | 0.986
+KNN (K=5)            | 0.969 | 0.979
+SVM (RBF)            | 0.979 | 0.979
+Naive Bayes          | 0.946 | 0.937
+Árbol (depth=4)      | 0.988 | 0.944
+Random Forest        | 1.000 | 0.958
+AdaBoost             | 1.000 | 0.972
+Gradient Boosting    | 1.000 | 0.958
+XGBoost              | 1.000 | 0.965</pre>
+    <p>Resultado, con 143 pacientes de test (cada uno vale 0,007): <strong>Regresión logística 0,986</strong>, KNN 0,979, SVM 0,979, AdaBoost 0,972, XGBoost 0,965, Random Forest 0,958, Gradient Boosting 0,958, árbol 0,944 y Naive Bayes 0,937. Tres lecturas: (1) los modelos más simples (logística, KNN, SVM sobre variables escaladas) ganan o empatan con los comités: en este conjunto pequeño y casi lineal no hacía falta más potencia; no existe un algoritmo mejor para todo. (2) Random Forest, AdaBoost, Gradient Boosting y XGBoost sacan 1,000 en train: se ajustan por completo al entrenamiento, y la brecha con el test es lo que mide su sobreajuste. (3) Entre 0,986 y 0,937 hay solo 7 pacientes de diferencia: con un único reparto, los puestos intermedios son casi un empate técnico (en el módulo 5 verás cómo compararlos con validación cruzada).</p>
+  </div>
+</article>
+</section>
+
 </div>
-</article></div></details></div></main></body></html>
+</main>
+</body>
+</html>

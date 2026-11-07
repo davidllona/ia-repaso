@@ -1,173 +1,365 @@
-<!DOCTYPE html>
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lección 4 · Un autoencoder no lineal sigue curvas que PCA no puede, pero no siempre gana · Módulo 5 · Curso 2 · Cuaderno de IA</title>
+<meta name="description" content="Autoencoder frente a PCA: lineal o no lineal, cuándo compensa cada uno, para qué sirve el encoder solo y qué son las RBM.">
+<script>try{var t=localStorage.getItem('cuaderno-ia:tema');if(t)document.documentElement.setAttribute('data-theme',t)}catch(e){}</script>
+<link rel="stylesheet" href="../../assets/css/style.css">
+<script src="../../assets/js/curriculum.js"></script>
+<script src="../../assets/js/lab.js"></script>
+<script src="../../assets/js/app.js" defer></script>
+</head>
+<body data-root="../../" data-course="2" data-module="5" data-lesson="4">
+<main>
+<div class="page">
 
-<html lang="es"><head><meta charset="utf-8"/><meta content="width=device-width,initial-scale=1" name="viewport"/><title>Lección 4 · Autoencoder con ruido: quitar el ruido de las imágenes · Curso 2 · Cuaderno de IA</title><meta content="Sí, y es una de las aplicaciones más famosas: el denoising autoencoder (autoencoder para quitar ruido)." name="description"/><script>try{var t=localStorage.getItem('cuaderno-ia:tema');if(t)document.documentElement.setAttribute('data-theme',t)}catch(e){}</script><link href="../../assets/css/style.css" rel="stylesheet"/><script src="../../assets/js/curriculum.js"></script><script src="../../assets/js/lab.js"></script><script defer="" src="../../assets/js/app.js"></script><script defer="" src="../../assets/js/microanimations.js"></script></head><body data-course="2" data-lesson="4" data-module="5" data-root="../../"><main><div class="page" data-micro="3min"><header class="hero leccion"><div class="hero-grid"><div><p class="eyebrow">Curso 2 · Módulo 5 · Lección 4 de 21</p><h1>Autoencoder con ruido: quitar el ruido de las imágenes</h1><p class="lead">Sí, y es una de las aplicaciones más famosas: el denoising autoencoder (autoencoder para quitar ruido).</p><p class="meta-line"><span class="read-time" data-render="read-time"></span><a href="../modulo-5.html">Índice del módulo</a></p></div><div aria-hidden="true" class="hero-tile"></div></div></header><details class="predice"><summary>Antes de mirar el ejemplo: ¿qué crees que va a cambiar al mover los controles?</summary><div><p>Sí, y es una de las aplicaciones más famosas: el denoising autoencoder (autoencoder para quitar ruido).</p></div></details><section aria-label="Explicación breve" class="micro-core"><div class="micro-kicker">01 · ENTENDER <span>≈ 45 s</span></div><h2>La idea en palabras sencillas</h2><p>Sí, y es una de las aplicaciones más famosas: el denoising autoencoder (autoencoder para quitar ruido).</p><div class="micro-example"><span aria-hidden="true" class="micro-example-icon">💡</span><div><strong>Otro ejemplo · Diseño</strong><p>Con ejemplos de diseños, un modelo puede crear variaciones nuevas sin copiar un ejemplo entero.</p></div></div></section><div class="micro-kicker micro-checkpoint">02 · RESPONDER <span>≈ 15 s</span></div><section aria-label="Pregunta intercalada" class="quiz mini micro-check"><script class="quiz-data" type="application/json">{"titulo": "Pausa rápida · Comprueba la idea", "preguntas": [{"q": "¿Cuál es el objetivo típico de un autoencoder?", "opciones": ["Calcular solo medias", "Reconstruir la entrada a partir de una representación comprimida", "Clasificar siempre en tres clases"], "correcta": 1, "porque": "El encoder comprime y el decoder reconstruye."}]}</script></section><section aria-label="Animación interactiva" class="micro-viz" data-index="11" data-micro-viz="generative"><div class="micro-kicker">03 · EXPERIMENTAR <span>≈ 45 s</span></div><div class="micro-viz-title"><div><h2>Del ruido a una estructura</h2><p>Avanza la transformación y observa cómo emerge un patrón.</p></div><span aria-hidden="true" class="micro-viz-symbol">✦</span></div><div aria-live="polite" class="micro-viz-stage"><p>Animación interactiva: Del ruido a una estructura</p></div></section><div class="micro-kicker micro-checkpoint">04 · APLICAR <span>≈ 15 s</span></div><section aria-label="Pregunta intercalada" class="quiz mini micro-check"><script class="quiz-data" type="application/json">{"titulo": "Pausa rápida · ¿Lo aplicarías?", "preguntas": [{"q": "¿Qué es el bottleneck?", "opciones": ["La parte de representación comprimida", "Un optimizador de Keras", "Una carpeta de TEST"], "correcta": 0, "porque": "El cuello de botella fuerza una representación más compacta."}]}</script></section><div class="micro-finish"><strong>Idea que te llevas</strong><span>Sí, y es una de las aplicaciones más famosas: el denoising autoencoder (autoencoder para quitar ruido)</span><small>¿Quieres más ejemplos, fórmulas o código? Los tienes justo debajo, sin límite de tiempo.</small></div><details class="profundizar micro-legacy"><summary><span>Explorar más: explicación y simulaciones completas<small>Todo el texto original, tablas y demos avanzadas. Opcional.</small></span></summary><div class="prof-body"><section><h2>Autoencoder con ruido: quitar el ruido de las imágenes</h2>
-<p>Sí, y es una de las aplicaciones más famosas: el <strong>denoising autoencoder</strong> (autoencoder para quitar ruido). El truco consiste en <strong>cambiar una sola cosa del entrenamiento</strong>: la entrada es la imagen <em>con ruido</em> y el objetivo es la imagen <em>limpia</em>.</p>
-<p>Como el cuello de botella no puede guardar cada píxel, solo conserva la estructura que se repite en <em>todas</em> las imágenes (aquí: «hay un rectángulo»). El ruido es distinto en cada imagen, no sigue ninguna regla, así que no cabe en el pasillo: se queda fuera. Y como el objetivo es la imagen limpia, la red aprende a producirla.</p>
-<p>Partimos de las imágenes limpias <code>clean</code> (valores 0 y 1). Se crea una matriz de ruido <code>noise</code> con la misma forma, donde cada número se sortea de una <strong>distribución normal</strong> (la campana de Gauss) con <em>media</em> 0 y <em>desviación típica</em> 0,25. Se suman y, como una imagen no puede valer menos de 0 ni más de 1, se «recorta» con <code>np.clip</code>:</p>
-<ul class="flow">
-<li class="d">Imagen limpia<small>es el objetivo</small></li>
-<li class="c">+ ruido<small>«nieve» de TV, a mano</small></li>
-<li class="a">Imagen ruidosa<small>es la entrada</small></li>
-<li class="b">Autoencoder<small>comprime y reconstruye</small></li>
-<li class="d">Salida<small>se compara con la limpia</small></li>
-</ul>
-<div class="callout ejemplo"><span class="lbl">Ejemplo tomado del módulo</span><p>: tres píxeles de un póster, con valores elegidos para el ejemplo Píxel Limpio Ruido Suma Tras clip Error² (con el limpio) A (fondo oscuro) 0 +0,10 0,10 0,10 0,0100 B (fondo oscuro) 0 −0,20 −0,20 0 0 C (recuadro del título) 1 +0,30 1,30 1…</p></div></section><figure class="demo" data-demo="curso2/c2m5-denoising" data-titulo="Quitar ruido: lo que entra, lo que sale">
-<div class="haz">Espera a que termine el entrenamiento (120 épocas, unos segundos). Mira las filas «pósters con ruido» y «salida del autoencoder» (la fila de arriba es el póster limpio que queremos recuperar). Sube el slider del ruido de prueba hasta 0,60 (más del que vio al entrenar) y luego bájalo a 0. Después pulsa «entrada limpia → objetivo limpio» y compara el número «veces menos».</div>
-<div class="observa">Entrenado con ruido σ = 0,25, el autoencoder reduce el error unas 7 veces con σ = 0,25 (0,031 → 0,004). Con σ = 0,60 todavía mejora (≈ 2,6 veces) pero la imagen sale peor: <strong>nunca vio un ruido tan fuerte</strong>. Con σ = 0 (imagen sin ruido) «no mejora»: ya no hay nada que quitar y la reconstrucción añade su pequeño error propio. Y fíjate en el último experimento: incluso entrenado <em>sin</em> ruido, el autoencoder quita algo (≈ 3 veces), porque el cuello de botella ya filtra lo que no es estructura; pero entrenarlo con ruido lo hace claramente mejor.</div>
-</figure><div class="resumen"><h2 class="sin-num sin-toc">En pocas líneas</h2><ul><li><strong>Autoencoder con ruido: quitar el ruido de las imágenes:</strong> Sí, y es una de las aplicaciones más famosas: el denoising autoencoder (autoencoder para quitar ruido).</li><li>Antes de continuar, intenta explicar la demo sin mirar su resultado.</li></ul></div><section class="quiz mini"><script class="quiz-data" type="application/json">{"titulo": "¿Lo tienes?", "preguntas": [{"q": "¿Qué concepto estamos trabajando en esta lección?", "opciones": ["Autoencoder con ruido: quitar el ruido de las imágenes", "Datos y ImageDataGenerator", "Compilar y entrenar: compile , fit , history"], "correcta": 0, "porque": "Sí, y es una de las aplicaciones más famosas: el denoising autoencoder (autoencoder para quitar ruido)."}, {"q": "¿Cuál de estas afirmaciones recoge lo que acabas de estudiar?", "opciones": ["Lo importante es comprender la idea y comprobarla con ejemplos, no memorizar términos.", "Sí, y es una de las aplicaciones más famosas: el denoising autoencoder (autoencoder para quitar ruido).", "Siempre hay un único método que sirve para todos los problemas."], "correcta": 1, "porque": "La explicación central es: Sí, y es una de las aplicaciones más famosas: el denoising autoencoder (autoencoder para quitar ruido)."}, {"q": "Si una demo o un ejemplo te desconcierta, ¿cuál es la mejor forma de aprenderlo?", "opciones": ["Memorizar el nombre sin entender la operación.", "Volver a los números, cambiar un valor y explicar qué ocurre.", "Ignorar los resultados que no coinciden con tu intuición."], "correcta": 1, "porque": "Explorar qué cambia y por qué ayuda a conectar el concepto con su resultado."}]}</script></section></div></details><details class="profundizar"><summary><span>Profundizar: explicación completa<small>Matices, fórmulas, tablas, otros ejemplos y experimentos del módulo original.</small></span></summary><div class="prof-body"><section>
-<h2 id="denoising">Autoencoder con ruido: quitar el ruido de las imágenes</h2>
-<p class="pregunta">Si un autoencoder solo puede conservar lo «importante», ¿qué pasa con lo que <em>no</em> es importante, como el grano de una carátula fotografiada con el móvil o una película con la señal de TV llena de interferencias? ¿Se puede usar esa pérdida a nuestro favor?</p>
-<p>Sí, y es una de las aplicaciones más famosas: el <strong>denoising autoencoder</strong> (autoencoder para quitar ruido). El truco consiste en <strong>cambiar una sola cosa del entrenamiento</strong>: la entrada es la imagen <em>con ruido</em> y el objetivo es la imagen <em>limpia</em>.</p>
-<ul class="flow">
-<li class="d">Imagen limpia<small>es el objetivo</small></li>
-<li class="c">+ ruido<small>«nieve» de TV, a mano</small></li>
-<li class="a">Imagen ruidosa<small>es la entrada</small></li>
-<li class="b">Autoencoder<small>comprime y reconstruye</small></li>
-<li class="d">Salida<small>se compara con la limpia</small></li>
-</ul>
-<p>Como el cuello de botella no puede guardar cada píxel, solo conserva la estructura que se repite en <em>todas</em> las imágenes (aquí: «hay un rectángulo»). El ruido es distinto en cada imagen, no sigue ninguna regla, así que no cabe en el pasillo: se queda fuera. Y como el objetivo es la imagen limpia, la red aprende a producirla.</p>
-<h3>Cómo se fabrica el ruido, paso a paso</h3>
-<p>Partimos de las imágenes limpias <code>clean</code> (valores 0 y 1). Se crea una matriz de ruido <code>noise</code> con la misma forma, donde cada número se sortea de una <strong>distribución normal</strong> (la campana de Gauss) con <em>media</em> 0 y <em>desviación típica</em> 0,25. Se suman y, como una imagen no puede valer menos de 0 ni más de 1, se «recorta» con <code>np.clip</code>:</p>
-<div class="formula">\[ \text{noisy} = \operatorname{clip}\big(\text{clean} + \text{noise},\ 0,\ 1\big) \qquad \text{noise} \sim \mathcal{N}(0,\ 0{,}25^2) \]</div>
+<header class="hero leccion">
+  <div class="hero-grid">
+    <div>
+      <p class="eyebrow">Curso 2 · Módulo 5 · Lección 4 de 8</p>
+      <h1>Un autoencoder no lineal sigue curvas que PCA no puede, pero no siempre gana</h1>
+      <p class="lead">PCA ya comprimía cada película a unos pocos rasgos. El autoencoder hace lo mismo con activaciones no lineales: si los datos forman una curva, la sigue; si no, PCA basta.</p>
+      <p class="meta-line"><span class="read-time" data-render="read-time"></span><a href="../modulo-5.html">Índice del módulo</a></p>
+    </div>
+    <div class="hero-tile" aria-hidden="true"></div>
+  </div>
+</header>
+
+<details class="predice">
+  <summary>Las películas se reparten a lo largo de un arco: de «solo acción», pasando por mezclas, a «solo comedia». Quieres resumir cada una en un solo número y PCA solo sabe proyectar sobre una recta. ¿Le irá bien en los extremos del arco?<span class="hint"></span></summary>
+  <div>
+    <p>No. Los extremos de la curva quedan lejos de cualquier recta, así que su proyección cae lejos de donde estaban. Un autoencoder con un cuello de 1 neurona puede aprender a «recorrer la curva» y reconstruir sobre ella.</p>
+  </div>
+</details>
+
+<section>
+<h2 id="idea">Lineal frente a no lineal</h2>
 <ul>
-<li><strong>Media 0</strong> (<code>loc=0</code>): el ruido suma tanto como resta; la mitad de los valores son positivos y la otra mitad negativos.</li>
-<li><strong>Desviación típica 0,25</strong> (<code>scale=0.25</code>): un valor típico de ruido ronda ±0,25. Muy pocos pasan de ±0,5 (el 95 % queda entre −0,5 y +0,5).</li>
-<li><strong><code>size=clean.shape</code></strong>: un número de ruido <em>distinto</em> para cada píxel de cada imagen.</li>
+  <li><strong>PCA</strong> es una transformación <em>lineal</em>: proyecta los datos sobre las direcciones donde más varían. Es rápido, no se entrena y solo hay que elegir el número de componentes.</li>
+  <li>Un <strong>autoencoder</strong> tiene activaciones <em>no lineales</em>: captura relaciones curvas. A cambio hay que entrenarlo, elegir la arquitectura y vigilar el sobreajuste.</li>
 </ul>
+<p>Un dato precioso: un autoencoder <strong>sin activaciones</strong>, entrenado con MSE, aprende prácticamente lo mismo que PCA. Lo que lo distingue es la no linealidad.</p>
+<p>Y una vez entrenado, el autoencoder son dos redes: el <strong>encoder</strong> (imagen → código) sirve para comprimir, visualizar, agrupar o alimentar otro modelo; el <strong>decoder</strong> (código → imagen), para reconstruir.</p>
+</section>
+<figure class="demo" data-demo="curso2/c2m5-pca-vs-ae" data-titulo="PCA frente a autoencoder sobre un arco">
+  <div class="haz">Mira la recta de PCA y pulsa «Entrenar el autoencoder».</div>
+  <div class="observa">PCA se queda en un error de 0,0335; el autoencoder se pega al arco y baja a ≈ 0,0005. Con una nube alargada, PCA ya sería casi perfecto.</div>
+</figure>
+
+<section>
+<h2 id="con-numeros">Con números: 1.797 dígitos comprimidos a 8</h2>
 <div class="callout ejemplo">
-<span class="lbl">Ejemplo numérico: tres píxeles de un póster, con valores elegidos para el ejemplo</span>
-<table>
-<thead><tr><th>Píxel</th><th>Limpio</th><th>Ruido</th><th>Suma</th><th>Tras <code>clip</code></th><th>Error² (con el limpio)</th></tr></thead>
-<tbody>
-<tr><td>A (fondo oscuro)</td><td>0</td><td>+0,10</td><td>0,10</td><td>0,10</td><td>0,0100</td></tr>
-<tr><td>B (fondo oscuro)</td><td>0</td><td>−0,20</td><td>−0,20</td><td class="res">0</td><td>0</td></tr>
-<tr><td>C (recuadro del título)</td><td>1</td><td>+0,30</td><td>1,30</td><td class="res">1</td><td>0</td></tr>
-</tbody>
-</table>
-<p>El <code>clip</code> deshace en B y en C parte del ruido: el fondo nunca baja de 0 y el blanco nunca sube de 1. <strong>Consecuencia</strong>: los píxeles negros dejan de valer 0 en promedio. Cuando el ruido es positivo (la mitad de las veces) sube; cuando es negativo, el <code>clip</code> lo deja en 0. El promedio es \( 0{,}25/\sqrt{2\pi} \approx \) <span class="res">0,0997</span>. Y el error cuadrático medio de la imagen ruidosa es \( 0{,}25^2/2 = \) <span class="res">0,03125</span> (la mitad del ruido al cuadrado desaparece con el <code>clip</code>). Con las 500 imágenes del fragmento 2 sale 0,100 y 0,0312: coincide.</p>
-</div>
-<div class="callout regla">
-<span class="lbl">Regla fácil</span>
-<p>Autoencoder normal: <code>fit(X, X)</code>. Autoencoder para quitar ruido: <code>fit(X_ruidoso, X_limpio)</code>. Lo único que cambia es el objetivo.</p>
+  <span class="lbl">Ejemplo numérico</span>
+  <p>Imágenes de 8×8 = 64 valores, comprimidas a 8 números. Error en test:</p>
+  <table>
+    <thead><tr><th>Método</th><th>MSE</th></tr></thead>
+    <tbody>
+      <tr><td>Imagen media (no mira nada)</td><td>0,0729</td></tr>
+      <tr><td>PCA, 8 componentes</td><td>0,0240</td></tr>
+      <tr><td>Autoencoder lineal</td><td>0,0242</td></tr>
+      <tr><td>Autoencoder no lineal</td><td class="res">0,0161</td></tr>
+    </tbody>
+  </table>
+  <p>El lineal empata con PCA, como dice la teoría; el no lineal baja el error un tercio. El precio: PCA se calcula de golpe y cada autoencoder necesitó 200 épocas y 4.744 parámetros.</p>
 </div>
 <div class="callout ojo">
-<span class="lbl">Ojo: un denoiser es específico del ruido que vio</span>
-<p>Un autoencoder entrenado con ruido gaussiano de 0,25 no sabe quitar manchas, rayones ni ruido de otra intensidad. Y lo que hace bien lo hace porque todas las imágenes comparten estructura (rectángulos). Con carátulas reales de películas tendrías que entrenarlo con carátulas reales.</p>
+  <span class="lbl">No confundir</span>
+  <p>Las <strong>RBM</strong> (máquinas de Boltzmann restringidas) aparecen cerca en el curso, pero son otro modelo: aprenden la <em>distribución</em> de los datos para generar ejemplos, no a reconstruir por un cuello de botella.</p>
 </div>
-</section></div></details><details class="profundizar" id="codigo"><summary><span>Ver código explicado paso a paso<small>2 fragmento(s) original(es), con cada línea comentada y salida esperada.</small></span></summary><div class="prof-body"><article class="snippet" data-lang="python">
-<header>
-<h3>1 · Imágenes de rectángulos: los datos del autoencoder</h3>
-<p class="para-que"><strong>Para qué sirve</strong> Generar las 500 imágenes sintéticas de 28×28 con un rectángulo blanco en posición y tamaño aleatorios (la función <code>create_rectangle_images</code> de las notas) y dibujar una en texto para comprobar que es lo que esperamos.</p>
-</header>
-<pre class="code"><code>import numpy as np
-
-def create_rectangle_images(number_samples=500, image_size=28):
-    images = np.zeros((number_samples, image_size, image_size, 1), dtype="float32")
-    for i in range(number_samples):
-        x1, y1 = np.random.randint(2, 14, size=2)
-        x2, y2 = np.random.randint(14, 26, size=2)
-        images[i, y1:y2, x1:x2, 0] = 1
-    return images
-
-np.random.seed(42)
-clean = create_rectangle_images()
-
-print(clean.shape, clean.dtype)
-print("valores distintos:", np.unique(clean))
-ys, xs = np.where(clean[0, :, :, 0] == 1)
-print("imagen 0 -&gt; filas", ys.min(), "a", ys.max(), "| columnas", xs.min(), "a", xs.max())
-print("píxeles encendidos:", int(clean[0].sum()), "de", 28 * 28)
-for fila in clean[0, ::2, :, 0]:
-    print("".join("#" if v &gt; 0.5 else "." for v in fila))</code></pre>
-<details class="linea-a-linea" open="">
-<summary>Línea por línea</summary>
-<p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
-<table class="lineas">
-<thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
-<tbody>
-<tr data-lines="1"><td><code>import numpy as np</code></td><td>Importa NumPy, la librería de arrays (tablas de números), con el apodo habitual <code>np</code>.</td></tr>
-<tr data-lines="3"><td><code>def create_rectangle_images(number_samples=500, image_size=28):</code></td><td>Define la función con dos parámetros y sus valores por defecto: cuántas imágenes (500) y el lado de cada una (28).</td></tr>
-<tr data-lines="4"><td><code>images = np.zeros((number_samples, image_size, image_size, 1), dtype="float32")</code></td><td>Crea 500 imágenes negras. La forma <code>(500, 28, 28, 1)</code> significa: 500 imágenes, 28 filas, 28 columnas y 1 canal (gris). <code>float32</code> es el tipo de número con el que trabaja Keras.</td></tr>
-<tr data-lines="5"><td><code>for i in range(number_samples):</code></td><td>Bucle que recorre las 500 imágenes (<code>i</code> va de 0 a 499).</td></tr>
-<tr data-lines="6"><td><code>x1, y1 = np.random.randint(2, 14, size=2)</code></td><td>Sortea dos enteros entre 2 y 13 (el extremo 14 no entra): la esquina <strong>superior izquierda</strong> del rectángulo. <code>size=2</code> da dos números a la vez.</td></tr>
-<tr data-lines="7"><td><code>x2, y2 = np.random.randint(14, 26, size=2)</code></td><td>Sortea dos enteros entre 14 y 25: la esquina <strong>inferior derecha</strong>. Como el mínimo de <code>x2</code> (14) es mayor que el máximo de <code>x1</code> (13), el rectángulo siempre tiene al menos 1 píxel de lado.</td></tr>
-<tr data-lines="8"><td><code>images[i, y1:y2, x1:x2, 0] = 1</code></td><td>Pinta de blanco (valor 1) las filas <code>y1</code> a <code>y2-1</code> y las columnas <code>x1</code> a <code>x2-1</code> de la imagen <code>i</code>. En NumPy <code>a:b</code> incluye <code>a</code> y excluye <code>b</code>, y el orden es filas primero (por eso <code>y</code> antes que <code>x</code>). El <code>0</code> final es el único canal.</td></tr>
-<tr data-lines="9"><td><code>return images</code></td><td>Devuelve las 500 imágenes.</td></tr>
-<tr data-lines="11"><td><code>np.random.seed(42)</code></td><td>Fija la semilla del generador aleatorio: cada vez que ejecutes el fragmento saldrán los mismos rectángulos (reproducibilidad).</td></tr>
-<tr data-lines="12"><td><code>clean = create_rectangle_images()</code></td><td>Genera las imágenes limpias con los valores por defecto. <code>clean</code> será el <em>objetivo</em> del autoencoder.</td></tr>
-<tr data-lines="14"><td><code>print(clean.shape, clean.dtype)</code></td><td>Muestra la forma y el tipo de dato.</td></tr>
-<tr data-lines="15"><td><code>print("valores distintos:", np.unique(clean))</code></td><td><code>np.unique</code> lista los valores diferentes que aparecen: debería haber solo 0 y 1.</td></tr>
-<tr data-lines="16"><td><code>ys, xs = np.where(clean[0, :, :, 0] == 1)</code></td><td>Busca en la imagen 0 las posiciones (fila <code>ys</code>, columna <code>xs</code>) de todos los píxeles que valen 1. <code>clean[0, :, :, 0]</code> es la imagen 0 sin el eje de canal.</td></tr>
-<tr data-lines="17"><td><code>print("imagen 0 -&gt; filas", ys.min(), "a", ys.max(), "| columnas", xs.min(), "a", xs.max())</code></td><td>Muestra el rango de filas y columnas que ocupa el rectángulo.</td></tr>
-<tr data-lines="18"><td><code>print("píxeles encendidos:", int(clean[0].sum()), "de", 28 * 28)</code></td><td>Suma todos los valores de la imagen 0 (cada píxel blanco vale 1, así que la suma cuenta píxeles encendidos) y los compara con los 784 totales.</td></tr>
-<tr data-lines="19-20"><td><code>for fila in clean[0, ::2, :, 0]: print("".join("#" if v &gt; 0.5 else "." for v in fila))</code></td><td>Dibuja la imagen en texto: <code>::2</code> se salta una fila de cada dos (así cabe mejor en pantalla) y cada píxel mayor de 0,5 se escribe como <code>#</code> y el resto como <code>.</code>. <code>"".join(...)</code> pega los 28 caracteres de la fila.</td></tr>
-</tbody>
-</table>
+</section>
+<details class="predice">
+  <summary>Entrenas un autoencoder solo con carátulas normales y le llega una imagen en blanco por un fallo de la web. ¿Su error de reconstrucción será alto o bajo?<span class="hint"></span></summary>
+  <div>
+    <p>Alto: no se parece a nada de lo que vio y la reconstruye mal. Por eso un autoencoder sirve para <strong>detectar anomalías</strong>: un error de reconstrucción alto delata «esto es raro».</p>
+  </div>
 </details>
-<div class="salida">
-<strong>Salida esperada</strong>
-<pre>(500, 28, 28, 1) float32
-valores distintos: [0. 1.]
-imagen 0 -&gt; filas 5 a 20 | columnas 8 a 23
-píxeles encendidos: 256 de 784
-............................
-............................
-............................
-........################....
-........################....
-........################....
-........################....
-........################....
-........################....
-........################....
-........################....
-............................
-............................
-............................</pre>
-<p>Hay 500 imágenes de 28×28 con un solo canal y solo dos valores, 0 y 1. La imagen 0 tiene el rectángulo en las filas 5 a 20 y las columnas 8 a 23: \(16\times16=256\) píxeles blancos de 784 (el 32,7 %). El dibujo en texto muestra una de cada dos filas (14 de las 28): 8 de ellas llevan 16 caracteres <code>#</code> seguidos (las columnas 8 a 23) y el resto está vacío. Es un único rectángulo sobre fondo negro, como esperábamos.</p>
+<div class="resumen">
+  <h2 class="sin-num sin-toc">En tres líneas</h2>
+  <ul>
+    <li>PCA = lineal y rápido; autoencoder = no lineal, sigue curvas, pero hay que entrenarlo.</li>
+    <li>Autoencoder lineal ≈ PCA: prueba primero PCA, que es la referencia.</li>
+    <li>El encoder solo es un compresor reutilizable; un error de reconstrucción alto delata una anomalía.</li>
+  </ul>
 </div>
-</article><article class="snippet" data-lang="python">
-<header>
-<h3>2 · Fabricar el ruido: normal, suma y clip</h3>
-<p class="para-que"><strong>Para qué sirve</strong> Convertir las imágenes limpias en imágenes ruidosas (el <em>input</em> del autoencoder para quitar ruido) y medir exactamente cuánto ruido se ha añadido y qué hace el <code>clip</code>. Continúa el fragmento 1 (usa <code>clean</code>).</p>
-</header>
-<pre class="code"><code>noise = np.random.normal(0, 0.25, size=clean.shape)
-noisy = np.clip(clean + noise, 0, 1).astype("float32")
 
-print("ruido: media %.3f, desviación %.3f" % (noise.mean(), noise.std()))
-print("noisy: mínimo %.2f, máximo %.2f" % (noisy.min(), noisy.max()))
-print("error de la imagen ruidosa (MSE): %.4f" % np.mean((noisy - clean) ** 2))
-print("media de los píxeles negros:  %.3f (antes 0.000)" % noisy[clean == 0].mean())
-print("media de los píxeles blancos: %.3f (antes 1.000)" % noisy[clean == 1].mean())
-print("negros que el clip dejó en 0 exacto: %.1f %%" % (100 * np.mean(noisy[clean == 0] == 0)))
-print("primeros 6 píxeles de la fila 0, imagen 0:", noisy[0, 0, :6, 0].round(2))</code></pre>
-<details class="linea-a-linea" open="">
-<summary>Línea por línea</summary>
-<p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
-<table class="lineas">
-<thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
-<tbody>
-<tr data-lines="1"><td><code>noise = np.random.normal(0, 0.25, size=clean.shape)</code></td><td>Crea una matriz de ruido con la misma forma que <code>clean</code>. Cada número sale de una distribución normal (campana de Gauss) de media 0 (<code>loc</code>) y desviación típica 0,25 (<code>scale</code>).</td></tr>
-<tr data-lines="2"><td><code>noisy = np.clip(clean + noise, 0, 1).astype("float32")</code></td><td>Suma ruido a la imagen limpia y <code>np.clip(…, 0, 1)</code> recorta: todo lo que sea menor que 0 pasa a 0 y todo lo mayor que 1 pasa a 1. <code>astype("float32")</code> deja el tipo que usa Keras.</td></tr>
-<tr data-lines="4"><td><code>print("ruido: media …, desviación …" % (noise.mean(), noise.std()))</code></td><td>Comprueba que el ruido es lo que pedimos: media ≈ 0 y desviación ≈ 0,25.</td></tr>
-<tr data-lines="5"><td><code>print("noisy: mínimo …, máximo …" % (noisy.min(), noisy.max()))</code></td><td>Confirma que tras el <code>clip</code> todo está entre 0 y 1.</td></tr>
-<tr data-lines="6"><td><code>print("error de la imagen ruidosa (MSE): …" % np.mean((noisy - clean) ** 2))</code></td><td>El error cuadrático medio de la imagen ruidosa respecto a la limpia: es el punto de partida que el autoencoder tiene que mejorar.</td></tr>
-<tr data-lines="7"><td><code>print("media de los píxeles negros: …" % noisy[clean == 0].mean())</code></td><td><code>noisy[clean == 0]</code> selecciona solo los píxeles que eran negros y calcula su media: tras el <code>clip</code> ya no es 0.</td></tr>
-<tr data-lines="8"><td><code>print("media de los píxeles blancos: …" % noisy[clean == 1].mean())</code></td><td>Lo mismo con los píxeles que eran blancos (1).</td></tr>
-<tr data-lines="9"><td><code>print("negros que el clip dejó en 0 exacto: …" …)</code></td><td>Qué porcentaje de píxeles negros siguen valiendo exactamente 0: aquellos en los que el ruido fue negativo y el <code>clip</code> lo recortó.</td></tr>
-<tr data-lines="10"><td><code>print("primeros 6 píxeles de la fila 0, imagen 0:", noisy[0, 0, :6, 0].round(2))</code></td><td>Enseña seis valores concretos de la primera fila (fondo negro) para ver el ruido «a ojo».</td></tr>
-</tbody>
-</table>
-</details>
-<div class="salida">
-<strong>Salida esperada</strong>
-<pre>ruido: media 0.000, desviación 0.250
-noisy: mínimo 0.00, máximo 1.00
-error de la imagen ruidosa (MSE): 0.0312
-media de los píxeles negros:  0.100 (antes 0.000)
-media de los píxeles blancos: 0.901 (antes 1.000)
-negros que el clip dejó en 0 exacto: 50.0 %
-primeros 6 píxeles de la fila 0, imagen 0: [0.43 0.11 0.01 0.03 0.15 0.  ]</pre>
-<p>El ruido tiene media 0,000 y desviación 0,250, justo lo pedido. Tras el <code>clip</code> los valores quedan entre 0,00 y 1,00. El MSE de la imagen ruidosa es <strong>0,0312</strong>, casi exactamente \(0{,}25^2/2=0{,}03125\) (la mitad del ruido al cuadrado se pierde en el recorte). La media de los píxeles negros ya no es 0 sino <strong>0,100</strong> (la teoría da \(0{,}25/\sqrt{2\pi}\approx0{,}0997\)) y la de los blancos baja a 0,901. Exactamente el <strong>50,0 %</strong> de los negros quedó en 0: son aquellos con ruido negativo, que el <code>clip</code> recortó. Los seis píxeles de fondo que se ven (0,43; 0,11; 0,01; 0,03; 0,15; 0,00) lo confirman: nada es negativo y casi todos son pequeños.</p>
+<section class="quiz mini">
+<script type="application/json" class="quiz-data">
+{
+ "titulo": "¿Lo tienes?",
+ "preguntas": [
+  {
+   "q": "Entrenas un autoencoder <strong>lineal</strong> (sin activaciones) con cuello de botella de 8 números y lo comparas con PCA de 8 componentes. ¿Qué esperas?",
+   "opciones": [
+    "Mucho mejor que PCA, porque tiene más parámetros.",
+    "Mucho peor, porque no usa ReLU y no puede aprender.",
+    "Un error de reconstrucción muy parecido al de PCA; para ganarle hace falta la no linealidad.",
+    "Exactamente 0, porque reconstruye la entrada."
+   ],
+   "correcta": 2,
+   "porque": "Un autoencoder lineal entrenado con MSE aprende prácticamente el mismo subespacio que PCA. En el fragmento 6: PCA 0,0240 y autoencoder lineal 0,0242; el no lineal baja a 0,0161. Tener más parámetros no basta si no hay activaciones; sí puede aprender (igual que PCA); y el cuello de botella impide el error 0."
+  },
+  {
+   "q": "¿Qué es una máquina de Boltzmann restringida (RBM)?",
+   "opciones": [
+    "Un autoencoder con un cuello de botella muy estrecho",
+    "Un modelo distinto, que aprende la distribución de los datos y puede generar ejemplos parecidos",
+    "La versión lineal de PCA"
+   ],
+   "correcta": 1,
+   "porque": "Aunque el curso la presenta cerca, una RBM no reconstruye por un cuello de botella: modela qué combinaciones de valores son frecuentes. Sirve, por ejemplo, para equilibrar clases o estimar valores que faltan."
+  },
+  {
+   "q": "Tus datos forman una nube alargada, casi una recta. ¿Qué pruebas primero para comprimirlos?",
+   "opciones": [
+    "Un autoencoder profundo con muchas capas",
+    "PCA: es rápido, no se entrena y aquí ya es casi perfecto",
+    "Una RBM"
+   ],
+   "correcta": 1,
+   "porque": "El autoencoder solo gana cuando hay estructura curva. Con una nube alargada, PCA ya reconstruye casi perfecto y es la referencia que hay que batir."
+  }
+ ]
+}
+</script>
+</section>
+
+<details class="profundizar">
+  <summary><span>Profundizar: la explicación completa<small>Separar el encoder y el decoder con get_layer, la comparación completa con PCA, la guía del experimento del arco, los tres usos del autoencoder y la tabla autoencoder frente a RBM.</small></span></summary>
+  <div class="prof-body">
+<h2 id="encoder-decoder">Separar el encoder y el decoder</h2>
+<p class="pregunta">Si ya entrenamos el modelo entero, ¿se pueden usar las dos mitades por separado? ¿Para qué querríamos solo el código comprimido?</p>
+
+<p>Sí. Un autoencoder entrenado son <em>dos redes en una</em>, y Keras permite sacarlas. Como a la capa del cuello de botella le pusimos <code>name="bottleneck"</code>, podemos pedirla por nombre:</p>
+<ul>
+  <li><strong>Encoder</strong>: <code>keras.Model(inputs, autoencoder.get_layer("bottleneck").output)</code>. Entrada: imagen; salida: el código <code>(7, 7, 8)</code>. Sirve para <strong>comprimir</strong>, para <strong>visualizar</strong>, para hacer <em>clustering</em> o para <strong>alimentar otro modelo</strong> con una versión más corta de los datos.</li>
+  <li><strong>Decoder</strong>: las capas posteriores al cuello, encadenadas desde una entrada nueva <code>keras.Input(shape=(7, 7, 8))</code>. Sirve para <strong>reconstruir</strong> a partir de un código (y, con ideas más avanzadas, para generar imágenes nuevas).</li>
+</ul>
+<p>La prueba de que son la misma red: <code>decoder(encoder(x))</code> da lo mismo que <code>autoencoder(x)</code> (fragmento 5, <code>True</code>). El código de una imagen son 392 valores en lugar de 784.</p>
+
+<h2 id="ae-pca">Autoencoder frente a PCA</h2>
+<p class="pregunta">Describir cada película con 100 rasgos (género, duración, año, actores…) y quedarte con los 10 más útiles ya se hacía con PCA en el Curso 1. ¿Para qué quiero un autoencoder si hago lo mismo?</p>
+
+<h3>Qué hace cada uno</h3>
+<ul>
+  <li><strong>PCA</strong> (análisis de componentes principales) es una <strong>transformación lineal</strong>: proyecta los datos sobre las direcciones donde más varían. Su reconstrucción es siempre «combinación lineal de esas direcciones». Es rápido, no necesita entrenar y no tiene hiperparámetros salvo el número de componentes.</li>
+  <li>Un <strong>autoencoder</strong> es una red con <strong>activaciones no lineales</strong>. Puede capturar relaciones curvas, más complejas, entre las características. A cambio hay que entrenarlo, decidir una arquitectura y vigilar el sobreajuste. Y <strong>no siempre es mejor</strong>.</li>
+</ul>
+<p>Hay un hecho precioso: si construyes un autoencoder <em>sin activaciones</em> (todo lineal) y lo entrenas con MSE, aprende prácticamente el mismo subespacio que PCA. Lo que lo distingue es la no linealidad.</p>
+
+<h3>Un ejemplo en el que PCA no puede</h3>
+<p>Imagina que cada película se describe con 2 números (por ejemplo, cuánta acción y cuánta comedia tiene, cifras inventadas) y que, en este ejemplo, las películas se reparten a lo largo de un arco (media luna): desde «solo acción», pasando por mezclas, hasta «solo comedia». Las queremos comprimir a <strong>1 número</strong> (algo así como «dónde está en el arco»). PCA solo puede proyectar sobre una recta: los puntos del extremo del arco se proyectan lejos de donde estaban. Un autoencoder con cuello de 1 neurona puede aprender a «recorrer la curva» y reconstruir sobre ella.</p>
+
+<div class="callout recuerda">
+  <span class="lbl">Guía completa del experimento «PCA frente a autoencoder sobre un arco»</span>
+  <p>El experimento está más arriba, en la lección. Estas son sus instrucciones completas.</p>
+  <p><strong>Haz esto:</strong> Cada punto azul es una película descrita con 2 números (cuánta acción y cuánta comedia, cifras inventadas). Con «PCA» seleccionado mira la recta y los segmentos finos que unen cada punto con su reconstrucción. Pulsa «Entrenar el autoencoder» y espera a que termine (2.400 pasos).</p>
+  <p><strong>Fíjate en:</strong> PCA proyecta sobre una recta y el error es 0,0335. El autoencoder empieza reconstruyendo mal (error ≈ 0,37 sin entrenar) y, al terminar, su curva se pega al arco y el error baja a ≈ 0,0005: unas 65 veces menos que PCA. Este es el caso favorable para el autoencoder: los datos <em>son</em> una curva. Si fuesen una nube alargada, PCA ya sería casi perfecto y el autoencoder no ganaría nada.</p>
 </div>
-</article></div></details></div></main></body></html>
+
+<h3>Con números reales: el fragmento 6</h3>
+<p>El fragmento 6 compara los dos con los 1.797 dígitos de 8×8 de scikit-learn (64 características por imagen), comprimiendo todos a 8 números. Error cuadrático medio en las imágenes de test:</p>
+<table>
+  <thead><tr><th>Método</th><th>MSE de test</th></tr></thead>
+  <tbody>
+    <tr><td>Imagen media (no usa información de la imagen)</td><td>0,0729</td></tr>
+    <tr><td>PCA, 8 componentes</td><td>0,0240</td></tr>
+    <tr><td>Autoencoder <em>lineal</em>, 8 números</td><td>0,0242</td></tr>
+    <tr><td>Autoencoder <em>no lineal</em>, 8 números</td><td class="res">0,0161</td></tr>
+  </tbody>
+</table>
+<p>El autoencoder lineal empata con PCA (0,0242 frente a 0,0240), tal y como dice la teoría. El no lineal baja el error un tercio (0,0161). Pero fíjate en el precio: PCA se calcula de golpe; cada autoencoder necesitó 200 épocas de entrenamiento y tiene 4.744 parámetros (\( 64\cdot32+32 \), \( 32\cdot8+8 \), \( 8\cdot32+32 \) y \( 32\cdot64+64 \) sumados).</p>
+
+<div class="callout regla">
+  <span class="lbl">Regla fácil</span>
+  <p>Prueba primero PCA: es rápido y es la referencia. Pasa al autoencoder si los datos tienen estructura curva o si necesitas un codificador que tu modelo pueda reutilizar y afinar.</p>
+</div>
+
+<h3>Usos del autoencoder</h3>
+<div class="cards">
+  <div class="card"><h4>Reducir dimensiones</h4><p>100 rasgos de cada película → encoder → 10. Para visualizar, agrupar o dar al siguiente modelo datos más compactos.</p></div>
+  <div class="card"><h4>Quitar ruido</h4><p>Entrada ruidosa, objetivo limpio (lo que acabas de hacer).</p></div>
+  <div class="card"><h4>Detectar anomalías</h4><p>Un autoencoder entrenado solo con carátulas normales reconstruye mal una carátula rara (una imagen en blanco o corrupta, un fallo de la web): un error de reconstrucción alto delata «esto no se parece a lo que he visto».</p></div>
+</div>
+<div class="callout ojo">
+  <span class="lbl">Ojo: es específico de sus datos</span>
+  <p>Un autoencoder entrenado con carátulas de terror comprime bien carátulas de terror y mal las de comedias o dibujos animados, porque sus reglas de compresión son las de <em>sus</em> datos. Es el mismo motivo por el que sirve para detectar anomalías, y por el que no es un compresor de propósito general como JPEG.</p>
+</div>
+
+<h2 id="rbm">Un modelo distinto que se presenta cerca: las RBM</h2>
+<p class="pregunta">En el curso aparecen justo después las <strong>máquinas de Boltzmann restringidas</strong> (RBM, <em>Restricted Boltzmann Machines</em>). ¿Son otro tipo de autoencoder?</p>
+
+<p><strong>No.</strong> Aunque el curso las presenta cerca, una RBM es un <strong>modelo distinto</strong>. Un autoencoder aprende a reconstruir un dato pasando por un cuello de botella; una RBM aprende <strong>la distribución de los datos</strong>: qué combinaciones de valores son frecuentes y cuáles raras. Si sabes cómo se distribuyen, puedes <em>generar</em> ejemplos nuevos parecidos.</p>
+
+<table>
+  <caption>Autoencoder frente a RBM</caption>
+  <thead><tr><th></th><th>Autoencoder</th><th>RBM</th></tr></thead>
+  <tbody>
+    <tr><td>Qué aprende</td><td>A comprimir y reconstruir cada dato</td><td>La distribución de probabilidad de los datos</td></tr>
+    <tr><td>Cómo se entrena</td><td>Backpropagation con MSE y Adam</td><td>Con un procedimiento propio (no es el ciclo <em>forward → loss → backprop</em> de este curso)</td></tr>
+    <tr><td>Salida</td><td>Una reconstrucción de la entrada</td><td>Una distribución sobre los datos, de la que se pueden sacar muestras</td></tr>
+  </tbody>
+</table>
+
+<p>Aplicaciones que menciona el curso:</p>
+<ul>
+  <li><strong>Equilibrar datasets desequilibrados.</strong> Si tienes 10.000 reseñas positivas y solo 300 negativas, se modela la distribución de las negativas y se <em>generan</em> reseñas parecidas hasta compensar.</li>
+  <li><strong>Estimar valores que faltan.</strong> Si de un usuario sabes que puntuó con un 5 <em>Titanic</em> y con un 4 <em>Matrix</em>, pero te falta su nota de <em>Toy Story</em>, el modelo estima la nota más probable dado todo lo demás.</li>
+  <li><strong>Extracción automática de características.</strong> Las unidades ocultas de la RBM acaban representando patrones útiles de los datos.</li>
+</ul>
+<p>Aquí no las programamos: lo importante es que no confundas las dos ideas. Si lo que haces es <code>fit(X, X)</code> con un cuello de botella, es un autoencoder.</p>
+  </div>
+</details>
+
+<section>
+<h2 class="sin-num">Código</h2>
+
+<article class="snippet" data-lang="python">
+  <header>
+    <h3>5 · Separar el encoder y el decoder</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Sacar del autoencoder entrenado el <strong>encoder</strong> (imagen → código) y el <strong>decoder</strong> (código → imagen) y comprobar que juntos hacen lo mismo que el modelo completo. Continúa los fragmentos 1-4.</p>
+  </header>
+  <pre class="code"><code>encoder = keras.Model(inputs, autoencoder.get_layer("bottleneck").output)
+codigo = encoder.predict(noisy[:5], verbose=0)
+print("código de 5 imágenes:", codigo.shape, "-&gt; valores por imagen:", codigo[0].size, "(antes 784)")
+print("compresión: %.1f veces" % (784 / codigo[0].size))
+print("valores del código que son exactamente 0: %.0f %%" % (100 * np.mean(codigo == 0)), "| máximo: %.2f" % codigo.max())
+
+# Decoder: las capas que van después del cuello de botella
+entrada_codigo = keras.Input(shape=(7, 7, 8))
+y = entrada_codigo
+for capa in autoencoder.layers[autoencoder.layers.index(autoencoder.get_layer("bottleneck")) + 1:]:
+    y = capa(y)
+decoder = keras.Model(entrada_codigo, y)
+
+via_dos_pasos = decoder.predict(codigo, verbose=0)
+directo = autoencoder.predict(noisy[:5], verbose=0)
+print("decoder(encoder(x)) == autoencoder(x):", np.allclose(via_dos_pasos, directo, atol=1e-5))</code></pre>
+  <details class="linea-a-linea" open>
+    <summary>Línea por línea</summary>
+    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+      <tbody>
+        <tr data-lines="1"><td><code>encoder = keras.Model(inputs, autoencoder.get_layer("bottleneck").output)</code></td><td>Un modelo nuevo que va desde la entrada hasta la salida de la capa llamada <code>"bottleneck"</code>. Comparte las capas (y los pesos ya entrenados) con el autoencoder.</td></tr>
+        <tr data-lines="2"><td><code>codigo = encoder.predict(noisy[:5], verbose=0)</code></td><td>Comprime 5 imágenes ruidosas: obtiene 5 códigos.</td></tr>
+        <tr data-lines="3"><td><code>print("código de 5 imágenes:", codigo.shape, "-> valores por imagen:", codigo[0].size, "(antes 784)")</code></td><td>Forma del código y cuántos valores tiene cada uno (<code>.size</code> cuenta todos los elementos del array).</td></tr>
+        <tr data-lines="4"><td><code>print("compresión: %.1f veces" % (784 / codigo[0].size))</code></td><td>Razón entre el tamaño original y el del código.</td></tr>
+        <tr data-lines="5"><td><code>print("valores del código que son exactamente 0: …" …)</code></td><td>Porcentaje de ceros exactos en el código (la ReLU los produce) y el valor máximo.</td></tr>
+        <tr data-lines="7"><td><code># Decoder: las capas que van después del cuello de botella</code></td><td>Comentario.</td></tr>
+        <tr data-lines="8"><td><code>entrada_codigo = keras.Input(shape=(7, 7, 8))</code></td><td>Nueva entrada con la forma del código.</td></tr>
+        <tr data-lines="9"><td><code>y = entrada_codigo</code></td><td>Empezamos a encadenar capas desde esa entrada.</td></tr>
+        <tr data-lines="10-11"><td><code>for capa in autoencoder.layers[… + 1:]: y = capa(y)</code></td><td>Recorre las capas que van <em>después</em> de <code>bottleneck</code> (<code>autoencoder.layers.index(…) + 1</code> es la posición siguiente) y aplica cada una a <code>y</code>, reutilizando las mismas capas ya entrenadas.</td></tr>
+        <tr data-lines="12"><td><code>decoder = keras.Model(entrada_codigo, y)</code></td><td>Crea el modelo decoder: código → imagen.</td></tr>
+        <tr data-lines="14"><td><code>via_dos_pasos = decoder.predict(codigo, verbose=0)</code></td><td>Reconstruye pasando el código por el decoder.</td></tr>
+        <tr data-lines="15"><td><code>directo = autoencoder.predict(noisy[:5], verbose=0)</code></td><td>Reconstruye pasando las imágenes por el autoencoder completo.</td></tr>
+        <tr data-lines="16"><td><code>print("decoder(encoder(x)) == autoencoder(x):", np.allclose(via_dos_pasos, directo, atol=1e-5))</code></td><td>Compara ambas reconstrucciones. <code>np.allclose</code> compara con tolerancia (<code>atol</code>) porque los <code>float32</code> pueden diferir en el último decimal.</td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>código de 5 imágenes: (5, 7, 7, 8) -&gt; valores por imagen: 392 (antes 784)
+compresión: 2.0 veces
+valores del código que son exactamente 0: 30 % | máximo: 6.17
+decoder(encoder(x)) == autoencoder(x): True</pre>
+    <p>El código de cada imagen tiene forma <code>(7, 7, 8)</code>: 392 valores en lugar de 784, una compresión de solo 2,0 veces (recuerda: el cuello convolucional es espacial). El 30 % de esos 392 valores son exactamente 0 (efecto de la ReLU) y el máximo es 6,17. La última línea imprime <code>True</code>: <strong>decoder(encoder(x)) y autoencoder(x) dan lo mismo</strong>; son la misma red cortada en dos.</p>
+  </div>
+</article>
+
+<article class="snippet" data-lang="python">
+  <header>
+    <h3>6 · Autoencoder denso frente a PCA con 8 números</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Contar los parámetros del autoencoder denso de las notas (784→128→32→128→784) y comparar, con dígitos reales de scikit-learn, PCA frente a un autoencoder lineal y otro no lineal que comprimen 64 valores a 8.</p>
+  </header>
+  <pre class="code"><code>import numpy as np
+import keras
+from keras import layers
+from sklearn.datasets import load_digits
+from sklearn.decomposition import PCA
+from sklearn.model_selection import train_test_split
+
+# El ejemplo de las notas: 784 -&gt; 128 -&gt; 32 -&gt; 128 -&gt; 784 (solo contamos parámetros)
+notas = keras.Sequential([
+    keras.Input(shape=(784,)),
+    layers.Dense(128, activation="relu"),
+    layers.Dense(32, activation="relu"),          # cuello de botella
+    layers.Dense(128, activation="relu"),
+    layers.Dense(784, activation="sigmoid"),
+])
+print("784-128-32-128-784 tiene", notas.count_params(), "parámetros")
+
+# Ahora, de verdad: dígitos 8x8 (64 valores) comprimidos a 8 números
+X = load_digits().data / 16.0                       # 1797 dígitos, valores en [0, 1]
+X_train, X_test = train_test_split(X, test_size=0.25, random_state=42)
+
+def autoencoder_denso(activacion, salida):
+    keras.utils.set_random_seed(0)
+    modelo = keras.Sequential([
+        keras.Input(shape=(64,)),
+        layers.Dense(32, activation=activacion),
+        layers.Dense(8, activation=activacion),          # cuello de botella: 8 números
+        layers.Dense(32, activation=activacion),
+        layers.Dense(64, activation=salida),
+    ])
+    modelo.compile(optimizer=keras.optimizers.Adam(3e-3), loss="mse")
+    modelo.fit(X_train, X_train, epochs=200, batch_size=64, verbose=0)   # entrada = objetivo
+    return modelo
+
+print("imagen media (sin información)    MSE test: %.4f" % np.mean((X_train.mean(axis=0) - X_test) ** 2))
+
+pca = PCA(n_components=8).fit(X_train)
+rec_pca = pca.inverse_transform(pca.transform(X_test))
+print("PCA, 8 componentes                MSE test: %.4f" % np.mean((rec_pca - X_test) ** 2))
+
+for nombre, act, sal in [("autoencoder lineal", None, None), ("autoencoder no lineal", "relu", "sigmoid")]:
+    ae = autoencoder_denso(act, sal)
+    mse = np.mean((ae.predict(X_test, verbose=0) - X_test) ** 2)
+    print("%-33s MSE test: %.4f" % (nombre + ", 8 números", mse))</code></pre>
+  <details class="linea-a-linea" open>
+    <summary>Línea por línea</summary>
+    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+      <tbody>
+        <tr data-lines="1-6"><td><code>import numpy as np … from sklearn.model_selection import train_test_split</code></td><td>Importa NumPy, Keras y sus capas, el conjunto de dígitos de scikit-learn (<code>load_digits</code>), PCA y la función que separa entrenamiento y test.</td></tr>
+        <tr data-lines="8"><td><code># El ejemplo de las notas: …</code></td><td>Comentario: primero solo contamos parámetros del autoencoder 784-128-32-128-784.</td></tr>
+        <tr data-lines="9-15"><td><code>notas = keras.Sequential([ … ])</code></td><td>Modelo secuencial con <code>Input(784)</code>, <code>Dense(128, relu)</code>, <code>Dense(32, relu)</code> (el cuello de botella), <code>Dense(128, relu)</code> y <code>Dense(784, sigmoid)</code>. Las líneas 9 y 15 abren y cierran la lista; la 10 es la entrada y las 11-14 las capas.</td></tr>
+        <tr data-lines="16"><td><code>print("784-128-32-128-784 tiene", notas.count_params(), "parámetros")</code></td><td><code>count_params()</code> suma todos los pesos y sesgos.</td></tr>
+        <tr data-lines="18"><td><code># Ahora, de verdad: …</code></td><td>Comentario: pasamos a datos reales pequeños para que corra en segundos.</td></tr>
+        <tr data-lines="19"><td><code>X = load_digits().data / 16.0</code></td><td>1.797 dígitos de 8×8 (64 valores cada uno) con valores de 0 a 16; al dividir entre 16 quedan entre 0 y 1.</td></tr>
+        <tr data-lines="20"><td><code>X_train, X_test = train_test_split(X, test_size=0.25, random_state=42)</code></td><td>Aparta el 25 % para test. <code>random_state=42</code> fija el reparto.</td></tr>
+        <tr data-lines="22"><td><code>def autoencoder_denso(activacion, salida):</code></td><td>Función que construye y entrena un autoencoder 64→32→8→32→64 con la activación que le pidamos.</td></tr>
+        <tr data-lines="23"><td><code>keras.utils.set_random_seed(0)</code></td><td>Semilla para que los pesos iniciales sean siempre los mismos.</td></tr>
+        <tr data-lines="24-30"><td><code>modelo = keras.Sequential([ … ])</code></td><td>Las cuatro capas densas con 32, 8 (<em>cuello de botella: 8 números</em>), 32 y 64 neuronas. Las tres primeras usan <code>activacion</code>; la de salida usa <code>salida</code>. Con <code>activacion=None</code> (lineal) la red es lineal de punta a punta.</td></tr>
+        <tr data-lines="31"><td><code>modelo.compile(optimizer=keras.optimizers.Adam(3e-3), loss="mse")</code></td><td>Adam con learning rate 0,003 y MSE.</td></tr>
+        <tr data-lines="32"><td><code>modelo.fit(X_train, X_train, epochs=200, batch_size=64, verbose=0)</code></td><td>Entrena con entrada = objetivo = la imagen (autoencoder): 200 épocas, batch de 64.</td></tr>
+        <tr data-lines="33"><td><code>return modelo</code></td><td>Devuelve el modelo entrenado.</td></tr>
+        <tr data-lines="35"><td><code>print("imagen media (sin información) MSE test: …" % np.mean((X_train.mean(axis=0) - X_test) ** 2))</code></td><td>Línea base: predecir siempre la imagen media de entrenamiento (sin mirar la imagen). Cualquier método útil debe batirla.</td></tr>
+        <tr data-lines="37"><td><code>pca = PCA(n_components=8).fit(X_train)</code></td><td>Ajusta PCA con 8 componentes.</td></tr>
+        <tr data-lines="38"><td><code>rec_pca = pca.inverse_transform(pca.transform(X_test))</code></td><td><code>transform</code> comprime a 8 números y <code>inverse_transform</code> reconstruye los 64 valores.</td></tr>
+        <tr data-lines="39"><td><code>print("PCA, 8 componentes … MSE test: …" % np.mean((rec_pca - X_test) ** 2))</code></td><td>Error de reconstrucción de PCA en test.</td></tr>
+        <tr data-lines="41"><td><code>for nombre, act, sal in [("autoencoder lineal", None, None), ("autoencoder no lineal", "relu", "sigmoid")]:</code></td><td>Dos variantes: sin activaciones (lineal) y con ReLU y sigmoide (no lineal).</td></tr>
+        <tr data-lines="42"><td><code>ae = autoencoder_denso(act, sal)</code></td><td>Construye y entrena la variante.</td></tr>
+        <tr data-lines="43"><td><code>mse = np.mean((ae.predict(X_test, verbose=0) - X_test) ** 2)</code></td><td>MSE en las imágenes de test.</td></tr>
+        <tr data-lines="44"><td><code>print("%-33s MSE test: %.4f" % (nombre + ", 8 números", mse))</code></td><td>Imprime con <code>%-33s</code> (texto alineado a la izquierda en 33 caracteres) para que las columnas queden ordenadas.</td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>784-128-32-128-784 tiene 209968 parámetros
+imagen media (sin información)    MSE test: 0.0729
+PCA, 8 componentes                MSE test: 0.0240
+autoencoder lineal, 8 números     MSE test: 0.0242
+autoencoder no lineal, 8 números  MSE test: 0.0161</pre>
+    <p>El autoencoder de las notas tiene <strong>209.968</strong> parámetros, justo la suma de la tabla del texto (100.480 + 4.128 + 4.224 + 101.136). Con dígitos de 64 valores comprimidos a 8: la imagen media da 0,0729; PCA, 0,0240; el autoencoder <em>lineal</em>, 0,0242 (empata con PCA, como predice la teoría), y el <em>no lineal</em>, <strong>0,0161</strong>, un tercio menos de error. No siempre ocurrirá: depende de los datos, y el autoencoder cuesta 200 épocas de entrenamiento frente a un cálculo instantáneo de PCA.</p>
+  </div>
+</article>
+</section>
+
+</div>
+</main>
+</body>
+</html>

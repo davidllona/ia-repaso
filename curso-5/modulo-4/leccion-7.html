@@ -1,116 +1,378 @@
-<!DOCTYPE html>
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lección 7 · Todo en la misma sala y guardado con su nombre: .to() y state_dict · Módulo 4 · Curso 5 · Cuaderno de IA</title>
+<meta name="description" content="CPU o GPU con torch.device y .to() (en sitio para módulos, copia para tensores) y cómo guardar y cargar una red con state_dict, strict y weights_only.">
+<script>try{var t=localStorage.getItem('cuaderno-ia:tema');if(t)document.documentElement.setAttribute('data-theme',t)}catch(e){}</script>
+<link rel="stylesheet" href="../../assets/css/style.css">
+<script src="../../assets/js/curriculum.js"></script>
+<script src="../../assets/js/lab.js"></script>
+<script src="../../assets/js/app.js" defer></script>
+</head>
+<body data-root="../../" data-course="5" data-module="4" data-lesson="7">
+<main>
+<div class="page">
 
-<html lang="es"><head><meta charset="utf-8"/><meta content="width=device-width,initial-scale=1" name="viewport"/><title>Lección 7 · Congelar, sustituir la última capa y entrenar solo la cabeza · Curso 5 · Cuaderno de IA</title><meta content="Cada parámetro de PyTorch lleva un interruptor, requires_grad ." name="description"/><script>try{var t=localStorage.getItem('cuaderno-ia:tema');if(t)document.documentElement.setAttribute('data-theme',t)}catch(e){}</script><link href="../../assets/css/style.css" rel="stylesheet"/><script src="../../assets/js/curriculum.js"></script><script src="../../assets/js/lab.js"></script><script defer="" src="../../assets/js/app.js"></script><script defer="" src="../../assets/js/microanimations.js"></script></head><body data-course="5" data-lesson="7" data-module="4" data-root="../../"><main><div class="page" data-micro="3min"><header class="hero leccion"><div class="hero-grid"><div><p class="eyebrow">Curso 5 · Módulo 4 · Lección 7 de 13</p><h1>Congelar, sustituir la última capa y entrenar solo la cabeza</h1><p class="lead">Cada parámetro de PyTorch lleva un interruptor, requires_grad .</p><p class="meta-line"><span class="read-time" data-render="read-time"></span><a href="../modulo-4.html">Índice del módulo</a></p></div><div aria-hidden="true" class="hero-tile"></div></div></header><details class="predice"><summary>¿Cómo le digo a PyTorch «no toques el criterio del crítico» (estos pesos) y «esta capa es nueva» (la nota por géneros que tiene que aprender)?<span class="hint"></span></summary><div><p>Cada parámetro de PyTorch lleva un interruptor, requires_grad .</p></div></details><section aria-label="Explicación breve" class="micro-core"><div class="micro-kicker">01 · ENTENDER <span>≈ 45 s</span></div><h2>La idea en palabras sencillas</h2><p>Cada parámetro de PyTorch lleva un interruptor, requires_grad. Con True (el valor por defecto), loss.backward() calcula su gradiente y el optimizador lo actualiza; con False, no se calcula gradiente y nada lo modifica. Para cambiarlos todos de golpe: modelo.requires_grad_(False) (el guion bajo final indica que modifica el objeto en sitio). Es el equivalente de trainable=False de Keras.</p><div class="micro-example"><span aria-hidden="true" class="micro-example-icon">🚲</span><div><strong>Otro ejemplo · Vehículos</strong><p>Reutilizas filtros entrenados en millones de fotos y cambias la última capa para detectar bicicletas.</p></div></div></section><div class="micro-kicker micro-checkpoint">02 · RESPONDER <span>≈ 15 s</span></div><section aria-label="Pregunta intercalada" class="quiz mini micro-check"><script class="quiz-data" type="application/json">{"titulo": "Pausa rápida · Comprueba la idea", "preguntas": [{"q": "Al congelar una capa preentrenada…", "opciones": ["Se borra su salida", "Se mantienen sus pesos durante esa fase", "Se eliminan todas las neuronas"], "correcta": 1, "porque": "Las capas congeladas siguen procesando datos, pero sus pesos no cambian."}]}</script></section><section aria-label="Animación interactiva" class="micro-viz" data-index="16" data-micro-viz="transfer"><div class="micro-kicker">03 · EXPERIMENTAR <span>≈ 45 s</span></div><div class="micro-viz-title"><div><h2>Reutilizar conocimiento previo</h2><p>Alterna entre «extraer características» y «ajustar capas».</p></div><span aria-hidden="true" class="micro-viz-symbol">✦</span></div><div aria-live="polite" class="micro-viz-stage"><p>Animación interactiva: Reutilizar conocimiento previo</p></div></section><div class="micro-kicker micro-checkpoint">04 · APLICAR <span>≈ 15 s</span></div><section aria-label="Pregunta intercalada" class="quiz mini micro-check"><script class="quiz-data" type="application/json">{"titulo": "Pausa rápida · ¿Lo aplicarías?", "preguntas": [{"q": "¿Qué permite el fine-tuning?", "opciones": ["Ajustar algunas capas del modelo previamente entrenado", "Entrenar siempre desde cero", "Ignorar las etiquetas"], "correcta": 0, "porque": "Es posible desbloquear capas y afinarlas con cuidado."}]}</script></section><div class="micro-finish"><strong>Idea que te llevas</strong><span>Cada parámetro de PyTorch lleva un interruptor, requires_grad</span><small>¿Quieres más ejemplos, fórmulas o código? Los tienes justo debajo, sin límite de tiempo.</small></div><details class="profundizar micro-legacy"><summary><span>Explorar más: explicación y simulaciones completas<small>Todo el texto original, tablas y demos avanzadas. Opcional.</small></span></summary><div class="prof-body"><section><h2>Congelar, sustituir la última capa y entrenar solo la cabeza</h2>
-<p>Cada parámetro de PyTorch lleva un interruptor, <code>requires_grad</code>. Con <code>True</code> (el valor por defecto), <code>loss.backward()</code> calcula su gradiente y el optimizador lo actualiza; con <code>False</code>, no se calcula gradiente y nada lo modifica. Para cambiarlos todos de golpe: <code>modelo.requires_grad_(False)</code> (el guion bajo final indica que modifica el objeto en sitio). Es el equivalente de <code>trainable=False</code> de Keras.</p>
-<p>La receta completa tiene cuatro pasos, y <strong>el orden importa</strong>:</p>
-<p>Dos detalles que aparecen en el <a href="#frag-6">fragmento 6</a>: (1) pasar al optimizador solo <code>modelo.fc.parameters()</code> es lo correcto y lo eficiente, aunque PyTorch también aceptaría <code>modelo.parameters()</code> (los congelados no tienen gradiente y los salta); (2) el <a href="leccion-3.html#frag-8">fragmento 8</a> junta todo el flujo de trabajo en una función que lee tus carpetas de fotos con <code>ImageFolder</code> y <code>DataLoader</code>, entrena la cabeza y luego afina. Ese fragmento <strong>no se ha podido ejecutar con los pesos de ImageNet</strong> (sin internet), pero sí entero con <code>weights=None</code> y fotos sintéticas en el <a href="leccion-12.html#frag-9">fragmento 9</a>, para comprobar que las llamadas, las formas y los recuentos son correctos.</p>
-<div class="callout ejemplo"><span class="lbl">Con números</span><p>Dos detalles que aparecen en el fragmento 6 : (1) pasar al optimizador solo modelo.fc.parameters() es lo correcto y lo eficiente, aunque PyTorch también aceptaría modelo.parameters() (los congelados no tienen…</p></div></section><div class="resumen"><h2 class="sin-num sin-toc">En pocas líneas</h2><ul><li><strong>Congelar, sustituir la última capa y entrenar solo la cabeza:</strong> Cada parámetro de PyTorch lleva un interruptor, requires_grad .</li><li>Antes de continuar, intenta explicar la demo sin mirar su resultado.</li></ul></div><section class="quiz mini"><script class="quiz-data" type="application/json">{"titulo": "¿Lo tienes?", "preguntas": [{"q": "¿Qué concepto estamos trabajando en esta lección?", "opciones": ["Congelar, sustituir la última capa y entrenar solo la cabeza", "CPU o GPU: device y .to()", "Nuestro experimento: ¿ayuda de verdad el preentrenamiento?"], "correcta": 0, "porque": "Cada parámetro de PyTorch lleva un interruptor, requires_grad ."}, {"q": "¿Cuál de estas afirmaciones recoge lo que acabas de estudiar?", "opciones": ["Lo importante es comprender la idea y comprobarla con ejemplos, no memorizar términos.", "Cada parámetro de PyTorch lleva un interruptor, requires_grad .", "Siempre hay un único método que sirve para todos los problemas."], "correcta": 1, "porque": "La explicación central es: Cada parámetro de PyTorch lleva un interruptor, requires_grad ."}, {"q": "Si una demo o un ejemplo te desconcierta, ¿cuál es la mejor forma de aprenderlo?", "opciones": ["Memorizar el nombre sin entender la operación.", "Volver a los números, cambiar un valor y explicar qué ocurre.", "Ignorar los resultados que no coinciden con tu intuición."], "correcta": 1, "porque": "Explorar qué cambia y por qué ayuda a conectar el concepto con su resultado."}]}</script></section></div></details><details class="profundizar"><summary><span>Profundizar: explicación completa<small>Matices, fórmulas, tablas, otros ejemplos y experimentos del módulo original.</small></span></summary><div class="prof-body"><section>
-<h2 id="congelar">Congelar, sustituir la última capa y entrenar solo la cabeza</h2>
-<p class="pregunta">¿Cómo le digo a PyTorch «no toques el criterio del crítico» (estos pesos) y «esta capa es nueva» (la nota por géneros que tiene que aprender)?</p>
-<p>Cada parámetro de PyTorch lleva un interruptor, <code>requires_grad</code>. Con <code>True</code> (el valor por defecto), <code>loss.backward()</code> calcula su gradiente y el optimizador lo actualiza; con <code>False</code>, no se calcula gradiente y nada lo modifica. Para cambiarlos todos de golpe: <code>modelo.requires_grad_(False)</code> (el guion bajo final indica que modifica el objeto en sitio). Es el equivalente de <code>trainable=False</code> de Keras.</p>
-<div class="callout analogia">
-<span class="lbl">Analogía</span>
-<p>El crítico veterano es el cuerpo de la red; la cabeza es el becario que traduce lo que ve el crítico a <em>tus</em> géneros. <code>requires_grad_(False)</code> es ponerle un candado a todo lo que el crítico ya sabe. El becario nuevo (<code>nn.Linear</code>) llega sin candado. Por eso el orden importa: si ficharas al becario primero y luego pusieras candados a todos, también quedaría encerrado y nunca aprendería.</p>
-</div>
-<p>La receta completa tiene cuatro pasos, y <strong>el orden importa</strong>:</p>
-<ol class="pasos">
-<li><strong>Cargar</strong> el modelo con sus pesos: <code>modelo = models.resnet18(weights=ResNet18_Weights.DEFAULT)</code>.</li>
-<li><strong>Congelar todo</strong>: <code>modelo.requires_grad_(False)</code>.</li>
-<li><strong>Sustituir la cabeza</strong>: <code>modelo.fc = nn.Linear(modelo.fc.in_features, K)</code>. Una capa recién creada nace con <code>requires_grad=True</code>, así que sustituirla <em>después</em> de congelar deja exactamente la cabeza nueva como lo único entrenable. Si la cambiaras antes y congelaras al final, congelarías también la cabeza nueva y no aprendería nada.</li>
-<li><strong>Pasar al optimizador solo lo entrenable</strong>: <code>torch.optim.Adam(modelo.fc.parameters(), lr=1e-3)</code>.</li>
-</ol>
-<div class="callout recuerda">
-<span class="lbl">Recuerda (Keras)</span>
-<p>En Keras, después de cambiar <code>trainable</code> tenías que volver a llamar a <code>compile</code>, porque el modelo «fotografía» qué es entrenable en ese momento. En PyTorch no hay <code>compile</code>: el equivalente es <strong>crear un optimizador nuevo</strong> con los parámetros y learning rates que quieras entrenar a partir de ahora.</p>
-</div>
-<div class="callout ojo">
-<span class="lbl">Ojo</span>
-<p>Cada arquitectura esconde su última capa en un sitio distinto: <code>.fc</code> en ResNet, <code>.classifier[6]</code> en VGG16, <code>.classifier[1]</code> en MobileNet y EfficientNet, <code>.classifier</code> en DenseNet. Antes de sustituirla, haz <code>print(modelo)</code> y mira cómo se llama la última capa y cuántas entradas (<code>in_features</code>) tiene. El <a href="#frag-6">fragmento 6</a> los muestra sin construir los modelos en memoria (con el dispositivo <code>meta</code>, que crea los modelos «vacíos»: solo la forma, ningún número).</p>
-</div>
-<p>Dos detalles que aparecen en el <a href="#frag-6">fragmento 6</a>: (1) pasar al optimizador solo <code>modelo.fc.parameters()</code> es lo correcto y lo eficiente, aunque PyTorch también aceptaría <code>modelo.parameters()</code> (los congelados no tienen gradiente y los salta); (2) el <a href="leccion-3.html#frag-8">fragmento 8</a> junta todo el flujo de trabajo en una función que lee tus carpetas de fotos con <code>ImageFolder</code> y <code>DataLoader</code>, entrena la cabeza y luego afina. Ese fragmento <strong>no se ha podido ejecutar con los pesos de ImageNet</strong> (sin internet), pero sí entero con <code>weights=None</code> y fotos sintéticas en el <a href="leccion-12.html#frag-9">fragmento 9</a>, para comprobar que las llamadas, las formas y los recuentos son correctos.</p>
-</section></div></details><details class="profundizar" id="codigo"><summary><span>Ver código explicado paso a paso<small>1 fragmento(s) original(es), con cada línea comentada y salida esperada.</small></span></summary><div class="prof-body"><article class="snippet" data-lang="python" id="frag-6">
-<header>
-<h3>6 · Congelar con requires_grad_(False), cambiar la última capa y optimizar solo la cabeza</h3>
-<p class="para-que"><strong>Para qué sirve</strong> El corazón del transfer learning en PyTorch: contar parámetros entrenables, congelar toda la red, sustituir <code>model.fc</code> por una capa nueva (que nace entrenable), pasarle al optimizador solo esa capa, y ver dónde está la «última capa» en otras arquitecturas (sin construirlas en memoria, con el dispositivo <code>meta</code>).</p>
+<header class="hero leccion">
+  <div class="hero-grid">
+    <div>
+      <p class="eyebrow">Curso 5 · Módulo 4 · Lección 7 de 8</p>
+      <h1>Todo en la misma sala y guardado con su nombre: .to() y state_dict</h1>
+      <p class="lead">Modelo, imágenes y etiquetas tienen que estar en el mismo dispositivo para poder calcular. Y para guardar la red se guardan sus números con nombre, no el plano.</p>
+      <p class="meta-line"><span class="read-time" data-render="read-time"></span><a href="../modulo-4.html">Índice del módulo</a></p>
+    </div>
+    <div class="hero-tile" aria-hidden="true"></div>
+  </div>
 </header>
-<pre class="code"><code>import torch
+
+<details class="predice">
+  <summary>Entrenas en la GPU de la oficina, guardas los pesos y mañana los cargas en tu portátil sin GPU con <code>torch.load(ruta)</code>. ¿Funciona sin más?<span class="hint"></span></summary>
+  <div>
+    <p><strong>No:</strong> los tensores guardados recuerdan que estaban en <code>cuda</code>. Hay que cargar con <code>torch.load(ruta, map_location="cpu")</code>. Dónde vive cada tensor es la mitad de esta lección; la otra mitad, cómo se guarda.</p>
+  </div>
+</details>
+
+<section>
+<h2 id="idea">Dónde vive cada número y cómo se guarda</h2>
+<p>Cada tensor vive en un <strong>dispositivo</strong>: la CPU, o una GPU (<code>cuda</code> en NVIDIA, <code>mps</code> en los Mac con chip de Apple). Una operación solo funciona si todos sus tensores están en el mismo. Con <code>dispositivo = torch.device("cuda" if torch.cuda.is_available() else "cpu")</code> eliges el mejor, y lo mueves con <code>.to(dispositivo)</code>. Ojo: en un <strong>módulo</strong>, <code>.to()</code> mueve en sitio; en un <strong>tensor</strong> devuelve una copia y hay que reasignar: <code>x = x.to(dispositivo)</code>.</p>
+<p>Para guardar, se usa el <code>state_dict</code>: un diccionario que asocia cada nombre (<code>"conv1.weight"</code>, <code>"bn1.running_mean"</code>, <code>"fc.bias"</code>) con su tensor, parámetros y buffers. Es la libreta del crítico, sin el puesto de trabajo: para cargar, reconstruyes la arquitectura idéntica (con tu cabeza) y llamas a <code>load_state_dict</code>. Con <code>strict=False</code> se toleran claves que faltan o sobran, pero nunca una forma distinta.</p>
+</section>
+
+<figure class="demo" data-demo="curso5/c5m4-device" data-titulo="dónde está cada cosa: modelo, imágenes y etiquetas">
+  <div class="haz">Con GPU en «sí», quita el movimiento del modelo, luego el de las imágenes, y prueba «x.to(dev) a secas».</div>
+  <div class="observa">Solo funciona si las tres cosas están en el mismo dispositivo; sin reasignar, el fallo aparece más tarde.</div>
+</figure>
+
+<figure class="demo" data-demo="curso5/c5m4-state-dict" data-titulo="qué ocurre al cargar un checkpoint en distintas redes">
+  <div class="haz">Carga el checkpoint en «ResNet-18 con otra fc» y alterna <code>strict</code> entre True y False.</div>
+  <div class="observa">Falla <code>fc.weight</code> por la forma, también con <code>strict=False</code>.</div>
+</figure>
+
+<section>
+<h2 id="con-numeros">Con números: lo que pesa y lo que no encaja</h2>
+<div class="callout ejemplo">
+  <span class="lbl">Ejemplo numérico</span>
+  <ol class="pasos">
+    <li>Parámetros de la ResNet-18: 11.689.512 · 4 bytes (<code>float32</code>) = 46.758.048 bytes ≈ <strong>44,6 MiB</strong>, casi todo el archivo de 44,7 MiB del <a href="#frag-10">fragmento 10</a>.</li>
+    <li><code>fc.weight</code> del checkpoint de ImageNet: forma (1000, 512), <strong>512.000</strong> números.</li>
+    <li><code>fc.weight</code> de tu red de 10 géneros: forma (10, 512), <strong>5.120</strong> números. No caben uno en otro: <em>size mismatch</em>.</li>
+  </ol>
+</div>
+</section>
+
+<details class="predice">
+  <summary>Guardas el modelo entero con <code>torch.save(modelo, ruta)</code> y al cargarlo con PyTorch 2.6 sale <code>UnpicklingError</code>. ¿Por qué?<span class="hint"></span></summary>
+  <div>
+    <p><strong>Desde la 2.6, <code>torch.load</code> usa <code>weights_only=True</code></strong> y rechaza objetos arbitrarios. Guarda siempre el <code>state_dict</code>, y no cargues archivos de desconocidos con <code>weights_only=False</code>: el formato usa <code>pickle</code>, que puede ejecutar código.</p>
+  </div>
+</details>
+
+<div class="resumen">
+  <h2 class="sin-num sin-toc">En tres líneas</h2>
+  <ul>
+    <li>Modelo, imágenes y etiquetas, en el mismo dispositivo; <code>x = x.to(dev)</code> se reasigna.</li>
+    <li><code>state_dict</code> guarda parámetros y buffers con su nombre; para cargar, primero la misma arquitectura.</li>
+    <li><em>size mismatch</em> es error incluso con <code>strict=False</code>; para reutilizar el cuerpo, quita las claves <code>fc.*</code>.</li>
+  </ul>
+</div>
+
+<section class="quiz mini">
+<script type="application/json" class="quiz-data">
+{
+ "titulo": "¿Lo tienes?",
+ "preguntas": [
+  {
+   "q": "Tienes una GPU y escribes <code>x = torch.ones(1, 3)</code> y luego <code>x.to('cuda')</code> (sin asignar el resultado). ¿Dónde está <code>x</code> después?",
+   "opciones": [
+    "Sigue en la CPU: en un tensor, <code>.to()</code> devuelve una copia y hay que reasignar",
+    "En la GPU, igual que ocurre con un módulo",
+    "En ambos sitios a la vez, sincronizado",
+    "Ya no existe: <code>.to()</code> lo ha movido y lo ha borrado de la CPU"
+   ],
+   "correcta": 0,
+   "porque": "En un <code>nn.Module</code>, <code>.to()</code> modifica el objeto en sitio, pero en un tensor devuelve un tensor nuevo y el original no cambia: hay que escribir <code>x = x.to('cuda')</code>. El fragmento 7 lo muestra con <code>float64</code>: el tensor sigue en <code>float32</code> y la capa sí cambió."
+  },
+  {
+   "q": "Intentas cargar con <code>load_state_dict(…, strict=False)</code> un checkpoint de 1.000 clases en una ResNet-18 cuya <code>fc</code> tiene 10 salidas. ¿Qué ocurre?",
+   "opciones": [
+    "Se carga todo y la <code>fc</code> se recorta a 10 salidas",
+    "Se carga todo menos <code>fc</code>, que se ignora sin avisar",
+    "Da un <code>RuntimeError</code> de <em>size mismatch</em> incluso con <code>strict=False</code>",
+    "Se carga y pone <code>fc</code> a cero"
+   ],
+   "correcta": 2,
+   "porque": "<code>strict=False</code> tolera claves que faltan o sobran, pero no una forma distinta: ese caso siempre es error. Para aprovechar el cuerpo hay que quitar antes las claves <code>fc.*</code> del diccionario (fragmento 10), con lo que <code>load_state_dict</code> informa de que faltan <code>fc.weight</code> y <code>fc.bias</code> y los deja como estaban."
+  },
+  {
+   "q": "¿Qué contiene el <code>state_dict</code> de una ResNet-18?",
+   "opciones": [
+    "Solo los pesos de las convoluciones",
+    "Los parámetros y los buffers de BatchNorm, cada uno con su nombre",
+    "La arquitectura completa, lista para usar sin reconstruirla"
+   ],
+   "correcta": 1,
+   "porque": "Es un diccionario nombre → tensor con parámetros y buffers (122 entradas en la ResNet-18). No guarda el plano: por eso hay que reconstruir la arquitectura antes de cargar."
+  }
+ ]
+}
+</script>
+</section>
+
+<details class="profundizar">
+  <summary><span>Profundizar: la explicación completa<small>Los dispositivos, la analogía de los dos cines, cuatro avisos si usas GPU, el código de guardar y cargar, lo que mide el fragmento 10, weights_only y las claves con module.</small></span></summary>
+  <div class="prof-body">
+<h2 id="device">CPU o GPU: <code>device</code> y <code>.to()</code></h2>
+
+<p class="pregunta">¿Dónde «vive» una red y por qué a veces PyTorch se queja de que «los tensores están en dispositivos distintos»?</p>
+
+<p>Los números de un tensor se guardan en la memoria de un <strong>dispositivo</strong>: la CPU (memoria RAM del ordenador) o una GPU (<code>cuda</code> en tarjetas NVIDIA, <code>mps</code> en los Mac con chip de Apple). Una operación solo funciona si todos sus tensores están en el mismo dispositivo. El código estándar elige el mejor disponible:</p>
+
+<pre class="code"><code>dispositivo = torch.device("cuda" if torch.cuda.is_available() else "cpu")</code></pre>
+
+<p>Y se mueve con <code>.to(dispositivo)</code>. Aquí está la diferencia que más tropieza:</p>
+
+<ul>
+  <li>En un <strong>módulo</strong> (<code>nn.Module</code>), <code>.to()</code> mueve los parámetros <strong>en sitio</strong> y devuelve el mismo objeto: <code>modelo.to(dispositivo)</code> basta.</li>
+  <li>En un <strong>tensor</strong>, <code>.to()</code> devuelve una <strong>copia</strong> y el original no cambia: hay que reasignar, <code>x = x.to(dispositivo)</code>.</li>
+</ul>
+
+<div class="callout analogia">
+  <span class="lbl">Analogía</span>
+  <p>Dos cines en edificios distintos (CPU y GPU). Para proyectar, el proyector (el modelo), las bobinas (las imágenes <code>x</code>) y la hoja con los géneros correctos (las etiquetas <code>y</code>) tienen que estar en la misma sala. Mover el cine entero (el módulo) traslada el proyector con todo lo que lleva dentro; pedir una bobina a la otra sala (el tensor) te da una copia allí, y la bobina original sigue donde estaba, a menos que sustituyas la que tenías por la copia.</p>
+</div>
+
+<div class="callout recuerda">
+  <span class="lbl">Experimento de arriba: «dónde está cada cosa: modelo, imágenes y etiquetas», con todo detalle</span>
+  <p><strong>Haz esto.</strong> Con «¿Tu ordenador tiene GPU?» en «sí», quita el movimiento del modelo, luego de las imágenes, luego deja «x.to(dev) a secas» sin reasignar. Activa «Luego imprimo salida.numpy()».</p>
+  <p><strong>Fíjate en.</strong> Solo funciona sin error cuando modelo, imágenes y etiquetas están en el mismo dispositivo. <code>x.to(dev)</code> sin reasignar es un error silencioso: no da fallo en la línea, sino más adelante. Y <code>.numpy()</code> sobre un tensor en la GPU falla: hay que llevarlo antes a la CPU con <code>.cpu()</code>.</p>
+</div>
+
+<p>El <a href="#frag-7">fragmento 7</a> demuestra las dos reglas en tu máquina (aquí no hay GPU, así que el dispositivo elegido es <code>cpu</code>) y reproduce el error de dispositivos mezclados usando el dispositivo <code>meta</code>.</p>
+
+<div class="callout ojo">
+  <span class="lbl">Ojo</span>
+  <p>Si usas GPU: (1) mueve el modelo <strong>antes</strong> de crear el optimizador, para que éste apunte a los parámetros ya movidos; (2) mueve en cada lote tanto <code>x</code> como <code>y</code>; (3) para convertir a NumPy o dibujar, <code>.detach().cpu().numpy()</code>; (4) cuando cargues un checkpoint guardado desde una GPU en una máquina sin GPU, usa <code>torch.load(ruta, map_location="cpu")</code>. El texto exacto del error de mezclar dispositivos con una GPU real es «Expected all tensors to be on the same device…»; aquí no se ha podido reproducir, porque este entorno no tiene GPU.</p>
+</div>
+
+<h2 id="state-dict">Guardar y cargar: <code>state_dict</code></h2>
+
+<p class="pregunta">¿Cómo guardo la red que he afinado y cómo la recupero mañana (o en otro ordenador)?</p>
+
+<p>Un <code>state_dict</code> es un diccionario de Python que asocia el <strong>nombre</strong> de cada tensor del modelo con su valor: <code>"conv1.weight"</code>, <code>"bn1.running_mean"</code>, <code>"fc.bias"</code>… Contiene los parámetros <em>y</em> los buffers de BatchNorm. Es como guardar la libreta de apuntes del crítico: cada página tiene un título y sus notas, pero la libreta no incluye el puesto de trabajo. Se guarda y se carga así:</p>
+
+<pre class="code"><code>torch.save(modelo.state_dict(), "resnet18_fotos.pth")        # guardar
+
+modelo = models.resnet18(weights=None)                        # misma arquitectura
+modelo.fc = nn.Linear(512, 10)                                # misma cabeza que cuando guardaste
+modelo.load_state_dict(torch.load("resnet18_fotos.pth", map_location="cpu"))
+modelo.eval()</code></pre>
+
+<p>Para cargar, <strong>primero hay que reconstruir la arquitectura idéntica</strong> (incluida tu cabeza nueva), porque el archivo solo contiene los números y los nombres, no el plano. <code>load_state_dict</code> compara cada clave con las del modelo, y si no encajan (otro nombre, otra forma) da error.</p>
+
+<div class="callout recuerda">
+  <span class="lbl">Experimento de arriba: «qué ocurre al cargar un checkpoint en distintas redes», con todo detalle</span>
+  <p><strong>Haz esto.</strong> Elige dónde cargas el checkpoint de 1.000 clases: «ResNet-18 igual», «ResNet-18 con otra fc» (mueve K) y «ResNet-34». Alterna <code>strict</code> entre True y False y recorre la tabla de claves.</p>
+  <p><strong>Fíjate en.</strong> En la red igual, todas las claves coinciden. Con otra <code>fc</code>, falla solo <code>fc.weight</code> por la forma: <code>strict=False</code> <em>no</em> arregla una diferencia de forma, solo tolera claves que faltan o sobran. En la ResNet-34 no hay formas distintas (los bloques con el mismo nombre se parecen), pero faltan las claves de los bloques que solo tiene ella: con <code>strict=True</code> es error, y con <code>strict=False</code> se carga lo que coincide y esos bloques se quedan con pesos al azar.</p>
+</div>
+
+<p>El <a href="#frag-10">fragmento 10</a> hace el recorrido completo con una ResNet-18 real: 122 entradas (parámetros más buffers), un archivo de 44,7 MiB, una recarga que da salidas idénticas, el error <em>size mismatch</em> al cargar un checkpoint de 1.000 clases en una red de 10, la solución de cargar sin la cabeza, y por qué se prefiere guardar el <code>state_dict</code> en vez del modelo entero.</p>
+
+<div class="callout ojo">
+  <span class="lbl">Ojo · versiones y seguridad</span>
+  <p>Desde PyTorch 2.6, <code>torch.load</code> usa <code>weights_only=True</code> por defecto: solo carga tensores y diccionarios, y rechaza objetos arbitrarios (por ejemplo, un modelo guardado entero con <code>torch.save(modelo, ...)</code>). Con <code>weights_only=False</code> se carga cualquier cosa, pero el formato de PyTorch usa <code>pickle</code>, que puede ejecutar código: <strong>no cargues archivos de desconocidos con <code>weights_only=False</code></strong>. Otra trampa: si entrenaste con <code>nn.DataParallel</code> las claves empiezan por <code>module.</code> y hay que quitarlo al cargar en una red sin él.</p>
+</div>
+  </div>
+</details>
+
+<section>
+<h2 class="sin-num">Código</h2>
+<article class="snippet" data-lang="python" id="frag-7">
+      <header>
+        <h3>7 · CPU o GPU: elegir el dispositivo y mover el modelo y los datos con .to()</h3>
+        <p class="para-que"><strong>Para qué sirve</strong> Escribir el código que elige GPU si existe y CPU si no, y entender dónde viven los tensores y los modelos: cuándo <code>.to()</code> modifica el objeto y cuándo devuelve una copia, y qué error aparece si el modelo y los datos están en dispositivos distintos.</p>
+      </header>
+      <pre class="code"><code>import torch
+from torch import nn
+
+print(torch.cuda.is_available(), torch.backends.mps.is_available())
+dispositivo = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+print(dispositivo)
+
+capa = nn.Linear(3, 2)
+x = torch.ones(1, 3)
+print(capa.weight.device, x.device)
+
+x64 = x.to(torch.float64)
+print("tensor:", x.dtype, "-&gt;", x64.dtype)
+capa.to(torch.float64)
+print("módulo:", capa.weight.dtype)
+
+capa.to(dispositivo)
+x = x.to(dispositivo)
+print(next(capa.parameters()).device, x.device)
+
+capa_meta = nn.Linear(3, 2, device="meta")
+try:
+    capa_meta(torch.ones(1, 3, dtype=torch.float64))
+except Exception as e:
+    print(type(e).__name__, "-&gt;", e)</code></pre>
+      <details class="linea-a-linea" open>
+        <summary>Línea por línea</summary>
+        <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+        <table class="lineas">
+          <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+          <tbody>
+        <tr data-lines="1"><td><code>import torch</code></td><td>PyTorch.</td></tr>
+        <tr data-lines="2"><td><code>from torch import nn</code></td><td>Capas.</td></tr>
+        <tr data-lines="4"><td><code>print(torch.cuda.is_available(), torch.backends.mps.is_available())</code></td><td>Pregunta si hay una GPU de NVIDIA utilizable (<code>cuda</code>) y si hay una GPU de Apple Silicon (<code>mps</code>).</td></tr>
+        <tr data-lines="5"><td><code>dispositivo = torch.device("cuda" if torch.cuda.is_available() else "cpu")</code></td><td>El patrón estándar: GPU si existe y CPU si no. Un <code>torch.device</code> es solo una etiqueta («cuda», «cpu»…).</td></tr>
+        <tr data-lines="6"><td><code>print(dispositivo)</code></td><td>Qué dispositivo se ha elegido.</td></tr>
+        <tr data-lines="8"><td><code>capa = nn.Linear(3, 2)</code></td><td>Una capa pequeña de ejemplo.</td></tr>
+        <tr data-lines="9"><td><code>x = torch.ones(1, 3)</code></td><td>Un tensor de entrada de unos.</td></tr>
+        <tr data-lines="10"><td><code>print(capa.weight.device, x.device)</code></td><td>Por defecto, todo se crea en la CPU.</td></tr>
+        <tr data-lines="12"><td><code>x64 = x.to(torch.float64)</code></td><td>En un <strong>tensor</strong>, <code>.to()</code> <strong>devuelve una copia</strong> (aquí, con otro tipo de dato). El original no cambia.</td></tr>
+        <tr data-lines="13"><td><code>print("tensor:", x.dtype, "-&gt;", x64.dtype)</code></td><td><code>x</code> sigue en 32 bits y la copia es de 64.</td></tr>
+        <tr data-lines="14"><td><code>capa.to(torch.float64)</code></td><td>En un <strong>módulo</strong>, <code>.to()</code> <strong>modifica el módulo in situ</strong> (convierte sus parámetros) y no hace falta reasignar.</td></tr>
+        <tr data-lines="15"><td><code>print("módulo:", capa.weight.dtype)</code></td><td>Los pesos de la capa ya son de 64 bits.</td></tr>
+        <tr data-lines="17"><td><code>capa.to(dispositivo)</code></td><td>Mueve la capa al dispositivo elegido (con CPU no hace nada).</td></tr>
+        <tr data-lines="18"><td><code>x = x.to(dispositivo)</code></td><td>Con un tensor <strong>hay que reasignar</strong>: si escribieras solo <code>x.to(dispositivo)</code>, la copia en la GPU se perdería y <code>x</code> seguiría en la CPU.</td></tr>
+        <tr data-lines="19"><td><code>print(next(capa.parameters()).device, x.device)</code></td><td>Dónde viven ahora la capa (leyendo su primer parámetro) y el tensor.</td></tr>
+        <tr data-lines="21"><td><code>capa_meta = nn.Linear(3, 2, device="meta")</code></td><td>Una capa en el dispositivo <code>meta</code>, que usamos como sustituto de «otro dispositivo» porque aquí no hay GPU.</td></tr>
+        <tr data-lines="22"><td><code>try:</code></td><td>Bloque protegido.</td></tr>
+        <tr data-lines="23"><td><code>capa_meta(torch.ones(1, 3, dtype=torch.float64))</code></td><td>Pasa a una capa en <code>meta</code> un tensor de la CPU: dispositivos distintos.</td></tr>
+        <tr data-lines="24"><td><code>except Exception as e:</code></td><td>Captura el error.</td></tr>
+        <tr data-lines="25"><td><code>print(type(e).__name__, "-&gt;", e)</code></td><td>Imprime el tipo y el mensaje.</td></tr>
+          </tbody>
+        </table>
+      </details>
+      <div class="salida">
+        <strong>Salida esperada</strong>
+    <pre>False False
+cpu
+cpu cpu
+tensor: torch.float32 -&gt; torch.float64
+módulo: torch.float64
+cpu cpu
+RuntimeError -&gt; Tensor on device meta is not on the expected device cpu!</pre>
+        <p>En esta máquina no hay GPU: ambas respuestas son <code>False</code> y el dispositivo elegido es <code>cpu</code>. Las dos líneas del medio muestran la diferencia que más tropieza al principio: el tensor <code>x</code> se queda en <code>float32</code> (la copia <code>x64</code> es <code>float64</code>), mientras que la capa <strong>sí</strong> pasó a <code>float64</code> sin reasignar. Y mezclar dispositivos da un <code>RuntimeError</code>. El mensaje de arriba es el que sale con el dispositivo <code>meta</code>; con una GPU de verdad el texto habitual es <em>«Expected all tensors to be on the same device, but found at least two devices, cuda:0 and cpu!»</em> (ese texto exacto no se ha podido reproducir aquí). La regla es la misma: <strong>modelo y datos en el mismo dispositivo</strong>.</p>
+      </div>
+    </article>
+
+<article class="snippet" data-lang="python" id="frag-10">
+      <header>
+        <h3>10 · Guardar y cargar con state_dict: claves, tamaño, errores de forma y la cabeza que no encaja</h3>
+        <p class="para-que"><strong>Para qué sirve</strong> Guardar solo los pesos (<code>state_dict</code>) de una ResNet-18, recargarlos en otra red y comprobar que predice igual; ver qué guarda realmente (parámetros <em>y</em> estadísticas de BatchNorm); reproducir el error clásico al cargar un checkpoint de 1.000 clases en una red de 10, y cargar solo el cuerpo.</p>
+      </header>
+      <pre class="code"><code>import os
+import tempfile
+import torch
 from torch import nn
 from torchvision import models
 
+torch.manual_seed(0)
 modelo = models.resnet18(weights=None)
+sd = modelo.state_dict()
+claves = list(sd)
+print(len(sd), claves[:3], claves[-2:])
+print([k for k in claves if k.startswith("bn1.")])
 
-def contar(m):
-    total = sum(p.numel() for p in m.parameters())
-    entrenables = sum(p.numel() for p in m.parameters() if p.requires_grad)
-    return total, entrenables
+ruta = os.path.join(tempfile.mkdtemp(), "resnet18.pth")
+torch.save(sd, ruta)
+print(round(os.path.getsize(ruta) / 2**20, 1), "MiB")
 
-print("al crearlo:", contar(modelo))
-modelo.requires_grad_(False)
-print("congelado:", contar(modelo))
+otro = models.resnet18(weights=None)
+print(otro.load_state_dict(torch.load(ruta, map_location="cpu")))
+x = torch.randn(2, 3, 64, 64)
+modelo.eval()
+otro.eval()
+print("mismas salidas:", torch.equal(modelo(x), otro(x)))
 
-print(modelo.fc)
-modelo.fc = nn.Linear(modelo.fc.in_features, 10)
-print("con cabeza nueva:", contar(modelo))
-print([n for n, p in modelo.named_parameters() if p.requires_grad])
+nuevo = models.resnet18(weights=None)
+nuevo.fc = nn.Linear(512, 10)
+try:
+    nuevo.load_state_dict(torch.load(ruta))
+except RuntimeError as e:
+    lineas = str(e).splitlines()
+    print(lineas[0])
+    print(lineas[1].strip())
 
-optimizador = torch.optim.Adam(modelo.fc.parameters(), lr=1e-3)
-print(len(optimizador.param_groups), sum(p.numel() for g in optimizador.param_groups for p in g["params"]))
+sin_fc = {k: v for k, v in sd.items() if not k.startswith("fc.")}
+print(nuevo.load_state_dict(sin_fc, strict=False))
 
-with torch.device("meta"):
-    for nombre, ultima in [("resnet50", lambda m: m.fc),
-                           ("vgg16", lambda m: m.classifier[6]),
-                           ("mobilenet_v2", lambda m: m.classifier[1]),
-                           ("efficientnet_b0", lambda m: m.classifier[1]),
-                           ("densenet121", lambda m: m.classifier)]:
-        m = getattr(models, nombre)(weights=None)
-        print(nombre, ultima(m))</code></pre>
-<details class="linea-a-linea" open="">
-<summary>Línea por línea</summary>
-<p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
-<table class="lineas">
-<thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
-<tbody>
-<tr data-lines="1"><td><code>import torch</code></td><td>PyTorch.</td></tr>
-<tr data-lines="2"><td><code>from torch import nn</code></td><td>Capas y redes.</td></tr>
-<tr data-lines="3"><td><code>from torchvision import models</code></td><td>Catálogo de modelos.</td></tr>
-<tr data-lines="5"><td><code>modelo = models.resnet18(weights=None)</code></td><td>ResNet-18 (la estructura es la misma con o sin pesos; con pesos reales sería <code>weights=ResNet18_Weights.DEFAULT</code>).</td></tr>
-<tr data-lines="7"><td><code>def contar(m):</code></td><td>Una función auxiliar que cuenta parámetros.</td></tr>
-<tr data-lines="8"><td><code>total = sum(p.numel() for p in m.parameters())</code></td><td>Todos los parámetros del módulo.</td></tr>
-<tr data-lines="9"><td><code>entrenables = sum(p.numel() for p in m.parameters() if p.requires_grad)</code></td><td>Solo los que tienen <code>requires_grad=True</code>, es decir, los que el optimizador podría modificar.</td></tr>
-<tr data-lines="10"><td><code>return total, entrenables</code></td><td>Devuelve las dos cifras.</td></tr>
-<tr data-lines="12"><td><code>print("al crearlo:", contar(modelo))</code></td><td>Al crear una red, todos los parámetros nacen entrenables.</td></tr>
-<tr data-lines="13"><td><code>modelo.requires_grad_(False)</code></td><td>Pone <code>requires_grad=False</code> en <strong>todos</strong> los parámetros de la red de golpe (el guion bajo final indica que modifica el objeto <em>in situ</em>).</td></tr>
-<tr data-lines="14"><td><code>print("congelado:", contar(modelo))</code></td><td>Ahora no hay ningún parámetro entrenable.</td></tr>
-<tr data-lines="16"><td><code>print(modelo.fc)</code></td><td>Muestra la última capa original: una <code>Linear</code> de 512 entradas a 1.000 salidas.</td></tr>
-<tr data-lines="17"><td><code>modelo.fc = nn.Linear(modelo.fc.in_features, 10)</code></td><td>Sustituye la capa por una nueva de 10 salidas. <code>in_features</code> (512) se lee de la antigua, así no hay que recordarlo. La capa nueva nace con <code>requires_grad=True</code> (lo normal en un parámetro recién creado).</td></tr>
-<tr data-lines="18"><td><code>print("con cabeza nueva:", contar(modelo))</code></td><td>Total y entrenables tras el cambio.</td></tr>
-<tr data-lines="19"><td><code>print([n for n, p in modelo.named_parameters() if p.requires_grad])</code></td><td>Los nombres de los tensores entrenables: deben ser solo los de <code>fc</code>.</td></tr>
-<tr data-lines="21"><td><code>optimizador = torch.optim.Adam(modelo.fc.parameters(), lr=1e-3)</code></td><td>El optimizador recibe <strong>solo</strong> los parámetros de la cabeza nueva, con learning rate 0,001.</td></tr>
-<tr data-lines="22"><td><code>print(len(optimizador.param_groups), sum(p.numel() for g in optimizador.param_groups for p in g["params"]))</code></td><td>Un grupo de parámetros y cuántos elementos tiene en total el optimizador.</td></tr>
-<tr data-lines="24"><td><code>with torch.device("meta"):</code></td><td>Dentro de este bloque, los tensores se crean en el dispositivo <code>meta</code>: tienen forma y tipo pero <strong>no ocupan memoria</strong>. Permite construir redes enormes (VGG16 pesa más de 500 MB) solo para mirar su estructura.</td></tr>
-<tr data-lines="25"><td><code>for nombre, ultima in [("resnet50", lambda m: m.fc),</code></td><td>Recorre parejas «nombre de arquitectura, función que localiza su última capa». Un <code>lambda</code> es una función de una línea.</td></tr>
-<tr data-lines="26"><td><code>("vgg16", lambda m: m.classifier[6]),</code></td><td>En VGG16 la última capa es la posición 6 del <code>Sequential</code> llamado <code>classifier</code>.</td></tr>
-<tr data-lines="27"><td><code>("mobilenet_v2", lambda m: m.classifier[1]),</code></td><td>En MobileNetV2 es la posición 1 del <code>classifier</code> (la 0 es un Dropout).</td></tr>
-<tr data-lines="28"><td><code>("efficientnet_b0", lambda m: m.classifier[1]),</code></td><td>Igual en EfficientNet-B0.</td></tr>
-<tr data-lines="29"><td><code>("densenet121", lambda m: m.classifier)]:</code></td><td>En DenseNet el <code>classifier</code> ya es directamente la capa lineal.</td></tr>
-<tr data-lines="30"><td><code>m = getattr(models, nombre)(weights=None)</code></td><td>Construye la arquitectura por su nombre (<code>models.vgg16</code>, etc.), sin pesos y en <code>meta</code>.</td></tr>
-<tr data-lines="31"><td><code>print(nombre, ultima(m))</code></td><td>Imprime la última capa de cada una.</td></tr>
-</tbody>
-</table>
-</details>
-<div class="salida">
-<strong>Salida esperada</strong>
-<pre>al crearlo: (11689512, 11689512)
-congelado: (11689512, 0)
-Linear(in_features=512, out_features=1000, bias=True)
-con cabeza nueva: (11181642, 5130)
-['fc.weight', 'fc.bias']
-1 5130
-resnet50 Linear(in_features=2048, out_features=1000, bias=True)
-vgg16 Linear(in_features=4096, out_features=1000, bias=True)
-mobilenet_v2 Linear(in_features=1280, out_features=1000, bias=True)
-efficientnet_b0 Linear(in_features=1280, out_features=1000, bias=True)
-densenet121 Linear(in_features=1024, out_features=1000, bias=True)</pre>
-<p>Al crearla, la ResNet-18 tiene <strong>11.689.512</strong> parámetros, todos entrenables. Tras <code>requires_grad_(False)</code> hay <strong>0</strong> entrenables. Al sustituir <code>fc</code> (512 → 1.000, es decir, 513.000 parámetros) por una capa 512 → 10 (\( 512\cdot10 + 10 = 5.130 \)) el total pasa a 11.181.642 y <strong>solo 5.130 son entrenables</strong>: el 0,046 % de la red. Los únicos nombres entrenables son <code>fc.weight</code> y <code>fc.bias</code>, y el optimizador gestiona justo esos 5.130. Fíjate en las últimas líneas: <strong>cada arquitectura esconde su última capa en un sitio distinto</strong> (<code>.fc</code>, <code>.classifier[6]</code>, <code>.classifier[1]</code>, <code>.classifier</code>), pero en todas es una <code>Linear</code> con 1.000 salidas. Para cambiarla hay que mirar primero la estructura con <code>print(modelo)</code>.</p>
+ruta2 = os.path.join(os.path.dirname(ruta), "entero.pth")
+torch.save(modelo, ruta2)
+try:
+    torch.load(ruta2)
+except Exception as e:
+    print(type(e).__name__, str(e)[:55])
+print(type(torch.load(ruta2, weights_only=False)).__name__)</code></pre>
+      <details class="linea-a-linea" open>
+        <summary>Línea por línea</summary>
+        <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+        <table class="lineas">
+          <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+          <tbody>
+        <tr data-lines="1"><td><code>import os</code></td><td>Rutas y tamaños de archivo.</td></tr>
+        <tr data-lines="2"><td><code>import tempfile</code></td><td>Carpeta temporal para no ensuciar tu disco.</td></tr>
+        <tr data-lines="3"><td><code>import torch</code></td><td>PyTorch.</td></tr>
+        <tr data-lines="4"><td><code>from torch import nn</code></td><td>Capas.</td></tr>
+        <tr data-lines="5"><td><code>from torchvision import models</code></td><td>Modelos.</td></tr>
+        <tr data-lines="7"><td><code>torch.manual_seed(0)</code></td><td>Semilla (pesos iniciales reproducibles).</td></tr>
+        <tr data-lines="8"><td><code>modelo = models.resnet18(weights=None)</code></td><td>Una ResNet-18.</td></tr>
+        <tr data-lines="9"><td><code>sd = modelo.state_dict()</code></td><td>El <em>state_dict</em>: un diccionario ordenado «nombre de tensor → tensor» con todos los parámetros <strong>y los buffers</strong> (como las estadísticas de BatchNorm).</td></tr>
+        <tr data-lines="10"><td><code>claves = list(sd)</code></td><td>Las claves (nombres) en forma de lista.</td></tr>
+        <tr data-lines="11"><td><code>print(len(sd), claves[:3], claves[-2:])</code></td><td>Cuántas entradas hay y cómo se llaman las primeras y las últimas.</td></tr>
+        <tr data-lines="12"><td><code>print([k for k in claves if k.startswith("bn1.")])</code></td><td>Las entradas de la primera BatchNorm: dos parámetros (<code>weight</code>, <code>bias</code>) y tres buffers.</td></tr>
+        <tr data-lines="14"><td><code>ruta = os.path.join(tempfile.mkdtemp(), "resnet18.pth")</code></td><td>Ruta de un archivo <code>.pth</code> dentro de una carpeta temporal.</td></tr>
+        <tr data-lines="15"><td><code>torch.save(sd, ruta)</code></td><td>Guarda el diccionario en disco (formato pickle de PyTorch).</td></tr>
+        <tr data-lines="16"><td><code>print(round(os.path.getsize(ruta) / 2**20, 1), "MiB")</code></td><td>Tamaño del archivo en MiB (1 MiB = 2²⁰ bytes).</td></tr>
+        <tr data-lines="18"><td><code>otro = models.resnet18(weights=None)</code></td><td>Otra ResNet-18 distinta, con otros pesos al azar.</td></tr>
+        <tr data-lines="19"><td><code>print(otro.load_state_dict(torch.load(ruta, map_location="cpu")))</code></td><td>Carga los pesos guardados en <code>otro</code>. <code>map_location="cpu"</code> fuerza a leerlos en la CPU aunque se guardaran desde una GPU. <code>load_state_dict</code> devuelve el resultado de la carga.</td></tr>
+        <tr data-lines="20"><td><code>x = torch.randn(2, 3, 64, 64)</code></td><td>Dos imágenes inventadas de 64×64.</td></tr>
+        <tr data-lines="21"><td><code>modelo.eval()</code></td><td>Modo evaluación en el original…</td></tr>
+        <tr data-lines="22"><td><code>otro.eval()</code></td><td>…y en la copia.</td></tr>
+        <tr data-lines="23"><td><code>print("mismas salidas:", torch.equal(modelo(x), otro(x)))</code></td><td>Comprueba que los dos modelos dan exactamente la misma salida: la copia es fiel.</td></tr>
+        <tr data-lines="25"><td><code>nuevo = models.resnet18(weights=None)</code></td><td>Una tercera red…</td></tr>
+        <tr data-lines="26"><td><code>nuevo.fc = nn.Linear(512, 10)</code></td><td>…con la cabeza cambiada a 10 clases.</td></tr>
+        <tr data-lines="27"><td><code>try:</code></td><td>Bloque protegido.</td></tr>
+        <tr data-lines="28"><td><code>nuevo.load_state_dict(torch.load(ruta))</code></td><td>Intenta cargar en ella el checkpoint de 1.000 clases: las formas de <code>fc</code> no coinciden.</td></tr>
+        <tr data-lines="29"><td><code>except RuntimeError as e:</code></td><td>Captura el error de forma.</td></tr>
+        <tr data-lines="30"><td><code>lineas = str(e).splitlines()</code></td><td>Parte el mensaje en líneas.</td></tr>
+        <tr data-lines="31"><td><code>print(lineas[0])</code></td><td>Primera línea: en qué clase falló.</td></tr>
+        <tr data-lines="32"><td><code>print(lineas[1].strip())</code></td><td>Segunda línea: qué tensor no encaja y qué forma tiene en el archivo y en el modelo.</td></tr>
+        <tr data-lines="34"><td><code>sin_fc = {k: v for k, v in sd.items() if not k.startswith("fc.")}</code></td><td>Filtra el diccionario quitando las entradas de la cabeza antigua.</td></tr>
+        <tr data-lines="35"><td><code>print(nuevo.load_state_dict(sin_fc, strict=False))</code></td><td>Carga solo el cuerpo. <code>strict=False</code> permite que falten claves (las de <code>fc</code>) y avisa de cuáles.</td></tr>
+        <tr data-lines="37"><td><code>ruta2 = os.path.join(os.path.dirname(ruta), "entero.pth")</code></td><td>Ruta de un segundo archivo.</td></tr>
+        <tr data-lines="38"><td><code>torch.save(modelo, ruta2)</code></td><td>Guarda el <strong>modelo entero</strong> (la clase y los pesos, con pickle), no solo los pesos.</td></tr>
+        <tr data-lines="39"><td><code>try:</code></td><td>Bloque protegido.</td></tr>
+        <tr data-lines="40"><td><code>torch.load(ruta2)</code></td><td>Intenta cargarlo con la configuración por defecto de las versiones recientes (<code>weights_only=True</code>).</td></tr>
+        <tr data-lines="41"><td><code>except Exception as e:</code></td><td>Captura el error.</td></tr>
+        <tr data-lines="42"><td><code>print(type(e).__name__, str(e)[:55])</code></td><td>Tipo y comienzo del mensaje.</td></tr>
+        <tr data-lines="43"><td><code>print(type(torch.load(ruta2, weights_only=False)).__name__)</code></td><td>Con <code>weights_only=False</code> sí carga (solo hazlo con archivos de confianza): devuelve un objeto <code>ResNet</code>.</td></tr>
+          </tbody>
+        </table>
+      </details>
+      <div class="salida">
+        <strong>Salida esperada</strong>
+    <pre>122 ['conv1.weight', 'bn1.weight', 'bn1.bias'] ['fc.weight', 'fc.bias']
+['bn1.weight', 'bn1.bias', 'bn1.running_mean', 'bn1.running_var', 'bn1.num_batches_tracked']
+44.7 MiB
+&lt;All keys matched successfully&gt;
+mismas salidas: True
+Error(s) in loading state_dict for ResNet:
+size mismatch for fc.weight: copying a param with shape torch.Size([1000, 512]) from checkpoint, the shape in current model is torch.Size([10, 512]).
+_IncompatibleKeys(missing_keys=['fc.weight', 'fc.bias'], unexpected_keys=[])
+UnpicklingError Weights only load failed. This file can still be loaded
+ResNet</pre>
+        <p>Un <code>state_dict</code> de ResNet-18 tiene <strong>122</strong> entradas: 62 tensores de parámetros más 60 <em>buffers</em> de BatchNorm (20 capas BatchNorm × <code>running_mean</code>, <code>running_var</code> y <code>num_batches_tracked</code>). Fíjate en las claves de <code>bn1</code>: además de <code>weight</code> y <code>bias</code> (lo que se aprende) guarda las estadísticas que se usan en <code>eval()</code>; por eso cargar solo "los pesos" no basta si se omiten. El archivo ocupa 44,7 MiB: los 11.689.512 parámetros a 4 bytes y los buffers de BatchNorm suman unos 44,6 MiB, y el resto es la cabecera del formato. La recarga funciona (<code>&lt;All keys matched successfully&gt;</code>) y las salidas son idénticas bit a bit. Al cargar el checkpoint de 1.000 clases en una red con <code>fc</code> de 10 sale el <code>RuntimeError</code> de <em>size mismatch</em>: dice qué tensor falla y las dos formas, <code>[1000, 512]</code> y <code>[10, 512]</code>. La solución es quitar las claves <code>fc.*</code> y cargar con <code>strict=False</code>, que devuelve qué faltaba (<code>missing_keys=['fc.weight', 'fc.bias']</code>: justo lo que se entrena después). Por último, un modelo guardado entero con <code>torch.save(modelo, …)</code> ya no se carga con el <code>torch.load</code> por defecto (<code>weights_only=True</code> desde PyTorch 2.6): hace falta <code>weights_only=False</code>, que ejecuta código arbitrario del archivo, así que solo se usa con archivos propios. Por eso se recomienda guardar el <code>state_dict</code>.</p>
+      </div>
+    </article>
+
+</section>
+
 </div>
-</article></div></details></div></main></body></html>
+</main>
+</body>
+</html>

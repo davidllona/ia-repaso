@@ -1,323 +1,458 @@
-<!DOCTYPE html>
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lección 5 · El gradiente tiene que caber: ni infinito ni cero · Módulo 5 · Curso 3 · Cuaderno de IA</title>
+<meta name="description" content="Gradientes que explotan o se desvanecen: factor por capa, inicialización He, clipnorm, clipvalue y global_clipnorm, y la precisión mixta con loss scaling.">
+<script>try{var t=localStorage.getItem('cuaderno-ia:tema');if(t)document.documentElement.setAttribute('data-theme',t)}catch(e){}</script>
+<link rel="stylesheet" href="../../assets/css/style.css">
+<script src="../../assets/js/curriculum.js"></script>
+<script src="../../assets/js/lab.js"></script>
+<script src="../../assets/js/app.js" defer></script>
+</head>
+<body data-root="../../" data-course="3" data-module="5" data-lesson="5">
+<main>
+<div class="page">
 
-<html lang="es"><head><meta charset="utf-8"/><meta content="width=device-width,initial-scale=1" name="viewport"/><title>Lección 5 · Callbacks: engancharte al entrenamiento · Curso 3 · Cuaderno de IA</title><meta content="Un callback es una clase que hereda de keras.callbacks.Callback y sobrescribe los métodos on_... que le interesen." name="description"/><script>try{var t=localStorage.getItem('cuaderno-ia:tema');if(t)document.documentElement.setAttribute('data-theme',t)}catch(e){}</script><link href="../../assets/css/style.css" rel="stylesheet"/><script src="../../assets/js/curriculum.js"></script><script src="../../assets/js/lab.js"></script><script defer="" src="../../assets/js/app.js"></script><script defer="" src="../../assets/js/microanimations.js"></script></head><body data-course="3" data-lesson="5" data-module="5" data-root="../../"><main><div class="page" data-micro="3min"><header class="hero leccion"><div class="hero-grid"><div><p class="eyebrow">Curso 3 · Módulo 5 · Lección 5 de 14</p><h1>Callbacks: engancharte al entrenamiento</h1><p class="lead">Un callback es una clase que hereda de keras.callbacks.Callback y sobrescribe los métodos on_... que le interesen.</p><p class="meta-line"><span class="read-time" data-render="read-time"></span><a href="../modulo-5.html">Índice del módulo</a></p></div><div aria-hidden="true" class="hero-tile"></div></div></header><details class="predice"><summary>Quiero que el entrenamiento se pare solo cuando deje de mejorar, que guarde el mejor modelo y que baje el learning rate si se atasca. Y quiero hacerlo sin tocar el bucle. ¿Cómo se «engancha» código propio a mitad de un fit ?<span class="hint"></span></summary><div><p>Un callback es una clase que hereda de keras.callbacks.Callback y sobrescribe los métodos on_... que le interesen.</p></div></details><section aria-label="Explicación breve" class="micro-core"><div class="micro-kicker">01 · ENTENDER <span>≈ 45 s</span></div><h2>La idea en palabras sencillas</h2><p>Un callback es una clase que hereda de keras.callbacks.Callback y sobrescribe los métodos on_... que le interesen.</p><div class="micro-example"><span aria-hidden="true" class="micro-example-icon">🐾</span><div><strong>Otro ejemplo · Mascotas</strong><p>Una red combina tamaño, orejas y pelaje para distinguir patrones que no dependen de una sola regla.</p></div></div></section><div class="micro-kicker micro-checkpoint">02 · RESPONDER <span>≈ 15 s</span></div><section aria-label="Pregunta intercalada" class="quiz mini micro-check"><script class="quiz-data" type="application/json">{"titulo": "Pausa rápida · Comprueba la idea", "preguntas": [{"q": "Una neurona recibe dos entradas. ¿Qué hace con los pesos?", "opciones": ["Borra las entradas al entrenar", "Multiplica cada entrada por su peso y combina resultados", "Elige siempre la entrada mayor"], "correcta": 1, "porque": "La suma ponderada combina entradas, pesos y bias antes de la activación."}]}</script></section><section aria-label="Animación interactiva" class="micro-viz" data-index="13" data-micro-viz="neural"><div class="micro-kicker">03 · EXPERIMENTAR <span>≈ 45 s</span></div><div class="micro-viz-title"><div><h2>Señales que atraviesan una red</h2><p>Pulsa «Propagar» para seguir el recorrido de entradas a salida.</p></div><span aria-hidden="true" class="micro-viz-symbol">✦</span></div><div aria-live="polite" class="micro-viz-stage"><p>Animación interactiva: Señales que atraviesan una red</p></div></section><div class="micro-kicker micro-checkpoint">04 · APLICAR <span>≈ 15 s</span></div><section aria-label="Pregunta intercalada" class="quiz mini micro-check"><script class="quiz-data" type="application/json">{"titulo": "Pausa rápida · ¿Lo aplicarías?", "preguntas": [{"q": "¿Cuándo se actualizan los pesos de una red?", "opciones": ["Al aplicar el optimizador durante el entrenamiento", "Cada vez que se abre la página", "Nunca: los pesos son fijos"], "correcta": 0, "porque": "El optimizador utiliza los gradientes para ajustar parámetros durante el aprendizaje."}]}</script></section><div class="micro-finish"><strong>Idea que te llevas</strong><span>Un callback es una clase que hereda de keras</span><small>¿Quieres más ejemplos, fórmulas o código? Los tienes justo debajo, sin límite de tiempo.</small></div><details class="profundizar micro-legacy"><summary><span>Explorar más: explicación y simulaciones completas<small>Todo el texto original, tablas y demos avanzadas. Opcional.</small></span></summary><div class="prof-body"><section><h2>Callbacks: engancharte al entrenamiento</h2>
-<p>Un callback es una clase que hereda de <code>keras.callbacks.Callback</code> y sobrescribe los métodos <code>on_...</code> que le interesen. Todos son opcionales. Keras los llama siempre en este orden (se comprobó imprimiendo cada llamada, fragmento 5):</p>
-<p>También existen los equivalentes <code>on_predict_*</code> para <code>predict</code>.</p>
-<p><code>logs</code> contiene las métricas con los nombres que les diste: <code>loss</code>, <code>accuracy</code>, <code>val_loss</code>, <code>val_accuracy</code>… En <code>on_epoch_end</code> son las medias de toda la época. En <code>on_train_batch_end</code> <strong>no es la pérdida del lote suelto</strong>, sino la <strong>media acumulada de la época hasta ese lote</strong>, porque las métricas son <code>Mean</code> y solo se reinician al empezar la época. Se comprobó con la tasa de aprendizaje a 0 (el modelo no cambia): los lotes tenían pérdida 4,95 y 9,39 y el <code>logs["loss"]</code> tras el segundo lote fue 7,17, que es \( (4{,}95+9{,}39)/2 \).</p>
-<div class="callout ejemplo"><span class="lbl">Ejemplo tomado del módulo</span><p>· patience = 3 Cada época es un capítulo de una serie que empieza bien y se va torciendo. val_loss es el error del modelo al predecir las notas de usuarios que no vio al entrenar (más bajo es mejor; cifras inventadas).</p></div></section><figure class="demo" data-demo="curso3/c3m5-callbacks-orden" data-titulo="En qué orden llama Keras a los ganchos">
-<div class="haz">Pulsa «Paso ▶» repetidamente y sigue la lista: la fila naranja es la llamada actual y a la derecha ves qué hace cada gancho. Después pulsa «Hasta el final de la época». Quita <code>validation_data</code> con el interruptor y fíjate en qué filas desaparecen. Sube épocas y lotes y mira cómo crece el número total de llamadas.</div>
-<div class="observa">Los ganchos de <strong>época</strong> abren y cierran un bloque de ganchos de <strong>lote</strong>; la validación ocurre <strong>antes</strong> de <code>on_epoch_end</code>, y por eso en <code>on_epoch_end</code> ya existe <code>val_loss</code>. Con muchos lotes, <code>on_train_batch_*</code> se llama miles de veces: un callback que hace trabajo pesado en ese gancho ralentiza todo el entrenamiento. Los callbacks de este módulo (<code>EarlyStopping</code>, <code>ModelCheckpoint</code>, <code>ReduceLROnPlateau</code>) viven en <code>on_epoch_end</code>.</div>
-</figure><div class="resumen"><h2 class="sin-num sin-toc">En pocas líneas</h2><ul><li><strong>Callbacks: engancharte al entrenamiento:</strong> Un callback es una clase que hereda de keras.callbacks.Callback y sobrescribe los métodos on_... que le interesen.</li><li>Antes de continuar, intenta explicar la demo sin mirar su resultado.</li></ul></div><section class="quiz mini"><script class="quiz-data" type="application/json">{"titulo": "¿Lo tienes?", "preguntas": [{"q": "¿Qué concepto estamos trabajando en esta lección?", "opciones": ["tf.function dentro del bucle: rapidez y trampas", "Optimizadores en la práctica: Nesterov, AdamW y los mandos de Keras", "Callbacks: engancharte al entrenamiento"], "correcta": 2, "porque": "Un callback es una clase que hereda de keras.callbacks.Callback y sobrescribe los métodos on_... que le interesen."}, {"q": "¿Cuál de estas afirmaciones recoge lo que acabas de estudiar?", "opciones": ["Un callback es una clase que hereda de keras.callbacks.Callback y sobrescribe los métodos on_... que le interesen.", "Siempre hay un único método que sirve para todos los problemas.", "Lo importante es comprender la idea y comprobarla con ejemplos, no memorizar términos."], "correcta": 0, "porque": "La explicación central es: Un callback es una clase que hereda de keras.callbacks.Callback y sobrescribe los métodos on_... que le interesen."}, {"q": "Si una demo o un ejemplo te desconcierta, ¿cuál es la mejor forma de aprenderlo?", "opciones": ["Volver a los números, cambiar un valor y explicar qué ocurre.", "Ignorar los resultados que no coinciden con tu intuición.", "Memorizar el nombre sin entender la operación."], "correcta": 0, "porque": "Explorar qué cambia y por qué ayuda a conectar el concepto con su resultado."}]}</script></section></div></details><details class="profundizar"><summary><span>Profundizar: explicación completa<small>Matices, fórmulas, tablas, otros ejemplos y experimentos del módulo original.</small></span></summary><div class="prof-body"><section>
-<h2 id="callbacks">Callbacks: engancharte al entrenamiento</h2>
-<p class="pregunta">Quiero que el entrenamiento se pare solo cuando deje de mejorar, que guarde el mejor modelo y que baje el learning rate si se atasca. Y quiero hacerlo sin tocar el bucle. ¿Cómo se «engancha» código propio a mitad de un <code>fit</code>?</p>
-<div class="callout analogia">
-<span class="lbl">Analogía</span>
-<p>El mando a distancia en una maratón de series. La serie (<code>fit</code>) sigue sola, pero al acabar cada capítulo (cada época) tú decides: «¿bajo la velocidad de reproducción (bajo el learning rate)?», «¿apunto en qué capítulo voy (guardo el modelo)?», «¿esto ya no mejora, la dejo (paro)?». Un <strong>callback</strong> es ese mando: un objeto cuyos métodos Keras llama en momentos fijos del entrenamiento.</p>
-</div>
-<div class="callout recuerda">
-<span class="lbl">Recuerda (<a href="../../curso-2/modulo-2.html#sobreajuste">Curso 2 · módulo 2</a>)</span>
-<p>Ya usaste <code>EarlyStopping(patience=..., restore_best_weights=True)</code> y <code>ModelCheckpoint(..., save_best_only=True)</code>. Aquí abrimos esos callbacks para ver <em>cuándo</em> se llaman, <em>qué</em> reciben y cómo escribir los tuyos.</p>
-</div>
-<h3>Los ganchos y su orden</h3>
-<p>Un callback es una clase que hereda de <code>keras.callbacks.Callback</code> y sobrescribe los métodos <code>on_...</code> que le interesen. Todos son opcionales. Keras los llama siempre en este orden (se comprobó imprimiendo cada llamada, fragmento 5):</p>
-<table>
-<caption>Ganchos de <code>fit</code>, en el orden en que ocurren</caption>
-<thead><tr><th>Gancho</th><th>Cuándo</th><th>Qué recibe</th></tr></thead>
-<tbody>
-<tr><td><code>on_train_begin</code></td><td>Una vez, antes de la primera época</td><td><code>logs</code></td></tr>
-<tr><td><code>on_epoch_begin</code></td><td>Al empezar cada época</td><td><code>epoch</code> (empieza en 0)</td></tr>
-<tr><td><code>on_train_batch_begin</code> / <code>on_train_batch_end</code></td><td>Antes y después de cada lote</td><td><code>batch</code>, <code>logs</code></td></tr>
-<tr><td><code>on_test_begin</code>, <code>on_test_batch_*</code>, <code>on_test_end</code></td><td>La validación de esa época (solo con <code>validation_data</code>) o un <code>evaluate</code></td><td><code>batch</code>, <code>logs</code></td></tr>
-<tr><td><code>on_epoch_end</code></td><td>Al acabar la época, con las métricas de entrenamiento y validación</td><td><code>epoch</code>, <code>logs</code> (<code>loss</code>, <code>val_loss</code>…)</td></tr>
-<tr><td><code>on_train_end</code></td><td>Una vez, al final</td><td><code>logs</code></td></tr>
-</tbody>
-</table>
-<p>También existen los equivalentes <code>on_predict_*</code> para <code>predict</code>.</p>
-<h3>El diccionario <code>logs</code> (y una trampa)</h3>
-<p><code>logs</code> contiene las métricas con los nombres que les diste: <code>loss</code>, <code>accuracy</code>, <code>val_loss</code>, <code>val_accuracy</code>… En <code>on_epoch_end</code> son las medias de toda la época. En <code>on_train_batch_end</code> <strong>no es la pérdida del lote suelto</strong>, sino la <strong>media acumulada de la época hasta ese lote</strong>, porque las métricas son <code>Mean</code> y solo se reinician al empezar la época. Se comprobó con la tasa de aprendizaje a 0 (el modelo no cambia): los lotes tenían pérdida 4,95 y 9,39 y el <code>logs["loss"]</code> tras el segundo lote fue 7,17, que es \( (4{,}95+9{,}39)/2 \).</p>
-<div class="callout ojo">
-<span class="lbl">Ojo · <code>val_loss</code> no existe si no hay validación</span>
-<p>Si pones <code>monitor="val_loss"</code> en <code>EarlyStopping</code> y haces <code>fit</code> sin <code>validation_data</code> ni <code>validation_split</code>, <strong>no falla</strong>: emite un <code>UserWarning</code> («conditioned on metric <code>val_loss</code> which is not available») en cada época y simplemente no hace nada. El entrenamiento parece normal y nunca para. Lee los avisos.</p>
-</div>
-<h3>Los callbacks incluidos, uno a uno</h3>
-<table>
-<caption>Los que más vas a usar</caption>
-<thead><tr><th>Callback</th><th>Qué hace</th><th>Argumentos clave</th></tr></thead>
-<tbody>
-<tr><td><code>EarlyStopping</code></td><td>Para cuando la métrica vigilada deja de mejorar</td><td><code>monitor</code>, <code>patience</code>, <code>min_delta</code>, <code>restore_best_weights</code>, <code>start_from_epoch</code>, <code>baseline</code></td></tr>
-<tr><td><code>ModelCheckpoint</code></td><td>Guarda el modelo (o los pesos) durante el entrenamiento</td><td><code>filepath</code>, <code>monitor</code>, <code>save_best_only</code>, <code>save_weights_only</code>, <code>save_freq</code></td></tr>
-<tr><td><code>ReduceLROnPlateau</code></td><td>Multiplica el learning rate por <code>factor</code> si la métrica se estanca</td><td><code>monitor</code>, <code>factor</code>, <code>patience</code>, <code>min_delta</code>, <code>cooldown</code>, <code>min_lr</code></td></tr>
-<tr><td><code>LearningRateScheduler</code></td><td>Pone el learning rate de cada época con una función tuya</td><td><code>schedule(epoch, lr)</code></td></tr>
-<tr><td><code>CSVLogger</code></td><td>Escribe una línea por época en un CSV</td><td><code>filename</code>, <code>append</code></td></tr>
-<tr><td><code>TensorBoard</code></td><td>Guarda registros para verlos en el navegador</td><td><code>log_dir</code>, <code>histogram_freq</code>, <code>update_freq</code></td></tr>
-<tr><td><code>TerminateOnNaN</code></td><td>Para en cuanto la pérdida es <code>nan</code> o <code>inf</code></td><td><code>raise_error</code></td></tr>
-<tr><td><code>BackupAndRestore</code></td><td>Guarda el estado completo para reanudar tras una caída</td><td><code>backup_dir</code></td></tr>
-<tr><td><code>LambdaCallback</code></td><td>Callback rápido con funciones sueltas en vez de una clase</td><td><code>on_epoch_end=…</code>, etc.</td></tr>
-</tbody>
-</table>
-<h3>EarlyStopping a mano</h3>
-<p>El callback lleva dos números: la <strong>mejor</strong> métrica vista hasta ahora y un contador <code>wait</code> de épocas sin mejorar. Al final de cada época: si la métrica mejora (en más de <code>min_delta</code>), actualiza la mejor, guarda los pesos y pone <code>wait = 0</code>; si no, suma 1 a <code>wait</code>. Cuando <code>wait</code> llega a <code>patience</code>, pone <code>self.model.stop_training = True</code>.</p>
-<div class="callout ejemplo">
-<span class="lbl">Ejemplo numérico · patience = 3</span>
-<p>Cada época es un capítulo de una serie que empieza bien y se va torciendo. <code>val_loss</code> es el error del modelo al predecir las notas de usuarios que no vio al entrenar (más bajo es mejor; cifras inventadas). Si pasan 3 capítulos seguidos sin superar al mejor, dejas de verla.</p>
-<table>
-<thead><tr><th>Época</th><th>val_loss</th><th>¿Mejora?</th><th>Mejor hasta ahora</th><th>wait</th></tr></thead>
-<tbody>
-<tr><td>1</td><td>0,50</td><td>Sí</td><td>0,50</td><td>0</td></tr>
-<tr><td>2</td><td>0,45</td><td>Sí</td><td>0,45</td><td>0</td></tr>
-<tr><td>3</td><td>0,41</td><td>Sí</td><td class="res">0,41 (época 3)</td><td>0</td></tr>
-<tr><td>4</td><td>0,42</td><td>No</td><td>0,41</td><td>1</td></tr>
-<tr><td>5</td><td>0,43</td><td>No</td><td>0,41</td><td>2</td></tr>
-<tr><td>6</td><td>0,44</td><td>No</td><td>0,41</td><td class="res">3 = patience → PARA</td></tr>
-</tbody>
-</table>
-<p>Con <code>restore_best_weights=True</code> el modelo recupera los pesos de la época 3 (te quedas con «el mejor capítulo»). Sin él se quedaría con los de la época 6, <strong>peores</strong>: es el olvido más común. En el fragmento 4 pasa justo esto con <code>patience=12</code>: la mejor época es la 4 y el entrenamiento para en la 16 (\( 4+12 \)) y restaura «el final de la mejor época: 4».</p>
-</div>
-<h3>ReduceLROnPlateau a mano</h3>
-<p>Funciona igual que <code>EarlyStopping</code>, pero en lugar de parar, <strong>baja el learning rate</strong>: si la métrica no mejora durante <code>patience</code> épocas, \( \eta \leftarrow \max(\eta\cdot\text{factor},\ \text{min\_lr}) \) y el contador vuelve a 0. Con <code>cooldown=c</code>, después de bajar se esperan <code>c</code> épocas sin contar. La idea: en lugar de abandonar la serie, la ves más despacio para no perderte detalles. Cuando el entrenamiento se atasca, a menudo es porque el paso es demasiado grande para afinar; pasos más pequeños permiten seguir bajando.</p>
-<div class="callout ejemplo">
-<span class="lbl">Ejemplo numérico · el fragmento 4 época a época</span>
-<p><code>ReduceLROnPlateau(factor=0.5, patience=4)</code> con \( \eta=0{,}02 \) y la mejor época en la 4.</p>
-<ol class="pasos">
-<li><strong>Épocas 5, 6, 7 y 8:</strong> no mejora, <code>wait</code> = 1, 2, 3, 4. Al acabar la 8: \( 0{,}02\cdot0{,}5=0{,}01 \) y <code>wait</code> vuelve a 0.</li>
-<li><strong>Épocas 9 a 12:</strong> otra vez cuatro sin mejorar: \( \eta=0{,}005 \).</li>
-<li><strong>Épocas 13 a 16:</strong> \( \eta=0{,}0025 \) y, además, <code>EarlyStopping</code> llega a su <code>patience</code> de 12 y para.</li>
-</ol>
-<p>Por eso <code>history["learning_rate"]</code> sale como ocho valores de 0,02, cuatro de 0,01 y cuatro de 0,005 (cada época registra el valor con el que se entrenó). El aviso de Keras escribe 0,009999999776… porque el 0,01 se guarda en <code>float32</code>.</p>
-</div>
-<figure class="demo" data-demo="curso3/c3m5-parada-lr" data-titulo="EarlyStopping y ReduceLROnPlateau en un entrenamiento real">
-<div class="haz">Se entrena de verdad (con SGD y mini-lotes) un polinomio de grado 9 que intenta predecir la nota de 20 películas con ruido (datos inventados), y se mide su error con 80 películas nuevas: eso es la validación. Con los valores iniciales mira dónde está el punto verde (la mejor época) y cuándo para. Desactiva <code>restore_best_weights</code> y compara el <code>val_loss</code> que te quedas. Desactiva <code>ReduceLROnPlateau</code> y observa las oscilaciones. Prueba «Otro ruido».</div>
-<div class="observa">Con un learning rate alto (0,5) las primeras épocas oscilan; cada bajada del learning rate (línea de puntos) <strong>calma</strong> la curva. <code>EarlyStopping</code> para <code>patience</code> épocas después del mínimo, y con <code>restore_best_weights</code> recuperas los pesos del punto verde. Sin él, te quedas con los del final, algo peores. Con <code>patience</code> muy pequeño para antes de que ReduceLROnPlateau tenga tiempo de ayudar: <strong>la paciencia de EarlyStopping debe ser mayor que la de ReduceLROnPlateau</strong> (aquí, 12 frente a 5). Ojo: ReduceLROnPlateau estabiliza, pero no garantiza un mínimo mejor; el mejor valor lo marca el punto verde.</div>
+<header class="hero leccion">
+  <div class="hero-grid">
+    <div>
+      <p class="eyebrow">Curso 3 · Módulo 5 · Lección 5 de 8</p>
+      <h1>El gradiente tiene que caber: ni infinito ni cero</h1>
+      <p class="lead">Con pesos iniciales mal escalados la señal explota o se apaga capa a capa. La inicialización He lo evita, el recorte frena los <code>nan</code> y el <em>loss scaling</em> rescata los gradientes diminutos de float16.</p>
+      <p class="meta-line"><span class="read-time" data-render="read-time"></span><a href="../modulo-5.html">Índice del módulo</a></p>
+    </div>
+    <div class="hero-tile" aria-hidden="true"></div>
+  </div>
+</header>
+<details class="predice">
+  <summary>Una red de 10 capas ReLU de 100 neuronas empieza con pesos de desviación típica 1,0. La señal que llega a la última capa, ¿es más grande, más pequeña o igual que la de entrada?<span class="hint"></span></summary>
+  <div>
+    <p><strong>Unas 300 millones de veces más grande.</strong> Cada capa multiplica el tamaño por \( \sqrt{100\cdot1/2}=7{,}07 \), y \( 7{,}07^{10}\approx3\cdot10^8 \). El gradiente recorre el mismo camino hacia atrás, así que también explota: <code>loss: nan</code> en pocos lotes.</p>
+  </div>
+</details>
+
+<section>
+<h2 id="idea">El gradiente tiene que caber: ni infinito ni cero</h2>
+<p>Imagina el sonido de una película pasando por 10 amplificadores seguidos. Si cada uno multiplica el volumen por 0,07, al final no se oye nada (<strong>se desvanece</strong>); si lo multiplica por 7, revientan los altavoces (<strong>explota</strong>). Solo con factor 1 llega tal cual. En una capa <code>Dense</code> con \( n \) entradas y ReLU, ese factor es:</p>
+<div class="formula">\[ \text{factor por capa}=\sqrt{\frac{n\,\sigma^2}{2}} \]</div>
+<p>donde \( \sigma^2 \) es la varianza de los pesos iniciales. Para que valga 1, \( \sigma^2=2/n \): es la inicialización <strong>He</strong> (<code>kernel_initializer="he_normal"</code>). La de serie, Glorot, está pensada para tanh y sigmoide; con ReLU encoge la señal un 30 % por capa.</p>
+<p>Si aun así la pérdida da <code>nan</code>, el cinturón de seguridad es <strong>recortar</strong> el gradiente antes de aplicarlo: <code>clipnorm=1.0</code> lo acorta sin cambiar su dirección, <code>clipvalue</code> recorta cada componente (y la dirección cambia) y <code>global_clipnorm</code> usa una sola norma para todas las capas. Solo actúa cuando el gradiente se pasa del umbral.</p>
+<p>El problema contrario aparece con la <strong>precisión mixta</strong>: en float16 un gradiente menor que unos \( 6\cdot10^{-8} \) se redondea a 0 y su peso no se mueve. El arreglo es el <em>loss scaling</em>: multiplicar la pérdida por \( S \) (todos los gradientes crecen \( S \) veces) y dividir entre \( S \) en float32 antes del paso.</p>
+</section>
+
+<figure class="demo" data-demo="curso3/c3m5-clip-precipicio" data-titulo="Un precipicio en la pérdida: con y sin clipnorm">
+  <div class="haz">Empieza en \( w=3 \), contra la pared, y compara las dos trayectorias. Luego empieza en 2,2.</div>
+  <div class="observa">Sin recorte, un paso de 12 lanza el peso lejísimos; con <code>clipnorm</code> baja por la pared. Desde 2,2 el recorte solo frena.</div>
 </figure>
-<h3>Combinarlos: el trío de siempre</h3>
-<p>El fragmento 4 usa cinco callbacks a la vez. Cada uno vive en su <code>on_epoch_end</code> y se ejecutan en el orden de la lista:</p>
-<ol>
-<li><code>ModelCheckpoint(".../mejor.keras", monitor="val_loss", save_best_only=True)</code> guarda solo cuando mejora. Tras el entrenamiento, cargar ese archivo da exactamente el mismo <code>val_loss</code> (0,4121) que el modelo con los pesos restaurados.</li>
-<li><code>ReduceLROnPlateau(factor=0.5, patience=4, min_lr=1e-4)</code> baja el learning rate al atascarse.</li>
-<li><code>EarlyStopping(patience=12, restore_best_weights=True)</code> para si pasa mucho tiempo sin mejorar.</li>
-<li><code>CSVLogger</code> deja un CSV con una fila por época (cabecera <code>epoch,accuracy,learning_rate,loss,val_accuracy,val_loss</code>), cómodo para dibujar curvas después.</li>
-<li><code>TensorBoard(log_dir=...)</code> escribe los registros. Para verlos abre una terminal y ejecuta <code>tensorboard --logdir la_carpeta</code>, luego entra en <code>http://localhost:6006</code>. Necesita el paquete <code>tensorboard</code> (<code>pip install tensorboard</code>): sin él, el entrenamiento falla con <code>TBNotInstalledError</code>.</li>
-</ol>
-<div class="callout regla">
-<span class="lbl">Regla fácil</span>
-<p>Receta por defecto: <strong>ModelCheckpoint (guarda el mejor) + ReduceLROnPlateau (patience corto) + EarlyStopping (patience largo, con <code>restore_best_weights=True</code>)</strong>, todos vigilando la <em>misma</em> métrica de validación. Pon un número de épocas alto: el callback decide cuándo parar.</p>
+
+<section>
+<h2 id="numeros">Con números: 10 capas de 100 neuronas</h2>
+<div class="callout ejemplo">
+  <span class="lbl">Ejemplo numérico</span>
+  <p>Con \( n=100 \) y ReLU, el factor por capa según la desviación σ de los pesos, y elevado a 10 capas (Glorot es el inicializador por defecto):</p>
+  <table>
+    <thead><tr><th>Pesos</th><th>Factor</th><th>10 capas</th></tr></thead>
+    <tbody>
+      <tr><td>σ = 0,01</td><td>0,071</td><td>\( 3\cdot10^{-12} \)</td></tr>
+      <tr><td>σ = 1,0</td><td>7,07</td><td>\( 3\cdot10^{8} \)</td></tr>
+      <tr><td>Glorot</td><td>0,71</td><td>0,031</td></tr>
+      <tr><td>He</td><td class="res">1,00</td><td class="res">1</td></tr>
+    </tbody>
+  </table>
+  <p>Medido con Keras (<a href="#frag-8">fragmento 8</a>): 2,5·10⁻¹², 2,5·10⁸, 0,024 y 0,98. La cuenta acierta el orden de magnitud.</p>
 </div>
+</section>
+
+<figure class="demo" data-demo="curso3/c3m5-fp16" data-titulo="Loss scaling: rescatar gradientes del underflow">
+  <div class="haz">Mira el porcentaje de ceros sin escalar y sube la escala <em>S</em>. Luego sube la magnitud a 10⁻³.</div>
+  <div class="observa">Sin escalar, el 15,7 % se vuelve 0; con \( S=2^{10} \), ninguno. Con \( S \) enorme aparecen <code>inf</code>.</div>
+</figure>
+
+<details class="predice">
+  <summary>Un gradiente de \( 10^{-8} \) en float16 es 0. Si multiplicas la pérdida por \( S=1024 \) y luego divides entre 1024, ¿recuperas el gradiente?<span class="hint"></span></summary>
+  <div>
+    <p><strong>Sí, casi exacto.</strong> \( 10^{-8}\cdot1024=1{,}024\cdot10^{-5} \) sí cabe en float16 (se guarda como 1,025·10⁻⁵); al dividir da \( 1{,}0012\cdot10^{-8} \), un error del 0,12 %. Pero si \( S \) es demasiado grande, los gradientes grandes pasan de 65504 y dan <code>inf</code>: por eso Keras ajusta \( S \) solo.</p>
+  </div>
+</details>
+
+<div class="resumen">
+  <h2 class="sin-num sin-toc">En tres líneas</h2>
+  <ul>
+    <li>Con ReLU, inicializa con He (\( \sigma^2=2/n \)): factor 1 por capa.</li>
+    <li><code>nan</code>: baja \( \eta \), usa He y añade <code>clipnorm</code> o <code>global_clipnorm</code> como cinturón.</li>
+    <li>En float16 los gradientes diminutos se vuelven 0: el <em>loss scaling</em> los rescata.</li>
+  </ul>
+</div>
+
+<section class="quiz mini">
+<script type="application/json" class="quiz-data">
+{
+ "titulo": "¿Lo tienes?",
+ "preguntas": [
+  {
+   "q": "Una red tiene capas <code>Dense</code> con ReLU y 200 entradas por capa. ¿Qué desviación típica de los pesos iniciales conserva el tamaño de las activaciones de una capa a otra (inicialización He)?",
+   "opciones": ["0,01", "0,05", "1,0", "0,1"],
+   "correcta": 3,
+   "porque": "El factor por capa es la raíz de (n·σ²/2), y vale 1 cuando σ² = 2/n. Con n = 200, σ² = 0,01 y σ = 0,1. Con σ = 0,01 el factor es 0,1 (la señal se apaga capa a capa y los gradientes se desvanecen), con 0,05 es 0,5 (también se encoge) y con 1,0 es 10 (explota)."
+  },
+  {
+   "q": "Con <code>SGD(learning_rate=1.0, global_clipnorm=1.0)</code> se aplican dos gradientes a la vez: [3, 4] a la variable a y [12] a la variable b. ¿Cuánto vale el gradiente recortado de b?",
+   "opciones": ["1,0", "0,923", "0,2308", "12,0"],
+   "correcta": 1,
+   "porque": "<code>global_clipnorm</code> calcula una sola norma con todos los gradientes: √(9 + 16 + 144) = 13, y como supera 1, los divide todos entre 13. El de b queda en 12/13 = 0,923 y el de a en [0,2308 ; 0,3077]. El 1,0 sería <code>clipnorm</code> (que recorta cada variable por separado) y el 12 es sin recorte."
+  },
+  {
+   "q": "En precisión mixta (<code>mixed_float16</code>), ¿para qué sirve el escalado de la pérdida (loss scaling)?",
+   "opciones": [
+    "Para que la pérdida valga más y el modelo aprenda más rápido.",
+    "Para que los gradientes muy pequeños no se conviertan en 0 al calcularlos en float16: se multiplican por una escala S y luego se dividen entre S en float32.",
+    "Para convertir los pesos de float32 a float16 sin perder precisión.",
+    "Para evitar el overflow de los gradientes grandes."
+   ],
+   "correcta": 1,
+   "porque": "En float16 un gradiente de 10⁻⁸ se redondea a 0 (underflow) y su peso no se actualiza. Multiplicar la pérdida por S multiplica todos los gradientes por S (regla de la cadena) y los saca de esa zona; luego se desescalan en float32. No cambia la velocidad de aprendizaje, no convierte pesos (se guardan en float32) y de hecho una escala demasiado grande provoca overflow: por eso Keras la ajusta de forma dinámica (salta el paso y la reduce a la mitad si aparece <code>inf</code>)."
+  }
+ ]
+}
+</script>
+</section>
+
+<details class="profundizar">
+  <summary><span>Profundizar: la explicación completa<small>La escala de una capa a otra con la tabla medida, los inicializadores de Keras, los tres recortes con números, la demo del círculo y el cuadrado, normalizar frente a recortar y la precisión mixta en Keras 3.</small></span></summary>
+  <div class="prof-body">
+<h2 id="gradientes">Gradientes que explotan o se desvanecen: inicialización y recorte</h2>
+
+<p class="pregunta">Tu entrenamiento imprime <code>loss: nan</code> a los pocos lotes, o al revés: la pérdida no se mueve en ninguna época. En los dos casos «el gradiente» es el sospechoso. ¿Cómo se distingue una cosa de la otra y qué se arregla en cada caso?</p>
+
+<div class="callout recuerda">
+  <span class="lbl">Recuerda (<a href="../../curso-2/modulo-1/leccion-7.html#desvanece">Curso 2 · módulo 1</a>)</span>
+  <p>El gradiente de una capa se obtiene multiplicando los factores de todas las capas que tiene encima (regla de la cadena). Si cada factor es menor que 1 (la derivada de la sigmoide vale como mucho 0,25), el producto se <strong>desvanece</strong>; si es mayor que 1, <strong>explota</strong>. En el <a href="../modulo-2/leccion-4.html#resnet">módulo 2</a> viste el atajo residual como remedio estructural. Aquí vemos el otro culpable, que no depende de la activación: <strong>la escala de los pesos iniciales</strong>.</p>
+</div>
+
+<h3>Cuánto cambia la escala de una capa a otra</h3>
+<p>Sea una capa <code>Dense</code> con \( n \) entradas. Cada salida es \( z=\sum_{i=1}^{n} w_i x_i \), una suma de \( n \) productos. Si los pesos son independientes, de media 0 y varianza \( \sigma^2 \), y las entradas tienen segundo momento \( q \) (el valor medio de \( x^2 \)), entonces \( \operatorname{Var}(z)=n\,\sigma^2\,q \). Una ReLU pone a 0 la mitad de los valores (los negativos), así que el segundo momento de su salida es la <strong>mitad</strong>. En resumen, el tamaño típico (la raíz de \( q \)) se multiplica en cada capa por:</p>
+<div class="formula">\[ \text{factor por capa}=\sqrt{\frac{n\,\sigma^2}{2}} \qquad\Longrightarrow\qquad \text{tras } L \text{ capas: } (\text{factor})^{L} \]</div>
+<div class="callout analogia">
+  <span class="lbl">Analogía</span>
+  <p>El sonido de una película pasando por 10 amplificadores seguidos. Si cada uno multiplica el volumen por 0,07, al final no se oye nada (la señal se desvanece); si cada uno lo multiplica por 7, los altavoces revientan (la señal explota). Solo si cada amplificador deja el volumen igual (factor 1) llega el sonido tal cual al final. Los pesos iniciales son el botón de volumen de cada amplificador.</p>
+</div>
+
+<p>Si el factor es distinto de 1, la señal (y el gradiente, que recorre el mismo camino hacia atrás) crece o se encoge <strong>de forma exponencial</strong> con la profundidad. Con \( n=100 \) entradas en cada capa y 10 capas:</p>
+
+<table>
+  <caption>Predicción a mano frente a lo medido (fragmento 8, 10 capas ReLU de 100 neuronas)</caption>
+  <thead><tr><th>Inicializador</th><th>Varianza \( \sigma^2 \)</th><th>Factor por capa</th><th>Factor\( ^{10} \)</th><th>Desviación medida en la capa 10</th></tr></thead>
+  <tbody>
+    <tr><td><code>RandomNormal(stddev=0.01)</code></td><td>\( 10^{-4} \)</td><td>\( \sqrt{100\cdot10^{-4}/2}=0{,}071 \)</td><td>\( 3\cdot10^{-12} \)</td><td>2,5·10⁻¹²</td></tr>
+    <tr><td><code>RandomNormal(stddev=1.0)</code></td><td>1</td><td>\( \sqrt{100/2}=7{,}07 \)</td><td>\( 3\cdot10^{8} \)</td><td>2,5·10⁸</td></tr>
+    <tr><td><code>GlorotUniform</code> (el defecto)</td><td>\( 2/(n_{in}+n_{out})=0{,}01 \)</td><td>0,71</td><td>0,031</td><td>0,024</td></tr>
+    <tr><td><code>HeNormal</code></td><td>\( 2/n_{in}=0{,}02 \)</td><td>1,00</td><td>1</td><td>0,98</td></tr>
+  </tbody>
+</table>
+<p>La predicción acierta en el orden de magnitud (lo medido es una desviación típica y sale algo menor, aproximadamente un 0,8 de la raíz del segundo momento, porque las salidas de una ReLU son todas positivas). Dos mensajes: <strong>pesos demasiado pequeños dejan la señal en 0 y pesos demasiado grandes la hacen explotar</strong>, y para una ReLU la receta es \( \sigma^2=2/n_{in} \), que es <strong>He</strong>. Con el inicializador por defecto de <code>Dense</code> (<strong>Glorot</strong>, pensado para activaciones lineales, tanh y sigmoide) la señal se encoge un 30 % por capa con ReLU: en una red de 10 capas llega a la última con el 3 % del tamaño.</p>
+
+<div class="callout ejemplo">
+  <span class="lbl">Ejemplo numérico · sigmoide: el gradiente de la capa 1 frente al de la capa 10</span>
+  <p>La última fila del fragmento 8 usa sigmoide con Glorot. La derivada de la sigmoide vale como mucho 0,25, así que cada capa multiplica el gradiente por una cifra pequeña. Medido: la norma del gradiente del <code>kernel</code> de la capa 10 es 0,52 y la de la capa 1, <strong>5,9·10⁻⁷</strong>: un millón de veces menos. Con ese gradiente la primera capa <strong>no aprende nada</strong>, aunque el entrenamiento no dé ningún error.</p>
+</div>
+
+<h3>Los inicializadores de Keras</h3>
+<table>
+  <caption>Qué usar y cuándo</caption>
+  <thead><tr><th>Inicializador</th><th>Varianza de los pesos</th><th>Úsalo con</th></tr></thead>
+  <tbody>
+    <tr><td><code>glorot_uniform</code> (por defecto en <code>Dense</code> y <code>Conv</code>), <code>glorot_normal</code></td><td>\( 2/(n_{in}+n_{out}) \)</td><td>tanh, sigmoide, salidas lineales o softmax</td></tr>
+    <tr><td><code>he_normal</code>, <code>he_uniform</code></td><td>\( 2/n_{in} \)</td><td><strong>ReLU</strong> y derivadas (LeakyReLU, ELU…)</td></tr>
+    <tr><td><code>zeros</code> (por defecto en los sesgos), <code>ones</code></td><td>—</td><td>sesgos; \( \gamma \) de BatchNorm</td></tr>
+    <tr><td><code>orthogonal</code></td><td>—</td><td>pesos recurrentes (es el defecto del <code>recurrent_kernel</code> de LSTM y GRU)</td></tr>
+    <tr><td><code>RandomNormal(stddev=…)</code>, <code>RandomUniform</code></td><td>la que digas</td><td>experimentos; casi nunca para un modelo real</td></tr>
+  </tbody>
+</table>
+<p>Se pasan con <code>kernel_initializer="he_normal"</code> (por nombre) o con el objeto <code>keras.initializers.HeNormal(seed=0)</code>. Los pesos <strong>no pueden empezar todos iguales</strong> (si todas las neuronas de una capa empiezan igual reciben el mismo gradiente y se quedan iguales para siempre): por eso los inicializadores son aleatorios, aunque los sesgos sí valen 0.</p>
+
 <div class="callout ojo">
-<span class="lbl">Ojo · <code>ModelCheckpoint</code> y la extensión del archivo en Keras 3</span>
-<p>En Keras 3 el nombre del archivo decide el formato y se valida. Con <code>filepath="mejor.ckpt"</code> da <code>ValueError: The filepath provided must end in .keras</code>. Con <code>save_weights_only=True</code> el nombre debe acabar en <code>.weights.h5</code>; con <code>"pesos.keras"</code> da otro <code>ValueError</code>. Los dos fallan <strong>nada más crear el callback</strong>, antes de entrenar. El fragmento 5 los provoca. Para un nombre distinto por época puedes usar plantillas como <code>"mejor_{epoch:02d}.keras"</code>.</p>
+  <span class="lbl">Ojo · un inicializador creado antes de fijar la semilla no usa esa semilla</span>
+  <p>Al hacer los experimentos del fragmento 8 salió algo desconcertante: con <code>RandomNormal(stddev=0.01)</code> los resultados cambiaban de una ejecución a otra aunque usábamos <code>keras.utils.set_random_seed(0)</code>. La causa: el objeto inicializador se había creado <em>antes</em> de fijar la semilla y llevaba ya su propia semilla aleatoria. La solución es crear el inicializador <strong>después</strong> de <code>set_random_seed</code> (el fragmento lo hace con una función fábrica) o pasarle <code>seed=</code>.</p>
 </div>
-<h3>Tus propios callbacks</h3>
-<p>Escribir un callback es heredar y sobrescribir. Dos cosas lo hacen potente: <code>self.model</code> (el modelo que se entrena, con su optimizador) y <code>logs</code> (las métricas). Con ellos puedes parar el entrenamiento (<code>self.model.stop_training = True</code>), leer el learning rate (<code>float(self.model.optimizer.learning_rate)</code>) o cambiarlo (asignándole un número, siempre que no uses un planificador, ver <a href="leccion-7.html#schedules">schedules</a>). El fragmento 5 tiene tres ejemplos:</p>
-<ul>
-<li><strong><code>Espia</code></strong> imprime cada gancho. Con 64 datos, <code>validation_split=0.25</code> y lotes de 32 quedan 48 de entrenamiento: <strong>2 lotes por época</strong> (<code>lote=0</code> y <code>lote=1</code>) y las dos épocas muestran el orden de la tabla de arriba.</li>
-<li><strong><code>ParaSiBaja(umbral)</code></strong> para cuando la pérdida de la época baja de un umbral. Con 0,1 la pérdida va 2,78, 0,257, 0,162… hasta 0,0929 en la época 10, donde se dispara <code>stop_training</code>: se hicieron 10 épocas de las 50 pedidas. Fíjate en <code>epoch + 1</code>: Keras numera las épocas desde 0.</li>
-<li><strong><code>LearningRateScheduler(plan)</code></strong> usa una función <code>plan(epoca, lr)</code> que devuelve el learning rate de esa época. Con «igual las dos primeras, luego la mitad» da 0,1, 0,1, 0,05, 0,025, 0,0125.</li>
-</ul>
-</section></div></details><details class="profundizar" id="codigo"><summary><span>Ver código explicado paso a paso<small>2 fragmento(s) original(es), con cada línea comentada y salida esperada.</small></span></summary><div class="prof-body"><article class="snippet" data-lang="python">
-<header>
-<h3>4 · Los callbacks incluidos: ModelCheckpoint, ReduceLROnPlateau, EarlyStopping, CSVLogger y TensorBoard</h3>
-<p class="para-que"><strong>Para qué sirve</strong> Combina cinco callbacks en un solo <code>fit</code> sobre un problema pequeño que sobreajusta, y comprueba qué dejó cada uno: épocas, learning rate, archivos y el modelo guardado. Necesita <code>pip install tensorboard</code>.</p>
-</header>
-<pre class="code"><code>import os, tempfile
-import numpy as np
-import keras
-from sklearn.datasets import make_moons
 
-keras.utils.set_random_seed(3)
-X, y = make_moons(n_samples=400, noise=0.35, random_state=3)
-X, y = X.astype("float32"), y.astype("float32")
-Xe, ye, Xv, yv = X[:120], y[:120], X[120:], y[120:]
+<h3>Cuando explota: recortar el gradiente</h3>
+<p>Si la pérdida se vuelve <code>nan</code>, un gradiente enorme ha lanzado los pesos a un valor absurdo. El remedio de urgencia es <strong>recortar</strong> el gradiente <em>antes</em> de aplicarlo. Keras lo hace dentro de <code>apply_gradients</code> con tres argumentos de cualquier optimizador. El fragmento 9 prueba cada uno con un gradiente \( g=[3,4] \), de norma \( \sqrt{9+16}=5 \):</p>
 
-modelo = keras.Sequential([
-    keras.Input(shape=(2,)),
-    keras.layers.Dense(64, activation="relu"),
-    keras.layers.Dense(64, activation="relu"),
-    keras.layers.Dense(1, activation="sigmoid"),
-])
-modelo.compile(optimizer=keras.optimizers.Adam(0.02), loss="binary_crossentropy", metrics=["accuracy"])
-
-carpeta = tempfile.mkdtemp()
-callbacks = [
-    keras.callbacks.ModelCheckpoint(os.path.join(carpeta, "mejor.keras"),
-                                    monitor="val_loss", save_best_only=True),
-    keras.callbacks.ReduceLROnPlateau(monitor="val_loss", factor=0.5, patience=4,
-                                      min_lr=1e-4, verbose=1),
-    keras.callbacks.EarlyStopping(monitor="val_loss", patience=12,
-                                  restore_best_weights=True, verbose=1),
-    keras.callbacks.CSVLogger(os.path.join(carpeta, "log.csv")),
-    keras.callbacks.TensorBoard(log_dir=os.path.join(carpeta, "tb")),
-]
-h = modelo.fit(Xe, ye, validation_data=(Xv, yv), epochs=100, batch_size=16,
-               callbacks=callbacks, verbose=0)
-
-val = np.array(h.history["val_loss"])
-print("épocas entrenadas:", len(val), "| mejor época:", int(val.argmin()) + 1, "| mejor val_loss:", round(float(val.min()), 4))
-lrs = [round(float(v), 4) for v in h.history["learning_rate"]]
-print("learning rate por época:", lrs)
-print("archivos creados:", sorted(os.listdir(carpeta)))
-print("primeras líneas del CSV:", open(os.path.join(carpeta, "log.csv")).read().splitlines()[0])
-cargado = keras.models.load_model(os.path.join(carpeta, "mejor.keras"))
-print("val_loss del checkpoint:", round(float(cargado.evaluate(Xv, yv, verbose=0)[0]), 4))</code></pre>
-<details class="linea-a-linea" open="">
-<summary>Línea por línea</summary>
-<p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
-<table class="lineas">
-<thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
-<tbody>
-<tr data-lines="1-4"><td><code>import os, tempfile …</code></td><td>Importaciones. <code>tempfile</code> crea una carpeta temporal para los archivos que escriben los callbacks.</td></tr>
-<tr data-lines="6"><td><code>keras.utils.set_random_seed(3)</code></td><td>Semilla fija.</td></tr>
-<tr data-lines="7-9"><td><code>X, y = make_moons(n_samples=400, noise=0.35, random_state=3) …</code></td><td>400 puntos de dos lunas con mucho ruido (0,35). Se usan solo 120 para entrenar y 280 para validar: pocos datos y un modelo grande favorecen el sobreajuste, que es lo que queremos que los callbacks gestionen.</td></tr>
-<tr data-lines="11-16"><td><code>modelo = keras.Sequential([ …</code></td><td>Un modelo con dos capas ocultas de 64 neuronas: demasiado grande para 120 datos.</td></tr>
-<tr data-lines="17"><td><code>modelo.compile(optimizer=keras.optimizers.Adam(0.02), loss="binary_…</code></td><td>Compila con Adam a 0,02 (un learning rate algo alto a propósito) y entropía cruzada binaria.</td></tr>
-<tr data-lines="19"><td><code>carpeta = tempfile.mkdtemp()</code></td><td>Carpeta temporal donde se guardan los archivos.</td></tr>
-<tr data-lines="20-22"><td><code>callbacks = [ …</code></td><td><code>ModelCheckpoint</code>: guarda el modelo en <code>mejor.keras</code> solo cuando <code>val_loss</code> mejora (<code>save_best_only=True</code>). La extensión <code>.keras</code> es obligatoria.</td></tr>
-<tr data-lines="23-24"><td><code>keras.callbacks.ReduceLROnPlateau(monitor="val_loss", factor=0.5, p… …</code></td><td><code>ReduceLROnPlateau</code>: si <code>val_loss</code> no mejora durante 4 épocas, multiplica el learning rate por 0,5, sin bajar de 1e-4. <code>verbose=1</code> imprime cada reducción.</td></tr>
-<tr data-lines="25-26"><td><code>keras.callbacks.EarlyStopping(monitor="val_loss", patience=12, …</code></td><td><code>EarlyStopping</code>: para tras 12 épocas sin mejorar y <strong>restaura los pesos de la mejor época</strong>.</td></tr>
-<tr data-lines="27"><td><code>keras.callbacks.CSVLogger(os.path.join(carpeta, "log.csv")),</code></td><td><code>CSVLogger</code>: escribe una fila por época con todas las métricas.</td></tr>
-<tr data-lines="28-29"><td><code>keras.callbacks.TensorBoard(log_dir=os.path.join(carpeta, "tb")), …</code></td><td><code>TensorBoard</code>: guarda registros que se ven con <code>tensorboard --logdir</code>. Cierra la lista de callbacks.</td></tr>
-<tr data-lines="30-31"><td><code>h = modelo.fit(Xe, ye, validation_data=(Xv, yv), epochs=100, batch_… …</code></td><td>Entrena hasta 100 épocas (el tope; los callbacks decidirán antes), con lotes de 16 y los callbacks. <code>verbose=0</code> silencia la barra, pero los mensajes de los callbacks se imprimen igualmente.</td></tr>
-<tr data-lines="33-34"><td><code>val = np.array(h.history["val_loss"]) …</code></td><td>Guarda <code>val_loss</code> de cada época en un array y muestra cuántas épocas hubo, cuál fue la mejor (<code>argmin + 1</code>, porque las épocas se cuentan desde 0) y su valor.</td></tr>
-<tr data-lines="35-36"><td><code>lrs = [round(float(v), 4) for v in h.history["learning_rate"]] …</code></td><td><code>ReduceLROnPlateau</code> añade la clave <code>learning_rate</code> al historial: imprime el learning rate de cada época.</td></tr>
-<tr data-lines="37-38"><td><code>print("archivos creados:", sorted(os.listdir(carpeta))) …</code></td><td>Lista los archivos que dejaron los callbacks y la cabecera del CSV.</td></tr>
-<tr data-lines="39-40"><td><code>cargado = keras.models.load_model(os.path.join(carpeta, "mejor.kera… …</code></td><td>Carga <code>mejor.keras</code> y evalúa en validación: debe dar el mismo <code>val_loss</code> que el mejor.</td></tr>
-</tbody>
+<table>
+  <caption>Tres tipos de recorte con \( g=[3,4] \) (salida del fragmento 9)</caption>
+  <thead><tr><th>Argumento</th><th>Regla</th><th>Resultado</th><th>Dirección</th></tr></thead>
+  <tbody>
+    <tr><td><em>(ninguno)</em></td><td>—</td><td>[3, 4]</td><td>la original</td></tr>
+    <tr><td><code>clipnorm=1.0</code></td><td>Si \( \lVert g\rVert>c \), \( g\leftarrow g\cdot c/\lVert g\rVert \) (por variable)</td><td>[0,6 ; 0,8] (el gradiente por 1/5)</td><td class="res">igual</td></tr>
+    <tr><td><code>clipvalue=1.0</code></td><td>Cada componente a \( [-v,v] \)</td><td>[1 ; 1]</td><td class="res">cambia (de 53,1° a 45°)</td></tr>
+    <tr><td><code>global_clipnorm=1.0</code></td><td>Una sola norma para <em>todas</em> las variables juntas</td><td>ver abajo</td><td>igual en todas</td></tr>
+  </tbody>
 </table>
-</details>
-<div class="salida">
-<strong>Salida esperada</strong>
-<pre>Epoch 8: ReduceLROnPlateau reducing learning rate to 0.009999999776482582.
 
-Epoch 12: ReduceLROnPlateau reducing learning rate to 0.004999999888241291.
+<p>Con dos variables, \( a \) con gradiente \( [3,4] \) y \( b \) con gradiente \( [12] \): <code>clipnorm=1.0</code> recorta <em>cada variable por separado</em> y da \( a\to[0{,}6;0{,}8] \), \( b\to[1] \); en cambio <code>global_clipnorm=1.0</code> calcula la norma de todo junto, \( \sqrt{9+16+144}=13 \), y reduce <em>todos</em> los gradientes por el mismo factor 1/13: \( a\to[0{,}2308;0{,}3077] \), \( b\to[0{,}9231] \). El global conserva las proporciones entre capas (la dirección de «todo el gradiente»), el recorte por variable no. Es lo que prefieren los Transformers (<code>global_clipnorm=1.0</code>).</p>
 
-Epoch 16: ReduceLROnPlateau reducing learning rate to 0.0024999999441206455.
-Epoch 16: early stopping
-Restoring model weights from the end of the best epoch: 4.
-épocas entrenadas: 16 | mejor época: 4 | mejor val_loss: 0.4121
-learning rate por época: [0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.01, 0.01, 0.01, 0.01, 0.005, 0.005, 0.005, 0.005]
-archivos creados: ['log.csv', 'mejor.keras', 'tb']
-primeras líneas del CSV: epoch,accuracy,learning_rate,loss,val_accuracy,val_loss
-val_loss del checkpoint: 0.4121</pre>
-<p>Léelo de arriba abajo. <code>ReduceLROnPlateau</code> avisa en las épocas 8, 12 y 16: cuatro épocas sin mejorar desde la mejor (la 4), cuatro más… y el learning rate baja 0,02 → 0,01 → 0,005 → 0,0025 (Keras imprime 0,00999999977… porque el 0,01 se guarda en <code>float32</code>). <code>EarlyStopping</code> para en la época 16 = 4 + 12 y <strong>restaura los pesos de la época 4</strong>. La lista de learning rates de la historia tiene 8 valores de 0,02, 4 de 0,01 y 4 de 0,005 (cada época registra el valor con el que se entrenó). Los tres archivos son el CSV, el modelo y la carpeta de TensorBoard. Y el modelo cargado de disco obtiene <code>val_loss = 0,4121</code>, el de la mejor época: guardar en el mejor momento y restaurar al final dan lo mismo.</p>
+<figure class="demo" data-demo="curso3/c3m5-clip-geometria" data-titulo="Recortar un gradiente: el círculo y el cuadrado">
+  <div class="haz">Arrastra la punta del gradiente \( g \) por el plano (o mueve los deslizadores de g₁ y g₂). El círculo es <code>clipnorm</code> y el cuadrado es <code>clipvalue</code>. Mueve \( g \) dentro de las dos figuras, luego fuera, y mira la fila de resultados. Cambia el radio y el lado con los deslizadores.</div>
+  <div class="observa">Dentro del círculo (y del cuadrado) <strong>no pasa nada</strong>: el recorte es un cinturón de seguridad que solo actúa cuando hace falta. Fuera, <code>clipnorm</code> lleva \( g \) a lo largo de su propia dirección hasta el borde del círculo: el cambio de ángulo es siempre 0°. <code>clipvalue</code> lo aplasta contra el cuadrado y la dirección <strong>cambia</strong> (con \( g=(4{,}2;\,1{,}2) \) y \( v=1{,}5 \) pasa de 15,9° a 38,7°, un cambio de unos 23°). Solo coincide con la dirección original cuando \( g \) está sobre un eje o sobre la diagonal.</div>
+</figure>
+
+<h3>Un entrenamiento que explota de verdad</h3>
+<p>El fragmento 9 construye una red de 6 capas ocultas con pesos iniciales demasiado grandes (<code>RandomNormal(stddev=1.0)</code>), le pone \( \eta=0{,}01 \) y entrena 15 épocas:</p>
+<table>
+  <caption>Pérdida de la época 1, la 5 y la 15 (fragmento 9)</caption>
+  <thead><tr><th>Configuración</th><th>Época 1</th><th>Época 5</th><th>Época 15</th></tr></thead>
+  <tbody>
+    <tr><td>sin recorte</td><td class="res"><code>nan</code></td><td><code>nan</code></td><td><code>nan</code></td></tr>
+    <tr><td><code>clipnorm=1.0</code></td><td>6456</td><td>548,7</td><td>78,75</td></tr>
+    <tr><td><code>clipvalue=0.1</code></td><td>7716</td><td>2020</td><td>165,3</td></tr>
+  </tbody>
+</table>
+<p>Sin recorte, unos pocos pasos lanzan los pesos a infinito y todo se vuelve <code>nan</code> en la primera época. Con recorte la pérdida es enorme al principio (la red está mal inicializada) pero <strong>baja de forma estable</strong>. Observa que el problema sigue ahí: 78 es una pérdida altísima para este problema. El recorte te ha salvado de <code>nan</code>, pero la solución buena sería inicializar bien (He) o bajar \( \eta \).</p>
+
+<div class="callout recuerda">
+  <span class="lbl">Experimento de arriba: «Un precipicio en la pérdida: con y sin clipnorm», con todo detalle</span>
+  <p><strong>Haz esto.</strong> La pérdida tiene forma de cuenco con una pared casi vertical a la derecha, \( f(w)=0{,}05\,w^2+2e^{3(w-2)} \). Empieza con \( w=3 \) (dentro de la pared), \( \eta=0{,}1 \) y <code>clipnorm</code> = 3. Mira las dos trayectorias. Luego cambia el punto de partida a 2,2 y vuelve a mirar.</p>
+  <p><strong>Fíjate en.</strong> Desde \( w=3 \) el gradiente vale 120,8 y un paso sin recorte es \( \eta g=12{,}08 \): el peso sale lanzado a \( w=-9{,}08 \), ya muy fuera del cuenco; allí el gradiente es minúsculo (0,1·\( w \)) y 40 pasos después sigue en −6,14, con pérdida 1,88. Con <code>clipnorm</code> el paso máximo es \( \eta c=0{,}3 \): baja por la pared sin pasarse y a los 40 pasos está en 0,45 con pérdida 0,03. Desde 2,2 (un gradiente de 11, que ya no es tan grande) el recorte frena sin necesidad: tras 40 pasos la pérdida es 0,03 con recorte frente a 0,02 sin él. <strong>Recortar de más cuesta velocidad</strong>.</p>
 </div>
-</article><article class="snippet" data-lang="python">
-<header>
-<h3>5 · Callbacks propios, orden de los ganchos y errores de ModelCheckpoint</h3>
-<p class="para-que"><strong>Para qué sirve</strong> Escribe tres callbacks (uno que espía el orden de las llamadas, uno que para el entrenamiento y un planificador por época) y provoca los dos errores de extensión de <code>ModelCheckpoint</code> en Keras 3.</p>
-</header>
-<pre class="code"><code>import numpy as np
+
+<h3>Normalizar el gradiente no es lo mismo que recortarlo</h3>
+<p>La <strong>normalización de gradientes</strong> divide <em>siempre</em> el gradiente por su norma, \( g\leftarrow g/\lVert g\rVert \), de modo que el paso tenga siempre longitud \( \eta \) (una idea emparentada con la de optimizadores para lotes enormes como LARS y LAMB). El <strong>recorte</strong> solo actúa cuando \( \lVert g\rVert \) pasa del umbral. La diferencia es crucial cuando el gradiente es <em>pequeño</em>, que es lo que pasa cerca del mínimo. El fragmento 9 lo muestra con dos gradientes de la misma dirección:</p>
+<table>
+  <thead><tr><th>Gradiente</th><th>Recortado (<code>clipnorm=1</code>)</th><th>Normalizado (<code>l2_normalize</code>)</th></tr></thead>
+  <tbody>
+    <tr><td>\( [3,\ 4] \) (norma 5)</td><td>[0,6 ; 0,8]</td><td>[0,6 ; 0,8]</td></tr>
+    <tr><td>\( [0{,}03,\ 0{,}04] \) (norma 0,05)</td><td class="res">[0,03 ; 0,04] (no lo toca)</td><td class="res">[0,6 ; 0,8] (¡20 veces mayor!)</td></tr>
+  </tbody>
+</table>
+<p>Normalizar siempre significa dar el mismo paso \( \eta \) tanto lejos como a punto de llegar, así que <strong>nunca se detiene</strong> y oscila alrededor del mínimo si \( \eta \) es fijo. Keras no tiene un argumento «normalizar»: se hace en un bucle propio con <code>tf.math.l2_normalize</code>. Para entrenar con <code>fit</code>, lo normal es recortar.</p>
+
+<div class="callout regla">
+  <span class="lbl">Regla fácil · diagnóstico</span>
+  <p><strong><code>nan</code> o pérdida disparada</strong> → baja el learning rate, usa <code>he_normal</code> con ReLU, añade <code>clipnorm=1.0</code> o <code>global_clipnorm=1.0</code> como cinturón. <strong>La pérdida no se mueve</strong> → mira las normas de los gradientes por capa (una capa con gradiente 10⁶ veces menor que otra es el síntoma de que se desvanecen), cambia sigmoide/tanh por ReLU, usa inicialización He, BatchNorm o atajos residuales. Si necesitas el recorte en <em>cada</em> paso, el problema de fondo es otro: ya no es un cinturón sino un parche.</p>
+</div>
+
+<h2 id="precision-mixta">Precisión mixta: números más pequeños, entrenamiento más rápido</h2>
+
+<p class="pregunta">Una GPU moderna hace cuentas con números de 16 bits mucho más deprisa (y con la mitad de memoria) que con 32. ¿Por qué no entrenamos todo en 16 bits? ¿Qué se rompe?</p>
+
+<p>Un número de <strong>float32</strong> usa 32 bits y cubre magnitudes de unos \( 10^{-38} \) a \( 3{,}4\cdot10^{38} \). Un <strong>float16</strong> usa 16 y solo llega de \( 6{,}1\cdot10^{-5} \) (el menor «normal»; por debajo pierde precisión hasta \( \approx6\cdot10^{-8} \)) a <strong>65504</strong>. Pasarse por arriba da <code>inf</code> (<em>overflow</em>) y quedarse por debajo da 0 (<em>underflow</em>). El fragmento 15 lo comprueba:</p>
+<table>
+  <thead><tr><th>Operación en NumPy</th><th>Resultado</th></tr></thead>
+  <tbody>
+    <tr><td><code>np.float16(70000)</code></td><td class="res"><code>inf</code> (overflow)</td></tr>
+    <tr><td><code>np.float16(1e-8)</code></td><td class="res"><code>0.0</code> (underflow)</td></tr>
+    <tr><td>máximo de float16 / de float32</td><td>65504 / \( 3{,}4\cdot10^{38} \)</td></tr>
+  </tbody>
+</table>
+
+<p>El problema real: <strong>los gradientes suelen ser muy pequeños</strong> (\( 10^{-8} \) es habitual en las primeras capas) y en float16 se convierten en 0, así que esos pesos no se actualizan. La solución se llama <strong>loss scaling</strong> (escalado de la pérdida): multiplicar la pérdida por un número grande \( S \) antes de derivar, lo que multiplica <em>todos</em> los gradientes por \( S \) (por la regla de la cadena) y los saca de la zona de underflow; luego se <strong>dividen entre \( S \) en float32</strong> antes de aplicar el paso.</p>
+
+<div class="callout analogia">
+  <span class="lbl">Analogía</span>
+  <p>Ver una película en 720p en vez de 4K: pesa la mitad y va más rápido, pero los detalles finísimos desaparecen (un gradiente muy pequeño se queda en 0). El <em>loss scaling</em> es subir mucho el volumen de un susurro antes de mandarlo por un altavoz barato, que si no lo ignoraría, y bajarlo de nuevo al llegar. Pero si lo subes demasiado, el sonido se satura y revienta (<em>overflow</em>).</p>
+</div>
+
+<div class="callout ejemplo">
+  <span class="lbl">Ejemplo numérico · escalar un gradiente de 10⁻⁸</span>
+  <ol class="pasos">
+    <li><strong>Sin escalar:</strong> \( 10^{-8} \) en float16 es 0. El peso no se mueve.</li>
+    <li><strong>Con \( S=1024 \):</strong> \( 10^{-8}\cdot1024=1{,}024\cdot10^{-5} \), que sí cabe en float16 (se guarda como 1,025·10⁻⁵ con el redondeo).</li>
+    <li><strong>Desescalar:</strong> \( 1{,}025\cdot10^{-5}/1024=1{,}0012\cdot10^{-8} \). Es el gradiente real con un error del 0,12 %.</li>
+  </ol>
+</div>
+
+<div class="callout recuerda">
+  <span class="lbl">Experimento de arriba: «Loss scaling: rescatar gradientes del underflow», con todo detalle</span>
+  <p><strong>Haz esto.</strong> Se simulan 3000 gradientes con tamaños repartidos alrededor de 10⁻⁶·⁵ y se redondean de verdad a float16. Con «Sin escalar» mira qué porcentaje se convierte en 0. Sube la escala <em>S</em> (es una potencia de 2) con el deslizador y observa los porcentajes. Luego sube la magnitud de los gradientes hasta 10⁻³ y la escala hasta 2²⁰, y pulsa el botón dinámico.</p>
+  <p><strong>Fíjate en.</strong> Con gradientes típicos de 10⁻⁶·⁵ y sin escalar, el <strong>15,7 %</strong> se convierte en 0; con \( S=2^6 \) baja al 0,2 % y con \( S=2^{10} \) a 0 %. Pero <strong>no se puede subir \( S \) sin límite</strong>: con gradientes de tamaño 10⁻³ y \( S=2^{20} \) un 3 % ya hace overflow (<code>inf</code>), y un solo <code>inf</code> estropea el paso entero. Por eso Keras usa un escalado <strong>dinámico</strong>: parte de un valor alto, y si aparece <code>inf</code> o <code>nan</code> <strong>salta ese paso y divide \( S \) entre 2</strong>; tras muchos pasos seguidos sin problemas lo vuelve a doblar.</p>
+</div>
+
+<h3>En Keras 3</h3>
+<p>Basta una línea antes de crear el modelo: <code>keras.mixed_precision.set_global_policy("mixed_float16")</code>. Con ella, cada capa <strong>calcula en float16 pero guarda sus pesos en float32</strong> (el fragmento 15: <code>compute_dtype = float16</code>, <code>kernel.dtype = float32</code>), de modo que las actualizaciones pequeñas no se pierden. Al compilar, Keras envuelve tu optimizador en un <code>LossScaleOptimizer</code> con escala dinámica: parte de \( 2^{15}=32768 \) y la dobla tras 2000 pasos sin overflow (<code>dynamic_growth_steps</code>). Tras 5 épocas = 35 pasos la escala sigue en 32768 y lleva 35 pasos buenos seguidos: no hubo ningún <code>inf</code>.</p>
+
+<div class="callout ojo">
+  <span class="lbl">Ojo · tres detalles de la precisión mixta</span>
+  <p><strong>(1) La última capa en float32.</strong> Un softmax en float16 es numéricamente inestable: se acaba el modelo con <code>keras.layers.Activation("softmax", dtype="float32")</code>, como en el fragmento. <strong>(2) Solo acelera en hardware con soporte</strong> (GPU con tensor cores, TPU). En una CPU como la de estas pruebas no esperes ganar tiempo: el fragmento solo muestra la mecánica, no la velocidad. <strong>(3) <code>bfloat16</code></strong> (<code>"mixed_bfloat16"</code>) tiene el mismo rango que float32 con menos decimales, y no necesita escalado de la pérdida: es lo habitual en TPU. Y recuerda dejar la política global como estaba (<code>set_global_policy("float32")</code>) si sigues con otros experimentos en la misma sesión.</p>
+</div>
+
+<div class="callout regla">
+  <span class="lbl">Regla fácil</span>
+  <p>Precisión mixta = <strong>cálculo en 16 bits, pesos y actualización en 32, pérdida escalada y salida en float32</strong>. Es «gratis» en la GPU adecuada (una línea y casi el doble de velocidad); en otro hardware, no la actives.</p>
+</div>
+
+  </div>
+</details>
+
+<section>
+<h2 class="sin-num">Código</h2>
+<!-- ---------- Fragmento 8 ---------- -->
+<article class="snippet" data-lang="python" id="frag-8">
+  <header>
+    <h3>8 · Inicializadores y gradientes en una red de 10 capas</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Mide cómo cambia el tamaño de las activaciones y de los gradientes capa a capa según el inicializador y la activación, y comprueba la regla del factor por capa.</p>
+  </header>
+  <pre class="code"><code>import numpy as np
+import tensorflow as tf
 import keras
 
-keras.utils.set_random_seed(0)
-X = np.random.rand(64, 3).astype("float32")
-y = X.sum(axis=1, keepdims=True)
+rng = np.random.default_rng(0)
+X = rng.normal(size=(512, 100)).astype("float32")           # entrada con desviación típica 1
+y = rng.normal(size=(512, 1)).astype("float32")
 
-class Espia(keras.callbacks.Callback):
-    def on_train_begin(self, logs=None):
-        print("on_train_begin")
-    def on_epoch_begin(self, epoch, logs=None):
-        print(f"  on_epoch_begin   epoca={epoch}")
-    def on_train_batch_begin(self, batch, logs=None):
-        print(f"    on_train_batch_begin  lote={batch}")
-    def on_train_batch_end(self, batch, logs=None):
-        print(f"    on_train_batch_end    lote={batch}  claves={sorted(logs)}")
-    def on_epoch_end(self, epoch, logs=None):
-        print(f"  on_epoch_end     epoca={epoch}  loss={logs['loss']:.3f}  val_loss={logs['val_loss']:.3f}")
-    def on_train_end(self, logs=None):
-        print("on_train_end")
+def probar(nombre, fabrica, activacion="relu", capas=10):
+    keras.utils.set_random_seed(0)
+    init = fabrica()                                          # el inicializador se crea DESPUÉS de fijar la semilla
+    modelo = keras.Sequential([keras.Input(shape=(100,))] +
+                              [keras.layers.Dense(100, activation=activacion, kernel_initializer=init) for _ in range(capas)] +
+                              [keras.layers.Dense(1)])
+    # desviación típica de la activación de cada capa oculta
+    h, stds = X, []
+    for capa in modelo.layers[:-1]:
+        h = capa(h)
+        stds.append(float(np.std(h.numpy())))
+    # norma del gradiente del kernel de la primera y de la última capa oculta
+    with tf.GradientTape() as cinta:
+        perdida = tf.reduce_mean(tf.square(modelo(X) - y))
+    g = cinta.gradient(perdida, [modelo.layers[0].kernel, modelo.layers[capas - 1].kernel])
+    g1, g10 = [float(tf.norm(v)) for v in g]
+    print(f"{nombre:&lt;24}{stds[0]:&gt;9.3g}{stds[4]:&gt;10.3g}{stds[-1]:&gt;10.3g} |{g1:&gt;10.3g}{g10:&gt;10.3g}")
 
-modelo = keras.Sequential([keras.Input(shape=(3,)), keras.layers.Dense(1)])
-modelo.compile(optimizer="sgd", loss="mse")
-modelo.fit(X, y, epochs=2, batch_size=32, validation_split=0.25, callbacks=[Espia()], verbose=0)
+print(f"{'inicializador':&lt;24}{'std c.1':&gt;9}{'std c.5':&gt;10}{'std c.10':&gt;10} |{'grad c.1':&gt;10}{'grad c.10':&gt;10}")
+probar("RandomNormal(0.01)", lambda: keras.initializers.RandomNormal(stddev=0.01))
+probar("RandomNormal(1.0)", lambda: keras.initializers.RandomNormal(stddev=1.0))
+probar("GlorotUniform (defecto)", lambda: "glorot_uniform")
+probar("HeNormal", lambda: "he_normal")
+probar("sigmoid + Glorot", lambda: "glorot_uniform", activacion="sigmoid")</code></pre>
+  <details class="linea-a-linea" open>
+    <summary>Línea por línea</summary>
+    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+      <tbody>
+        <tr data-lines="1-3"><td><code>import numpy as np …</code></td><td>Importaciones: NumPy, TensorFlow (para la cinta) y Keras.</td></tr>
+        <tr data-lines="5-7"><td><code>rng = np.random.default_rng(0) …</code></td><td>512 muestras de 100 variables con desviación típica 1 como entrada y una salida aleatoria como objetivo (no importa que no tenga sentido: solo medimos escalas).</td></tr>
+        <tr data-lines="9-11"><td><code>def probar(nombre, fabrica, activacion="relu", capas=10): …</code></td><td><code>probar</code> recibe un nombre, una <em>función fábrica</em> del inicializador, la activación y el número de capas. Fija la semilla y <strong>después</strong> crea el inicializador (si se creara antes llevaría su propia semilla y la ejecución no sería repetible).</td></tr>
+        <tr data-lines="12-14"><td><code>modelo = keras.Sequential([keras.Input(shape=(100,))] + …</code></td><td>Construye 10 capas <code>Dense(100)</code> con esa activación e inicializador y una salida lineal.</td></tr>
+        <tr data-lines="15-19"><td><code># desviación típica de la activación de cada capa oculta …</code></td><td>Pasa los datos capa a capa y guarda la desviación típica de cada activación. <code>modelo.layers[:-1]</code> son las 10 capas ocultas.</td></tr>
+        <tr data-lines="20-24"><td><code># norma del gradiente del kernel de la primera y de la última capa … …</code></td><td>Con una cinta calcula la pérdida (MSE con el objetivo) y la norma del gradiente del <code>kernel</code> de la primera y de la décima capa oculta (<code>tf.norm</code>).</td></tr>
+        <tr data-lines="25"><td><code>print(f"{nombre:&lt;24}{stds[0]:&gt;9.3g}{stds[4]:&gt;10.3g}{stds[-1]:&gt;10.3g…</code></td><td>Imprime una fila: desviación en las capas 1, 5 y 10 y normas de los dos gradientes.</td></tr>
+        <tr data-lines="27"><td><code>print(f"{'inicializador':&lt;24}{'std c.1':&gt;9}{'std c.5':&gt;10}{'std c.1…</code></td><td>Cabecera de la tabla.</td></tr>
+        <tr data-lines="28-29"><td><code>probar("RandomNormal(0.01)", lambda: keras.initializers.RandomNorma… …</code></td><td>Pesos normales con desviación 0,01 (demasiado pequeña) y con 1,0 (demasiado grande).</td></tr>
+        <tr data-lines="30-31"><td><code>probar("GlorotUniform (defecto)", lambda: "glorot_uniform") …</code></td><td>El inicializador por defecto de Keras (Glorot uniforme) y He normal, ambos con ReLU.</td></tr>
+        <tr data-lines="32"><td><code>probar("sigmoid + Glorot", lambda: "glorot_uniform", activacion="si…</code></td><td>Sigmoide con Glorot, para ver el desvanecimiento clásico.</td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>inicializador             std c.1   std c.5  std c.10 |  grad c.1 grad c.10
+RandomNormal(0.01)         0.0593  1.53e-06  2.53e-12 |  5.12e-11  4.06e-11
+RandomNormal(1.0)            5.93  1.53e+04  2.53e+08 |  2.33e+16  2.77e+17
+GlorotUniform (defecto)     0.587     0.126    0.0242 |    0.0535    0.0693
+HeNormal                    0.825     0.811     0.976 |      4.78      74.2
+sigmoid + Glorot            0.209     0.106     0.113 |  5.92e-07     0.522</pre>
+    <p>Con pesos de desviación 0,01 la señal cae a 2,5·10⁻¹² en la capa 10 y los gradientes valen 10⁻¹¹: no aprende. Con desviación 1 explota a 2,5·10⁸ (gradientes de 2·10¹⁶ y 3·10¹⁷). Con Glorot y ReLU baja de 0,59 a 0,024: la señal se encoge, aunque sin llegar al desastre. Con <strong>He se mantiene en 0,83 → 0,81 → 0,98</strong>. Y con sigmoide el gradiente de la capa 1 (5,9·10⁻⁷) es un millón de veces menor que el de la capa 10 (0,52). Compara con la tabla de predicciones del texto: los factores por capa 0,071, 7,07, 0,71 y 1 dan 3·10⁻¹², 3·10⁸, 0,031 y 1.</p>
+  </div>
+</article>
+<!-- ---------- Fragmento 9 ---------- -->
+<article class="snippet" data-lang="python" id="frag-9">
+  <header>
+    <h3>9 · Recorte de gradientes: clipnorm, clipvalue, global_clipnorm y normalización</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Aplica los tres tipos de recorte a un gradiente conocido, entrena una red que explota con y sin recorte, y compara recortar con normalizar.</p>
+  </header>
+  <pre class="code"><code>import numpy as np
+import tensorflow as tf
+import keras
 
-# Un callback propio con lógica: para cuando la pérdida baja de un umbral
-class ParaSiBaja(keras.callbacks.Callback):
-    def __init__(self, umbral):
-        super().__init__()
-        self.umbral = umbral
-    def on_epoch_end(self, epoch, logs=None):
-        lr = float(self.model.optimizer.learning_rate)
-        print(f"época {epoch + 1}: loss = {logs['loss']:.4f}, lr = {lr:.2f}")
-        if logs["loss"] &lt; self.umbral:
-            print("  -&gt; umbral alcanzado: self.model.stop_training = True")
-            self.model.stop_training = True
+# 1) Qué hace cada tipo de recorte con un gradiente [3, 4] (norma 5), con lr = 1 para ver el paso entero
+def un_paso(**kw):
+    w = keras.Variable([0.0, 0.0])
+    keras.optimizers.SGD(learning_rate=1.0, **kw).apply_gradients([(tf.constant([3.0, 4.0]), w)])
+    return [round(float(v), 4) for v in -w.numpy()]       # el paso dado = -(nuevo w)
 
-modelo = keras.Sequential([keras.Input(shape=(3,)), keras.layers.Dense(1)])
-modelo.compile(optimizer=keras.optimizers.SGD(0.1), loss="mse")
-h = modelo.fit(X, y, epochs=50, batch_size=16, callbacks=[ParaSiBaja(0.1)], verbose=0)
-print("épocas realizadas:", len(h.history["loss"]))
+print("sin recorte        :", un_paso())
+print("clipnorm=1.0       :", un_paso(clipnorm=1.0), "-&gt; misma dirección, norma 1")
+print("clipvalue=1.0      :", un_paso(clipvalue=1.0), "-&gt; cada componente a ±1: dirección distinta")
 
-# Un planificador de learning rate con LearningRateScheduler: función (época, lr_actual) -&gt; nuevo lr
-def plan(epoca, lr):
-    return lr if epoca &lt; 2 else lr * 0.5
+# 2) Dos variables: clipnorm recorta cada una por separado; global_clipnorm mira todas juntas
+def dos_vars(**kw):
+    a, b = keras.Variable([0.0, 0.0]), keras.Variable([0.0])
+    keras.optimizers.SGD(learning_rate=1.0, **kw).apply_gradients(
+        [(tf.constant([3.0, 4.0]), a), (tf.constant([12.0]), b)])
+    return [round(float(v), 4) for v in -a.numpy()], [round(float(v), 4) for v in -b.numpy()]
 
-modelo = keras.Sequential([keras.Input(shape=(3,)), keras.layers.Dense(1)])
-modelo.compile(optimizer=keras.optimizers.SGD(0.1), loss="mse")
-h = modelo.fit(X, y, epochs=5, batch_size=16, callbacks=[keras.callbacks.LearningRateScheduler(plan)], verbose=0)
-print("lr por época:", [round(float(v), 4) for v in h.history["learning_rate"]])
+print("clipnorm=1.0       :", dos_vars(clipnorm=1.0))
+print("global_clipnorm=1.0:", dos_vars(global_clipnorm=1.0), "(norma global = raíz(9+16+144) = 13)")
 
-# ModelCheckpoint: la extensión del archivo importa en Keras 3
-for nombre, solo_pesos in [("mejor.ckpt", False), ("pesos.keras", True)]:
-    try:
-        modelo.fit(X, y, epochs=1, verbose=0,
-                   callbacks=[keras.callbacks.ModelCheckpoint(nombre, save_weights_only=solo_pesos)])
-    except ValueError as e:
-        print(f"{nombre}: ValueError -&gt;", str(e)[:62], "...")</code></pre>
-<details class="linea-a-linea" open="">
-<summary>Línea por línea</summary>
-<p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
-<table class="lineas">
-<thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
-<tbody>
-<tr data-lines="1-2"><td><code>import numpy as np …</code></td><td>Importamos NumPy y Keras.</td></tr>
-<tr data-lines="4-6"><td><code>keras.utils.set_random_seed(0) …</code></td><td>Semilla; 64 datos de 3 variables y la etiqueta es su suma (una regresión trivial: el modelo aprenderá una suma).</td></tr>
-<tr data-lines="8-10"><td><code>class Espia(keras.callbacks.Callback): …</code></td><td><code>Espia</code> hereda de <code>keras.callbacks.Callback</code>. <code>on_train_begin</code> se llama una vez al empezar; imprime su nombre.</td></tr>
-<tr data-lines="11-12"><td><code>def on_epoch_begin(self, epoch, logs=None): …</code></td><td><code>on_epoch_begin</code> recibe el número de época (desde 0).</td></tr>
-<tr data-lines="13-14"><td><code>def on_train_batch_begin(self, batch, logs=None): …</code></td><td><code>on_train_batch_begin</code>: antes de cada lote; recibe el número de lote.</td></tr>
-<tr data-lines="15-16"><td><code>def on_train_batch_end(self, batch, logs=None): …</code></td><td><code>on_train_batch_end</code>: tras cada lote; <code>logs</code> contiene las métricas. Imprimimos sus claves ordenadas.</td></tr>
-<tr data-lines="17-18"><td><code>def on_epoch_end(self, epoch, logs=None): …</code></td><td><code>on_epoch_end</code>: al acabar la época; aquí <code>logs</code> ya trae la pérdida de entrenamiento y la de validación.</td></tr>
-<tr data-lines="19-20"><td><code>def on_train_end(self, logs=None): …</code></td><td><code>on_train_end</code>: se llama una vez al final.</td></tr>
-<tr data-lines="22-24"><td><code>modelo = keras.Sequential([keras.Input(shape=(3,)), keras.layers.De… …</code></td><td>Un modelo de una neurona con SGD y MSE, y <code>fit</code> con 2 épocas, lotes de 32 y el 25 % para validación (48 de entrenamiento: 2 lotes). Se le pasa el espía.</td></tr>
-<tr data-lines="26-30"><td><code># Un callback propio con lógica: para cuando la pérdida baja de un … …</code></td><td><code>ParaSiBaja</code>: un callback con lógica. El constructor recibe un umbral y lo guarda; llama a <code>super().__init__()</code> primero.</td></tr>
-<tr data-lines="31-33"><td><code>def on_epoch_end(self, epoch, logs=None): …</code></td><td>En <code>on_epoch_end</code> lee el learning rate del optimizador a través de <code>self.model</code> e imprime la pérdida de la época (número de época + 1, porque cuenta desde 0).</td></tr>
-<tr data-lines="34-36"><td><code>if logs["loss"] &lt; self.umbral: …</code></td><td>Si la pérdida baja del umbral, pone <code>self.model.stop_training = True</code>: Keras termina el <code>fit</code> al final de esa época.</td></tr>
-<tr data-lines="38-41"><td><code>modelo = keras.Sequential([keras.Input(shape=(3,)), keras.layers.De… …</code></td><td>Un modelo nuevo con SGD a 0,1, un <code>fit</code> de hasta 50 épocas con lotes de 16 y el callback con umbral 0,1; imprime cuántas épocas se hicieron.</td></tr>
-<tr data-lines="43-45"><td><code># Un planificador de learning rate con LearningRateScheduler: funci… …</code></td><td>Una función <code>plan(epoca, lr)</code> que devuelve el learning rate de la época: igual si <code>epoca &lt; 2</code> y la mitad a partir de ahí.</td></tr>
-<tr data-lines="47-50"><td><code>modelo = keras.Sequential([keras.Input(shape=(3,)), keras.layers.De… …</code></td><td><code>LearningRateScheduler(plan)</code> llama a la función al empezar cada época y pone el valor que devuelve. El historial guarda el learning rate de cada época.</td></tr>
-<tr data-lines="52-58"><td><code># ModelCheckpoint: la extensión del archivo importa en Keras 3 …</code></td><td>Dos intentos de <code>ModelCheckpoint</code> con nombres incorrectos. <code>"mejor.ckpt"</code> con el modelo completo y <code>"pesos.keras"</code> con <code>save_weights_only=True</code>. Ambos fallan con un <code>ValueError</code> <strong>al crear el callback</strong>, antes de que empiece el entrenamiento; el <code>try/except</code> imprime el principio del mensaje.</td></tr>
-</tbody>
-</table>
-</details>
-<div class="salida">
-<strong>Salida esperada</strong>
-<pre>on_train_begin
-  on_epoch_begin   epoca=0
-    on_train_batch_begin  lote=0
-    on_train_batch_end    lote=0  claves=['loss']
-    on_train_batch_begin  lote=1
-    on_train_batch_end    lote=1  claves=['loss']
-  on_epoch_end     epoca=0  loss=1.791  val_loss=1.865
-  on_epoch_begin   epoca=1
-    on_train_batch_begin  lote=0
-    on_train_batch_end    lote=0  claves=['loss']
-    on_train_batch_begin  lote=1
-    on_train_batch_end    lote=1  claves=['loss']
-  on_epoch_end     epoca=1  loss=1.568  val_loss=1.647
-on_train_end
-época 1: loss = 2.7805, lr = 0.10
-época 2: loss = 0.2573, lr = 0.10
-época 3: loss = 0.1620, lr = 0.10
-época 4: loss = 0.1462, lr = 0.10
-época 5: loss = 0.1352, lr = 0.10
-época 6: loss = 0.1254, lr = 0.10
-época 7: loss = 0.1163, lr = 0.10
-época 8: loss = 0.1079, lr = 0.10
-época 9: loss = 0.1001, lr = 0.10
-época 10: loss = 0.0929, lr = 0.10
-  -&gt; umbral alcanzado: self.model.stop_training = True
-épocas realizadas: 10
-lr por época: [0.1, 0.1, 0.05, 0.025, 0.0125]
-mejor.ckpt: ValueError -&gt; The filepath provided must end in `.keras` (Keras model format ...
-pesos.keras: ValueError -&gt; When using `save_weights_only=True` in `ModelCheckpoint`, the  ...</pre>
-<p>Con el espía se ve el orden: <code>on_train_begin</code>, luego, por época, <code>on_epoch_begin</code>, dos pares inicio/fin de lote (hay 2 lotes), y <code>on_epoch_end</code> con <code>loss</code> y <code>val_loss</code> (la validación ya ha ocurrido); y <code>on_train_end</code> al final. Las claves de <code>logs</code> en cada lote son solo <code>['loss']</code>. <code>ParaSiBaja</code> ve la pérdida 2,78, 0,257, 0,162… 0,0929, y en la época 10 (<code>0,0929 &lt; 0,1</code>) pone <code>stop_training</code>: se hicieron 10 de las 50 épocas. El planificador da 0,1, 0,1, 0,05, 0,025, 0,0125. Los dos <code>ValueError</code> de <code>ModelCheckpoint</code> piden <code>.keras</code> para el modelo entero y <code>.weights.h5</code> si solo se guardan pesos.</p>
+# 3) Un entrenamiento que explota: 6 capas ocultas con pesos iniciales demasiado grandes (std = 1)
+rng = np.random.default_rng(0)
+X = rng.normal(size=(200, 4)).astype("float32")
+y = (X @ np.array([1.0, -2.0, 0.5, 3.0], dtype="float32")).reshape(-1, 1)
+
+def entrenar(**kw):
+    keras.utils.set_random_seed(0)
+    capas = [keras.Input(shape=(4,))]
+    for _ in range(6):
+        capas.append(keras.layers.Dense(16, activation="relu",
+                                        kernel_initializer=keras.initializers.RandomNormal(stddev=1.0)))
+    capas.append(keras.layers.Dense(1))
+    m = keras.Sequential(capas)
+    m.compile(optimizer=keras.optimizers.SGD(learning_rate=0.01, **kw), loss="mse")
+    h = m.fit(X, y, epochs=15, batch_size=20, shuffle=False, verbose=0)
+    return [float(v) for v in h.history["loss"]]
+
+for nombre, kw in [("sin recorte", {}), ("clipnorm=1.0", {"clipnorm": 1.0}), ("clipvalue=0.1", {"clipvalue": 0.1})]:
+    l = entrenar(**kw)
+    print(f"{nombre:&lt;14} loss época 1: {l[0]:&gt;9.4g} | época 5: {l[4]:&gt;9.4g} | época 15: {l[-1]:&gt;9.4g}")
+
+# 4) Normalizar el gradiente (siempre a norma 1) frente a recortarlo (solo si pasa de 1)
+print()
+for v in ([3.0, 4.0], [0.03, 0.04]):
+    g = tf.constant(v)
+    print("g =", g.numpy(), "| recortado a norma 1:", tf.clip_by_norm(g, 1.0).numpy().round(3), "| normalizado:", tf.math.l2_normalize(g).numpy().round(3))</code></pre>
+  <details class="linea-a-linea" open>
+    <summary>Línea por línea</summary>
+    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+      <tbody>
+        <tr data-lines="1-3"><td><code>import numpy as np …</code></td><td>Importaciones.</td></tr>
+        <tr data-lines="5-9"><td><code># 1) Qué hace cada tipo de recorte con un gradiente [3, 4] (norma 5… …</code></td><td><code>un_paso(**kw)</code> aplica <strong>un</strong> paso de SGD con \( \eta=1 \) y gradiente \( [3,4] \) a una variable \( [0,0] \), con los argumentos de recorte que le pasemos (<code>**kw</code>), y devuelve el paso dado (menos el nuevo valor, para verlo en positivo). Con \( \eta=1 \) el paso es igual al gradiente recortado.</td></tr>
+        <tr data-lines="11-13"><td><code>print("sin recorte        :", un_paso()) …</code></td><td>Sin recorte, con <code>clipnorm=1.0</code> (reduce la norma, 5, a 1) y con <code>clipvalue=1.0</code> (cada componente a como mucho 1).</td></tr>
+        <tr data-lines="15-20"><td><code># 2) Dos variables: clipnorm recorta cada una por separado; global_… …</code></td><td><code>dos_vars</code>: dos variables, <code>a</code> con gradiente \( [3,4] \) y <code>b</code> con \( [12] \), para comparar el recorte por variable y el global.</td></tr>
+        <tr data-lines="22-23"><td><code>print("clipnorm=1.0       :", dos_vars(clipnorm=1.0)) …</code></td><td><code>clipnorm</code> recorta cada variable por separado; <code>global_clipnorm</code> calcula una sola norma con todas (\( \sqrt{9+16+144}=13 \)) y reduce todos los gradientes por el mismo factor.</td></tr>
+        <tr data-lines="25-28"><td><code># 3) Un entrenamiento que explota: 6 capas ocultas con pesos inicia… …</code></td><td>Datos para una red que va a explotar: 200 muestras de 4 variables y una etiqueta que es una combinación lineal de ellas.</td></tr>
+        <tr data-lines="30-31"><td><code>def entrenar(**kw): …</code></td><td><code>entrenar(**kw)</code>: recibe los argumentos de recorte del optimizador y fija la semilla.</td></tr>
+        <tr data-lines="32-36"><td><code>capas = [keras.Input(shape=(4,))] …</code></td><td>Construye la red: una entrada, <strong>6 capas ocultas</strong> de 16 neuronas ReLU con pesos iniciales de desviación 1 (demasiado grandes a propósito) y una salida lineal.</td></tr>
+        <tr data-lines="37-38"><td><code>m = keras.Sequential(capas) …</code></td><td>Crea el modelo y lo compila con SGD a 0,01 y los argumentos de recorte, con pérdida MSE.</td></tr>
+        <tr data-lines="39-40"><td><code>h = m.fit(X, y, epochs=15, batch_size=20, shuffle=False, verbose=0) …</code></td><td>Entrena 15 épocas con lotes de 20, sin barajar (para repetir exactamente) y devuelve la pérdida de cada época.</td></tr>
+        <tr data-lines="42-44"><td><code>for nombre, kw in [("sin recorte", {}), ("clipnorm=1.0", {"clipnorm… …</code></td><td>Tres configuraciones: sin recorte, con <code>clipnorm=1.0</code> y con <code>clipvalue=0.1</code>. Imprime la pérdida de las épocas 1, 5 y 15 con <code>:&gt;9.4g</code> (formato compacto de 4 cifras).</td></tr>
+        <tr data-lines="46-47"><td><code># 4) Normalizar el gradiente (siempre a norma 1) frente a recortarl… …</code></td><td>Parte 4: normalizar frente a recortar. Línea en blanco y comentario.</td></tr>
+        <tr data-lines="48-50"><td><code>for v in ([3.0, 4.0], [0.03, 0.04]): …</code></td><td>Para dos gradientes con la misma dirección y distinta norma (5 y 0,05), calcula el recortado con <code>tf.clip_by_norm</code> (lo que hace <code>clipnorm</code>) y el normalizado con <code>tf.math.l2_normalize</code> (divide siempre entre la norma).</td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>sin recorte        : [3.0, 4.0]
+clipnorm=1.0       : [0.6, 0.8] -&gt; misma dirección, norma 1
+clipvalue=1.0      : [1.0, 1.0] -&gt; cada componente a ±1: dirección distinta
+clipnorm=1.0       : ([0.6, 0.8], [1.0])
+global_clipnorm=1.0: ([0.2308, 0.3077], [0.9231]) (norma global = raíz(9+16+144) = 13)
+sin recorte    loss época 1:       nan | época 5:       nan | época 15:       nan
+clipnorm=1.0   loss época 1:      6456 | época 5:     548.7 | época 15:     78.75
+clipvalue=0.1  loss época 1:      7716 | época 5:      2020 | época 15:     165.3
+
+g = [3. 4.] | recortado a norma 1: [0.6 0.8] | normalizado: [0.6 0.8]
+g = [0.03 0.04] | recortado a norma 1: [0.03 0.04] | normalizado: [0.6 0.8]</pre>
+    <p>Las primeras tres líneas: \( g=[3,4] \) sin recorte da [3, 4]; <code>clipnorm</code> lo reduce a [0,6 ; 0,8] (<strong>misma dirección</strong>, norma 1) y <code>clipvalue</code> a [1 ; 1] (la dirección cambia). Las dos siguientes: el recorte por variable da \( b \to 1 \) y el global \( b \to 0{,}9231 \) con \( a \to [0{,}2308;\,0{,}3077] \) (todos divididos entre 13). La red con pesos grandes: sin recorte la pérdida ya es <code>nan</code> en la primera época; con <code>clipnorm=1.0</code> pasa de 6456 a 548,7 y 78,75; con <code>clipvalue=0.1</code> de 7716 a 2020 y 165,3: decrece sin explotar. Al final: con un gradiente grande, recortar y normalizar dan lo mismo ([0,6 ; 0,8]), pero con uno de norma 0,05 el recorte no toca nada y la normalización lo multiplica por 20.</p>
+  </div>
+</article>
+</section>
+
 </div>
-</article></div></details></div></main></body></html>
+</main>
+</body>
+</html>

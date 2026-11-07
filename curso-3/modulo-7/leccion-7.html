@@ -1,87 +1,410 @@
-<!DOCTYPE html>
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lección 7 · Dos fases: primero solo la cabeza, después afinar con learning rate bajo (y recompilar) · Módulo 7 · Curso 3 · Cuaderno de IA</title>
+<meta name="description" content="Las dos fases del transfer learning, cuánto puede moverse un peso según el learning rate, las trampas de trainable en Keras 3 y el flujo real con MobileNetV2.">
+<script>try{var t=localStorage.getItem('cuaderno-ia:tema');if(t)document.documentElement.setAttribute('data-theme',t)}catch(e){}</script>
+<link rel="stylesheet" href="../../assets/css/style.css">
+<script src="../../assets/js/curriculum.js"></script>
+<script src="../../assets/js/lab.js"></script>
+<script src="../../assets/js/app.js" defer></script>
+</head>
+<body data-root="../../" data-course="3" data-module="7" data-lesson="7">
+<main>
+<div class="page">
 
-<html lang="es"><head><meta charset="utf-8"/><meta content="width=device-width,initial-scale=1" name="viewport"/><title>Lección 7 · Keras Tuner: dejar que el ordenador pruebe · Curso 3 · Cuaderno de IA</title><meta content="Los hiperparámetros (neuronas por capa, dropout, λ de L2, learning rate…) son los números que tú eliges y que no se aprenden por gradiente." name="description"/><script>try{var t=localStorage.getItem('cuaderno-ia:tema');if(t)document.documentElement.setAttribute('data-theme',t)}catch(e){}</script><link href="../../assets/css/style.css" rel="stylesheet"/><script src="../../assets/js/curriculum.js"></script><script src="../../assets/js/lab.js"></script><script defer="" src="../../assets/js/app.js"></script><script defer="" src="../../assets/js/microanimations.js"></script></head><body data-course="3" data-lesson="7" data-module="7" data-root="../../"><main><div class="page" data-micro="3min"><header class="hero leccion"><div class="hero-grid"><div><p class="eyebrow">Curso 3 · Módulo 7 · Lección 7 de 18</p><h1>Keras Tuner: dejar que el ordenador pruebe</h1><p class="lead">Los hiperparámetros (neuronas por capa, dropout, λ de L2, learning rate…) son los números que tú eliges y que no se aprenden por gradiente.</p><p class="meta-line"><span class="read-time" data-render="read-time"></span><a href="../modulo-7.html">Índice del módulo</a></p></div><div aria-hidden="true" class="hero-tile"></div></div></header><details class="predice"><summary>¿64 y 32 neuronas? ¿Dropout 0,1? ¿Learning rate 0,001? Todo eso lo has elegido a ojo. ¿Hay una forma sistemática de buscar mejores valores sin pasarte la tarde reentrenando?<span class="hint"></span></summary><div><p>Los hiperparámetros (neuronas por capa, dropout, λ de L2, learning rate…) son los números que tú eliges y que no se aprenden por gradiente.</p></div></details><section aria-label="Explicación breve" class="micro-core"><div class="micro-kicker">01 · ENTENDER <span>≈ 45 s</span></div><h2>La idea en palabras sencillas</h2><p>Los hiperparámetros (neuronas por capa, dropout, λ de L2, learning rate…) son los números que tú eliges y que no se aprenden por gradiente.</p><div class="micro-example"><span aria-hidden="true" class="micro-example-icon">💡</span><div><strong>Otro ejemplo · Reparto</strong><p>Tu estimación se equivoca por 8 minutos. Ajustas el modelo con pequeños pasos, no de golpe.</p></div></div></section><div class="micro-kicker micro-checkpoint">02 · RESPONDER <span>≈ 15 s</span></div><section aria-label="Pregunta intercalada" class="quiz mini micro-check"><script class="quiz-data" type="application/json">{"titulo": "Pausa rápida · Comprueba la idea", "preguntas": [{"q": "Si el error baja después de un ajuste, ¿qué indica?", "opciones": ["Que siempre generalizará perfectamente", "Que se pueden ignorar los datos nuevos", "Que ese ajuste mejoró el resultado medido"], "correcta": 2, "porque": "La pérdida menor indica mejor ajuste para los datos en que se midió."}]}</script></section><section aria-label="Animación interactiva" class="micro-viz" data-index="17" data-micro-viz="gradient"><div class="micro-kicker">03 · EXPERIMENTAR <span>≈ 45 s</span></div><div class="micro-viz-title"><div><h2>Bajar el error, paso a paso</h2><p>Da pasos y mira cómo el punto se acerca al mínimo de la curva.</p></div><span aria-hidden="true" class="micro-viz-symbol">✦</span></div><div aria-live="polite" class="micro-viz-stage"><p>Animación interactiva: Bajar el error, paso a paso</p></div></section><div class="micro-kicker micro-checkpoint">04 · APLICAR <span>≈ 15 s</span></div><section aria-label="Pregunta intercalada" class="quiz mini micro-check"><script class="quiz-data" type="application/json">{"titulo": "Pausa rápida · ¿Lo aplicarías?", "preguntas": [{"q": "¿Qué riesgo tiene un learning rate demasiado grande?", "opciones": ["Convierte el modelo en clasificación", "Puede saltarse el mínimo y oscilar", "Siempre evita el sobreajuste"], "correcta": 1, "porque": "Pasos excesivos pueden impedir la convergencia."}]}</script></section><div class="micro-finish"><strong>Idea que te llevas</strong><span>Los hiperparámetros (neuronas por capa, dropout, λ de L2, learning rate…) son los números que tú eliges y que no se aprenden por gradiente</span><small>¿Quieres más ejemplos, fórmulas o código? Los tienes justo debajo, sin límite de tiempo.</small></div><details class="profundizar micro-legacy"><summary><span>Explorar más: explicación y simulaciones completas<small>Todo el texto original, tablas y demos avanzadas. Opcional.</small></span></summary><div class="prof-body"><section><h2>Keras Tuner: dejar que el ordenador pruebe</h2>
-<p>Los <strong>hiperparámetros</strong> (neuronas por capa, dropout, λ de L2, learning rate…) son los números que <em>tú</em> eliges y que no se aprenden por gradiente. <strong>Keras Tuner</strong> (<a href="../modulo-5.html">módulo 5</a>) automatiza la búsqueda: le das una función <code>build_model(hp)</code> que construye el modelo pidiendo cada valor a un objeto <code>hp</code>, y el tuner prueba combinaciones, entrena cada una y se queda con la mejor según el objetivo.</p>
-<p>La búsqueda en <strong>cuadrícula</strong> (<em>grid search</em>) prueba todas las combinaciones de una malla fija, en orden. La <strong>aleatoria</strong> (<code>RandomSearch</code>) sortea combinaciones. Parece que la cuadrícula, más ordenada, debería ser mejor, pero tiene dos problemas: crece de forma explosiva (5 valores para cada uno de 5 hiperparámetros son 3.125 entrenamientos) y, si solo uno o dos hiperparámetros importan (casi siempre el learning rate), una malla gasta casi todas sus pruebas repitiendo los mismos valores del que importa. Con el mismo número de pruebas, el sorteo explora <em>más valores distintos</em> de cada hiperparámetro.</p>
-<p>Una imagen de andar por casa: te dejan elegir 8 películas de un catálogo de 64 que está ordenado por género y quieres probar de todo. Si las eliges <em>en orden</em> (cuadrícula), tus 8 primeras serán todas del primer género (todo terror). Si las sorteas, caerás en géneros distintos. En la demo, el «género» que más manda es el learning rate, y la cuadrícula ordenada se queda atascada con un solo valor de él.</p>
-<div class="callout ejemplo"><span class="lbl">Con números</span><p>¿64 y 32 neuronas?</p></div></section><figure class="demo" data-demo="curso3/c3m7-tuner" data-titulo="Cuadrícula en orden frente a búsqueda aleatoria">
-<div class="haz">Deja «Aleatoria» y 8 pruebas: cada círculo numerado marca dónde cae esa prueba en el mapa (más rojo = peor error de validación). Cambia a «Cuadrícula (en orden)» con las mismas 8 pruebas y compara los «valores distintos de learning rate probados». Sube las pruebas poco a poco mirando la gráfica de abajo. Pulsa «Otro orden aleatorio» varias veces.</div>
-<div class="observa">El fondo son 64 redes entrenadas de verdad. Lo que más manda es el <strong>learning rate</strong>: a la izquierda (valores bajos) casi ninguna red llega a aprender en 60 épocas, y a la derecha todas lo consiguen; las neuronas importan mucho menos. La cuadrícula, con el learning rate como bucle exterior, gasta sus primeras 8 pruebas en <em>un solo</em> valor de learning rate (el más bajo, el peor), mientras que el sorteo prueba 8 valores distintos y da con la zona buena enseguida. Al llegar a 64 pruebas la diferencia casi desaparece: en un mapa tan pequeño la cuadrícula acaba cubriéndolo todo. La ventaja del sorteo se nota cuando el espacio es grande y el presupuesto es corto.</div>
-</figure><div class="resumen"><h2 class="sin-num sin-toc">En pocas líneas</h2><ul><li><strong>Keras Tuner: dejar que el ordenador pruebe:</strong> Los hiperparámetros (neuronas por capa, dropout, λ de L2, learning rate…) son los números que tú eliges y que no se aprenden por…</li><li>Antes de continuar, intenta explicar la demo sin mirar su resultado.</li></ul></div><section class="quiz mini"><script class="quiz-data" type="application/json">{"titulo": "¿Lo tienes?", "preguntas": [{"q": "¿Qué concepto estamos trabajando en esta lección?", "opciones": ["Keras Tuner: dejar que el ordenador pruebe", "Parte 1 · Los datos: pisos y un reparto en tres", "Métricas y baselines: ¿contra quién compites?"], "correcta": 0, "porque": "Los hiperparámetros (neuronas por capa, dropout, λ de L2, learning rate…) son los números que tú eliges y que no se aprenden por gradiente."}, {"q": "¿Cuál de estas afirmaciones recoge lo que acabas de estudiar?", "opciones": ["Lo importante es comprender la idea y comprobarla con ejemplos, no memorizar términos.", "Los hiperparámetros (neuronas por capa, dropout, λ de L2, learning rate…) son los números que tú eliges y que no se aprenden por gradiente.", "Siempre hay un único método que sirve para todos los problemas."], "correcta": 1, "porque": "La explicación central es: Los hiperparámetros (neuronas por capa, dropout, λ de L2, learning rate…) son los números que tú eliges y que no se aprenden por gradiente."}, {"q": "Si una demo o un ejemplo te desconcierta, ¿cuál es la mejor forma de aprenderlo?", "opciones": ["Memorizar el nombre sin entender la operación.", "Volver a los números, cambiar un valor y explicar qué ocurre.", "Ignorar los resultados que no coinciden con tu intuición."], "correcta": 1, "porque": "Explorar qué cambia y por qué ayuda a conectar el concepto con su resultado."}]}</script></section></div></details><details class="profundizar"><summary><span>Profundizar: explicación completa<small>Matices, fórmulas, tablas, otros ejemplos y experimentos del módulo original.</small></span></summary><div class="prof-body"><section>
-<h2 id="tuner">Keras Tuner: dejar que el ordenador pruebe</h2>
-<p class="pregunta">¿64 y 32 neuronas? ¿Dropout 0,1? ¿Learning rate 0,001? Todo eso lo has elegido a ojo. ¿Hay una forma sistemática de buscar mejores valores sin pasarte la tarde reentrenando?</p>
-<p>Los <strong>hiperparámetros</strong> (neuronas por capa, dropout, λ de L2, learning rate…) son los números que <em>tú</em> eliges y que no se aprenden por gradiente. <strong>Keras Tuner</strong> (<a href="../modulo-5.html">módulo 5</a>) automatiza la búsqueda: le das una función <code>build_model(hp)</code> que construye el modelo pidiendo cada valor a un objeto <code>hp</code>, y el tuner prueba combinaciones, entrena cada una y se queda con la mejor según el objetivo.</p>
-<ul>
-<li><code>hp.Int("unidades1", 32, 128, step=32)</code>: un entero entre 32 y 128 de 32 en 32 (32, 64, 96 o 128).</li>
-<li><code>hp.Float("dropout", 0.0, 0.3, step=0.1)</code>: 0,0; 0,1; 0,2 o 0,3.</li>
-<li><code>hp.Float("l2", 1e-6, 1e-2, sampling="log")</code>: un valor entre una millonésima y una centésima, <strong>muestreado en escala logarítmica</strong>. Es importante: en escala lineal casi todas las muestras caerían entre 0,001 y 0,01 y nunca probarías 0,00001. El learning rate también se muestrea en <code>log</code> por lo mismo.</li>
-</ul>
-<h3>Por qué «aleatorio» suele ganar a «cuadrícula»</h3>
-<p>La búsqueda en <strong>cuadrícula</strong> (<em>grid search</em>) prueba todas las combinaciones de una malla fija, en orden. La <strong>aleatoria</strong> (<code>RandomSearch</code>) sortea combinaciones. Parece que la cuadrícula, más ordenada, debería ser mejor, pero tiene dos problemas: crece de forma explosiva (5 valores para cada uno de 5 hiperparámetros son 3.125 entrenamientos) y, si solo uno o dos hiperparámetros importan (casi siempre el learning rate), una malla gasta casi todas sus pruebas repitiendo los mismos valores del que importa. Con el mismo número de pruebas, el sorteo explora <em>más valores distintos</em> de cada hiperparámetro.</p>
-<p>Una imagen de andar por casa: te dejan elegir 8 películas de un catálogo de 64 que está ordenado por género y quieres probar de todo. Si las eliges <em>en orden</em> (cuadrícula), tus 8 primeras serán todas del primer género (todo terror). Si las sorteas, caerás en géneros distintos. En la demo, el «género» que más manda es el learning rate, y la cuadrícula ordenada se queda atascada con un solo valor de él.</p>
-<h3>El tuner de los pisos</h3>
-<p>El <a href="#frag-10">fragmento 10</a> define <code>build_model(hp)</code> reutilizando la función <code>construir_modelo</code>, lanza un <code>RandomSearch</code> de <strong>solo 6 pruebas</strong> (<code>max_trials=6</code>, 40 épocas máximo cada una, con un <code>EarlyStopping</code> que las acorta) y muestra todas ordenadas. Un presupuesto tan pequeño es solo para que se pueda ejecutar aquí; con un proyecto real pondrías de 30 a 100 pruebas. Lo que enseña el resultado:</p>
-<ul>
-<li>Las dos mejores pruebas usan <strong>la misma arquitectura</strong> que la red hecha a mano (64 y 32 neuronas), con <strong>L2 minúsculo</strong> (1,2e-5 y 3,5e-6), Dropout de 0,2 y 0,1 y learning rates de 0,0045 y 0,00084. Sus <code>val_loss</code> (0,0324 y 0,0335) difieren en 0,001: son indistinguibles.</li>
-<li>La quinta (0,0973) es la de L2 más alto de las seis (2,8e-3). Con esta cantidad de datos, una penalización fuerte parece frenar el aprendizaje, aunque con seis pruebas no se puede aislar su efecto.</li>
-<li>La peor (0,1299) tiene un learning rate de 0,00012 y 40 épocas pueden no bastarle para converger, el síntoma de «learning rate demasiado bajo» de la demo de curvas. Pero <strong>la tercera tiene un learning rate parecido</strong> (0,00010) y queda tercera, con 128 y 32 neuronas. El learning rate no lo explica todo, y con seis pruebas no se pueden separar los efectos de cada hiperparámetro.</li>
-<li>La mejor <code>val_loss</code> del tuner (0,0324) es algo mejor que la de la red hecha a mano (0,0357). Una diferencia de 0,003 en una validación de 800 filas está en el borde del ruido: no la tomes como una mejora segura hasta confirmarla (con más semillas y, al final, con el test).</li>
-</ul>
-<div class="callout ojo">
-<span class="lbl">Ojo · el tuner elige con la validación</span>
-<p>El mejor valor de <code>val_loss</code> que da el tuner es el más optimista de todos los que probó: es el «ganador» entre varias suertes. La cifra real del modelo elegido se mide en el test. Y si el espacio de búsqueda es muy grande y el presupuesto pequeño, es posible que el tuner no encuentre nada mejor que tu intuición: no es magia, es un ayudante.</p>
-</div>
-</section></div></details><details class="profundizar" id="codigo"><summary><span>Ver código explicado paso a paso<small>1 fragmento(s) original(es), con cada línea comentada y salida esperada.</small></span></summary><div class="prof-body"><article class="snippet" data-lang="python" id="frag-10">
-<header>
-<h3>10 · Búsqueda de hiperparámetros con Keras Tuner (RandomSearch)</h3>
-<p class="para-que"><strong>Para qué sirve</strong> Dejar que <code>RandomSearch</code> pruebe 6 combinaciones de neuronas, Dropout, L2 y learning rate, ver todas ordenadas por <code>val_loss</code> y quedarse con la mejor. Continúa el fragmento 6 (usa <code>construir_modelo</code> y los datos escalados).</p>
+<header class="hero leccion">
+  <div class="hero-grid">
+    <div>
+      <p class="eyebrow">Curso 3 · Módulo 7 · Lección 7 de 8</p>
+      <h1>Dos fases: primero solo la cabeza, después afinar con learning rate bajo (y recompilar)</h1>
+      <p class="lead">Fase 1: base congelada, se entrena solo la cabeza nueva. Fase 2: se descongelan los últimos bloques, se recompila y se afina con un learning rate de 10 a 100 veces menor.</p>
+      <p class="meta-line"><span class="read-time" data-render="read-time"></span><a href="../modulo-7.html">Índice del módulo</a></p>
+    </div>
+    <div class="hero-tile" aria-hidden="true"></div>
+  </div>
 </header>
-<pre class="code"><code>import keras_tuner as kt
 
-def build_model(hp):
-    unidades = (hp.Int("unidades1", 32, 128, step=32), hp.Int("unidades2", 16, 64, step=16))
-    return construir_modelo(Z_train.shape[1], unidades=unidades,
-                            dropout=hp.Float("dropout", 0.0, 0.3, step=0.1),
-                            l2=hp.Float("l2", 1e-6, 1e-2, sampling="log"),
-                            lr=hp.Float("lr", 1e-4, 1e-2, sampling="log"))
-
-tuner = kt.RandomSearch(build_model, objective="val_loss", max_trials=6, seed=0,
-                        directory="tuner_pisos", project_name="rs", overwrite=True)
-tuner.search(Z_train, t_train, validation_data=(Z_val, t_val), epochs=40, batch_size=128, verbose=0,
-             callbacks=[keras.callbacks.EarlyStopping(patience=8, restore_best_weights=True)])
-for i, trial in enumerate(tuner.oracle.get_best_trials(6), start=1):
-    hp = trial.hyperparameters.values
-    print(f"{i}. val_loss={trial.score:.4f}  u1={hp['unidades1']} u2={hp['unidades2']} "
-          f"drop={hp['dropout']:.1f} l2={hp['l2']:.1e} lr={hp['lr']:.1e}")
-mejor_hp = tuner.get_best_hyperparameters(1)[0]
-print("mejores hiperparámetros:", mejor_hp.values)</code></pre>
-<details class="linea-a-linea">
-<summary>Línea por línea</summary>
-<p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
-<table class="lineas">
-<thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
-<tbody>
-<tr data-lines="1"><td><code>import keras_tuner as kt</code></td><td>Importa Keras Tuner.</td></tr>
-<tr data-lines="3"><td><code>def build_model(hp):</code></td><td><code>build_model(hp)</code>: la función que el tuner llamará una vez por prueba. El objeto <code>hp</code> sirve para <em>pedir</em> valores.</td></tr>
-<tr data-lines="4"><td><code>unidades = (hp.Int("unidades1", 32, 128, step=32), hp.I…</code></td><td><code>hp.Int</code> sortea un entero en un rango y un paso: 32, 64, 96 o 128 neuronas en la primera capa; 16, 32, 48 o 64 en la segunda.</td></tr>
-<tr data-lines="5-8"><td><code>return construir_modelo(Z_train.shape[1], unidades=unid…</code></td><td>Llama a <code>construir_modelo</code> con esas neuronas y con tres valores sorteados con <code>hp.Float</code>: Dropout (0 a 0,3 de 0,1 en 0,1), L2 y learning rate, estos dos con <code>sampling="log"</code> (sorteo en escala logarítmica).</td></tr>
-<tr data-lines="10-11"><td><code>tuner = kt.RandomSearch(build_model, objective="val_los…</code></td><td>Crea el <code>RandomSearch</code>: <code>objective="val_loss"</code> (lo que hay que minimizar), <code>max_trials=6</code> pruebas, <code>seed=0</code> para que el sorteo sea reproducible, y una carpeta donde guarda los resultados (<code>overwrite=True</code> borra lo anterior).</td></tr>
-<tr data-lines="12-13"><td><code>tuner.search(Z_train, t_train, validation_data=(Z_val,…</code></td><td><code>search</code> lanza las pruebas. Se usa como <code>fit</code> (datos, validación, épocas, lote) y cada prueba lleva su <code>EarlyStopping</code> para no gastar épocas de más.</td></tr>
-<tr data-lines="14"><td><code>for i, trial in enumerate(tuner.oracle.get_best_trials(…</code></td><td>Recorre las 6 pruebas ordenadas de mejor a peor (<code>get_best_trials</code>).</td></tr>
-<tr data-lines="15-17"><td><code>hp = trial.hyperparameters.values …</code></td><td>Para cada una imprime su posición, su <code>val_loss</code> (<code>trial.score</code>) y los hiperparámetros que se probaron. <code>:.1e</code> es notación científica con un decimal.</td></tr>
-<tr data-lines="18-19"><td><code>mejor_hp = tuner.get_best_hyperparameters(1)[0] …</code></td><td><code>get_best_hyperparameters</code> devuelve los de la mejor prueba, listos para reconstruir el modelo.</td></tr>
-</tbody>
-</table>
+<details class="predice">
+  <summary>Descongelas el último bloque de la base (cambias <code>trainable</code>) y sigues entrenando sin más. ¿Cuánto cambian sus pesos en una época?<span class="hint"></span></summary>
+  <div>
+    <p>Nada: <strong>0,000000</strong> en el fragmento 18. Keras aplica el cambio de <code>trainable</code> al compilar; sin un nuevo <code>compile()</code> entrenas con la configuración de la fase 1 y no recibes ningún aviso.</p>
+  </div>
 </details>
-<div class="salida">
-<strong>Salida esperada</strong>
-<pre>1. val_loss=0.0324  u1=64 u2=32 drop=0.2 l2=1.2e-05 lr=4.5e-03
-2. val_loss=0.0335  u1=64 u2=32 drop=0.1 l2=3.5e-06 lr=8.4e-04
-3. val_loss=0.0449  u1=128 u2=32 drop=0.1 l2=1.1e-06 lr=1.0e-04
-4. val_loss=0.0486  u1=32 u2=64 drop=0.0 l2=9.4e-05 lr=1.6e-03
-5. val_loss=0.0973  u1=128 u2=64 drop=0.1 l2=2.8e-03 lr=1.9e-03
-6. val_loss=0.1299  u1=32 u2=32 drop=0.1 l2=6.2e-05 lr=1.2e-04
-mejores hiperparámetros: {'unidades1': 64, 'unidades2': 32, 'dropout': 0.2, 'l2': 1.247980692558721e-05, 'lr': 0.004504449062092147}</pre>
-<p>Las seis pruebas van de 0,0324 a 0,1299. Ganan dos redes de 64 + 32 neuronas con L2 casi nulo (1,2e-5 y 3,5e-6) y learning rates de 0,0045 y 0,00084; sus val_loss (0,0324 y 0,0335) casi coinciden. La quinta, con el L2 más alto (2,8e-3), queda en 0,0973, y la sexta, con learning rate de 1,2e-4 y 32 + 32 neuronas, no llega a converger en 40 épocas (0,1299); pero la tercera tiene un learning rate parecido (1,0e-4) y es tercera (0,0449), así que el learning rate no lo explica todo. La mejor <code>val_loss</code> del tuner (0,0324) es un poco mejor que la de la red hecha a mano (0,0357): una diferencia pequeña que habría que confirmar con más semillas.</p>
+
+<section>
+<h2 id="idea">Primero el becario, después el veterano</h2>
+<p>Un montador veterano (la base) incorpora a un becario (la cabeza nueva, con pesos al azar). Si cada error del becario se le reprochara también al veterano, este estropearía una técnica que era buena. Por eso, en la <strong>fase 1</strong>, <code>base.trainable = False</code>: solo se entrenan los 5.125 parámetros de la cabeza, el 17,6 % del modelo.</p>
+<p>En la <strong>fase 2</strong> se descongelan los últimos bloques (los más específicos), se <strong>recompila</strong> y se afina con un learning rate bajo. Las trampas de Keras 3: recompilar siempre; poner <code>base.trainable = True</code> antes del bucle por capas; y llamar a la base con <code>training=False</code> para que sus BatchNorm no cambien.</p>
+<p>El resultado honesto de este juguete: entrenar desde cero (0,946) supera a la fase 1 (0,871) y a la fase 2 (de 0,894 a 0,917). Una base de dígitos 0–4 ayuda poco con los 5–9. Compara siempre con entrenar desde cero.</p>
+</section>
+
+<figure class="demo" data-demo="curso3/c3m7-fases" data-titulo="Las dos fases: parámetros, configuraciones y curvas">
+  <div class="haz">Pasa a «Fase 2», mueve los bloques descongelados y prueba cada learning rate.</div>
+  <div class="observa">1e-5 casi no cambia nada, 1e-4 mejora un par de puntos y 1e-3 es una lotería. Desde cero queda por encima de todas.</div>
+</figure>
+
+<section>
+<h2 id="numeros">Con números: cuánto puede moverse un peso</h2>
+<div class="callout ejemplo">
+  <span class="lbl">Ejemplo numérico</span>
+<p>Adam mueve cada peso, como mucho, más o menos el learning rate por paso. La fase 2 son 30 épocas de 5 pasos: <strong>150 pasos</strong>. Un peso típico de esa convolución ronda 0,083.</p>
+  <table>
+    <thead><tr><th>lr</th><th>Máximo en 150 pasos</th></tr></thead>
+    <tbody>
+      <tr><td>1e-5</td><td>0,0015 (≈ 2 % de 0,083)</td></tr>
+      <tr><td>1e-4</td><td class="res">0,015 (≈ 18 %)</td></tr>
+      <tr><td>1e-3</td><td>0,15 (≈ 180 %)</td></tr>
+    </tbody>
+  </table>
+  <p>1e-5 casi no mueve nada, 1e-4 es un ajuste fino y 1e-3 puede reescribir el filtro entero. Medido de verdad con 1e-4: los pesos del bloque 3 cambian <strong>0,0066</strong>, por debajo de la cota de 0,015.</p>
 </div>
-</article></div></details></div></main></body></html>
+</section>
+
+<details class="predice">
+  <summary>Con lr 1e-3 descongelando solo el bloque 3 sale 0,910 ± 0,023, el mejor número de la tabla de barrido. ¿Es la mejor configuración?<span class="hint"></span></summary>
+  <div>
+    <p>No se puede afirmar. Con desviaciones de 0,023 a 0,032 y tres semillas, ese 0,910 puede ser suerte: con los bloques 2 y 3, el mismo learning rate dio 0,870. 1e-4 mejora menos, pero de forma consistente. Una diferencia de un punto no es una diferencia.</p>
+  </div>
+</details>
+
+<div class="resumen">
+  <h2 class="sin-num sin-toc">En tres líneas</h2>
+  <ul>
+    <li>Fase 1: base congelada y cabeza nueva (5.125 de 29.045 parámetros).</li>
+    <li>Fase 2: descongelar los últimos bloques, recompilar y afinar con learning rate bajo (1e-4 aquí).</li>
+    <li>Compara con entrenar desde cero: en este juguete ganó (0,946).</li>
+  </ul>
+</div>
+
+<section class="quiz mini">
+<script type="application/json" class="quiz-data">
+{
+ "titulo": "¿Lo tienes?",
+ "preguntas": [
+  {
+   "q": "En la fase 2 del transfer learning descongelas el último bloque de la base. ¿Qué dos cosas necesitas hacer y por qué?",
+   "opciones": [
+    "Cambiar el número de épocas y volver a cargar los datos",
+    "Usar un learning rate muy bajo y volver a llamar a <code>compile()</code>, porque Keras solo aplica el cambio de <code>trainable</code> al compilar",
+    "Poner los pesos de la base a cero para que reaprenda",
+    "Usar un learning rate más alto que en la fase 1 para recuperar el tiempo perdido"
+   ],
+   "correcta": 1,
+   "porque": "Los pesos de la base son valiosos y están calibrados con la cabeza: un learning rate alto los destrozaría en pocos pasos, así que se afina con uno de 10 a 100 veces menor. Y el cambio de <code>trainable</code> solo surte efecto al volver a compilar el modelo; sin <code>compile()</code> entrenarías con las capas congeladas de antes sin enterarte."
+  },
+  {
+   "q": "La base tiene 23.920 parámetros y la cabeza nueva es <code>Flatten</code> + <code>Dense(5)</code> sobre 1.024 números. ¿Cuántos parámetros se entrenan en la fase 1?",
+   "opciones": [
+    "23.920",
+    "29.045",
+    "1.024",
+    "5.125"
+   ],
+   "correcta": 3,
+   "porque": "Con la base congelada solo se entrena la cabeza: 1.024 · 5 + 5 = 5.125. El modelo entero tiene 29.045, así que se actualiza el 17,6 %."
+  },
+  {
+   "q": "En el flujo real con <code>MobileNetV2</code>, ¿qué hace <code>preprocess_input</code>?",
+   "opciones": [
+    "Descarga los pesos de ImageNet",
+    "Recompila el modelo",
+    "Lleva los píxeles a la escala que espera esa base (de −1 a 1); con el de otra base rinde peor sin dar error",
+    "Aumenta las imágenes al azar"
+   ],
+   "correcta": 2,
+   "porque": "Cada base espera su propio preprocesado: MobileNetV2, píxeles entre −1 y 1; VGG16 resta la media de ImageNet y pasa a BGR. Si usas el equivocado, la red ve imágenes «raras» y no hay ningún error que te avise."
+  }
+ ]
+}
+</script>
+</section>
+
+
+<details class="profundizar">
+  <summary><span>Profundizar: la explicación completa<small>La analogía del montador, las dos fases con sus cuentas, las tres trampas de trainable, la tabla de resultados con desde cero, el barrido de nueve variantes y el flujo real con MobileNetV2 explicado línea a línea.</small></span></summary>
+  <div class="prof-body">
+<h2 id="fases">Las dos fases: extracción de características y <em>fine-tuning</em></h2>
+
+<p class="pregunta">Ya tenemos una base preentrenada y vamos a pegarle una cabeza nueva. ¿Entrenamos todo a la vez? ¿Por qué el transfer learning se hace en dos fases, y qué es eso de «recompilar»?</p>
+
+<div class="callout analogia">
+  <span class="lbl">Analogía</span>
+  <p>Un montador veterano (la base) incorpora a un becario (la cabeza), que al principio no sabe nada. Si cada error del becario se le reprocha también al veterano, este acabará cambiando su técnica, que era buena, para compensar al becario. Lo sensato es dejar primero que el becario aprenda con el veterano «quieto» (<strong>fase 1</strong>) y, cuando ya trabaja decentemente, permitir pequeños ajustes del veterano, con mucho cuidado (<strong>fase 2</strong>).</p>
+</div>
+
+<h3>Fase 1: extraer características con la base congelada</h3>
+<p>Al principio la cabeza tiene pesos aleatorios, así que sus predicciones son malas y el gradiente que fluye hacia atrás es grande y poco fiable. Si la base estuviera descongelada, esos gradientes grandes <strong>destrozarían</strong> unos pesos que estaban bien. Por eso se <em>congela</em> la base (<code>base.trainable = False</code>): sus pesos no cambian y se entrena solo la cabeza. La base funciona como un «extractor de características» fijo.</p>
+<p>Contemos lo que se entrena. La cabeza (<code>Flatten</code> y <code>Dense(5)</code> sobre 1.024 números) tiene \( 1024\cdot 5 + 5 = 5.125 \) parámetros; la base tiene 23.920, todos congelados. El <a href="#frag-17">fragmento 17</a> lo confirma: <strong>5.125 entrenables y 23.920 congelados</strong>, es decir, solo el 17,6 % del modelo (5.125 / 29.045) se actualiza.</p>
+
+<h3>Fase 2: descongelar un poco y afinar con learning rate bajo</h3>
+<p>Cuando la cabeza ya funciona, se pueden <em>descongelar</em> las últimas capas de la base para que se adapten a tu tarea. Se descongelan las <strong>últimas</strong> (las más específicas) y no las primeras (bordes y trazos, útiles en cualquier tarea). Y hay que hacerlo con un <strong>learning rate muy bajo</strong>: ya no hay un novato que genere errores enormes, pero los pesos de la base son valiosos y un paso grande los estropearía.</p>
+
+<div class="callout ejemplo">
+  <span class="lbl">Ejemplo numérico · cuánto puede moverse un peso</span>
+  <p>El optimizador Adam mueve cada peso, aproximadamente, como mucho una cantidad igual al learning rate en cada paso. La fase 2 dura 30 épocas de unos 5 pasos (75 imágenes en lotes de 16): <strong>150 pasos</strong>. Cota superior del desplazamiento de un peso:</p>
+  <table>
+    <thead><tr><th>Learning rate</th><th>Desplazamiento máximo en 150 pasos</th><th>En comparación con un peso típico</th></tr></thead>
+    <tbody>
+      <tr><td>1e-5</td><td>150 · 0,00001 = 0,0015</td><td>≈ 2 % de su tamaño: casi no cambia nada</td></tr>
+      <tr><td>1e-4</td><td>150 · 0,0001 = 0,015</td><td>≈ 18 %: un ajuste fino</td></tr>
+      <tr><td>1e-3</td><td>150 · 0,001 = 0,15</td><td>≈ 180 %: puede reescribir el filtro entero</td></tr>
+    </tbody>
+  </table>
+  <p>El «peso típico» de una convolución 3×3 de 32 a 64 canales con la inicialización de Keras (Glorot uniforme) está en el entorno de \( \sqrt{6/(9\cdot32+9\cdot64)} \approx 0{,}083 \) (el límite del intervalo en que se sortean). Son órdenes de magnitud, no una garantía: Adam no siempre da el paso máximo. En el <a href="#frag-18">fragmento 18</a> se mide el cambio real de los pesos del bloque 3: <strong>0,0066</strong>, por debajo de la cota de 0,015 para 1e-4.</p>
+</div>
+
+<h3>La trampa: cambiar <code>trainable</code> no basta, hay que recompilar</h3>
+<p>Descongelar es fácil y engañoso. El <a href="#frag-18">fragmento 18</a> hace el siguiente experimento: descongela el bloque 3, comprueba que el recuento de parámetros entrenables ya es 23.685 (5.125 de la cabeza + 18.560 del bloque 3: 18.432 de la convolución y 128 de \( \gamma \) y \( \beta \)), entrena <strong>una época sin recompilar</strong> y mide cuánto han cambiado los pesos del bloque 3: <strong>0,000000</strong>. Nada. El modelo sigue entrenando con la configuración de la fase 1. Solo después de volver a llamar a <code>compile</code> (aquí con learning rate 1e-4) los pesos empiezan a moverse.</p>
+
+<div class="callout ojo">
+  <span class="lbl">Ojo · las tres trampas de Keras 3 con <code>trainable</code></span>
+  <ul>
+    <li><strong>Recompilar tras cambiarlo</strong>, como acabas de ver. Si no, el entrenamiento ignora el cambio sin avisar.</li>
+    <li><strong>Orden</strong>: primero <code>base.trainable = True</code> y luego el bucle por capas. Si haces el bucle y después activas el interruptor de la base, este último manda y vuelve a descongelar todo.</li>
+    <li><strong>BatchNorm</strong>: la base se llama con <code>training=False</code>, así que aunque se descongelen sus BatchNorm (se actualizan \( \gamma \) y \( \beta \)), sus medias y varianzas móviles se quedan como estaban.</li>
+  </ul>
+</div>
+
+<div class="callout recuerda">
+  <span class="lbl">Experimento de arriba: «Las dos fases: parámetros, configuraciones y curvas», con todo detalle</span>
+  <p><strong>Haz esto.</strong> Empieza en «Fase 1» y mira cuántos parámetros se entrenan. Pasa a «Fase 2» y mueve el deslizador de bloques descongelados: el esquema y el recuento cambian. Elige cada learning rate y mira cómo se ilumina su barra en el gráfico de exactitud de test.</p>
+  <p><strong>Fíjate en.</strong> Los números del recuento se calculan al momento. Las barras y las curvas son <strong>resultados reales</strong> de los fragmentos del módulo (media de tres semillas en las barras, semilla 0 en las curvas). Con learning rate 1e-5 la fase 2 casi no cambia nada (las barras quedan en el nivel de la fase 1), con 1e-4 mejora un par de puntos y con 1e-3 puede dar el mejor o el peor resultado, según los bloques. Y fíjate en la primera barra: <strong>entrenar desde cero queda por encima de todas las configuraciones de transfer learning</strong>. Más abajo se explica por qué.</p>
+</div>
+
+<h3>Los resultados, sin adornos</h3>
+<p>El <a href="leccion-8.html#frag-19">fragmento 19</a> entrena la tarea B de cuatro maneras, con tres semillas cada una (media ± desviación de la exactitud sobre las 746 imágenes de test):</p>
+<table>
+  <thead><tr><th>Cómo se entrena</th><th>Exactitud de test</th><th>Lectura</th></tr></thead>
+  <tbody>
+    <tr><th scope="row">Desde cero (90 épocas, todo entrenable)</th><td>0,946 ± 0,019</td><td>El mejor, con de 3 a 7,5 puntos de ventaja sobre el transfer learning</td></tr>
+    <tr><th scope="row">Solo fase 1</th><td>0,871 ± 0,007</td><td>Una cabeza de 5.125 parámetros ya acierta casi 9 de cada 10</td></tr>
+    <tr><th scope="row">Fase 1 + 2 (bloque 3, lr 1e-4)</th><td>0,894 ± 0,011</td><td>Afinar el último bloque mejora unos 2 puntos la fase 1</td></tr>
+    <tr><th scope="row">Fase 1 + 2 (toda la base, lr 1e-4)</th><td>0,917 ± 0,004</td><td>Descongelar toda la base mejora otros 2 puntos y se acerca al «desde cero»</td></tr>
+  </tbody>
+</table>
+<p>Y el <a href="leccion-8.html#frag-22">fragmento 22</a> explora la fase 2 con nueve variantes (cuántos bloques descongelar y qué learning rate), siempre partiendo de los mismos pesos de la fase 1 (media ± desviación de tres semillas):</p>
+<table>
+  <thead><tr><th>Descongelar</th><th>lr 1e-5</th><th>lr 1e-4</th><th>lr 1e-3</th></tr></thead>
+  <tbody>
+    <tr><th scope="row">Solo el bloque 3</th><td>0,876 ± 0,004</td><td>0,886 ± 0,013</td><td>0,910 ± 0,023</td></tr>
+    <tr><th scope="row">Bloques 2 y 3</th><td>0,874 ± 0,011</td><td>0,902 ± 0,016</td><td>0,870 ± 0,032</td></tr>
+    <tr><th scope="row">Toda la base</th><td>0,868 ± 0,013</td><td>0,905 ± 0,007</td><td>0,889 ± 0,028</td></tr>
+  </tbody>
+</table>
+<p>Referencia de la fase 1 sin fase 2: 0,871 ± 0,009. Cómo leer la tabla, de lo más seguro a lo más dudoso:</p>
+<ul>
+  <li><strong>lr 1e-5 no hace nada</strong>: 0,868 a 0,876, el mismo nivel que la fase 1. Con 150 pasos de 1e-5 los pesos apenas se mueven (la cota de 0,0015 de arriba).</li>
+  <li><strong>lr 1e-4 mejora de forma consistente</strong>: de 0,886 a 0,905, entre 1,5 y 3,4 puntos sobre la fase 1, y con desviaciones de 0,007 a 0,016.</li>
+  <li><strong>lr 1e-3 es una lotería</strong>: da el mejor número de la tabla (0,910 con el bloque 3) y el peor de la segunda fila (0,870), con desviaciones de 0,023 a 0,032. Con tres semillas no se puede saber si ese 0,910 es mérito del learning rate o suerte.</li>
+  <li><strong>Cuánto vale el ruido</strong>: la misma configuración (toda la base, lr 1e-4) dio 0,917 en el <a href="leccion-8.html#frag-19">fragmento 19</a> y 0,905 en el <a href="leccion-8.html#frag-22">fragmento 22</a>, y el bloque 3 con lr 1e-4 dio 0,894 y 0,886. Lo que cambia entre ambos es sobre todo el azar (el aumento de datos y el Dropout). Una diferencia de un punto entre dos configuraciones <strong>no es una diferencia</strong>.</li>
+</ul>
+
+<div class="callout ojo">
+  <span class="lbl">Ojo · en este juguete, el transfer learning no gana en media</span>
+  <p>Es el resultado honesto, y conviene entenderlo en lugar de esconderlo. <strong>No</strong> significa que el transfer learning no sirva: significa que <em>esta</em> base no ayuda lo bastante. Observa el orden de la tabla: cuanto más se deja cambiar la base (solo la cabeza, el bloque 3, toda la base), mejor resultado, y lo mejor de todo es no usarla y entrenar todo desde cero. Es la señal de que lo que aprendió con los dígitos 0 a 4 sirve poco para los 5 a 9 (recuerda que el 8, por ejemplo, nunca apareció). Nuestra «experiencia previa» son 720 imágenes de cinco cifras, y la tarea B, con dígitos de 8 × 8 ampliados, es tan sencilla que una red pequeña la aprende sola con ayuda del aumento. Una base de ImageNet ha visto 1,2 millones de fotos y 1.000 categorías y sus características son mucho más ricas; además, las tareas con pocas fotos reales sí suelen ser imposibles de aprender desde cero. Pero eso último <strong>no lo hemos comprobado aquí</strong>. La lección práctica: <strong>compara siempre el transfer learning con el baseline de entrenar desde cero</strong> antes de decidir, y no des por hecho que reutilizar es mejor.</p>
+</div>
+
+<div class="callout ojo">
+  <span class="lbl">Ojo · elegir con la validación, no con el test</span>
+  <p>Los fragmentos 19 y 22 imprimen la exactitud de test para que veas el efecto de cada decisión, pero en un proyecto real elegirías el learning rate y los bloques a descongelar con la <strong>validación</strong> y solo medirías en el test el modelo ya elegido. Aquí la validación tiene solo 75 imágenes (cada imagen vale 1,3 puntos de exactitud), así que sería una elección ruidosa: otra razón para repetir con varias semillas.</p>
+</div>
+
+<h2 id="imagenet-real">El flujo real con ImageNet (código que no se ha ejecutado con los pesos)</h2>
+
+<p class="pregunta">Todo lo anterior usa una base que hemos preentrenado nosotros con dígitos. En un proyecto de verdad no entrenas tu propia base: descargas una ya entrenada con ImageNet. ¿Qué cambia exactamente en el código?</p>
+
+<p>Casi nada. Cambian cuatro cosas: (1) los datos vienen de carpetas con fotos, (2) la base se crea con <code>weights="imagenet"</code>, (3) hay que aplicar el <code>preprocess_input</code> <strong>de esa base</strong> y (4) el tamaño de imagen suele ser mayor (160 × 160 o 224 × 224). Este es el flujo completo con <code>MobileNetV2</code>, que es ligera y suficiente para la mayoría de proyectos:</p>
+
+<pre class="code"><code>import keras
+import tensorflow as tf
+from keras import layers
+
+TAM = (160, 160)
+train_ds = keras.utils.image_dataset_from_directory("fotos/train", image_size=TAM, batch_size=32, label_mode="int")
+val_ds = keras.utils.image_dataset_from_directory("fotos/val", image_size=TAM, batch_size=32, label_mode="int")
+clases = train_ds.class_names
+train_ds = train_ds.prefetch(tf.data.AUTOTUNE)
+val_ds = val_ds.prefetch(tf.data.AUTOTUNE)
+
+aumento = keras.Sequential([layers.RandomFlip("horizontal"), layers.RandomRotation(0.05), layers.RandomZoom(0.1)])
+
+base = keras.applications.MobileNetV2(input_shape=TAM + (3,), include_top=False, weights="imagenet")
+base.trainable = False
+
+entrada = keras.Input(shape=TAM + (3,))
+x = aumento(entrada)
+x = keras.applications.mobilenet_v2.preprocess_input(x)
+x = base(x, training=False)
+x = layers.GlobalAveragePooling2D()(x)
+x = layers.Dropout(0.2)(x)
+salida = layers.Dense(len(clases), activation="softmax")(x)
+modelo = keras.Model(entrada, salida)
+
+# Fase 1: solo la cabeza nueva
+modelo.compile(optimizer=keras.optimizers.Adam(1e-3), loss="sparse_categorical_crossentropy", metrics=["accuracy"])
+modelo.fit(train_ds, validation_data=val_ds, epochs=10)
+
+# Fase 2: descongelar las últimas 30 capas de la base y afinar con learning rate muy bajo
+base.trainable = True
+for capa in base.layers[:-30]:
+    capa.trainable = False
+modelo.compile(optimizer=keras.optimizers.Adam(1e-5), loss="sparse_categorical_crossentropy", metrics=["accuracy"])
+modelo.fit(train_ds, validation_data=val_ds, epochs=10)</code></pre>
+
+<div class="callout ojo">
+  <span class="lbl">Ojo · qué se ha comprobado y qué no</span>
+  <p>Este bloque <strong>no se ha ejecutado con los pesos de ImageNet</strong>, porque no se pueden descargar sin internet (la primera llamada a <code>weights="imagenet"</code> descarga un archivo de unos pocos MB en el caso de MobileNetV2 y de cientos de MB en el de VGG16 completa). Lo que sí se hizo es ejecutarlo <strong>completo con <code>weights=None</code></strong> (pesos al azar) sobre una carpeta de imágenes sintéticas con tres clases, una época por fase, para comprobar que las llamadas (<code>image_dataset_from_directory</code>, <code>preprocess_input</code>, el segundo <code>compile</code>) funcionan con Keras 3.15. No tengo, por tanto, ninguna exactitud de ImageNet que enseñarte: las cifras de este módulo son las de nuestras ejecuciones locales.</p>
+</div>
+
+<h3>Qué cambia y por qué, línea a línea</h3>
+<table>
+  <thead><tr><th>Línea</th><th>Qué hace y por qué</th></tr></thead>
+  <tbody>
+    <tr><th scope="row"><code>image_dataset_from_directory("fotos/train", …)</code></th><td>Lee una carpeta con una subcarpeta por clase (<code>fotos/train/gato/…</code>, <code>fotos/train/perro/…</code>) y devuelve un <code>tf.data.Dataset</code> de lotes de imágenes y etiquetas. Es la versión de Keras 3 de lo que hacía <code>ImageDataGenerator.flow_from_directory</code>, que ya no se importa desde <code>keras.preprocessing.image</code> (<a href="../../curso-2/modulo-5.html">Curso 2, módulo 5</a>). <code>image_size</code> redimensiona todas las fotos al mismo tamaño.</td></tr>
+    <tr><th scope="row"><code>class_names</code></th><td>La lista de clases en el orden de las carpetas; la etiqueta 0 es la primera. Guárdala: la necesitarás para traducir números a nombres al predecir.</td></tr>
+    <tr><th scope="row"><code>prefetch(tf.data.AUTOTUNE)</code></th><td>Prepara el siguiente lote mientras el modelo procesa el actual (<a href="../modulo-5.html">módulo 5</a>).</td></tr>
+    <tr><th scope="row"><code>MobileNetV2(…, include_top=False, weights="imagenet")</code></th><td>La base convolucional sin el clasificador de 1.000 clases de ImageNet, con los pesos ya entrenados. Con <code>weights=None</code> tendría la misma estructura y pesos al azar.</td></tr>
+    <tr><th scope="row"><code>preprocess_input</code></th><td><strong>Imprescindible y específico de cada base</strong>: MobileNetV2 espera píxeles entre −1 y 1; VGG16 resta la media de ImageNet y pasa a BGR; ResNet, otra cosa. Si usas el de una base equivocada, la red preentrenada ve imágenes «raras» y rinde peor sin dar ningún error. En nuestra base casera, la capa <code>Rescaling(1/127.5, offset=-1)</code> hace ese mismo trabajo.</td></tr>
+    <tr><th scope="row"><code>base(x, training=False)</code></th><td>Llama a la base en modo inferencia: sus capas BatchNorm usan las medias y varianzas que aprendieron con ImageNet en vez de recalcularlas con tus pocos lotes (que las estropearían).</td></tr>
+    <tr><th scope="row"><code>base.layers[:-30]</code></th><td>Todas las capas menos las últimas 30. El número depende de cada base: MobileNetV2 tiene 154 capas (comprobado con <code>weights=None</code>), así que <code>[:-30]</code> deja entrenables las últimas 30.</td></tr>
+    <tr><th scope="row">Segundo <code>compile</code> con <code>1e-5</code></th><td>Cambiar <code>trainable</code> exige recompilar, y es la ocasión de poner un learning rate pequeño para no deshacer lo aprendido.</td></tr>
+  </tbody>
+</table>
+
+<p>Con datos y pesos reales, lo habitual (no lo hemos medido aquí) es que la fase 1 ya dé una exactitud alta con pocas imágenes, porque ImageNet contiene objetos parecidos a los tuyos, y que la fase 2 la mejore unos puntos. En nuestro experimento con dígitos, la fase 1 llega al 87 % y la fase 2 la sube a 89–92 %, pero entrenar desde cero (94,6 %) las supera: nuestra base, entrenada solo con cinco dígitos y 720 imágenes, es un punto de partida demasiado estrecho. ImageNet, con 1.000 clases muy variadas, es un buen «punto de partida general». Que el transfer learning ayude depende de lo bien que se parezca la tarea de origen a la tuya y de lo rica que sea la base, y se comprueba comparándolo con el baseline de entrenar desde cero.</p>
+  </div>
+</details>
+
+
+<section>
+<h2 class="sin-num">Código</h2>
+<article class="snippet" data-lang="python" id="frag-17">
+  <header>
+    <h3>17 · Fase 1: base congelada y cabeza nueva (extracción de características)</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Cargar la base preentrenada, congelarla, pegarle una cabeza nueva para las cifras 5 a 9 (con el aumento de datos dentro del modelo) y entrenar solo la cabeza. Define también las funciones auxiliares que usarán los fragmentos siguientes.</p>
+  </header>
+  <pre class="code"><code>def modelo_con_cabeza(base, n_clases, dropout=0.3, aumentar=True):
+    entrada = keras.Input(shape=(32, 32, 3))
+    x = aumento(entrada) if aumentar else entrada
+    x = base(x, training=False)
+    x = layers.Flatten()(x)
+    x = layers.Dropout(dropout)(x)
+    salida = layers.Dense(n_clases, activation="softmax")(x)
+    return keras.Model(entrada, salida)
+
+def compilar(modelo, lr):
+    modelo.compile(optimizer=keras.optimizers.Adam(lr), loss="sparse_categorical_crossentropy", metrics=["accuracy"])
+
+def ajustar(modelo, epocas):
+    return modelo.fit(XB_train, yB_train, validation_data=(XB_val, yB_val), epochs=epocas, batch_size=16, verbose=0)
+
+def acierto_test(modelo):
+    return modelo.evaluate(XB_test, yB_test, verbose=0)[1]
+
+def parametros(modelo):
+    ent = sum(int(np.prod(w.shape)) for w in modelo.trainable_weights)
+    fro = sum(int(np.prod(w.shape)) for w in modelo.non_trainable_weights)
+    return ent, fro
+
+keras.utils.set_random_seed(0)
+base = keras.models.load_model("base_digitos_0a4.keras")
+base.trainable = False
+modelo = modelo_con_cabeza(base, 5)
+compilar(modelo, 1e-3)
+print("fase 1 -&gt; entrenables: %d | congelados: %d" % parametros(modelo))
+h1 = ajustar(modelo, 60)
+print(f"fase 1: val_accuracy = {h1.history['val_accuracy'][-1]:.3f} | test = {acierto_test(modelo):.3f}")</code></pre>
+  <details class="linea-a-linea">
+    <summary>Línea por línea</summary>
+    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+      <tbody>
+        <tr data-lines="1"><td><code>def modelo_con_cabeza(base, n_clases, dropout=0.3, aume…</code></td><td><code>modelo_con_cabeza</code> monta el clasificador completo a partir de una base ya creada.</td></tr>
+        <tr data-lines="2-3"><td><code>entrada = keras.Input(shape=(32, 32, 3)) …</code></td><td>Entrada de 32×32×3 y, si <code>aumentar</code> es verdadero, las capas de aumento del fragmento 15 aplicadas a la entrada (solo actúan al entrenar).</td></tr>
+        <tr data-lines="4"><td><code>x = base(x, training=False)</code></td><td><code>base(x, training=False)</code>: usa la base en modo inferencia, de modo que sus capas BatchNorm emplean las medias y varianzas aprendidas y no se mueven con los pocos lotes de la tarea B.</td></tr>
+        <tr data-lines="5-6"><td><code>x = layers.Flatten()(x) …</code></td><td><code>Flatten</code> convierte el mapa 4×4×64 en 1.024 números y <code>Dropout(0.3)</code> apaga un 30 % al azar durante el entrenamiento para frenar el sobreajuste (sobran parámetros para solo 75 imágenes).</td></tr>
+        <tr data-lines="7-8"><td><code>salida = layers.Dense(n_clases, activation="softmax")(x) …</code></td><td>La cabeza nueva: una <code>Dense</code> con 5 neuronas y softmax, y el <code>Model</code> que une entrada y salida.</td></tr>
+        <tr data-lines="10-11"><td><code>def compilar(modelo, lr): …</code></td><td><code>compilar</code> agrupa en una función la compilación con Adam y un learning rate que se le pasa como argumento. La usaremos otra vez con otro learning rate en la fase 2.</td></tr>
+        <tr data-lines="13-14"><td><code>def ajustar(modelo, epocas): …</code></td><td><code>ajustar</code> entrena con las 75 imágenes de B, valida con las otras 75 y usa lotes pequeños de 16 (unos 5 pasos por época).</td></tr>
+        <tr data-lines="16-17"><td><code>def acierto_test(modelo): …</code></td><td><code>acierto_test</code>: la exactitud en el test de B. Solo la usaremos para anotar resultados, no para decidir.</td></tr>
+        <tr data-lines="19-22"><td><code>def parametros(modelo): …</code></td><td><code>parametros</code> cuenta los pesos entrenables y los no entrenables (los congelados) sumando el tamaño de cada tensor: <code>np.prod(w.shape)</code> es el producto de sus dimensiones.</td></tr>
+        <tr data-lines="24-26"><td><code>keras.utils.set_random_seed(0) …</code></td><td>Semilla; carga la base guardada desde el archivo <code>.keras</code> y la <strong>congela</strong> con <code>trainable = False</code>.</td></tr>
+        <tr data-lines="27-28"><td><code>modelo = modelo_con_cabeza(base, 5) …</code></td><td>Monta el modelo con la base congelada y lo compila con learning rate 1e-3 (el habitual de Adam).</td></tr>
+        <tr data-lines="29"><td><code>print("fase 1 -&gt; entrenables: %d | congelados: %d" % pa…</code></td><td>Imprime los parámetros entrenables y congelados: solo la cabeza (1.024 · 5 + 5 = 5.125) se entrenará.</td></tr>
+        <tr data-lines="30"><td><code>h1 = ajustar(modelo, 60)</code></td><td>Entrena 60 épocas: la fase 1. <code>fit</code> devuelve el historial, que guardamos en <code>h1</code>.</td></tr>
+        <tr data-lines="31"><td><code>print(f"fase 1: val_accuracy = {h1.history['val_accurac…</code></td><td>Imprime la exactitud de validación de la última época y la del test.</td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>fase 1 -&gt; entrenables: 5125 | congelados: 23920
+fase 1: val_accuracy = 0.853 | test = 0.877</pre>
+    <p><strong>5.125 parámetros entrenables y 23.920 congelados</strong>, como se calculó a mano (1.024 · 5 + 5 = 5.125). Tras 60 épocas con la base congelada, la cabeza llega a una exactitud de validación de 0,853 y de test de 0,877: con solo 75 imágenes y una base que nunca vio estas cifras, ya acierta casi 9 de cada 10. (Una sola semilla, y con 75 imágenes de validación cada imagen pesa 1,3 puntos: no leas diferencias pequeñas.)</p>
+  </div>
+</article>
+
+<article class="snippet" data-lang="python" id="frag-18">
+  <header>
+    <h3>18 · Fase 2: descongelar el último bloque, recompilar y afinar con learning rate bajo</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Descongelar solo el bloque 3 de la base (la parte más específica), comprobar con un experimento que <strong>sin recompilar no se entrena nada nuevo</strong>, volver a compilar con un learning rate diez veces menor y entrenar 30 épocas más. Continúa el fragmento 17 (usa <code>base</code>, <code>modelo</code> y las funciones auxiliares).</p>
+  </header>
+  <pre class="code"><code>base.trainable = True
+for capa in base.layers:
+    capa.trainable = capa.name.startswith("bloque3")
+print("capas entrenables de la base:", [c.name for c in base.layers if c.trainable])
+print("fase 2, antes de recompilar -&gt; entrenables: %d | congelados: %d" % parametros(modelo))
+
+pesos_antes = base.get_layer("bloque3_conv").get_weights()[0].copy()
+ajustar(modelo, 1)
+cambio = np.abs(base.get_layer("bloque3_conv").get_weights()[0] - pesos_antes).max()
+print("una época SIN recompilar: cambio máximo en bloque3_conv = %.6f" % cambio)
+
+compilar(modelo, 1e-4)
+h2 = ajustar(modelo, 30)
+cambio = np.abs(base.get_layer("bloque3_conv").get_weights()[0] - pesos_antes).max()
+print("tras recompilar y 30 épocas: cambio máximo en bloque3_conv = %.6f" % cambio)
+print(f"fase 2: val_accuracy = {h2.history['val_accuracy'][-1]:.3f} | test = {acierto_test(modelo):.3f}")
+modelo_final = modelo</code></pre>
+  <details class="linea-a-linea">
+    <summary>Línea por línea</summary>
+    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+      <tbody>
+        <tr data-lines="1"><td><code>base.trainable = True</code></td><td><code>base.trainable = True</code> descongela <strong>todas</strong> las capas de la base. Se hace primero porque, en Keras 3, el interruptor general de la base manda sobre el de sus capas.</td></tr>
+        <tr data-lines="2-3"><td><code>for capa in base.layers: …</code></td><td>Recorre las capas de la base y deja entrenables solo las que empiezan por <code>"bloque3"</code> (convolución, BatchNorm, ReLU y pooling del último bloque); las demás vuelven a congelarse.</td></tr>
+        <tr data-lines="4"><td><code>print("capas entrenables de la base:", [c.name for c in…</code></td><td>Imprime los nombres de las capas entrenables para comprobar que son las cuatro del bloque 3.</td></tr>
+        <tr data-lines="5"><td><code>print("fase 2, antes de recompilar -&gt; entrenables: %d |…</code></td><td>Antes de recompilar, cuenta parámetros: el recuento ya refleja el cambio (la cabeza + el bloque 3).</td></tr>
+        <tr data-lines="7"><td><code>pesos_antes = base.get_layer("bloque3_conv").get_weight…</code></td><td>Guarda una copia de los pesos de la convolución del bloque 3 (<code>get_weights()[0]</code> son los pesos del filtro; <code>.copy()</code> evita que cambie la copia junto con el original).</td></tr>
+        <tr data-lines="8"><td><code>ajustar(modelo, 1)</code></td><td>Entrena <strong>una época sin recompilar</strong>, para ver qué pasa.</td></tr>
+        <tr data-lines="9-10"><td><code>cambio = np.abs(base.get_layer("bloque3_conv").get_weig…</code></td><td>Mide el mayor cambio absoluto de esos pesos (<code>np.abs(...).max()</code>) e imprímelo. Si es 0, esas capas no han aprendido nada.</td></tr>
+        <tr data-lines="12"><td><code>compilar(modelo, 1e-4)</code></td><td><strong>Recompila</strong> con learning rate 1e-4. Esta llamada crea de nuevo el optimizador, que ahora sí incluye las variables del bloque 3. El learning rate es diez veces menor que el de la fase 1 para no estropear con pasos grandes los pesos que ya funcionan.</td></tr>
+        <tr data-lines="13"><td><code>h2 = ajustar(modelo, 30)</code></td><td>Entrena 30 épocas más (fase 2) con el mismo conjunto de datos y guarda el historial en <code>h2</code>.</td></tr>
+        <tr data-lines="14-15"><td><code>cambio = np.abs(base.get_layer("bloque3_conv").get_weig…</code></td><td>Vuelve a medir el cambio acumulado de los pesos del bloque 3 respecto a la copia de antes.</td></tr>
+        <tr data-lines="16"><td><code>print(f"fase 2: val_accuracy = {h2.history['val_accurac…</code></td><td>Imprime la exactitud de validación y la de test tras afinar.</td></tr>
+        <tr data-lines="17"><td><code>modelo_final = modelo</code></td><td>Da el nombre <code>modelo_final</code> al modelo resultante, para los fragmentos de evaluación.</td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>capas entrenables de la base: ['bloque3_conv', 'bloque3_bn', 'bloque3_relu', 'bloque3_pool']
+fase 2, antes de recompilar -&gt; entrenables: 23685 | congelados: 5360
+una época SIN recompilar: cambio máximo en bloque3_conv = 0.000000
+tras recompilar y 30 épocas: cambio máximo en bloque3_conv = 0.006601
+fase 2: val_accuracy = 0.867 | test = 0.882</pre>
+    <p>El bloque 3 tiene 18.560 parámetros entrenables (18.432 de la convolución y 128 de \( \gamma \) y \( \beta \)), de modo que el modelo pasa a <strong>23.685 entrenables</strong> (5.125 + 18.560) y 5.360 congelados. La línea clave: una época <strong>sin recompilar cambia los pesos del bloque 3 en 0,000000</strong>, es decir, nada. Tras recompilar y entrenar 30 épocas, el mayor cambio es 0,0066, por debajo de la cota de 0,015 que calculamos para lr 1e-4. Con esta semilla, el test pasa de 0,877 a 0,882: una mejora de medio punto que, sola, no demuestra nada. Para eso están los fragmentos siguientes.</p>
+  </div>
+</article>
+</section>
+
+
+</div>
+</main>
+</body>
+</html>

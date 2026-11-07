@@ -1,300 +1,292 @@
-<!DOCTYPE html>
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lección 3 · La red solo entiende carátulas preparadas como las de ImageNet · Módulo 4 · Curso 5 · Cuaderno de IA</title>
+<meta name="description" content="El preprocesado de ImageNet: Resize(256), CenterCrop(224), ToTensor y Normalize con la media y la desviación de cada canal, con un píxel calculado a mano.">
+<script>try{var t=localStorage.getItem('cuaderno-ia:tema');if(t)document.documentElement.setAttribute('data-theme',t)}catch(e){}</script>
+<link rel="stylesheet" href="../../assets/css/style.css">
+<script src="../../assets/js/curriculum.js"></script>
+<script src="../../assets/js/lab.js"></script>
+<script src="../../assets/js/app.js" defer></script>
+</head>
+<body data-root="../../" data-course="5" data-module="4" data-lesson="3">
+<main>
+<div class="page">
 
-<html lang="es"><head><meta charset="utf-8"/><meta content="width=device-width,initial-scale=1" name="viewport"/><title>Lección 3 · Por dentro de una ResNet-18 · Curso 5 · Cuaderno de IA</title><meta content="La ResNet ( Red Residual ) es la familia de redes más usada para transfer learning por su equilibrio entre tamaño y calidad." name="description"/><script>try{var t=localStorage.getItem('cuaderno-ia:tema');if(t)document.documentElement.setAttribute('data-theme',t)}catch(e){}</script><link href="../../assets/css/style.css" rel="stylesheet"/><script src="../../assets/js/curriculum.js"></script><script src="../../assets/js/lab.js"></script><script defer="" src="../../assets/js/app.js"></script><script defer="" src="../../assets/js/microanimations.js"></script></head><body data-course="5" data-lesson="3" data-module="4" data-root="../../"><main><div class="page" data-micro="3min"><header class="hero leccion"><div class="hero-grid"><div><p class="eyebrow">Curso 5 · Módulo 4 · Lección 3 de 13</p><h1>Por dentro de una ResNet-18</h1><p class="lead">La ResNet ( Red Residual ) es la familia de redes más usada para transfer learning por su equilibrio entre tamaño y calidad.</p><p class="meta-line"><span class="read-time" data-render="read-time"></span><a href="../modulo-4.html">Índice del módulo</a></p></div><div aria-hidden="true" class="hero-tile"></div></div></header><details class="predice"><summary>Antes de cambiarle la última capa al crítico, ¿qué tiene una ResNet-18 por dentro y cómo cambia el tamaño de la carátula al atravesarla?<span class="hint"></span></summary><div><p>La ResNet ( Red Residual ) es la familia de redes más usada para transfer learning por su equilibrio entre tamaño y calidad.</p></div></details><section aria-label="Explicación breve" class="micro-core"><div class="micro-kicker">01 · ENTENDER <span>≈ 45 s</span></div><h2>La idea en palabras sencillas</h2><p>La ResNet ( Red Residual ) es la familia de redes más usada para transfer learning por su equilibrio entre tamaño y calidad.</p><div class="micro-example"><span aria-hidden="true" class="micro-example-icon">🐾</span><div><strong>Otro ejemplo · Mascotas</strong><p>Una red que ya distingue formas puede adaptarse para reconocer gatos y perros con menos ejemplos.</p></div></div></section><div class="micro-kicker micro-checkpoint">02 · RESPONDER <span>≈ 15 s</span></div><section aria-label="Pregunta intercalada" class="quiz mini micro-check"><script class="quiz-data" type="application/json">{"titulo": "Pausa rápida · Comprueba la idea", "preguntas": [{"q": "Si reutilizas las capas visuales de un modelo ya entrenado, ¿qué técnica estás usando?", "opciones": ["Regresión con una sola variable", "Transfer learning", "Clustering sin etiquetas"], "correcta": 1, "porque": "El aprendizaje por transferencia aprovecha parámetros aprendidos antes."}]}</script></section><section aria-label="Animación interactiva" class="micro-viz" data-index="12" data-micro-viz="transfer"><div class="micro-kicker">03 · EXPERIMENTAR <span>≈ 45 s</span></div><div class="micro-viz-title"><div><h2>Reutilizar conocimiento previo</h2><p>Alterna entre «extraer características» y «ajustar capas».</p></div><span aria-hidden="true" class="micro-viz-symbol">✦</span></div><div aria-live="polite" class="micro-viz-stage"><p>Animación interactiva: Reutilizar conocimiento previo</p></div></section><div class="micro-kicker micro-checkpoint">04 · APLICAR <span>≈ 15 s</span></div><section aria-label="Pregunta intercalada" class="quiz mini micro-check"><script class="quiz-data" type="application/json">{"titulo": "Pausa rápida · ¿Lo aplicarías?", "preguntas": [{"q": "¿Qué significa congelar una capa durante el entrenamiento?", "opciones": ["Sus pesos no se actualizan", "Deja de producir salidas", "Se elimina de la arquitectura"], "correcta": 0, "porque": "Congelar impide actualizar esos parámetros durante el ajuste."}]}</script></section><div class="micro-finish"><strong>Idea que te llevas</strong><span>La ResNet ( Red Residual ) es la familia de redes más usada para transfer learning por su equilibrio entre tamaño y calidad</span><small>¿Quieres más ejemplos, fórmulas o código? Los tienes justo debajo, sin límite de tiempo.</small></div><details class="profundizar micro-legacy"><summary><span>Explorar más: explicación y simulaciones completas<small>Todo el texto original, tablas y demos avanzadas. Opcional.</small></span></summary><div class="prof-body"><section><h2>Por dentro de una ResNet-18</h2>
-<p>La <strong>ResNet</strong> (<abbr class="t" data-def="Residual Network: familia de redes (He et al., 2015) cuyos bloques suman a su salida la entrada original mediante un atajo ('skip connection'). Permitió entrenar redes de decenas y cientos de capas.">Red Residual</abbr>) es la familia de redes más usada para transfer learning por su equilibrio entre tamaño y calidad. La ResNet-18 tiene 18 capas con pesos: una convolución inicial, ocho bloques de dos convoluciones cada uno (16 capas) y la capa final. En PyTorch se ve así (<code>print(modelo)</code> la lista completa):</p>
-<p>Piensa en el crítico mirando un póster: primero se acerca y ve detalles finos (muchos píxeles, pocas ideas); en cada etapa se aleja un paso, ve menos píxeles pero con más «críticos» opinando sobre cada zona (más canales: luz, caras, texto, estilo…). Eso es lo que hace la red: el mapa encoge y los canales crecen. Una convolución desliza un filtro por la imagen. Si la entrada tiene lado \( n \), el filtro lado \( k \), se añade un borde de \( p \) píxeles de relleno (<em>padding</em>) y el filtro salta de \( s \) en \( s \) píxeles (<em>stride</em>), el lado de la salida es:</p>
-<p>Donde \( \lfloor\cdot\rfloor \) es «redondear hacia abajo». El numerador \( n+2p-k \) es el recorrido que puede hacer el filtro; dividido entre el salto da cuántos saltos caben, y el \( +1 \) cuenta la posición inicial.</p>
-<ul class="flow">
-<li class="a">conv1 + bn1<small>7×7, 64 canales, paso 2</small></li>
-<li class="b">maxpool<small>3×3, paso 2</small></li>
-<li class="c">layer1 ×2 bloques<small>64 canales</small></li>
-<li class="d">layer2 ×2<small>128 canales, reduce a la mitad</small></li>
-<li class="a">layer3 ×2<small>256 canales, reduce a la mitad</small></li>
-<li class="b">layer4 ×2<small>512 canales, reduce a la mitad</small></li>
-<li class="c">avgpool<small>promedia cada mapa a 1 número</small></li>
-<li class="d">fc<small>512 → 1000 puntuaciones</small></li>
-</ul>
-<div class="callout ejemplo"><span class="lbl">Ejemplo tomado del módulo</span><p>Una carátula de 224 × 224 píxeles entra en conv1 (\( k=7,\ s=2,\ p=3 \)); después pasa por maxpool (\( k=3,\ s=2,\ p=1 \)); y la primera convolución de layer2 reduce con \( s=2 \) (\( k=3,\ p=1 \)). conv1 : \( \lfloor (224+6-7)/2 \rfloor +…</p></div></section><figure class="demo" data-demo="curso5/c5m4-resnet-tamanos" data-titulo="el tamaño del mapa en cada etapa de ResNet-18">
-<div class="haz">Cambia el lado de la carátula de entrada (de 32 a 448) con el deslizador y compara cada etapa con el caso de 224. Pulsa «Volver a 224» para ver el tamaño con que se entrenó la red.</div>
-<div class="observa">Con 224 sale exactamente 112 → 56 → 56 → 28 → 14 → 7. Con 32 la última etapa ya es de 1×1 y el aviso lo dice. Los parámetros no dependen del tamaño de la entrada (la convolución es la misma), pero la memoria sí crece con el cuadrado del lado, y la red solo se entrenó con imágenes vistas a escala 224: es como un crítico que siempre ha visto los pósters a un mismo tamaño y de repente le enseñas uno diminuto o gigante.</div>
-</figure><div class="resumen"><h2 class="sin-num sin-toc">En pocas líneas</h2><ul><li><strong>Por dentro de una ResNet-18:</strong> La ResNet ( Red Residual ) es la familia de redes más usada para transfer learning por su equilibrio entre tamaño y calidad.</li><li>Antes de continuar, intenta explicar la demo sin mirar su resultado.</li></ul></div><section class="quiz mini"><script class="quiz-data" type="application/json">{"titulo": "¿Lo tienes?", "preguntas": [{"q": "¿Qué concepto estamos trabajando en esta lección?", "opciones": ["Guardar y cargar: state_dict", "Por dentro de una ResNet-18", "BatchNorm al congelar: la trampa de las estadísticas"], "correcta": 1, "porque": "La ResNet ( Red Residual ) es la familia de redes más usada para transfer learning por su equilibrio entre tamaño y calidad."}, {"q": "¿Cuál de estas afirmaciones recoge lo que acabas de estudiar?", "opciones": ["Siempre hay un único método que sirve para todos los problemas.", "Lo importante es comprender la idea y comprobarla con ejemplos, no memorizar términos.", "La ResNet ( Red Residual ) es la familia de redes más usada para transfer learning por su equilibrio entre tamaño y calidad."], "correcta": 2, "porque": "La explicación central es: La ResNet ( Red Residual ) es la familia de redes más usada para transfer learning por su equilibrio entre tamaño y calidad."}, {"q": "Si una demo o un ejemplo te desconcierta, ¿cuál es la mejor forma de aprenderlo?", "opciones": ["Ignorar los resultados que no coinciden con tu intuición.", "Memorizar el nombre sin entender la operación.", "Volver a los números, cambiar un valor y explicar qué ocurre."], "correcta": 2, "porque": "Explorar qué cambia y por qué ayuda a conectar el concepto con su resultado."}]}</script></section></div></details><details class="profundizar"><summary><span>Profundizar: explicación completa<small>Matices, fórmulas, tablas, otros ejemplos y experimentos del módulo original.</small></span></summary><div class="prof-body"><section>
-<h2 id="resnet">Por dentro de una ResNet-18</h2>
-<p class="pregunta">Antes de cambiarle la última capa al crítico, ¿qué tiene una ResNet-18 por dentro y cómo cambia el tamaño de la carátula al atravesarla?</p>
-<p>La <strong>ResNet</strong> (<abbr class="t" data-def="Residual Network: familia de redes (He et al., 2015) cuyos bloques suman a su salida la entrada original mediante un atajo ('skip connection'). Permitió entrenar redes de decenas y cientos de capas.">Red Residual</abbr>) es la familia de redes más usada para transfer learning por su equilibrio entre tamaño y calidad. La ResNet-18 tiene 18 capas con pesos: una convolución inicial, ocho bloques de dos convoluciones cada uno (16 capas) y la capa final. En PyTorch se ve así (<code>print(modelo)</code> la lista completa):</p>
-<ul class="flow">
-<li class="a">conv1 + bn1<small>7×7, 64 canales, paso 2</small></li>
-<li class="b">maxpool<small>3×3, paso 2</small></li>
-<li class="c">layer1 ×2 bloques<small>64 canales</small></li>
-<li class="d">layer2 ×2<small>128 canales, reduce a la mitad</small></li>
-<li class="a">layer3 ×2<small>256 canales, reduce a la mitad</small></li>
-<li class="b">layer4 ×2<small>512 canales, reduce a la mitad</small></li>
-<li class="c">avgpool<small>promedia cada mapa a 1 número</small></li>
-<li class="d">fc<small>512 → 1000 puntuaciones</small></li>
-</ul>
-<h3>Cómo cambia el tamaño: la fórmula de la convolución</h3>
-<p>Piensa en el crítico mirando un póster: primero se acerca y ve detalles finos (muchos píxeles, pocas ideas); en cada etapa se aleja un paso, ve menos píxeles pero con más «críticos» opinando sobre cada zona (más canales: luz, caras, texto, estilo…). Eso es lo que hace la red: el mapa encoge y los canales crecen. Una convolución desliza un filtro por la imagen. Si la entrada tiene lado \( n \), el filtro lado \( k \), se añade un borde de \( p \) píxeles de relleno (<em>padding</em>) y el filtro salta de \( s \) en \( s \) píxeles (<em>stride</em>), el lado de la salida es:</p>
-<div class="formula">\[ n_{\text{sal}} = \left\lfloor \frac{n + 2p - k}{s} \right\rfloor + 1 \]</div>
-<p>Donde \( \lfloor\cdot\rfloor \) es «redondear hacia abajo». El numerador \( n+2p-k \) es el recorrido que puede hacer el filtro; dividido entre el salto da cuántos saltos caben, y el \( +1 \) cuenta la posición inicial.</p>
-<div class="callout ejemplo">
-<span class="lbl">Ejemplo numérico</span>
-<p>Una carátula de 224 × 224 píxeles entra en <code>conv1</code> (\( k=7,\ s=2,\ p=3 \)); después pasa por <code>maxpool</code> (\( k=3,\ s=2,\ p=1 \)); y la primera convolución de <code>layer2</code> reduce con \( s=2 \) (\( k=3,\ p=1 \)).</p>
-<ol class="pasos">
-<li><code>conv1</code>: \( \lfloor (224+6-7)/2 \rfloor + 1 = \lfloor 111{,}5 \rfloor + 1 = \) <strong>112</strong>.</li>
-<li><code>maxpool</code>: \( \lfloor (112+2-3)/2 \rfloor + 1 = \lfloor 55{,}5 \rfloor + 1 = \) <strong>56</strong>.</li>
-<li><code>layer1</code> usa \( s=1,\ p=1,\ k=3 \): \( 56+2-3+1 = \) <strong>56</strong> (no cambia el tamaño).</li>
-<li>Primera convolución de <code>layer2</code>: \( \lfloor (56+2-3)/2 \rfloor + 1 = \lfloor 27{,}5 \rfloor + 1 = \) <strong>28</strong>. Igual en <code>layer3</code> (14) y en <code>layer4</code> (7).</li>
-</ol>
-<p>Resultado: \( 224\to112\to56\to56\to28\to14\to7 \), mientras los canales suben de 3 a 64, 128, 256 y 512. El <code>avgpool</code> promedia cada mapa de \( 7\times7 \) en un solo número y deja un vector de 512; es lo que recibe <code>fc</code>.</p>
-</div>
-<h3>Dónde están los parámetros: la cuenta a mano</h3>
-<p>Una convolución con \( c_{\text{ent}} \) canales de entrada, \( c_{\text{sal}} \) de salida y filtro \( k\times k \) tiene \( k\cdot k\cdot c_{\text{ent}}\cdot c_{\text{sal}} \) pesos (en ResNet no lleva sesgo porque la BatchNorm que le sigue ya aporta el suyo). Una BatchNorm con \( c \) canales tiene \( 2c \) parámetros que se aprenden (\( \gamma \) y \( \beta \)). Con eso:</p>
-<div class="callout ejemplo">
-<span class="lbl">Ejemplo numérico</span>
-<ol class="pasos">
-<li><code>conv1</code>: \( 7\cdot7\cdot3\cdot64 = \) <strong>9.408</strong>. Su <code>bn1</code>: \( 2\cdot64 = 128 \).</li>
-<li>Un bloque de <code>layer1</code> (dos convoluciones 3×3 de 64 a 64 y sus dos BatchNorm): \( 2\cdot(3\cdot3\cdot64\cdot64) + 2\cdot128 = 73.728 + 256 = \) <strong>73.984</strong>. Los dos bloques: 147.968.</li>
-<li>El primer bloque de <code>layer2</code> es especial: sube de 64 a 128 canales y necesita un <strong>atajo con convolución 1×1</strong> (\( 64\cdot128 = 8.192 \) más una BatchNorm de 256), y suma \( 73.728 + 147.456 + 512 + 8.192 + 256 = 230.144 \). El segundo bloque, ya sin atajo, tiene 295.424. <code>layer2</code> completo: 525.568.</li>
-<li>La capa final: \( 512\cdot1000+1000 = \) <strong>513.000</strong>.</li>
-<li>Suma de toda la red: <strong>11.689.512</strong>, de los cuales 8.393.728 (el <strong>71,8 %</strong>) están en <code>layer4</code>.</li>
-</ol>
-</div>
-<p>Los fragmentos <a href="#frag-2">2</a> y <a href="leccion-4.html#frag-3">3</a> hacen estas cuentas en código y las comparan con las de PyTorch (coinciden). Fíjate en una consecuencia práctica: el cuerpo de la red pesa más de 11 millones de números, y de ellos casi tres cuartas partes están en el último bloque. Por eso, cuando se afina, lo normal es descongelar solo <code>layer4</code> (o <code>layer3</code> y <code>layer4</code>).</p>
-</section></div></details><details class="profundizar" id="codigo"><summary><span>Ver código explicado paso a paso<small>2 fragmento(s) original(es), con cada línea comentada y salida esperada.</small></span></summary><div class="prof-body"><article class="snippet" data-lang="python" id="frag-2">
-<header>
-<h3>2 · ResNet-18 por dentro: cuántos parámetros tiene cada parte y qué forma tiene la salida de cada etapa</h3>
-<p class="para-que"><strong>Para qué sirve</strong> Abrir una ResNet-18 (con <code>weights=None</code>, es decir, sin pesos descargados: la <em>estructura</em> es idéntica), contar los parámetros de cada bloque, comprobar la cuenta a mano y seguir cómo cambia el tamaño de la imagen al atravesar la red con «ganchos» (<em>hooks</em>).</p>
+<header class="hero leccion">
+  <div class="hero-grid">
+    <div>
+      <p class="eyebrow">Curso 5 · Módulo 4 · Lección 3 de 8</p>
+      <h1>La red solo entiende carátulas preparadas como las de ImageNet</h1>
+      <p class="lead">Un crítico que siempre vio películas en pantalla de cine desbarra con un vídeo vertical del móvil. La red igual: espera imágenes de 224×224 con los píxeles en una escala muy concreta.</p>
+      <p class="meta-line"><span class="read-time" data-render="read-time"></span><a href="../modulo-4.html">Índice del módulo</a></p>
+    </div>
+    <div class="hero-tile" aria-hidden="true"></div>
+  </div>
 </header>
-<pre class="code"><code>import torch
-from torchvision import models
 
-modelo = models.resnet18(weights=None)
-
-total = 0
-for nombre, hijo in modelo.named_children():
-    n = sum(p.numel() for p in hijo.parameters())
-    total += n
-    print(f"{nombre:8s} {type(hijo).__name__:20s} {n:&gt;10,d}")
-print("total", f"{total:,d}")
-
-print("conv1 =", 7 * 7 * 3 * 64, " fc =", 512 * 1000 + 1000)
-
-formas = []
-def anotar(nombre):
-    def gancho(modulo, entrada, salida):
-        formas.append((nombre, tuple(salida.shape)))
-    return gancho
-
-for nombre in ["conv1", "maxpool", "layer1", "layer2", "layer3", "layer4", "avgpool", "fc"]:
-    getattr(modelo, nombre).register_forward_hook(anotar(nombre))
-
-modelo.eval()
-with torch.no_grad():
-    modelo(torch.zeros(1, 3, 224, 224))
-for nombre, forma in formas:
-    print(f"{nombre:8s} {forma}")</code></pre>
-<details class="linea-a-linea" open="">
-<summary>Línea por línea</summary>
-<p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
-<table class="lineas">
-<thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
-<tbody>
-<tr data-lines="1"><td><code>import torch</code></td><td>PyTorch.</td></tr>
-<tr data-lines="2"><td><code>from torchvision import models</code></td><td>El catálogo de arquitecturas.</td></tr>
-<tr data-lines="4"><td><code>modelo = models.resnet18(weights=None)</code></td><td>Construye la ResNet-18 con los pesos <strong>al azar</strong> (<code>weights=None</code>): misma estructura que la preentrenada, pero sin descargar nada.</td></tr>
-<tr data-lines="6"><td><code>total = 0</code></td><td>Acumulador del número de parámetros.</td></tr>
-<tr data-lines="7"><td><code>for nombre, hijo in modelo.named_children():</code></td><td><code>named_children()</code> recorre los módulos de primer nivel de la red, con su nombre (<code>conv1</code>, <code>bn1</code>, <code>layer1</code>…).</td></tr>
-<tr data-lines="8"><td><code>n = sum(p.numel() for p in hijo.parameters())</code></td><td><code>parameters()</code> da todos los tensores de pesos de ese módulo y <code>numel()</code> cuenta sus elementos; sumados, el número de parámetros del bloque.</td></tr>
-<tr data-lines="9"><td><code>total += n</code></td><td>Va sumando.</td></tr>
-<tr data-lines="10"><td><code>print(f"{nombre:8s} {type(hijo).__name__:20s} {n:&gt;10,d}")</code></td><td>Una fila por bloque: nombre (8 caracteres), tipo de módulo (20) y parámetros con separador de miles (alineados a la derecha en 10).</td></tr>
-<tr data-lines="11"><td><code>print("total", f"{total:,d}")</code></td><td>El total, que debe coincidir con los 11.689.512 de los metadatos del fragmento 1.</td></tr>
-<tr data-lines="13"><td><code>print("conv1 =", 7 * 7 * 3 * 64, " fc =", 512 * 1000 + 1000)</code></td><td>La cuenta a mano: una convolución 7×7 con 3 canales de entrada y 64 filtros tiene \( 7\cdot7\cdot3\cdot64 \) pesos; la capa final, \( 512\cdot1000 \) pesos más 1.000 sesgos.</td></tr>
-<tr data-lines="15"><td><code>formas = []</code></td><td>Lista donde los ganchos irán anotando lo que vean.</td></tr>
-<tr data-lines="16"><td><code>def anotar(nombre):</code></td><td>Una función que fabrica ganchos, uno por capa, recordando el nombre de su capa.</td></tr>
-<tr data-lines="17"><td><code>def gancho(modulo, entrada, salida):</code></td><td>Un <em>forward hook</em> es una función que PyTorch llama justo después de que un módulo calcule su salida. Recibe el módulo, su entrada y su salida.</td></tr>
-<tr data-lines="18"><td><code>formas.append((nombre, tuple(salida.shape)))</code></td><td>Anota el nombre de la capa y la forma de su salida.</td></tr>
-<tr data-lines="19"><td><code>return gancho</code></td><td>Devuelve el gancho ya configurado con su nombre.</td></tr>
-<tr data-lines="21"><td><code>for nombre in ["conv1", "maxpool", "layer1", "layer2", "layer3", "layer4", "avgpool", "fc"]:</code></td><td>Recorre las etapas que queremos observar.</td></tr>
-<tr data-lines="22"><td><code>getattr(modelo, nombre).register_forward_hook(anotar(nombre))</code></td><td><code>getattr(modelo, "layer1")</code> es lo mismo que <code>modelo.layer1</code>; <code>register_forward_hook</code> le engancha el anotador.</td></tr>
-<tr data-lines="24"><td><code>modelo.eval()</code></td><td>Modo evaluación (BatchNorm usará sus estadísticas guardadas).</td></tr>
-<tr data-lines="25"><td><code>with torch.no_grad():</code></td><td>No construir el grafo de gradientes: solo queremos mirar formas, y así gasta menos memoria.</td></tr>
-<tr data-lines="26"><td><code>modelo(torch.zeros(1, 3, 224, 224))</code></td><td>Pasa una «imagen» negra de 224×224 con 3 canales y un lote de 1. Su contenido da igual: aquí solo importan las formas.</td></tr>
-<tr data-lines="27"><td><code>for nombre, forma in formas:</code></td><td>Recorre lo que anotaron los ganchos, en orden de ejecución.</td></tr>
-<tr data-lines="28"><td><code>print(f"{nombre:8s} {forma}")</code></td><td>Imprime la forma de salida de cada etapa.</td></tr>
-</tbody>
-</table>
+<details class="predice">
+  <summary>Le pasas a una ResNet preentrenada los píxeles tal cual, de 0 a 255, sin normalizar. ¿Da error o da predicciones peores?<span class="hint"></span></summary>
+  <div>
+    <p><strong>Predicciones peores, sin ningún error.</strong> La red recibe números en una escala que nunca vio y sus pesos dejan de funcionar bien. En el <a href="leccion-8.html#frag-17">fragmento 17</a> el acierto cae del 100 % al 50 % solo por olvidar el preprocesado.</p>
+  </div>
 </details>
-<div class="salida">
-<strong>Salida esperada</strong>
-<pre>conv1    Conv2d                    9,408
-bn1      BatchNorm2d                 128
-relu     ReLU                          0
-maxpool  MaxPool2d                     0
-layer1   Sequential              147,968
-layer2   Sequential              525,568
-layer3   Sequential            2,099,712
-layer4   Sequential            8,393,728
-avgpool  AdaptiveAvgPool2d             0
-fc       Linear                  513,000
-total 11,689,512
-conv1 = 9408  fc = 513000
-conv1    (1, 64, 112, 112)
-maxpool  (1, 64, 56, 56)
-layer1   (1, 64, 56, 56)
-layer2   (1, 128, 28, 28)
-layer3   (1, 256, 14, 14)
-layer4   (1, 512, 7, 7)
-avgpool  (1, 512, 1, 1)
-fc       (1, 1000)</pre>
-<p>Los parámetros se reparten de forma muy desigual: <code>layer4</code> tiene <strong>8.393.728</strong> (el 71,8 % del total) y la capa final <code>fc</code> otros 513.000, mientras que <code>conv1</code> solo tiene 9.408. Las dos cuentas a mano (9.408 y 513.000) coinciden con la tabla. <code>relu</code>, <code>maxpool</code> y <code>avgpool</code> no tienen parámetros: solo aplican una operación fija. El tamaño de la imagen se va reduciendo y los canales aumentando: <code>224×224×3 → 112×112×64 → 56×56×64 → 28×28×128 → 14×14×256 → 7×7×512</code>, y <code>avgpool</code> promedia cada mapa de 7×7 a un solo número, dejando un vector de 512. Ese vector es lo que recibe <code>fc</code> para producir las 1.000 puntuaciones.</p>
+
+<section>
+<h2 id="idea">Cuatro pasos, siempre los mismos</h2>
+<ul class="flow">
+  <li class="a">Resize(256)<small>lado corto a 256</small></li>
+  <li class="b">CenterCrop(224)<small>cuadrado del centro</small></li>
+  <li class="c">ToTensor<small>(3, 224, 224), de 0–255 a 0–1</small></li>
+  <li class="d">Normalize<small>(x − μ) / σ por canal</small></li>
+</ul>
+<p>Los dos primeros pasos dejan la imagen al tamaño con que se entrenó la red, sin deformarla. <code>ToTensor</code> la convierte en números de 0 a 1 con los canales primero. <code>Normalize</code> resta a cada canal su media en ImageNet, \( \mu = (0{,}485;\ 0{,}456;\ 0{,}406) \), y divide entre su desviación, \( \sigma = (0{,}229;\ 0{,}224;\ 0{,}225) \). Así los valores quedan centrados en 0, la escala en la que los pesos aprendieron.</p>
+<p>No copies esos números de memoria: <code>ResNet18_Weights.DEFAULT.transforms()</code> devuelve el preprocesado exacto de esos pesos. Y para entrenar puedes añadir <strong>aumento de datos</strong> (recortes y reflejos al azar), pero solo al entrenar; el <code>Normalize</code> no cambia nunca.</p>
+</section>
+
+<figure class="demo" data-demo="curso5/c5m4-normalizar" data-titulo="Resize, CenterCrop y Normalize sobre tu fotograma y tu píxel">
+  <div class="haz">Cambia el tamaño del fotograma y luego mueve los tres canales del píxel.</div>
+  <div class="observa">Un fotograma apaisado pierde los laterales al recortar; un píxel gris medio cae cerca de 0.</div>
+</figure>
+
+<section>
+<h2 id="con-numeros">Con números: un píxel de <em>El Rey León</em></h2>
+<div class="callout ejemplo">
+  <span class="lbl">Ejemplo numérico</span>
+  <p>Un píxel naranja del atardecer, con valores (200, 100, 50) sobre 255:</p>
+  <ol class="pasos">
+    <li><code>ToTensor</code>: 200/255 = 0,7843; 100/255 = 0,3922; 50/255 = 0,1961.</li>
+    <li>Rojo: (0,7843 − 0,485) / 0,229 = <strong>1,307</strong>.</li>
+    <li>Verde: (0,3922 − 0,456) / 0,224 = <strong>−0,285</strong>. Azul: (0,1961 − 0,406) / 0,225 = <strong>−0,933</strong>.</li>
+    <li>Un fotograma de 400×300: <code>Resize(256)</code> lo deja en ≈ 341×256 y <code>CenterCrop(224)</code> recorta el centro a 224×224.</li>
+  </ol>
 </div>
-</article><article class="snippet" data-lang="python" id="frag-8">
-<header>
-<h3>8 · El flujo completo de transfer learning con ResNet-18 (código de producción, no ejecutado con pesos reales)</h3>
-<p class="para-que"><strong>Para qué sirve</strong> El script que usarías con tus propias fotos: leer carpetas con <code>ImageFolder</code>, preprocesar con las transformaciones oficiales, congelar la red, sustituir <code>fc</code>, entrenar la cabeza (fase 1), descongelar <code>layer4</code> con learning rate bajo (fase 2) y guardar el <code>state_dict</code>. Está escrito como función para poder probarlo también con <code>weights=None</code>.</p>
-</header>
-<pre class="code"><code>import torch
-from torch import nn
-from torch.utils.data import DataLoader
-from torchvision import datasets, models
+</section>
+
+<details class="predice">
+  <summary>Validas el modelo con <code>RandomResizedCrop</code> y <code>RandomHorizontalFlip</code> activados. ¿Qué vas a notar?<span class="hint"></span></summary>
+  <div>
+    <p><strong>Que la métrica de validación oscila sin que el modelo haya cambiado:</strong> cada vez ve un recorte distinto de la misma carátula. El aumento aleatorio es solo para entrenar; en validación y en producción, <code>Resize</code> + <code>CenterCrop</code>.</p>
+  </div>
+</details>
+
+<div class="resumen">
+  <h2 class="sin-num sin-toc">En tres líneas</h2>
+  <ul>
+    <li><code>Resize(256)</code> → <code>CenterCrop(224)</code> → <code>ToTensor</code> → <code>Normalize</code>: la red espera exactamente eso.</li>
+    <li>Normalizar es \( (x - \mu)/\sigma \) por canal: el rojo 200 entra como 1,307.</li>
+    <li>Usa <code>weights.transforms()</code>; aumento de datos solo al entrenar.</li>
+  </ul>
+</div>
+
+<section class="quiz mini">
+<script type="application/json" class="quiz-data">
+{
+ "titulo": "¿Lo tienes?",
+ "preguntas": [
+  {
+   "q": "Un píxel naranja de un fotograma tiene el canal rojo en 200 (sobre 255). Con el preprocesado de ImageNet (media 0,485 y desviación 0,229 en rojo), ¿qué valor entra en la red?",
+   "opciones": [
+    "Aproximadamente 1,307",
+    "0,784, porque solo se divide entre 255",
+    "−0,285",
+    "200, porque la red recibe valores de 0 a 255"
+   ],
+   "correcta": 0,
+   "porque": "<code>ToTensor</code> da 200/255 = 0,7843 y <code>Normalize</code> calcula (0,7843 − 0,485)/0,229 ≈ 1,307. El 0,784 se quedaría a mitad de camino (sin normalizar); −0,285 es el valor del canal <em>verde</em> del mismo píxel de ejemplo; y 200 es la escala de la imagen original, que la red nunca vio al entrenarse."
+  },
+  {
+   "q": "Tu carátula es un PNG con canal alfa (RGBA, 4 canales). ¿Qué haces antes de transformarla?",
+   "opciones": [
+    "Nada, <code>Normalize</code> acepta cualquier número de canales",
+    "Quitar el <code>ToTensor</code>",
+    "Convertirla con <code>foto.convert(\"RGB\")</code>"
+   ],
+   "correcta": 2,
+   "porque": "<code>Normalize</code> trae media y desviación para 3 canales. Una imagen en gris o RGBA falla; se arregla convirtiéndola a RGB antes de aplicar el preprocesado."
+  },
+  {
+   "q": "Un fotograma de 400×300 (ancho × alto) pasa por <code>Resize(256)</code>. ¿Qué tamaño tiene?",
+   "opciones": [
+    "256×256, deformado",
+    "≈ 341×256: el lado corto mide 256 y se conserva la proporción",
+    "224×224"
+   ],
+   "correcta": 1,
+   "porque": "<code>Resize</code> con un solo número ajusta el lado corto (300 → 256) y escala el largo igual: 400 · 256/300 ≈ 341. El 224×224 llega después, con <code>CenterCrop</code>."
+  }
+ ]
+}
+</script>
+</section>
+
+<details class="profundizar">
+  <summary><span>Profundizar: la explicación completa<small>Los cuatro pasos explicados uno a uno, la fórmula de Normalize con cada letra, el píxel y la geometría completos, el preprocesado de entrenamiento frente al de validación y tres fallos clásicos.</small></span></summary>
+  <div class="prof-body">
+<h2 id="preprocesado">El preprocesado de ImageNet: la red espera números muy concretos</h2>
+
+<p class="pregunta">¿Por qué no puedo pasarle a la red una carátula o un fotograma tal cual, y qué hacen exactamente <code>Resize</code>, <code>CenterCrop</code> y <code>Normalize</code>?</p>
+
+<p>Una red preentrenada se entrenó viendo imágenes de una forma muy concreta: todas del mismo tamaño y con los valores de los píxeles en una escala determinada, como un crítico que solo ha visto películas en pantalla de cine, con el mismo formato y el mismo brillo. Si le das un vídeo vertical del móvil con otro brillo, desbarra. Si le das imágenes preparadas de otra forma, recibe números que nunca vio y rinde peor (lo mediremos en el <a href="leccion-8.html#frag-17">fragmento 17</a>: pasa del 100 % al 50 %). El preprocesado de ImageNet tiene cuatro pasos:</p>
+
+<ol class="pasos">
+  <li><strong><code>Resize(256)</code></strong>: redimensiona de modo que el <em>lado corto</em> mida 256 píxeles, sin deformar (el lado largo se escala con la misma proporción).</li>
+  <li><strong><code>CenterCrop(224)</code></strong>: recorta un cuadrado de 224×224 del centro. Las redes de TorchVision se entrenaron con ese tamaño.</li>
+  <li><strong><code>ToTensor()</code></strong>: convierte la imagen en un tensor <code>float32</code> de forma <code>(3, 224, 224)</code> (canales primero) y divide por 255, de modo que los valores pasan de 0–255 a 0–1.</li>
+  <li><strong><code>Normalize(mean, std)</code></strong>: a cada canal le resta su media y lo divide por su desviación típica.</li>
+</ol>
+
+<div class="formula">\[ x'_c = \frac{x_c - \mu_c}{\sigma_c}, \qquad \mu=(0{,}485,\ 0{,}456,\ 0{,}406),\quad \sigma=(0{,}229,\ 0{,}224,\ 0{,}225) \]</div>
+
+<p>Donde \( x_c \) es el valor del píxel (entre 0 y 1) en el canal \( c \) (rojo, verde o azul), \( \mu_c \) es la media de ese canal calculada sobre todo ImageNet y \( \sigma_c \) su desviación típica. El resultado queda centrado en 0 y con una dispersión de orden 1, que es la escala con la que la red aprendió y donde sus pesos funcionan bien (es el mismo motivo por el que normalizas las columnas en un modelo de tablas).</p>
+
+<div class="callout ejemplo">
+  <span class="lbl">Ejemplo numérico</span>
+  <p>Un píxel naranja del atardecer de un fotograma de <em>El Rey León</em>, con valores (200, 100, 50) sobre 255 (cifras inventadas para el ejemplo):</p>
+  <ol class="pasos">
+    <li><code>ToTensor</code>: \( 200/255=0{,}7843 \), \( 100/255=0{,}3922 \), \( 50/255=0{,}1961 \).</li>
+    <li>Rojo: \( (0{,}7843-0{,}485)/0{,}229 = \) <strong>1,307</strong>.</li>
+    <li>Verde: \( (0{,}3922-0{,}456)/0{,}224 = \) <strong>−0,285</strong>.</li>
+    <li>Azul: \( (0{,}1961-0{,}406)/0{,}225 = \) <strong>−0,933</strong>.</li>
+  </ol>
+  <p>Son exactamente los tres números que da el <a href="#frag-4">fragmento 4</a>. Y para la geometría: un fotograma de 400×300 (ancho×alto) tiene lado corto 300; <code>Resize(256)</code> la deja en \( 400\cdot256/300 \approx 341 \) de ancho por 256 de alto; <code>CenterCrop(224)</code> recorta el centro a 224×224.</p>
+</div>
+
+<div class="callout recuerda">
+  <span class="lbl">Experimento de arriba: «Resize, CenterCrop y Normalize sobre tu fotograma y tu píxel», con todo detalle</span>
+  <p><strong>Haz esto.</strong> Arriba, cambia el tamaño del fotograma original y el lado del Resize: el rectángulo naranja del dibujo es lo que sobrevive al recorte. Abajo, mueve los tres canales del píxel y cambia entre la receta de ImageNet y «0,5 y 0,5».</p>
+  <p><strong>Fíjate en.</strong> Con un fotograma apaisado (más ancho que alto) el recorte central pierde los laterales: si el protagonista estaba en una esquina, puede desaparecer del recorte. Un píxel gris medio (≈124, 116, 104) cae cerca de 0 en los tres canales; uno muy claro supera +2.</p>
+</div>
+
+<div class="callout regla">
+  <span class="lbl">Regla fácil</span>
+  <p>No copies los números de memoria: usa <code>weights.transforms()</code> (por ejemplo <code>ResNet18_Weights.DEFAULT.transforms()</code>), que devuelve el preprocesado exacto de <em>esos</em> pesos. Se aplica a una imagen PIL (<code>preproceso(foto)</code>) y da el tensor listo. El <a href="#frag-4">fragmento 4</a> comprueba que el preprocesado hecho a mano coincide con el oficial.</p>
+</div>
+
+<h3>Preprocesado de entrenamiento y de validación: no son el mismo</h3>
+
+<p>Para entrenar, a menudo se añade <strong>aumento de datos</strong> (<abbr class="t" data-def="Data augmentation: generar variantes de cada imagen de entrenamiento (recortes al azar, reflejos…) para que la red vea más variedad y no memorice. Solo se usa al entrenar, nunca al validar ni al predecir.">data augmentation</abbr>): <code>RandomResizedCrop(224)</code> recorta una región al azar y <code>RandomHorizontalFlip()</code> refleja la imagen a veces. Son aleatorios: cada vez que la red ve la foto, la ve algo distinta. En validación y en producción se usa siempre el preprocesado determinista de arriba (<code>Resize</code> + <code>CenterCrop</code>). Lo que <strong>nunca</strong> debe cambiar entre entrenamiento y validación es el <code>Normalize</code>.</p>
+
+<div class="callout ojo">
+  <span class="lbl">Ojo</span>
+  <p>Tres fallos clásicos. <strong>(1)</strong> Usar la media y desviación de ImageNet con una red que <em>no</em> es de ImageNet (la de tu propio preentrenamiento tiene las suyas, como en el experimento de este módulo, donde se calculan con la tarea A). <strong>(2)</strong> Aplicar el aumento aleatorio en validación: las métricas oscilan sin que el modelo cambie. <strong>(3)</strong> Pasar una imagen en escala de grises o con canal alfa (RGBA): <code>Normalize</code> espera 3 canales; se arregla con <code>foto.convert("RGB")</code> antes de transformar.</p>
+</div>
+  </div>
+</details>
+
+<section>
+<h2 class="sin-num">Código</h2>
+<article class="snippet" data-lang="python" id="frag-4">
+      <header>
+        <h3>4 · El preprocesado de ImageNet paso a paso: Resize, CenterCrop, ToTensor y Normalize</h3>
+        <p class="para-que"><strong>Para qué sirve</strong> Construir con <code>torchvision.transforms</code> el mismo preprocesado que esperan las redes preentrenadas, verificar a mano el resultado de <code>Normalize</code> en un píxel y comprobar que coincide con <code>weights.transforms()</code>, que lo trae ya hecho.</p>
+      </header>
+      <pre class="code"><code>import numpy as np
+import torch
+from PIL import Image
+from torchvision import transforms as T
 from torchvision.models import ResNet18_Weights
 
-dispositivo = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+foto = Image.new("RGB", (400, 300), (200, 100, 50))
+print(foto.size, foto.mode)
 
+MEDIA = [0.485, 0.456, 0.406]
+STD = [0.229, 0.224, 0.225]
+preproceso = T.Compose([
+    T.Resize(256),
+    T.CenterCrop(224),
+    T.ToTensor(),
+    T.Normalize(mean=MEDIA, std=STD),
+])
+x = preproceso(foto)
+print(x.shape, x.dtype)
+print("píxel (0,0) por canal:", [round(v, 4) for v in x[:, 0, 0].tolist()])
 
-def transfer_learning(raiz, pesos, epocas_fase1=5, epocas_fase2=5):
-    preproceso = ResNet18_Weights.DEFAULT.transforms()
-    train_ds = datasets.ImageFolder(f"{raiz}/train", transform=preproceso)
-    val_ds = datasets.ImageFolder(f"{raiz}/val", transform=preproceso)
-    train_dl = DataLoader(train_ds, batch_size=8, shuffle=True)
-    val_dl = DataLoader(val_ds, batch_size=8)
-    print("clases:", train_ds.class_to_idx)
+for canal, v in enumerate([200, 100, 50]):
+    print(canal, round((v / 255 - MEDIA[canal]) / STD[canal], 4))
 
-    modelo = models.resnet18(weights=pesos)
-    modelo.requires_grad_(False)
-    modelo.fc = nn.Linear(modelo.fc.in_features, len(train_ds.classes))
-    modelo = modelo.to(dispositivo)
-    perdida = nn.CrossEntropyLoss()
+rng = np.random.default_rng(0)
+ruido = Image.fromarray(rng.integers(0, 256, size=(300, 400, 3), dtype=np.uint8))
+oficial = ResNet18_Weights.DEFAULT.transforms()
+print("igual que weights.transforms():", torch.allclose(preproceso(ruido), oficial(ruido), atol=1e-5))
 
-    def epoca(dl, optimizador=None):
-        entrenando = optimizador is not None
-        suma, aciertos, total = 0.0, 0, 0
-        with torch.set_grad_enabled(entrenando):
-            for x, y in dl:
-                x, y = x.to(dispositivo), y.to(dispositivo)
-                salida = modelo(x)
-                l = perdida(salida, y)
-                if entrenando:
-                    optimizador.zero_grad()
-                    l.backward()
-                    optimizador.step()
-                suma += l.item() * len(y)
-                aciertos += (salida.argmax(1) == y).sum().item()
-                total += len(y)
-        return suma / total, aciertos / total
+print(ruido.size, T.Resize(256)(ruido).size, T.CenterCrop(224)(T.Resize(256)(ruido)).size)
+lote = x.unsqueeze(0)
+print(lote.shape)
 
-    def entrenables():
-        return sum(p.numel() for p in modelo.parameters() if p.requires_grad)
+entrenamiento = T.Compose([
+    T.RandomResizedCrop(224),
+    T.RandomHorizontalFlip(),
+    T.ToTensor(),
+    T.Normalize(mean=MEDIA, std=STD),
+])
+torch.manual_seed(0)
+print(entrenamiento(ruido).shape, entrenamiento(ruido).std().item() &gt; 0.5)</code></pre>
+      <details class="linea-a-linea" open>
+        <summary>Línea por línea</summary>
+        <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+        <table class="lineas">
+          <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+          <tbody>
+        <tr data-lines="1"><td><code>import numpy as np</code></td><td>NumPy, para fabricar una imagen aleatoria.</td></tr>
+        <tr data-lines="2"><td><code>import torch</code></td><td>PyTorch.</td></tr>
+        <tr data-lines="3"><td><code>from PIL import Image</code></td><td>Pillow, la librería de imágenes que usa TorchVision para abrir fotos (<code>Image.open</code>).</td></tr>
+        <tr data-lines="4"><td><code>from torchvision import transforms as T</code></td><td>El módulo de transformaciones, con el alias habitual <code>T</code>.</td></tr>
+        <tr data-lines="5"><td><code>from torchvision.models import ResNet18_Weights</code></td><td>Los pesos, para leer su preprocesado oficial.</td></tr>
+        <tr data-lines="7"><td><code>foto = Image.new("RGB", (400, 300), (200, 100, 50))</code></td><td>Una «foto» de color uniforme (rojo 200, verde 100, azul 50), de <strong>400 de ancho por 300 de alto</strong>. Con un color uniforme el resultado se puede comprobar a mano.</td></tr>
+        <tr data-lines="8"><td><code>print(foto.size, foto.mode)</code></td><td>Pillow da el tamaño como (ancho, alto) y el modo de color <code>RGB</code>.</td></tr>
+        <tr data-lines="10"><td><code>MEDIA = [0.485, 0.456, 0.406]</code></td><td>La media de cada canal (rojo, verde, azul) calculada sobre todo ImageNet, con los píxeles escalados a 0–1.</td></tr>
+        <tr data-lines="11"><td><code>STD = [0.229, 0.224, 0.225]</code></td><td>La desviación típica de cada canal en ImageNet.</td></tr>
+        <tr data-lines="12"><td><code>preproceso = T.Compose([</code></td><td><code>Compose</code> encadena transformaciones: la salida de cada una es la entrada de la siguiente.</td></tr>
+        <tr data-lines="13"><td><code>T.Resize(256),</code></td><td>Cambia el tamaño para que el lado <strong>más corto</strong> mida 256 píxeles, conservando la proporción.</td></tr>
+        <tr data-lines="14"><td><code>T.CenterCrop(224),</code></td><td>Recorta un cuadrado de 224×224 del centro. La red espera exactamente ese tamaño.</td></tr>
+        <tr data-lines="15"><td><code>T.ToTensor(),</code></td><td>Convierte la imagen de Pillow (alto×ancho×canales, enteros 0–255) en un tensor <code>float32</code> de forma (canales, alto, ancho) con valores de 0 a 1 (divide entre 255).</td></tr>
+        <tr data-lines="16"><td><code>T.Normalize(mean=MEDIA, std=STD),</code></td><td>A cada canal le resta su media y lo divide por su desviación: \( (v - \text{media})/\text{std} \).</td></tr>
+        <tr data-lines="17"><td><code>])</code></td><td>Cierra la lista de transformaciones.</td></tr>
+        <tr data-lines="18"><td><code>x = preproceso(foto)</code></td><td>Aplica toda la cadena a la foto.</td></tr>
+        <tr data-lines="19"><td><code>print(x.shape, x.dtype)</code></td><td>Un tensor de 3 canales de 224×224 en <code>float32</code>.</td></tr>
+        <tr data-lines="20"><td><code>print("píxel (0,0) por canal:", [round(v, 4) for v in x[:, 0, 0].tolist()])</code></td><td>Valor del píxel de la esquina superior izquierda en los tres canales, redondeado.</td></tr>
+        <tr data-lines="22"><td><code>for canal, v in enumerate([200, 100, 50]):</code></td><td>Recorre los tres valores originales con su número de canal.</td></tr>
+        <tr data-lines="23"><td><code>print(canal, round((v / 255 - MEDIA[canal]) / STD[canal], 4))</code></td><td>La cuenta a mano: dividir entre 255, restar la media del canal y dividir por su desviación.</td></tr>
+        <tr data-lines="25"><td><code>rng = np.random.default_rng(0)</code></td><td>Generador aleatorio con semilla.</td></tr>
+        <tr data-lines="26"><td><code>ruido = Image.fromarray(rng.integers(0, 256, size=(300, 400, 3), dtype=np.uint8))</code></td><td>Una imagen de ruido de 300 de alto por 400 de ancho (matriz de enteros de 0 a 255 de 8 bits) convertida en imagen de Pillow.</td></tr>
+        <tr data-lines="27"><td><code>oficial = ResNet18_Weights.DEFAULT.transforms()</code></td><td>El preprocesado oficial de esos pesos, ya construido por TorchVision.</td></tr>
+        <tr data-lines="28"><td><code>print("igual que weights.transforms():", torch.allclose(preproceso(ruido), oficial(ruido), atol=1e-5))</code></td><td>Aplica los dos preprocesados a la misma imagen y comprueba que dan el mismo tensor.</td></tr>
+        <tr data-lines="30"><td><code>print(ruido.size, T.Resize(256)(ruido).size, T.CenterCrop(224)(T.Resize(256)(ruido)).size)</code></td><td>Cómo cambia el tamaño en cada paso: original, tras <code>Resize</code> y tras <code>CenterCrop</code>.</td></tr>
+        <tr data-lines="31"><td><code>lote = x.unsqueeze(0)</code></td><td>Añade un eje delante: la red espera un <em>lote</em> de imágenes, aunque sea de una sola.</td></tr>
+        <tr data-lines="32"><td><code>print(lote.shape)</code></td><td>Forma final (lote, canales, alto, ancho).</td></tr>
+        <tr data-lines="34"><td><code>entrenamiento = T.Compose([</code></td><td>Preprocesado <em>de entrenamiento</em>, que añade aumento de datos antes de la misma conversión y normalización.</td></tr>
+        <tr data-lines="35"><td><code>T.RandomResizedCrop(224),</code></td><td>Recorta una región al azar (de tamaño y proporción variables) y la reescala a 224×224: la red nunca ve dos veces exactamente la misma imagen.</td></tr>
+        <tr data-lines="36"><td><code>T.RandomHorizontalFlip(),</code></td><td>Con probabilidad 0,5 refleja la imagen como en un espejo (válido para fotos de objetos; no para dígitos ni texto).</td></tr>
+        <tr data-lines="37"><td><code>T.ToTensor(),</code></td><td>Igual que antes.</td></tr>
+        <tr data-lines="38"><td><code>T.Normalize(mean=MEDIA, std=STD),</code></td><td>Igual que antes: el mismo Normalize en entrenamiento y en validación.</td></tr>
+        <tr data-lines="39"><td><code>])</code></td><td>Cierra la lista.</td></tr>
+        <tr data-lines="40"><td><code>torch.manual_seed(0)</code></td><td>Semilla, para que el azar del recorte sea reproducible.</td></tr>
+        <tr data-lines="41"><td><code>print(entrenamiento(ruido).shape, entrenamiento(ruido).std().item() &gt; 0.5)</code></td><td>Aplica el preprocesado aleatorio a la imagen de ruido: sale de 3×224×224 igual que el otro, aunque cada llamada daría una versión distinta. La segunda cifra solo comprueba que el tensor no es constante.</td></tr>
+          </tbody>
+        </table>
+      </details>
+      <div class="salida">
+        <strong>Salida esperada</strong>
+    <pre>(400, 300) RGB
+torch.Size([3, 224, 224]) torch.float32
+píxel (0,0) por canal: [1.307, -0.285, -0.933]
+0 1.307
+1 -0.285
+2 -0.933
+igual que weights.transforms(): True
+(400, 300) (341, 256) (224, 224)
+torch.Size([1, 3, 224, 224])
+torch.Size([3, 224, 224]) True</pre>
+        <p>La foto de 400×300 pasa a 341×256 con <code>Resize(256)</code> (el lado corto, 300, se reduce a 256 y el largo se escala con la misma proporción: \( 400\cdot256/300 \approx 341 \)) y a 224×224 con <code>CenterCrop</code>. El píxel (0,0) vale <strong>1,307, −0,285 y −0,933</strong> y las cuentas a mano dan exactamente los mismos tres números: por ejemplo, para el rojo, \( (200/255 - 0{,}485)/0{,}229 = (0{,}7843 - 0{,}485)/0{,}229 \approx 1{,}307 \). El preprocesado hecho a mano y <code>weights.transforms()</code> coinciden (<code>True</code>). Por último, el lote tiene forma <code>(1, 3, 224, 224)</code>: ya es lo que acepta <code>modelo(lote)</code>.</p>
+      </div>
+    </article>
 
-    optimizador = torch.optim.Adam(modelo.fc.parameters(), lr=1e-3)
-    print("fase 1, parámetros entrenables:", entrenables())
-    for e in range(epocas_fase1):
-        modelo.eval()
-        l, a = epoca(train_dl, optimizador)
-        lv, av = epoca(val_dl)
-        print(f"  época {e + 1}: pérdida {l:.3f} acc {a:.2f} | val {lv:.3f} acc {av:.2f}")
+</section>
 
-    modelo.layer4.requires_grad_(True)
-    optimizador = torch.optim.Adam([
-        {"params": modelo.layer4.parameters(), "lr": 1e-4},
-        {"params": modelo.fc.parameters(), "lr": 1e-3},
-    ])
-    print("fase 2, parámetros entrenables:", entrenables())
-    for e in range(epocas_fase2):
-        modelo.eval()
-        modelo.layer4.train()
-        l, a = epoca(train_dl, optimizador)
-        modelo.eval()
-        lv, av = epoca(val_dl)
-        print(f"  época {e + 1}: pérdida {l:.3f} acc {a:.2f} | val {lv:.3f} acc {av:.2f}")
-    return modelo
-
-
-# --- uso real: necesita internet y una carpeta fotos/train/&lt;clase&gt;/*.jpg y fotos/val/&lt;clase&gt;/*.jpg ---
-modelo = transfer_learning("fotos", ResNet18_Weights.DEFAULT)
-torch.save(modelo.state_dict(), "resnet18_fotos.pth")</code></pre>
-<details class="linea-a-linea" open="">
-<summary>Línea por línea</summary>
-<p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
-<table class="lineas">
-<thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
-<tbody>
-<tr data-lines="1"><td><code>import torch</code></td><td>PyTorch.</td></tr>
-<tr data-lines="2"><td><code>from torch import nn</code></td><td>Capas y pérdidas.</td></tr>
-<tr data-lines="3"><td><code>from torch.utils.data import DataLoader</code></td><td>El que reparte los datos en lotes.</td></tr>
-<tr data-lines="4"><td><code>from torchvision import datasets, models</code></td><td><code>datasets</code> trae <code>ImageFolder</code> (leer carpetas de fotos); <code>models</code>, las arquitecturas.</td></tr>
-<tr data-lines="5"><td><code>from torchvision.models import ResNet18_Weights</code></td><td>Los pesos preentrenados (y su preprocesado oficial).</td></tr>
-<tr data-lines="7"><td><code>dispositivo = torch.device("cuda" if torch.cuda.is_available() else "cpu")</code></td><td>GPU si hay, CPU si no (fragmento 7).</td></tr>
-<tr data-lines="10"><td><code>def transfer_learning(raiz, pesos, epocas_fase1=5, epocas_fase2=5):</code></td><td>Toda la receta en una función: la carpeta con los datos, los pesos a usar (<code>None</code> o un enumerado) y las épocas de cada fase.</td></tr>
-<tr data-lines="11"><td><code>preproceso = ResNet18_Weights.DEFAULT.transforms()</code></td><td>El preprocesado oficial de ResNet-18 (Resize 256, CenterCrop 224, ToTensor, Normalize). Se usa siempre el mismo aunque los pesos sean <code>None</code>.</td></tr>
-<tr data-lines="12"><td><code>train_ds = datasets.ImageFolder(f"{raiz}/train", transform=preproceso)</code></td><td>Lee la carpeta <code>train</code>: cada subcarpeta es una clase y cada imagen de dentro un ejemplo. Aplica el preprocesado al cargarla.</td></tr>
-<tr data-lines="13"><td><code>val_ds = datasets.ImageFolder(f"{raiz}/val", transform=preproceso)</code></td><td>Lo mismo con la carpeta de validación.</td></tr>
-<tr data-lines="14"><td><code>train_dl = DataLoader(train_ds, batch_size=8, shuffle=True)</code></td><td>Lotes de 8 imágenes, barajados en cada época.</td></tr>
-<tr data-lines="15"><td><code>val_dl = DataLoader(val_ds, batch_size=8)</code></td><td>Validación en lotes de 8, sin barajar.</td></tr>
-<tr data-lines="16"><td><code>print("clases:", train_ds.class_to_idx)</code></td><td>Muestra qué número se asignó a cada carpeta (por orden alfabético).</td></tr>
-<tr data-lines="18"><td><code>modelo = models.resnet18(weights=pesos)</code></td><td>Crea la red con los pesos que se pidan: con <code>ResNet18_Weights.DEFAULT</code> los de ImageNet (descarga la primera vez), con <code>None</code> al azar.</td></tr>
-<tr data-lines="19"><td><code>modelo.requires_grad_(False)</code></td><td>Congela toda la red.</td></tr>
-<tr data-lines="20"><td><code>modelo.fc = nn.Linear(modelo.fc.in_features, len(train_ds.classes))</code></td><td>Cabeza nueva: de 512 características a tantas salidas como carpetas. Es lo único entrenable.</td></tr>
-<tr data-lines="21"><td><code>modelo = modelo.to(dispositivo)</code></td><td>Mueve el modelo al dispositivo (en un módulo no haría falta reasignar, pero es un hábito inofensivo).</td></tr>
-<tr data-lines="22"><td><code>perdida = nn.CrossEntropyLoss()</code></td><td>Pérdida de clasificación multiclase (recibe logits y etiquetas enteras).</td></tr>
-<tr data-lines="24"><td><code>def epoca(dl, optimizador=None):</code></td><td>Una pasada completa por unos datos. Si se le da optimizador, entrena; si no, solo mide.</td></tr>
-<tr data-lines="25"><td><code>entrenando = optimizador is not None</code></td><td>Bandera: ¿estamos entrenando?</td></tr>
-<tr data-lines="26"><td><code>suma, aciertos, total = 0.0, 0, 0</code></td><td>Acumuladores de pérdida, aciertos y número de imágenes.</td></tr>
-<tr data-lines="27"><td><code>with torch.set_grad_enabled(entrenando):</code></td><td>Activa el cálculo de gradientes solo al entrenar (equivale a <code>no_grad</code> al validar).</td></tr>
-<tr data-lines="28"><td><code>for x, y in dl:</code></td><td>Recorre los lotes: imágenes <code>x</code> y etiquetas <code>y</code>.</td></tr>
-<tr data-lines="29"><td><code>x, y = x.to(dispositivo), y.to(dispositivo)</code></td><td>Mueve el lote al mismo dispositivo que el modelo (con tensores hay que reasignar).</td></tr>
-<tr data-lines="30"><td><code>salida = modelo(x)</code></td><td>Paso hacia delante: las puntuaciones de cada clase.</td></tr>
-<tr data-lines="31"><td><code>l = perdida(salida, y)</code></td><td>La pérdida del lote.</td></tr>
-<tr data-lines="32"><td><code>if entrenando:</code></td><td>Solo se actualiza en entrenamiento.</td></tr>
-<tr data-lines="33"><td><code>optimizador.zero_grad()</code></td><td>Pone a cero los gradientes anteriores.</td></tr>
-<tr data-lines="34"><td><code>l.backward()</code></td><td>Calcula los gradientes (solo de los parámetros con <code>requires_grad=True</code>).</td></tr>
-<tr data-lines="35"><td><code>optimizador.step()</code></td><td>Actualiza esos parámetros.</td></tr>
-<tr data-lines="36"><td><code>suma += l.item() * len(y)</code></td><td>Acumula la pérdida del lote multiplicada por su tamaño (<code>item()</code> pasa de tensor a número de Python).</td></tr>
-<tr data-lines="37"><td><code>aciertos += (salida.argmax(1) == y).sum().item()</code></td><td>Cuenta cuántas veces la clase de mayor puntuación coincide con la real.</td></tr>
-<tr data-lines="38"><td><code>total += len(y)</code></td><td>Cuenta las imágenes vistas.</td></tr>
-<tr data-lines="39"><td><code>return suma / total, aciertos / total</code></td><td>Pérdida media y exactitud de toda la pasada.</td></tr>
-<tr data-lines="41"><td><code>def entrenables():</code></td><td>Función auxiliar.</td></tr>
-<tr data-lines="42"><td><code>return sum(p.numel() for p in modelo.parameters() if p.requires_grad)</code></td><td>Cuenta los parámetros entrenables en este momento.</td></tr>
-<tr data-lines="44"><td><code>optimizador = torch.optim.Adam(modelo.fc.parameters(), lr=1e-3)</code></td><td>Fase 1: optimizador que solo ve la cabeza, con learning rate 0,001.</td></tr>
-<tr data-lines="45"><td><code>print("fase 1, parámetros entrenables:", entrenables())</code></td><td>Comprobación: deben ser solo los de <code>fc</code>.</td></tr>
-<tr data-lines="46"><td><code>for e in range(epocas_fase1):</code></td><td>Bucle de épocas de la fase 1.</td></tr>
-<tr data-lines="47"><td><code>modelo.eval()</code></td><td>Toda la red en modo evaluación: la parte congelada no debe cambiar las estadísticas de BatchNorm con las pocas fotos nuevas.</td></tr>
-<tr data-lines="48"><td><code>l, a = epoca(train_dl, optimizador)</code></td><td>Una época de entrenamiento: devuelve pérdida y exactitud.</td></tr>
-<tr data-lines="49"><td><code>lv, av = epoca(val_dl)</code></td><td>Una pasada de validación (sin optimizador, sin gradientes).</td></tr>
-<tr data-lines="50"><td><code>print(f"  época {e + 1}: pérdida {l:.3f} acc {a:.2f} | val {lv:.3f} acc {av:.2f}")</code></td><td>Informe de la época.</td></tr>
-<tr data-lines="52"><td><code>modelo.layer4.requires_grad_(True)</code></td><td>Fase 2: descongela solo la última etapa convolucional.</td></tr>
-<tr data-lines="53-56"><td><code>optimizador = torch.optim.Adam([ … ])</code></td><td>Optimizador nuevo (es el «recompilar» de PyTorch) con <strong>dos grupos de parámetros</strong>, cada uno con su learning rate.</td></tr>
-<tr data-lines="54"><td><code>{"params": modelo.layer4.parameters(), "lr": 1e-4},</code></td><td>Grupo 1: <code>layer4</code> con learning rate bajo (0,0001), para retocar sin destrozar.</td></tr>
-<tr data-lines="55"><td><code>{"params": modelo.fc.parameters(), "lr": 1e-3},</code></td><td>Grupo 2: la cabeza sigue con 0,001.</td></tr>
-<tr data-lines="57"><td><code>print("fase 2, parámetros entrenables:", entrenables())</code></td><td>Ahora deben ser los de <code>layer4</code> más los de <code>fc</code>.</td></tr>
-<tr data-lines="58"><td><code>for e in range(epocas_fase2):</code></td><td>Bucle de épocas de la fase 2.</td></tr>
-<tr data-lines="59"><td><code>modelo.eval()</code></td><td>Todo en evaluación…</td></tr>
-<tr data-lines="60"><td><code>modelo.layer4.train()</code></td><td>…salvo <code>layer4</code>, que vuelve a modo entrenamiento (sus BatchNorm se adaptan a las fotos nuevas).</td></tr>
-<tr data-lines="61"><td><code>l, a = epoca(train_dl, optimizador)</code></td><td>Época de entrenamiento.</td></tr>
-<tr data-lines="62"><td><code>modelo.eval()</code></td><td>Antes de validar, todo en evaluación.</td></tr>
-<tr data-lines="63"><td><code>lv, av = epoca(val_dl)</code></td><td>Validación.</td></tr>
-<tr data-lines="64"><td><code>print(f"  época {e + 1}: pérdida {l:.3f} acc {a:.2f} | val {lv:.3f} acc {av:.2f}")</code></td><td>Informe de la época.</td></tr>
-<tr data-lines="65"><td><code>return modelo</code></td><td>Devuelve el modelo entrenado.</td></tr>
-<tr data-lines="68"><td><code># --- uso real: necesita internet y una carpeta fotos/train/&lt;clase&gt;/*.jpg y fotos/val/&lt;clase&gt;/*.jpg ---</code></td><td>Comentario: la llamada real necesita tus fotos y conexión para bajar los pesos.</td></tr>
-<tr data-lines="69"><td><code>modelo = transfer_learning("fotos", ResNet18_Weights.DEFAULT)</code></td><td>Ejecuta las dos fases con los pesos de ImageNet.</td></tr>
-<tr data-lines="70"><td><code>torch.save(modelo.state_dict(), "resnet18_fotos.pth")</code></td><td>Guarda solo los pesos (el <code>state_dict</code>) en un archivo.</td></tr>
-</tbody>
-</table>
-</details>
-<div class="salida">
-<strong>Salida esperada</strong>
-<pre>No ejecutado con pesos reales: necesita internet para descargar ResNet18_Weights.DEFAULT y una carpeta «fotos» con imágenes tuyas.
-La función se definió y se ejecutó entera con weights=None en el fragmento 9.
-Con pesos reales verías, época a época, la pérdida y la exactitud de entrenamiento y de validación; la fase 1 (solo fc) y la fase 2 (layer4 + fc) con sus recuentos de parámetros entrenables (1.539 y 8.395.267 si tuvieras 3 clases).</pre>
-<p>Este fragmento <strong>no se ha ejecutado con los pesos de ImageNet</strong> (no hay internet). Lo que sí se hizo es ejecutar la función entera con <code>weights=None</code> sobre una carpeta de imágenes sintéticas: es el fragmento 9. Fíjate en tres decisiones que se explican en el módulo: la cabeza se crea <em>después</em> de congelar (así nace entrenable); toda la red va en <code>eval()</code> salvo la parte que se está afinando; y el «recompilar» de Keras aquí es simplemente <strong>crear un optimizador nuevo</strong> con los parámetros y learning rates de la fase 2.</p>
 </div>
-</article></div></details></div></main></body></html>
+</main>
+</body>
+</html>

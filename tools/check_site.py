@@ -186,10 +186,7 @@ def main():
     base = f"http://127.0.0.1:{port}"
     total = 0
     with sync_playwright() as p:
-        # Use system Chromium where Playwright browser bundle is not installed.
-        import shutil
-        executable = shutil.which("chromium") or shutil.which("google-chrome")
-        browser = p.chromium.launch(executable_path=executable, args=["--no-sandbox"] if executable else [])
+        browser = p.chromium.launch()
         for rel in pages:
             probs = check_page(browser, base, rel, args.shots)
             total += len(probs)

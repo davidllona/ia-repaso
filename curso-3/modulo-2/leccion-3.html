@@ -1,484 +1,309 @@
-<!DOCTYPE html>
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lección 3 · 1×1 y separables: lo mismo con menos cuentas · Módulo 2 · Curso 3 · Cuaderno de IA</title>
+<meta name="description" content="Por qué una convolución 1×1 antes de una cara (Inception) y una separable en profundidad (MobileNet) ahorran tantas multiplicaciones, con la cuenta; EfficientNet y la comparación de arquitecturas reales.">
+<script>try{var t=localStorage.getItem('cuaderno-ia:tema');if(t)document.documentElement.setAttribute('data-theme',t)}catch(e){}</script>
+<link rel="stylesheet" href="../../assets/css/style.css">
+<script src="../../assets/js/curriculum.js"></script>
+<script src="../../assets/js/lab.js"></script>
+<script src="../../assets/js/app.js" defer></script>
+</head>
+<body data-root="../../" data-course="3" data-module="2" data-lesson="3">
+<main>
+<div class="page">
 
-<html lang="es"><head><meta charset="utf-8"/><meta content="width=device-width,initial-scale=1" name="viewport"/><title>Lección 3 · ResNet: los atajos que permiten redes de cientos de capas · Curso 3 · Cuaderno de IA</title><meta content="Al apilar capas ocurría algo desconcertante: una red de 56 capas daba peor error incluso en entrenamiento que una de 20." name="description"/><script>try{var t=localStorage.getItem('cuaderno-ia:tema');if(t)document.documentElement.setAttribute('data-theme',t)}catch(e){}</script><link href="../../assets/css/style.css" rel="stylesheet"/><script src="../../assets/js/curriculum.js"></script><script src="../../assets/js/lab.js"></script><script defer="" src="../../assets/js/app.js"></script><script defer="" src="../../assets/js/microanimations.js"></script></head><body data-course="3" data-lesson="3" data-module="2" data-root="../../"><main><div class="page" data-micro="3min"><header class="hero leccion"><div class="hero-grid"><div><p class="eyebrow">Curso 3 · Módulo 2 · Lección 3 de 8</p><h1>ResNet: los atajos que permiten redes de cientos de capas</h1><p class="lead">Al apilar capas ocurría algo desconcertante: una red de 56 capas daba peor error incluso en entrenamiento que una de 20.</p><p class="meta-line"><span class="read-time" data-render="read-time"></span><a href="../modulo-2.html">Índice del módulo</a></p></div><div aria-hidden="true" class="hero-tile"></div></div></header><details class="predice"><summary>Si más capas dan más capacidad, ¿por qué no apilamos 100 capas y ya está? ¿Qué pasaba en 2015 cuando se probaba?<span class="hint"></span></summary><div><p>Al apilar capas ocurría algo desconcertante: una red de 56 capas daba peor error incluso en entrenamiento que una de 20.</p></div></details><section aria-label="Explicación breve" class="micro-core"><div class="micro-kicker">01 · ENTENDER <span>≈ 45 s</span></div><h2>La idea en palabras sencillas</h2><p>Al apilar capas ocurría algo desconcertante: una red de 56 capas daba peor error incluso en entrenamiento que una de 20.</p><div class="micro-example"><span aria-hidden="true" class="micro-example-icon">🌱</span><div><strong>Otro ejemplo · Plantas</strong><p>Un modelo visual preentrenado puede servir de punto de partida para reconocer enfermedades en hojas.</p></div></div></section><div class="micro-kicker micro-checkpoint">02 · RESPONDER <span>≈ 15 s</span></div><section aria-label="Pregunta intercalada" class="quiz mini micro-check"><script class="quiz-data" type="application/json">{"titulo": "Pausa rápida · Comprueba la idea", "preguntas": [{"q": "Si reutilizas las capas visuales de un modelo ya entrenado, ¿qué técnica estás usando?", "opciones": ["Transfer learning", "Clustering sin etiquetas", "Regresión con una sola variable"], "correcta": 0, "porque": "El aprendizaje por transferencia aprovecha parámetros aprendidos antes."}]}</script></section><section aria-label="Animación interactiva" class="micro-viz" data-index="8" data-micro-viz="transfer"><div class="micro-kicker">03 · EXPERIMENTAR <span>≈ 45 s</span></div><div class="micro-viz-title"><div><h2>Reutilizar conocimiento previo</h2><p>Alterna entre «extraer características» y «ajustar capas».</p></div><span aria-hidden="true" class="micro-viz-symbol">✦</span></div><div aria-live="polite" class="micro-viz-stage"><p>Animación interactiva: Reutilizar conocimiento previo</p></div></section><div class="micro-kicker micro-checkpoint">04 · APLICAR <span>≈ 15 s</span></div><section aria-label="Pregunta intercalada" class="quiz mini micro-check"><script class="quiz-data" type="application/json">{"titulo": "Pausa rápida · ¿Lo aplicarías?", "preguntas": [{"q": "¿Qué significa congelar una capa durante el entrenamiento?", "opciones": ["Deja de producir salidas", "Se elimina de la arquitectura", "Sus pesos no se actualizan"], "correcta": 2, "porque": "Congelar impide actualizar esos parámetros durante el ajuste."}]}</script></section><div class="micro-finish"><strong>Idea que te llevas</strong><span>Al apilar capas ocurría algo desconcertante: una red de 56 capas daba peor error incluso en entrenamiento que una de 20</span><small>¿Quieres más ejemplos, fórmulas o código? Los tienes justo debajo, sin límite de tiempo.</small></div><details class="profundizar micro-legacy"><summary><span>Explorar más: explicación y simulaciones completas<small>Todo el texto original, tablas y demos avanzadas. Opcional.</small></span></summary><div class="prof-body"><section><h2>ResNet: los atajos que permiten redes de cientos de capas</h2>
-<p>Al apilar capas ocurría algo desconcertante: una red de 56 capas daba <strong>peor error incluso en entrenamiento</strong> que una de 20. No era sobreajuste (el error de entrenamiento también subía). La red más profunda podría, en teoría, imitar a la pequeña (bastaría con que las capas sobrantes no hicieran nada), pero en la práctica el optimizador no lo encontraba. Parte del motivo es el <strong>gradiente que se desvanece</strong> que ya conoces del Curso 2: al retropropagar, el gradiente se multiplica por un factor por cada capa, y si ese factor es menor que 1 el producto se hunde.</p>
-<p>Un bloque normal calcula \( y=H(x) \) y tiene que aprender toda la función \( H \). Un <strong>bloque residual</strong> calcula</p>
-<p>donde \( x \) es la entrada del bloque, \( F(x) \) es lo que calculan unas pocas capas (por ejemplo dos convoluciones con BatchNorm y ReLU) y la suma \( x+F(x) \) es el <strong>atajo</strong> (<em>skip connection</em>). Si lo mejor es no hacer nada, la red solo tiene que llevar \( F \) a 0, que es fácil (pesos pequeños). Y en la retropropagación el «1» abre una autopista por la que el gradiente baja directo.</p>
-<div class="callout ejemplo"><span class="lbl">Ejemplo tomado del módulo</span><p>: el producto de 20 factores Piensa en el gradiente como un mensaje que se pasa de boca en boca entre 20 amigos (las 20 capas), desde el que acaba de ver el final de una película hasta el primero de la fila.</p></div></section><figure class="demo" data-demo="curso3/c3m2-bloque-residual" data-titulo="El mensaje de boca en boca: gradiente en cada capa, red plana frente a red con atajos">
-<div class="haz">Es el mensaje de boca en boca entre los amigos del ejemplo (la capa 1 es el primero de la fila). Deja la profundidad en 20 y observa las dos curvas. Sube la profundidad a 60. Luego sube la escala de los pesos σ a 1,4 y pulsa varias veces «Otros pesos al azar». Fíjate en el mensaje de abajo.</div>
-<div class="observa">En la red plana el gradiente de las primeras capas cae muchos órdenes de magnitud (escala logarítmica: cada línea es ×10). En la red con atajos se mantiene en un rango razonable. Pero ojo: con pesos grandes los atajos pueden hacer que el gradiente <em>crezca</em> sin control; por eso las ResNet reales llevan BatchNorm entre capas. Los números salen de un forward y un backward reales con semilla, no de una fórmula.</div>
-</figure><div class="resumen"><h2 class="sin-num sin-toc">En pocas líneas</h2><ul><li><strong>ResNet: los atajos que permiten redes de cientos de capas:</strong> Al apilar capas ocurría algo desconcertante: una red de 56 capas daba peor error incluso en entrenamiento que una de 20.</li><li>Antes de continuar, intenta explicar la demo sin mirar su resultado.</li></ul></div><section class="quiz mini"><script class="quiz-data" type="application/json">{"titulo": "¿Lo tienes?", "preguntas": [{"q": "¿Qué concepto estamos trabajando en esta lección?", "opciones": ["Las grandes arquitecturas: de LeNet a EfficientNet", "ResNet: los atajos que permiten redes de cientos de capas", "Errores típicos y cómo leerlos"], "correcta": 1, "porque": "Al apilar capas ocurría algo desconcertante: una red de 56 capas daba peor error incluso en entrenamiento que una de 20."}, {"q": "¿Cuál de estas afirmaciones recoge lo que acabas de estudiar?", "opciones": ["Siempre hay un único método que sirve para todos los problemas.", "Lo importante es comprender la idea y comprobarla con ejemplos, no memorizar términos.", "Al apilar capas ocurría algo desconcertante: una red de 56 capas daba peor error incluso en entrenamiento que una de 20."], "correcta": 2, "porque": "La explicación central es: Al apilar capas ocurría algo desconcertante: una red de 56 capas daba peor error incluso en entrenamiento que una de 20."}, {"q": "Si una demo o un ejemplo te desconcierta, ¿cuál es la mejor forma de aprenderlo?", "opciones": ["Ignorar los resultados que no coinciden con tu intuición.", "Memorizar el nombre sin entender la operación.", "Volver a los números, cambiar un valor y explicar qué ocurre."], "correcta": 2, "porque": "Explorar qué cambia y por qué ayuda a conectar el concepto con su resultado."}]}</script></section></div></details><details class="profundizar"><summary><span>Profundizar: explicación completa<small>Matices, fórmulas, tablas, otros ejemplos y experimentos del módulo original.</small></span></summary><div class="prof-body"><section>
-<h2 id="resnet">ResNet: los atajos que permiten redes de cientos de capas</h2>
-<p class="pregunta">Si más capas dan más capacidad, ¿por qué no apilamos 100 capas y ya está? ¿Qué pasaba en 2015 cuando se probaba?</p>
-<h3>El problema de la degradación</h3>
-<p>Al apilar capas ocurría algo desconcertante: una red de 56 capas daba <strong>peor error incluso en entrenamiento</strong> que una de 20. No era sobreajuste (el error de entrenamiento también subía). La red más profunda podría, en teoría, imitar a la pequeña (bastaría con que las capas sobrantes no hicieran nada), pero en la práctica el optimizador no lo encontraba. Parte del motivo es el <strong>gradiente que se desvanece</strong> que ya conoces del Curso 2: al retropropagar, el gradiente se multiplica por un factor por cada capa, y si ese factor es menor que 1 el producto se hunde.</p>
-<div class="callout ejemplo">
-<span class="lbl">Ejemplo numérico: el producto de 20 factores</span>
-<p>Piensa en el gradiente como un mensaje que se pasa de boca en boca entre 20 amigos (las 20 capas), desde el que acaba de ver el final de una película hasta el primero de la fila. Cada amigo lo multiplica por un factor al transmitirlo.</p>
-<ol class="pasos">
-<li><strong>Red plana.</strong> Supón que cada amigo solo transmite la mitad de lo que oyó: cada capa multiplica el gradiente por 0,5. Tras 20 capas: \( 0{,}5^{20}=\;<span class="res">9{,}5\cdot10^{-7}</span> \). La primera capa recibe una millonésima parte del mensaje: no aprende.</li>
-<li><strong>Red con atajos.</strong> Si la capa calcula \( y=x+F(x) \), su derivada es \( 1+F'(x) \): cada amigo cuenta todo lo que oyó (el «1» del atajo) y además añade un poco de su cosecha. Con una \( F' \) pequeña, por ejemplo 0,05, cada capa multiplica por 1,05, y tras 20 capas: \( 1{,}05^{20}=\;<span class="res">2{,}65</span> \). El mensaje llega entero.</li>
-<li><strong>Misma profundidad, resultados opuestos</strong>: la diferencia es ese «+1» del atajo.</li>
+<header class="hero leccion">
+  <div class="hero-grid">
+    <div>
+      <p class="eyebrow">Curso 3 · Módulo 2 · Lección 3 de 8</p>
+      <h1>Un 1×1 y una convolución separable hacen el mismo trabajo con unas 9 veces menos cuentas</h1>
+      <p class="lead">Antes de pasar los informes de 192 críticos a un experto caro, un ayudante los resume en 16. Eso es una convolución 1×1, y MobileNet lleva la idea más lejos.</p>
+      <p class="meta-line"><span class="read-time" data-render="read-time"></span><a href="../modulo-2.html">Índice del módulo</a></p>
+    </div>
+    <div class="hero-tile" aria-hidden="true"></div>
+  </div>
+</header>
+<details class="predice">
+  <summary>Una convolución 1×1 solo mira un píxel cada vez. ¿Sirve para algo o es como no hacer nada?<span class="hint"></span></summary>
+  <div>
+    <p><strong>Sirve, y mucho.</strong> No mira vecinos, pero <strong>mezcla los canales</strong> de ese píxel, como una pequeña capa densa aplicada en cada posición. Su uso estrella: <strong>reducir canales</strong> justo antes de una convolución cara.</p>
+  </div>
+</details>
+
+<section>
+<h2 id="idea">Separar lo caro en dos pasos baratos</h2>
+<p>Piensa en cada canal como el informe de un crítico sobre cada zona del póster. Una convolución 5×5 que lee 192 informes hace muchísimas multiplicaciones. <strong>Inception</strong> (2014) pone antes un ayudante, una <strong>1×1 que resume 192 canales en 16</strong>, y la 5×5 trabaja sobre 16. La salida tiene exactamente la misma forma.</p>
+<p><strong>MobileNet</strong> (2017) separa lo que hace una convolución normal, mirar el vecindario y mezclar canales, en dos pasos:</p>
+<ol>
+  <li><strong>Depthwise:</strong> un filtro 3×3 por canal, sin mezclarlos (cada crítico estudia solo su aspecto).</li>
+  <li><strong>Pointwise:</strong> una 1×1 que mezcla los canales (los críticos ponen en común su opinión).</li>
 </ol>
-</div>
-<h3>La idea: aprender solo lo que cambia</h3>
-<div class="callout analogia">
-<span class="lbl">Analogía</span>
-<p>El montaje de una película: en lugar de volver a rodar todo, el montador parte de la versión anterior y marca solo los cambios (quitar una escena, añadir otra). Si la versión ya era buena, el cambio es «nada». Un bloque residual hace lo mismo: <strong>conserva la entrada y aprende solo la corrección</strong>.</p>
-</div>
-<p>Un bloque normal calcula \( y=H(x) \) y tiene que aprender toda la función \( H \). Un <strong>bloque residual</strong> calcula</p>
-<div class="formula">\[ y \;=\; x \;+\; F(x) \qquad\qquad \frac{\partial y}{\partial x} \;=\; 1 + F'(x) \]</div>
-<p>donde \( x \) es la entrada del bloque, \( F(x) \) es lo que calculan unas pocas capas (por ejemplo dos convoluciones con BatchNorm y ReLU) y la suma \( x+F(x) \) es el <strong>atajo</strong> (<em>skip connection</em>). Si lo mejor es no hacer nada, la red solo tiene que llevar \( F \) a 0, que es fácil (pesos pequeños). Y en la retropropagación el «1» abre una autopista por la que el gradiente baja directo.</p>
-<h3>El bloque en Keras: Add, y cuando las formas no coinciden</h3>
-<p>Para sumar \( x \) y \( F(x) \) deben tener <strong>la misma forma</strong>. Hay dos casos:</p>
-<ul>
-<li><strong>Misma forma</strong> (mismo tamaño y mismos canales): el atajo es la identidad, <code>layers.Add()([x, F])</code>. Cuesta 0 parámetros.</li>
-<li><strong>Distinta forma</strong> (el bloque reduce con stride 2 o cambia el número de canales): el atajo pasa por una convolución <strong>1×1 con ese stride</strong> (la llamada <em>proyección</em>), que adapta tamaño y canales para poder sumar.</li>
-</ul>
-<p>El fragmento 6 escribe ese bloque con la API funcional del <a href="../modulo-1.html">módulo 1</a>: dos conv 3×3 con BatchNorm, una ReLU en medio y otra después de la suma, y la proyección 1×1 cuando hace falta. Imprime además qué capas suma cada <code>Add</code>, para que veas el grafo en lugar de imaginarlo. Comparado con una red igual sin atajos, en una red de solo dos bloques los resultados son idénticos (0,980 los dos): los atajos <strong>no hacen magia en redes pequeñas</strong>. Lo que cambia es lo que ocurre con muchas capas; el fragmento 7 lo mide.</p>
+<p><strong>EfficientNet</strong> (2019) añade otra idea: para crecer, sube profundidad, anchura y resolución <em>a la vez y en proporción fija</em>. Resultado práctico: MobileNetV2 tiene 3,5 millones de parámetros y VGG16, 138.</p>
+</section>
+
+<figure class="demo" data-demo="curso3/c3m2-bottleneck-coste" data-titulo="Cuánto ahorra un 1×1, una convolución separable o un cuello de botella">
+  <div class="haz">En «A · Inception 1×1» baja el cuello de 16 a 4 y súbelo a 128. Pasa a «B · MobileNet» y sube los canales de salida.</div>
+  <div class="observa">Por defecto sale el ejemplo de abajo (÷ 9,7). En B el ahorro se acerca a 9, que es k².</div>
+</figure>
+
+<section>
+<h2 id="numeros">Con números: el ayudante que resume</h2>
 <div class="callout ejemplo">
-<span class="lbl">Midiéndolo de verdad (fragmento 7)</span>
-<p>Una red de 22 capas con sigmoides, con y sin atajos, mismos datos y misma semilla. El gradiente en la primera capa es 3,6·10⁻¹⁴ en la red plana y 2,6 en la que tiene atajos; el cociente primera/última capa es 3,2·10⁻¹³ frente a 0,12. Doce órdenes de magnitud de diferencia que salen de sumar \( x \) a \( F(x) \).</p>
+  <span class="lbl">Ejemplo numérico: de 28×28×192 a 28×28×32 con 5×5</span>
+  <ol class="pasos">
+    <li><strong>Directo:</strong> cada una de las \( 28\cdot28\cdot32=25\,088 \) salidas hace \( 5\cdot5\cdot192=4800 \) productos → 120 422 400.</li>
+    <li><strong>Con 1×1 a 16 canales:</strong> \( 28\cdot28\cdot16\cdot192=2\,408\,448 \), más la 5×5 sobre 16: \( 28\cdot28\cdot32\cdot5\cdot5\cdot16=10\,035\,200 \). Total: 12 443 648.</li>
+    <li><strong>Ahorro:</strong> \( 120\,422\,400/12\,443\,648\approx \) <span class="res">9,7 veces</span>; parámetros de 153 632 a 15 920.</li>
+  </ol>
 </div>
-<h3>ResNet-50: cuello de botella y cuenta de capas</h3>
-<p>Las ResNet profundas usan un bloque con <strong>cuello de botella</strong> (el truco del 1×1 de Inception) para ahorrar: 1×1 baja los canales, 3×3 trabaja con pocos, 1×1 los vuelve a subir. Con 256 canales de entrada y salida, un bloque básico (dos 3×3 a 256 canales) tendría \( 2\cdot9\cdot256\cdot256=1\,179\,648 \) pesos; el cuello (\( 256\to64\to64\to256 \)) tiene \( 256\cdot64+9\cdot64\cdot64+64\cdot256=69\,632 \) pesos (sin contar sesgos): casi 17 veces menos.</p>
-<p>Y de ahí sale el nombre: ResNet-50 tiene 1 convolución inicial, \( 3+4+6+3=16 \) bloques de cuello con 3 convoluciones cada uno (\( 16\cdot3=48 \)) y 1 capa densa final: \( 1+48+1=50 \).</p>
-<div class="callout regla">
-<span class="lbl">Regla fácil</span>
-<p>Un atajo hace que cada capa solo tenga que aprender <em>qué añadir</em> a lo que ya hay. Si no aporta nada, no estorba; y como la derivada de la suma es 1, el gradiente nunca tiene que atravesar una cadena de multiplicaciones por números pequeños. Por eso las ResNet de 50, 101 o 152 capas entrenan, y las redes planas de la misma profundidad no.</p>
+</section>
+
+<details class="predice">
+  <summary>Una separable 3×3 de 64 a 128 canales ahorra 8,41 veces. Si los canales de salida suben a 512, ¿ahorra más de 9 veces o se queda por debajo?<span class="hint"></span></summary>
+  <div>
+    <p><strong>Se queda por debajo, aunque se acerca.</strong> El ahorro es \( 1/(1/N+1/k^2) \): con \( N=512 \) sale \( \approx8{,}84 \). Cuantos más canales, más se acerca a \( k^2=9 \), pero nunca lo alcanza.</p>
+  </div>
+</details>
+
+<div class="resumen">
+  <h2 class="sin-num sin-toc">En tres líneas</h2>
+  <ul>
+    <li>Una 1×1 mezcla canales; puesta antes de una convolución cara, la abarata (÷ 9,7 en el ejemplo).</li>
+    <li>Separable = depthwise 3×3 por canal + pointwise 1×1: ahorro \( 1/(1/N+1/k^2) \), casi 9 con 3×3.</li>
+    <li>EfficientNet crece en profundidad, anchura y resolución a la vez (≈ ×2 de coste por paso).</li>
+  </ul>
 </div>
+<section class="quiz mini">
+<script type="application/json" class="quiz-data">
+{
+ "titulo": "¿Lo tienes?",
+ "preguntas": [
+  {
+   "q": "Sobre un mapa de 28×28×192 quieres obtener 28×28×32 con filtros 5×5. Comparas una 5×5 directa con una 1×1 que baja a 16 canales seguida de la 5×5. ¿Cuánto se reducen aproximadamente las multiplicaciones?",
+   "opciones": [
+    "Unas 2,4 veces",
+    "Unas 12 veces (192/16)",
+    "Unas 9,7 veces",
+    "No se reducen: la salida cambia de forma"
+   ],
+   "correcta": 2,
+   "porque": "La directa necesita 28·28·32·(5·5·192) = 120 422 400 multiplicaciones. Con el cuello: la 1×1 cuesta 28·28·16·192 = 2 408 448 y la 5×5, que ahora mira 16 canales, 28·28·32·(5·5·16) = 10 035 200; total 12 443 648. El cociente es 9,7. El 12 solo describiría la parte 5×5 (192/16) sin contar lo que cuesta la propia 1×1. Y la forma de salida es la misma, 28×28×32."
+  },
+  {
+   "q": "¿Cuántos parámetros tiene <code>SeparableConv2D(128, 3, padding=\"same\")</code> aplicada a un mapa con 64 canales (con sesgo)?",
+   "opciones": [
+    "8 896",
+    "73 856",
+    "8 768",
+    "576"
+   ],
+   "correcta": 0,
+   "porque": "Paso por canal (depthwise): 3·3·64 = 576 pesos. Paso 1×1 (pointwise): 64·128 = 8 192 pesos más 128 sesgos. Total: 576 + 8 192 + 128 = 8 896. El 73 856 es la convolución 3×3 normal, (9·64 + 1)·128. El 8 768 olvida los sesgos y el 576 es solo la parte depthwise."
+  },
+  {
+   "q": "EfficientNet sube a la vez profundidad (×1,2), anchura (×1,1) y resolución (×1,15) en cada paso de φ. ¿Cuánto crece aproximadamente el coste por paso?",
+   "opciones": [
+    "×1,15",
+    "×2 (1,2·1,1²·1,15² ≈ 1,92)",
+    "×3,45 (1,2 + 1,1 + 1,15)"
+   ],
+   "correcta": 1,
+   "porque": "El coste crece como α·β²·γ²: la anchura y la resolución cuentan al cuadrado porque afectan a dos dimensiones. 1,2·1,21·1,3225 ≈ 1,92, así que cada paso casi duplica el coste. De ahí salen B0 a B7."
+  }
+ ]
+}
+</script>
+</section>
+<details class="profundizar">
+  <summary><span>Profundizar: la explicación completa<small>Inception y su 1×1, MobileNet paso a paso, EfficientNet y el compound scaling, la tabla real de cinco arquitecturas de keras.applications y por qué Keras cuenta 177 capas en ResNet50.</small></span></summary>
+  <div class="prof-body">
+<h2 id="arquitecturas-2">Las grandes arquitecturas (continuación): Inception, MobileNet y EfficientNet</h2>
+<h3>Inception (2014): el cuello de botella 1×1</h3>
+<p>GoogLeNet/Inception preguntó otra cosa: ¿qué tamaño de filtro es mejor, 1×1, 3×3 o 5×5? Respuesta: <em>todos a la vez</em>, en ramas paralelas cuyas salidas se concatenan. Pero eso es carísimo… salvo que uses un truco. Una convolución <strong>1×1</strong> parece absurda (mira un solo píxel), pero no lo es: combina los <em>canales</em> de ese píxel, como una pequeña capa densa que se aplica en cada posición. Y sirve para <strong>reducir el número de canales antes de una convolución cara</strong>.</p>
+
+<div class="callout ejemplo">
+  <span class="lbl">Ejemplo numérico: reducir canales antes de una 5×5</span>
+  <p>Piensa en cada canal como el informe de un crítico sobre cada zona del póster: tienes un mapa de 28×28×192 (192 críticos) y quieres 28×28×32 con filtros 5×5 (padding <code>same</code>). La idea: antes de dar los informes a un experto caro (la 5×5), un ayudante los resume en 16.</p>
+  <ol class="pasos">
+    <li><strong>Directo:</strong> parámetros \( (5\cdot5\cdot192+1)\cdot32=153\,632 \). Multiplicaciones: cada una de las \( 28\cdot28\cdot32 \) salidas necesita \( 5\cdot5\cdot192=4800 \) productos → \( 25\,088\cdot4800=120\,422\,400 \).</li>
+    <li><strong>Con 1×1 previo a 16 canales:</strong> primero \( 192\to16 \) con un 1×1 (\( 28\cdot28\cdot16\cdot192=2\,408\,448 \) productos) y luego la 5×5 sobre 16 canales (\( 28\cdot28\cdot32\cdot5\cdot5\cdot16=10\,035\,200 \)). Total: \( 12\,443\,648 \).</li>
+    <li><strong>Ahorro:</strong> \( 120\,422\,400/12\,443\,648\approx\) <span class="res">\( 9{,}7\times \)</span> menos multiplicaciones, y parámetros \( 153\,632\to15\,920 \). La salida tiene <em>exactamente la misma forma</em> 28×28×32.</li>
+  </ol>
+</div>
+
+<h3>MobileNet (2017): la convolución separable en profundidad</h3>
+<p>Una convolución normal 3×3 de 64 canales a 128 hace dos cosas a la vez: mira el vecindario <em>espacial</em> y mezcla los <em>canales</em>. MobileNet las separa en dos pasos baratos. Es como tener 64 críticos, uno por aspecto del póster (colores, caras, texto…): primero cada crítico estudia <em>solo su aspecto</em> en el vecindario de cada zona, y después se juntan todos a mezclar opiniones para dar 128 valoraciones:</p>
+<ol>
+  <li><strong>Depthwise (por canal):</strong> un filtro 3×3 por cada canal de entrada, sin mezclarlos (64 filtros de 3×3).</li>
+  <li><strong>Pointwise (1×1):</strong> una convolución 1×1 que mezcla los canales (de 64 a 128).</li>
+</ol>
+<p>Cuentas con un mapa de 56×56×64 → 128: la normal tiene \( (3\cdot3\cdot64+1)\cdot128=73\,856 \) parámetros; la separable tiene \( 3\cdot3\cdot64+64\cdot128+128=8\,896 \), con 231 211 008 frente a 27 496 448 multiplicaciones. El ahorro es \( 1/(1/N+1/k^2) \) con \( N=128 \) canales de salida y \( k=3 \): \( 1/(1/128+1/9)=8{,}41\times \). Cuantos más canales, más se acerca a \( k^2=9 \).</p>
+
+<div class="callout recuerda">
+  <span class="lbl">Experimento de arriba: «Cuánto ahorra un 1×1, una convolución separable o un cuello de botella», con todo detalle</span>
+  <p><strong>Haz esto.</strong> Los «canales» son los críticos que opinan sobre cada zona del póster. En «A · Inception 1×1» baja los canales del cuello de 16 a 4 (el ayudante resume en 4 informes) y súbelos hasta 128: ¿cuándo deja de compensar? Pasa a «B · MobileNet» y sube los canales de salida de 16 a 512. Por último, en «C · ResNet-50» compara dos 3×3 con el cuello 1×1 → 3×3 → 1×1.</p>
+  <p><strong>Fíjate en.</strong> En A los números por defecto reproducen el ejemplo (153 632 → 15 920 parámetros, ÷ 9,7 en multiplicaciones). En B el ahorro se acerca a 9 (el valor de k²) cuando los canales de salida crecen. En C, con 256 canales, el cuello 1×1 → 3×3 → 1×1 con 64 canales intermedios tiene unos 70 000 parámetros frente a más de 1,1 millones de dos 3×3 directas. Todos los resultados cuadran con Keras en el fragmento 5.</p>
+</div>
+
+<h3>EfficientNet (2019): crecer con equilibrio</h3>
+<p>Para hacer una red más potente se puede aumentar su <strong>profundidad</strong> (más capas), su <strong>anchura</strong> (más canales) o la <strong>resolución</strong> de la imagen (la calidad del póster de entrada). EfficientNet propone aumentarlas <em>a la vez y en proporción fija</em> (<em>compound scaling</em>): profundidad \( \alpha^\phi \), anchura \( \beta^\phi \) y resolución \( \gamma^\phi \), con \( \alpha=1{,}2,\ \beta=1{,}1,\ \gamma=1{,}15 \). El coste en operaciones crece como \( \alpha\,\beta^2\,\gamma^2 \) por cada incremento de \( \phi \): \( 1{,}2\cdot1{,}1^2\cdot1{,}15^2=1{,}92\approx2 \). Es decir, cada paso de \( \phi \) duplica aproximadamente el coste. De ahí salen EfficientNetB0 a B7.</p>
+
+<h3>Cómo se comparan, con datos reales</h3>
+<p>El fragmento 4 crea cinco de ellas con <code>keras.applications</code> (sin pesos, para no necesitar internet) y mide parámetros y capas. Estos son los resultados reales:</p>
+<table>
+  <caption>Arquitecturas de keras.applications (entrada 224×224×3, salvo InceptionV3 con 299×299×3)</caption>
+  <thead><tr><th>Modelo</th><th>Parámetros (con cabeza)</th><th>Solo cuerpo</th><th>Capas</th><th>Salida del cuerpo</th></tr></thead>
+  <tbody>
+    <tr><td>VGG16</td><td>138 357 544</td><td>14 714 688</td><td>23</td><td>7×7×512</td></tr>
+    <tr><td>ResNet50</td><td>25 636 712</td><td>23 587 712</td><td>177</td><td>7×7×2048</td></tr>
+    <tr><td>InceptionV3</td><td>23 851 784</td><td>21 802 784</td><td>313</td><td>8×8×2048</td></tr>
+    <tr><td>MobileNetV2</td><td>3 538 984</td><td>2 257 984</td><td>156</td><td>7×7×1280</td></tr>
+    <tr><td>EfficientNetB0</td><td>5 330 571</td><td>4 049 571</td><td>240</td><td>7×7×1280</td></tr>
+  </tbody>
+</table>
+<p>Fíjate en que ResNet50 es <em>mucho más profunda</em> que VGG16 y tiene <em>cinco veces menos</em> parámetros: casi toda su cabeza es un GlobalAveragePooling y una sola densa (\( 2048\cdot1000+1000=2\,049\,000 \)). Y que todos acaban en un mapa de unos 7×7 con cientos o miles de canales: el cuerpo ha cambiado «mucha resolución, pocos canales» por «poca resolución, muchos canales» (¿te suena? es el mismo patrón del Curso 2).</p>
+
 <div class="callout ojo">
-<span class="lbl">Ojo</span>
-<p>Con el atajo <code>Add</code> las dos ramas deben tener exactamente la misma forma: si el error dice <em>«A merge layer should be called on inputs of compatible shapes»</em> (o algo parecido con <code>Add</code>), revisa tamaño espacial y canales. Y no apliques la ReLU antes de la suma en la rama principal: se aplica <em>después</em> de sumar, como en el fragmento 6.</p>
+  <span class="lbl">Ojo: «capas» en Keras no es «capas» en el artículo</span>
+  <p>ResNet50 se llama así por sus 50 capas con pesos, pero <code>len(modelo.layers)</code> da 177, porque Keras cuenta también cada BatchNormalization, cada ReLU, cada Add y cada padding como capa. No te asustes por el número; mira siempre los parámetros y las formas.</p>
 </div>
-</section></div></details><details class="profundizar" id="codigo"><summary><span>Ver código explicado paso a paso<small>5 fragmento(s) original(es), con cada línea comentada y salida esperada.</small></span></summary><div class="prof-body"><article class="snippet" data-lang="python">
-<header>
-<h3>3 · AlexNet (2012): cuántos parámetros hay en cada capa</h3>
-<p class="para-que"><strong>Para qué sirve</strong> Construir AlexNet en Keras, recorrer sus capas y repartir los parámetros entre convolucionales y densas. Comprueba con datos reales que las capas densas finales concentran casi todo el peso del modelo.</p>
-</header>
-<pre class="code"><code>import keras
+  </div>
+</details>
+
+<section>
+<h2 class="sin-num">Código</h2>
+<!-- ---------- Fragmento 5 ---------- -->
+<article class="snippet" data-lang="python">
+  <header>
+    <h3>5 · Cuello de botella 1×1 y convolución separable: cuánto ahorran</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Medir con Keras (parámetros) y con la fórmula (multiplicaciones) el ahorro de las dos ideas que hicieron posibles las redes modernas eficientes: el <em>1×1 previo</em> de Inception y la <em>convolución separable</em> de MobileNet.</p>
+  </header>
+  <pre class="code"><code>import keras
 from keras import layers
 
-alexnet = keras.Sequential([
-    keras.Input(shape=(227, 227, 3)),
-    layers.Conv2D(96, 11, strides=4, activation="relu"),
-    layers.MaxPooling2D(3, strides=2),
-    layers.Conv2D(256, 5, padding="same", activation="relu"),
-    layers.MaxPooling2D(3, strides=2),
-    layers.Conv2D(384, 3, padding="same", activation="relu"),
-    layers.Conv2D(384, 3, padding="same", activation="relu"),
-    layers.Conv2D(256, 3, padding="same", activation="relu"),
-    layers.MaxPooling2D(3, strides=2),
-    layers.Flatten(),
-    layers.Dense(4096, activation="relu"),
-    layers.Dropout(0.5),
-    layers.Dense(4096, activation="relu"),
-    layers.Dropout(0.5),
-    layers.Dense(1000, activation="softmax"),
-], name="alexnet")
+def parametros(*capas, entrada):
+    """Parámetros totales de una pila de capas aplicada a una entrada (alto, ancho, canales)."""
+    modelo = keras.Sequential([keras.Input(shape=entrada), *capas])
+    return modelo.count_params()
 
-conv = dense = 0
-for capa in alexnet.layers:
-    n = capa.count_params()
-    if isinstance(capa, layers.Conv2D):
-        conv += n
-    elif isinstance(capa, layers.Dense):
-        dense += n
-    print(f"{capa.name:16s} {str(capa.output.shape[1:]):18s} {n:&gt;11,d}")
-print(f"convolucionales: {conv:,d} ({conv / alexnet.count_params():.1%})")
-print(f"densas         : {dense:,d} ({dense / alexnet.count_params():.1%})")
-print(f"TOTAL          : {alexnet.count_params():,d}")</code></pre>
-<details class="linea-a-linea" open="">
-<summary>Línea por línea</summary>
-<p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
-<table class="lineas">
-<thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
-<tbody>
-<tr data-lines="1-2"><td><code>import keras / from keras import layers</code></td><td>Keras 3 y sus capas.</td></tr>
-<tr data-lines="4-5"><td><code>alexnet = keras.Sequential([ keras.Input(shape=(227, 227, 3)),</code></td><td>Modelo secuencial con entrada de 227×227 en color (el artículo dice 224, pero con 227 las cuentas salen exactas).</td></tr>
-<tr data-lines="6"><td><code>layers.Conv2D(96, 11, strides=4, activation="relu")</code></td><td>Primera capa: 96 filtros enormes de 11×11 con stride 4. Salida \(\lfloor(227-11)/4\rfloor+1=55\).</td></tr>
-<tr data-lines="7"><td><code>layers.MaxPooling2D(3, strides=2)</code></td><td>Pooling máximo 3×3 con stride 2 (<em>solapado</em>: la ventana es mayor que el paso). \(\lfloor(55-3)/2\rfloor+1=27\).</td></tr>
-<tr data-lines="8-9"><td><code>layers.Conv2D(256, 5, padding="same", …) / MaxPooling2D</code></td><td>256 filtros 5×5 que conservan el tamaño (27×27) y otro pooling (27 → 13).</td></tr>
-<tr data-lines="10-12"><td><code>tres Conv2D de 3×3 con padding="same"</code></td><td>Tres convoluciones seguidas (384, 384 y 256 filtros) sobre mapas de 13×13: aquí AlexNet profundiza sin reducir.</td></tr>
-<tr data-lines="13"><td><code>layers.MaxPooling2D(3, strides=2)</code></td><td>Último pooling: 13 → 6.</td></tr>
-<tr data-lines="14"><td><code>layers.Flatten()</code></td><td>Aplana \(6\times6\times256\) en 9 216 números.</td></tr>
-<tr data-lines="15-18"><td><code>Dense(4096) + Dropout(0.5), dos veces</code></td><td>Dos capas densas gigantes de 4 096 neuronas, cada una seguida de <code>Dropout(0.5)</code>, que apaga al azar la mitad de las neuronas en cada paso de entrenamiento para frenar el sobreajuste. El Dropout no tiene parámetros.</td></tr>
-<tr data-lines="19"><td><code>layers.Dense(1000, activation="softmax")</code></td><td>Salida: 1 000 clases de ImageNet.</td></tr>
-<tr data-lines="20"><td><code>], name="alexnet")</code></td><td>Cierra el modelo y le da nombre.</td></tr>
-<tr data-lines="22"><td><code>conv = dense = 0</code></td><td>Dos acumuladores inicializados a cero.</td></tr>
-<tr data-lines="23-24"><td><code>for capa in alexnet.layers: n = capa.count_params()</code></td><td>Recorre las capas y cuenta los parámetros de cada una.</td></tr>
-<tr data-lines="25-28"><td><code>if isinstance(capa, layers.Conv2D): … elif …Dense</code></td><td>Si la capa es convolucional, suma sus parámetros a <code>conv</code>; si es densa, a <code>dense</code>. El resto (pooling, Flatten, Dropout) no tiene parámetros.</td></tr>
-<tr data-lines="29"><td><code>print(f"{capa.name:16s} {str(capa.output.shape[1:]):18s} {n:&gt;11,d}")</code></td><td>Imprime nombre, forma de salida sin el eje del lote y parámetros con separador de miles. En Keras 3 <code>capa.output</code> existe en modelos con <code>Input</code> declarado.</td></tr>
-<tr data-lines="30-31"><td><code>print(f"convolucionales: … ({conv / alexnet.count_params():.1%})")</code></td><td>Imprime cada grupo y qué porcentaje del total representa (<code>.1%</code> = un decimal y signo %).</td></tr>
-<tr data-lines="32"><td><code>print(f"TOTAL          : …")</code></td><td>Total del modelo.</td></tr>
-</tbody>
-</table>
-</details>
-<div class="salida">
-<strong>Salida esperada</strong>
-<pre style="white-space:pre">conv2d           (55, 55, 96)            34,944
-max_pooling2d    (27, 27, 96)                 0
-conv2d_1         (27, 27, 256)          614,656
-max_pooling2d_1  (13, 13, 256)                0
-conv2d_2         (13, 13, 384)          885,120
-conv2d_3         (13, 13, 384)        1,327,488
-conv2d_4         (13, 13, 256)          884,992
-max_pooling2d_2  (6, 6, 256)                  0
-flatten          (9216,)                      0
-dense            (4096,)             37,752,832
-dropout          (4096,)                      0
-dense_1          (4096,)             16,781,312
-dropout_1        (4096,)                      0
-dense_2          (1000,)              4,097,000
-convolucionales: 3,747,200 (6.0%)
-densas         : 58,631,144 (94.0%)
-TOTAL          : 62,378,344</pre>
-<p>La capa <code>dense</code> (la primera tras el Flatten) tiene \(9216\cdot4096+4096=37\,752\,832\) parámetros: <strong>ella sola es el 60 % del modelo</strong>. Las cinco convoluciones juntas son 3 747 200 (<strong>6,0 %</strong>); las tres densas, 58 631 144 (<strong>94,0 %</strong>). Un detalle útil: el primer mapa es 55×55×96 con solo 34 944 parámetros, porque los filtros convolucionales se reutilizan en toda la imagen. Las convoluciones son baratas en parámetros (aunque caras en operaciones); las densas son lo contrario.</p>
-</div>
-</article><article class="snippet" data-lang="python">
-<header>
-<h3>6 · Un bloque residual en Keras: la capa Add y el atajo de proyección</h3>
-<p class="para-que"><strong>Para qué sirve</strong> Escribir con la API funcional un <em>bloque residual</em> de ResNet (con BatchNorm y atajo de proyección 1×1 cuando cambia la forma), ver qué capas suma <code>Add</code> y compararlo con la misma red sin atajos.</p>
-</header>
-<pre class="code"><code>import numpy as np
+# --- 1) Cuello de botella 1x1 (idea de Inception) sobre 28x28x192 -&gt; 28x28x32 ---
+H, C_ent, C_sal, C_red = 28, 192, 32, 16
+directa = parametros(layers.Conv2D(C_sal, 5, padding="same"), entrada=(H, H, C_ent))
+cuello = parametros(layers.Conv2D(C_red, 1), layers.Conv2D(C_sal, 5, padding="same"),
+                    entrada=(H, H, C_ent))
+mult_directa = H * H * C_sal * (5 * 5 * C_ent)
+mult_cuello = H * H * C_red * C_ent + H * H * C_sal * (5 * 5 * C_red)
+print("5x5 directa : params", directa, "| multiplicaciones", f"{mult_directa:,d}")
+print("con 1x1     : params", cuello, "| multiplicaciones", f"{mult_cuello:,d}")
+print(f"ahorro de multiplicaciones: {mult_directa / mult_cuello:.1f}x")
+
+# --- 2) Convolución separable en profundidad (idea de MobileNet) sobre 56x56x64 -&gt; 128 ---
+H, C_ent, C_sal = 56, 64, 128
+normal = parametros(layers.Conv2D(C_sal, 3, padding="same"), entrada=(H, H, C_ent))
+separable = parametros(layers.SeparableConv2D(C_sal, 3, padding="same"), entrada=(H, H, C_ent))
+mult_normal = H * H * C_sal * (3 * 3 * C_ent)
+mult_sep = H * H * C_ent * 9 + H * H * C_ent * C_sal
+print("3x3 normal    : params", normal, "| multiplicaciones", f"{mult_normal:,d}")
+print("3x3 separable : params", separable, "| multiplicaciones", f"{mult_sep:,d}")
+print(f"ahorro: {mult_normal / mult_sep:.2f}x  (fórmula 1/(1/N + 1/k^2) = {1 / (1 / C_sal + 1 / 9):.2f}x)")</code></pre>
+  <details class="linea-a-linea" open>
+    <summary>Línea por línea</summary>
+    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+      <tbody>
+        <tr data-lines="1-2"><td><code>import keras / from keras import layers</code></td><td>Keras 3 y sus capas.</td></tr>
+        <tr data-lines="4-7"><td><code>def parametros(*capas, entrada): …</code></td><td>Función auxiliar: recibe una o varias capas y la forma de la entrada, construye un modelo secuencial con ellas (<code>*capas</code> desempaqueta la lista) y devuelve su número de parámetros. La línea 5 es una descripción (<em>docstring</em>) de la función.</td></tr>
+        <tr data-lines="9"><td><code># --- 1) Cuello de botella 1x1 …</code></td><td>Comentario: la primera prueba parte de un mapa de 28×28×192 y quiere obtener 28×28×32.</td></tr>
+        <tr data-lines="10"><td><code>H, C_ent, C_sal, C_red = 28, 192, 32, 16</code></td><td>Define el alto, los canales de entrada, los de salida y los del cuello de botella (16).</td></tr>
+        <tr data-lines="11"><td><code>directa = parametros(layers.Conv2D(C_sal, 5, padding="same"), …)</code></td><td>Parámetros de la convolución 5×5 directa: \((5\cdot5\cdot192+1)\cdot32=153\,632\).</td></tr>
+        <tr data-lines="12-13"><td><code>cuello = parametros(Conv2D(C_red, 1), Conv2D(C_sal, 5, …), …)</code></td><td>Parámetros del diseño con cuello: primero una 1×1 que baja de 192 a 16 canales y luego la 5×5 que sube a 32.</td></tr>
+        <tr data-lines="14"><td><code>mult_directa = H * H * C_sal * (5 * 5 * C_ent)</code></td><td>Multiplicaciones de la directa: cada una de las \(28\cdot28\cdot32\) salidas necesita \(5\cdot5\cdot192\) productos.</td></tr>
+        <tr data-lines="15"><td><code>mult_cuello = H * H * C_red * C_ent + H * H * C_sal * (5 * 5 * C_red)</code></td><td>Multiplicaciones del cuello: las de la 1×1 (\(28\cdot28\cdot16\) salidas × 192 productos) más las de la 5×5, que ahora solo mira 16 canales.</td></tr>
+        <tr data-lines="16-18"><td><code>print(…) ×3</code></td><td>Imprime los parámetros y las multiplicaciones de ambas, y su cociente. <code>:,d</code> pone separadores de miles; <code>:.1f</code> un decimal.</td></tr>
+        <tr data-lines="20-21"><td><code># --- 2) … / H, C_ent, C_sal = 56, 64, 128</code></td><td>Segunda prueba: mapa 56×56×64 que pasa a 128 canales con filtros 3×3.</td></tr>
+        <tr data-lines="22"><td><code>normal = parametros(layers.Conv2D(C_sal, 3, padding="same"), …)</code></td><td>Parámetros de una convolución 3×3 normal: \((9\cdot64+1)\cdot128=73\,856\).</td></tr>
+        <tr data-lines="23"><td><code>separable = parametros(layers.SeparableConv2D(C_sal, 3, …), …)</code></td><td><code>SeparableConv2D</code> hace en una capa los dos pasos de MobileNet: una 3×3 <em>por canal</em> (depthwise) y después una 1×1 que mezcla los canales (pointwise).</td></tr>
+        <tr data-lines="24"><td><code>mult_normal = H * H * C_sal * (3 * 3 * C_ent)</code></td><td>Multiplicaciones de la normal.</td></tr>
+        <tr data-lines="25"><td><code>mult_sep = H * H * C_ent * 9 + H * H * C_ent * C_sal</code></td><td>Las de la separable: \(56\cdot56\cdot64\cdot9\) del paso por canal más \(56\cdot56\cdot64\cdot128\) del paso 1×1.</td></tr>
+        <tr data-lines="26-28"><td><code>print(…) ×3</code></td><td>Imprime parámetros, multiplicaciones y el ahorro, junto a la fórmula teórica \(1/(1/N+1/k^2)\).</td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre style="white-space:pre">5x5 directa : params 153632 | multiplicaciones 120,422,400
+con 1x1     : params 15920 | multiplicaciones 12,443,648
+ahorro de multiplicaciones: 9.7x
+3x3 normal    : params 73856 | multiplicaciones 231,211,008
+3x3 separable : params 8896 | multiplicaciones 27,496,448
+ahorro: 8.41x  (fórmula 1/(1/N + 1/k^2) = 8.41x)</pre>
+    <p>En el primer caso, el 1×1 reduce casi <strong>10 veces</strong> los parámetros (153 632 → 15 920, 9,65×) y <strong>9,7 veces</strong> las multiplicaciones (120 422 400 → 12 443 648) con la misma forma de salida. En el segundo, la separable pasa de 73 856 a 8 896 parámetros y de 231 211 008 a 27 496 448 multiplicaciones: <strong>8,41×</strong>, que coincide con la fórmula \(1/(1/128+1/9)=8{,}41\). Ambas ideas son un truco de reparto: en lugar de que un solo filtro grande mire espacio y canales a la vez, se separan las dos tareas.</p>
+  </div>
+</article>
+
+<!-- ---------- Fragmento 4 ---------- -->
+<article class="snippet" data-lang="python">
+  <header>
+    <h3>4 · Las grandes arquitecturas de keras.applications, comparadas</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Instanciar VGG16, ResNet50, InceptionV3, MobileNetV2 y EfficientNetB0 <em>sin descargar pesos</em> (<code>weights=None</code>) y comparar parámetros, número de capas y forma de la salida del cuerpo.</p>
+  </header>
+  <pre class="code"><code>import gc
 import keras
-from keras import layers
-from sklearn.datasets import load_digits
-from sklearn.model_selection import train_test_split
+from keras import applications as apps
 
-def bloque(x, filtros, stride=1, residual=True):
-    atajo = x
-    x = layers.Conv2D(filtros, 3, strides=stride, padding="same", use_bias=False)(x)
-    x = layers.BatchNormalization()(x)
-    x = layers.Activation("relu")(x)
-    x = layers.Conv2D(filtros, 3, padding="same", use_bias=False)(x)
-    x = layers.BatchNormalization()(x)
-    if not residual:
-        return layers.Activation("relu")(x)
-    if stride != 1 or atajo.shape[-1] != filtros:
-        atajo = layers.Conv2D(filtros, 1, strides=stride, use_bias=False)(atajo)
-        atajo = layers.BatchNormalization()(atajo)
-    x = layers.Add()([x, atajo])
-    return layers.Activation("relu")(x)
+modelos = [
+    ("VGG16",          apps.VGG16,          (224, 224, 3)),
+    ("ResNet50",       apps.ResNet50,       (224, 224, 3)),
+    ("InceptionV3",    apps.InceptionV3,    (299, 299, 3)),
+    ("MobileNetV2",    apps.MobileNetV2,    (224, 224, 3)),
+    ("EfficientNetB0", apps.EfficientNetB0, (224, 224, 3)),
+]
+print(f"{'modelo':15s}{'con cabeza':&gt;13s}{'sin cabeza':&gt;13s}{'capas':&gt;7s}  salida del cuerpo")
+for nombre, fabrica, forma in modelos:
+    completo = fabrica(weights=None, input_shape=forma)
+    cuerpo = fabrica(weights=None, include_top=False, input_shape=forma)
+    print(f"{nombre:15s}{completo.count_params():&gt;13,d}{cuerpo.count_params():&gt;13,d}"
+          f"{len(completo.layers):&gt;7d}  {cuerpo.output_shape[1:]}")
+    del completo, cuerpo
+    keras.backend.clear_session()
+    gc.collect()</code></pre>
+  <details class="linea-a-linea" open>
+    <summary>Línea por línea</summary>
+    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+      <tbody>
+        <tr data-lines="1-3"><td><code>import gc / import keras / from keras import applications as apps</code></td><td><code>gc</code> es el recolector de basura de Python (para liberar memoria entre modelos). <code>keras.applications</code> contiene las arquitecturas clásicas; el alias <code>apps</code> acorta.</td></tr>
+        <tr data-lines="5-11"><td><code>modelos = [ … ]</code></td><td>Lista de tuplas <code>(nombre, función que lo crea, forma de entrada)</code>. Cada una de esas funciones (<code>apps.VGG16</code>, etc.) construye el modelo. InceptionV3 es el único que se diseñó para 299×299.</td></tr>
+        <tr data-lines="12"><td><code>print(f"{'modelo':15s}{'con cabeza':&gt;13s} …")</code></td><td>Cabecera de la tabla. «Cabeza» es el clasificador del final (las capas que deciden las 1 000 clases).</td></tr>
+        <tr data-lines="13"><td><code>for nombre, fabrica, forma in modelos:</code></td><td>Recorre la lista.</td></tr>
+        <tr data-lines="14"><td><code>completo = fabrica(weights=None, input_shape=forma)</code></td><td>Crea el modelo <strong>completo</strong> (con cabeza) y pesos aleatorios. <code>weights=None</code> evita la descarga de internet; con <code>weights=\"imagenet\"</code> descargaría los pesos entrenados.</td></tr>
+        <tr data-lines="15"><td><code>cuerpo = fabrica(weights=None, include_top=False, input_shape=forma)</code></td><td>Crea el mismo modelo <strong>sin cabeza</strong> (<code>include_top=False</code>): solo el cuerpo convolucional, que es lo que se reutiliza en transfer learning.</td></tr>
+        <tr data-lines="16-17"><td><code>print(f"{nombre:15s}{completo.count_params():&gt;13,d} …")</code></td><td>Imprime parámetros del completo y del cuerpo, número de capas del completo (<code>len(completo.layers)</code>) y la forma de salida del cuerpo (<code>output_shape[1:]</code> quita el eje del lote).</td></tr>
+        <tr data-lines="18"><td><code>del completo, cuerpo</code></td><td>Borra las referencias a los modelos.</td></tr>
+        <tr data-lines="19-20"><td><code>keras.backend.clear_session() / gc.collect()</code></td><td>Limpia el estado global de Keras y obliga a Python a liberar la memoria, para que los cinco modelos no se acumulen.</td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre style="white-space:pre">modelo            con cabeza   sin cabeza  capas  salida del cuerpo
+VGG16            138,357,544   14,714,688     23  (7, 7, 512)
+ResNet50          25,636,712   23,587,712    177  (7, 7, 2048)
+InceptionV3       23,851,784   21,802,784    313  (8, 8, 2048)
+MobileNetV2        3,538,984    2,257,984    156  (7, 7, 1280)
+EfficientNetB0     5,330,571    4,049,571    240  (7, 7, 1280)</pre>
+    <p>Fíjate en tres cosas. <strong>1)</strong> VGG16 completa tiene 138 millones de parámetros, pero su cuerpo solo 14,7 millones: los otros 123,6 millones (el 89 %) son las capas densas de la cabeza. <strong>2)</strong> ResNet50, mucho más profunda (177 «capas» de Keras), tiene menos parámetros que VGG16 (25,6 millones) porque casi no usa capas densas. <strong>3)</strong> MobileNetV2 (3,5 M) y EfficientNetB0 (5,3 M) están pensados para ser pequeñas. Todos terminan en un mapa de 7×7 (8×8 en InceptionV3) con 512 a 2 048 canales: ahí empieza la cabeza.</p>
+  </div>
+</article>
 
-def mini_resnet(residual=True):
-    entrada = keras.Input(shape=(8, 8, 1))
-    x = layers.Conv2D(8, 3, padding="same", activation="relu")(entrada)
-    x = bloque(x, 8, residual=residual)
-    x = bloque(x, 16, stride=2, residual=residual)
-    x = layers.GlobalAveragePooling2D()(x)
-    salida = layers.Dense(10, activation="softmax")(x)
-    return keras.Model(entrada, salida, name="resnet" if residual else "plana")
+</section>
 
-modelo = mini_resnet()
-for capa in modelo.layers:
-    if isinstance(capa, layers.Add):
-        origenes = [t._keras_history.operation.name for t in capa.input]
-        print(f"{capa.name} suma las salidas de: {origenes} -&gt; {capa.output.shape[1:]}")
-
-digitos = load_digits()
-X = (digitos.images / 16.0).astype("float32")[..., None]
-Xtr, Xte, ytr, yte = train_test_split(X, digitos.target, test_size=0.25, random_state=0, stratify=digitos.target)
-
-for residual in (False, True):
-    keras.utils.set_random_seed(0)
-    m = mini_resnet(residual)
-    m.compile("adam", "sparse_categorical_crossentropy", metrics=["accuracy"])
-    m.fit(Xtr, ytr, epochs=25, batch_size=32, verbose=0)
-    acc = m.evaluate(Xte, yte, verbose=0)[1]
-    print(f"{m.name:8s} parámetros={m.count_params():5d}  precisión en test={acc:.3f}")</code></pre>
-<details class="linea-a-linea" open="">
-<summary>Línea por línea</summary>
-<p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
-<table class="lineas">
-<thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
-<tbody>
-<tr data-lines="1-3"><td><code>import numpy as np / import keras / from keras import layers</code></td><td>NumPy, Keras 3 y sus capas.</td></tr>
-<tr data-lines="4-5"><td><code>from sklearn… load_digits / train_test_split</code></td><td>Del paquete scikit-learn: el conjunto de 1 797 dígitos 8×8 (viene instalado, no hay que descargarlo) y la función que lo parte en entrenamiento y prueba.</td></tr>
-<tr data-lines="7"><td><code>def bloque(x, filtros, stride=1, residual=True):</code></td><td>Función que añade un bloque al tensor <code>x</code>. <code>residual=False</code> quitará el atajo para poder comparar.</td></tr>
-<tr data-lines="8"><td><code>atajo = x</code></td><td>Guarda la entrada del bloque: es la autopista del atajo.</td></tr>
-<tr data-lines="9-11"><td><code>Conv2D → BatchNormalization → Activation("relu")</code></td><td>Primera mitad de \(F(x)\): una 3×3 (sin sesgo, <code>use_bias=False</code>, porque la BatchNorm que viene después ya añade un desplazamiento), su normalización por lotes y ReLU. Aquí es donde se aplica el <code>stride</code> si queremos reducir.</td></tr>
-<tr data-lines="12-13"><td><code>Conv2D → BatchNormalization</code></td><td>Segunda 3×3 con su normalización, <strong>sin ReLU todavía</strong>: se aplica después de la suma.</td></tr>
-<tr data-lines="14-15"><td><code>if not residual: return layers.Activation("relu")(x)</code></td><td>Versión «plana»: aplica la ReLU y devuelve el resultado sin sumar la entrada.</td></tr>
-<tr data-lines="16"><td><code>if stride != 1 or atajo.shape[-1] != filtros:</code></td><td>Comprueba si la forma de \(F(x)\) ha cambiado respecto a <code>x</code>: ¿se redujo el tamaño (stride≠1) o cambió el número de canales? Si es así no se pueden sumar tal cual.</td></tr>
-<tr data-lines="17-18"><td><code>atajo = Conv2D(filtros, 1, strides=stride, …) → BatchNormalization</code></td><td><strong>Atajo de proyección</strong>: una convolución 1×1 con el mismo stride y los mismos canales que la rama principal, para que ambas tengan igual forma.</td></tr>
-<tr data-lines="19"><td><code>x = layers.Add()([x, atajo])</code></td><td>Suma elemento a elemento la rama principal y el atajo: \(y = F(x) + x\). <code>Add</code> no tiene parámetros y exige formas idénticas.</td></tr>
-<tr data-lines="20"><td><code>return layers.Activation("relu")(x)</code></td><td>ReLU sobre la suma y fin del bloque.</td></tr>
-<tr data-lines="22"><td><code>def mini_resnet(residual=True):</code></td><td>Función que construye la red completa, con o sin atajos.</td></tr>
-<tr data-lines="23-24"><td><code>entrada = keras.Input(…) / x = Conv2D(8, …)</code></td><td>Entrada de 8×8×1 y una convolución inicial de 8 filtros.</td></tr>
-<tr data-lines="25-26"><td><code>x = bloque(x, 8, …) / x = bloque(x, 16, stride=2, …)</code></td><td>Dos bloques: el primero mantiene la forma (8×8×8); el segundo la reduce a 4×4 y duplica los canales a 16, así que necesita atajo de proyección.</td></tr>
-<tr data-lines="27-28"><td><code>GlobalAveragePooling2D → Dense(10, softmax)</code></td><td>Promedia cada mapa a un número y clasifica en 10 dígitos.</td></tr>
-<tr data-lines="29"><td><code>return keras.Model(entrada, salida, name=…)</code></td><td>Crea el modelo funcional uniendo entrada y salida; el nombre es «resnet» o «plana».</td></tr>
-<tr data-lines="31"><td><code>modelo = mini_resnet()</code></td><td>Construye la versión con atajos.</td></tr>
-<tr data-lines="32-33"><td><code>for capa in modelo.layers: if isinstance(capa, layers.Add):</code></td><td>Busca las capas <code>Add</code>.</td></tr>
-<tr data-lines="34"><td><code>origenes = [t._keras_history.operation.name for t in capa.input]</code></td><td>Averigua qué capas produjeron las dos entradas de la suma. <code>_keras_history</code> es un atributo interno de Keras que guarda de dónde viene cada tensor; sirve aquí para ver el grafo.</td></tr>
-<tr data-lines="35"><td><code>print(f"{capa.name} suma las salidas de: {origenes} -&gt; …")</code></td><td>Imprime qué suma cada <code>Add</code> y la forma resultante.</td></tr>
-<tr data-lines="37-39"><td><code>digitos = load_digits() … train_test_split(…)</code></td><td>Carga los dígitos, los escala a 0-1 dividiendo por 16 (el máximo), añade el eje de canales con <code>[..., None]</code> y reserva el 25 % para prueba, con la misma proporción de cada dígito (<code>stratify</code>) y semilla fija.</td></tr>
-<tr data-lines="41"><td><code>for residual in (False, True):</code></td><td>Entrena las dos versiones, primero la plana y luego la residual.</td></tr>
-<tr data-lines="42-43"><td><code>keras.utils.set_random_seed(0) / m = mini_resnet(residual)</code></td><td>Fija las semillas para que el experimento sea reproducible y construye la red.</td></tr>
-<tr data-lines="44-45"><td><code>m.compile(…) / m.fit(…, epochs=25, batch_size=32, verbose=0)</code></td><td>Compila con Adam y entropía cruzada para etiquetas enteras, y entrena 25 épocas sin escribir el progreso.</td></tr>
-<tr data-lines="46-47"><td><code>acc = m.evaluate(…)[1] / print(…)</code></td><td>Mide la precisión en los datos de prueba (el segundo valor que devuelve <code>evaluate</code>) y la imprime junto con los parámetros.</td></tr>
-</tbody>
-</table>
-</details>
-<div class="salida">
-<strong>Salida esperada</strong>
-<pre style="white-space:pre">add suma las salidas de: ['batch_normalization_1', 'conv2d'] -&gt; (8, 8, 8)
-add_1 suma las salidas de: ['batch_normalization_3', 'batch_normalization_4'] -&gt; (4, 4, 16)
-plana    parámetros= 5050  precisión en test=0.980
-resnet   parámetros= 5242  precisión en test=0.980</pre>
-<p>Las dos líneas del principio muestran que <code>Add</code> junta <strong>dos ramas</strong>: en el primer bloque, la salida de la BatchNorm y la salida de la convolución inicial (el atajo directo, forma 8×8×8); en el segundo, la rama principal y el <strong>atajo de proyección</strong> (la BatchNorm tras la 1×1), forma 4×4×16. Los atajos cuestan 192 parámetros extra (5 242 − 5 050): esa es la proyección. En esta red de solo dos bloques <strong>no hay ventaja visible</strong> (0,980 las dos): los atajos brillan cuando hay decenas de capas, como enseña el fragmento siguiente. Ser honesto con esto es parte de entenderlo.</p>
 </div>
-</article><article class="snippet" data-lang="python">
-<header>
-<h3>7 · Gradiente por capa: red plana frente a red con atajos</h3>
-<p class="para-que"><strong>Para qué sirve</strong> Medir con <code>tf.GradientTape</code> cuánto gradiente llega a cada capa en una red de 22 capas con pesos, con y sin atajos. Es la demostración numérica de por qué \(y=x+F(x)\) permite entrenar redes profundas.</p>
-</header>
-<pre class="code"><code>import numpy as np
-import keras
-import tensorflow as tf
-from keras import layers
-
-def red(profundidad, residual):
-    entrada = keras.Input(shape=(16,))
-    x = layers.Dense(16, activation="sigmoid")(entrada)
-    for _ in range(profundidad):
-        h = layers.Dense(16, activation="sigmoid")(x)
-        x = layers.Add()([x, h]) if residual else h
-    return keras.Model(entrada, layers.Dense(1)(x))
-
-rng = np.random.default_rng(0)
-X = rng.normal(size=(64, 16)).astype("float32")
-y = rng.normal(size=(64, 1)).astype("float32")
-
-for residual in (False, True):
-    keras.utils.set_random_seed(1)
-    modelo = red(20, residual)
-    with tf.GradientTape() as cinta:
-        perdida = tf.reduce_mean(keras.losses.mean_squared_error(y, modelo(X)))
-    grads = cinta.gradient(perdida, modelo.trainable_variables)
-    normas = [float(tf.norm(g)) for g, v in zip(grads, modelo.trainable_variables)
-              if "kernel" in v.path]
-    nombre = "con atajos" if residual else "plana     "
-    print(nombre, " ".join(f"capa{i + 1:2d}={normas[i]:.1e}" for i in (0, 4, 9, 14, 19)),
-          f"| primera/última = {normas[0] / normas[19]:.1e}")</code></pre>
-<details class="linea-a-linea" open="">
-<summary>Línea por línea</summary>
-<p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
-<table class="lineas">
-<thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
-<tbody>
-<tr data-lines="1-4"><td><code>import numpy / keras / tensorflow / layers</code></td><td>NumPy para datos, Keras para el modelo y <code>tensorflow</code> solo para <code>GradientTape</code> (el cuaderno que graba las operaciones para derivar).</td></tr>
-<tr data-lines="6"><td><code>def red(profundidad, residual):</code></td><td>Construye una red de <code>profundidad</code> capas ocultas, con atajos o sin ellos.</td></tr>
-<tr data-lines="7-8"><td><code>entrada = keras.Input(shape=(16,)) / x = Dense(16, sigmoid)(entrada)</code></td><td>Entrada de 16 números y una primera capa densa de 16 neuronas con sigmoide (a propósito: es la activación que más encoge el gradiente).</td></tr>
-<tr data-lines="9-11"><td><code>for _ in range(profundidad): h = Dense(16, …)(x); x = Add()([x, h]) if residual else h</code></td><td>Repite la capa. Si es residual, la salida es \(x+h\) (atajo); si no, es solo \(h\). La expresión <code>A if condición else B</code> elige entre las dos.</td></tr>
-<tr data-lines="12"><td><code>return keras.Model(entrada, layers.Dense(1)(x))</code></td><td>Cierra con una neurona lineal de salida y crea el modelo.</td></tr>
-<tr data-lines="14-16"><td><code>rng = np.random.default_rng(0) … X, y</code></td><td>Genera 64 ejemplos aleatorios de 16 números y 64 objetivos aleatorios con semilla. No importa qué aprende: solo queremos ver cómo viaja el gradiente.</td></tr>
-<tr data-lines="18"><td><code>for residual in (False, True):</code></td><td>Mide las dos redes.</td></tr>
-<tr data-lines="19-20"><td><code>keras.utils.set_random_seed(1) / modelo = red(20, residual)</code></td><td>Misma semilla para las dos y 20 bloques repetidos. Contando la primera densa y la de salida, la red tiene 22 matrices de pesos; el programa mira las números 1, 5, 10, 15 y 20 contando desde la entrada.</td></tr>
-<tr data-lines="21-22"><td><code>with tf.GradientTape() as cinta: perdida = …</code></td><td>Dentro del bloque <code>with</code> la cinta graba el cálculo: pasa los datos por la red y calcula el error cuadrático medio.</td></tr>
-<tr data-lines="23"><td><code>grads = cinta.gradient(perdida, modelo.trainable_variables)</code></td><td>Retropropagación: el gradiente de la pérdida respecto a cada variable entrenable.</td></tr>
-<tr data-lines="24-25"><td><code>normas = [float(tf.norm(g)) … if "kernel" in v.path]</code></td><td>Para cada variable que sea un <em>kernel</em> (matriz de pesos, no sesgos) calcula la norma del gradiente: un número que dice «cuánto empuja» la pérdida a esa capa. La lista queda en orden: la capa 1 primero.</td></tr>
-<tr data-lines="26"><td><code>nombre = "con atajos" if residual else "plana     "</code></td><td>Etiqueta para imprimir (con espacios para alinear).</td></tr>
-<tr data-lines="27-28"><td><code>print(nombre, … capa{i+1} … | primera/última = …)</code></td><td>Imprime la norma en las capas 1, 5, 10, 15 y 20, y el cociente entre la primera y la última.</td></tr>
-</tbody>
-</table>
-</details>
-<div class="salida">
-<strong>Salida esperada</strong>
-<pre style="white-space:pre">plana      capa 1=3.6e-14 capa 5=1.8e-11 capa10=4.2e-08 capa15=6.7e-05 capa20=1.1e-01 | primera/última = 3.2e-13
-con atajos capa 1=2.6e+00 capa 5=2.3e+01 capa10=5.5e+01 capa15=7.2e+01 capa20=2.2e+01 | primera/última = 1.2e-01</pre>
-<p>En la <strong>red plana</strong> el gradiente cae capa a capa: llega 1,1·10⁻¹ a la capa 20 y solo 3,6·10⁻¹⁴ a la capa 1, un factor de \(3{,}2\cdot10^{-13}\). Eso es el <strong>gradiente que se desvanece</strong>: la capa 1 prácticamente no aprende. En la <strong>red con atajos</strong> la capa 1 recibe 2,6 y la 20 recibe 22: el cociente es 0,12. El gradiente se mantiene entre 2,6 y 72 en lugar de hundirse, porque \(\partial y/\partial x=1+F'\) y ese «1» garantiza un camino directo hasta la capa 1. (Los valores exactos dependen de la semilla, pero la diferencia de más de doce órdenes de magnitud no.)</p>
-</div>
-</article><article class="snippet" data-lang="python">
-<header>
-<h3>8 · Las capas de augmentation de Keras 3 y el interruptor training</h3>
-<p class="para-que"><strong>Para qué sirve</strong> Ver qué hacen realmente <code>RandomFlip</code>, <code>RandomRotation</code> y <code>RandomTranslation</code> sobre una imagen 5×5 numerada (así se distingue cada píxel) y comprobar que <em>solo actúan durante el entrenamiento</em>.</p>
-</header>
-<pre class="code"><code>import numpy as np
-import keras
-from keras import layers
-
-img = np.arange(25, dtype="float32").reshape(1, 5, 5, 1)     # un "lote" de 1 imagen 5x5
-
-# 1) RandomFlip: cada vez decide al azar si voltea o no
-voltear = layers.RandomFlip("horizontal", seed=0)
-res = []
-for _ in range(8):
-    sal = voltear(img, training=True).numpy()
-    res.append("volteada" if np.array_equal(sal, img[:, :, ::-1, :]) else "igual")
-print("RandomFlip, 8 llamadas:", res)
-
-# 2) RandomRotation con factor fijo: (0.25, 0.25) = siempre un cuarto de vuelta = 90 grados
-girar = layers.RandomRotation(factor=(0.25, 0.25), fill_mode="constant", interpolation="nearest")
-sal = girar(img, training=True).numpy()[0, :, :, 0]
-print("giro de 90 grados == np.rot90:", np.array_equal(sal, np.rot90(img[0, :, :, 0])))
-print("RandomRotation(0.1) gira como máximo", 0.1 * 360, "grados")
-
-# 3) ¿Cuándo se aplican? Solo si training=True
-print("training=False -&gt; idéntica:", np.array_equal(girar(img, training=False).numpy(), img))
-
-modelo = keras.Sequential([keras.Input(shape=(5, 5, 1)), girar])
-print("model.predict -&gt; idéntica:", np.array_equal(modelo.predict(img, verbose=0), img))
-
-# 4) Traslación: height_factor=0.2 en una imagen de 5 píxeles = 0.2 * 5 = 1 píxel
-mover = layers.RandomTranslation(height_factor=(0.2, 0.2), width_factor=(0.0, 0.0),
-                                 fill_mode="constant", interpolation="nearest")
-print(mover(img, training=True).numpy()[0, :, :, 0])</code></pre>
-<details class="linea-a-linea" open="">
-<summary>Línea por línea</summary>
-<p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
-<table class="lineas">
-<thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
-<tbody>
-<tr data-lines="1-3"><td><code>import numpy as np / import keras / from keras import layers</code></td><td>NumPy, Keras 3 y su módulo de capas, donde viven las capas de preprocesado.</td></tr>
-<tr data-lines="5"><td><code>img = np.arange(25, dtype="float32").reshape(1, 5, 5, 1)</code></td><td>Crea una «imagen» de 5×5 con los números 0 a 24 (cada píxel es único, así se ve qué se mueve). Forma <code>(1, 5, 5, 1)</code>: un lote de 1 imagen con 1 canal.</td></tr>
-<tr data-lines="7"><td><code># 1) RandomFlip …</code></td><td>Comentario: primera prueba.</td></tr>
-<tr data-lines="8"><td><code>voltear = layers.RandomFlip("horizontal", seed=0)</code></td><td>Capa que voltea la imagen de izquierda a derecha <strong>con probabilidad 1/2</strong> en cada llamada. <code>seed=0</code> hace reproducible el sorteo.</td></tr>
-<tr data-lines="9"><td><code>res = []</code></td><td>Lista vacía donde apuntaremos qué pasó en cada llamada.</td></tr>
-<tr data-lines="10-11"><td><code>for _ in range(8): sal = voltear(img, training=True).numpy()</code></td><td>Llama a la capa 8 veces. <code>training=True</code> la activa. <code>.numpy()</code> convierte el resultado en un array de NumPy.</td></tr>
-<tr data-lines="12"><td><code>res.append("volteada" if np.array_equal(sal, img[:, :, ::-1, :]) else "igual")</code></td><td>Compara con la imagen volteada a mano (<code>[:, :, ::-1, :]</code> invierte el eje de las columnas) y apunta «volteada» o «igual».</td></tr>
-<tr data-lines="13"><td><code>print("RandomFlip, 8 llamadas:", res)</code></td><td>Muestra el resultado de las 8 llamadas.</td></tr>
-<tr data-lines="15"><td><code># 2) RandomRotation con factor fijo …</code></td><td>Comentario: segunda prueba.</td></tr>
-<tr data-lines="16"><td><code>girar = layers.RandomRotation(factor=(0.25, 0.25), fill_mode="constant", interpolation="nearest")</code></td><td>El <code>factor</code> es una <strong>fracción de vuelta completa</strong> (360°), no grados. Con el rango <code>(0.25, 0.25)</code> siempre sortea 0,25 de vuelta = 90°. <code>nearest</code> evita mezclar píxeles al girar y <code>constant</code> rellena con 0 lo que quede fuera.</td></tr>
-<tr data-lines="17"><td><code>sal = girar(img, training=True).numpy()[0, :, :, 0]</code></td><td>Aplica el giro y se queda con la imagen 5×5 (primer elemento del lote, primer canal).</td></tr>
-<tr data-lines="18"><td><code>print("giro de 90 grados == np.rot90:", np.array_equal(…))</code></td><td>Comprueba que da lo mismo que <code>np.rot90</code>, que gira 90° en sentido antihorario.</td></tr>
-<tr data-lines="19"><td><code>print("RandomRotation(0.1) gira como máximo", 0.1 * 360, "grados")</code></td><td>La cuenta que conviene recordar: <code>RandomRotation(0.1)</code> gira hasta \(\pm 0{,}1\cdot360^\circ=\pm36^\circ\).</td></tr>
-<tr data-lines="21-22"><td><code># 3) … / print("training=False -&gt; idéntica:", …)</code></td><td>Llama a la misma capa con <code>training=False</code> y comprueba que devuelve la imagen sin tocar.</td></tr>
-<tr data-lines="24"><td><code>modelo = keras.Sequential([keras.Input(shape=(5, 5, 1)), girar])</code></td><td>Mete la capa de giro dentro de un modelo, como se hace en la práctica.</td></tr>
-<tr data-lines="25"><td><code>print("model.predict -&gt; idéntica:", …)</code></td><td><code>predict</code> usa siempre el modo de inferencia (<code>training=False</code>), así que las capas aleatorias no hacen nada. Por eso la augmentation puede ir <em>dentro</em> del modelo sin estropear la evaluación.</td></tr>
-<tr data-lines="27-29"><td><code>mover = layers.RandomTranslation(height_factor=(0.2, 0.2), width_factor=(0.0, 0.0), …)</code></td><td>Traslación vertical fija de 0,2 de la altura; con 5 píxeles de alto son \(0{,}2\cdot5=1\) píxel. Horizontalmente no se mueve. Con un factor positivo la imagen baja.</td></tr>
-<tr data-lines="30"><td><code>print(mover(img, training=True).numpy()[0, :, :, 0])</code></td><td>Muestra la imagen trasladada.</td></tr>
-</tbody>
-</table>
-</details>
-<div class="salida">
-<strong>Salida esperada</strong>
-<pre style="white-space:pre">RandomFlip, 8 llamadas: ['volteada', 'volteada', 'volteada', 'igual', 'igual', 'igual', 'volteada', 'igual']
-giro de 90 grados == np.rot90: True
-RandomRotation(0.1) gira como máximo 36.0 grados
-training=False -&gt; idéntica: True
-model.predict -&gt; idéntica: True
-[[ 0.  0.  0.  0.  0.]
- [ 0.  1.  2.  3.  4.]
- [ 5.  6.  7.  8.  9.]
- [10. 11. 12. 13. 14.]
- [15. 16. 17. 18. 19.]]</pre>
-<p><strong>1)</strong> Las 8 llamadas dan un reparto al azar de volteada/igual (aquí 4 y 4): cada vez que la red ve la imagen, el cara o cruz decide si llega volteada. <strong>2)</strong> Con el factor fijo 0,25 el giro es exactamente <code>np.rot90</code> (True), y 0,1 equivale a ±36°. <strong>3)</strong> Con <code>training=False</code> y con <code>predict</code> la imagen sale idéntica (True, True): la augmentation se apaga sola al evaluar. <strong>4)</strong> La traslación dejó la fila 0 vacía (ceros, <code>fill_mode=\"constant\"</code>), bajó cada fila un puesto (la que era 0..4 es ahora la fila 1) y la última (20..24) cayó fuera de la imagen.</p>
-</div>
-</article><article class="snippet" data-lang="python">
-<header>
-<h3>22 · Mini U-Net: segmentación píxel a píxel con transpuestas y atajos</h3>
-<p class="para-que"><strong>Para qué sirve</strong> Construir una U-Net en miniatura (bajar con pooling, subir con <code>Conv2DTranspose</code> y recuperar detalle con atajos de <code>Concatenate</code>) y entrenarla para decir, <em>píxel a píxel</em>, dónde hay un objeto en imágenes con ruido.</p>
-</header>
-<pre class="code"><code>import numpy as np
-import keras
-from keras import layers
-
-def fabricar(n, rng, lado=24):
-    """n imágenes con ruido y un rectángulo o un círculo algo más claro; la máscara marca dónde está."""
-    yy, xx = np.mgrid[0:lado, 0:lado]
-    imgs = rng.normal(0.35, 0.15, (n, lado, lado, 1)).astype("float32")
-    masks = np.zeros((n, lado, lado, 1), dtype="float32")
-    for i in range(n):
-        cy, cx = rng.integers(6, lado - 6, 2)
-        r = rng.integers(3, 6)
-        if rng.random() &lt; 0.5:
-            m = (abs(yy - cy) &lt;= r) &amp; (abs(xx - cx) &lt;= r + 1)
-        else:
-            m = (yy - cy) ** 2 + (xx - cx) ** 2 &lt;= r * r
-        imgs[i, m, 0] += 0.35
-        masks[i, m, 0] = 1.0
-    return imgs, masks
-
-rng = np.random.default_rng(0)
-Xtr, Ytr = fabricar(600, rng)
-Xte, Yte = fabricar(100, rng)
-
-keras.utils.set_random_seed(0)
-
-# Una "mini U-Net": bajar con pooling, subir con Conv2DTranspose y recuperar detalle con atajos (Concatenate)
-entrada = keras.Input(shape=(24, 24, 1))
-c1 = layers.Conv2D(8, 3, padding="same", activation="relu")(entrada)               # 24x24x8
-c2 = layers.Conv2D(16, 3, padding="same", activation="relu")(layers.MaxPooling2D()(c1))   # 12x12x16
-c3 = layers.Conv2D(16, 3, padding="same", activation="relu")(layers.MaxPooling2D()(c2))   # 6x6x16
-u2 = layers.Conv2DTranspose(16, 2, strides=2)(c3)                                  # 6x6 -&gt; 12x12
-u2 = layers.Conv2D(16, 3, padding="same", activation="relu")(layers.Concatenate()([u2, c2]))
-u1 = layers.Conv2DTranspose(8, 2, strides=2)(u2)                                   # 12x12 -&gt; 24x24
-u1 = layers.Conv2D(8, 3, padding="same", activation="relu")(layers.Concatenate()([u1, c1]))
-salida = layers.Conv2D(1, 1, activation="sigmoid")(u1)                             # un número 0-1 por píxel
-modelo = keras.Model(entrada, salida)
-print("parámetros:", modelo.count_params(), "| salida:", modelo.output_shape[1:])
-
-modelo.compile("adam", "binary_crossentropy", metrics=["accuracy"])
-modelo.fit(Xtr, Ytr, epochs=12, batch_size=16, verbose=0)
-
-pred = modelo.predict(Xte, verbose=0) &gt; 0.5
-real = Yte &gt; 0.5
-iou = (pred &amp; real).sum() / (pred | real).sum()
-print(f"precisión por píxel={(pred == real).mean():.3f}  IoU={iou:.3f}  (píxeles de objeto: {real.mean():.1%} del total)")
-
-i = 0
-print("máscara real (#) frente a predicción (#), imagen de test 0, filas 4 a 19:")
-for fila in range(4, 20):
-    a = "".join("#" if v else "." for v in real[i, fila, :, 0])
-    b = "".join("#" if v else "." for v in pred[i, fila, :, 0])
-    print(a, "  ", b)</code></pre>
-<details class="linea-a-linea" open="">
-<summary>Línea por línea</summary>
-<p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
-<table class="lineas">
-<thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
-<tbody>
-<tr data-lines="1-3"><td><code>import numpy as np / import keras / from keras import layers</code></td><td>NumPy, Keras 3 y capas.</td></tr>
-<tr data-lines="5-7"><td><code>def fabricar(n, rng, lado=24): … yy, xx = np.mgrid[0:lado, 0:lado]</code></td><td>Función que genera datos sintéticos. La línea 6 es su descripción; la 7 crea mallas de coordenadas para dibujar formas.</td></tr>
-<tr data-lines="8"><td><code>imgs = rng.normal(0.35, 0.15, (n, lado, lado, 1)).astype("float32")</code></td><td>Imágenes de fondo: ruido gaussiano con media 0,35 y desviación 0,15.</td></tr>
-<tr data-lines="9"><td><code>masks = np.zeros((n, lado, lado, 1), dtype="float32")</code></td><td>Máscaras de ceros: la «respuesta correcta» píxel a píxel (1 = objeto).</td></tr>
-<tr data-lines="10-12"><td><code>for i in range(n): cy, cx = … / r = rng.integers(3, 6)</code></td><td>Para cada imagen sortea el centro del objeto y su tamaño.</td></tr>
-<tr data-lines="13-16"><td><code>if rng.random() &lt; 0.5: m = rectángulo else: m = círculo</code></td><td>Con probabilidad 1/2 el objeto es un rectángulo (la condición con <code>abs</code>) y si no un círculo (distancia al centro \(\le r\)). <code>m</code> es una máscara booleana.</td></tr>
-<tr data-lines="17"><td><code>imgs[i, m, 0] += 0.35</code></td><td>Hace el objeto <strong>más claro</strong> (suma 0,35 en sus píxeles).</td></tr>
-<tr data-lines="18-19"><td><code>masks[i, m, 0] = 1.0 / return imgs, masks</code></td><td>Marca la máscara correcta y devuelve imágenes y máscaras.</td></tr>
-<tr data-lines="21-23"><td><code>rng = … / Xtr, Ytr = fabricar(600, rng) / Xte, Yte = fabricar(100, rng)</code></td><td>600 imágenes de entrenamiento y 100 de prueba.</td></tr>
-<tr data-lines="25"><td><code>keras.utils.set_random_seed(0)</code></td><td>Semilla global, para que la salida sea reproducible.</td></tr>
-<tr data-lines="27"><td><code># Una "mini U-Net": …</code></td><td>Comentario con la idea: bajar, subir y tender atajos.</td></tr>
-<tr data-lines="28"><td><code>entrada = keras.Input(shape=(24, 24, 1))</code></td><td>Entrada 24×24 en gris.</td></tr>
-<tr data-lines="29"><td><code>c1 = layers.Conv2D(8, 3, padding="same", activation="relu")(entrada)</code></td><td>Primer bloque, 8 mapas de 24×24. Se guarda como <code>c1</code> para el atajo.</td></tr>
-<tr data-lines="30"><td><code>c2 = Conv2D(16, …)(MaxPooling2D()(c1))</code></td><td>Baja a 12×12 con max pooling y convoluciona (16 mapas). Guardado como <code>c2</code>.</td></tr>
-<tr data-lines="31"><td><code>c3 = Conv2D(16, …)(MaxPooling2D()(c2))</code></td><td>Baja a 6×6, el «fondo» de la U (el cuello de botella).</td></tr>
-<tr data-lines="32"><td><code>u2 = layers.Conv2DTranspose(16, 2, strides=2)(c3)</code></td><td><strong>Subida:</strong> transpuesta con k=2 y stride 2, que duplica 6×6 → 12×12 (sin tablero de ajedrez porque 2 es múltiplo de 2).</td></tr>
-<tr data-lines="33"><td><code>u2 = Conv2D(16, …)(Concatenate()([u2, c2]))</code></td><td><strong>Atajo de la U-Net:</strong> pega (en el eje de canales) los mapas de subida y los de bajada del mismo tamaño, <code>c2</code>, para recuperar el detalle espacial que el pooling destruyó; luego una convolución los mezcla.</td></tr>
-<tr data-lines="34-35"><td><code>u1 = Conv2DTranspose(8, 2, strides=2)(u2) / u1 = Conv2D(8, …)(Concatenate()([u1, c1]))</code></td><td>Lo mismo en el siguiente nivel: 12×12 → 24×24 y atajo con <code>c1</code>.</td></tr>
-<tr data-lines="36"><td><code>salida = layers.Conv2D(1, 1, activation="sigmoid")(u1)</code></td><td>Una convolución 1×1 con sigmoide da <strong>un número entre 0 y 1 por píxel</strong>: la probabilidad de que pertenezca al objeto.</td></tr>
-<tr data-lines="37-38"><td><code>modelo = keras.Model(entrada, salida) / print("parámetros:", …)</code></td><td>Crea el modelo y muestra parámetros y forma de salida (24×24×1, igual que la entrada).</td></tr>
-<tr data-lines="40-41"><td><code>modelo.compile("adam", "binary_crossentropy", …) / modelo.fit(…, epochs=12, …)</code></td><td>Entropía cruzada binaria (cada píxel es una pregunta sí/no) y 12 épocas.</td></tr>
-<tr data-lines="43-44"><td><code>pred = modelo.predict(Xte, verbose=0) &gt; 0.5 / real = Yte &gt; 0.5</code></td><td>Predicciones y máscaras reales convertidas a verdadero/falso con umbral 0,5.</td></tr>
-<tr data-lines="45"><td><code>iou = (pred &amp; real).sum() / (pred | real).sum()</code></td><td><strong>IoU</strong> (<em>intersección sobre unión</em>): píxeles que ambas marcan, entre píxeles que alguna marca. 1 es perfecto.</td></tr>
-<tr data-lines="46"><td><code>print(f"precisión por píxel=… IoU=… (píxeles de objeto: …)")</code></td><td>Muestra la precisión por píxel, el IoU y qué parte de la imagen es objeto.</td></tr>
-<tr data-lines="48-53"><td><code>i = 0 / print(…) / for fila in range(4, 20): … print(a, "  ", b)</code></td><td>Dibuja en texto la máscara real y la predicha de la imagen de prueba 0 (filas 4 a 19): <code>#</code> = objeto, <code>.</code> = fondo.</td></tr>
-</tbody>
-</table>
-</details>
-<div class="salida">
-<strong>Salida esperada</strong>
-<pre style="white-space:pre">parámetros: 10921 | salida: (24, 24, 1)
-precisión por píxel=0.987  IoU=0.913  (píxeles de objeto: 14.0% del total)
-máscara real (#) frente a predicción (#), imagen de test 0, filas 4 a 19:
-...#############........    ...#############........
-...#############........    ..##############........
-...#############........    ..##############........
-...#############........    ..##############........
-...#############........    ..##############........
-...#############........    ..##############........
-...#############........    ...#############........
-...#############........    ...#############........
-...#############........    ...#############........
-...#############........    ...#############........
-........................    ........................
-........................    ........................
-........................    ........................
-........................    ........................
-........................    ........................
-........................    ........................</pre>
-<p>La red (10 921 parámetros) produce una máscara de 24×24, del mismo tamaño que la entrada. Acierta el <strong>98,7 %</strong> de los píxeles, pero ojo con ese número: solo el 14 % de los píxeles son objeto, así que decir «todo fondo» ya daría 86 %. Por eso se usa el <strong>IoU</strong>, que vale <strong>0,913</strong>. En el dibujo, la predicción (derecha) acierta el rectángulo y solo se equivoca en unas columnas del borde izquierdo (marca una columna de más en cinco filas). Los atajos <code>Concatenate</code> son la razón de ser de la U-Net: devuelven a la subida el detalle espacial fino que el pooling descartó (aquí no medimos la red sin ellos).</p>
-</div>
-</article></div></details></div></main></body></html>
+</main>
+</body>
+</html>

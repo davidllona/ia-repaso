@@ -1,68 +1,440 @@
-<!DOCTYPE html>
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lección 4 · La activación decide cuánto gradiente vuelve atrás · Módulo 1 · Curso 5 · Cuaderno de IA</title>
+<meta name="description" content="Sigmoide, tanh, ReLU y LeakyReLU en PyTorch: su derivada decide cuánto gradiente llega a las capas anteriores, por qué la sigmoide es lenta y por qué una ReLU puede morir.">
+<script>try{var t=localStorage.getItem('cuaderno-ia:tema');if(t)document.documentElement.setAttribute('data-theme',t)}catch(e){}</script>
+<link rel="stylesheet" href="../../assets/css/style.css">
+<script src="../../assets/js/curriculum.js"></script>
+<script src="../../assets/js/lab.js"></script>
+<script src="../../assets/js/app.js" defer></script>
+</head>
+<body data-root="../../" data-course="5" data-module="1" data-lesson="4">
+<main>
+<div class="page">
 
-<html lang="es"><head><meta charset="utf-8"/><meta content="width=device-width,initial-scale=1" name="viewport"/><title>Lección 4 · Funciones de activación en PyTorch · Curso 5 · Cuaderno de IA</title><meta content="Piensa en \( z \) como las ganas brutas que tiene un usuario de ver una película: pueden ser muy altas, cero o incluso negativas («ni de regalo»)." name="description"/><script>try{var t=localStorage.getItem('cuaderno-ia:tema');if(t)document.documentElement.setAttribute('data-theme',t)}catch(e){}</script><link href="../../assets/css/style.css" rel="stylesheet"/><script src="../../assets/js/curriculum.js"></script><script src="../../assets/js/lab.js"></script><script defer="" src="../../assets/js/app.js"></script><script defer="" src="../../assets/js/microanimations.js"></script></head><body data-course="5" data-lesson="4" data-module="1" data-root="../../"><main><div class="page" data-micro="3min"><header class="hero leccion"><div class="hero-grid"><div><p class="eyebrow">Curso 5 · Módulo 1 · Lección 4 de 12</p><h1>Funciones de activación en PyTorch</h1><p class="lead">Piensa en \( z \) como las ganas brutas que tiene un usuario de ver una película: pueden ser muy altas, cero o incluso negativas («ni de regalo»).</p><p class="meta-line"><span class="read-time" data-render="read-time"></span><a href="../modulo-1.html">Índice del módulo</a></p></div><div aria-hidden="true" class="hero-tile"></div></div></header><details class="predice"><summary>Antes de mirar el ejemplo: ¿qué crees que va a cambiar al mover los controles?</summary><div><p>Piensa en \( z \) como las ganas brutas que tiene un usuario de ver una película: pueden ser muy altas, cero o incluso negativas («ni de regalo»).</p></div></details><section aria-label="Explicación breve" class="micro-core"><div class="micro-kicker">01 · ENTENDER <span>≈ 45 s</span></div><h2>La idea en palabras sencillas</h2><p>Piensa en \( z \) como las ganas brutas que tiene un usuario de ver una película: pueden ser muy altas, cero o incluso negativas («ni de regalo»).</p><div class="micro-example"><span aria-hidden="true" class="micro-example-icon">🐾</span><div><strong>Otro ejemplo · Mascotas</strong><p>Una red combina tamaño, orejas y pelaje para distinguir patrones que no dependen de una sola regla.</p></div></div></section><div class="micro-kicker micro-checkpoint">02 · RESPONDER <span>≈ 15 s</span></div><section aria-label="Pregunta intercalada" class="quiz mini micro-check"><script class="quiz-data" type="application/json">{"titulo": "Pausa rápida · Comprueba la idea", "preguntas": [{"q": "Una neurona recibe dos entradas. ¿Qué hace con los pesos?", "opciones": ["Multiplica cada entrada por su peso y combina resultados", "Elige siempre la entrada mayor", "Borra las entradas al entrenar"], "correcta": 0, "porque": "La suma ponderada combina entradas, pesos y bias antes de la activación."}]}</script></section><section aria-label="Animación interactiva" class="micro-viz" data-index="10" data-micro-viz="neural"><div class="micro-kicker">03 · EXPERIMENTAR <span>≈ 45 s</span></div><div class="micro-viz-title"><div><h2>Señales que atraviesan una red</h2><p>Pulsa «Propagar» para seguir el recorrido de entradas a salida.</p></div><span aria-hidden="true" class="micro-viz-symbol">✦</span></div><div aria-live="polite" class="micro-viz-stage"><p>Animación interactiva: Señales que atraviesan una red</p></div></section><div class="micro-kicker micro-checkpoint">04 · APLICAR <span>≈ 15 s</span></div><section aria-label="Pregunta intercalada" class="quiz mini micro-check"><script class="quiz-data" type="application/json">{"titulo": "Pausa rápida · ¿Lo aplicarías?", "preguntas": [{"q": "¿Cuándo se actualizan los pesos de una red?", "opciones": ["Cada vez que se abre la página", "Nunca: los pesos son fijos", "Al aplicar el optimizador durante el entrenamiento"], "correcta": 2, "porque": "El optimizador utiliza los gradientes para ajustar parámetros durante el aprendizaje."}]}</script></section><div class="micro-finish"><strong>Idea que te llevas</strong><span>Piensa en \( z \) como las ganas brutas que tiene un usuario de ver una película: pueden ser muy altas, cero o incluso negativas («ni de regalo»)</span><small>¿Quieres más ejemplos, fórmulas o código? Los tienes justo debajo, sin límite de tiempo.</small></div><details class="profundizar micro-legacy"><summary><span>Explorar más: explicación y simulaciones completas<small>Todo el texto original, tablas y demos avanzadas. Opcional.</small></span></summary><div class="prof-body"><section><h2>Funciones de activación en PyTorch</h2>
-<p>Piensa en \( z \) como las ganas brutas que tiene un usuario de ver una película: pueden ser muy altas, cero o incluso negativas («ni de regalo»). La <strong>sigmoide</strong> convierte esas ganas en un porcentaje entre 0 y 1; <strong>tanh</strong> en un valor entre −1 y 1; la <strong>ReLU</strong> deja pasar las ganas tal cual si son positivas y las corta a 0 si son negativas («no me interesa»); y la <strong>LeakyReLU</strong> hace lo mismo pero deja pasar un hilito de las negativas.</p>
-<p>Las tres formas de escribir una activación (módulo <code>nn.ReLU()</code>, función <code>torch.relu</code>, función de <code>torch.nn.functional</code> como <code>F.relu</code>) hacen exactamente lo mismo. La diferencia es de estilo: el <strong>módulo</strong> se puede colocar dentro de un <code>nn.Sequential</code> (<code>nn.Sequential(nn.Linear(2,3), nn.ReLU(), …)</code>) y se ve al hacer <code>print(modelo)</code>; la <strong>función</strong> se llama dentro de <code>forward</code>. Ninguna tiene parámetros que aprender (salvo la pendiente de LeakyReLU, que es fija).</p>
-<p>Mira las cuatro derivadas del cuadro: son lo que decide si una red aprende bien.</p>
-<div class="callout ejemplo"><span class="lbl">Ejemplo tomado del módulo</span><p>· valores y derivadas en z = −2, 0, 2 Activación \( f(-2) \) \( f(0) \) \( f(2) \) \( f'(-2) \) \( f'(0) \) \( f'(2) \) Sigmoide 0.1192 0.5 0.8808 0.105 0.25 0.105 tanh −0.964 0 0.964 0.0707 1 0.0707 ReLU 0 0 2 0 0 * 1 LeakyReLU (α = 0.1)…</p></div></section><figure class="demo" data-demo="curso5/c5m1-activaciones" data-titulo="Las cuatro activaciones, sus derivadas y el gradiente tras n capas">
-<div class="haz">Mueve z (las «ganas brutas» de ver la peli) con el deslizador (o tocando o arrastrando sobre cualquiera de las dos gráficas). Prueba z = 0.5, z = 3 y z = 6; luego z = −3. Sube «Capas seguidas» hasta 10 y mira la columna de la derecha. Cambia la pendiente de LeakyReLU.</div>
-<div class="observa">La curva azul (sigmoide) de la gráfica inferior nunca pasa de 0.25 y casi desaparece para |z| &gt; 5; tanh sube a 1 pero también se aplasta. ReLU vale 1 para todo z positivo y 0 para el negativo (se «apaga»); LeakyReLU nunca llega a 0. En la tabla, con 10 capas en z = 0 la sigmoide deja el gradiente en 9.5·10<sup>−7</sup> y ReLU en 1.</div>
-</figure><div class="resumen"><h2 class="sin-num sin-toc">En pocas líneas</h2><ul><li><strong>Funciones de activación en PyTorch:</strong> Piensa en \( z \) como las ganas brutas que tiene un usuario de ver una película: pueden ser muy altas, cero o incluso negativas («ni…</li><li>Antes de continuar, intenta explicar la demo sin mirar su resultado.</li></ul></div><section class="quiz mini"><script class="quiz-data" type="application/json">{"titulo": "¿Lo tienes?", "preguntas": [{"q": "¿Qué concepto estamos trabajando en esta lección?", "opciones": ["Funciones de activación en PyTorch", "Dígitos: una red 64-16-10 de verdad", "Una neurona dibuja una recta (y eso no basta)"], "correcta": 0, "porque": "Piensa en \\( z \\) como las ganas brutas que tiene un usuario de ver una película: pueden ser muy altas, cero o incluso negativas («ni de regalo»)."}, {"q": "¿Cuál de estas afirmaciones recoge lo que acabas de estudiar?", "opciones": ["Lo importante es comprender la idea y comprobarla con ejemplos, no memorizar términos.", "Piensa en \\( z \\) como las ganas brutas que tiene un usuario de ver una película: pueden ser muy altas, cero o incluso negativas («ni de regalo»).", "Siempre hay un único método que sirve para todos los problemas."], "correcta": 1, "porque": "La explicación central es: Piensa en \\( z \\) como las ganas brutas que tiene un usuario de ver una película: pueden ser muy altas, cero o incluso negativas («ni de regalo»)."}, {"q": "Si una demo o un ejemplo te desconcierta, ¿cuál es la mejor forma de aprenderlo?", "opciones": ["Memorizar el nombre sin entender la operación.", "Volver a los números, cambiar un valor y explicar qué ocurre.", "Ignorar los resultados que no coinciden con tu intuición."], "correcta": 1, "porque": "Explorar qué cambia y por qué ayuda a conectar el concepto con su resultado."}]}</script></section></div></details><details class="profundizar"><summary><span>Profundizar: explicación completa<small>Matices, fórmulas, tablas, otros ejemplos y experimentos del módulo original.</small></span></summary><div class="prof-body"><section>
-<h2 id="activaciones">Funciones de activación en PyTorch</h2>
-<p class="pregunta">Cada neurona calcula unas «ganas brutas» \( z \) (por ejemplo, las ganas que tiene un usuario de ver una película). Entre las dos capas lineales hay una función de activación que decide cuántas de esas ganas pasan a la capa siguiente. ¿Cuál elegir, cómo se escribe en PyTorch, y qué pasa con su derivada, que es lo que usa el aprendizaje?</p>
-<div class="callout recuerda">
-<span class="lbl">Recuerda (Curso 2)</span>
-<p>La activación tiene que ser <strong>no lineal</strong>: si no, dos capas valen lo mismo que una (<a href="../../curso-2/modulo-1.html#no-linealidad">demostración</a>). En el <a href="../../curso-2/modulo-1.html#activaciones">catálogo del Curso 2</a> las viste una a una y con su derivada. Aquí las usamos en PyTorch y nos fijamos en lo que importa al entrenar: <strong>qué derivada tienen</strong>, porque en el <em>backward</em> el gradiente se multiplica por ella en cada neurona (lo viste en el <a href="leccion-7.html#frag-6">paso a mano</a> y lo verás en la sección 7).</p>
+<header class="hero leccion">
+  <div class="hero-grid">
+    <div>
+      <p class="eyebrow">Curso 5 · Módulo 1 · Lección 4 de 8</p>
+      <h1>La activación decide cuánto gradiente vuelve atrás</h1>
+      <p class="lead">Entre capa y capa, la activación convierte las «ganas brutas» \( z \) en lo que pasa a la siguiente. Su <strong>derivada</strong> decide además cuánta corrección vuelve atrás al entrenar. Por eso ReLU es la opción por defecto.</p>
+      <p class="meta-line"><span class="read-time" data-render="read-time"></span><a href="../modulo-1.html">Índice del módulo</a></p>
+    </div>
+    <div class="hero-tile" aria-hidden="true"></div>
+  </div>
+</header>
+
+<details class="predice">
+  <summary>En el boca a boca, cada amigo repite solo una cuarta parte de tu recomendación de película. Tras 5 amigos, ¿cuánto queda: 1/20, 1/100 o 1/1000?<span class="hint"></span></summary>
+  <div>
+    <p><strong>Una milésima:</strong> \( 0.25^5 = 0.00098 \). Es lo que le pasa al gradiente al cruzar 5 capas con sigmoide, cuya derivada nunca pasa de 0.25. Se llama <strong>gradiente que se desvanece</strong>.</p>
+  </div>
+</details>
+
+<section>
+<h2 id="idea">Cuatro activaciones, cuatro derivadas</h2>
+<div class="cards">
+  <div class="card"><h4>Sigmoide</h4><p>De 0 a 1. Derivada máx. 0.25 y se hunde con \( |z| \) grande: <em>satura</em>. Hoy, solo en la salida binaria.</p></div>
+  <div class="card"><h4>tanh</h4><p>De −1 a 1, centrada en 0. Derivada máx. 1, pero también satura (0.0707 ya en \( z = 2 \)).</p></div>
+  <div class="card"><h4>ReLU</h4><p>\( \max(0, z) \). Derivada 1 si \( z > 0 \) y 0 si no. Barata: la opción por defecto en capas ocultas.</p></div>
+  <div class="card"><h4>LeakyReLU</h4><p>Como ReLU, con una rendija \( \alpha z \) para \( z \le 0 \): 0.01 en PyTorch, 0.3 en Keras.</p></div>
 </div>
+<p>¿Por qué importa la derivada? En el <em>backward</em>, el gradiente que llega a cada neurona se <strong>multiplica por \( f'(z) \)</strong>. Si es pequeña, las capas anteriores casi no aprenden; con ReLU y \( z > 0 \) pasa intacto.</p>
+<p>El peligro de ReLU: si \( z \le 0 \) para <strong>todos</strong> los datos, la neurona devuelve 0, su derivada es 0 y no vuelve a recibir gradiente. Está <strong>muerta</strong>. Suele causarlo un <em>learning rate</em> demasiado grande; LeakyReLU deja pasar siempre un hilo.</p>
+<p>En PyTorch, <code>nn.ReLU()</code> es un módulo (va dentro de <code>nn.Sequential</code>) y <code>torch.relu</code> o <code>F.relu</code> son funciones (se llaman en <code>forward</code>). Hacen lo mismo.</p>
+</section>
+
+<figure class="demo" data-demo="curso5/c5m1-activaciones" data-titulo="Las cuatro activaciones, sus derivadas y el gradiente tras n capas">
+  <div class="haz">Mueve z a 0.5, 3 y 6, y sube «Capas seguidas» hasta 10.</div>
+  <div class="observa">La derivada de la sigmoide nunca pasa de 0.25: tras 10 capas deja el gradiente en 9.5·10<sup>−7</sup>. ReLU lo deja en 1.</div>
+</figure>
+
+<figure class="demo" data-demo="curso5/c5m1-carrera-activaciones" data-titulo="La carrera de las cuatro activaciones">
+  <div class="haz">Pulsa «▶ Empezar la carrera» con lr = 0.10. Después sube el learning rate a 10.</div>
+  <div class="observa">La sigmoide llega la última. Con lr = 10 aparecen ReLU «muertas»; LeakyReLU resiste mejor.</div>
+</figure>
+
+<section>
+<h2 id="numeros">Con números: en \( z = 2 \) y \( z = -2 \)</h2>
+<div class="callout ejemplo">
+  <span class="lbl">Ejemplo numérico</span>
+  <table>
+    <thead><tr><th>Activación</th><th>\( f'(2) \)</th><th>\( f'(-2) \)</th></tr></thead>
+    <tbody>
+      <tr><td>Sigmoide</td><td>0.105</td><td>0.105</td></tr>
+      <tr><td>tanh</td><td>0.0707</td><td>0.0707</td></tr>
+      <tr><td>ReLU</td><td>1</td><td class="res">0</td></tr>
+      <tr><td>Leaky (α = 0.1)</td><td>1</td><td>0.1</td></tr>
+    </tbody>
+  </table>
+  <p>Sigmoide: \( \sigma(2) = 1/(1+e^{-2}) = 0.8808 \) y \( \sigma' = 0.8808 \cdot 0.1192 = 0.105 \). tanh: \( \tanh(2) = 0.964 \) y \( 1 - 0.964^2 = 0.0707 \). Con ReLU y \( z = -2 \) no pasa nada de gradiente.</p>
+</div>
+</section>
+
+<details class="predice">
+  <summary>Misma red 2-8-1, mismos datos, SGD con lr = 0.1. ¿Quién baja antes la pérdida, sigmoide o ReLU? ¿Y aciertan muy distinto al final?<span class="hint"></span></summary>
+  <div>
+    <p><strong>ReLU baja antes</strong>: en la época 100 va por 0.406 y la sigmoide por 0.647. Pero en la época 800 aciertan casi lo mismo en test (91.8 % frente a 91.0 %). La diferencia es cuánto tardan, no a dónde llegan.</p>
+  </div>
+</details>
+
+<div class="resumen">
+  <h2 class="sin-num sin-toc">En tres líneas</h2>
+  <ul>
+    <li>En el <em>backward</em> el gradiente se multiplica por \( f'(z) \): sigmoide ≤ 0.25 (satura), ReLU = 1 si \( z > 0 \).</li>
+    <li>Capas ocultas: empieza con ReLU; la sigmoide, en la salida binaria.</li>
+    <li>Una ReLU con \( z \le 0 \) en todos los datos muere (gradiente 0); LeakyReLU o un lr menor lo evitan.</li>
+  </ul>
+</div>
+
+<section class="quiz mini">
+<script type="application/json" class="quiz-data">
+{
+ "titulo": "¿Lo tienes?",
+ "preguntas": [
+  {
+   "q": "La derivada máxima de la sigmoide es 0.25. Si el gradiente atraviesa 5 capas seguidas con sigmoide y todas en su mejor caso, ¿por cuánto se multiplica?",
+   "opciones": [
+    "\\( 0.25 \\), siempre",
+    "\\( 0.25^5 \\approx 0.001 \\): queda una milésima",
+    "\\( 5\\cdot 0.25 = 1.25 \\)",
+    "\\( 1 \\): la derivada no se acumula"
+   ],
+   "correcta": 1,
+   "porque": "Por la regla de la cadena, en cada capa se multiplica por \\( f'(z) \\le 0.25 \\), así que tras 5 capas el factor es \\( 0.25^5 = 0.00098 \\approx 0.001 \\), y en el caso real aún menos. Es el <em>gradiente que se desvanece</em>. ReLU tiene derivada 1 si \\( z>0 \\), y por eso no lo sufre en ese lado."
+  },
+  {
+   "q": "Una neurona ReLU tiene \\( z \\le 0 \\) para <strong>todos</strong> los datos de entrenamiento. ¿Qué le pasa a su gradiente?",
+   "opciones": [
+    "Es pequeño pero no nulo, y se recupera sola",
+    "Se vuelve negativo y empuja la neurona hacia arriba",
+    "Se hace enorme y la red diverge",
+    "Vale exactamente 0, así que sus pesos dejan de actualizarse (neurona «muerta»)"
+   ],
+   "correcta": 3,
+   "porque": "Con \\( z\\le 0 \\) la ReLU devuelve 0 y su derivada es 0 (en PyTorch también en \\( z=0 \\)); la regla de la cadena multiplica por ese 0 y el gradiente es exactamente 0 (lo vimos en el fragmento 12). Sin gradiente no hay actualización, y la neurona sigue apagada. LeakyReLU conserva una pendiente pequeña que permite recuperarse."
+  },
+  {
+   "q": "Quieres poner una ReLU dentro de un <code>nn.Sequential</code>. ¿Qué escribes?",
+   "opciones": [
+    "<code>nn.ReLU()</code>",
+    "<code>F.relu</code>",
+    "<code>nn.ReLU(x)</code>"
+   ],
+   "correcta": 0,
+   "porque": "Dentro de <code>nn.Sequential</code> van módulos: <code>nn.ReLU()</code>. <code>F.relu</code> es una función que se llama en <code>forward</code>. Y <code>nn.ReLU(x)</code> no aplica la ReLU a <code>x</code>: intenta crear un módulo nuevo."
+  }
+ ]
+}
+</script>
+</section>
+
+<details class="profundizar">
+  <summary><span>Profundizar: la explicación completa<small>La tabla completa con fórmulas, derivadas y nombres en PyTorch, z = −2, 0 y 2, por qué unas sí y otras no, el gradiente tras 5 capas, la carrera con números y las neuronas ReLU muertas.</small></span></summary>
+  <div class="prof-body">
+<h2 id="activaciones">Funciones de activación en PyTorch</h2>
+
+<p class="pregunta">Cada neurona calcula unas «ganas brutas» \( z \) (por ejemplo, las ganas que tiene un usuario de ver una película). Entre las dos capas lineales hay una función de activación que decide cuántas de esas ganas pasan a la capa siguiente. ¿Cuál elegir, cómo se escribe en PyTorch, y qué pasa con su derivada, que es lo que usa el aprendizaje?</p>
+
+<div class="callout recuerda">
+  <span class="lbl">Recuerda (Curso 2)</span>
+  <p>La activación tiene que ser <strong>no lineal</strong>: si no, dos capas valen lo mismo que una (<a href="../../curso-2/modulo-1/leccion-2.html#no-linealidad">demostración</a>). En el <a href="../../curso-2/modulo-1/leccion-2.html#activaciones">catálogo del Curso 2</a> las viste una a una y con su derivada. Aquí las usamos en PyTorch y nos fijamos en lo que importa al entrenar: <strong>qué derivada tienen</strong>, porque en el <em>backward</em> el gradiente se multiplica por ella en cada neurona (lo viste en el <a href="leccion-5.html#frag-6">paso a mano</a> y lo verás en la <a href="leccion-5.html#entrenar">lección 5</a>).</p>
+</div>
+
 <h3>Las cuatro del módulo, de un vistazo</h3>
 <p>Piensa en \( z \) como las ganas brutas que tiene un usuario de ver una película: pueden ser muy altas, cero o incluso negativas («ni de regalo»). La <strong>sigmoide</strong> convierte esas ganas en un porcentaje entre 0 y 1; <strong>tanh</strong> en un valor entre −1 y 1; la <strong>ReLU</strong> deja pasar las ganas tal cual si son positivas y las corta a 0 si son negativas («no me interesa»); y la <strong>LeakyReLU</strong> hace lo mismo pero deja pasar un hilito de las negativas.</p>
 <table>
-<caption>Funciones de activación, su derivada y cómo se escriben en PyTorch</caption>
-<thead><tr><th>Activación</th><th>Fórmula \( f(z) \)</th><th>Derivada \( f'(z) \)</th><th>Rango y máx. de \( f' \)</th><th>En PyTorch</th></tr></thead>
-<tbody>
-<tr><td><strong>Sigmoide</strong></td><td>\( \dfrac{1}{1+e^{-z}} \)</td><td>\( \sigma(z)\,(1-\sigma(z)) \)</td><td>\( (0,1) \); máx. 0.25</td><td><code>torch.sigmoid(z)</code> · <code>nn.Sigmoid()</code></td></tr>
-<tr><td><strong>tanh</strong></td><td>\( \dfrac{e^{z}-e^{-z}}{e^{z}+e^{-z}} \)</td><td>\( 1-\tanh^2(z) \)</td><td>\( (-1,1) \); máx. 1</td><td><code>torch.tanh(z)</code> · <code>nn.Tanh()</code></td></tr>
-<tr><td><strong>ReLU</strong></td><td>\( \max(0, z) \)</td><td>1 si \( z&gt;0 \); 0 si \( z\le 0 \)</td><td>\( [0,\infty) \); máx. 1</td><td><code>torch.relu(z)</code> · <code>F.relu(z)</code> · <code>nn.ReLU()</code></td></tr>
-<tr><td><strong>LeakyReLU</strong></td><td>\( z \) si \( z&gt;0 \); \( \alpha z \) si no</td><td>1 si \( z&gt;0 \); \( \alpha \) si no</td><td>\( (-\infty,\infty) \); máx. 1</td><td><code>F.leaky_relu(z, 0.01)</code> · <code>nn.LeakyReLU(negative_slope=0.01)</code></td></tr>
-</tbody>
+  <caption>Funciones de activación, su derivada y cómo se escriben en PyTorch</caption>
+  <thead><tr><th>Activación</th><th>Fórmula \( f(z) \)</th><th>Derivada \( f'(z) \)</th><th>Rango y máx. de \( f' \)</th><th>En PyTorch</th></tr></thead>
+  <tbody>
+    <tr><td><strong>Sigmoide</strong></td><td>\( \dfrac{1}{1+e^{-z}} \)</td><td>\( \sigma(z)\,(1-\sigma(z)) \)</td><td>\( (0,1) \); máx. 0.25</td><td><code>torch.sigmoid(z)</code> · <code>nn.Sigmoid()</code></td></tr>
+    <tr><td><strong>tanh</strong></td><td>\( \dfrac{e^{z}-e^{-z}}{e^{z}+e^{-z}} \)</td><td>\( 1-\tanh^2(z) \)</td><td>\( (-1,1) \); máx. 1</td><td><code>torch.tanh(z)</code> · <code>nn.Tanh()</code></td></tr>
+    <tr><td><strong>ReLU</strong></td><td>\( \max(0, z) \)</td><td>1 si \( z>0 \); 0 si \( z\le 0 \)</td><td>\( [0,\infty) \); máx. 1</td><td><code>torch.relu(z)</code> · <code>F.relu(z)</code> · <code>nn.ReLU()</code></td></tr>
+    <tr><td><strong>LeakyReLU</strong></td><td>\( z \) si \( z>0 \); \( \alpha z \) si no</td><td>1 si \( z>0 \); \( \alpha \) si no</td><td>\( (-\infty,\infty) \); máx. 1</td><td><code>F.leaky_relu(z, 0.01)</code> · <code>nn.LeakyReLU(negative_slope=0.01)</code></td></tr>
+  </tbody>
 </table>
+
 <p>Las tres formas de escribir una activación (módulo <code>nn.ReLU()</code>, función <code>torch.relu</code>, función de <code>torch.nn.functional</code> como <code>F.relu</code>) hacen exactamente lo mismo. La diferencia es de estilo: el <strong>módulo</strong> se puede colocar dentro de un <code>nn.Sequential</code> (<code>nn.Sequential(nn.Linear(2,3), nn.ReLU(), …)</code>) y se ve al hacer <code>print(modelo)</code>; la <strong>función</strong> se llama dentro de <code>forward</code>. Ninguna tiene parámetros que aprender (salvo la pendiente de LeakyReLU, que es fija).</p>
+
 <div class="callout ejemplo">
-<span class="lbl">Ejemplo numérico · valores y derivadas en z = −2, 0, 2</span>
-<table>
-<thead><tr><th>Activación</th><th>\( f(-2) \)</th><th>\( f(0) \)</th><th>\( f(2) \)</th><th>\( f'(-2) \)</th><th>\( f'(0) \)</th><th>\( f'(2) \)</th></tr></thead>
-<tbody>
-<tr><td>Sigmoide</td><td>0.1192</td><td>0.5</td><td>0.8808</td><td>0.105</td><td>0.25</td><td>0.105</td></tr>
-<tr><td>tanh</td><td>−0.964</td><td>0</td><td>0.964</td><td>0.0707</td><td>1</td><td>0.0707</td></tr>
-<tr><td>ReLU</td><td>0</td><td>0</td><td>2</td><td>0</td><td>0 *</td><td>1</td></tr>
-<tr><td>LeakyReLU (α = 0.1)</td><td>−0.2</td><td>0</td><td>2</td><td>0.1</td><td>0.1 *</td><td>1</td></tr>
-</tbody>
-</table>
-<p>Cómo salen: sigmoide en \( z=2 \): \( \sigma(2) = 1/(1+e^{-2}) = 1/1.1353\ldots \) → 0.8808, y \( \sigma' = 0.8808 \cdot 0.1192 = 0.105 \). tanh en \( z=2 \): \( \tanh(2)=0.9640 \) y \( 1 - 0.9640^2 = 1 - 0.9293 = 0.0707 \). (* En \( z = 0 \) la derivada de ReLU no está definida; PyTorch usa 0 y la de LeakyReLU usa la rama pequeña \( \alpha \).) Son los números que imprime el <a href="leccion-5.html#frag-4">fragmento 4</a> con <code>autograd</code>.</p>
+  <span class="lbl">Ejemplo numérico · valores y derivadas en z = −2, 0, 2</span>
+  <table>
+    <thead><tr><th>Activación</th><th>\( f(-2) \)</th><th>\( f(0) \)</th><th>\( f(2) \)</th><th>\( f'(-2) \)</th><th>\( f'(0) \)</th><th>\( f'(2) \)</th></tr></thead>
+    <tbody>
+      <tr><td>Sigmoide</td><td>0.1192</td><td>0.5</td><td>0.8808</td><td>0.105</td><td>0.25</td><td>0.105</td></tr>
+      <tr><td>tanh</td><td>−0.964</td><td>0</td><td>0.964</td><td>0.0707</td><td>1</td><td>0.0707</td></tr>
+      <tr><td>ReLU</td><td>0</td><td>0</td><td>2</td><td>0</td><td>0 *</td><td>1</td></tr>
+      <tr><td>LeakyReLU (α = 0.1)</td><td>−0.2</td><td>0</td><td>2</td><td>0.1</td><td>0.1 *</td><td>1</td></tr>
+    </tbody>
+  </table>
+  <p>Cómo salen: sigmoide en \( z=2 \): \( \sigma(2) = 1/(1+e^{-2}) = 1/1.1353\ldots \) → 0.8808, y \( \sigma' = 0.8808 \cdot 0.1192 = 0.105 \). tanh en \( z=2 \): \( \tanh(2)=0.9640 \) y \( 1 - 0.9640^2 = 1 - 0.9293 = 0.0707 \). (* En \( z = 0 \) la derivada de ReLU no está definida; PyTorch usa 0 y la de LeakyReLU usa la rama pequeña \( \alpha \).) Son los números que imprime el <a href="#frag-4">fragmento 4</a> con <code>autograd</code>.</p>
 </div>
+
 <h3>Por qué unas funciones y no otras</h3>
 <p>Mira las cuatro derivadas del cuadro: son lo que decide si una red aprende bien.</p>
 <ul>
-<li><strong>Sigmoide.</strong> Su derivada nunca pasa de 0.25 y se hunde cuando \( |z| \) es grande (0.0066 en \( z = 5 \)): se dice que <em>satura</em>. Además sus salidas son siempre positivas, y eso hace que los gradientes de la capa siguiente tengan todos el mismo signo y el aprendizaje avance en zigzag. En capas ocultas está en desuso; se queda como <strong>salida de la clasificación binaria</strong> (da una probabilidad).</li>
-<li><strong>tanh.</strong> Es una sigmoide estirada y centrada en cero (rango −1 a 1), con derivada máxima 1. Mejor que la sigmoide en capas ocultas, pero también satura (derivada 0.0707 ya en \( z=2 \)).</li>
-<li><strong>ReLU.</strong> Para \( z&gt;0 \) deja pasar el valor y su derivada es exactamente 1: el gradiente la atraviesa intacto. Es barata (una comparación) y es la opción por defecto en capas ocultas. Su peligro: si \( z\le 0 \) para <em>todos</em> los datos, la neurona devuelve 0 y su derivada es 0: no recibe gradiente nunca más. Se dice que está <strong>muerta</strong> (sección 9).</li>
-<li><strong>LeakyReLU.</strong> Como ReLU pero con una «rendija»: para \( z\le 0 \) devuelve \( \alpha z \) con \( \alpha \) pequeño y su derivada vale \( \alpha \) en vez de 0, así que siempre pasa un hilo de gradiente. Ojo con el valor por defecto: en PyTorch <code>nn.LeakyReLU()</code> usa <strong>0.01</strong> y en Keras 3 <code>LeakyReLU()</code> usa <strong>0.3</strong> (se comprobó en las dos librerías).</li>
+  <li><strong>Sigmoide.</strong> Su derivada nunca pasa de 0.25 y se hunde cuando \( |z| \) es grande (0.0066 en \( z = 5 \)): se dice que <em>satura</em>. Además sus salidas son siempre positivas, y eso hace que los gradientes de la capa siguiente tengan todos el mismo signo y el aprendizaje avance en zigzag. En capas ocultas está en desuso; se queda como <strong>salida de la clasificación binaria</strong> (da una probabilidad).</li>
+  <li><strong>tanh.</strong> Es una sigmoide estirada y centrada en cero (rango −1 a 1), con derivada máxima 1. Mejor que la sigmoide en capas ocultas, pero también satura (derivada 0.0707 ya en \( z=2 \)).</li>
+  <li><strong>ReLU.</strong> Para \( z>0 \) deja pasar el valor y su derivada es exactamente 1: el gradiente la atraviesa intacto. Es barata (una comparación) y es la opción por defecto en capas ocultas. Su peligro: si \( z\le 0 \) para <em>todos</em> los datos, la neurona devuelve 0 y su derivada es 0: no recibe gradiente nunca más. Se dice que está <strong>muerta</strong> (<a href="#comparar-activaciones">más abajo</a>).</li>
+  <li><strong>LeakyReLU.</strong> Como ReLU pero con una «rendija»: para \( z\le 0 \) devuelve \( \alpha z \) con \( \alpha \) pequeño y su derivada vale \( \alpha \) en vez de 0, así que siempre pasa un hilo de gradiente. Ojo con el valor por defecto: en PyTorch <code>nn.LeakyReLU()</code> usa <strong>0.01</strong> y en Keras 3 <code>LeakyReLU()</code> usa <strong>0.3</strong> (se comprobó en las dos librerías).</li>
 </ul>
+
 <div class="callout ejemplo">
-<span class="lbl">Ejemplo numérico · lo que le pasa al gradiente al cruzar capas</span>
-<p>En el <em>backward</em>, el gradiente que llega a una neurona se multiplica por \( f'(z) \). Si el mejor caso de cada capa es el máximo de la derivada, tras 5 capas el gradiente puede haber quedado así:</p>
-<table>
-<thead><tr><th>Activación</th><th>Mejor caso por capa</th><th>Tras 5 capas</th></tr></thead>
-<tbody>
-<tr><td>Sigmoide</td><td>0.25</td><td class="res">\( 0.25^5 = 0.00098 \)</td></tr>
-<tr><td>tanh</td><td>1 (solo en \( z=0 \))</td><td>\( 1^5 = 1 \) (pero a \( z = 2 \): \( 0.0707^5 \approx 1.8\cdot 10^{-6} \))</td></tr>
-<tr><td>ReLU</td><td>1 (si \( z&gt;0 \))</td><td class="res">\( 1^5 = 1 \)</td></tr>
-</tbody>
-</table>
-<p>Es como el boca a boca: si cada amigo solo repite una cuarta parte de lo que le contaron, tras cinco amigos tu recomendación de película ha llegado casi vacía. Con sigmoides, el gradiente se reduce a una milésima en solo 5 capas. Es el <strong>problema de los gradientes que se desvanecen</strong> (<em>vanishing gradient</em>): las primeras capas casi no aprenden. En el <a href="../../curso-2/modulo-1.html#desvanece">Curso 2</a> lo viste con números; en el <a href="../modulo-2.html">módulo 2</a> lo mediremos capa a capa en PyTorch. En una red de una sola capa oculta como la de este módulo el efecto es solo una <em>lentitud</em> extra de la sigmoide (la veremos en el experimento 9).</p>
+  <span class="lbl">Ejemplo numérico · lo que le pasa al gradiente al cruzar capas</span>
+  <p>En el <em>backward</em>, el gradiente que llega a una neurona se multiplica por \( f'(z) \). Si el mejor caso de cada capa es el máximo de la derivada, tras 5 capas el gradiente puede haber quedado así:</p>
+  <table>
+    <thead><tr><th>Activación</th><th>Mejor caso por capa</th><th>Tras 5 capas</th></tr></thead>
+    <tbody>
+      <tr><td>Sigmoide</td><td>0.25</td><td class="res">\( 0.25^5 = 0.00098 \)</td></tr>
+      <tr><td>tanh</td><td>1 (solo en \( z=0 \))</td><td>\( 1^5 = 1 \) (pero a \( z = 2 \): \( 0.0707^5 \approx 1.8\cdot 10^{-6} \))</td></tr>
+      <tr><td>ReLU</td><td>1 (si \( z>0 \))</td><td class="res">\( 1^5 = 1 \)</td></tr>
+    </tbody>
+  </table>
+  <p>Es como el boca a boca: si cada amigo solo repite una cuarta parte de lo que le contaron, tras cinco amigos tu recomendación de película ha llegado casi vacía. Con sigmoides, el gradiente se reduce a una milésima en solo 5 capas. Es el <strong>problema de los gradientes que se desvanecen</strong> (<em>vanishing gradient</em>): las primeras capas casi no aprenden. En el <a href="../../curso-2/modulo-1/leccion-7.html#desvanece">Curso 2</a> lo viste con números; en el <a href="../modulo-2.html">módulo 2</a> lo mediremos capa a capa en PyTorch. En una red de una sola capa oculta como la de este módulo el efecto es solo una <em>lentitud</em> extra de la sigmoide (la verás en el experimento «La carrera de las cuatro activaciones», en esta misma lección).</p>
 </div>
+
+<div class="callout recuerda">
+  <span class="lbl">Experimento de arriba: «Las cuatro activaciones, sus derivadas y el gradiente tras n capas», con todo detalle</span>
+  <p><strong>Haz esto.</strong> Mueve z (las «ganas brutas» de ver la peli) con el deslizador (o tocando o arrastrando sobre cualquiera de las dos gráficas). Prueba z = 0.5, z = 3 y z = 6; luego z = −3. Sube «Capas seguidas» hasta 10 y mira la columna de la derecha. Cambia la pendiente de LeakyReLU.</p>
+  <p><strong>Fíjate en.</strong> La curva azul (sigmoide) de la gráfica inferior nunca pasa de 0.25 y casi desaparece para |z| &gt; 5; tanh sube a 1 pero también se aplasta. ReLU vale 1 para todo z positivo y 0 para el negativo (se «apaga»); LeakyReLU nunca llega a 0. En la tabla, con 10 capas en z = 0 la sigmoide deja el gradiente en 9.5·10<sup>−7</sup> y ReLU en 1.</p>
+</div>
+
 <div class="callout ojo">
-<span class="lbl">Ojo</span>
-<p><strong>(1)</strong> No pongas ReLU (ni otra activación) en la <strong>salida</strong> de una red que vaya a usar <code>CrossEntropyLoss</code> o <code>BCEWithLogitsLoss</code>: esas pérdidas quieren el logit crudo (sección 6). <strong>(2)</strong> La activación va <em>entre</em> las capas lineales, no después de la última (salvo que sea la sigmoide de <code>BCELoss</code>). <strong>(3)</strong> <code>nn.ReLU</code> es una clase y <code>F.relu</code> una función: <code>nn.ReLU(x)</code> no aplica la ReLU a <code>x</code>: crea un módulo nuevo (hay que escribir <code>nn.ReLU()(x)</code>). <strong>(4)</strong> Existen más activaciones (<code>nn.ELU</code>, <code>nn.GELU</code>, <code>nn.SiLU</code>, <code>nn.Softplus</code>…): siguen la misma idea y se usan igual.</p>
+  <span class="lbl">Ojo</span>
+  <p><strong>(1)</strong> No pongas ReLU (ni otra activación) en la <strong>salida</strong> de una red que vaya a usar <code>CrossEntropyLoss</code> o <code>BCEWithLogitsLoss</code>: esas pérdidas quieren el logit crudo (<a href="leccion-5.html#salida-perdida">lección 5</a>). <strong>(2)</strong> La activación va <em>entre</em> las capas lineales, no después de la última (salvo que sea la sigmoide de <code>BCELoss</code>). <strong>(3)</strong> <code>nn.ReLU</code> es una clase y <code>F.relu</code> una función: <code>nn.ReLU(x)</code> no aplica la ReLU a <code>x</code>: crea un módulo nuevo (hay que escribir <code>nn.ReLU()(x)</code>). <strong>(4)</strong> Existen más activaciones (<code>nn.ELU</code>, <code>nn.GELU</code>, <code>nn.SiLU</code>, <code>nn.Softplus</code>…): siguen la misma idea y se usan igual.</p>
 </div>
-</section></div></details><details class="profundizar" id="codigo"><summary><span>Ver código explicado paso a paso<small>0 fragmento(s) original(es), con cada línea comentada y salida esperada.</small></span></summary><div class="prof-body"><p>Esta lección se centra en la idea y la demo; no requiere código adicional.</p></div></details></div></main></body></html>
+
+<h2 id="comparar-activaciones">Sigmoide, tanh, ReLU o LeakyReLU: qué cambia al entrenar</h2>
+
+<p class="pregunta">Sabemos que las derivadas son distintas. ¿Se nota de verdad al entrenar una red pequeña que predice si un usuario termina la serie? ¿Y qué es eso de que una neurona «se muere»?</p>
+
+<h3>La carrera, con números</h3>
+<p>El <a href="leccion-8.html#frag-11">fragmento 11</a> entrena la misma red 2-8-1 con las cuatro activaciones sobre dos lunas (400 puntos, ruido 0.2), con SGD sin momentum, y promedia 5 semillas (cada activación usa las mismas 5). La pérdida de entrenamiento media:</p>
+<table>
+  <caption>Pérdida media de entrenamiento (5 semillas, SGD, lr = 0.1)</caption>
+  <thead><tr><th>Activación</th><th>Época 1</th><th>Época 100</th><th>Época 400</th><th>Época 800</th><th>Acierto en test</th></tr></thead>
+  <tbody>
+    <tr><td>Sigmoide</td><td>0.736</td><td>0.647</td><td>0.425</td><td class="res">0.337</td><td>91.0 %</td></tr>
+    <tr><td>tanh</td><td>0.707</td><td>0.389</td><td>0.311</td><td>0.298</td><td>91.4 %</td></tr>
+    <tr><td>ReLU</td><td>0.717</td><td>0.406</td><td>0.302</td><td class="res">0.285</td><td>91.8 %</td></tr>
+    <tr><td>LeakyReLU (0.01)</td><td>0.717</td><td>0.405</td><td>0.302</td><td class="res">0.285</td><td>91.8 %</td></tr>
+  </tbody>
+</table>
+<p>La sigmoide va claramente rezagada (0.647 frente a ~0.40 en la época 100): su derivada (máx. 0.25) frena el gradiente. Al final del entrenamiento todas aciertan casi lo mismo en test; la diferencia es <em>cuánto tardan</em> en llegar. ReLU y LeakyReLU dan números idénticos hasta el tercer decimal: con <code>lr = 0.1</code> casi ninguna neurona se queda con \( z\le 0 \) en todos los datos, y la pendiente de 0.01 apenas influye. Lo que sigue lo fuerza.</p>
+
+<div class="callout recuerda">
+  <span class="lbl">Experimento de arriba: «La carrera de las cuatro activaciones», con todo detalle</span>
+  <p><strong>Haz esto.</strong> Cada punto es un usuario en un mapa de gustos y se trata de acertar si termina la serie (azul) o la abandona (rojo). Pulsa «▶ Empezar la carrera» con SGD y lr = 0.10 y mira las curvas. Después sube el «Learning rate» a 1 y repite; luego al máximo (10) y fíjate en la columna «muertas». Prueba también «Otros pesos iniciales» y cambia el optimizador a Adam.</p>
+  <p><strong>Fíjate en.</strong> Con lr = 0.1 la sigmoide queda por encima (más pérdida, más lenta) y ReLU y LeakyReLU casi se superponen. Con un lr muy alto mira cuántas neuronas de ReLU y de LeakyReLU aparecen como «muertas» (z ≤ 0 en todos los puntos de entrenamiento; en LeakyReLU significa que solo trabajan en su tramo de pendiente pequeña) y cómo cambia el acierto. Al pasar a Adam, comprueba si las diferencias entre activaciones siguen igual de grandes.</p>
+</div>
+
+<h3>Neuronas ReLU «muertas»</h3>
+<p>Una neurona ReLU con \( z\le 0 \) devuelve 0 y su derivada es 0. Si eso ocurre <strong>para todos los datos</strong>, el gradiente que le llega es exactamente 0 y su peso no se actualiza nunca más: la neurona está <em>muerta</em> (<em>dying ReLU</em>): es como un crítico que ya no se entusiasma con ninguna película, siempre responde «0» y, como nadie le corrige cuando responde 0, nunca cambia de opinión. Suele pasar con un <em>learning rate</em> demasiado grande: un paso brusco empuja el sesgo y los pesos a un valor donde la neurona ya nunca se enciende. El <a href="#frag-12">fragmento 12</a> lo provoca con <code>lr = 10</code>:</p>
+<ul>
+  <li>Con <code>lr = 0.1</code>: casi ninguna neurona muerta (0 en 3 de 4 semillas) y ReLU y LeakyReLU dan resultados iguales.</li>
+  <li>Con <code>lr = 10</code>: ReLU deja inactivas <strong>7 de 8</strong> neuronas en las semillas 0 y 1 (en la 0 acaba con pérdida 1.044 y acierto 0.50: no aprende nada); LeakyReLU, con las mismas semillas, deja 3 o 4 inactivas y en dos de ellas (1 y 3) llega a pérdidas de 0.12 y acierto 0.96.</li>
+  <li>El gradiente de las filas de <code>W1</code> de las neuronas ReLU inactivas vale <strong>exactamente 0</strong>; en LeakyReLU, aun inactivas, es pequeño pero no nulo (2·10⁻⁴, 4·10⁻⁴…). Esa rendija es lo que les permite «resucitar».</li>
+</ul>
+
+<div class="callout regla">
+  <span class="lbl">Regla fácil</span>
+  <p><strong>Capas ocultas: empieza con ReLU.</strong> Si ves que muchas neuronas se apagan, prueba un <em>learning rate</em> menor o LeakyReLU. tanh y sigmoide en capas ocultas solo en redes muy pequeñas o por razones específicas. <strong>Sigmoide en la salida</strong> solo para clasificación binaria (y mejor como logit con <code>BCEWithLogitsLoss</code>).</p>
+</div>
+
+<div class="callout ojo">
+  <span class="lbl">Ojo</span>
+  <p>Estas comparaciones son <strong>de una red pequeña y unos datos concretos</strong>: no son una ley. En redes más grandes, con otros datos u otro optimizador, las diferencias cambian de tamaño. Lo que sí es general: la sigmoide/tanh satura; ReLU/LeakyReLU no satura en el lado positivo; y un <em>learning rate</em> mal elegido puede estropear cualquier combinación.</p>
+</div>
+  </div>
+</details>
+
+<section>
+<h2 class="sin-num">Código</h2>
+<article class="snippet" data-lang="python" id="frag-4">
+  <header>
+    <h3>4 · Activaciones y sus derivadas con autograd</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Evaluar las cuatro activaciones del módulo en tres valores de <code>z</code> y pedirle a PyTorch su derivada con <code>backward()</code>, para comprobar a mano las fórmulas de la sección 4.</p>
+  </header>
+  <pre class="code"><code>import torch
+from torch import nn
+import torch.nn.functional as F
+
+z = torch.tensor([-2., 0., 2.], requires_grad=True)
+
+activaciones = {
+    "sigmoide": torch.sigmoid,
+    "tanh": torch.tanh,
+    "ReLU": torch.relu,
+    "LeakyReLU": nn.LeakyReLU(negative_slope=0.1),
+}
+for nombre, f in activaciones.items():
+    a = f(z)
+    a.sum().backward()
+    print(f"{nombre:9s} f(z) = {a.detach().numpy().round(4)}   f'(z) = {z.grad.numpy().round(4)}")
+    z.grad = None
+
+print("nn.ReLU()(z)   :", nn.ReLU()(z).detach().numpy())
+print("F.relu(z)      :", F.relu(z).detach().numpy())
+print("pendiente por defecto de nn.LeakyReLU():", nn.LeakyReLU().negative_slope)</code></pre>
+  <details class="linea-a-linea" open>
+    <summary>Línea por línea</summary>
+    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+      <tbody>
+        <tr data-lines="1-3"><td><code>import torch …</code></td><td><code>torch</code>, <code>nn</code> (las activaciones como módulos) y <code>torch.nn.functional as F</code> (las mismas como funciones sueltas).</td></tr>
+        <tr data-lines="5"><td><code>z = torch.tensor([-2., 0., 2.], requires_grad=True)</code></td><td>Tres valores de <code>z</code>: −2, 0 y 2. <code>requires_grad=True</code> pide a PyTorch que recuerde las operaciones para poder derivar respecto a <code>z</code> (lo viste en el Curso 4).</td></tr>
+        <tr data-lines="7-12"><td><code>activaciones = { …</code></td><td>Un diccionario <code>nombre → función</code>. Las tres primeras son funciones de <code>torch</code>; la cuarta es un módulo <code>nn.LeakyReLU</code> con pendiente negativa 0.1, que también se puede llamar como una función.</td></tr>
+        <tr data-lines="13"><td><code>for nombre, f in activaciones.items():</code></td><td>Recorre el diccionario.</td></tr>
+        <tr data-lines="14"><td><code>a = f(z)</code></td><td>Aplica la activación al vector <code>z</code>, elemento a elemento.</td></tr>
+        <tr data-lines="15"><td><code>a.sum().backward()</code></td><td><code>a.sum().backward()</code>: sumamos las tres salidas para tener un solo número y derivamos. Como cada salida depende solo de su <code>z</code>, el gradiente de la suma respecto a cada <code>z</code> es la derivada de la activación en ese punto.</td></tr>
+        <tr data-lines="16"><td><code>print(f"{nombre:9s} f(z) = {a.detach().numpy().round(4)}   f'(z) = {z.grad.numpy().round(4)}")</code></td><td>Imprime nombre, valores de <code>f(z)</code> y derivadas (<code>z.grad</code>).</td></tr>
+        <tr data-lines="17"><td><code>z.grad = None</code></td><td><code>z.grad = None</code> borra el gradiente acumulado: si no, el siguiente <code>backward()</code> se <em>sumaría</em> al anterior.</td></tr>
+        <tr data-lines="19"><td><code>print("nn.ReLU()(z)   :", nn.ReLU()(z).detach().numpy())</code></td><td>Las tres formas de usar ReLU dan lo mismo: aquí el módulo <code>nn.ReLU()</code> (se crea y se llama en una línea)…</td></tr>
+        <tr data-lines="20"><td><code>print("F.relu(z)      :", F.relu(z).detach().numpy())</code></td><td>…y aquí la función <code>F.relu</code>.</td></tr>
+        <tr data-lines="21"><td><code>print("pendiente por defecto de nn.LeakyReLU():", nn.LeakyReLU().negative_slope)</code></td><td>La pendiente que usa <code>nn.LeakyReLU()</code> si no se indica nada.</td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>sigmoide  f(z) = [0.1192 0.5    0.8808]   f'(z) = [0.105 0.25  0.105]
+tanh      f(z) = [-0.964  0.     0.964]   f'(z) = [0.0707 1.     0.0707]
+ReLU      f(z) = [0. 0. 2.]   f'(z) = [0. 0. 1.]
+LeakyReLU f(z) = [-0.2  0.   2. ]   f'(z) = [0.1 0.1 1. ]
+nn.ReLU()(z)   : [0. 0. 2.]
+F.relu(z)      : [0. 0. 2.]
+pendiente por defecto de nn.LeakyReLU(): 0.01</pre>
+    <p>Sigmoide: 0.1192, 0.5, 0.8808 con derivadas 0.105, 0.25 y 0.105 (σ(1−σ) = 0.8808·0.1192 = 0.105). Tanh: −0.964, 0, 0.964 y derivadas 0.0707, 1, 0.0707. ReLU: 0, 0, 2 y derivadas 0, 0, 1: fíjate en que en <code>z = 0</code> PyTorch usa derivada <strong>0</strong>. LeakyReLU con 0.1: −0.2, 0, 2 y derivadas 0.1, 0.1, 1 (en <code>z = 0</code> usa la rama de la pendiente pequeña). <code>nn.ReLU()</code> y <code>F.relu</code> dan lo mismo. Y la pendiente por defecto de <code>nn.LeakyReLU()</code> en PyTorch es <strong>0.01</strong> (en Keras 3 es 0.3).</p>
+  </div>
+</article>
+
+<article class="snippet" data-lang="python" id="frag-12">
+  <header>
+    <h3>12 · Neuronas ReLU «muertas»: contarlas y ver su gradiente</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Provocar neuronas muertas con un <em>learning rate</em> absurdo (10), contarlas, y comprobar que a una neurona ReLU apagada no le llega gradiente (exactamente 0) mientras que a una LeakyReLU sí le llega un hilo.</p>
+  </header>
+  <pre class="code"><code>import torch
+from torch import nn
+from sklearn.datasets import make_moons
+
+X, y = make_moons(n_samples=400, noise=0.2, random_state=3)
+Xt = torch.tensor(X, dtype=torch.float32)
+yt = torch.tensor(y, dtype=torch.float32).view(-1, 1)
+
+def entrenar(activacion, lr, semilla, h=8, epocas=300):
+    torch.manual_seed(semilla)
+    modelo = nn.Sequential(nn.Linear(2, h), activacion, nn.Linear(h, 1))
+    opt = torch.optim.SGD(modelo.parameters(), lr=lr)
+    criterio = nn.BCEWithLogitsLoss()
+    for _ in range(epocas):
+        loss = criterio(modelo(Xt), yt)
+        opt.zero_grad()
+        loss.backward()
+        opt.step()
+    with torch.no_grad():
+        z = modelo[0](Xt)
+        inactivas = (z &lt;= 0).all(dim=0)
+        acc = ((modelo(Xt) &gt; 0).float() == yt).float().mean().item()
+    return modelo, inactivas, loss.item(), acc
+
+for lr in (0.1, 10.0):
+    print(f"--- lr = {lr} ---")
+    for nombre, act in (("ReLU", nn.ReLU()), ("LeakyReLU", nn.LeakyReLU(0.01))):
+        print(nombre)
+        for semilla in range(4):
+            _, ina, loss, acc = entrenar(act, lr, semilla)
+            print(f"  semilla {semilla}: neuronas inactivas {int(ina.sum())} de 8   pérdida {loss:.3f}   accuracy {acc:.2f}")
+
+# Una neurona apagada no recibe gradiente: miramos el gradiente de cada fila de W1.
+for nombre, act in (("ReLU", nn.ReLU()), ("LeakyReLU", nn.LeakyReLU(0.01))):
+    modelo, ina, _, _ = entrenar(act, 10.0, 2)
+    loss = nn.BCEWithLogitsLoss()(modelo(Xt), yt)
+    modelo.zero_grad()
+    loss.backward()
+    print(f"{nombre}, lr = 10, semilla 2")
+    print("  inactiva?          ", " ".join("sí" if v else "no" for v in ina.tolist()))
+    print("  |gradiente| de W1  ", " ".join(f"{v:.0e}" for v in modelo[0].weight.grad.norm(dim=1).tolist()))</code></pre>
+  <details class="linea-a-linea" open>
+    <summary>Línea por línea</summary>
+    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+      <tbody>
+        <tr data-lines="1-3"><td><code>import torch …</code></td><td>Importaciones.</td></tr>
+        <tr data-lines="5"><td><code>X, y = make_moons(n_samples=400, noise=0.2, random_state=3)</code></td><td>400 puntos de dos lunas con ruido 0.2.</td></tr>
+        <tr data-lines="6-7"><td><code>Xt = torch.tensor(X, dtype=torch.float32)
+yt = torch.tensor(y, dtype=torch.float32).view(-1, 1)</code></td><td>Tensores <code>float32</code>; las etiquetas con forma <code>(400, 1)</code>.</td></tr>
+        <tr data-lines="9"><td><code>def entrenar(activacion, lr, semilla, h=8, epocas=300):</code></td><td>La función recibe el <em>objeto</em> de activación, el <code>lr</code>, la semilla, el número de neuronas ocultas <code>h</code> y las épocas.</td></tr>
+        <tr data-lines="10"><td><code>torch.manual_seed(semilla)</code></td><td>Semilla fija.</td></tr>
+        <tr data-lines="11"><td><code>modelo = nn.Sequential(nn.Linear(2, h), activacion, nn.Linear(h, 1))</code></td><td>Red 2-h-1 con la activación elegida.</td></tr>
+        <tr data-lines="12-13"><td><code>opt = torch.optim.SGD(modelo.parameters(), lr=lr)
+criterio = nn.BCEWithLogitsLoss()</code></td><td>SGD y pérdida con logits.</td></tr>
+        <tr data-lines="14-18"><td><code>for _ in range(epocas): …</code></td><td>Bucle de entrenamiento habitual, con los 400 datos de una vez.</td></tr>
+        <tr data-lines="19"><td><code>with torch.no_grad():</code></td><td>Evaluación sin gradientes.</td></tr>
+        <tr data-lines="20"><td><code>z = modelo[0](Xt)</code></td><td><code>z</code>: lo que reciben las activaciones, es decir la salida de la primera <code>Linear</code> (<code>modelo[0]</code>) para todos los datos. Tiene forma <code>(400, 8)</code>.</td></tr>
+        <tr data-lines="21"><td><code>inactivas = (z &lt;= 0).all(dim=0)</code></td><td>Una neurona está «inactiva» si su <code>z</code> es ≤ 0 en <em>todos</em> los 400 datos (<code>.all(dim=0)</code> recorre los datos de cada columna).</td></tr>
+        <tr data-lines="22"><td><code>acc = ((modelo(Xt) &gt; 0).float() == yt).float().mean().item()</code></td><td>Accuracy sobre los datos de entrenamiento.</td></tr>
+        <tr data-lines="23"><td><code>return modelo, inactivas, loss.item(), acc</code></td><td>Devuelve la red, qué neuronas están inactivas, la pérdida final y el acierto.</td></tr>
+        <tr data-lines="25"><td><code>for lr in (0.1, 10.0):</code></td><td>Dos learning rates: uno razonable (0.1) y uno exagerado (10).</td></tr>
+        <tr data-lines="26"><td><code>print(f"--- lr = {lr} ---")</code></td><td>Imprime el título del bloque.</td></tr>
+        <tr data-lines="27"><td><code>for nombre, act in (("ReLU", nn.ReLU()), ("LeakyReLU", nn.LeakyReLU(0.01))):</code></td><td>Para cada una de las dos activaciones…</td></tr>
+        <tr data-lines="28"><td><code>print(nombre)</code></td><td>…su nombre…</td></tr>
+        <tr data-lines="29"><td><code>for semilla in range(4):</code></td><td>…y 4 semillas.</td></tr>
+        <tr data-lines="30"><td><code>_, ina, loss, acc = entrenar(act, lr, semilla)</code></td><td>Entrena y recoge lo que interesa.</td></tr>
+        <tr data-lines="31"><td><code>print(f"  semilla {semilla}: neuronas inactivas {int(ina.sum())} de 8   pérdida {loss:.3f}   accuracy {acc:.2f}")</code></td><td>Imprime el número de neuronas inactivas, la pérdida y el acierto.</td></tr>
+        <tr data-lines="33"><td><code># Una neurona apagada no recibe gradiente: miramos el gradiente de cada fila de W1.</code></td><td>Comentario: ahora miraremos el gradiente de cada neurona.</td></tr>
+        <tr data-lines="34"><td><code>for nombre, act in (("ReLU", nn.ReLU()), ("LeakyReLU", nn.LeakyReLU(0.01))):</code></td><td>Las dos activaciones otra vez, con <code>lr = 10</code> y la semilla 2.</td></tr>
+        <tr data-lines="35"><td><code>modelo, ina, _, _ = entrenar(act, 10.0, 2)</code></td><td>Entrena.</td></tr>
+        <tr data-lines="36"><td><code>loss = nn.BCEWithLogitsLoss()(modelo(Xt), yt)</code></td><td>Vuelve a calcular la pérdida sobre los datos <em>con</em> gradiente (fuera de <code>no_grad</code>).</td></tr>
+        <tr data-lines="37-38"><td><code>modelo.zero_grad()
+loss.backward()</code></td><td><code>zero_grad</code> y <code>backward</code>: calculan el gradiente de todos los parámetros para esa pérdida.</td></tr>
+        <tr data-lines="39"><td><code>print(f"{nombre}, lr = 10, semilla 2")</code></td><td>Título.</td></tr>
+        <tr data-lines="40"><td><code>print("  inactiva?          ", " ".join("sí" if v else "no" for v in ina.tolist()))</code></td><td>Muestra qué neuronas están inactivas («sí») o activas («no»).</td></tr>
+        <tr data-lines="41"><td><code>print("  |gradiente| de W1  ", " ".join(f"{v:.0e}" for v in modelo[0].weight.grad.norm(dim=1).tolist()))</code></td><td><code>weight.grad.norm(dim=1)</code>: la longitud del gradiente de cada fila de <code>W1</code> (una por neurona). <code>f"{v:.0e}"</code> lo escribe en notación científica con un dígito.</td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>--- lr = 0.1 ---
+ReLU
+  semilla 0: neuronas inactivas 0 de 8   pérdida 0.286   accuracy 0.89
+  semilla 1: neuronas inactivas 2 de 8   pérdida 0.293   accuracy 0.89
+  semilla 2: neuronas inactivas 0 de 8   pérdida 0.290   accuracy 0.89
+  semilla 3: neuronas inactivas 0 de 8   pérdida 0.287   accuracy 0.89
+LeakyReLU
+  semilla 0: neuronas inactivas 0 de 8   pérdida 0.286   accuracy 0.89
+  semilla 1: neuronas inactivas 2 de 8   pérdida 0.293   accuracy 0.89
+  semilla 2: neuronas inactivas 0 de 8   pérdida 0.290   accuracy 0.89
+  semilla 3: neuronas inactivas 0 de 8   pérdida 0.287   accuracy 0.89
+--- lr = 10.0 ---
+ReLU
+  semilla 0: neuronas inactivas 7 de 8   pérdida 1.044   accuracy 0.50
+  semilla 1: neuronas inactivas 7 de 8   pérdida 0.434   accuracy 0.81
+  semilla 2: neuronas inactivas 4 de 8   pérdida 0.243   accuracy 0.89
+  semilla 3: neuronas inactivas 3 de 8   pérdida 0.306   accuracy 0.87
+LeakyReLU
+  semilla 0: neuronas inactivas 4 de 8   pérdida 0.265   accuracy 0.89
+  semilla 1: neuronas inactivas 3 de 8   pérdida 0.125   accuracy 0.96
+  semilla 2: neuronas inactivas 4 de 8   pérdida 0.240   accuracy 0.89
+  semilla 3: neuronas inactivas 3 de 8   pérdida 0.120   accuracy 0.96
+ReLU, lr = 10, semilla 2
+  inactiva?           sí sí sí no sí no no no
+  |gradiente| de W1   0e+00 0e+00 0e+00 5e-03 0e+00 2e-02 2e-12 6e-04
+LeakyReLU, lr = 10, semilla 2
+  inactiva?           sí no sí sí sí no no no
+  |gradiente| de W1   2e-04 2e-04 2e-04 4e-04 3e-05 2e-03 3e-04 2e-02</pre>
+    <p>Con <code>lr = 0.1</code> prácticamente no hay neuronas muertas (solo 2 en la semilla 1) y ReLU y LeakyReLU dan resultados idénticos. Con <code>lr = 10</code> un paso tan grande lanza los pesos muy lejos y muchas neuronas quedan con z ≤ 0 para todos los datos: ReLU deja <strong>7 de 8</strong> inactivas en las semillas 0 y 1, y en la 0 acaba en pérdida 1.044 y accuracy 0.50 (la red no aprende). Con LeakyReLU, mismo <code>lr</code> y mismos pesos iniciales, quedan 3-4 inactivas, pero la pérdida es 0.265, 0.125, 0.240 y 0.120. Lo decisivo está al final (semilla 2): las neuronas ReLU inactivas tienen gradiente <strong>exactamente 0</strong> (<code>0e+00</code>) y no pueden «resucitar», mientras que las LeakyReLU, aun «inactivas», reciben gradientes pequeños pero distintos de cero (2e-04, 2e-04, 4e-04…).</p>
+  </div>
+</article>
+
+</section>
+
+</div>
+</main>
+</body>
+</html>

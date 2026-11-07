@@ -1,153 +1,432 @@
-<!DOCTYPE html>
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lección 6 · Con pocos datos, toca poco: tres escenarios y un learning rate diminuto · Módulo 5 · Curso 2 · Cuaderno de IA</title>
+<meta name="description" content="Los tres escenarios de uso de un preentrenado y por qué el fine-tuning necesita un learning rate muy pequeño.">
+<script>try{var t=localStorage.getItem('cuaderno-ia:tema');if(t)document.documentElement.setAttribute('data-theme',t)}catch(e){}</script>
+<link rel="stylesheet" href="../../assets/css/style.css">
+<script src="../../assets/js/curriculum.js"></script>
+<script src="../../assets/js/lab.js"></script>
+<script src="../../assets/js/app.js" defer></script>
+</head>
+<body data-root="../../" data-course="2" data-module="5" data-lesson="6">
+<main>
+<div class="page">
 
-<html lang="es"><head><meta charset="utf-8"/><meta content="width=device-width,initial-scale=1" name="viewport"/><title>Lección 6 · Compilar y entrenar: compile , fit y el error a mano · Curso 2 · Cuaderno de IA</title><meta content="Lee la tabla con calma." name="description"/><script>try{var t=localStorage.getItem('cuaderno-ia:tema');if(t)document.documentElement.setAttribute('data-theme',t)}catch(e){}</script><link href="../../assets/css/style.css" rel="stylesheet"/><script src="../../assets/js/curriculum.js"></script><script src="../../assets/js/lab.js"></script><script defer="" src="../../assets/js/app.js"></script><script defer="" src="../../assets/js/microanimations.js"></script></head><body data-course="2" data-lesson="6" data-module="5" data-root="../../"><main><div class="page" data-micro="3min"><header class="hero leccion"><div class="hero-grid"><div><p class="eyebrow">Curso 2 · Módulo 5 · Lección 6 de 21</p><h1>Compilar y entrenar: compile , fit y el error a mano</h1><p class="lead">Lee la tabla con calma.</p><p class="meta-line"><span class="read-time" data-render="read-time"></span><a href="../modulo-5.html">Índice del módulo</a></p></div><div aria-hidden="true" class="hero-tile"></div></div></header><details class="predice"><summary>¿Cómo se le dice a Keras «aprende a quitar ruido»? ¿Y cómo sabemos que de verdad ha aprendido, sin fiarnos solo de lo que imprime?<span class="hint"></span></summary><div><p>Lee la tabla con calma.</p></div></details><section aria-label="Explicación breve" class="micro-core"><div class="micro-kicker">01 · ENTENDER <span>≈ 45 s</span></div><h2>La idea en palabras sencillas</h2><p>La prueba de que son la misma red: decoder(encoder(x)) da lo mismo que autoencoder(x) (fragmento 5, True ). El código de una imagen son 392 valores en lugar de 784.</p><div class="micro-example"><span aria-hidden="true" class="micro-example-icon">🐾</span><div><strong>Otro ejemplo · Mascotas</strong><p>Una red combina tamaño, orejas y pelaje para distinguir patrones que no dependen de una sola regla.</p></div></div></section><div class="micro-kicker micro-checkpoint">02 · RESPONDER <span>≈ 15 s</span></div><section aria-label="Pregunta intercalada" class="quiz mini micro-check"><script class="quiz-data" type="application/json">{"titulo": "Pausa rápida · Comprueba la idea", "preguntas": [{"q": "Una neurona recibe dos entradas. ¿Qué hace con los pesos?", "opciones": ["Borra las entradas al entrenar", "Multiplica cada entrada por su peso y combina resultados", "Elige siempre la entrada mayor"], "correcta": 1, "porque": "La suma ponderada combina entradas, pesos y bias antes de la activación."}]}</script></section><section aria-label="Animación interactiva" class="micro-viz" data-index="13" data-micro-viz="neural"><div class="micro-kicker">03 · EXPERIMENTAR <span>≈ 45 s</span></div><div class="micro-viz-title"><div><h2>Señales que atraviesan una red</h2><p>Pulsa «Propagar» para seguir el recorrido de entradas a salida.</p></div><span aria-hidden="true" class="micro-viz-symbol">✦</span></div><div aria-live="polite" class="micro-viz-stage"><p>Animación interactiva: Señales que atraviesan una red</p></div></section><div class="micro-kicker micro-checkpoint">04 · APLICAR <span>≈ 15 s</span></div><section aria-label="Pregunta intercalada" class="quiz mini micro-check"><script class="quiz-data" type="application/json">{"titulo": "Pausa rápida · ¿Lo aplicarías?", "preguntas": [{"q": "¿Cuándo se actualizan los pesos de una red?", "opciones": ["Al aplicar el optimizador durante el entrenamiento", "Cada vez que se abre la página", "Nunca: los pesos son fijos"], "correcta": 0, "porque": "El optimizador utiliza los gradientes para ajustar parámetros durante el aprendizaje."}]}</script></section><div class="micro-finish"><strong>Idea que te llevas</strong><span>La prueba de que son la misma red: decoder(encoder(x)) da lo mismo que autoencoder(x) (fragmento 5, True )</span><small>¿Quieres más ejemplos, fórmulas o código? Los tienes justo debajo, sin límite de tiempo.</small></div><details class="profundizar micro-legacy"><summary><span>Explorar más: explicación y simulaciones completas<small>Todo el texto original, tablas y demos avanzadas. Opcional.</small></span></summary><div class="prof-body"><section><h2>Compilar y entrenar: compile , fit y el error a mano</h2>
-<p>Lee la tabla con calma. Las dos curvas bajan juntas (buena señal: no hay sobreajuste todavía). Pero <strong>al final de las 8 épocas la red limpia solo un poco</strong>: en las 100 imágenes de validación, el error de la imagen ruidosa era 0,0315 y el de la imagen «limpiada» 0,0172, apenas 1,8 veces menos. Ocho épocas con 400 imágenes son pocos pasos de entrenamiento (13 por época: 400 / 32 = 12,5 → 13). Si seguimos con 40 épocas más, el error de validación baja a <strong>0,0020</strong>: unas 15 veces menos que el ruido de partida. Moraleja: la pérdida seguía bajando cuando paramos; «pocas épocas» no significa «mal modelo», significa «sin terminar».</p>
-<h2>Separar el encoder y el decoder</h2>
-<p>Sí. Un autoencoder entrenado son <em>dos redes en una</em>, y Keras permite sacarlas. Como a la capa del cuello de botella le pusimos <code>name="bottleneck"</code>, podemos pedirla por nombre:</p>
-<p>La prueba de que son la misma red: <code>decoder(encoder(x))</code> da lo mismo que <code>autoencoder(x)</code> (fragmento 5, <code>True</code>). El código de una imagen son 392 valores en lugar de 784.</p>
-<div class="callout ejemplo"><span class="lbl">Ejemplo tomado del módulo</span><p>: el MSE de una imagen minúscula Carátula limpia de 4 píxeles \( (0,\ 0,\ 1,\ 1) \) y reconstrucción \( (0{,}1,\ 0,\ 0{,}8,\ 1) \).</p></div></section><div class="resumen"><h2 class="sin-num sin-toc">En pocas líneas</h2><ul><li><strong>Compilar y entrenar: compile , fit y el error a mano:</strong> Lee la tabla con calma.</li><li><strong>Separar el encoder y el decoder:</strong> Sí.</li><li>Antes de continuar, intenta explicar la demo sin mirar su resultado.</li></ul></div><section class="quiz mini"><script class="quiz-data" type="application/json">{"titulo": "¿Lo tienes?", "preguntas": [{"q": "¿Qué concepto estamos trabajando en esta lección?", "opciones": ["Autoencoders: aprender a comprimir y a reconstruir", "Compilar y entrenar: compile , fit y el error a mano", "Parte 2: describir la imagen con BLIP"], "correcta": 1, "porque": "Lee la tabla con calma."}, {"q": "¿Cuál de estas afirmaciones recoge lo que acabas de estudiar?", "opciones": ["Siempre hay un único método que sirve para todos los problemas.", "Lo importante es comprender la idea y comprobarla con ejemplos, no memorizar términos.", "Lee la tabla con calma."], "correcta": 2, "porque": "La explicación central es: Lee la tabla con calma."}, {"q": "Si una demo o un ejemplo te desconcierta, ¿cuál es la mejor forma de aprenderlo?", "opciones": ["Ignorar los resultados que no coinciden con tu intuición.", "Memorizar el nombre sin entender la operación.", "Volver a los números, cambiar un valor y explicar qué ocurre."], "correcta": 2, "porque": "Explorar qué cambia y por qué ayuda a conectar el concepto con su resultado."}]}</script></section></div></details><details class="profundizar"><summary><span>Profundizar: explicación completa<small>Matices, fórmulas, tablas, otros ejemplos y experimentos del módulo original.</small></span></summary><div class="prof-body"><section>
-<h2 id="entrenar-conv">Compilar y entrenar: <code>compile</code>, <code>fit</code> y el error a mano</h2>
-<p class="pregunta">¿Cómo se le dice a Keras «aprende a quitar ruido»? ¿Y cómo sabemos que de verdad ha aprendido, sin fiarnos solo de lo que imprime?</p>
+<header class="hero leccion">
+  <div class="hero-grid">
+    <div>
+      <p class="eyebrow">Curso 2 · Módulo 5 · Lección 6 de 8</p>
+      <h1>Con pocos datos, toca poco: tres escenarios y un learning rate diminuto</h1>
+      <p class="lead">Puedes usar al crítico de tres formas: pedirle sus apuntes, aprender tú la nota final o dejarle retocar sus criterios. Cuantos menos datos tengas, menos conviene tocarle.</p>
+      <p class="meta-line"><span class="read-time" data-render="read-time"></span><a href="../modulo-5.html">Índice del módulo</a></p>
+    </div>
+    <div class="hero-tile" aria-hidden="true"></div>
+  </div>
+</header>
+
+<details class="predice">
+  <summary>Descongelas el último bloque de VGG16 para afinarlo y entrenas con el mismo learning rate grande que usaste para la cabeza nueva. ¿Mejora o empeora?<span class="hint"></span></summary>
+  <div>
+    <p>Empeora: los primeros gradientes vienen de una cabeza todavía mala y mueven pesos buenos en direcciones equivocadas. <strong>Destruyes lo preentrenado</strong>, como el crítico que tras dos películas malas de terror decide que todo el cine es malo. Por eso el fine-tuning usa <code>Adam(1e-5)</code>.</p>
+  </div>
+</details>
+
+<section>
+<h2 id="idea">Tres formas de usar un preentrenado</h2>
 <ol class="pasos">
-<li><strong><code>autoencoder.compile(optimizer="adam", loss="mean_squared_error")</code></strong>. <code>compile</code> no entrena nada: define <em>cómo medir el error</em> (MSE, que compara cada píxel de la salida con el de la imagen limpia) y <em>cómo corregir los pesos</em> (Adam, el optimizador del módulo anterior).</li>
-<li><strong><code>autoencoder.fit(noisy, clean, epochs=8, batch_size=32, validation_split=0.2)</code></strong>. Entrada: las imágenes ruidosas; objetivo: las limpias. <code>epochs=8</code> son 8 pasadas completas. <code>batch_size=32</code> actualiza los pesos cada 32 imágenes. <code>validation_split=0.2</code> aparta el último 20 % (las imágenes 400 a 499) y no entrena con ellas: sirven para medir cómo funciona con imágenes que la red no ha visto.</li>
-<li><strong><code>reconstructed = autoencoder.predict(noisy[:1])</code></strong>. Pasa la primera imagen ruidosa por la red y devuelve la imagen reconstruida (forma <code>(1, 28, 28, 1)</code>).</li>
-<li><strong>Error a mano</strong>: <code>np.mean((reconstructed[0] - clean[0]) ** 2)</code>. Resta pixel a pixel, eleva al cuadrado y hace la media: eso es el MSE que Keras calcula por dentro.</li>
+  <li><strong>Feature extraction</strong>: toda la base congelada; sus 25.088 números por imagen se dan a algo sencillo (clustering, PCA, un clasificador pequeño). Para muy pocos datos.</li>
+  <li><strong>Transfer learning</strong>: base congelada y una cabeza nueva que se entrena con un learning rate normal (<code>Adam(0.0001)</code>). Es el del proyecto.</li>
+  <li><strong>Fine-tuning</strong>: además se descongelan algunas capas <em>superiores</em> de la base, con un learning rate muy pequeño (<code>Adam(1e-5)</code>). Para más datos o imágenes muy distintas de ImageNet.</li>
 </ol>
+<p>Se descongelan las superiores y no las primeras porque las primeras son generales (bordes, colores) y valen para todo; las superiores son las más específicas de ImageNet.</p>
+</section>
+<figure class="demo" data-demo="curso2/c2m5-escenarios" data-titulo="Qué se congela en cada escenario">
+  <div class="haz">Elige los escenarios 1, 2 y 3; en el 3, mueve el slider de capas descongeladas.</div>
+  <div class="observa">En el 2 solo se entrenan las 3 <code>Dense</code>. En el 3, descongelar el bloque 5 deja 20.188.161 parámetros entrenables y el gradiente baja hasta <code>block5_conv1</code>.</div>
+</figure>
+
+<section>
+<h2 id="con-numeros">Con números: un experimento honesto</h2>
 <div class="callout ejemplo">
-<span class="lbl">Ejemplo numérico: el MSE de una imagen minúscula</span>
-<p>Carátula limpia de 4 píxeles \( (0,\ 0,\ 1,\ 1) \) y reconstrucción \( (0{,}1,\ 0,\ 0{,}8,\ 1) \). Diferencias: \( (0{,}1,\ 0,\ -0{,}2,\ 0) \). Al cuadrado: \( (0{,}01,\ 0,\ 0{,}04,\ 0) \). Media: \( 0{,}05/4 = \) <span class="res">0,0125</span>. El MSE de las 784 posiciones se calcula igual.</p>
+  <span class="lbl">Ejemplo numérico</span>
+  <p>Abolladuras y grietas sintéticas con <strong>solo 40 fotos</strong> de entrenamiento. Acierto en 60 de test:</p>
+  <table>
+    <thead><tr><th>Variante</th><th>Test</th></tr></thead>
+    <tbody>
+      <tr><td>Desde cero, todo se entrena</td><td>0,550</td></tr>
+      <tr><td>Base al azar congelada + cabeza</td><td>0,767</td></tr>
+      <tr><td>Preentrenada congelada + cabeza</td><td class="res">0,767</td></tr>
+      <tr><td>Fine-tuning, lr 1e-4</td><td>0,700</td></tr>
+      <tr><td>Fine-tuning, lr 1e-2</td><td>0,500</td></tr>
+    </tbody>
+  </table>
+  <p>Entrenarlo todo con 40 fotos apenas supera el azar (0,5); congelar sube a 0,767; un learning rate grande lo hunde al 0,500 exacto del azar. (El preentrenado de juguete no gana a la base al azar: la ventaja de verdad llega con millones de imágenes.)</p>
 </div>
-<h3>Qué pasó de verdad al ejecutarlo (fragmento 4)</h3>
+</section>
+<figure class="demo" data-demo="curso2/c2m5-curva-lr" data-titulo="Fine-tuning: el learning rate puede destruir lo preentrenado">
+  <div class="haz">Mueve el learning rate de 0,001 a 1 y compara con la curva de «base congelada».</div>
+  <div class="observa">Con lr ≥ 0,1 el error de entrenamiento llega a 0 mientras el de validación sube: memoriza los 30 puntos.</div>
+</figure>
+<details class="predice">
+  <summary>En Keras 3 congelaste la base capa a capa. Luego escribes <code>base_model.trainable = True</code> y sigues entrenando sin más. ¿Se entrena ahora la base?<span class="hint"></span></summary>
+  <div>
+    <p>No. Esa asignación puede no hacer nada (el indicador del modelo ya estaba en <code>True</code>) y, además, sin volver a llamar a <code>compile()</code> el entrenamiento sigue con la configuración antigua. Descongela capa a capa y <strong>recompila</strong>: es el momento de poner <code>Adam(1e-5)</code>.</p>
+  </div>
+</details>
+<div class="resumen">
+  <h2 class="sin-num sin-toc">En tres líneas</h2>
+  <ul>
+    <li>Feature extraction (nada se entrena en la base), transfer learning (cabeza nueva), fine-tuning (cabeza + capas superiores).</li>
+    <li>Fine-tuning con un learning rate diminuto (1e-5): retocar sin destruir.</li>
+    <li>Tras cambiar <code>trainable</code>, descongela capa a capa y vuelve a compilar.</li>
+  </ul>
+</div>
+
+<section class="quiz mini">
+<script type="application/json" class="quiz-data">
+{
+ "titulo": "¿Lo tienes?",
+ "preguntas": [
+  {
+   "q": "¿Por qué el fine-tuning usa un learning rate muy pequeño como <code>Adam(learning_rate=1e-5)</code>?",
+   "opciones": [
+    "Para que el entrenamiento termine antes.",
+    "Porque las capas congeladas necesitan un learning rate pequeño para seguir congeladas.",
+    "Porque con un learning rate grande el modelo deja de usar la GPU.",
+    "Para retocar sin destruir los pesos preentrenados, que ya están casi bien."
+   ],
+   "correcta": 3,
+   "porque": "Los pesos descongelados ya contienen conocimiento útil; con pasos grandes, los gradientes iniciales (de una cabeza todavía mala) los moverían en direcciones equivocadas y se perdería lo aprendido (en el fragmento 18, lr 1e-2 baja la accuracy de 0,70 a 0,50). Un learning rate pequeño no acelera nada (al contrario), las capas congeladas no se tocan sea cual sea el learning rate, y la GPU no tiene que ver."
+  },
+  {
+   "q": "Congelaste la base capa a capa (<code>for layer in base_model.layers: layer.trainable = False</code>) y después escribes <code>base_model.trainable = True</code>. Cuentas los parámetros entrenables y no han cambiado. ¿Qué pasa y qué haces?",
+   "opciones": [
+    "En Keras 3 esa asignación puede no hacer nada porque el indicador del modelo ya estaba en <code>True</code>; hay que descongelar capa a capa y volver a llamar a <code>compile()</code>.",
+    "Es un fallo de memoria: reinicia el ordenador.",
+    "Hay que llamar a <code>fit</code> con <code>epochs=0</code> para que se apliquen los cambios.",
+    "Eso significa que la base ya estaba descongelada desde el principio."
+   ],
+   "correcta": 0,
+   "porque": "Fragmento 9: tras la asignación siguen siendo 13.108.737 los entrenables. Se resuelve descongelando capa a capa (<code>layer.trainable = …</code>) y recompilando: el fragmento 10 enseña que sin <code>compile()</code> los pesos de la primera capa no cambian aunque se haya descongelado. No es un problema de memoria, <code>fit</code> con 0 épocas no es la solución, y la base <em>no</em> estaba descongelada: lo estaba el indicador, no las capas."
+  },
+  {
+   "q": "Tienes muy pocas fotos y tu problema se parece a ImageNet. ¿Qué escenario eliges?",
+   "opciones": [
+    "Fine-tuning de toda la red con un learning rate grande",
+    "Transfer learning: base congelada y solo la cabeza nueva",
+    "Entrenar desde cero"
+   ],
+   "correcta": 1,
+   "porque": "Con pocos datos conviene tener pocos parámetros entrenables. En el experimento, congelar dio 0,767 frente al 0,550 de entrenarlo todo."
+  }
+ ]
+}
+</script>
+</section>
+
+<details class="profundizar">
+  <summary><span>Profundizar: la explicación completa<small>La tabla completa de los tres escenarios, la analogía del crítico, el flujo completo, las guías de los dos experimentos, las trampas de trainable en Keras 3 y cómo leer el experimento con 40 imágenes.</small></span></summary>
+  <div class="prof-body">
+<h2 id="escenarios">Los tres escenarios: feature extraction, transfer learning y fine-tuning</h2>
+<p class="pregunta">Hay tres formas de usar un preentrenado. ¿Cuál elijo según los datos y el cálculo que tengo?</p>
+
 <table>
-<caption>Pérdida (MSE) por época, 500 imágenes con ruido 0,25 y semilla 42</caption>
-<thead><tr><th>Época</th><th>1</th><th>2</th><th>3</th><th>4</th><th>5</th><th>6</th><th>7</th><th>8</th></tr></thead>
-<tbody>
-<tr><td>Entrenamiento</td><td>0,2270</td><td>0,1668</td><td>0,1154</td><td>0,0880</td><td>0,0732</td><td>0,0575</td><td>0,0307</td><td>0,0197</td></tr>
-<tr><td>Validación</td><td>0,1936</td><td>0,1410</td><td>0,1016</td><td>0,0828</td><td>0,0695</td><td>0,0449</td><td>0,0214</td><td>0,0172</td></tr>
-</tbody>
+  <thead><tr><th>Escenario</th><th>Qué se congela</th><th>Qué se entrena</th><th>Learning rate típico</th><th>Cuándo</th></tr></thead>
+  <tbody>
+    <tr><td><strong>1 · Feature extraction</strong></td><td>Toda la base</td><td>Nada en la base. Las <em>features</em> (7×7×512, o 25.088 números) se extraen una vez y se dan a un método sencillo: clustering, PCA, visualización o un clasificador pequeño</td><td>—</td><td>Muy pocos datos o recursos</td></tr>
+    <tr><td><strong>2 · Transfer learning</strong></td><td>Toda la base</td><td>La cabeza nueva (<code>Dense</code>…)</td><td>Normal, p. ej. <code>Adam(learning_rate=0.0001)</code> en el proyecto</td><td>Tu problema se parece a ImageNet; pocos datos</td></tr>
+    <tr><td><strong>3 · Fine-tuning</strong></td><td>Las capas iniciales</td><td>Cabeza nueva <strong>y</strong> algunas capas <em>superiores</em> de la base</td><td>Muy pequeño, p. ej. <code>Adam(learning_rate=1e-5)</code></td><td>Más datos, o tus imágenes se parecen poco a ImageNet</td></tr>
+  </tbody>
 </table>
-<p>Lee la tabla con calma. Las dos curvas bajan juntas (buena señal: no hay sobreajuste todavía). Pero <strong>al final de las 8 épocas la red limpia solo un poco</strong>: en las 100 imágenes de validación, el error de la imagen ruidosa era 0,0315 y el de la imagen «limpiada» 0,0172, apenas 1,8 veces menos. Ocho épocas con 400 imágenes son pocos pasos de entrenamiento (13 por época: 400 / 32 = 12,5 → 13). Si seguimos con 40 épocas más, el error de validación baja a <strong>0,0020</strong>: unas 15 veces menos que el ruido de partida. Moraleja: la pérdida seguía bajando cuando paramos; «pocas épocas» no significa «mal modelo», significa «sin terminar».</p>
-</section><section>
-<h2 id="encoder-decoder">Separar el encoder y el decoder</h2>
-<p class="pregunta">Si ya entrenamos el modelo entero, ¿se pueden usar las dos mitades por separado? ¿Para qué querríamos solo el código comprimido?</p>
-<p>Sí. Un autoencoder entrenado son <em>dos redes en una</em>, y Keras permite sacarlas. Como a la capa del cuello de botella le pusimos <code>name="bottleneck"</code>, podemos pedirla por nombre:</p>
-<ul>
-<li><strong>Encoder</strong>: <code>keras.Model(inputs, autoencoder.get_layer("bottleneck").output)</code>. Entrada: imagen; salida: el código <code>(7, 7, 8)</code>. Sirve para <strong>comprimir</strong>, para <strong>visualizar</strong>, para hacer <em>clustering</em> o para <strong>alimentar otro modelo</strong> con una versión más corta de los datos.</li>
-<li><strong>Decoder</strong>: las capas posteriores al cuello, encadenadas desde una entrada nueva <code>keras.Input(shape=(7, 7, 8))</code>. Sirve para <strong>reconstruir</strong> a partir de un código (y, con ideas más avanzadas, para generar imágenes nuevas).</li>
+<p>¿Por qué las <em>superiores</em> y no las primeras? Porque las primeras son generales (bordes, colores) y valen para todo; las superiores son las más específicas de ImageNet y las que más conviene adaptar a tu problema.</p>
+
+<div class="callout analogia">
+  <span class="lbl">Analogía: tres formas de usar al crítico</span>
+  <ul>
+    <li><strong>1 · Feature extraction</strong>: el crítico te da sus apuntes sobre cada película (sin cambiar de opinión) y tú los metes en una hoja de cálculo sencilla.</li>
+    <li><strong>2 · Transfer learning</strong>: el crítico no cambia nada; tú solo aprendes a poner la nota final de tu género a partir de lo que él ve.</li>
+    <li><strong>3 · Fine-tuning</strong>: además de aprender la nota final, dejas que el crítico <em>retoque un poco</em> sus criterios más especializados, con mucho cuidado.</li>
+  </ul>
+</div>
+
+<div class="callout recuerda">
+  <span class="lbl">Guía completa del experimento «Qué se congela en cada escenario»</span>
+  <p>El experimento está más arriba, en la lección. Estas son sus instrucciones completas.</p>
+  <p><strong>Haz esto:</strong> Piensa en las barras grises como lo que el crítico veterano ya sabe (no cambia) y en las naranjas como lo que aprende de tu género. Elige el escenario 1, luego el 2 y el 3. En el escenario 3 mueve el slider de capas descongeladas de 0 a 13 y fíjate en el bloque 5 (3 capas) y en qué capa llega el gradiente.</p>
+  <p><strong>Fíjate en:</strong> En el escenario 2, las únicas capas con pesos que se actualizan son 3 de las 16 del dibujo (las <code>Dense</code>): el gradiente «solo llega hasta <code>Dense 512</code>» y no se calcula nada dentro de la base, por eso es rápido. En el 3, descongelar 3 capas (el bloque 5) deja entrenables 20.188.161 parámetros (13.108.737 de la cabeza + 7.079.424 del bloque 5) y el gradiente tiene que bajar hasta <code>block5_conv1</code>. Con 13 capas descongeladas, todo el modelo (27.823.425) se entrena de nuevo, sin sentido práctico con pocas fotos.</p>
+</div>
+
+<h3>El flujo completo</h3>
+<ul class="flow">
+  <li class="a">Dataset nuevo</li>
+  <li class="a">Preprocesar<small>rescale / preprocess_input</small></li>
+  <li class="b">VGG16 preentrenada<small>include_top=False</small></li>
+  <li class="b">Congelar la base</li>
+  <li class="d">Cabeza nueva<small>Flatten / Dense / sigmoide</small></li>
+  <li class="d">Entrenar la cabeza</li>
+  <li class="c">Evaluar<small>si hace falta: descongelar capas + lr pequeño = fine-tuning</small></li>
 </ul>
-<p>La prueba de que son la misma red: <code>decoder(encoder(x))</code> da lo mismo que <code>autoencoder(x)</code> (fragmento 5, <code>True</code>). El código de una imagen son 392 valores en lugar de 784.</p>
-</section></div></details><details class="profundizar" id="codigo"><summary><span>Ver código explicado paso a paso<small>2 fragmento(s) original(es), con cada línea comentada y salida esperada.</small></span></summary><div class="prof-body"><article class="snippet" data-lang="python">
-<header>
-<h3>4 · Compilar, entrenar y medir el error a mano</h3>
-<p class="para-que"><strong>Para qué sirve</strong> Entrenar el autoencoder para quitar ruido (<code>fit(noisy, clean)</code>), medir el error de una imagen a mano como en las notas y comprobar con las imágenes de validación que la red de verdad limpia. Continúa los fragmentos 1-3.</p>
-</header>
-<pre class="code"><code>autoencoder.compile(optimizer="adam", loss="mean_squared_error")
 
-history = autoencoder.fit(
-    noisy, clean,
-    epochs=8, batch_size=32, validation_split=0.2, verbose=0,
-)
-print("loss (train):", np.round(history.history["loss"], 4))
-print("loss (val)  :", np.round(history.history["val_loss"], 4))
+<h3>Por qué el learning rate del fine-tuning es tan pequeño</h3>
+<p>La cabeza empieza con pesos aleatorios: necesita pasos grandes para colocarse. Las capas descongeladas de la base ya están casi bien: lo único que queremos es un <em>retoque fino</em>. Si las entrenas con un paso grande, los primeros gradientes (que vienen de una cabeza todavía mala) mueven pesos buenos en direcciones equivocadas y <strong>destruyes el conocimiento preentrenado</strong>: es el crítico que, tras ver dos películas malas de terror, decide que todo el cine es malo. Con \( 10^{-5} \) cada paso mueve un peso una cienmilésima de su escala.</p>
 
-reconstructed = autoencoder.predict(noisy[:1], verbose=0)
-print("MSE manual, imagen 0:", np.mean((reconstructed[0] - clean[0]) ** 2).round(4))
-
-val_noisy, val_clean = noisy[400:], clean[400:]       # el 20 % que fit no usó para entrenar
-val_rec = autoencoder.predict(val_noisy, verbose=0)
-print("validación, imagen ruidosa  -&gt; limpia: %.4f" % np.mean((val_noisy - val_clean) ** 2))
-print("validación, imagen limpiada -&gt; limpia: %.4f" % np.mean((val_rec - val_clean) ** 2))
-
-# 8 épocas es poco: seguimos entrenando 40 más
-history2 = autoencoder.fit(noisy, clean, epochs=40, batch_size=32, validation_split=0.2, verbose=0)
-val_rec = autoencoder.predict(val_noisy, verbose=0)
-print("tras 48 épocas, val_loss =", round(history2.history["val_loss"][-1], 4))
-print("validación, imagen limpiada -&gt; limpia: %.4f" % np.mean((val_rec - val_clean) ** 2))</code></pre>
-<details class="linea-a-linea" open="">
-<summary>Línea por línea</summary>
-<p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
-<table class="lineas">
-<thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
-<tbody>
-<tr data-lines="1"><td><code>autoencoder.compile(optimizer="adam", loss="mean_squared_error")</code></td><td>Configura el entrenamiento: Adam para corregir los pesos y el error cuadrático medio como pérdida. No entrena todavía.</td></tr>
-<tr data-lines="3-6"><td><code>history = autoencoder.fit(noisy, clean, epochs=8, batch_size=32, validation_split=0.2, verbose=0)</code></td><td>Entrena: entrada = imágenes ruidosas, objetivo = limpias. <code>epochs=8</code>: ocho pasadas completas. <code>batch_size=32</code>: se actualizan los pesos cada 32 imágenes. <code>validation_split=0.2</code>: el último 20 % (imágenes 400-499) se aparta para validar. <code>verbose=0</code> evita imprimir el progreso. Las líneas 3 y 6 abren y cierran el paréntesis; 4-5 son los argumentos.</td></tr>
-<tr data-lines="7"><td><code>print("loss (train):", np.round(history.history["loss"], 4))</code></td><td><code>history.history</code> es un diccionario con las listas por época; <code>"loss"</code> es el error en las imágenes de entrenamiento. <code>np.round(…, 4)</code> redondea a 4 decimales.</td></tr>
-<tr data-lines="8"><td><code>print("loss (val)  :", np.round(history.history["val_loss"], 4))</code></td><td><code>"val_loss"</code> es el error en las 100 imágenes de validación (las que no entrenan).</td></tr>
-<tr data-lines="10"><td><code>reconstructed = autoencoder.predict(noisy[:1], verbose=0)</code></td><td>Pasa por la red la primera imagen ruidosa (<code>noisy[:1]</code> mantiene el eje del lote) y devuelve su reconstrucción.</td></tr>
-<tr data-lines="11"><td><code>print("MSE manual, imagen 0:", np.mean((reconstructed[0] - clean[0]) ** 2).round(4))</code></td><td>El MSE a mano: resta la reconstrucción y la imagen limpia, eleva al cuadrado y hace la media de los 784 píxeles.</td></tr>
-<tr data-lines="13"><td><code>val_noisy, val_clean = noisy[400:], clean[400:]</code></td><td>Recupera el 20 % de validación (las imágenes 400 en adelante), que son las que <code>fit</code> apartó.</td></tr>
-<tr data-lines="14"><td><code>val_rec = autoencoder.predict(val_noisy, verbose=0)</code></td><td>Reconstruye las 100 imágenes de validación ruidosas.</td></tr>
-<tr data-lines="15"><td><code>print("validación, imagen ruidosa  -&gt; limpia: %.4f" % np.mean((val_noisy - val_clean) ** 2))</code></td><td>Error de partida: lo lejos que está la imagen ruidosa de la limpia, sin usar la red.</td></tr>
-<tr data-lines="16"><td><code>print("validación, imagen limpiada -&gt; limpia: %.4f" % np.mean((val_rec - val_clean) ** 2))</code></td><td>Error tras pasar por el autoencoder: si es menor, la red limpia.</td></tr>
-<tr data-lines="18"><td><code># 8 épocas es poco: seguimos entrenando 40 más</code></td><td>Comentario: el entrenamiento aún no había terminado.</td></tr>
-<tr data-lines="19"><td><code>history2 = autoencoder.fit(noisy, clean, epochs=40, batch_size=32, validation_split=0.2, verbose=0)</code></td><td>Otro <code>fit</code>: continúa desde los pesos actuales (no empieza de cero) con 40 épocas más.</td></tr>
-<tr data-lines="20"><td><code>val_rec = autoencoder.predict(val_noisy, verbose=0)</code></td><td>Reconstruye otra vez las imágenes de validación con la red ya más entrenada.</td></tr>
-<tr data-lines="21"><td><code>print("tras 48 épocas, val_loss =", round(history2.history["val_loss"][-1], 4))</code></td><td>La última pérdida de validación (<code>[-1]</code> es el último elemento de la lista).</td></tr>
-<tr data-lines="22"><td><code>print("validación, imagen limpiada -&gt; limpia: %.4f" % np.mean((val_rec - val_clean) ** 2))</code></td><td>El mismo error calculado a mano: debe coincidir con el <code>val_loss</code> anterior.</td></tr>
-</tbody>
-</table>
-</details>
-<div class="salida">
-<strong>Salida esperada</strong>
-<pre>loss (train): [0.227  0.1668 0.1154 0.088  0.0732 0.0575 0.0307 0.0197]
-loss (val)  : [0.1936 0.141  0.1016 0.0828 0.0695 0.0449 0.0214 0.0172]
-MSE manual, imagen 0: 0.0183
-validación, imagen ruidosa  -&gt; limpia: 0.0315
-validación, imagen limpiada -&gt; limpia: 0.0172
-tras 48 épocas, val_loss = 0.002
-validación, imagen limpiada -&gt; limpia: 0.0020</pre>
-<p>Las dos pérdidas bajan juntas durante las ocho épocas, de 0,227 a 0,0197 en entrenamiento y de 0,1936 a 0,0172 en validación: no hay sobreajuste. El MSE manual de la imagen 0 es 0,0183. Y la prueba que importa: en validación, el error de la imagen ruidosa es 0,0315 y el de la imagen «limpiada» 0,0172, es decir, la red ya quita ruido, pero poco (1,8 veces). Tras 40 épocas más (48 en total) el <code>val_loss</code> es <strong>0,0020</strong> y el cálculo manual da el mismo número: unas 15 veces menos que el ruido de partida. Ocho épocas eran pocas.</p>
+<div class="callout recuerda">
+  <span class="lbl">Guía completa del experimento «Fine-tuning: el learning rate puede destruir lo preentrenado»</span>
+  <p>El experimento está más arriba, en la lección. Estas son sus instrucciones completas.</p>
+  <p><strong>Haz esto:</strong> Es un modelo de juguete: una red pequeña «preentrenada» en una tarea parecida (un crítico que ya conoce el cine de acción) y adaptada a una tarea nueva con solo 30 puntos (30 películas de tu género). Mueve el slider del learning rate de 0,001 a 1 y compara la curva con la de «base congelada».</p>
+  <p><strong>Fíjate en:</strong> Con <code>lr = 0,001</code> el modelo apenas se mueve: aprende muy poco (error 0,72, acierto 64 %). Un valor intermedio (0,01–0,03) alcanza error y acierto razonables (acierto 92–93 %), pero la base se aleja ya de lo preentrenado (distancia entre pesos 3,7–6,9). Con <code>lr</code> ≥ 0,1 el error en entrenamiento llega a 0,00 mientras el de validación <em>sube</em> (0,36–0,47) y la base se aleja mucho (11–28): se memorizaron los 30 puntos. La base congelada (curva verde oliva) queda en 0,11 y 95 %. <strong>Con pocos datos, tocar poco es mejor.</strong> (En una red tan pequeña los números exactos no se extrapolan a VGG16; sí el patrón.)</p>
 </div>
-</article><article class="snippet" data-lang="python">
-<header>
-<h3>5 · Separar el encoder y el decoder</h3>
-<p class="para-que"><strong>Para qué sirve</strong> Sacar del autoencoder entrenado el <strong>encoder</strong> (imagen → código) y el <strong>decoder</strong> (código → imagen) y comprobar que juntos hacen lo mismo que el modelo completo. Continúa los fragmentos 1-4.</p>
-</header>
-<pre class="code"><code>encoder = keras.Model(inputs, autoencoder.get_layer("bottleneck").output)
-codigo = encoder.predict(noisy[:5], verbose=0)
-print("código de 5 imágenes:", codigo.shape, "-&gt; valores por imagen:", codigo[0].size, "(antes 784)")
-print("compresión: %.1f veces" % (784 / codigo[0].size))
-print("valores del código que son exactamente 0: %.0f %%" % (100 * np.mean(codigo == 0)), "| máximo: %.2f" % codigo.max())
 
-# Decoder: las capas que van después del cuello de botella
-entrada_codigo = keras.Input(shape=(7, 7, 8))
-y = entrada_codigo
-for capa in autoencoder.layers[autoencoder.layers.index(autoencoder.get_layer("bottleneck")) + 1:]:
-    y = capa(y)
-decoder = keras.Model(entrada_codigo, y)
-
-via_dos_pasos = decoder.predict(codigo, verbose=0)
-directo = autoencoder.predict(noisy[:5], verbose=0)
-print("decoder(encoder(x)) == autoencoder(x):", np.allclose(via_dos_pasos, directo, atol=1e-5))</code></pre>
-<details class="linea-a-linea" open="">
-<summary>Línea por línea</summary>
-<p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
-<table class="lineas">
-<thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
-<tbody>
-<tr data-lines="1"><td><code>encoder = keras.Model(inputs, autoencoder.get_layer("bottleneck").output)</code></td><td>Un modelo nuevo que va desde la entrada hasta la salida de la capa llamada <code>"bottleneck"</code>. Comparte las capas (y los pesos ya entrenados) con el autoencoder.</td></tr>
-<tr data-lines="2"><td><code>codigo = encoder.predict(noisy[:5], verbose=0)</code></td><td>Comprime 5 imágenes ruidosas: obtiene 5 códigos.</td></tr>
-<tr data-lines="3"><td><code>print("código de 5 imágenes:", codigo.shape, "-&gt; valores por imagen:", codigo[0].size, "(antes 784)")</code></td><td>Forma del código y cuántos valores tiene cada uno (<code>.size</code> cuenta todos los elementos del array).</td></tr>
-<tr data-lines="4"><td><code>print("compresión: %.1f veces" % (784 / codigo[0].size))</code></td><td>Razón entre el tamaño original y el del código.</td></tr>
-<tr data-lines="5"><td><code>print("valores del código que son exactamente 0: …" …)</code></td><td>Porcentaje de ceros exactos en el código (la ReLU los produce) y el valor máximo.</td></tr>
-<tr data-lines="7"><td><code># Decoder: las capas que van después del cuello de botella</code></td><td>Comentario.</td></tr>
-<tr data-lines="8"><td><code>entrada_codigo = keras.Input(shape=(7, 7, 8))</code></td><td>Nueva entrada con la forma del código.</td></tr>
-<tr data-lines="9"><td><code>y = entrada_codigo</code></td><td>Empezamos a encadenar capas desde esa entrada.</td></tr>
-<tr data-lines="10-11"><td><code>for capa in autoencoder.layers[… + 1:]: y = capa(y)</code></td><td>Recorre las capas que van <em>después</em> de <code>bottleneck</code> (<code>autoencoder.layers.index(…) + 1</code> es la posición siguiente) y aplica cada una a <code>y</code>, reutilizando las mismas capas ya entrenadas.</td></tr>
-<tr data-lines="12"><td><code>decoder = keras.Model(entrada_codigo, y)</code></td><td>Crea el modelo decoder: código → imagen.</td></tr>
-<tr data-lines="14"><td><code>via_dos_pasos = decoder.predict(codigo, verbose=0)</code></td><td>Reconstruye pasando el código por el decoder.</td></tr>
-<tr data-lines="15"><td><code>directo = autoencoder.predict(noisy[:5], verbose=0)</code></td><td>Reconstruye pasando las imágenes por el autoencoder completo.</td></tr>
-<tr data-lines="16"><td><code>print("decoder(encoder(x)) == autoencoder(x):", np.allclose(via_dos_pasos, directo, atol=1e-5))</code></td><td>Compara ambas reconstrucciones. <code>np.allclose</code> compara con tolerancia (<code>atol</code>) porque los <code>float32</code> pueden diferir en el último decimal.</td></tr>
-</tbody>
-</table>
-</details>
-<div class="salida">
-<strong>Salida esperada</strong>
-<pre>código de 5 imágenes: (5, 7, 7, 8) -&gt; valores por imagen: 392 (antes 784)
-compresión: 2.0 veces
-valores del código que son exactamente 0: 30 % | máximo: 6.17
-decoder(encoder(x)) == autoencoder(x): True</pre>
-<p>El código de cada imagen tiene forma <code>(7, 7, 8)</code>: 392 valores en lugar de 784, una compresión de solo 2,0 veces (recuerda: el cuello convolucional es espacial). El 30 % de esos 392 valores son exactamente 0 (efecto de la ReLU) y el máximo es 6,17. La última línea imprime <code>True</code>: <strong>decoder(encoder(x)) y autoencoder(x) dan lo mismo</strong>; son la misma red cortada en dos.</p>
+<div class="callout ojo">
+  <span class="lbl">Ojo (Keras 3): descongelar no siempre hace lo que crees</span>
+  <p>Dos trampas reales, comprobadas en los fragmentos 9 y 10:</p>
+  <ul>
+    <li><strong><code>base_model.trainable = True</code> puede no hacer nada.</strong> Si congelaste la base capa a capa (<code>for layer in base_model.layers: layer.trainable = False</code>), el indicador del <em>modelo</em> sigue en <code>True</code>, así que asignarle <code>True</code> no cambia nada y las capas siguen congeladas (en el fragmento 9 los entrenables siguen siendo 13.108.737). Descongela <em>capa a capa</em> o pon primero <code>base_model.trainable = False</code> y luego <code>True</code>.</li>
+    <li><strong>Hay que volver a llamar a <code>compile()</code> después de cambiar <code>trainable</code>.</strong> Sin recompilar, el entrenamiento sigue con la configuración antigua: en el fragmento 10 (<a href="leccion-8.html#resto">lección 8</a>), los pesos de la primera capa no cambian tras descongelar (<code>False</code>) y sí cambian tras recompilar (<code>True</code>). Es la ocasión natural de poner el nuevo <code>Adam(learning_rate=1e-5)</code>.</li>
+  </ul>
 </div>
-</article></div></details></div></main></body></html>
+
+<p>El fragmento 9 reproduce los tres escenarios con el código de las notas (<code>for layer in base_model.layers: layer.trainable = layer.name.startswith("block5")</code> deja entrenables 4 capas: <code>block5_conv1</code>, <code>block5_conv2</code>, <code>block5_conv3</code> y <code>block5_pool</code>; esta última no tiene pesos) y el 11 es la función <code>transfer_learning_demo</code> de las notas, con <code>GlobalAveragePooling2D</code> y fine-tuning de las últimas cuatro capas (<code>layers[-4:]</code>): pasa de 131.585 a 7.211.009 parámetros entrenables.</p>
+
+<h3>Ventajas, limitaciones y cómo se relaciona con el autoencoder</h3>
+<div class="cards">
+  <div class="card"><h4>Ventajas</h4><p>Menos entrenamiento, menos datos, menos cálculo, implementación rápida y <em>features</em> potentes.</p></div>
+  <div class="card"><h4>Limitaciones</h4><p>Puede no encajar si tus imágenes son muy distintas de ImageNet; los modelos son grandes (memoria); la arquitectura viene fija; y <strong>hereda los sesgos</strong> de los datos con los que se entrenó.</p></div>
+  <div class="card"><h4>Autoencoder o preentrenado</h4><p>Ambos aprenden representaciones útiles. El autoencoder aprende <strong>la tuya, con tus datos</strong>, sin etiquetas; el preentrenado <strong>reutiliza la de otros</strong>.</p></div>
+</div>
+
+<h2 id="transfer-pequeno">Un experimento honesto: ¿ayuda de verdad congelar un preentrenado?</h2>
+<p class="pregunta">Mucha teoría. ¿Se puede <em>ver</em> sin internet y sin VGG16 que congelar una base preentrenada con pocos datos funciona mejor que entrenar todo, y que un learning rate grande lo estropea?</p>
+
+<p>El fragmento 18 reproduce la idea en pequeño. Se juega con dos tareas:</p>
+<ol class="pasos">
+  <li><strong>Tarea de origen («ImageNet de juguete»)</strong>: 2.500 imágenes de 64×64 con 5 clases de formas simples (barra horizontal, vertical, diagonal, mancha clara, mancha oscura). Una CNN pequeña la aprende (accuracy 0,994). Esa CNN es la «base preentrenada».</li>
+  <li><strong>Tarea de destino</strong>: nuestro dent/crack sintético, pero con <strong>solo 40 imágenes de entrenamiento</strong> (20 + 20) y evaluando en las 60 imágenes de test.</li>
+</ol>
+<p>Se entrenan cinco variantes (30 épocas, batch 8) y se mide la accuracy en test:</p>
+<table>
+  <thead><tr><th>Variante</th><th>Accuracy en test</th></tr></thead>
+  <tbody>
+    <tr><td>Desde cero (todo se entrena)</td><td>0,550</td></tr>
+    <tr><td>Base <em>al azar</em>, congelada + cabeza</td><td class="res">0,767</td></tr>
+    <tr><td>Base <em>preentrenada</em>, congelada + cabeza (transfer learning)</td><td class="res">0,767</td></tr>
+    <tr><td>Preentrenada, fine-tuning con lr 1e-4</td><td>0,700</td></tr>
+    <tr><td>Preentrenada, fine-tuning con lr 1e-2</td><td>0,500</td></tr>
+  </tbody>
+</table>
+<p>Cómo leerlo, sin trampas:</p>
+<ul>
+  <li><strong>Entrenar todo con 40 imágenes casi no funciona</strong> (0,550, apenas por encima del 0,5 del azar): hay demasiados parámetros libres para tan pocos ejemplos. Congelar la base y entrenar solo la cabeza sube a 0,767. Esa es la lección principal: <em>pocos parámetros entrenables con pocos datos</em>.</li>
+  <li><strong>Un learning rate grande destruye</strong>: con 1e-2 el fine-tuning se queda en 0,500, exactamente el azar; con 1e-4 se queda a medio camino (0,700). Es la misma historia de la demo del learning rate, ahora con imágenes.</li>
+  <li><strong>Aquí no hay ventaja del preentrenado frente a una base al azar congelada</strong> (las dos 0,767). Es un resultado honesto y esperable: la tarea de origen es de juguete, parecida solo de lejos, y una base convolucional pequeña aleatoria ya extrae «bordes» útiles. La ventaja grande de ImageNet aparece cuando la base se ha entrenado con <em>millones</em> de imágenes variadas y tiene 14 millones de parámetros; con una base minúscula no hay tanto que reutilizar. No extrapoles estas cifras a VGG16.</li>
+</ul>
+  </div>
+</details>
+
+<section>
+<h2 class="sin-num">Código</h2>
+
+<article class="snippet" data-lang="python">
+  <header>
+    <h3>9 · Los tres escenarios y la trampa de trainable en Keras 3</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Pasar del escenario 2 (transfer learning) al 3 (fine-tuning de las capas superiores) y al 1 (feature extraction puro), comprobar con cifras qué se entrena en cada uno, ver por qué <code>base_model.trainable = True</code> puede no hacer nada y fijar el learning rate pequeño con <code>Adam(1e-5)</code>. Continúa los fragmentos 7 y 8.</p>
+  </header>
+  <pre class="code"><code>from keras.optimizers import Adam
+
+# Escenario 2 (transfer learning): base congelada, solo se entrena la cabeza
+print("escenario 2, entrenables:", contar(model)[0])
+
+# Trampa de Keras 3: la base ya está marcada como entrenable, así que esta línea no hace nada
+base_model.trainable = True
+print("tras base_model.trainable = True, entrenables:", contar(model)[0])
+
+# Escenario 3 (fine-tuning): descongelamos solo el bloque 5 de VGG16
+for layer in base_model.layers:
+    layer.trainable = layer.name.startswith("block5")
+print("capas entrenables de la base:", [l.name for l in base_model.layers if l.trainable])
+print("escenario 3, entrenables:", contar(model)[0], "| solo bloque 5:", contar(base_model)[0])
+
+# Y se vuelve a compilar con un learning rate pequeño
+model.compile(optimizer=Adam(learning_rate=1e-5), loss="binary_crossentropy", metrics=["accuracy"])
+print("learning rate:", round(float(model.optimizer.learning_rate), 8))
+
+# Escenario 1 (feature extraction puro): la base sola, todo congelado
+for layer in base_model.layers:
+    layer.trainable = False
+print("escenario 1, base sola, entrenables:", contar(base_model)[0], "| salida:", base_model.output_shape)</code></pre>
+  <details class="linea-a-linea" open>
+    <summary>Línea por línea</summary>
+    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+      <tbody>
+        <tr data-lines="1"><td><code>from keras.optimizers import Adam</code></td><td>Importa el optimizador Adam.</td></tr>
+        <tr data-lines="3"><td><code># Escenario 2 …</code></td><td>Comentario: base congelada, solo se entrena la cabeza.</td></tr>
+        <tr data-lines="4"><td><code>print("escenario 2, entrenables:", contar(model)[0])</code></td><td>Parámetros entrenables ahora: <code>[0]</code> toma el primero de la pareja.</td></tr>
+        <tr data-lines="6"><td><code># Trampa de Keras 3: …</code></td><td>Comentario sobre lo que viene.</td></tr>
+        <tr data-lines="7"><td><code>base_model.trainable = True</code></td><td>Intenta «descongelar» la base. Como el indicador del <em>modelo</em> ya estaba en <code>True</code> (solo congelamos <em>capa a capa</em>), la asignación no cambia nada.</td></tr>
+        <tr data-lines="8"><td><code>print("tras base_model.trainable = True, entrenables:", contar(model)[0])</code></td><td>Comprueba que el número no cambió.</td></tr>
+        <tr data-lines="10"><td><code># Escenario 3 …</code></td><td>Comentario: ahora sí, descongelar solo el bloque 5.</td></tr>
+        <tr data-lines="11-12"><td><code>for layer in base_model.layers: layer.trainable = layer.name.startswith("block5")</code></td><td>Para cada capa, <code>trainable</code> vale <code>True</code> solo si su nombre empieza por <code>block5</code> (<code>startswith</code> comprueba el comienzo del texto).</td></tr>
+        <tr data-lines="13"><td><code>print("capas entrenables de la base:", [l.name for l in base_model.layers if l.trainable])</code></td><td>Una <em>lista por comprensión</em>: los nombres de las capas que tienen <code>trainable</code> a <code>True</code>.</td></tr>
+        <tr data-lines="14"><td><code>print("escenario 3, entrenables:", contar(model)[0], "| solo bloque 5:", contar(base_model)[0])</code></td><td>Entrenables del modelo entero y de la base sola.</td></tr>
+        <tr data-lines="16"><td><code># Y se vuelve a compilar …</code></td><td>Comentario: hay que recompilar para que el cambio se aplique.</td></tr>
+        <tr data-lines="17"><td><code>model.compile(optimizer=Adam(learning_rate=1e-5), loss="binary_crossentropy", metrics=["accuracy"])</code></td><td>Compila de nuevo con un learning rate muy pequeño, <code>1e-5</code> (= 0,00001).</td></tr>
+        <tr data-lines="18"><td><code>print("learning rate:", round(float(model.optimizer.learning_rate), 8))</code></td><td>Lee el learning rate del optimizador para confirmarlo.</td></tr>
+        <tr data-lines="20"><td><code># Escenario 1 …</code></td><td>Comentario: feature extraction puro.</td></tr>
+        <tr data-lines="21-22"><td><code>for layer in base_model.layers: layer.trainable = False</code></td><td>Vuelve a congelar todas las capas de la base.</td></tr>
+        <tr data-lines="23"><td><code>print("escenario 1, base sola, entrenables:", contar(base_model)[0], "| salida:", base_model.output_shape)</code></td><td>La base sola, sin nada entrenable, produce un vector de 25.088 valores por imagen (<code>output_shape</code>): son las <em>features</em> que se darían a un clasificador sencillo.</td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>escenario 2, entrenables: 13108737
+tras base_model.trainable = True, entrenables: 13108737
+capas entrenables de la base: ['block5_conv1', 'block5_conv2', 'block5_conv3', 'block5_pool']
+escenario 3, entrenables: 20188161 | solo bloque 5: 7079424
+learning rate: 1e-05
+escenario 1, base sola, entrenables: 0 | salida: (None, 25088)</pre>
+    <p>En el escenario 2 hay 13.108.737 parámetros entrenables. <strong>Tras <code>base_model.trainable = True</code> siguen siendo 13.108.737</strong>: la asignación no hizo nada (la trampa). Descongelando capa a capa solo las del <code>block5</code>, las entrenables de la base son <code>block5_conv1</code>, <code>block5_conv2</code>, <code>block5_conv3</code> y <code>block5_pool</code> (esta no tiene pesos): 7.079.424 parámetros, que sumados a los 13.108.737 de la cabeza dan <strong>20.188.161</strong>. El learning rate queda en 1e-05. Y en el escenario 1 la base sola no tiene nada entrenable y su salida es <code>(None, 25088)</code>.</p>
+  </div>
+</article>
+
+<article class="snippet" data-lang="python">
+  <header>
+    <h3>18 · Transfer learning en pequeño: ¿congelar ayuda con pocos datos?</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Comparar, con pocos datos, entrenar desde cero, congelar una base al azar, congelar una base «preentrenada» en una tarea de formas y hacer fine-tuning con learning rate pequeño y grande. Es una versión de juguete (sin ImageNet) de la idea del tema. Necesita las carpetas del fragmento 13.</p>
+  </header>
+  <pre class="code"><code>import numpy as np
+import keras
+from keras import layers
+from tensorflow.keras.preprocessing.image import ImageDataGenerator
+
+N = 64
+def tarea_origen(n_por_clase, semilla):
+    """Tarea 'grande' sin daños: 5 clases de formas simples (3 orientaciones de barra, mancha clara, mancha oscura)."""
+    rng = np.random.default_rng(semilla)
+    yy, xx = np.mgrid[0:N, 0:N]
+    imgs, etiquetas = [], []
+    for clase in range(5):
+        for _ in range(n_por_clase):
+            fondo = 0.55 + rng.normal(0, 0.03, (N, N))
+            cx, cy = rng.uniform(16, N - 16, 2)
+            if clase &lt; 3:
+                ang = [0, np.pi / 2, np.pi / 4][clase] + rng.normal(0, 0.15)
+                distancia = np.abs((xx - cx) * np.sin(ang) - (yy - cy) * np.cos(ang))
+                fondo -= 0.4 * (distancia &lt; rng.uniform(1, 3))
+            else:
+                radio = rng.uniform(4, 12)
+                fondo += (0.4 if clase == 3 else -0.4) * np.exp(-((xx - cx) ** 2 + (yy - cy) ** 2) / (2 * radio ** 2))
+            imgs.append(np.repeat(np.clip(fondo, 0, 1)[..., None], 3, axis=-1))
+            etiquetas.append(clase)
+    return np.array(imgs, dtype="float32"), np.array(etiquetas)
+
+def base_cnn():
+    return keras.Sequential([keras.Input(shape=(N, N, 3)),
+        layers.Conv2D(16, 3, activation="relu"), layers.MaxPooling2D(2),
+        layers.Conv2D(32, 3, activation="relu"), layers.MaxPooling2D(2),
+        layers.Conv2D(32, 3, activation="relu"), layers.GlobalAveragePooling2D()])
+
+# 1) "Preentrenamiento": aprender la tarea de origen con 2500 imágenes
+keras.utils.set_random_seed(0)
+X_o, y_o = tarea_origen(500, 1)
+preentrenada = base_cnn()
+origen = keras.Sequential([preentrenada, layers.Dense(5, activation="softmax")])
+origen.compile(optimizer="adam", loss="sparse_categorical_crossentropy", metrics=["accuracy"])
+h = origen.fit(X_o, y_o, epochs=15, batch_size=32, verbose=0)
+print("tarea de origen, accuracy final: %.3f" % h.history["accuracy"][-1])
+
+# 2) Tarea de destino: dent/crack con POCOS datos (20 + 20 imágenes de entrenamiento)
+def cargar(carpeta, n):
+    gen = ImageDataGenerator(rescale=1./255).flow_from_directory(
+        "aviones_sinteticos/" + carpeta, target_size=(N, N), batch_size=n, class_mode="binary",
+        shuffle=False, interpolation="bilinear")
+    return next(gen)
+X_all, y_all = cargar("train", 300)
+idx = np.concatenate([np.where(y_all == 0)[0][:20], np.where(y_all == 1)[0][:20]])
+X_tr, y_tr = X_all[idx], y_all[idx]
+X_te, y_te = cargar("test", 60)
+
+def evaluar(base, congelar, lr, nombre):
+    keras.utils.set_random_seed(0)
+    base.trainable = not congelar
+    modelo = keras.Sequential([base, layers.Dense(32, activation="relu"), layers.Dense(1, activation="sigmoid")])
+    modelo.compile(optimizer=keras.optimizers.Adam(lr), loss="binary_crossentropy", metrics=["accuracy"])
+    modelo.fit(X_tr, y_tr, epochs=30, batch_size=8, verbose=0)
+    acc = modelo.evaluate(X_te, y_te, verbose=0)[1]
+    print("%-38s accuracy en test: %.3f" % (nombre, acc))
+
+def copia_preentrenada():
+    copia = keras.models.clone_model(preentrenada)
+    copia.set_weights(preentrenada.get_weights())
+    return copia
+
+evaluar(base_cnn(), False, 1e-3, "desde cero (todo se entrena)")
+evaluar(base_cnn(), True, 1e-3, "base al azar, congelada + cabeza")
+evaluar(copia_preentrenada(), True, 1e-3, "base preentrenada, congelada + cabeza")
+evaluar(copia_preentrenada(), False, 1e-4, "preentrenada, fine-tuning lr 1e-4")
+evaluar(copia_preentrenada(), False, 1e-2, "preentrenada, fine-tuning lr 1e-2")</code></pre>
+  <details class="linea-a-linea" open>
+    <summary>Línea por línea</summary>
+    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+      <tbody>
+        <tr data-lines="1-4"><td><code>import numpy as np … from tensorflow.keras.preprocessing.image import ImageDataGenerator</code></td><td>NumPy, Keras, capas y el generador de imágenes.</td></tr>
+        <tr data-lines="6"><td><code>N = 64</code></td><td>Lado de las imágenes: 64×64.</td></tr>
+        <tr data-lines="7-25"><td><code>def tarea_origen(n_por_clase, semilla): …</code></td><td>Fabrica la «tarea grande» de origen, hecha de formas sencillas, con 5 clases: tres orientaciones de barra, una mancha clara y una oscura. Línea 8: docstring. 9-10: generador aleatorio y coordenadas. 11: listas vacías. 12-13: bucles por clase y por imagen. 14: fondo gris con grano. 15: posición al azar. 16-19: si la clase es 0, 1 o 2, dibuja una barra oscura con orientación horizontal, vertical o diagonal (distancia a una recta menor que su grosor). 20-22: si no, una mancha gaussiana clara (clase 3) u oscura (clase 4). 23: la convierte a 3 canales. 24: guarda la etiqueta. 25: devuelve todo.</td></tr>
+        <tr data-lines="27-31"><td><code>def base_cnn(): return keras.Sequential([…])</code></td><td>La «base convolucional» que se va a preentrenar: tres <code>Conv2D</code> con dos <code>MaxPooling2D</code> y un <code>GlobalAveragePooling2D</code> final que la deja en un vector de 32 valores.</td></tr>
+        <tr data-lines="33"><td><code># 1) "Preentrenamiento": …</code></td><td>Comentario.</td></tr>
+        <tr data-lines="34"><td><code>keras.utils.set_random_seed(0)</code></td><td>Semilla.</td></tr>
+        <tr data-lines="35"><td><code>X_o, y_o = tarea_origen(500, 1)</code></td><td>2.500 imágenes de origen (500 por clase).</td></tr>
+        <tr data-lines="36"><td><code>preentrenada = base_cnn()</code></td><td>Crea la base.</td></tr>
+        <tr data-lines="37"><td><code>origen = keras.Sequential([preentrenada, layers.Dense(5, activation="softmax")])</code></td><td>Le pone una cabeza de 5 clases con softmax para la tarea de origen.</td></tr>
+        <tr data-lines="38"><td><code>origen.compile(optimizer="adam", loss="sparse_categorical_crossentropy", metrics=["accuracy"])</code></td><td>Compila; etiquetas enteras de varias clases → <code>sparse_categorical_crossentropy</code>.</td></tr>
+        <tr data-lines="39"><td><code>h = origen.fit(X_o, y_o, epochs=15, batch_size=32, verbose=0)</code></td><td>Entrena 15 épocas: esto es el «preentrenamiento».</td></tr>
+        <tr data-lines="40"><td><code>print("tarea de origen, accuracy final: %.3f" % h.history["accuracy"][-1])</code></td><td>Comprueba que la base aprendió su tarea.</td></tr>
+        <tr data-lines="42"><td><code># 2) Tarea de destino: …</code></td><td>Comentario.</td></tr>
+        <tr data-lines="43-47"><td><code>def cargar(carpeta, n): …</code></td><td>Carga <code>n</code> imágenes de una carpeta del dataset de aviones de golpe: crea el generador con un único lote de tamaño <code>n</code> (línea 44-46) y devuelve el primer lote (<code>next</code>, línea 47).</td></tr>
+        <tr data-lines="48"><td><code>X_all, y_all = cargar("train", 300)</code></td><td>Las 300 imágenes de train.</td></tr>
+        <tr data-lines="49"><td><code>idx = np.concatenate([np.where(y_all == 0)[0][:20], np.where(y_all == 1)[0][:20]])</code></td><td>Se queda con los índices de solo 20 imágenes de cada clase.</td></tr>
+        <tr data-lines="50"><td><code>X_tr, y_tr = X_all[idx], y_all[idx]</code></td><td>El conjunto de entrenamiento pequeño: 40 imágenes.</td></tr>
+        <tr data-lines="51"><td><code>X_te, y_te = cargar("test", 60)</code></td><td>Las 60 imágenes de test.</td></tr>
+        <tr data-lines="53"><td><code>def evaluar(base, congelar, lr, nombre):</code></td><td>Entrena una variante y mide su accuracy en test.</td></tr>
+        <tr data-lines="54"><td><code>keras.utils.set_random_seed(0)</code></td><td>Misma semilla en todas las variantes (comparación justa).</td></tr>
+        <tr data-lines="55"><td><code>base.trainable = not congelar</code></td><td>Si <code>congelar</code> es <code>True</code>, la base queda congelada.</td></tr>
+        <tr data-lines="56"><td><code>modelo = keras.Sequential([base, layers.Dense(32, activation="relu"), layers.Dense(1, activation="sigmoid")])</code></td><td>La base más una cabeza de 32 neuronas y una salida sigmoide.</td></tr>
+        <tr data-lines="57"><td><code>modelo.compile(optimizer=keras.optimizers.Adam(lr), loss="binary_crossentropy", metrics=["accuracy"])</code></td><td>Compila con el learning rate de cada variante.</td></tr>
+        <tr data-lines="58"><td><code>modelo.fit(X_tr, y_tr, epochs=30, batch_size=8, verbose=0)</code></td><td>30 épocas con lotes de 8 sobre las 40 imágenes.</td></tr>
+        <tr data-lines="59"><td><code>acc = modelo.evaluate(X_te, y_te, verbose=0)[1]</code></td><td><code>evaluate</code> devuelve la pérdida y las métricas; <code>[1]</code> es la accuracy en test.</td></tr>
+        <tr data-lines="60"><td><code>print("%-38s accuracy en test: %.3f" % (nombre, acc))</code></td><td>Imprime el nombre de la variante y su resultado.</td></tr>
+        <tr data-lines="62-65"><td><code>def copia_preentrenada(): …</code></td><td>Hace una copia independiente de la base preentrenada: <code>clone_model</code> copia la estructura (línea 63) y <code>set_weights</code> le pasa los pesos (línea 64). Así cada experimento parte de los mismos pesos sin estropear la original.</td></tr>
+        <tr data-lines="67"><td><code>evaluar(base_cnn(), False, 1e-3, "desde cero (todo se entrena)")</code></td><td>Variante 1: base nueva y sin congelar.</td></tr>
+        <tr data-lines="68"><td><code>evaluar(base_cnn(), True, 1e-3, "base al azar, congelada + cabeza")</code></td><td>Variante 2: base al azar pero congelada.</td></tr>
+        <tr data-lines="69"><td><code>evaluar(copia_preentrenada(), True, 1e-3, …)</code></td><td>Variante 3: base preentrenada congelada: transfer learning.</td></tr>
+        <tr data-lines="70"><td><code>evaluar(copia_preentrenada(), False, 1e-4, …)</code></td><td>Variante 4: preentrenada con todo descongelado y learning rate pequeño: fine-tuning.</td></tr>
+        <tr data-lines="71"><td><code>evaluar(copia_preentrenada(), False, 1e-2, …)</code></td><td>Variante 5: igual con learning rate grande.</td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>tarea de origen, accuracy final: 0.994
+Found 300 images belonging to 2 classes.
+Found 60 images belonging to 2 classes.
+desde cero (todo se entrena)           accuracy en test: 0.550
+base al azar, congelada + cabeza       accuracy en test: 0.767
+base preentrenada, congelada + cabeza  accuracy en test: 0.767
+preentrenada, fine-tuning lr 1e-4      accuracy en test: 0.700
+preentrenada, fine-tuning lr 1e-2      accuracy en test: 0.500</pre>
+    <p>La base aprende su tarea de origen (accuracy 0,994). En el destino, con solo 40 imágenes de entrenamiento: desde cero <strong>0,550</strong>; base al azar congelada <strong>0,767</strong>; base preentrenada congelada <strong>0,767</strong>; fine-tuning con lr 1e-4, <strong>0,700</strong>; con lr 1e-2, <strong>0,500</strong>. Se leen tres cosas: entrenar todo con pocos datos casi no funciona; congelar y entrenar solo la cabeza ayuda mucho; y un learning rate grande lo estropea hasta el azar. <strong>Aquí no hay ventaja del preentrenado sobre una base al azar</strong> (las dos 0,767): la tarea de origen es de juguete. No se puede extrapolar a VGG16 y ImageNet.</p>
+  </div>
+</article>
+</section>
+
+</div>
+</main>
+</body>
+</html>

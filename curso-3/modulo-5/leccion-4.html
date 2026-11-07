@@ -1,163 +1,472 @@
-<!DOCTYPE html>
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lección 4 · El optimizador convierte el gradiente en un paso; el planificador lo encoge · Módulo 5 · Curso 3 · Cuaderno de IA</title>
+<meta name="description" content="Dos pasos de SGD, momentum, Nesterov, Adam y AdamW calculados a mano y los planificadores de learning rate de Keras, con el suelo de ruido.">
+<script>try{var t=localStorage.getItem('cuaderno-ia:tema');if(t)document.documentElement.setAttribute('data-theme',t)}catch(e){}</script>
+<link rel="stylesheet" href="../../assets/css/style.css">
+<script src="../../assets/js/curriculum.js"></script>
+<script src="../../assets/js/lab.js"></script>
+<script src="../../assets/js/app.js" defer></script>
+</head>
+<body data-root="../../" data-course="3" data-module="5" data-lesson="4">
+<main>
+<div class="page">
 
-<html lang="es"><head><meta charset="utf-8"/><meta content="width=device-width,initial-scale=1" name="viewport"/><title>Lección 4 · Sobrescribir train_step : tu paso con el fit de siempre · Curso 3 · Cuaderno de IA</title><meta content="Sí." name="description"/><script>try{var t=localStorage.getItem('cuaderno-ia:tema');if(t)document.documentElement.setAttribute('data-theme',t)}catch(e){}</script><link href="../../assets/css/style.css" rel="stylesheet"/><script src="../../assets/js/curriculum.js"></script><script src="../../assets/js/lab.js"></script><script defer="" src="../../assets/js/app.js"></script><script defer="" src="../../assets/js/microanimations.js"></script></head><body data-course="3" data-lesson="4" data-module="5" data-root="../../"><main><div class="page" data-micro="3min"><header class="hero leccion"><div class="hero-grid"><div><p class="eyebrow">Curso 3 · Módulo 5 · Lección 4 de 14</p><h1>Sobrescribir train_step : tu paso con el fit de siempre</h1><p class="lead">Sí.</p><p class="meta-line"><span class="read-time" data-render="read-time"></span><a href="../modulo-5.html">Índice del módulo</a></p></div><div aria-hidden="true" class="hero-tile"></div></div></header><details class="predice"><summary>Mi bucle propio ya funciona, pero he perdido la barra de progreso, la validación, el History y los callbacks. ¿Hay forma de personalizar solo el paso y conservar todo lo demás?<span class="hint"></span></summary><div><p>Sí.</p></div></details><section aria-label="Explicación breve" class="micro-core"><div class="micro-kicker">01 · ENTENDER <span>≈ 45 s</span></div><h2>La idea en palabras sencillas</h2><p>Hay que cumplir un contrato muy concreto. train_step(self, data) recibe un lote, hace forward, gradiente y actualización, actualiza las métricas y devuelve un diccionario {nombre: valor}. Ese diccionario es lo que Keras muestra en la barra de progreso, guarda en History y pasa a los callbacks como logs. El fragmento 2 es el esqueleto completo:</p><div class="micro-example"><span aria-hidden="true" class="micro-example-icon">📝</span><div><strong>Otro ejemplo · Examen</strong><p>Practicas 8 ejercicios y guardas 2 sin mirar. Los dos reservados te dicen si sabes resolver casos nuevos.</p></div></div></section><div class="micro-kicker micro-checkpoint">02 · RESPONDER <span>≈ 15 s</span></div><section aria-label="Pregunta intercalada" class="quiz mini micro-check"><script class="quiz-data" type="application/json">{"titulo": "Pausa rápida · Comprueba la idea", "preguntas": [{"q": "Entrenas con 80 fotos. ¿Cuál es la mejor forma de medir si generaliza?", "opciones": ["Probarlo con fotos nuevas reservadas", "Cambiar las etiquetas del test", "Evaluarlo con esas mismas 80"], "correcta": 0, "porque": "TEST debe contener ejemplos no utilizados para entrenar."}]}</script></section><section aria-label="Animación interactiva" class="micro-viz" data-index="12" data-micro-viz="split"><div class="micro-kicker">03 · EXPERIMENTAR <span>≈ 45 s</span></div><div class="micro-viz-title"><div><h2>Entrenar no es examinar</h2><p>Cambia la proporción y observa qué ejemplos se reservan para el test.</p></div><span aria-hidden="true" class="micro-viz-symbol">✦</span></div><div aria-live="polite" class="micro-viz-stage"><p>Animación interactiva: Entrenar no es examinar</p></div></section><div class="micro-kicker micro-checkpoint">04 · APLICAR <span>≈ 15 s</span></div><section aria-label="Pregunta intercalada" class="quiz mini micro-check"><script class="quiz-data" type="application/json">{"titulo": "Pausa rápida · ¿Lo aplicarías?", "preguntas": [{"q": "¿Para qué sirve un conjunto de validación?", "opciones": ["Para reemplazar las entradas de entrenamiento", "Para elegir ajustes durante el desarrollo", "Para ocultar errores al final"], "correcta": 1, "porque": "Validación permite comparar y seleccionar configuraciones sin gastar el test final."}]}</script></section><div class="micro-finish"><strong>Idea que te llevas</strong><span>Hay que cumplir un contrato muy concreto</span><small>¿Quieres más ejemplos, fórmulas o código? Los tienes justo debajo, sin límite de tiempo.</small></div><details class="profundizar micro-legacy"><summary><span>Explorar más: explicación y simulaciones completas<small>Todo el texto original, tablas y demos avanzadas. Opcional.</small></span></summary><div class="prof-body"><section><h2>Sobrescribir train_step : tu paso con el fit de siempre</h2>
-<p>Sí. Cuando llamas a <code>fit</code>, Keras ejecuta por dentro este esquema, y el método <code>train_step</code> del modelo es el único que cambias:</p>
-<p>Hay que cumplir un contrato muy concreto. <code>train_step(self, data)</code> recibe un lote, hace forward, gradiente y actualización, actualiza las métricas y <strong>devuelve un diccionario</strong> <code>{nombre: valor}</code>. Ese diccionario es lo que Keras muestra en la barra de progreso, guarda en <code>History</code> y pasa a los callbacks como <code>logs</code>. El fragmento 2 es el esqueleto completo:</p>
-<p>Resultado del fragmento 2: el modelo con <code>train_step</code> propio devuelve las claves <code>['accuracy', 'loss', 'val_accuracy', 'val_loss']</code> en <code>History</code> (igual que un modelo normal) y baja la pérdida de 0,760 a 0,331 en 30 épocas, con 0,883 de precisión en validación. Es decir: personalizamos el paso y <strong>todo lo demás siguió funcionando</strong>.</p>
-<ul class="flow">
-<li class="a">DESEMPAQUETAR<small>x, y = data</small></li>
-<li class="b">CINTA<small>self(x, training=True) + self.compute_loss</small></li>
-<li class="c">APLICAR<small>self.optimizer.apply_gradients</small></li>
-<li class="d">MÉTRICAS<small>for m in self.metrics</small></li>
-<li class="a">DEVOLVER<small>{m.name: m.result()}</small></li>
-</ul>
-<div class="callout ejemplo"><span class="lbl">Con números</span><p>Hay que cumplir un contrato muy concreto. train_step(self, data) recibe un lote, hace forward, gradiente y actualización, actualiza las métricas y devuelve un diccionario {nombre: valor} .</p></div></section><div class="resumen"><h2 class="sin-num sin-toc">En pocas líneas</h2><ul><li><strong>Sobrescribir train_step : tu paso con el fit de siempre:</strong> Sí.</li><li>Antes de continuar, intenta explicar la demo sin mirar su resultado.</li></ul></div><section class="quiz mini"><script class="quiz-data" type="application/json">{"titulo": "¿Lo tienes?", "preguntas": [{"q": "¿Qué concepto estamos trabajando en esta lección?", "opciones": ["Sobrescribir train_step : tu paso con el fit de siempre", "tf.data : que el modelo no espere a los datos", "Precisión mixta: números más pequeños, entrenamiento más rápido"], "correcta": 0, "porque": "Sí."}, {"q": "¿Cuál de estas afirmaciones recoge lo que acabas de estudiar?", "opciones": ["Lo importante es comprender la idea y comprobarla con ejemplos, no memorizar términos.", "Sí.", "Siempre hay un único método que sirve para todos los problemas."], "correcta": 1, "porque": "La explicación central es: Sí."}, {"q": "Si una demo o un ejemplo te desconcierta, ¿cuál es la mejor forma de aprenderlo?", "opciones": ["Memorizar el nombre sin entender la operación.", "Volver a los números, cambiar un valor y explicar qué ocurre.", "Ignorar los resultados que no coinciden con tu intuición."], "correcta": 1, "porque": "Explorar qué cambia y por qué ayuda a conectar el concepto con su resultado."}]}</script></section></div></details><details class="profundizar"><summary><span>Profundizar: explicación completa<small>Matices, fórmulas, tablas, otros ejemplos y experimentos del módulo original.</small></span></summary><div class="prof-body"><section>
-<h2 id="train-step">Sobrescribir <code>train_step</code>: tu paso con el <code>fit</code> de siempre</h2>
-<p class="pregunta">Mi bucle propio ya funciona, pero he perdido la barra de progreso, la validación, el <code>History</code> y los callbacks. ¿Hay forma de personalizar solo el paso y conservar todo lo demás?</p>
-<p>Sí. Cuando llamas a <code>fit</code>, Keras ejecuta por dentro este esquema, y el método <code>train_step</code> del modelo es el único que cambias:</p>
-<pre class="ascii">fit(X, y, epochs=E, callbacks=[...])
- on_train_begin
- para cada época:
-    on_epoch_begin          (Keras reinicia las métricas)
-    para cada lote:
-        on_train_batch_begin
-        logs = train_step(lote)         &lt;-- AQUÍ entras tú (dentro de una tf.function)
-        on_train_batch_end(logs)
-    si hay validación: test_step(lote) por cada lote de validación
-    on_epoch_end(epoca, logs)           (EarlyStopping, ModelCheckpoint, ...)
- on_train_end</pre>
-<p>Hay que cumplir un contrato muy concreto. <code>train_step(self, data)</code> recibe un lote, hace forward, gradiente y actualización, actualiza las métricas y <strong>devuelve un diccionario</strong> <code>{nombre: valor}</code>. Ese diccionario es lo que Keras muestra en la barra de progreso, guarda en <code>History</code> y pasa a los callbacks como <code>logs</code>. El fragmento 2 es el esqueleto completo:</p>
-<ul class="flow">
-<li class="a">DESEMPAQUETAR<small>x, y = data</small></li>
-<li class="b">CINTA<small>self(x, training=True) + self.compute_loss</small></li>
-<li class="c">APLICAR<small>self.optimizer.apply_gradients</small></li>
-<li class="d">MÉTRICAS<small>for m in self.metrics</small></li>
-<li class="a">DEVOLVER<small>{m.name: m.result()}</small></li>
-</ul>
-<div class="callout analogia">
-<span class="lbl">Analogía</span>
-<p>Es como un cine con la sala ya montada. Las butacas, la taquilla, la pantalla y los altavoces (lotes, épocas, validación, barra de progreso, callbacks) son de Keras y no los tocas. Tú cambias solo la película que se proyecta: <code>train_step</code>. Mientras la entregues en el formato que espera el proyector (el diccionario), el resto del cine sigue funcionando.</p>
-</div>
-<h3>Qué hace cada pieza (y en qué se diferencia del bucle manual)</h3>
-<ul>
-<li><code>self(x, training=True)</code> llama al propio modelo. <code>self.compute_loss(x=x, y=y, y_pred=y_pred)</code> calcula la pérdida que pusiste en <code>compile(loss=...)</code> <strong>y suma</strong> las pérdidas de regularización (<code>self.losses</code>), así que no hay que sumar nada a mano como en el bucle del apartado anterior.</li>
-<li><code>self.optimizer</code> y <code>self.trainable_variables</code> existen ya porque llamaste a <code>compile</code>. No hace falta crear el optimizador ni <code>build</code>.</li>
-<li><code>self.metrics</code> es la lista de métricas de Keras: la pérdida (llamada <code>"loss"</code>) y las que pusiste en <code>compile(metrics=[...])</code>. La pérdida se actualiza con <code>update_state(perdida)</code> y las demás con <code>update_state(y, y_pred)</code>. Por eso el bucle distingue por nombre.</li>
-<li>Si tus datos traen pesos por ejemplo, <code>data</code> es <code>(x, y, sample_weight)</code>; <code>keras.utils.unpack_x_y_sample_weight(data)</code> lo desempaqueta en los tres casos.</li>
-<li><code>test_step</code> es lo mismo sin cinta ni optimizador y con <code>training=False</code>. Si no lo sobrescribes, Keras usa el suyo y ya funciona; el fragmento 2 lo escribe solo para mostrar el esqueleto.</li>
-</ul>
-<div class="callout ojo">
-<span class="lbl">Ojo · las tres trampas de <code>train_step</code> en Keras 3</span>
-<p><strong>(1) Olvidar el <code>return</code>.</strong> El fragmento 2 lo provoca a propósito y el error no dice nada de diccionarios: <code>ValueError: Attr 'Toutput_types' of 'OptionalFromValue' Op passed list of length 0</code>. Si ves un mensaje así dentro de <code>fit</code>, mira primero si <code>train_step</code> devuelve el diccionario.</p>
-<p><strong>(2) Usar la API de Keras 2.</strong> En los tutoriales antiguos aparecen <code>self.compiled_loss(y, y_pred)</code> y <code>self.compiled_metrics.update_state(y, y_pred)</code>. En Keras 3.15 siguen existiendo pero están <strong>obsoletos</strong> (avisan y desaparecerán): usa <code>self.compute_loss</code> y el bucle <code>for m in self.metrics</code>.</p>
-<p><strong>(3) Depender del backend.</strong> Este <code>train_step</code> usa <code>tf.GradientTape</code>, así que solo vale con el backend de TensorFlow. En JAX (funcional, sin estado) y en PyTorch (<code>loss.backward()</code>) el paso se escribe con otras llamadas. Si quieres código portable, el bucle sobre <code>self.metrics</code> y <code>compute_loss</code> sí lo es; la cinta no.</p>
-</div>
-<p>Resultado del fragmento 2: el modelo con <code>train_step</code> propio devuelve las claves <code>['accuracy', 'loss', 'val_accuracy', 'val_loss']</code> en <code>History</code> (igual que un modelo normal) y baja la pérdida de 0,760 a 0,331 en 30 épocas, con 0,883 de precisión en validación. Es decir: personalizamos el paso y <strong>todo lo demás siguió funcionando</strong>.</p>
-<div class="callout regla">
-<span class="lbl">Regla fácil</span>
-<p>¿Necesitas cambiar <em>qué se calcula en cada lote</em> (otra pérdida, dos optimizadores, un término extra, un gradiente especial)? Sobrescribe <code>train_step</code>. ¿Necesitas cambiar <em>qué ocurre entre épocas</em> (parar, guardar, bajar el learning rate)? Escribe un callback. ¿Ninguna de las dos? Usa <code>fit</code> tal cual.</p>
-</div>
-</section></div></details><details class="profundizar" id="codigo"><summary><span>Ver código explicado paso a paso<small>1 fragmento(s) original(es), con cada línea comentada y salida esperada.</small></span></summary><div class="prof-body"><article class="snippet" data-lang="python">
-<header>
-<h3>2 · Sobrescribir train_step y test_step</h3>
-<p class="para-que"><strong>Para qué sirve</strong> Personaliza <em>qué se hace en cada lote</em> y conserva <code>fit</code>, la validación, el historial y los callbacks. Incluye la trampa típica: olvidar el <code>return</code>.</p>
+<header class="hero leccion">
+  <div class="hero-grid">
+    <div>
+      <p class="eyebrow">Curso 3 · Módulo 5 · Lección 4 de 8</p>
+      <h1>El optimizador convierte el gradiente en un paso; el planificador lo encoge</h1>
+      <p class="lead">SGD, momentum, Nesterov, Adam y AdamW reciben el mismo gradiente y dan pasos distintos. Un planificador hace los pasos grandes al principio y pequeños al final.</p>
+      <p class="meta-line"><span class="read-time" data-render="read-time"></span><a href="../modulo-5.html">Índice del módulo</a></p>
+    </div>
+    <div class="hero-tile" aria-hidden="true"></div>
+  </div>
 </header>
-<pre class="code"><code>import tensorflow as tf
+<details class="predice">
+  <summary>Un peso vale 1, el gradiente es \( g=0{,}5 \) y \( \eta=0{,}1 \). SGD lo deja en 0,95. Con <code>momentum=0.9</code>, ¿el primer paso es mayor, menor o igual?<span class="hint"></span></summary>
+  <div>
+    <p><strong>Igual: 0,95.</strong> La velocidad empieza en 0, así que el primer paso coincide con SGD. La inercia se nota en el segundo: 0,855 frente a 0,90. Nesterov, que «mira adelante», ya se adelanta en el primero: 0,905.</p>
+  </div>
+</details>
+
+<section>
+<h2 id="idea">Cada optimizador convierte el gradiente en un paso distinto</h2>
+<p>Todos reciben el mismo gradiente \( g \); lo que cambia es <strong>cuánto y cómo</strong> se mueven:</p>
+<ul>
+  <li><strong>SGD</strong>: \( w \leftarrow w - \eta g \). Sin memoria.</li>
+  <li><strong>Momentum</strong>: acumula una velocidad \( v \leftarrow \beta v - \eta g \) y avanza con ella, como una bola que coge carrerilla.</li>
+  <li><strong>Nesterov</strong>: aplica por adelantado el empujón que la inercia va a dar (\( w \leftarrow w + \beta v - \eta g \)); oscila algo menos.</li>
+  <li><strong>Adam</strong>: divide por el tamaño típico del gradiente, así que da pasos de unos \( \eta \) <em>sea cual sea su escala</em> (con \( g=0{,}5 \) o \( g=50 \), el mismo 0,90).</li>
+  <li><strong>AdamW</strong> (o <code>weight_decay</code> en cualquiera): además encoge cada peso una fracción fija, \( w \leftarrow w - \eta\lambda w \).</li>
+</ul>
+<p>Consecuencia: <strong>un mismo learning rate no significa lo mismo</strong> en optimizadores distintos. Con \( \eta=0{,}1 \) en un valle curvo, SGD y momentum divergen y Adam llega.</p>
+<p>El segundo mando es el <strong>planificador</strong> (<em>schedule</em>). Para buscar una escena saltas de 10 en 10 minutos, luego de 10 en 10 segundos y al final fotograma a fotograma. Un planificador hace eso con \( \eta \): grande al principio, pequeño al final. Se pasa como <code>learning_rate=</code> y cuenta <strong>pasos</strong>, no épocas.</p>
+</section>
+
+<figure class="demo" data-demo="curso3/c3m5-optimizadores" data-titulo="Cinco optimizadores en el mismo valle curvo">
+  <div class="haz">Activa los cinco y pulsa «Correr» con η = 0,01 y luego con η = 0,1.</div>
+  <div class="observa">Con 0,01 llegan antes momentum y Nesterov; con 0,1 los SGD divergen y Adam llega. Ninguno gana siempre.</div>
+</figure>
+
+<section>
+<h2 id="numeros">Con números: dos pasos con \( g=0{,}5 \)</h2>
+<div class="callout ejemplo">
+  <span class="lbl">Ejemplo numérico</span>
+  <p>Peso inicial \( w=1 \), \( \eta=0{,}1 \), \( \beta=0{,}9 \), gradiente constante 0,5.</p>
+  <table>
+    <thead><tr><th>Optimizador</th><th>Paso 1</th><th>Paso 2</th></tr></thead>
+    <tbody>
+      <tr><td>SGD</td><td>0,95</td><td>0,90</td></tr>
+      <tr><td>Momentum</td><td>0,95</td><td class="res">0,855</td></tr>
+      <tr><td>Nesterov</td><td>0,905</td><td>0,7695</td></tr>
+      <tr><td>Adam</td><td>0,90</td><td>0,80</td></tr>
+    </tbody>
+  </table>
+  <p>Momentum, paso 2: \( v = 0{,}9\cdot(-0{,}05) - 0{,}05 = -0{,}095 \), así que \( w = 0{,}95 - 0{,}095 = 0{,}855 \).</p>
+</div>
+</section>
+
+<figure class="demo" data-demo="curso3/c3m5-schedules" data-titulo="Learning rate frente a pérdida esperada">
+  <div class="haz">Elige un planificador y compara la pérdida azul (con planificador) con la naranja (constante).</div>
+  <div class="observa">Con η constante la pérdida se queda en un suelo; al acabar con η pequeño el suelo baja varios órdenes.</div>
+</figure>
+
+<details class="predice">
+  <summary>Con mini-lotes el gradiente trae ruido, y con \( \eta=0{,}6 \) constante la pérdida se atasca en 0,21. Si acabas con \( \eta=0{,}006 \), ¿el suelo baja 10 veces, 100 veces o nada?<span class="hint"></span></summary>
+  <div>
+    <p><strong>Más de 100 veces.</strong> El suelo de ruido es \( \tfrac12\,\eta\sigma^2/(2-\eta) \): con \( \sigma=1 \) pasa de 0,214 a 0,0015. Por eso se baja el learning rate al final: el ruido de cada paso se hace más pequeño y puedes afinar.</p>
+  </div>
+</details>
+
+<div class="resumen">
+  <h2 class="sin-num sin-toc">En tres líneas</h2>
+  <ul>
+    <li>Empieza con <code>Adam(1e-3)</code>; ajusta antes el learning rate que el optimizador.</li>
+    <li>Un planificador va de pasos grandes a pequeños y cuenta pasos (lotes), no épocas.</li>
+    <li>Planificador en el optimizador <em>o</em> callback que cambia el learning rate: nunca los dos.</li>
+  </ul>
+</div>
+
+<section class="quiz mini">
+<script type="application/json" class="quiz-data">
+{
+ "titulo": "¿Lo tienes?",
+ "preguntas": [
+  {
+   "q": "Se aplica dos veces un gradiente constante de 0,5 a un peso que vale 1, con <code>SGD(learning_rate=0.1, momentum=0.9)</code>. ¿Cuánto vale el peso tras el segundo paso?",
+   "opciones": ["0,90", "0,855", "0,7695", "0,80"],
+   "correcta": 1,
+   "porque": "Con momentum: la velocidad es v = 0,9·v − 0,1·g. Paso 1: v = −0,05 y w = 0,95. Paso 2: v = 0,9·(−0,05) − 0,05 = −0,095 y w = 0,95 − 0,095 = 0,855. El 0,90 sería SGD sin momentum, el 0,7695 es Nesterov y el 0,80 es lo que haría Adam (que da pasos de tamaño aproximado η con cualquier escala del gradiente)."
+  },
+  {
+   "q": "Un <code>ExponentialDecay(initial_learning_rate=0.1, decay_steps=1000, decay_rate=0.5)</code> sin <code>staircase</code>, ¿qué learning rate da en el paso 500?",
+   "opciones": ["0,0750", "0,0500", "0,0707", "0,0250"],
+   "correcta": 2,
+   "porque": "La fórmula es lr = 0,1 · 0,5^(t/1000). En t = 500 el exponente es 0,5, y 0,5^0,5 = 0,707, así que lr = 0,0707. El 0,0750 sería el valor de una caída lineal de 0,1 a 0 en 2000 pasos, 0,05 es el valor de este planificador en el paso 1000 y 0,025 en el 2000."
+  },
+  {
+   "q": "Creas un optimizador con <code>Adam(learning_rate=ExponentialDecay(...))</code> y entrenas con <code>callbacks=[LearningRateScheduler(f)]</code>. ¿Qué ocurre?",
+   "opciones": [
+    "Falla con un <code>TypeError</code>: un optimizador creado con un planificador tiene el learning rate «no asignable».",
+    "Funciona: el callback multiplica el valor que da el planificador.",
+    "El planificador se ignora y manda el callback.",
+    "Se aplican los dos a la vez y el learning rate real es el producto."
+   ],
+   "correcta": 0,
+   "porque": "El learning rate de un optimizador con planificador es una función del paso, no una variable que se pueda asignar. <code>LearningRateScheduler</code> intenta asignarlo al empezar la primera época y falla (<code>ReduceLROnPlateau</code> falla igual cuando intenta bajarlo). Hay que elegir una vía: planificador dentro del optimizador, o callback sobre un learning rate numérico."
+  }
+ ]
+}
+</script>
+</section>
+
+<details class="profundizar">
+  <summary><span>Profundizar: la explicación completa<small>Nesterov y AdamW con fórmula, los mandos comunes de los optimizadores de Keras 3, la misma red con cinco optimizadores, el suelo de ruido, las fórmulas de cada planificador y el warmup.</small></span></summary>
+  <div class="prof-body">
+<h2 id="optimizadores">Optimizadores en la práctica: Nesterov, AdamW y los mandos de Keras</h2>
+
+<p class="pregunta">Ya sabes que Adam «suele funcionar». Entonces, ¿para qué existen SGD con momentum, Nesterov, RMSprop, AdamW…? ¿Y qué otros botones tiene un optimizador de Keras además del learning rate?</p>
+
+<div class="callout recuerda">
+  <span class="lbl">Recuerda (<a href="../../curso-2/modulo-1/leccion-7.html#optimizadores">Curso 2 · módulo 1</a>)</span>
+  <p>Con \( g \) el gradiente, \( \eta \) el learning rate y \( t \) el número de paso: SGD hace \( w\leftarrow w-\eta g \); el <strong>momentum</strong> acumula una velocidad \( v\leftarrow\beta v-\eta g,\ w\leftarrow w+v \); <strong>RMSprop</strong> divide por una media del tamaño del gradiente; <strong>Adam</strong> combina las dos cosas con una corrección de sesgo. Aquí no se repiten esas fórmulas: se estrena <em>Nesterov</em>, la <em>caída de pesos desacoplada</em> (AdamW) y los mandos que Keras añade a todos.</p>
+</div>
+
+<h3>Los pasos de cada optimizador, con números</h3>
+<p>Para ver las reglas sin ruido, fijamos un solo peso del modelo de notas, \( w=1 \), un gradiente constante \( g=0{,}5 \) en todos los pasos, \( \eta=0{,}1 \) y \( \beta=0{,}9 \). El fragmento 6 lo ejecuta con Keras y estos son los dos primeros pasos, que puedes comprobar a mano:</p>
+
+<table>
+  <caption>Dos pasos con \( g=0{,}5 \) constante (salida del fragmento 6)</caption>
+  <thead><tr><th>Optimizador</th><th>Cuenta a mano</th><th>\( w \) tras 1 y 2 pasos</th></tr></thead>
+  <tbody>
+    <tr><td><code>SGD</code></td><td>\( 1-0{,}1\cdot0{,}5=0{,}95 \); \( 0{,}95-0{,}05 \)</td><td class="res">0,95 ; 0,90</td></tr>
+    <tr><td><code>SGD(momentum=0.9)</code></td><td>\( v_1=-0{,}05 \), \( w_1=0{,}95 \); \( v_2=0{,}9\cdot(-0{,}05)-0{,}05=-0{,}095 \), \( w_2=0{,}855 \)</td><td class="res">0,95 ; 0,855</td></tr>
+    <tr><td><code>SGD(momentum=0.9, nesterov=True)</code></td><td>\( w_1=1+0{,}9\cdot(-0{,}05)-0{,}05=0{,}905 \); \( w_2=0{,}905+0{,}9\cdot(-0{,}095)-0{,}05=0{,}7695 \)</td><td class="res">0,905 ; 0,7695</td></tr>
+    <tr><td><code>Adam(0.1)</code></td><td>Paso 1: \( \hat m=g,\ \hat s=g^2 \), paso \( =\eta\,g/|g|=0{,}1 \). Paso 2: igual</td><td class="res">0,90 ; 0,80</td></tr>
+    <tr><td><code>Adam(0.1)</code> con \( g=50 \)</td><td>Mismo cálculo: el paso no depende de la escala del gradiente</td><td class="res">0,90 ; 0,80</td></tr>
+    <tr><td><code>Adam(0.1)</code> con \( g=0 \)</td><td>\( m=0 \): no se mueve</td><td class="res">1,0 ; 1,0</td></tr>
+    <tr><td><code>AdamW(0.1, weight_decay=0.1)</code> con \( g=0 \)</td><td>\( w\leftarrow w(1-\eta\lambda)=1\cdot0{,}99 \); luego \( 0{,}99\cdot0{,}99 \)</td><td class="res">0,99 ; 0,9801</td></tr>
+  </tbody>
+</table>
+
+<h3>Nesterov: mirar antes de empujar</h3>
+<div class="formula">\[ v \leftarrow \beta\,v-\eta\,g \qquad\qquad w \leftarrow w+\underbrace{\beta\,v-\eta\,g}_{\text{paso de Nesterov}} \]</div>
+<p>El momentum normal da el paso \( v \), la velocidad ya actualizada. Nesterov da <strong>\( \beta v-\eta g \)</strong> (con la \( v \) ya actualizada): la velocidad que llevarías en el paso siguiente más el gradiente actual. Es una forma de «mirar adelante»: se aplica por adelantado el empujón que la inercia va a dar. Es la forma que usa Keras (<code>nesterov=True</code>). En la tabla, tras el primer paso el momentum normal llega a 0,95 y Nesterov a 0,905: con un gradiente que no cambia de signo avanza más deprisa. Y como el término \( -\eta g \) entra directamente en el paso, cuando el gradiente cambia de signo (pasas el fondo del valle) el cambio se nota un paso antes, lo que en la práctica reduce un poco las oscilaciones.</p>
+
+<h3>Caída de pesos desacoplada: AdamW</h3>
+<p>Una forma de evitar pesos enormes es la L2 de siempre (más abajo, en <a href="leccion-6.html#regularizacion">regularización</a>): sumar \( \lambda\sum w^2 \) a la pérdida, es decir, <em>sumar \( 2\lambda w \) al gradiente</em> y que el optimizador haga lo que haga con él. Con Adam eso tiene un defecto: el gradiente «con penalización» se divide después por \( \sqrt{\hat s} \), así que los pesos que tienen gradientes grandes reciben una caída <strong>más débil</strong> y los que tienen gradientes pequeños una más fuerte. La caída <strong>desacoplada</strong> hace otra cosa: después del paso normal, encoge cada peso una fracción fija.</p>
+<div class="formula">\[ w \leftarrow w-\eta\,\lambda\,w \quad(\text{además del paso de Adam}) \]</div>
+<p>donde \( \lambda \) es el <code>weight_decay</code>. Es la última fila de la tabla de arriba: con gradiente cero y \( \lambda=0{,}1 \), \( \eta=0{,}1 \), cada paso multiplica el peso por 0,99. Detalles de Keras 3 que conviene saber (comprobados): <code>AdamW</code> es Adam con <code>weight_decay=0.004</code> por defecto, y <strong>todos</strong> los optimizadores aceptan <code>weight_decay</code> con esta misma regla desacoplada (<code>Adam(0.1, weight_decay=0.1)</code> y <code>SGD(0.1, weight_decay=0.1)</code> dan el mismo 0,99 y 0,9801).</p>
+
+<h3>Los mandos que comparten todos los optimizadores de Keras 3</h3>
+<table>
+  <caption>Argumentos que acepta cualquier <code>keras.optimizers.*</code></caption>
+  <thead><tr><th>Argumento</th><th>Qué hace</th></tr></thead>
+  <tbody>
+    <tr><td><code>learning_rate</code></td><td>Un número o un <a href="#schedules">planificador</a> (no <code>lr=</code>, que ya no existe)</td></tr>
+    <tr><td><code>clipnorm</code>, <code>clipvalue</code>, <code>global_clipnorm</code></td><td>Recorte de gradientes (ver <a href="leccion-5.html#gradientes">gradientes</a>)</td></tr>
+    <tr><td><code>weight_decay</code></td><td>Caída de pesos desacoplada: \( w\leftarrow w-\eta\lambda w \)</td></tr>
+    <tr><td><code>use_ema</code>, <code>ema_momentum</code></td><td>Guarda una media móvil exponencial de los pesos, \( w_{\text{ema}}\leftarrow m\,w_{\text{ema}}+(1-m)\,w \); sirve para evaluar con pesos más suaves</td></tr>
+    <tr><td><code>gradient_accumulation_steps</code></td><td>Acumula gradientes durante <em>k</em> lotes y aplica <strong>su media</strong> una sola vez. Simula un lote k veces mayor con la memoria de uno. Comprobado: con \( k=2 \) y gradientes 1 y 3 se aplica 2 (\( w=1-0{,}1\cdot2=0{,}8 \)) y <code>iterations</code> solo cuenta 1</td></tr>
+    <tr><td><code>loss_scale_factor</code></td><td>Escala la pérdida para precisión mixta (<a href="leccion-5.html#precision-mixta">más abajo</a>)</td></tr>
+  </tbody>
+</table>
+
+<div class="callout recuerda">
+  <span class="lbl">Experimento de arriba: «Cinco optimizadores en el mismo valle curvo», con todo detalle</span>
+  <p><strong>Haz esto.</strong> Cada punto del plano es una pareja de pesos del modelo de notas y su color indica el error de predicción: es la montaña que hay que bajar. La superficie es un valle curvo con forma de plátano; el mínimo (la nota ideal) está en (1, 1). Activa SGD, momentum, Nesterov, RMSprop y Adam a la vez y pulsa «Correr». Prueba tres valores de learning rate: 0,01, unos 0,03 y 0,1 (el deslizador es logarítmico). Después sube el ruido del gradiente y arrastra el punto de partida a otro sitio.</p>
+  <p><strong>Fíjate en.</strong> Con η = 0,01, tras 400 pasos el momentum y Nesterov ya han llegado, mientras SGD sin momentum va por una distancia de 0,32 y Adam por 0,43: ningún optimizador gana siempre. Con η = 0,1, <strong>SGD, momentum y Nesterov divergen</strong> (la tabla lo marca) mientras Adam llega: Adam normaliza el paso por el tamaño del gradiente y tolera valores que a SGD le explotan. Por eso un mismo learning rate no significa lo mismo en optimizadores distintos. Con ruido en el gradiente, los que acumulan (momentum, Adam) lo promedian y se agitan menos.</p>
+</div>
+
+<h3>La misma red con distintos optimizadores</h3>
+<p>El fragmento 6 entrena <em>exactamente la misma red</em> (16 neuronas ReLU, 500 puntos de dos lunas, semilla fija) durante 30 épocas = 480 pasos con cada optimizador y sus valores habituales:</p>
+<table>
+  <caption>Resultado tras 480 pasos (salida del fragmento 6)</caption>
+  <thead><tr><th>Optimizador</th><th>Pérdida final</th><th>Accuracy</th></tr></thead>
+  <tbody>
+    <tr><td><code>SGD(0.01)</code></td><td>0,393</td><td>0,834</td></tr>
+    <tr><td><code>SGD(0.01, momentum=0.9)</code></td><td class="res">0,286</td><td class="res">0,872</td></tr>
+    <tr><td><code>RMSprop(0.001)</code></td><td>0,317</td><td>0,862</td></tr>
+    <tr><td><code>Adam(0.001)</code></td><td>0,323</td><td>0,862</td></tr>
+    <tr><td><code>AdamW(0.001)</code></td><td>0,323</td><td>0,862</td></tr>
+  </tbody>
+</table>
+<p>Lee la tabla con cuidado. SGD sin momentum es el más lento (con 480 pasos aún no ha convergido). El mejor aquí es SGD <em>con momentum</em>, no Adam. <code>AdamW</code> da igual que <code>Adam</code> porque con el <code>weight_decay</code> de 0,004 y solo 480 pasos el encogimiento \( \eta\lambda=4\cdot10^{-6} \) por paso es despreciable. La conclusión útil no es «este es mejor», sino que <strong>con el mismo número de pasos las diferencias son de velocidad</strong>, y que cada uno necesita su learning rate.</p>
+
+<div class="callout regla">
+  <span class="lbl">Regla fácil · cuál elegir</span>
+  <p><strong>Empieza con <code>Adam(1e-3)</code></strong>: funciona casi siempre sin ajustar. Si entrenas Transformers, <code>AdamW</code> con <code>weight_decay</code> y un planificador con <em>warmup</em>. Si buscas el último punto de precisión en visión, <code>SGD</code> con <code>momentum=0.9</code> (o <code>nesterov=True</code>) y un planificador, que exige afinar más el learning rate. Cambia de optimizador solo cuando hayas ajustado el learning rate: casi siempre es el hiperparámetro que más pesa.</p>
+</div>
+
+<h2 id="schedules">Planificadores de learning rate (schedules)</h2>
+
+<p class="pregunta">Un learning rate grande avanza deprisa pero acaba temblando alrededor del mínimo; uno pequeño llega finamente pero tarda una eternidad. ¿No se puede tener lo mejor de los dos: grande al principio y pequeño al final?</p>
+
+<div class="callout analogia">
+  <span class="lbl">Analogía</span>
+  <p>Buscar una escena concreta en una película. Al principio saltas de 10 minutos en 10 con las flechas para llegar rápido a la zona; después, de 10 segundos en 10; y al final avanzas fotograma a fotograma para parar justo en la escena. Si fueras siempre de 10 minutos en 10, te pasarías la escena una y otra vez; si fueras siempre fotograma a fotograma, no llegarías nunca. Un <strong>planificador</strong> (<em>schedule</em>) es quien va reduciendo el tamaño del salto a medida que pasa el tiempo.</p>
+</div>
+
+<h3>Por qué bajar el learning rate ayuda: el «suelo de ruido»</h3>
+<p>Con mini-lotes, cada gradiente lleva ruido. Tomemos la parábola más simple, \( f(w)=\tfrac12 w^2 \) (mínimo en 0), con gradiente ruidoso \( g=w+\sigma\,\varepsilon \), donde \( \varepsilon \) es ruido de media 0 y varianza 1 y \( \sigma \) mide cuánto ruido hay. Cada paso es \( w\leftarrow w-\eta g=(1-\eta)w-\eta\sigma\varepsilon \). Si \( s=E[w^2] \) (el valor medio de \( w^2 \)), elevando al cuadrado y promediando queda la recursión exacta:</p>
+<div class="formula">\[ s \leftarrow (1-\eta)^2\,s+\eta^2\sigma^2 \qquad\Longrightarrow\qquad s_\infty=\frac{\eta\,\sigma^2}{2-\eta},\qquad \text{pérdida} =\tfrac12 s_\infty \]</div>
+<p>El primer término encoge \( w \) (aprender) y el segundo lo agita (ruido). Cuando se equilibran, la pérdida ya no baja de un <strong>suelo que crece con \( \eta \)</strong>. Con \( \sigma=1 \):</p>
+<div class="callout ejemplo">
+  <span class="lbl">Ejemplo numérico · el suelo de ruido</span>
+  <table>
+    <thead><tr><th>Learning rate \( \eta \)</th><th>Suelo \( \tfrac12\,\eta\sigma^2/(2-\eta) \)</th></tr></thead>
+    <tbody>
+      <tr><td>0,6</td><td>\( 0{,}5\cdot0{,}6/1{,}4=0{,}214 \)</td></tr>
+      <tr><td>0,06</td><td>\( 0{,}5\cdot0{,}06/1{,}94=0{,}0155 \)</td></tr>
+      <tr><td>0,006</td><td>\( 0{,}5\cdot0{,}006/1{,}994=0{,}0015 \)</td></tr>
+    </tbody>
+  </table>
+  <p>Con un learning rate constante de 0,6 la pérdida se atasca en 0,21. Si lo vamos bajando hasta 0,006, el suelo baja a 0,0015: <strong>más de cien veces menos</strong>. Eso es un planificador: llegar rápido con \( \eta \) grande y afinar con \( \eta \) pequeño.</p>
+</div>
+
+<h3>Los planificadores de <code>keras.optimizers.schedules</code></h3>
+<p>Todos reciben el <strong>número de paso</strong> \( t \) (no la época: cuenta lotes, como <code>optimizer.iterations</code>) y devuelven el learning rate de ese paso. Con \( \eta_0 \) el valor inicial:</p>
+<table>
+  <caption>Fórmulas y argumentos</caption>
+  <thead><tr><th>Clase</th><th>Fórmula del learning rate en el paso \( t \)</th><th>Argumentos</th></tr></thead>
+  <tbody>
+    <tr><td><code>ExponentialDecay</code></td><td>\( \eta_0\cdot r^{\,t/T} \) (con <code>staircase=True</code>, \( \lfloor t/T\rfloor \): escalones)</td><td><code>decay_steps</code> \( T \), <code>decay_rate</code> \( r \)</td></tr>
+    <tr><td><code>PiecewiseConstantDecay</code></td><td>Constante a trozos: <code>values[i]</code> mientras \( t\le \) <code>boundaries[i]</code></td><td><code>boundaries</code>, <code>values</code> (un valor más que fronteras)</td></tr>
+    <tr><td><code>CosineDecay</code></td><td>\( \eta_0\left[(1-\alpha)\,\tfrac12\bigl(1+\cos\tfrac{\pi\,\min(t,T)}{T}\bigr)+\alpha\right] \)</td><td><code>decay_steps</code> \( T \), <code>alpha</code> \( \alpha \) (fracción mínima)</td></tr>
+    <tr><td><code>CosineDecay</code> con <em>warmup</em></td><td>Sube lineal de <code>initial_learning_rate</code> a <code>warmup_target</code> en <code>warmup_steps</code>; luego coseno durante <code>decay_steps</code> más</td><td><code>warmup_target</code>, <code>warmup_steps</code></td></tr>
+    <tr><td><code>PolynomialDecay</code></td><td>\( (\eta_0-\eta_{\text{fin}})\bigl(1-\min(t,T)/T\bigr)^{p}+\eta_{\text{fin}} \)</td><td><code>decay_steps</code>, <code>end_learning_rate</code>, <code>power</code> \( p \) (con \( p=1 \): recta)</td></tr>
+  </tbody>
+</table>
+<p>Existen también <code>InverseTimeDecay</code> y <code>CosineDecayRestarts</code> (coseno que «reinicia» el learning rate cada cierto tiempo); funcionan igual.</p>
+
+<p>El fragmento 7 evalúa cada uno en los pasos 0, 100, 500, 1000 y 2000, y comprueba dos valores a mano:</p>
+<table>
+  <caption>Learning rate de cada planificador (salida del fragmento 7)</caption>
+  <thead><tr><th>Planificador</th><th>t = 0</th><th>100</th><th>500</th><th>1000</th><th>2000</th></tr></thead>
+  <tbody>
+    <tr><td><code>ExponentialDecay</code> (\( r=0{,}5,\ T=1000 \))</td><td>0,1000</td><td>0,0933</td><td>0,0707</td><td>0,0500</td><td>0,0250</td></tr>
+    <tr><td>&nbsp;&nbsp;con <code>staircase=True</code></td><td>0,1000</td><td>0,1000</td><td>0,1000</td><td>0,0500</td><td>0,0250</td></tr>
+    <tr><td><code>PiecewiseConstantDecay</code> (fronteras 500, 1500)</td><td>0,1000</td><td>0,1000</td><td>0,1000</td><td>0,0100</td><td>0,0010</td></tr>
+    <tr><td><code>CosineDecay</code> (\( T=2000,\ \alpha=0{,}01 \))</td><td>0,1000</td><td>0,0994</td><td>0,0855</td><td>0,0505</td><td>0,0010</td></tr>
+    <tr><td><code>CosineDecay</code> + warmup (500 pasos)</td><td>0,0000</td><td>0,0200</td><td>0,1000</td><td>0,0750</td><td>0,0000</td></tr>
+    <tr><td><code>PolynomialDecay</code> (lineal)</td><td>0,1000</td><td>0,0950</td><td>0,0750</td><td>0,0500</td><td>0,0000</td></tr>
+  </tbody>
+</table>
+<p>Las comprobaciones a mano: exponencial en \( t=500 \): \( 0{,}1\cdot0{,}5^{0{,}5}=0{,}0707 \). Coseno en \( t=1000 \) (la mitad de \( T \), donde \( \cos(\pi/2)=0 \)): \( 0{,}1\,[0{,}99\cdot0{,}5\cdot1+0{,}01]=0{,}0505 \). Del warmup: en \( t=100 \) sube \( 0{,}1\cdot100/500=0{,}02 \); en \( t=1000 \), a mitad de coseno, \( 0{,}1\cdot0{,}5\,(1+\cos\frac{\pi}{3})=0{,}075 \).</p>
+
+<h3>Cómo se usa en Keras</h3>
+<p>Un planificador <strong>se pasa como <code>learning_rate</code></strong> del optimizador y es el propio optimizador quien avanza el contador con cada <code>apply_gradients</code> (fragmento 7: tras 4 épocas de 50 lotes = 200 pasos, <code>optimizer.learning_rate</code> vale 0,0871, igual que \( 0{,}1\cdot0{,}5^{0{,}2} \)). Como cuenta pasos y no épocas, calcula \( T \) como <code>pasos_por_epoca * epocas</code>: el fragmento 3 pone <code>decay_steps=pasos_por_epoca * 8</code> para que el coseno llegue a 0 justo en la última época (su <code>lr</code> por época: 0,0096, 0,0085, 0,0069, 0,0050, 0,0031, 0,0015, 0,0004 y 0,0000).</p>
+
+<p><strong>¿Y el warmup?</strong> Al principio los pesos son aleatorios y los gradientes enormes y poco informativos; las estadísticas de Adam (\( \hat m \), \( \hat s \)) aún están poco asentadas. Empezar con un learning rate alto puede romper el entrenamiento en la primera época. El <em>warmup</em> sube el learning rate despacio durante los primeros pasos y luego deja que el coseno lo baje. Es habitual en Transformers.</p>
+
+<div class="callout recuerda">
+  <span class="lbl">Experimento de arriba: «Learning rate frente a pérdida esperada», con todo detalle</span>
+  <p><strong>Haz esto.</strong> Elige un planificador en el selector y mira la gráfica de arriba (el learning rate paso a paso) y la de abajo (la pérdida esperada con ese planificador, en azul, frente a la del mismo learning rate constante, en naranja). Cambia <code>initial_learning_rate</code>, el ruido del gradiente σ y los parámetros de cada planificador. Activa <code>staircase</code> con Exponential.</p>
+  <p><strong>Fíjate en.</strong> Con learning rate constante la pérdida baja enseguida y se queda plana en el suelo de ruido (0,21 con η = 0,6 y σ = 1, el valor de nuestra cuenta). Con cualquier planificador que acabe en un learning rate pequeño el suelo baja varios órdenes de magnitud (con Exponential, de 2,1·10⁻¹ a 2,1·10⁻³). Fíjate en que Piecewise mantiene el 0,21 hasta que pasa la frontera, y luego cae de golpe; el coseno y el polinómico caen suavemente. Con más σ el suelo constante sube, y con él la ventaja del planificador.</p>
+</div>
+
+<div class="callout ojo">
+  <span class="lbl">Ojo · un planificador y un callback que cambia el learning rate no se mezclan</span>
+  <p>Un optimizador creado con un planificador tiene el learning rate <strong>«no asignable»</strong>: es una función del paso. Por eso <code>LearningRateScheduler</code> falla en la primera época con <code>TypeError: This optimizer was created with a LearningRateSchedule object ... hence its learning rate is not settable</code>, y <code>ReduceLROnPlateau</code> falla con el mismo error en el momento en que intenta bajarlo (no antes, así que el fallo puede aparecer varias épocas después de empezar). Elige una de las dos vías: un planificador dentro del optimizador, o un callback que cambie un learning rate numérico.</p>
+</div>
+
+<div class="callout regla">
+  <span class="lbl">Regla fácil</span>
+  <p>Planificador por defecto: <strong>coseno con un poco de warmup</strong> si sabes cuántos pasos vas a dar; <strong><code>ReduceLROnPlateau</code></strong> si no lo sabes y prefieres reaccionar a la validación. Los dos persiguen lo mismo: pasos grandes primero, pequeños al final.</p>
+</div>
+
+  </div>
+</details>
+
+<section>
+<h2 class="sin-num">Código</h2>
+<!-- ---------- Fragmento 6 ---------- -->
+<article class="snippet" data-lang="python" id="frag-6">
+  <header>
+    <h3>6 · Los pasos de cada optimizador, comprobados a mano, y una comparación</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Aplica gradientes fijos a una sola variable para ver la regla de cada optimizador (SGD, momentum, Nesterov, Adam, AdamW) y después entrena la misma red con cinco optimizadores.</p>
+  </header>
+  <pre class="code"><code>import numpy as np
+import tensorflow as tf
 import keras
 from sklearn.datasets import make_moons
 
-keras.utils.set_random_seed(1)
-X, y = make_moons(n_samples=600, noise=0.2, random_state=0)
+# 1) Los pasos de cada optimizador, comprobados a mano sobre UNA variable (w = 1, gradiente fijo g = 0.5)
+def pasos(opt, n=2, g=0.5, w0=1.0):
+    w = keras.Variable([w0])
+    salida = []
+    for _ in range(n):
+        opt.apply_gradients([(tf.constant([g]), w)])
+        salida.append(round(float(w.numpy()[0]), 4))
+    return salida
+
+print("SGD lr=0.1                    :", pasos(keras.optimizers.SGD(0.1)))
+print("SGD lr=0.1 momentum=0.9       :", pasos(keras.optimizers.SGD(0.1, momentum=0.9)))
+print("SGD lr=0.1 mom=0.9 nesterov   :", pasos(keras.optimizers.SGD(0.1, momentum=0.9, nesterov=True)))
+print("Adam lr=0.1                   :", pasos(keras.optimizers.Adam(0.1)))
+print("Adam, gradiente 100 veces mayor:", pasos(keras.optimizers.Adam(0.1), g=50.0))
+print("Adam, gradiente 0, sin decay  :", pasos(keras.optimizers.Adam(0.1), g=0.0))
+print("AdamW wd=0.1, gradiente 0     :", pasos(keras.optimizers.AdamW(0.1, weight_decay=0.1), g=0.0))
+
+# 2) Los mismos datos y la misma red con distintos optimizadores
+X, y = make_moons(n_samples=500, noise=0.2, random_state=0)
 X, y = X.astype("float32"), y.astype("float32")
 
-class ModeloConPasoPropio(keras.Model):
-    def train_step(self, data):
-        x, y = data
-        with tf.GradientTape() as cinta:
-            y_pred = self(x, training=True)
-            perdida = self.compute_loss(x=x, y=y, y_pred=y_pred)
-        grads = cinta.gradient(perdida, self.trainable_variables)
-        self.optimizer.apply_gradients(zip(grads, self.trainable_variables))
-        for m in self.metrics:
-            if m.name == "loss":
-                m.update_state(perdida)
-            else:
-                m.update_state(y, y_pred)
-        return {m.name: m.result() for m in self.metrics}
+def entrenar(opt):
+    keras.utils.set_random_seed(0)
+    m = keras.Sequential([keras.Input(shape=(2,)), keras.layers.Dense(16, activation="relu"),
+                          keras.layers.Dense(1, activation="sigmoid")])
+    m.compile(optimizer=opt, loss="binary_crossentropy", metrics=["accuracy"])
+    h = m.fit(X, y, epochs=30, batch_size=32, verbose=0)
+    return h.history["loss"][-1], h.history["accuracy"][-1], int(m.optimizer.iterations.numpy())
 
-    def test_step(self, data):
-        x, y = data
-        y_pred = self(x, training=False)
-        perdida = self.compute_loss(x=x, y=y, y_pred=y_pred)
-        for m in self.metrics:
-            if m.name == "loss":
-                m.update_state(perdida)
-            else:
-                m.update_state(y, y_pred)
-        return {m.name: m.result() for m in self.metrics}
+print()
+print(f"{'optimizador':&lt;28}{'loss final':&gt;11}{'accuracy':&gt;10}{'pasos':&gt;7}")
+for nombre, opt in [("SGD(0.01)", keras.optimizers.SGD(0.01)),
+                    ("SGD(0.01, momentum=0.9)", keras.optimizers.SGD(0.01, momentum=0.9)),
+                    ("RMSprop(0.001)", keras.optimizers.RMSprop(0.001)),
+                    ("Adam(0.001)", keras.optimizers.Adam(0.001)),
+                    ("AdamW(0.001)", keras.optimizers.AdamW(0.001))]:
+    l, a, it = entrenar(opt)
+    print(f"{nombre:&lt;28}{l:&gt;11.3f}{a:&gt;10.3f}{it:&gt;7}")</code></pre>
+  <details class="linea-a-linea" open>
+    <summary>Línea por línea</summary>
+    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+      <tbody>
+        <tr data-lines="1-4"><td><code>import numpy as np …</code></td><td>Importaciones; <code>make_moons</code> dará los datos de la segunda parte.</td></tr>
+        <tr data-lines="6-9"><td><code># 1) Los pasos de cada optimizador, comprobados a mano sobre UNA va… …</code></td><td>Comentario y definición de <code>pasos(opt, n, g, w0)</code>: crea una variable con un solo número (<code>w0 = 1</code>) y una lista donde guardar su valor tras cada paso. <code>keras.Variable</code> es la variable de Keras 3.</td></tr>
+        <tr data-lines="10-12"><td><code>for _ in range(n): …</code></td><td>Repite <code>n</code> veces: aplica el optimizador con el gradiente constante <code>g</code> (en un tensor, emparejado con la variable) y anota el valor redondeado.</td></tr>
+        <tr data-lines="13"><td><code>return salida</code></td><td>Devuelve la lista de valores.</td></tr>
+        <tr data-lines="15-17"><td><code>print("SGD lr=0.1                    :", pasos(keras.optimizers.SGD… …</code></td><td>SGD, SGD con momentum y SGD con Nesterov, todos con \( \eta = 0{,}1 \) y gradiente 0,5.</td></tr>
+        <tr data-lines="18-20"><td><code>print("Adam lr=0.1                   :", pasos(keras.optimizers.Ada… …</code></td><td>Adam con gradiente 0,5; con gradiente 50 (100 veces mayor, para ver que el paso no cambia) y con gradiente 0 (para ver que no se mueve).</td></tr>
+        <tr data-lines="21"><td><code>print("AdamW wd=0.1, gradiente 0     :", pasos(keras.optimizers.Ada…</code></td><td>AdamW con <code>weight_decay=0.1</code> y gradiente 0: solo actúa la caída de pesos.</td></tr>
+        <tr data-lines="23-25"><td><code># 2) Los mismos datos y la misma red con distintos optimizadores …</code></td><td>Segunda parte: 500 puntos de dos lunas (ruido 0,2) en <code>float32</code>.</td></tr>
+        <tr data-lines="27-28"><td><code>def entrenar(opt): …</code></td><td><code>entrenar(opt)</code> recibe un optimizador. Fija la semilla en cada llamada para que <em>todos</em> partan de los mismos pesos iniciales.</td></tr>
+        <tr data-lines="29-31"><td><code>m = keras.Sequential([keras.Input(shape=(2,)), keras.layers.Dense(1… …</code></td><td>Una red con una capa oculta de 16 neuronas y salida sigmoide, compilada con el optimizador que toque.</td></tr>
+        <tr data-lines="32-33"><td><code>h = m.fit(X, y, epochs=30, batch_size=32, verbose=0) …</code></td><td>Entrena 30 épocas con lotes de 32 (16 lotes por época = 480 pasos) y devuelve la pérdida final, la precisión final y el número de pasos del optimizador.</td></tr>
+        <tr data-lines="35-36"><td><code>print() …</code></td><td>Imprime una línea en blanco y la cabecera de la tabla; <code>:&lt;28</code> y <code>:&gt;11</code> son anchos de columna.</td></tr>
+        <tr data-lines="37-41"><td><code>for nombre, opt in [("SGD(0.01)", keras.optimizers.SGD(0.01)), …</code></td><td>Los cinco optimizadores con sus valores habituales: <code>SGD(0.01)</code>, con momentum 0,9, <code>RMSprop(0.001)</code>, <code>Adam(0.001)</code> y <code>AdamW(0.001)</code>.</td></tr>
+        <tr data-lines="42-43"><td><code>l, a, it = entrenar(opt) …</code></td><td>Entrena con cada uno e imprime una fila de la tabla.</td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>SGD lr=0.1                    : [0.95, 0.9]
+SGD lr=0.1 momentum=0.9       : [0.95, 0.855]
+SGD lr=0.1 mom=0.9 nesterov   : [0.905, 0.7695]
+Adam lr=0.1                   : [0.9, 0.8]
+Adam, gradiente 100 veces mayor: [0.9, 0.8]
+Adam, gradiente 0, sin decay  : [1.0, 1.0]
+AdamW wd=0.1, gradiente 0     : [0.99, 0.9801]
 
-entrada = keras.Input(shape=(2,))
-h = keras.layers.Dense(16, activation="relu")(entrada)
-salida = keras.layers.Dense(1, activation="sigmoid")(h)
-modelo = ModeloConPasoPropio(entrada, salida)
+optimizador                  loss final  accuracy  pasos
+SGD(0.01)                         0.393     0.834    480
+SGD(0.01, momentum=0.9)           0.286     0.872    480
+RMSprop(0.001)                    0.317     0.862    480
+Adam(0.001)                       0.323     0.862    480
+AdamW(0.001)                      0.323     0.862    480</pre>
+    <p>Primera parte (comprueba cada cuenta con la tabla del texto): SGD da 0,95 y 0,90; el momentum acumula velocidad (0,95 y 0,855); Nesterov va más lejos en el primer paso (0,905 y 0,7695); Adam avanza 0,1 en cada paso <strong>sin importar si el gradiente es 0,5 o 50</strong> (el paso normalizado de Adam vale \( \eta \)); con gradiente 0 Adam no se mueve; y AdamW con gradiente 0 solo encoge el peso por 0,99 en cada paso (0,99 y 0,9801). Segunda parte: tras 480 pasos el mejor es SGD con momentum (pérdida 0,286, precisión 0,872) y el peor SGD sin momentum (0,393 y 0,834). <code>Adam</code> y <code>AdamW</code> dan idéntico a tres decimales porque su <code>weight_decay</code> (0,004) apenas actúa en 480 pasos.</p>
+  </div>
+</article>
+<!-- ---------- Fragmento 7 ---------- -->
+<article class="snippet" data-lang="python" id="frag-7">
+  <header>
+    <h3>7 · Planificadores de learning rate (schedules)</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Evalúa seis planificadores en los pasos 0, 100, 500, 1000 y 2000, comprueba dos valores con la fórmula y mira cómo un optimizador avanza su planificador al entrenar.</p>
+  </header>
+  <pre class="code"><code>import math
+import keras
+from keras.optimizers import schedules as S
 
-modelo.compile(optimizer="adam", loss="binary_crossentropy", metrics=["accuracy"])
-historia = modelo.fit(X, y, epochs=30, batch_size=32, validation_split=0.2, verbose=0)
-print("claves de logs:", sorted(historia.history.keys()))
-print("loss época 1 -&gt; 30:", round(historia.history["loss"][0], 3), "-&gt;", round(historia.history["loss"][-1], 3))
-print("val_accuracy final:", round(historia.history["val_accuracy"][-1], 3))
-print("evaluate:", [round(float(v), 3) for v in modelo.evaluate(X, y, verbose=0)])
+pasos = [0, 100, 500, 1000, 2000]
 
-# Trampa: un train_step que no devuelve el diccionario de métricas
-class SinReturn(keras.Model):
-    def train_step(self, data):
-        x, y = data
-        with tf.GradientTape() as cinta:
-            y_pred = self(x, training=True)
-            perdida = self.compute_loss(x=x, y=y, y_pred=y_pred)
-        grads = cinta.gradient(perdida, self.trainable_variables)
-        self.optimizer.apply_gradients(zip(grads, self.trainable_variables))
+exp = S.ExponentialDecay(initial_learning_rate=0.1, decay_steps=1000, decay_rate=0.5)
+esc = S.ExponentialDecay(0.1, decay_steps=1000, decay_rate=0.5, staircase=True)
+por_trozos = S.PiecewiseConstantDecay(boundaries=[500, 1500], values=[0.1, 0.01, 0.001])
+coseno = S.CosineDecay(initial_learning_rate=0.1, decay_steps=2000, alpha=0.01)
+calentamiento = S.CosineDecay(initial_learning_rate=0.0, decay_steps=1500, warmup_target=0.1, warmup_steps=500)
+polinomico = S.PolynomialDecay(0.1, decay_steps=2000, end_learning_rate=0.0, power=1.0)
 
-roto = SinReturn(entrada, salida)
-roto.compile(optimizer="adam", loss="binary_crossentropy")
-try:
-    roto.fit(X, y, epochs=1, verbose=0)
-except ValueError as e:
-    print("ValueError:", str(e)[:70], "...")</code></pre>
-<details class="linea-a-linea" open="">
-<summary>Línea por línea</summary>
-<p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
-<table class="lineas">
-<thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
-<tbody>
-<tr data-lines="1-3"><td><code>import tensorflow as tf …</code></td><td>Importamos TensorFlow (para la cinta), Keras y <code>make_moons</code>, un generador de dos lunas entrelazadas para clasificar en 2 clases.</td></tr>
-<tr data-lines="5"><td><code>keras.utils.set_random_seed(1)</code></td><td>Semilla fija.</td></tr>
-<tr data-lines="6-7"><td><code>X, y = make_moons(n_samples=600, noise=0.2, random_state=0) …</code></td><td>600 puntos con ruido 0,2; <code>astype("float32")</code> porque Keras trabaja en 32 bits.</td></tr>
-<tr data-lines="9-10"><td><code>class ModeloConPasoPropio(keras.Model): …</code></td><td>Una clase que hereda de <code>keras.Model</code> y redefine <code>train_step</code>, el método que <code>fit</code> llama una vez por lote. Recibe <code>data</code>, el lote.</td></tr>
-<tr data-lines="11"><td><code>x, y = data</code></td><td>Desempaqueta el lote en entradas <code>x</code> y etiquetas <code>y</code> (si hubiera pesos por ejemplo vendrían como tercer elemento).</td></tr>
-<tr data-lines="12-14"><td><code>with tf.GradientTape() as cinta: …</code></td><td>La cinta graba el forward: <code>self(x, training=True)</code> llama al propio modelo y <code>self.compute_loss(...)</code> calcula la pérdida que pondremos en <code>compile</code> <strong>más</strong> las pérdidas de regularización.</td></tr>
-<tr data-lines="15-16"><td><code>grads = cinta.gradient(perdida, self.trainable_variables) …</code></td><td>Gradientes respecto a las variables entrenables y paso del optimizador que se creó en <code>compile</code> (<code>self.optimizer</code>).</td></tr>
-<tr data-lines="17-21"><td><code>for m in self.metrics: …</code></td><td>Actualiza las métricas. <code>self.metrics</code> contiene la pérdida (nombre <code>"loss"</code>) y las demás métricas del <code>compile</code>. La pérdida se actualiza con el valor ya calculado y las demás con <code>(y, y_pred)</code>.</td></tr>
-<tr data-lines="22"><td><code>return {m.name: m.result() for m in self.metrics}</code></td><td><strong>El contrato:</strong> devolver un diccionario <code>{nombre: valor}</code>. Es lo que Keras muestra, guarda en <code>History</code> y pasa a los callbacks.</td></tr>
-<tr data-lines="24-27"><td><code>def test_step(self, data): …</code></td><td><code>test_step</code> hace lo mismo sin cinta ni optimizador: forward con <code>training=False</code> y pérdida. Lo usan la validación y <code>evaluate</code>.</td></tr>
-<tr data-lines="28-33"><td><code>for m in self.metrics: …</code></td><td>Actualiza las métricas y devuelve el diccionario, igual que en el entrenamiento.</td></tr>
-<tr data-lines="35-38"><td><code>entrada = keras.Input(shape=(2,)) …</code></td><td>Se construye el modelo con la API funcional (<code>Input</code> → <code>Dense(16, relu)</code> → <code>Dense(1, sigmoid)</code>), pero con <em>nuestra</em> clase: <code>ModeloConPasoPropio(entrada, salida)</code>.</td></tr>
-<tr data-lines="40"><td><code>modelo.compile(optimizer="adam", loss="binary_crossentropy", metric…</code></td><td><code>compile</code> como siempre: el optimizador <code>"adam"</code>, la pérdida de entropía cruzada binaria y la métrica <code>accuracy</code>.</td></tr>
-<tr data-lines="41"><td><code>historia = modelo.fit(X, y, epochs=30, batch_size=32, validation_sp…</code></td><td><code>fit</code> normal: 30 épocas, lotes de 32 y el 20 % de los datos como validación. Por dentro usa nuestro <code>train_step</code> y <code>test_step</code>.</td></tr>
-<tr data-lines="42-45"><td><code>print("claves de logs:", sorted(historia.history.keys())) …</code></td><td>Comprobaciones: las claves del historial, cómo baja la pérdida, la precisión final de validación y el resultado de <code>evaluate</code> (devuelve la pérdida y la precisión).</td></tr>
-<tr data-lines="47-55"><td><code># Trampa: un train_step que no devuelve el diccionario de métricas …</code></td><td>La trampa. Una clase idéntica salvo que <strong>no tiene <code>return</code></strong> (ni actualiza las métricas): <code>train_step</code> devuelve <code>None</code>.</td></tr>
-<tr data-lines="57-58"><td><code>roto = SinReturn(entrada, salida) …</code></td><td>Se construye y compila el modelo defectuoso con el mismo grafo de capas.</td></tr>
-<tr data-lines="59-62"><td><code>try: …</code></td><td>Intenta entrenarlo y captura el <code>ValueError</code>. Imprime solo los 70 primeros caracteres del mensaje, que es críptico.</td></tr>
-</tbody>
-</table>
-</details>
-<div class="salida">
-<strong>Salida esperada</strong>
-<pre>claves de logs: ['accuracy', 'loss', 'val_accuracy', 'val_loss']
-loss época 1 -&gt; 30: 0.76 -&gt; 0.331
-val_accuracy final: 0.883
-evaluate: [0.328, 0.865]
-ValueError: Attr 'Toutput_types' of 'OptionalFromValue' Op passed list of length 0 ...</pre>
-<p>El historial tiene las cuatro claves de siempre (<code>accuracy</code>, <code>loss</code>, <code>val_accuracy</code>, <code>val_loss</code>): <strong>nuestro paso es invisible para el resto de Keras</strong>. La pérdida baja de 0,760 a 0,331 y la precisión de validación llega a 0,883; <code>evaluate</code> da [0,328 ; 0,865] (pérdida y precisión sobre los 600 datos, con el modelo ya entrenado). La última línea es la trampa: sin <code>return</code> no hay diccionario y Keras falla con un mensaje que habla de «OptionalFromValue» y «lista de longitud 0», que no menciona <code>train_step</code> por ningún lado. Cuando veas algo así dentro de <code>fit</code>, revisa si tu paso devuelve el diccionario.</p>
+def fila(nombre, f):
+    print(f"{nombre:&lt;26}" + "".join(f"{float(f(p)):&gt;9.4f}" for p in pasos))
+
+print(f"{'paso':&lt;26}" + "".join(f"{p:&gt;9}" for p in pasos))
+fila("ExponentialDecay", exp)
+fila("  staircase=True", esc)
+fila("PiecewiseConstantDecay", por_trozos)
+fila("CosineDecay (alpha=0.01)", coseno)
+fila("CosineDecay + warmup", calentamiento)
+fila("PolynomialDecay (lineal)", polinomico)
+
+# Comprobación a mano de dos valores
+print()
+print("Exponential en paso 500 a mano :", round(0.1 * 0.5 ** (500 / 1000), 4))
+print("Coseno en paso 1000 a mano     :", round(0.1 * ((1 - 0.01) * 0.5 * (1 + math.cos(math.pi * 1000 / 2000)) + 0.01), 4))
+
+# Un planificador se pasa como learning_rate del optimizador; el propio optimizador lo avanza
+import numpy as np
+X = np.random.default_rng(0).normal(size=(1600, 3)).astype("float32")
+y = X.sum(axis=1, keepdims=True)
+modelo = keras.Sequential([keras.Input(shape=(3,)), keras.layers.Dense(1)])
+opt = keras.optimizers.Adam(learning_rate=exp)
+modelo.compile(optimizer=opt, loss="mse")
+print()
+print("paso 0   -&gt; learning_rate =", round(float(opt.learning_rate), 4))
+modelo.fit(X, y, epochs=4, batch_size=32, verbose=0)      # 4 épocas x 50 lotes = 200 pasos
+print("paso", int(opt.iterations), "-&gt; learning_rate =", round(float(opt.learning_rate), 4),
+      "| a mano:", round(0.1 * 0.5 ** (200 / 1000), 4))</code></pre>
+  <details class="linea-a-linea" open>
+    <summary>Línea por línea</summary>
+    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+      <tbody>
+        <tr data-lines="1-3"><td><code>import math …</code></td><td>Importamos <code>math</code> (para el coseno de la comprobación a mano), Keras y el módulo de planificadores con el alias <code>S</code>.</td></tr>
+        <tr data-lines="5"><td><code>pasos = [0, 100, 500, 1000, 2000]</code></td><td>Los pasos en los que mediremos el learning rate.</td></tr>
+        <tr data-lines="7-8"><td><code>exp = S.ExponentialDecay(initial_learning_rate=0.1, decay_steps=100… …</code></td><td><code>ExponentialDecay</code>: \( 0{,}1\cdot0{,}5^{t/1000} \), y la versión con <code>staircase=True</code>, que baja a escalones cada 1000 pasos.</td></tr>
+        <tr data-lines="9"><td><code>por_trozos = S.PiecewiseConstantDecay(boundaries=[500, 1500], value…</code></td><td><code>PiecewiseConstantDecay</code>: 0,1 hasta el paso 500, 0,01 hasta el 1500 y 0,001 después (tres valores para dos fronteras).</td></tr>
+        <tr data-lines="10-11"><td><code>coseno = S.CosineDecay(initial_learning_rate=0.1, decay_steps=2000,… …</code></td><td><code>CosineDecay</code> con un suelo del 1 % (<code>alpha=0.01</code>), y otro con calentamiento: sube linealmente de 0 a 0,1 en 500 pasos y luego baja con coseno durante 1500 pasos más.</td></tr>
+        <tr data-lines="12"><td><code>polinomico = S.PolynomialDecay(0.1, decay_steps=2000, end_learning_…</code></td><td><code>PolynomialDecay</code> con <code>power=1</code>: una recta de 0,1 a 0 en 2000 pasos.</td></tr>
+        <tr data-lines="14-15"><td><code>def fila(nombre, f): …</code></td><td>Una función auxiliar que imprime una fila: el nombre y el valor del planificador en cada paso. <code>f(p)</code> llama al planificador como una función del paso.</td></tr>
+        <tr data-lines="17"><td><code>print(f"{'paso':&lt;26}" + "".join(f"{p:&gt;9}" for p in pasos))</code></td><td>Cabecera: los pasos.</td></tr>
+        <tr data-lines="18-23"><td><code>fila("ExponentialDecay", exp) …</code></td><td>Una fila por planificador.</td></tr>
+        <tr data-lines="25-28"><td><code># Comprobación a mano de dos valores …</code></td><td>Dos comprobaciones a mano: exponencial en el paso 500 y coseno en el 1000 (con \( \cos(\pi/2)=0 \)). Deben coincidir con la tabla.</td></tr>
+        <tr data-lines="30-33"><td><code># Un planificador se pasa como learning_rate del optimizador; el pr… …</code></td><td>Un planificador se pasa como <code>learning_rate</code> del optimizador y es el optimizador quien avanza el contador. Preparamos datos (1600 muestras de 3 variables) cuya etiqueta es la suma.</td></tr>
+        <tr data-lines="34-36"><td><code>modelo = keras.Sequential([keras.Input(shape=(3,)), keras.layers.De… …</code></td><td>Un modelo de una neurona, un Adam con el planificador exponencial y <code>compile</code>.</td></tr>
+        <tr data-lines="37-38"><td><code>print() …</code></td><td>Imprime el learning rate inicial, antes de entrenar.</td></tr>
+        <tr data-lines="39"><td><code>modelo.fit(X, y, epochs=4, batch_size=32, verbose=0)      # 4 época…</code></td><td>Entrena 4 épocas de 50 lotes = 200 pasos.</td></tr>
+        <tr data-lines="40-41"><td><code>print("paso", int(opt.iterations), "-&gt; learning_rate =", round(floa… …</code></td><td>Imprime el learning rate después de 200 pasos y lo compara con la fórmula \( 0{,}1\cdot0{,}5^{0{,}2} \).</td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>paso                              0      100      500     1000     2000
+ExponentialDecay             0.1000   0.0933   0.0707   0.0500   0.0250
+  staircase=True             0.1000   0.1000   0.1000   0.0500   0.0250
+PiecewiseConstantDecay       0.1000   0.1000   0.1000   0.0100   0.0010
+CosineDecay (alpha=0.01)     0.1000   0.0994   0.0855   0.0505   0.0010
+CosineDecay + warmup         0.0000   0.0200   0.1000   0.0750   0.0000
+PolynomialDecay (lineal)     0.1000   0.0950   0.0750   0.0500   0.0000
+
+Exponential en paso 500 a mano : 0.0707
+Coseno en paso 1000 a mano     : 0.0505
+
+paso 0   -&gt; learning_rate = 0.1
+paso 200 -&gt; learning_rate = 0.0871 | a mano: 0.0871</pre>
+    <p>Cada fila de la tabla es una de las curvas de la teoría: el exponencial baja a la mitad cada 1000 pasos (0,1 → 0,05 → 0,025); su versión escalonada se queda en 0,1 hasta el paso 1000; el planificador por trozos cae a saltos; el coseno es casi plano al principio y al final y cae rápido en medio (0,0505 en el paso 1000); el del calentamiento sube a 0,1 en el 500 y luego baja a 0; el polinómico lineal es una recta. Las dos comprobaciones a mano (0,0707 y 0,0505) coinciden con la tabla, y tras 200 pasos el optimizador tiene un learning rate de 0,0871, igual que la fórmula: <strong>el planificador cuenta pasos del optimizador, no épocas</strong>.</p>
+  </div>
+</article>
+</section>
+
 </div>
-</article></div></details></div></main></body></html>
+</main>
+</body>
+</html>

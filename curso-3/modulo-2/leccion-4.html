@@ -1,184 +1,350 @@
-<!DOCTYPE html>
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lección 4 · ResNet: el atajo que deja pasar el gradiente · Módulo 2 · Curso 3 · Cuaderno de IA</title>
+<meta name="description" content="ResNet: por qué una red plana muy profunda no entrena, cómo el atajo y = x + F(x) mantiene vivo el gradiente y cómo se escribe el bloque en Keras.">
+<script>try{var t=localStorage.getItem('cuaderno-ia:tema');if(t)document.documentElement.setAttribute('data-theme',t)}catch(e){}</script>
+<link rel="stylesheet" href="../../assets/css/style.css">
+<script src="../../assets/js/curriculum.js"></script>
+<script src="../../assets/js/lab.js"></script>
+<script src="../../assets/js/app.js" defer></script>
+</head>
+<body data-root="../../" data-course="3" data-module="2" data-lesson="4">
+<main>
+<div class="page">
 
-<html lang="es"><head><meta charset="utf-8"/><meta content="width=device-width,initial-scale=1" name="viewport"/><title>Lección 4 · Data augmentation: inventar datos sin salir de casa · Curso 3 · Cuaderno de IA</title><meta content="El requisito es que la transformación conserve la etiqueta ." name="description"/><script>try{var t=localStorage.getItem('cuaderno-ia:tema');if(t)document.documentElement.setAttribute('data-theme',t)}catch(e){}</script><link href="../../assets/css/style.css" rel="stylesheet"/><script src="../../assets/js/curriculum.js"></script><script src="../../assets/js/lab.js"></script><script defer="" src="../../assets/js/app.js"></script><script defer="" src="../../assets/js/microanimations.js"></script></head><body data-course="3" data-lesson="4" data-module="2" data-root="../../"><main><div class="page" data-micro="3min"><header class="hero leccion"><div class="hero-grid"><div><p class="eyebrow">Curso 3 · Módulo 2 · Lección 4 de 8</p><h1>Data augmentation: inventar datos sin salir de casa</h1><p class="lead">El requisito es que la transformación conserve la etiqueta .</p><p class="meta-line"><span class="read-time" data-render="read-time"></span><a href="../modulo-2.html">Índice del módulo</a></p></div><div aria-hidden="true" class="hero-tile"></div></div></header><details class="predice"><summary>Antes de mirar el ejemplo: ¿qué crees que va a cambiar al mover los controles?</summary><div><p>El requisito es que la transformación conserve la etiqueta .</p></div></details><section aria-label="Explicación breve" class="micro-core"><div class="micro-kicker">01 · ENTENDER <span>≈ 45 s</span></div><h2>La idea en palabras sencillas</h2><p>El requisito es que la transformación conserve la etiqueta. No toda transformación sirve:</p><div class="micro-example"><span aria-hidden="true" class="micro-example-icon">💡</span><div><strong>Otro ejemplo · Veterinaria</strong><p>De 5 mascotas falta el peso de una. Un dato ausente no equivale a 0 kg: hay que tratarlo.</p></div></div></section><div class="micro-kicker micro-checkpoint">02 · RESPONDER <span>≈ 15 s</span></div><section aria-label="Pregunta intercalada" class="quiz mini micro-check"><script class="quiz-data" type="application/json">{"titulo": "Pausa rápida · Comprueba la idea", "preguntas": [{"q": "En una tabla de temperatura aparece NaN. ¿Qué significa?", "opciones": ["No hay valor registrado", "La temperatura es muy alta", "La temperatura fue 0 °C"], "correcta": 0, "porque": "NaN representa un valor faltante, no cero."}]}</script></section><section aria-label="Animación interactiva" class="micro-viz" data-index="9" data-micro-viz="data"><div class="micro-kicker">03 · EXPERIMENTAR <span>≈ 45 s</span></div><div class="micro-viz-title"><div><h2>De datos imperfectos a datos útiles</h2><p>Pulsa «Preparar datos» y descubre qué se transforma.</p></div><span aria-hidden="true" class="micro-viz-symbol">✦</span></div><div aria-live="polite" class="micro-viz-stage"><p>Animación interactiva: De datos imperfectos a datos útiles</p></div></section><div class="micro-kicker micro-checkpoint">04 · APLICAR <span>≈ 15 s</span></div><section aria-label="Pregunta intercalada" class="quiz mini micro-check"><script class="quiz-data" type="application/json">{"titulo": "Pausa rápida · ¿Lo aplicarías?", "preguntas": [{"q": "¿Por qué conviene preparar los datos ANTES de entrenar?", "opciones": ["Para evitar siempre hacer pruebas", "Para que el modelo reciba información coherente", "Para garantizar un 100 % de aciertos"], "correcta": 1, "porque": "Las transformaciones y los datos faltantes afectan a lo que aprende el modelo."}]}</script></section><div class="micro-finish"><strong>Idea que te llevas</strong><span>El requisito es que la transformación conserve la etiqueta</span><small>¿Quieres más ejemplos, fórmulas o código? Los tienes justo debajo, sin límite de tiempo.</small></div><details class="profundizar micro-legacy"><summary><span>Explorar más: explicación y simulaciones completas<small>Todo el texto original, tablas y demos avanzadas. Opcional.</small></span></summary><div class="prof-body"><section><h2>Data augmentation: inventar datos sin salir de casa</h2>
-<p>El requisito es que la transformación <strong>conserve la etiqueta</strong>. No toda transformación sirve:</p>
-<p>Ese es el trabajo del humano: <strong>elegir transformaciones que ocurren de verdad en el mundo real de tus datos</strong>. Si tus fotogramas siempre son horizontales (16:9), girarlos 90° inventa casos que nunca verás.</p>
-<p>Girar una imagen parece sencillo, pero hay una trampa. Si tomas cada píxel de entrada y calculas dónde cae tras el giro, caen en posiciones <em>fraccionarias</em> y quedan huecos. Por eso se hace al revés: <strong>para cada píxel de la imagen de salida se calcula de dónde vendría en la de entrada</strong> (se gira «hacia atrás») y se lee ahí, interpolando si cae entre píxeles.</p>
-<div class="callout ejemplo"><span class="lbl">Ejemplo tomado del módulo</span><p>: girar 30° un píxel El píxel de salida está a 2 columnas a la derecha del centro y a 0 filas: \( (u,v)=(2,0) \).</p></div></section><figure class="demo" data-demo="curso3/c3m2-augmentation" data-titulo="Doce versiones de un mismo póster">
-<div class="haz">El póster en miniatura tiene cielo, césped, un sol y una gran F (la inicial del título). En «Cada transformación al máximo» sube el giro a 60° y cambia <em>fill_mode</em> entre <code>constant</code>, <code>reflect</code> y <code>wrap</code>. Pasa a «12 sorteos aleatorios» y pulsa «Nuevo sorteo» varias veces. Después apaga el volteo horizontal: la F tiene una orientación, ¿en qué parte de un póster real sería un error voltearla?</div>
-<div class="observa">El póster es el «dato de entrada» que el sorteo mueve, gira, estira y oscurece. Cada tarjeta está calculada píxel a píxel con la interpolación del ejemplo. Los controles son los <em>rangos</em> de las capas de Keras (abajo verás cómo escribirlos). En Keras el signo del zoom es el contrario (un factor positivo aleja), pero como el rango es simétrico, da igual. El contraste usa la fórmula de <code>tf.image.adjust_contrast</code>: \( (x-\text{media})\cdot c+\text{media} \).</div>
-</figure><div class="resumen"><h2 class="sin-num sin-toc">En pocas líneas</h2><ul><li><strong>Data augmentation: inventar datos sin salir de casa:</strong> El requisito es que la transformación conserve la etiqueta .</li><li>Antes de continuar, intenta explicar la demo sin mirar su resultado.</li></ul></div><section class="quiz mini"><script class="quiz-data" type="application/json">{"titulo": "¿Lo tienes?", "preguntas": [{"q": "¿Qué concepto estamos trabajando en esta lección?", "opciones": ["Data augmentation: inventar datos sin salir de casa", "ResNet: los atajos que permiten redes de cientos de capas", "Transfer learning: no empieces de cero"], "correcta": 0, "porque": "El requisito es que la transformación conserve la etiqueta ."}, {"q": "¿Cuál de estas afirmaciones recoge lo que acabas de estudiar?", "opciones": ["Lo importante es comprender la idea y comprobarla con ejemplos, no memorizar términos.", "El requisito es que la transformación conserve la etiqueta .", "Siempre hay un único método que sirve para todos los problemas."], "correcta": 1, "porque": "La explicación central es: El requisito es que la transformación conserve la etiqueta ."}, {"q": "Si una demo o un ejemplo te desconcierta, ¿cuál es la mejor forma de aprenderlo?", "opciones": ["Memorizar el nombre sin entender la operación.", "Volver a los números, cambiar un valor y explicar qué ocurre.", "Ignorar los resultados que no coinciden con tu intuición."], "correcta": 1, "porque": "Explorar qué cambia y por qué ayuda a conectar el concepto con su resultado."}]}</script></section></div></details><details class="profundizar"><summary><span>Profundizar: explicación completa<small>Matices, fórmulas, tablas, otros ejemplos y experimentos del módulo original.</small></span></summary><div class="prof-body"><section>
-<h2 id="augmentation">Data augmentation: inventar datos sin salir de casa</h2>
-<p class="pregunta">Tienes 150 pósters de entrenamiento, cada uno con su género. La red los memoriza en pocas épocas y falla con pósters nuevos. Conseguir y etiquetar más pósters cuesta dinero. ¿Hay alguna forma de fabricar datos «nuevos» a partir de los que ya tienes?</p>
-<h3>La idea</h3>
-<div class="callout analogia">
-<span class="lbl">Analogía</span>
-<p>Para reconocer a Woody, tu cerebro no necesita haberlo visto <em>exactamente</em> con ese ángulo y esa luz. Si el póster de <em>Toy Story</em> está ligeramente girado, más cerca o más oscuro, sigue saliendo Woody. La augmentation enseña eso a la red: <strong>le muestras el mismo póster con pequeñas variaciones que no cambian lo que representa</strong>, de modo que aprenda lo esencial (el sombrero y la cara de Woody) y no lo accidental (que en ese póster estaba siempre en el centro).</p>
-</div>
-<p>El requisito es que la transformación <strong>conserve la etiqueta</strong>. No toda transformación sirve:</p>
-<table>
-<caption>¿Esta transformación conserva la etiqueta?</caption>
-<thead><tr><th>Transformación</th><th>Pósters y fotogramas (¿qué personaje, qué género?)</th><th>Dígitos escritos a mano</th><th>Título del póster (el texto)</th></tr></thead>
-<tbody>
-<tr><td>Volteo horizontal</td><td>Sí (Woody mirando al otro lado sigue siendo Woody)</td><td><strong>No</strong> (un 2 volteado no es un 2)</td><td>No: el texto en espejo no se lee</td></tr>
-<tr><td>Volteo vertical</td><td>Casi nunca (un póster boca abajo no aparece)</td><td>No</td><td>No</td></tr>
-<tr><td>Giro pequeño (±10-20°)</td><td>Sí</td><td>Sí, pequeño</td><td>Sí, pequeño (un título algo inclinado)</td></tr>
-<tr><td>Giro de 180°</td><td>No</td><td>6 ↔ 9: <strong>cambia la etiqueta</strong></td><td>No</td></tr>
-<tr><td>Zoom y desplazamiento pequeños</td><td>Sí</td><td>Sí</td><td>Sí, con cuidado (no cortar letras)</td></tr>
-<tr><td>Brillo y contraste</td><td>Sí</td><td>Sí</td><td>Sí, mientras se siga leyendo</td></tr>
-</tbody>
-</table>
-<p>Ese es el trabajo del humano: <strong>elegir transformaciones que ocurren de verdad en el mundo real de tus datos</strong>. Si tus fotogramas siempre son horizontales (16:9), girarlos 90° inventa casos que nunca verás.</p>
-<h3>Cómo funciona por dentro: mirar hacia atrás</h3>
-<p>Girar una imagen parece sencillo, pero hay una trampa. Si tomas cada píxel de entrada y calculas dónde cae tras el giro, caen en posiciones <em>fraccionarias</em> y quedan huecos. Por eso se hace al revés: <strong>para cada píxel de la imagen de salida se calcula de dónde vendría en la de entrada</strong> (se gira «hacia atrás») y se lee ahí, interpolando si cae entre píxeles.</p>
-<div class="callout ejemplo">
-<span class="lbl">Ejemplo numérico: girar 30° un píxel</span>
-<ol class="pasos">
-<li><strong>El píxel de salida</strong> está a 2 columnas a la derecha del centro y a 0 filas: \( (u,v)=(2,0) \).</li>
-<li><strong>Lo llevamos hacia atrás</strong> con la rotación inversa: \( u'=u\cos30^\circ+v\sin30^\circ=2\cdot0{,}866+0=1{,}732 \) y \( v'=-u\sin30^\circ+v\cos30^\circ=-2\cdot0{,}5+0=-1 \). Procede de \( (1{,}732,\,-1) \) en la entrada.</li>
-<li><strong>Esa posición cae entre píxeles</strong>: la columna 1,732 está entre las columnas 1 y 2, a un 73,2 % del camino. Sea 10 el gris del póster en la columna 1 y 20 en la columna 2 (misma fila).</li>
-<li><strong>Interpolación bilineal</strong>: se mezcla en proporción a la cercanía: \( (1-0{,}732)\cdot10+0{,}732\cdot20=2{,}68+14{,}64=\;<span class="res">17{,}32</span> \). (En 2D se hace lo mismo en vertical y se combinan; aquí \( v'=-1 \) es exacto y basta una dimensión.)</li>
-</ol>
-</div>
-<p>¿Y qué hay fuera de la imagen? Al girar o desplazar, algunos píxeles de salida vienen de fuera de la entrada. El argumento <code>fill_mode</code> decide qué poner:</p>
-<table>
-<caption>fill_mode: qué se pone donde no hay imagen (borde <code>a b c d</code>)</caption>
-<thead><tr><th>Valor</th><th>Resultado</th><th>Cuándo usarlo</th></tr></thead>
-<tbody>
-<tr><td><code>constant</code></td><td><code>0 0 0 | a b c d | 0 0 0</code></td><td>Cuando el fondo negro es normal</td></tr>
-<tr><td><code>nearest</code></td><td><code>a a a | a b c d | d d d</code></td><td>Repite el último píxel: casi invisible</td></tr>
-<tr><td><code>reflect</code></td><td><code>d c b | a b c d | c b a</code></td><td>Espejo: suele ser el menos llamativo</td></tr>
-<tr><td><code>wrap</code></td><td><code>b c d | a b c d | a b c</code></td><td>La imagen «da la vuelta»: rara vez tiene sentido</td></tr>
-</tbody>
-</table>
-<h3>Brillo y contraste, con números</h3>
-<div class="callout ejemplo">
-<span class="lbl">Ejemplo numérico: contraste × 2</span>
-<p>Tres píxeles de gris de un fotograma nocturno: \( [0{,}2,\ 0{,}4,\ 0{,}9] \). Su media es \( 1{,}5/3=0{,}5 \). La fórmula separa cada valor de la media: \( (x-\text{media})\cdot c+\text{media} \).</p>
-<ol class="pasos">
-<li>Con \( c=2 \): \( (0{,}2-0{,}5)\cdot2+0{,}5=-0{,}1;\quad (0{,}4-0{,}5)\cdot2+0{,}5=0{,}3;\quad (0{,}9-0{,}5)\cdot2+0{,}5=1{,}3 \).</li>
-<li>Los valores se <strong>recortan</strong> al rango válido 0-1: queda \( [0,\ 0{,}3,\ 1] \). Los extremos se saturan: ya no hay información entre «negro» y «0,3».</li>
-<li>El brillo, en cambio, <strong>suma</strong> una constante a todos: con \( +0{,}1 \) pasa de \( 0{,}059 \) a \( 0{,}159 \) (lo comprobamos en el fragmento 10).</li>
-</ol>
-</div>
-<h3>La forma moderna en Keras 3: capas de preprocesado</h3>
-<p>En Keras 3 la augmentation son <strong>capas</strong> como cualquier otra, que se ponen al principio del modelo. Las que más usarás:</p>
-<table>
-<caption>Capas de augmentation de Keras 3</caption>
-<thead><tr><th>Capa</th><th>Qué hace</th><th>Argumento clave</th></tr></thead>
-<tbody>
-<tr><td><code>RandomFlip</code></td><td>Voltea con probabilidad 1/2</td><td><code>"horizontal"</code>, <code>"vertical"</code>, <code>"horizontal_and_vertical"</code></td></tr>
-<tr><td><code>RandomRotation</code></td><td>Gira un ángulo al azar</td><td><code>factor</code>: <strong>fracción de 360°</strong>. <code>0.1</code> → ±36°</td></tr>
-<tr><td><code>RandomZoom</code></td><td>Acerca o aleja</td><td><code>height_factor</code> (y <code>width_factor</code>): positivo <strong>aleja</strong>, negativo acerca</td></tr>
-<tr><td><code>RandomTranslation</code></td><td>Desplaza</td><td>fracción de la altura y del ancho: <code>0.2</code> en 5 píxeles = 1 píxel</td></tr>
-<tr><td><code>RandomContrast</code>, <code>RandomBrightness</code></td><td>Cambian contraste y brillo</td><td>Brillo: suma <code>factor × value_range</code>; por defecto <code>value_range</code> es 0-255</td></tr>
-<tr><td><code>RandomCrop</code>, <code>Rescaling</code>, <code>Resizing</code></td><td>Recortar al azar; escalar valores (por ejemplo <code>1/255</code>); redimensionar</td><td>—</td></tr>
-</tbody>
-</table>
-<p>El fragmento 8 comprueba esto sobre una imagen 5×5 numerada de 0 a 24, donde se ve cada píxel: <code>RandomRotation(factor=(0.25, 0.25))</code> es exactamente <code>np.rot90</code>; <code>RandomRotation(0.1)</code> gira hasta \( 0{,}1\cdot360=36 \) grados; y <code>RandomTranslation(0.2, …)</code> en una imagen de 5 píxeles desplaza \( 0{,}2\cdot5=1 \) píxel.</p>
-<div class="callout ojo">
-<span class="lbl">Ojo: las capas aleatorias solo actúan al entrenar</span>
-<p>Estas capas se comportan distinto según el argumento <code>training</code>. En <code>fit</code> están activas. En <code>predict</code> y <code>evaluate</code> se desactivan solas y devuelven la imagen intacta (el fragmento 8 lo comprueba: <code>training=False</code> y <code>predict</code> dan la imagen idéntica). Es lo que quieres: evaluar sobre imágenes sin deformar. Por eso es seguro ponerlas <em>dentro del modelo</em>. Si las llamas a mano sobre un array, comprobado en Keras 3: <strong>una llamada directa sin argumentos también transforma la imagen</strong>. Para que tu intención quede clara, pasa siempre <code>training=True</code> (o <code>False</code>) explícitamente.</p>
-</div>
-<div class="callout ojo">
-<span class="lbl">Ojo: el camino antiguo, <code>ImageDataGenerator</code></span>
-<p>En cursos y libros antiguos verás <code>from keras.preprocessing.image import ImageDataGenerator</code> con <code>rotation_range=20</code>, <code>width_shift_range=0.1</code>, <code>horizontal_flip=True</code>, <code>zoom_range</code>, <code>shear_range</code> y <code>fill_mode</code>. <strong>En Keras 3 ese import falla</strong> (<code>ImportError</code>, lo comprobamos en el fragmento 9). Sobrevive, marcado «legacy», en <code>tensorflow.keras.preprocessing.image</code>. Dos diferencias de convención: <code>rotation_range</code> está en <strong>grados</strong> (20 → ±20°) mientras que el <code>factor</code> de <code>RandomRotation</code> es una <strong>fracción de vuelta</strong> (20° = 20/360 ≈ 0,056); y el generador divide entre 255 con <code>rescale=1/255</code>, mientras que el sustituto moderno es la capa <code>Rescaling(1/255)</code>. Para código nuevo usa las capas.</p>
-</div>
-<div class="callout ojo">
-<span class="lbl">Ojo: <code>tf.keras</code> y <code>keras</code> ya no son lo mismo de cabecera</span>
-<p>Muchos tutoriales empiezan con <code>from tensorflow import keras</code> o <code>tf.keras.layers…</code>. Con TensorFlow 2.21 y Keras 3 funciona, pero en este cuaderno escribimos <code>import keras</code> y <code>from keras import layers</code>: es Keras 3 directamente. Cuando un ejemplo antiguo falle con un <code>ImportError</code>, busca el mismo nombre en <code>tensorflow.keras</code> o su equivalente en <code>keras.utils</code> / <code>keras.layers</code>.</p>
-</div>
-<h3>¿Sirve de verdad? Un experimento real</h3>
-<p>El fragmento 11 prueba la augmentation en serio. Se entrena la misma CNN pequeña con solo 150 dígitos (8×8, pegados en un lienzo de 16×16), con y sin <code>RandomTranslation</code>, y se evalúa en dos situaciones: dígitos <strong>centrados</strong> (igual que en el entrenamiento) y dígitos <strong>desplazados</strong> hasta 3 píxeles (como pasa fuera del laboratorio). Los resultados reales:</p>
-<table>
-<caption>Precisión (una semilla)</caption>
-<thead><tr><th>Variante</th><th>Entrenamiento</th><th>Test centrado</th><th>Test desplazado</th></tr></thead>
-<tbody>
-<tr><td>Sin augmentation (40 épocas)</td><td>0,980</td><td>0,871</td><td>0,208</td></tr>
-<tr><td>Con augmentation (150 épocas)</td><td>0,820</td><td>0,750</td><td>0,586</td></tr>
-</tbody>
-</table>
-<p>Lee la tabla con calma, porque la lección es más fina que «augmentation = mejor». <strong>Sin augmentation</strong> el modelo memoriza (0,980) y funciona bien mientras todo esté centrado (0,871), pero se hunde a 0,208 cuando el dígito se mueve: nunca vio un dígito desplazado. <strong>Con augmentation</strong> el modelo rinde peor donde ya era bueno (0,750 frente a 0,871) y mucho mejor donde no lo era (0,586 frente a 0,208). La augmentation <strong>no suma precisión gratis: compra robustez</strong> frente a las variaciones que simula. Y como las imágenes cambian cada época, necesita más épocas (aquí 150 frente a 40).</p>
-</section></div></details><details class="profundizar" id="codigo"><summary><span>Ver código explicado paso a paso<small>1 fragmento(s) original(es), con cada línea comentada y salida esperada.</small></span></summary><div class="prof-body"><article class="snippet" data-lang="python">
-<header>
-<h3>11 · Experimento real: ¿ayuda la augmentation cuando las imágenes llegan desplazadas?</h3>
-<p class="para-que"><strong>Para qué sirve</strong> Entrenar la misma CNN pequeña con y sin <code>RandomTranslation</code>, con solo 150 imágenes, y medir la precisión en dos pruebas: dígitos centrados (como en el entrenamiento) y dígitos <em>desplazados</em> (como pasa en el mundo real).</p>
+<header class="hero leccion">
+  <div class="hero-grid">
+    <div>
+      <p class="eyebrow">Curso 3 · Módulo 2 · Lección 4 de 8</p>
+      <h1>Un atajo y = x + F(x) deja pasar el gradiente por cientos de capas</h1>
+      <p class="lead">El montador no vuelve a rodar la película: parte de la versión anterior y marca solo los cambios. Un bloque residual hace lo mismo, y así el gradiente llega entero hasta la primera capa.</p>
+      <p class="meta-line"><span class="read-time" data-render="read-time"></span><a href="../modulo-2.html">Índice del módulo</a></p>
+    </div>
+    <div class="hero-tile" aria-hidden="true"></div>
+  </div>
 </header>
-<pre class="code"><code>import numpy as np
+<details class="predice">
+  <summary>En 2015, una red plana de 56 capas daba más error que una de 20, <em>incluso en entrenamiento</em>. ¿Es sobreajuste?<span class="hint"></span></summary>
+  <div>
+    <p><strong>No.</strong> Con sobreajuste el error de entrenamiento baja; aquí subía. La red grande podría imitar a la pequeña (bastaría con que sus capas sobrantes no hicieran nada), pero el optimizador no lo encontraba. Parte del motivo: el <strong>gradiente se desvanece</strong> al cruzar tantas capas.</p>
+  </div>
+</details>
+
+<section>
+<h2 id="idea">Aprender solo lo que cambia</h2>
+<p>Al retropropagar, el gradiente es como un mensaje que pasa de boca en boca por una fila de amigos (las capas): cada uno lo multiplica por un factor. Si ese factor es menor que 1, tras muchas capas el mensaje se queda en nada y las primeras capas no aprenden.</p>
+<p>Un <strong>bloque residual</strong> no calcula \( y=H(x) \) entero, sino</p>
+<div class="formula">\[ y = x + F(x) \qquad\qquad \frac{\partial y}{\partial x} = 1 + F'(x) \]</div>
+<p>Es el montador de la película: conserva la versión anterior (\( x \)) y añade solo la corrección \( F(x) \). Si lo mejor es no cambiar nada, basta con llevar \( F \) a 0. Y ese «+1» de la derivada es una autopista por la que el gradiente baja sin encogerse.</p>
+<p>En Keras el atajo es <code>layers.Add()([x, F])</code>. Las dos ramas deben tener <strong>la misma forma</strong>; si el bloque reduce con stride 2 o cambia de canales, el atajo pasa por una <strong>convolución 1×1 con ese stride</strong> (la proyección).</p>
+</section>
+
+<figure class="demo" data-demo="curso3/c3m2-bloque-residual" data-titulo="El mensaje de boca en boca: gradiente en cada capa, red plana frente a red con atajos">
+  <div class="haz">Deja la profundidad en 20 y compara las dos curvas. Luego súbela a 60.</div>
+  <div class="observa">En la red plana el gradiente de las primeras capas cae muchos órdenes de magnitud; con atajos se mantiene.</div>
+</figure>
+
+<section>
+<h2 id="numeros">Con números: 20 amigos en fila</h2>
+<div class="callout ejemplo">
+  <span class="lbl">Ejemplo numérico: el producto de 20 factores</span>
+  <ol class="pasos">
+    <li><strong>Red plana:</strong> cada capa multiplica por 0,5. Tras 20: \( 0{,}5^{20} = \) <span class="res">\( 9{,}5\cdot10^{-7} \)</span>. Una millonésima.</li>
+    <li><strong>Con atajos:</strong> cada capa multiplica por \( 1+F'=1{,}05 \). Tras 20: \( 1{,}05^{20} = \) <span class="res">2,65</span>. El mensaje llega entero.</li>
+    <li><strong>Medido de verdad</strong> (fragmento 7, 22 capas con sigmoides): gradiente en la primera capa 3,6·10⁻¹⁴ sin atajos frente a 2,6 con ellos.</li>
+  </ol>
+</div>
+</section>
+
+<details class="predice">
+  <summary>Comparas una red de solo dos bloques con y sin atajos. ¿La de atajos acierta claramente más?<span class="hint"></span></summary>
+  <div>
+    <p><strong>No:</strong> en el fragmento 6 las dos dan 0,980. Con pocas capas el gradiente llega bien de todos modos. Los atajos no hacen magia en redes pequeñas; marcan la diferencia con 50, 101 o 152 capas.</p>
+  </div>
+</details>
+
+<div class="resumen">
+  <h2 class="sin-num sin-toc">En tres líneas</h2>
+  <ul>
+    <li>Bloque residual: \( y=x+F(x) \); la capa solo aprende qué añadir.</li>
+    <li>La derivada \( 1+F' \) evita que el gradiente se hunda: \( 0{,}5^{20} \) frente a \( 1{,}05^{20} \).</li>
+    <li><code>Add</code> exige formas iguales; si cambian, el atajo lleva una proyección 1×1.</li>
+  </ul>
+</div>
+<section class="quiz mini">
+<script type="application/json" class="quiz-data">
+{
+ "titulo": "¿Lo tienes?",
+ "preguntas": [
+  {
+   "q": "El gradiente es como un mensaje que pasa de boca en boca por 20 capas. En la red plana cada capa lo multiplica por 0,5; en la red con atajos, cada capa lo multiplica por 1,05 (porque la derivada del bloque es 1 + F′). ¿Qué llega a la primera capa?",
+   "opciones": [
+    "Lo mismo en las dos: los atajos solo aceleran el cálculo",
+    "10 en la plana (0,5·20) y 21 con atajos (1,05·20)",
+    "0,5 en la plana y 1,05 con atajos",
+    "Unos 9,5·10⁻⁷ en la plana y unos 2,65 con atajos"
+   ],
+   "correcta": 3,
+   "porque": "Los factores se multiplican capa a capa (regla de la cadena), no se suman: 0,5²⁰ ≈ 9,5·10⁻⁷ y 1,05²⁰ ≈ 2,65. Esa es la diferencia entre una primera capa que no aprende (una millonésima del gradiente) y una que sí. Sumar (10 y 21) o quedarse con un solo factor (0,5 y 1,05) confunde la regla de la cadena con una suma."
+  },
+  {
+   "q": "En un bloque residual, la rama principal reduce el mapa con stride 2 y duplica los canales. ¿Qué tiene que hacer el atajo para poder usar <code>Add()</code>?",
+   "opciones": [
+    "Nada: <code>Add</code> acepta formas distintas y las ajusta",
+    "Pasar por una <code>Conv2D</code> 1×1 con stride 2 y el mismo número de filtros que la rama principal",
+    "Pasar por un <code>MaxPooling2D</code> para igualar solo el tamaño",
+    "Sumar igualmente: el broadcasting resolverá la diferencia"
+   ],
+   "correcta": 1,
+   "porque": "Add exige formas idénticas. La proyección 1×1 con el mismo stride reduce el tamaño espacial y con el mismo número de filtros iguala los canales, y solo cuesta (C_ent + 1)·C_sal pesos. El pooling no cambia el número de canales; el broadcasting no arregla una diferencia de tamaño espacial (daría un error de formas); y Add no ajusta nada por su cuenta."
+  },
+  {
+   "q": "¿De dónde sale el «50» de ResNet-50?",
+   "opciones": [
+    "De las 50 capas que cuenta <code>len(modelo.layers)</code>",
+    "1 convolución inicial + 16 bloques de cuello × 3 convoluciones + 1 densa = 50",
+    "De 50 bloques residuales"
+   ],
+   "correcta": 1,
+   "porque": "Hay 3 + 4 + 6 + 3 = 16 bloques de cuello de botella con 3 convoluciones cada uno (48), más la convolución inicial y la densa final: 50 capas con pesos. Keras cuenta 177 porque también cuenta BatchNorm, ReLU, Add y padding."
+  }
+ ]
+}
+</script>
+</section>
+<details class="profundizar">
+  <summary><span>Profundizar: la explicación completa<small>La degradación, el mensaje de boca en boca, el montaje de la película, Add y la proyección, la medida real del fragmento 7 y el cuello de botella de ResNet-50.</small></span></summary>
+  <div class="prof-body">
+<h2 id="resnet">ResNet: los atajos que permiten redes de cientos de capas</h2>
+
+<p class="pregunta">Si más capas dan más capacidad, ¿por qué no apilamos 100 capas y ya está? ¿Qué pasaba en 2015 cuando se probaba?</p>
+
+<h3>El problema de la degradación</h3>
+<p>Al apilar capas ocurría algo desconcertante: una red de 56 capas daba <strong>peor error incluso en entrenamiento</strong> que una de 20. No era sobreajuste (el error de entrenamiento también subía). La red más profunda podría, en teoría, imitar a la pequeña (bastaría con que las capas sobrantes no hicieran nada), pero en la práctica el optimizador no lo encontraba. Parte del motivo es el <strong>gradiente que se desvanece</strong> que ya conoces del Curso 2: al retropropagar, el gradiente se multiplica por un factor por cada capa, y si ese factor es menor que 1 el producto se hunde.</p>
+
+<div class="callout ejemplo">
+  <span class="lbl">Ejemplo numérico: el producto de 20 factores</span>
+  <p>Piensa en el gradiente como un mensaje que se pasa de boca en boca entre 20 amigos (las 20 capas), desde el que acaba de ver el final de una película hasta el primero de la fila. Cada amigo lo multiplica por un factor al transmitirlo.</p>
+  <ol class="pasos">
+    <li><strong>Red plana.</strong> Supón que cada amigo solo transmite la mitad de lo que oyó: cada capa multiplica el gradiente por 0,5. Tras 20 capas: \( 0{,}5^{20}=\) <span class="res">\( 9{,}5\cdot10^{-7} \)</span>. La primera capa recibe una millonésima parte del mensaje: no aprende.</li>
+    <li><strong>Red con atajos.</strong> Si la capa calcula \( y=x+F(x) \), su derivada es \( 1+F'(x) \): cada amigo cuenta todo lo que oyó (el «1» del atajo) y además añade un poco de su cosecha. Con una \( F' \) pequeña, por ejemplo 0,05, cada capa multiplica por 1,05, y tras 20 capas: \( 1{,}05^{20}=\) <span class="res">\( 2{,}65 \)</span>. El mensaje llega entero.</li>
+    <li><strong>Misma profundidad, resultados opuestos</strong>: la diferencia es ese «+1» del atajo.</li>
+  </ol>
+</div>
+
+<h3>La idea: aprender solo lo que cambia</h3>
+<div class="callout analogia">
+  <span class="lbl">Analogía</span>
+  <p>El montaje de una película: en lugar de volver a rodar todo, el montador parte de la versión anterior y marca solo los cambios (quitar una escena, añadir otra). Si la versión ya era buena, el cambio es «nada». Un bloque residual hace lo mismo: <strong>conserva la entrada y aprende solo la corrección</strong>.</p>
+</div>
+<p>Un bloque normal calcula \( y=H(x) \) y tiene que aprender toda la función \( H \). Un <strong>bloque residual</strong> calcula</p>
+<div class="formula">\[ y \;=\; x \;+\; F(x) \qquad\qquad \frac{\partial y}{\partial x} \;=\; 1 + F'(x) \]</div>
+<p>donde \( x \) es la entrada del bloque, \( F(x) \) es lo que calculan unas pocas capas (por ejemplo dos convoluciones con BatchNorm y ReLU) y la suma \( x+F(x) \) es el <strong>atajo</strong> (<em>skip connection</em>). Si lo mejor es no hacer nada, la red solo tiene que llevar \( F \) a 0, que es fácil (pesos pequeños). Y en la retropropagación el «1» abre una autopista por la que el gradiente baja directo.</p>
+
+<div class="callout recuerda">
+  <span class="lbl">Experimento de arriba: «El mensaje de boca en boca: gradiente en cada capa, red plana frente a red con atajos», con todo detalle</span>
+  <p><strong>Haz esto.</strong> Es el mensaje de boca en boca entre los amigos del ejemplo (la capa 1 es el primero de la fila). Deja la profundidad en 20 y observa las dos curvas. Sube la profundidad a 60. Luego sube la escala de los pesos σ a 1,4 y pulsa varias veces «Otros pesos al azar». Fíjate en el mensaje de abajo.</p>
+  <p><strong>Fíjate en.</strong> En la red plana el gradiente de las primeras capas cae muchos órdenes de magnitud (escala logarítmica: cada línea es ×10). En la red con atajos se mantiene en un rango razonable. Pero ojo: con pesos grandes los atajos pueden hacer que el gradiente <em>crezca</em> sin control; por eso las ResNet reales llevan BatchNorm entre capas. Los números salen de un forward y un backward reales con semilla, no de una fórmula.</p>
+</div>
+
+<h3>El bloque en Keras: Add, y cuando las formas no coinciden</h3>
+<p>Para sumar \( x \) y \( F(x) \) deben tener <strong>la misma forma</strong>. Hay dos casos:</p>
+<ul>
+  <li><strong>Misma forma</strong> (mismo tamaño y mismos canales): el atajo es la identidad, <code>layers.Add()([x, F])</code>. Cuesta 0 parámetros.</li>
+  <li><strong>Distinta forma</strong> (el bloque reduce con stride 2 o cambia el número de canales): el atajo pasa por una convolución <strong>1×1 con ese stride</strong> (la llamada <em>proyección</em>), que adapta tamaño y canales para poder sumar.</li>
+</ul>
+<p>El fragmento 6 escribe ese bloque con la API funcional del <a href="../modulo-1.html">módulo 1</a>: dos conv 3×3 con BatchNorm, una ReLU en medio y otra después de la suma, y la proyección 1×1 cuando hace falta. Imprime además qué capas suma cada <code>Add</code>, para que veas el grafo en lugar de imaginarlo. Comparado con una red igual sin atajos, en una red de solo dos bloques los resultados son idénticos (0,980 los dos): los atajos <strong>no hacen magia en redes pequeñas</strong>. Lo que cambia es lo que ocurre con muchas capas; el fragmento 7 lo mide.</p>
+
+<div class="callout ejemplo">
+  <span class="lbl">Midiéndolo de verdad (fragmento 7)</span>
+  <p>Una red de 22 capas con sigmoides, con y sin atajos, mismos datos y misma semilla. El gradiente en la primera capa es 3,6·10⁻¹⁴ en la red plana y 2,6 en la que tiene atajos; el cociente primera/última capa es 3,2·10⁻¹³ frente a 0,12. Doce órdenes de magnitud de diferencia que salen de sumar \( x \) a \( F(x) \).</p>
+</div>
+
+<h3>ResNet-50: cuello de botella y cuenta de capas</h3>
+<p>Las ResNet profundas usan un bloque con <strong>cuello de botella</strong> (el truco del 1×1 de Inception) para ahorrar: 1×1 baja los canales, 3×3 trabaja con pocos, 1×1 los vuelve a subir. Con 256 canales de entrada y salida, un bloque básico (dos 3×3 a 256 canales) tendría \( 2\cdot9\cdot256\cdot256=1\,179\,648 \) pesos; el cuello (\( 256\to64\to64\to256 \)) tiene \( 256\cdot64+9\cdot64\cdot64+64\cdot256=69\,632 \) pesos (sin contar sesgos): casi 17 veces menos.</p>
+<p>Y de ahí sale el nombre: ResNet-50 tiene 1 convolución inicial, \( 3+4+6+3=16 \) bloques de cuello con 3 convoluciones cada uno (\( 16\cdot3=48 \)) y 1 capa densa final: \( 1+48+1=50 \).</p>
+
+<div class="callout regla">
+  <span class="lbl">Regla fácil</span>
+  <p>Un atajo hace que cada capa solo tenga que aprender <em>qué añadir</em> a lo que ya hay. Si no aporta nada, no estorba; y como la derivada de la suma es 1, el gradiente nunca tiene que atravesar una cadena de multiplicaciones por números pequeños. Por eso las ResNet de 50, 101 o 152 capas entrenan, y las redes planas de la misma profundidad no.</p>
+</div>
+
+<div class="callout ojo">
+  <span class="lbl">Ojo</span>
+  <p>Con el atajo <code>Add</code> las dos ramas deben tener exactamente la misma forma: si el error dice <em>«A merge layer should be called on inputs of compatible shapes»</em> (o algo parecido con <code>Add</code>), revisa tamaño espacial y canales. Y no apliques la ReLU antes de la suma en la rama principal: se aplica <em>después</em> de sumar, como en el fragmento 6.</p>
+</div>
+  </div>
+</details>
+
+<section>
+<h2 class="sin-num">Código</h2>
+<!-- ---------- Fragmento 6 ---------- -->
+<article class="snippet" data-lang="python">
+  <header>
+    <h3>6 · Un bloque residual en Keras: la capa Add y el atajo de proyección</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Escribir con la API funcional un <em>bloque residual</em> de ResNet (con BatchNorm y atajo de proyección 1×1 cuando cambia la forma), ver qué capas suma <code>Add</code> y compararlo con la misma red sin atajos.</p>
+  </header>
+  <pre class="code"><code>import numpy as np
 import keras
 from keras import layers
 from sklearn.datasets import load_digits
 from sklearn.model_selection import train_test_split
 
-digitos = load_digits()
-X = (digitos.images / 16.0).astype("float32")
-Xtr, Xte, ytr, yte = train_test_split(X, digitos.target, test_size=0.5, random_state=0, stratify=digitos.target)
-Xtr, ytr = Xtr[:150], ytr[:150]                      # solo 150 imágenes para entrenar
+def bloque(x, filtros, stride=1, residual=True):
+    atajo = x
+    x = layers.Conv2D(filtros, 3, strides=stride, padding="same", use_bias=False)(x)
+    x = layers.BatchNormalization()(x)
+    x = layers.Activation("relu")(x)
+    x = layers.Conv2D(filtros, 3, padding="same", use_bias=False)(x)
+    x = layers.BatchNormalization()(x)
+    if not residual:
+        return layers.Activation("relu")(x)
+    if stride != 1 or atajo.shape[-1] != filtros:
+        atajo = layers.Conv2D(filtros, 1, strides=stride, use_bias=False)(atajo)
+        atajo = layers.BatchNormalization()(atajo)
+    x = layers.Add()([x, atajo])
+    return layers.Activation("relu")(x)
 
-def en_lienzo(imgs, max_desp, rng):
-    """Pega cada dígito 8x8 en un lienzo de 16x16, centrado o desplazado hasta max_desp píxeles."""
-    out = np.zeros((len(imgs), 16, 16, 1), dtype="float32")
-    for i, im in enumerate(imgs):
-        dy, dx = rng.integers(-max_desp, max_desp + 1, 2) if max_desp else (0, 0)
-        out[i, 4 + dy:12 + dy, 4 + dx:12 + dx, 0] = im
-    return out
+def mini_resnet(residual=True):
+    entrada = keras.Input(shape=(8, 8, 1))
+    x = layers.Conv2D(8, 3, padding="same", activation="relu")(entrada)
+    x = bloque(x, 8, residual=residual)
+    x = bloque(x, 16, stride=2, residual=residual)
+    x = layers.GlobalAveragePooling2D()(x)
+    salida = layers.Dense(10, activation="softmax")(x)
+    return keras.Model(entrada, salida, name="resnet" if residual else "plana")
+
+modelo = mini_resnet()
+for capa in modelo.layers:
+    if isinstance(capa, layers.Add):
+        origenes = [t._keras_history.operation.name for t in capa.input]
+        print(f"{capa.name} suma las salidas de: {origenes} -&gt; {capa.output.shape[1:]}")
+
+digitos = load_digits()
+X = (digitos.images / 16.0).astype("float32")[..., None]
+Xtr, Xte, ytr, yte = train_test_split(X, digitos.target, test_size=0.25, random_state=0, stratify=digitos.target)
+
+for residual in (False, True):
+    keras.utils.set_random_seed(0)
+    m = mini_resnet(residual)
+    m.compile("adam", "sparse_categorical_crossentropy", metrics=["accuracy"])
+    m.fit(Xtr, ytr, epochs=25, batch_size=32, verbose=0)
+    acc = m.evaluate(Xte, yte, verbose=0)[1]
+    print(f"{m.name:8s} parámetros={m.count_params():5d}  precisión en test={acc:.3f}")</code></pre>
+  <details class="linea-a-linea" open>
+    <summary>Línea por línea</summary>
+    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+      <tbody>
+        <tr data-lines="1-3"><td><code>import numpy as np / import keras / from keras import layers</code></td><td>NumPy, Keras 3 y sus capas.</td></tr>
+        <tr data-lines="4-5"><td><code>from sklearn… load_digits / train_test_split</code></td><td>Del paquete scikit-learn: el conjunto de 1 797 dígitos 8×8 (viene instalado, no hay que descargarlo) y la función que lo parte en entrenamiento y prueba.</td></tr>
+        <tr data-lines="7"><td><code>def bloque(x, filtros, stride=1, residual=True):</code></td><td>Función que añade un bloque al tensor <code>x</code>. <code>residual=False</code> quitará el atajo para poder comparar.</td></tr>
+        <tr data-lines="8"><td><code>atajo = x</code></td><td>Guarda la entrada del bloque: es la autopista del atajo.</td></tr>
+        <tr data-lines="9-11"><td><code>Conv2D → BatchNormalization → Activation("relu")</code></td><td>Primera mitad de \(F(x)\): una 3×3 (sin sesgo, <code>use_bias=False</code>, porque la BatchNorm que viene después ya añade un desplazamiento), su normalización por lotes y ReLU. Aquí es donde se aplica el <code>stride</code> si queremos reducir.</td></tr>
+        <tr data-lines="12-13"><td><code>Conv2D → BatchNormalization</code></td><td>Segunda 3×3 con su normalización, <strong>sin ReLU todavía</strong>: se aplica después de la suma.</td></tr>
+        <tr data-lines="14-15"><td><code>if not residual: return layers.Activation("relu")(x)</code></td><td>Versión «plana»: aplica la ReLU y devuelve el resultado sin sumar la entrada.</td></tr>
+        <tr data-lines="16"><td><code>if stride != 1 or atajo.shape[-1] != filtros:</code></td><td>Comprueba si la forma de \(F(x)\) ha cambiado respecto a <code>x</code>: ¿se redujo el tamaño (stride≠1) o cambió el número de canales? Si es así no se pueden sumar tal cual.</td></tr>
+        <tr data-lines="17-18"><td><code>atajo = Conv2D(filtros, 1, strides=stride, …) → BatchNormalization</code></td><td><strong>Atajo de proyección</strong>: una convolución 1×1 con el mismo stride y los mismos canales que la rama principal, para que ambas tengan igual forma.</td></tr>
+        <tr data-lines="19"><td><code>x = layers.Add()([x, atajo])</code></td><td>Suma elemento a elemento la rama principal y el atajo: \(y = F(x) + x\). <code>Add</code> no tiene parámetros y exige formas idénticas.</td></tr>
+        <tr data-lines="20"><td><code>return layers.Activation("relu")(x)</code></td><td>ReLU sobre la suma y fin del bloque.</td></tr>
+        <tr data-lines="22"><td><code>def mini_resnet(residual=True):</code></td><td>Función que construye la red completa, con o sin atajos.</td></tr>
+        <tr data-lines="23-24"><td><code>entrada = keras.Input(…) / x = Conv2D(8, …)</code></td><td>Entrada de 8×8×1 y una convolución inicial de 8 filtros.</td></tr>
+        <tr data-lines="25-26"><td><code>x = bloque(x, 8, …) / x = bloque(x, 16, stride=2, …)</code></td><td>Dos bloques: el primero mantiene la forma (8×8×8); el segundo la reduce a 4×4 y duplica los canales a 16, así que necesita atajo de proyección.</td></tr>
+        <tr data-lines="27-28"><td><code>GlobalAveragePooling2D → Dense(10, softmax)</code></td><td>Promedia cada mapa a un número y clasifica en 10 dígitos.</td></tr>
+        <tr data-lines="29"><td><code>return keras.Model(entrada, salida, name=…)</code></td><td>Crea el modelo funcional uniendo entrada y salida; el nombre es «resnet» o «plana».</td></tr>
+        <tr data-lines="31"><td><code>modelo = mini_resnet()</code></td><td>Construye la versión con atajos.</td></tr>
+        <tr data-lines="32-33"><td><code>for capa in modelo.layers: if isinstance(capa, layers.Add):</code></td><td>Busca las capas <code>Add</code>.</td></tr>
+        <tr data-lines="34"><td><code>origenes = [t._keras_history.operation.name for t in capa.input]</code></td><td>Averigua qué capas produjeron las dos entradas de la suma. <code>_keras_history</code> es un atributo interno de Keras que guarda de dónde viene cada tensor; sirve aquí para ver el grafo.</td></tr>
+        <tr data-lines="35"><td><code>print(f"{capa.name} suma las salidas de: {origenes} -&gt; …")</code></td><td>Imprime qué suma cada <code>Add</code> y la forma resultante.</td></tr>
+        <tr data-lines="37-39"><td><code>digitos = load_digits() … train_test_split(…)</code></td><td>Carga los dígitos, los escala a 0-1 dividiendo por 16 (el máximo), añade el eje de canales con <code>[..., None]</code> y reserva el 25 % para prueba, con la misma proporción de cada dígito (<code>stratify</code>) y semilla fija.</td></tr>
+        <tr data-lines="41"><td><code>for residual in (False, True):</code></td><td>Entrena las dos versiones, primero la plana y luego la residual.</td></tr>
+        <tr data-lines="42-43"><td><code>keras.utils.set_random_seed(0) / m = mini_resnet(residual)</code></td><td>Fija las semillas para que el experimento sea reproducible y construye la red.</td></tr>
+        <tr data-lines="44-45"><td><code>m.compile(…) / m.fit(…, epochs=25, batch_size=32, verbose=0)</code></td><td>Compila con Adam y entropía cruzada para etiquetas enteras, y entrena 25 épocas sin escribir el progreso.</td></tr>
+        <tr data-lines="46-47"><td><code>acc = m.evaluate(…)[1] / print(…)</code></td><td>Mide la precisión en los datos de prueba (el segundo valor que devuelve <code>evaluate</code>) y la imprime junto con los parámetros.</td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre style="white-space:pre">add suma las salidas de: ['batch_normalization_1', 'conv2d'] -&gt; (8, 8, 8)
+add_1 suma las salidas de: ['batch_normalization_3', 'batch_normalization_4'] -&gt; (4, 4, 16)
+plana    parámetros= 5050  precisión en test=0.980
+resnet   parámetros= 5242  precisión en test=0.980</pre>
+    <p>Las dos líneas del principio muestran que <code>Add</code> junta <strong>dos ramas</strong>: en el primer bloque, la salida de la BatchNorm y la salida de la convolución inicial (el atajo directo, forma 8×8×8); en el segundo, la rama principal y el <strong>atajo de proyección</strong> (la BatchNorm tras la 1×1), forma 4×4×16. Los atajos cuestan 192 parámetros extra (5 242 − 5 050): esa es la proyección. En esta red de solo dos bloques <strong>no hay ventaja visible</strong> (0,980 las dos): los atajos brillan cuando hay decenas de capas, como enseña el fragmento siguiente. Ser honesto con esto es parte de entenderlo.</p>
+  </div>
+</article>
+
+<!-- ---------- Fragmento 7 ---------- -->
+<article class="snippet" data-lang="python">
+  <header>
+    <h3>7 · Gradiente por capa: red plana frente a red con atajos</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Medir con <code>tf.GradientTape</code> cuánto gradiente llega a cada capa en una red de 22 capas con pesos, con y sin atajos. Es la demostración numérica de por qué \(y=x+F(x)\) permite entrenar redes profundas.</p>
+  </header>
+  <pre class="code"><code>import numpy as np
+import keras
+import tensorflow as tf
+from keras import layers
+
+def red(profundidad, residual):
+    entrada = keras.Input(shape=(16,))
+    x = layers.Dense(16, activation="sigmoid")(entrada)
+    for _ in range(profundidad):
+        h = layers.Dense(16, activation="sigmoid")(x)
+        x = layers.Add()([x, h]) if residual else h
+    return keras.Model(entrada, layers.Dense(1)(x))
 
 rng = np.random.default_rng(0)
-Xtr_c = en_lienzo(Xtr, 0, rng)          # entrenamiento: todos centrados
-Xte_c = en_lienzo(Xte, 0, rng)          # test A: centrados, como en entrenamiento
-Xte_d = en_lienzo(Xte, 3, rng)          # test B: desplazados hasta 3 píxeles
+X = rng.normal(size=(64, 16)).astype("float32")
+y = rng.normal(size=(64, 1)).astype("float32")
 
-def modelo(con_augmentation):
-    capas = [keras.Input(shape=(16, 16, 1))]
-    if con_augmentation:
-        capas.append(layers.RandomTranslation(0.19, 0.19, fill_mode="constant"))
-    capas += [layers.Conv2D(8, 3, activation="relu"), layers.MaxPooling2D(),
-              layers.Conv2D(16, 3, activation="relu"), layers.MaxPooling2D(),
-              layers.Flatten(), layers.Dense(10, activation="softmax")]
-    m = keras.Sequential(capas)
-    m.compile("adam", "sparse_categorical_crossentropy", metrics=["accuracy"])
-    return m
+for residual in (False, True):
+    keras.utils.set_random_seed(1)
+    modelo = red(20, residual)
+    with tf.GradientTape() as cinta:
+        perdida = tf.reduce_mean(keras.losses.mean_squared_error(y, modelo(X)))
+    grads = cinta.gradient(perdida, modelo.trainable_variables)
+    normas = [float(tf.norm(g)) for g, v in zip(grads, modelo.trainable_variables)
+              if "kernel" in v.path]
+    nombre = "con atajos" if residual else "plana     "
+    print(nombre, " ".join(f"capa{i + 1:2d}={normas[i]:.1e}" for i in (0, 4, 9, 14, 19)),
+          f"| primera/última = {normas[0] / normas[19]:.1e}")</code></pre>
+  <details class="linea-a-linea" open>
+    <summary>Línea por línea</summary>
+    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+      <tbody>
+        <tr data-lines="1-4"><td><code>import numpy / keras / tensorflow / layers</code></td><td>NumPy para datos, Keras para el modelo y <code>tensorflow</code> solo para <code>GradientTape</code> (el cuaderno que graba las operaciones para derivar).</td></tr>
+        <tr data-lines="6"><td><code>def red(profundidad, residual):</code></td><td>Construye una red de <code>profundidad</code> capas ocultas, con atajos o sin ellos.</td></tr>
+        <tr data-lines="7-8"><td><code>entrada = keras.Input(shape=(16,)) / x = Dense(16, sigmoid)(entrada)</code></td><td>Entrada de 16 números y una primera capa densa de 16 neuronas con sigmoide (a propósito: es la activación que más encoge el gradiente).</td></tr>
+        <tr data-lines="9-11"><td><code>for _ in range(profundidad): h = Dense(16, …)(x); x = Add()([x, h]) if residual else h</code></td><td>Repite la capa. Si es residual, la salida es \(x+h\) (atajo); si no, es solo \(h\). La expresión <code>A if condición else B</code> elige entre las dos.</td></tr>
+        <tr data-lines="12"><td><code>return keras.Model(entrada, layers.Dense(1)(x))</code></td><td>Cierra con una neurona lineal de salida y crea el modelo.</td></tr>
+        <tr data-lines="14-16"><td><code>rng = np.random.default_rng(0) … X, y</code></td><td>Genera 64 ejemplos aleatorios de 16 números y 64 objetivos aleatorios con semilla. No importa qué aprende: solo queremos ver cómo viaja el gradiente.</td></tr>
+        <tr data-lines="18"><td><code>for residual in (False, True):</code></td><td>Mide las dos redes.</td></tr>
+        <tr data-lines="19-20"><td><code>keras.utils.set_random_seed(1) / modelo = red(20, residual)</code></td><td>Misma semilla para las dos y 20 bloques repetidos. Contando la primera densa y la de salida, la red tiene 22 matrices de pesos; el programa mira las números 1, 5, 10, 15 y 20 contando desde la entrada.</td></tr>
+        <tr data-lines="21-22"><td><code>with tf.GradientTape() as cinta: perdida = …</code></td><td>Dentro del bloque <code>with</code> la cinta graba el cálculo: pasa los datos por la red y calcula el error cuadrático medio.</td></tr>
+        <tr data-lines="23"><td><code>grads = cinta.gradient(perdida, modelo.trainable_variables)</code></td><td>Retropropagación: el gradiente de la pérdida respecto a cada variable entrenable.</td></tr>
+        <tr data-lines="24-25"><td><code>normas = [float(tf.norm(g)) … if "kernel" in v.path]</code></td><td>Para cada variable que sea un <em>kernel</em> (matriz de pesos, no sesgos) calcula la norma del gradiente: un número que dice «cuánto empuja» la pérdida a esa capa. La lista queda en orden: la capa 1 primero.</td></tr>
+        <tr data-lines="26"><td><code>nombre = "con atajos" if residual else "plana     "</code></td><td>Etiqueta para imprimir (con espacios para alinear).</td></tr>
+        <tr data-lines="27-28"><td><code>print(nombre, … capa{i+1} … | primera/última = …)</code></td><td>Imprime la norma en las capas 1, 5, 10, 15 y 20, y el cociente entre la primera y la última.</td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre style="white-space:pre">plana      capa 1=3.6e-14 capa 5=1.8e-11 capa10=4.2e-08 capa15=6.7e-05 capa20=1.1e-01 | primera/última = 3.2e-13
+con atajos capa 1=2.6e+00 capa 5=2.3e+01 capa10=5.5e+01 capa15=7.2e+01 capa20=2.2e+01 | primera/última = 1.2e-01</pre>
+    <p>En la <strong>red plana</strong> el gradiente cae capa a capa: llega 1,1·10⁻¹ a la capa 20 y solo 3,6·10⁻¹⁴ a la capa 1, un factor de \(3{,}2\cdot10^{-13}\). Eso es el <strong>gradiente que se desvanece</strong>: la capa 1 prácticamente no aprende. En la <strong>red con atajos</strong> la capa 1 recibe 2,6 y la 20 recibe 22: el cociente es 0,12. El gradiente se mantiene entre 2,6 y 72 en lugar de hundirse, porque \(\partial y/\partial x=1+F'\) y ese «1» garantiza un camino directo hasta la capa 1. (Los valores exactos dependen de la semilla, pero la diferencia de más de doce órdenes de magnitud no.)</p>
+  </div>
+</article>
 
-print("variante          | train | test centrado | test desplazado")
-for nombre, aug, epocas in (("sin augmentation", False, 40), ("con augmentation", True, 150)):
-    keras.utils.set_random_seed(0)
-    m = modelo(aug)
-    m.fit(Xtr_c, ytr, epochs=epocas, batch_size=16, verbose=0)
-    a = [m.evaluate(d, y, verbose=0)[1] for d, y in ((Xtr_c, ytr), (Xte_c, yte), (Xte_d, yte))]
-    print(f"{nombre:17s} | {a[0]:.3f} |     {a[1]:.3f}     |     {a[2]:.3f}")</code></pre>
-<details class="linea-a-linea" open="">
-<summary>Línea por línea</summary>
-<p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
-<table class="lineas">
-<thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
-<tbody>
-<tr data-lines="1-5"><td><code>import numpy / keras / layers / load_digits / train_test_split</code></td><td>Librerías: NumPy, Keras 3 y, de scikit-learn, el conjunto de dígitos 8×8 y la función que reparte entrenamiento y prueba.</td></tr>
-<tr data-lines="7-9"><td><code>digitos = load_digits() … train_test_split(…, test_size=0.5, …)</code></td><td>Carga los 1 797 dígitos, escala los píxeles de 0-16 a 0-1 y reserva la mitad para prueba, manteniendo la proporción de cada dígito (<code>stratify</code>).</td></tr>
-<tr data-lines="10"><td><code>Xtr, ytr = Xtr[:150], ytr[:150]</code></td><td>Se queda con <strong>solo 150 imágenes</strong> de entrenamiento: pocos datos, que es cuando la augmentation más se nota.</td></tr>
-<tr data-lines="12-13"><td><code>def en_lienzo(imgs, max_desp, rng):</code></td><td>Función que pega cada dígito 8×8 en un lienzo vacío de 16×16. La línea 13 es su descripción. Hay sitio de sobra para desplazarlo.</td></tr>
-<tr data-lines="14"><td><code>out = np.zeros((len(imgs), 16, 16, 1), dtype="float32")</code></td><td>Lienzos negros: una imagen por dígito, 16×16, 1 canal.</td></tr>
-<tr data-lines="15"><td><code>for i, im in enumerate(imgs):</code></td><td>Recorre las imágenes con su posición <code>i</code>.</td></tr>
-<tr data-lines="16"><td><code>dy, dx = rng.integers(-max_desp, max_desp + 1, 2) if max_desp else (0, 0)</code></td><td>Sortea el desplazamiento vertical y horizontal entre <code>-max_desp</code> y <code>+max_desp</code> píxeles. Si <code>max_desp</code> es 0, no hay desplazamiento.</td></tr>
-<tr data-lines="17"><td><code>out[i, 4 + dy:12 + dy, 4 + dx:12 + dx, 0] = im</code></td><td>Pega el dígito en el centro (filas y columnas 4 a 11) movido <code>dy</code> y <code>dx</code>.</td></tr>
-<tr data-lines="18"><td><code>return out</code></td><td>Devuelve las imágenes ya en el lienzo.</td></tr>
-<tr data-lines="20-23"><td><code>rng = … / Xtr_c = … / Xte_c = … / Xte_d = …</code></td><td>Tres conjuntos: entrenamiento centrado; prueba A, centrada (igual que el entrenamiento); y prueba B, con desplazamientos de hasta 3 píxeles.</td></tr>
-<tr data-lines="25-26"><td><code>def modelo(con_augmentation): capas = [keras.Input(shape=(16, 16, 1))]</code></td><td>Función que construye el modelo; empieza una lista de capas con la entrada de 16×16×1.</td></tr>
-<tr data-lines="27-28"><td><code>if con_augmentation: capas.append(layers.RandomTranslation(0.19, 0.19, …))</code></td><td>Si se pide augmentation, añade una capa que desplaza la imagen hasta el 19 % de su tamaño (\(0{,}19\cdot16\approx3\) píxeles) en cada eje, rellenando con ceros.</td></tr>
-<tr data-lines="29-31"><td><code>capas += [Conv2D(8, 3) … Dense(10, softmax)]</code></td><td>El resto es una CNN pequeña de las que ya conoces: dos parejas convolución+pooling, <code>Flatten</code> y la capa de 10 clases.</td></tr>
-<tr data-lines="32-34"><td><code>m = keras.Sequential(capas) / m.compile(…) / return m</code></td><td>Crea el modelo, lo compila con Adam y entropía cruzada y lo devuelve.</td></tr>
-<tr data-lines="36"><td><code>print("variante          | train | test centrado | test desplazado")</code></td><td>Cabecera de la tabla.</td></tr>
-<tr data-lines="37"><td><code>for nombre, aug, epocas in ((… False, 40), (… True, 150)):</code></td><td>Dos variantes: sin augmentation (40 épocas) y con augmentation (150). Con augmentation hace falta entrenar más: cada época la red ve imágenes distintas y aprende más despacio.</td></tr>
-<tr data-lines="38-40"><td><code>keras.utils.set_random_seed(0) / m = modelo(aug) / m.fit(…)</code></td><td>Fija la semilla, construye el modelo y lo entrena sobre las imágenes centradas.</td></tr>
-<tr data-lines="41"><td><code>a = [m.evaluate(d, y, verbose=0)[1] for d, y in (…)]</code></td><td>Evalúa tres veces: entrenamiento (sin augmentation, porque <code>evaluate</code> la apaga), prueba centrada y prueba desplazada. Guarda las tres precisiones.</td></tr>
-<tr data-lines="42"><td><code>print(f"{nombre:17s} | {a[0]:.3f} | …")</code></td><td>Imprime una fila de la tabla.</td></tr>
-</tbody>
-</table>
-</details>
-<div class="salida">
-<strong>Salida esperada</strong>
-<pre style="white-space:pre">variante          | train | test centrado | test desplazado
-sin augmentation  | 0.980 |     0.871     |     0.208
-con augmentation  | 0.820 |     0.750     |     0.586</pre>
-<p>Sin augmentation el modelo memoriza: <strong>0,980</strong> en entrenamiento y 0,871 con dígitos centrados, pero cuando los dígitos llegan desplazados cae a <strong>0,208</strong> (casi el azar de 0,10 + algo). Con augmentation baja la precisión en entrenamiento (0,820, porque ahora le cuesta más) y en centrados (0,750), pero con dígitos desplazados sube a <strong>0,586</strong>. Es un intercambio honesto: la augmentation <em>no regala</em> precisión donde el modelo ya era bueno; compra <strong>robustez</strong> frente a lo que no vio. Como sólo hay una semilla, mira el orden de magnitud, no las décimas.</p>
+</section>
+
 </div>
-</article></div></details></div></main></body></html>
+</main>
+</body>
+</html>

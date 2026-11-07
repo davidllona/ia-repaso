@@ -1,5 +1,275 @@
-<!DOCTYPE html>
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lección 5 · En el híbrido, cada casilla del mapa de la CNN es un token · Módulo 3 · Curso 6 · Cuaderno de IA</title>
+<meta name="description" content="El híbrido CNN + Vision Transformer: la CNN extrae un mapa de características, cada casilla se convierte en un token y el Transformer las relaciona. Dónde cortas la CNN decide el coste de la atención.">
+<script>try{var t=localStorage.getItem('cuaderno-ia:tema');if(t)document.documentElement.setAttribute('data-theme',t)}catch(e){}</script>
+<link rel="stylesheet" href="../../assets/css/style.css">
+<script src="../../assets/js/curriculum.js"></script>
+<script src="../../assets/js/lab.js"></script>
+<script src="../../assets/js/app.js" defer></script>
+</head>
+<body data-root="../../" data-course="6" data-module="3" data-lesson="5">
+<main>
+<div class="page">
 
-<html lang="es"><head><meta charset="utf-8"/><meta content="width=device-width,initial-scale=1" name="viewport"/><title>Lección 5 · CNN y ViT: elegir con pruebas, no por moda · Curso 6 · Cuaderno de IA</title><meta content="Una arquitectura es una hipótesis: compárala bajo las mismas condiciones." name="description"/><script>try{var t=localStorage.getItem('cuaderno-ia:tema');if(t)document.documentElement.setAttribute('data-theme',t)}catch(e){}</script><link href="../../assets/css/style.css" rel="stylesheet"/><script src="../../assets/js/curriculum.js"></script><script src="../../assets/js/lab.js"></script><script defer="" src="../../assets/js/app.js"></script><script defer="" src="../../assets/js/microanimations.js"></script></head><body data-course="6" data-lesson="5" data-module="3" data-root="../../"><main><div class="page" data-micro="3min"><header class="hero leccion"><div class="hero-grid"><div><p class="eyebrow">Curso 6 · Módulo 3 · Lección 5 de 5</p><h1>CNN y ViT: elegir con pruebas, no por moda</h1><p class="lead">Una arquitectura es una hipótesis: compárala bajo las mismas condiciones.</p><p class="meta-line"><span class="read-time" data-render="read-time"></span><a href="../modulo-3.html">Índice del módulo</a></p></div><div aria-hidden="true" class="hero-tile"></div></div></header><details class="predice"><summary>¿Se puede concluir que ViT es mejor porque tiene más parámetros?<span class="hint"></span></summary><div><p>No. Un modelo más grande puede costar más, sobreajustar y no mejorar las métricas de interés.</p></div></details><section aria-label="Explicación breve" class="micro-core"><div class="micro-kicker">01 · ENTENDER <span>≈ 45 s</span></div><h2>La idea en palabras sencillas</h2><p>Diseña un experimento justo: mismos datos, mismo TEST, mismas métricas, presupuestos de entrenamiento comparables. Registra arquitectura, pesos iniciales, augmentation, épocas y tiempo. Es válido que uno gane en precisión y otro en velocidad o tamaño.</p><div class="micro-example"><span aria-hidden="true" class="micro-example-icon">🐾</span><div><strong>Otro ejemplo · Mascotas</strong><p>Para detectar orejas en una foto, un filtro busca formas locales aunque aparezcan en posiciones distintas.</p></div></div></section><div class="micro-kicker micro-checkpoint">02 · RESPONDER <span>≈ 15 s</span></div><section aria-label="Pregunta intercalada" class="quiz mini micro-check"><script class="quiz-data" type="application/json">{"titulo": "Pausa rápida · Comprueba la idea", "preguntas": [{"q": "Un kernel 3×3 se coloca sobre una foto. ¿Qué analiza primero?", "opciones": ["Solo la etiqueta final", "Nueve posiciones próximas de la imagen", "Todas las fotografías del dataset a la vez"], "correcta": 1, "porque": "El filtro procesa una región local y luego se desplaza."}]}</script></section><section aria-label="Animación interactiva" class="micro-viz" data-index="14" data-micro-viz="convolution"><div class="micro-kicker">03 · EXPERIMENTAR <span>≈ 45 s</span></div><div class="micro-viz-title"><div><h2>Una ventana recorre la imagen</h2><p>Avanza el filtro 3×3; fíjate en qué píxeles observa cada vez.</p></div><span aria-hidden="true" class="micro-viz-symbol">✦</span></div><div aria-live="polite" class="micro-viz-stage"><p>Animación interactiva: Una ventana recorre la imagen</p></div></section><div class="micro-kicker micro-checkpoint">04 · APLICAR <span>≈ 15 s</span></div><section aria-label="Pregunta intercalada" class="quiz mini micro-check"><script class="quiz-data" type="application/json">{"titulo": "Pausa rápida · ¿Lo aplicarías?", "preguntas": [{"q": "¿Por qué compartir un filtro en distintas posiciones es útil?", "opciones": ["Porque permite buscar el mismo patrón en varias zonas", "Porque hace innecesarias las imágenes", "Porque siempre produce una sola clase"], "correcta": 0, "porque": "La convolución reutiliza los pesos del filtro en diferentes zonas."}]}</script></section><div class="micro-finish"><strong>Idea que te llevas</strong><span>Diseña un experimento justo: mismos datos, mismo TEST, mismas métricas, presupuestos de entrenamiento comparables</span><small>¿Quieres más ejemplos, fórmulas o código? Los tienes justo debajo, sin límite de tiempo.</small></div><details class="profundizar micro-legacy"><summary><span>Explorar más: explicación y simulaciones completas<small>Todo el texto original, tablas y demos avanzadas. Opcional.</small></span></summary><div class="prof-body"><section><h2 id="concepto">La idea y el ejemplo</h2><p>Diseña un experimento justo: <strong>mismos datos, mismo TEST, mismas métricas, presupuestos de entrenamiento comparables</strong>. Registra arquitectura, pesos iniciales, augmentation, épocas y tiempo. Es válido que uno gane en precisión y otro en velocidad o tamaño.</p><p>Una <strong>CNN</strong> incorpora una intuición útil sobre vecindad y filtros. Un <strong>ViT</strong> relaciona parches con atención y suele beneficiarse especialmente del preentrenamiento. También es posible combinar extractores, pero añade complejidad que debes justificar.</p><div class="callout ejemplo"><span class="lbl">Ejemplo hipotético</span><p>CNN: recall 89 % y 8 ms por imagen. ViT: recall 90 % y 24 ms. Si la latencia importa mucho, el 1 % extra quizá no compense. No son resultados de un experimento real.</p></div></section><figure class="demo" data-demo="curso2/c2m3-cnn-vs-dense" data-titulo="Explora: CNN y ViT: elegir con pruebas, no por moda"><div class="haz">Compara capacidad y coste de distintas arquitecturas como intuición visual.</div><div class="observa">Más capas o parámetros no significan automáticamente mejor modelo.</div></figure><div class="resumen"><h2 class="sin-num sin-toc">En tres ideas</h2><ul><li>Una arquitectura es una hipótesis: compárala bajo las mismas condiciones.</li><li>No. Un modelo más grande puede costar más, sobreajustar y no mejorar las métricas de interés.</li><li>Abre el código y explica cada línea antes de pasar a la siguiente lección.</li></ul></div><section class="quiz mini"><script class="quiz-data" type="application/json">{"titulo": "Mini test · Comprueba la idea", "preguntas": [{"q": "¿Qué hace justa la comparación?", "opciones": ["Elegir el modelo con nombre más moderno", "Evaluar ambos sobre el mismo TEST", "Entrenar uno con los datos de TEST"], "correcta": 1, "porque": "No. Un modelo más grande puede costar más, sobreajustar y no mejorar las métricas de interés."}, {"q": "¿Qué conviene hacer después de comprender el ejemplo?", "opciones": ["Probar otro caso y explicar qué cambia", "Memorizar números sin contexto", "Dar por bueno el resultado sin validar"], "correcta": 0, "porque": "Cambiar una entrada y observar la respuesta refuerza la comprensión."}]}</script></section></div></details><details class="profundizar" id="codigo"><summary><span>Código explicado línea a línea<small>Abre el ejemplo para entender qué hace cada instrucción y por qué.</small></span></summary><div class="prof-body"><section><h2 class="sin-num">Código de la lección</h2><article class="snippet" data-lang="python"><header><h3>CNN y ViT: elegir con pruebas, no por moda</h3><p class="para-que"><strong>Para qué sirve</strong> Una arquitectura es una hipótesis: compárala bajo las mismas condiciones.</p></header><pre class="code"><code>resultados = {"cnn": {"recall": 0.89, "ms": 8}, "vit": {"recall": 0.90, "ms": 24}}
-for nombre, r in resultados.items():
-    print(nombre, r["recall"], r["ms"])</code></pre><details class="linea-a-linea" open=""><summary>Línea por línea</summary><table class="lineas"><tbody><tr data-lines="1"><td><code>resultados = {"cnn": {"recall": 0.89, "ms": 8}, "vit": {"recall": 0.90, "ms": 24}}</code></td><td>Guarda resultados hipotéticos de dos modelos para aprender a comparar.</td></tr><tr data-lines="2"><td><code>for nombre, r in resultados.items():</code></td><td>Recorre cada arquitectura y sus medidas.</td></tr><tr data-lines="3"><td><code>print(nombre, r["recall"], r["ms"])</code></td><td>Muestra recall y latencia; no atribuyas estas cifras a entrenamientos reales.</td></tr></tbody></table></details><div class="salida"><strong>Qué comprobar</strong><p>Ejemplo didáctico: adapta las rutas, datasets o variables que procedan y verifica la salida en tu propio entorno. No se afirma que se haya entrenado un modelo real.</p></div></article></section></div></details></div></main></body></html>
+<header class="hero leccion">
+  <div class="hero-grid">
+    <div>
+      <p class="eyebrow">Curso 6 · Módulo 3 · Lección 5 de 6</p>
+      <h1>En el híbrido, cada casilla del mapa de la CNN es un token</h1>
+      <p class="lead">En vez de trocear el póster en bruto, se lo das primero a una CNN. Su mapa de características ya trae bordes y formas; cada casilla de ese mapa entra al Transformer como un token.</p>
+      <p class="meta-line"><span class="read-time" data-render="read-time"></span><a href="../modulo-3.html">Índice del módulo</a></p>
+    </div>
+    <div class="hero-tile" aria-hidden="true"></div>
+  </div>
+</header>
+
+<details class="predice">
+  <summary>Una CNN deja un póster de 224 en un mapa de 14×14×1.024. Si cada casilla es un token, ¿cuántos tokens recibe el Transformer?<span class="hint"></span></summary>
+  <div>
+    <p>14 · 14 = <strong>196</strong>, los mismos que un ViT con parches de 16. La diferencia está en lo que lleva cada token: no 768 píxeles en bruto, sino 1.024 rasgos que la CNN ya detectó (bordes, texturas, caras).</p>
+  </div>
+</details>
+
+<section>
+<h2 id="idea">La CNN mira cerca; el Transformer relaciona lejos</h2>
+<p>El híbrido junta lo mejor de las dos lecciones anteriores. La CNN aporta su sesgo de «mirar cerca», así que hacen falta menos datos. El Transformer relaciona zonas lejanas del póster desde el primer bloque. Y si la CNN ya está entrenada (la de tu <a href="../modulo-2/leccion-1.html">módulo 2</a>), es además transfer learning.</p>
+<ul class="flow">
+  <li class="a">Póster<small>32×32×3</small></li>
+  <li class="b">CNN cortada<small>mapa 8×8×32</small></li>
+  <li class="c">Reshape<small>64 tokens de 32</small></li>
+  <li class="d">Dense + CLS + posición<small>65 tokens de d</small></li>
+  <li>Bloques<small>la cabeza lee el CLS</small></li>
+</ul>
+<p>Los pasos: cargas la CNN, la <strong>cortas</strong> tras la última convolución o pooling (sin <code>Flatten</code> ni densas), pones el mapa \((H, W, C)\) en fila como \((H \cdot W, C)\) y lo proyectas a \(d\) con una <code>Dense</code>. Desde ahí todo es igual que en el ViT: CLS, posición, bloques y cabeza.</p>
+<p><strong>Dónde cortas decide el coste.</strong> Cortar pronto da un mapa grande, muchos tokens y una atención carísima. Cortar tarde da pocos tokens, más resumidos.</p>
+</section>
+
+<figure class="demo" data-demo="curso6/c6m3-hibrido-coste" data-titulo="Dónde cortas la CNN, cuánto cuesta la atención">
+  <p class="haz">Cambia la etapa de corte y luego el tamaño de la imagen.</p>
+  <p class="observa">Cortar en la etapa 1 cuesta 250 veces más que un ViT puro.</p>
+</figure>
+
+<section>
+<h2 id="numeros">Con números: el híbrido diminuto del código</h2>
+<div class="callout ejemplo">
+  <span class="lbl">Ejemplo numérico</span>
+  <ol class="pasos">
+    <li>Miniatura 32×32 → dos convoluciones con pooling → mapa \(8 \times 8 \times 32\).</li>
+    <li>\(8 \cdot 8 = 64\) tokens de 32 números; con el CLS, 65.</li>
+    <li>Atención: \(65^2 = 4.225\) pesos por cabeza, frente a \(17^2 = 289\) del ViT diminuto: <span class="res">14,6 veces</span> más.</li>
+    <li>Keras, CNN congelada: 16.930 parámetros, de los que 11.842 entrenan. Acierto por época: 0,543 → 0,819 → 1,000.</li>
+  </ol>
+  <p>El ViT puro de la lección 3 necesitó 5 épocas para llegar a 1,000; el híbrido de PyTorch acierta todo ya en la primera.</p>
+</div>
+</section>
+
+<details class="predice">
+  <summary>Cortas la CNN un pooling antes, con un mapa de 16×16. ¿Cuánto crece la atención?<span class="hint"></span></summary>
+  <div>
+    <p>256 tokens + CLS = 257, y \(257^2 = 66.049\) pesos por cabeza: <strong>unas 15,6 veces</strong> más que con 8×8. Ganas detalle espacial, pero entrenas más despacio y gastas más memoria.</p>
+  </div>
+</details>
+
+<div class="resumen">
+  <h2 class="sin-num sin-toc">En tres líneas</h2>
+  <ul>
+    <li>Híbrido: la CNN extrae un mapa \((H, W, C)\) y cada casilla se convierte en un token.</li>
+    <li>Reshape a \((H \cdot W, C)\), Dense a \(d\), CLS, posición y bloques Transformer.</li>
+    <li>Cuanto antes cortas la CNN, más tokens y más cara la atención.</li>
+  </ul>
+</div>
+
+<section class="quiz mini">
+<script type="application/json" class="quiz-data">
+{"titulo":"¿Lo tienes?","preguntas":[
+ {"q":"Tu CNN de Keras termina en <code>MaxPooling2D</code> (7×7×128) → <code>Flatten</code> → <code>Dense</code>. ¿Por dónde la cortas para el híbrido?","opciones":["Después de la última Dense","Después del Flatten","Después del MaxPooling2D, antes del Flatten","Antes de la primera convolución"],"correcta":2,"porque":"El Transformer necesita la rejilla para hacer tokens: 7·7 = 49 casillas de 128. Tras el Flatten ya es un vector sin estructura de casillas."},
+ {"q":"En PyTorch el mapa sale como (B, 128, 7, 7). ¿Qué haces para tener (B, 49, 128)?","opciones":["<code>mapa.view(B, 49, 128)</code>","<code>mapa.flatten(2).transpose(1, 2)</code>","<code>mapa.mean(dim=1)</code>","<code>mapa.permute(0, 2, 3, 1)</code> y nada más"],"correcta":1,"porque":"flatten(2) junta alto y ancho → (B, 128, 49) y transpose(1, 2) pone las casillas delante → (B, 49, 128). Un view directo mezclaría canales y casillas aunque la forma salga bien."},
+ {"q":"¿Por qué el híbrido suele aprender antes que un ViT puro con pocos datos?","opciones":["Porque tiene menos tokens siempre","Porque la CNN aporta el sesgo de mirar cerca y los tokens ya llevan rasgos útiles","Porque no usa atención","Porque no necesita posición"],"correcta":1,"porque":"El Transformer recibe bordes y formas ya detectados, en vez de tener que aprender desde los píxeles que lo cercano importa."}
+]}
+</script>
+</section>
+
+<details class="profundizar">
+  <summary><span>Profundizar: el híbrido original, congelar o no la CNN y errores de forma<small>R50 + ViT-B/16 del artículo, la equivalencia con un parche de 1×1, cuándo descongelar la CNN y cómo no romper las formas en cada framework.</small></span></summary>
+  <div class="prof-body">
+    <h3>El híbrido del artículo original</h3>
+    <p>El artículo del ViT ya proponía esta variante: una ResNet-50 cortada al final de su tercera etapa da un mapa de 14×14×1.024, y cada casilla se trata como un «parche de 1×1» que se proyecta a 768. Con ese corte salen 196 tokens, igual que el ViT-B/16. Su conclusión fue que, con presupuestos de cálculo pequeños, el híbrido rinde algo mejor que el ViT puro, y que la ventaja desaparece en los modelos grandes con muchísimos datos: entonces el ViT aprende solo lo que aportaba la CNN.</p>
+    <h3>¿Congelar la CNN o no?</h3>
+    <p>Es la misma decisión que en la lección 4. Con pocos datos y una CNN que ya funciona (tu módulo 2), congélala y entrena solo la parte Transformer: menos parámetros, menos sobreajuste y más rápido (en Keras, 11.842 entrenables de 16.930). Si tienes más datos, entrena todo junto con un lr pequeño para que la CNN se adapte a lo que pide la atención. En el fragmento 11 de la lección 6 el híbrido se entrena entero desde cero (<code>congelar=False</code>) para compararlo de igual a igual.</p>
+    <h3>Formas en cada framework</h3>
+    <table>
+      <thead><tr><th></th><th>Keras (NHWC)</th><th>PyTorch (NCHW)</th></tr></thead>
+      <tbody>
+        <tr><td>Mapa de la CNN</td><td>(B, 8, 8, 32)</td><td>(B, 32, 8, 8)</td></tr>
+        <tr><td>A tokens</td><td><code>Reshape((64, 32))</code></td><td><code>flatten(2).transpose(1, 2)</code></td></tr>
+        <tr><td>Proyección a d</td><td><code>Dense(d)</code></td><td><code>nn.Linear(32, d)</code></td></tr>
+        <tr><td>Cortar un modelo</td><td><code>keras.Model(cnn.input, cnn.get_layer("mapa").output)</code></td><td><code>nn.Sequential</code> con las capas hasta el pooling, o <code>children()</code></td></tr>
+      </tbody>
+    </table>
+    <div class="callout ojo">
+      <span class="lbl">Ojo</span>
+      <p>En Keras 3, <code>cnn.input</code> funciona con modelos funcionales; con un <code>Sequential</code> te puede decir que «nunca se ha llamado». Construye la CNN con la API funcional (como en el fragmento 9) o usa <code>cnn.inputs[0]</code>. Y dale nombre a la capa donde vas a cortar: <code>get_layer("mapa")</code> es mucho más seguro que <code>layers[4]</code>.</p>
+    </div>
+    <h3>La posición sigue haciendo falta</h3>
+    <p>Las casillas del mapa ya saben un poco dónde están (el relleno de ceros de los bordes deja huella), pero no lo suficiente. El híbrido conserva su tabla de posiciones: 65 filas en nuestro caso.</p>
+    <h3>Para el cuestionario</h3>
+    <p>La cuenta típica es «mapa \(H \times W \times C\) → \(H \cdot W\) tokens de \(C\) números». Si preguntan por el coste, eleva al cuadrado \(H \cdot W + 1\).</p>
+  </div>
+</details>
+
+<section>
+<h2 class="sin-num">Código</h2>
+<article class="snippet" data-lang="python">
+  <header>
+    <h3>9 · Keras: tu CNN, cortada y congelada, alimenta a un bloque Transformer</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> El flujo del laboratorio: una CNN ya entrenada (aquí la entrenamos 3 épocas como si fuera la del módulo 2), se corta en el último pooling, se congela y sus 64 casillas pasan a un bloque Transformer. Usa <code>ClsYPos</code> (fragmento 3) y <code>posters</code> (fragmento 5). Define <code>crea_hibrido</code>, que usa la lección 6.</p>
+  </header>
+  <pre class="code"><code>Xtr, ytr = posters(800, seed=1); Xte, yte = posters(400, seed=2)
+ent = keras.Input((32, 32, 3))                                # la CNN «del módulo 2»
+x = layers.MaxPooling2D()(layers.Conv2D(16, 3, padding="same", activation="relu")(ent))
+x = layers.MaxPooling2D(name="mapa")(layers.Conv2D(32, 3, padding="same", activation="relu")(x))
+cnn = keras.Model(ent, layers.Dense(2, activation="softmax")(layers.Flatten()(x)))
+cnn.compile(optimizer="adam", loss="sparse_categorical_crossentropy", metrics=["accuracy"])
+cnn.fit(Xtr, ytr, epochs=3, batch_size=32, verbose=0)
+
+def crea_hibrido(cnn, d=32, congelar=True):
+    extractor = keras.Model(cnn.input, cnn.get_layer("mapa").output)   # corta tras el último pooling
+    extractor.trainable = not congelar
+    ent = keras.Input((32, 32, 3))
+    mapa = extractor(ent)                                    # (8, 8, 32)
+    t = layers.Dense(d)(layers.Reshape((64, 32))(mapa))      # 64 casillas -&gt; 64 tokens de d números
+    t = ClsYPos(name="cls_pos")(t)                           # (65, d)
+    a = layers.LayerNormalization()(t)
+    t = t + layers.MultiHeadAttention(2, d // 2)(a, a)
+    a = layers.LayerNormalization()(t)
+    t = t + layers.Dense(d)(layers.Dense(2 * d, activation="gelu")(a))
+    cls = layers.LayerNormalization()(t)[:, 0]
+    return keras.Model(ent, layers.Dense(2, activation="softmax")(cls))
+
+hib = crea_hibrido(cnn)
+print("mapa:", cnn.get_layer("mapa").output.shape, "-&gt; tokens:", hib.get_layer("cls_pos").output.shape)
+n_ent = sum(int(np.prod(w.shape)) for w in hib.trainable_weights)
+print("parámetros:", hib.count_params(), "| entrenables (sin la CNN congelada):", n_ent)
+hib.compile(optimizer="adam", loss="sparse_categorical_crossentropy", metrics=["accuracy"])
+hist = hib.fit(Xtr, ytr, epochs=3, batch_size=32, verbose=0)
+print("acierto por época:", np.round(hist.history["accuracy"], 3))
+print("híbrido -&gt; test", round(hib.evaluate(Xte, yte, verbose=0)[1], 3))</code></pre>
+  <details class="linea-a-linea" open>
+    <summary>Línea por línea</summary>
+    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+      <tbody>
+        <tr data-lines="1"><td><code>Xtr, ytr = posters(800 …); Xte, yte = …</code></td><td>Las miniaturas de siempre: 800 para entrenar, 400 de test.</td></tr>
+        <tr data-lines="2-5"><td><code>ent = keras.Input(…); x = …; cnn = keras.Model(…)</code></td><td>Una CNN pequeña con la API funcional: dos convoluciones 3×3 con pooling (32 → 16 → 8) y la capa de corte llamada <code>"mapa"</code>; después, Flatten y la Dense de 2 clases.</td></tr>
+        <tr data-lines="6-7"><td><code>cnn.compile(…); cnn.fit(…, epochs=3)</code></td><td>La entrena 3 épocas: hace el papel de tu CNN del módulo 2.</td></tr>
+        <tr data-lines="9-11"><td><code>def crea_hibrido(…): extractor = keras.Model(cnn.input, get_layer("mapa").output)</code></td><td>Corta la CNN tras el último pooling y la congela si <code>congelar=True</code>.</td></tr>
+        <tr data-lines="12-13"><td><code>ent = …; mapa = extractor(ent)</code></td><td>La entrada del híbrido pasa por la CNN cortada: (8, 8, 32).</td></tr>
+        <tr data-lines="14"><td><code>Dense(d)(Reshape((64, 32))(mapa))</code></td><td>Pone las 64 casillas en fila y proyecta cada una a d = 32.</td></tr>
+        <tr data-lines="15"><td><code>ClsYPos(name="cls_pos")(t)</code></td><td>CLS delante y posición sumada: 65 tokens. Con nombre, para buscarla después.</td></tr>
+        <tr data-lines="16-19"><td><code>a = LayerNormalization …; t = t + …</code></td><td>Un bloque Transformer: atención con atajo y MLP con atajo, como en <code>crea_vit</code>.</td></tr>
+        <tr data-lines="20-21"><td><code>cls = …[:, 0]; return keras.Model(…)</code></td><td>Norma final, el CLS y la cabeza de 2 clases.</td></tr>
+        <tr data-lines="23-24"><td><code>hib = crea_hibrido(cnn); print("mapa:" …)</code></td><td>Construye el híbrido y muestra la forma del mapa y la de los tokens.</td></tr>
+        <tr data-lines="25-26"><td><code>n_ent = …; print("parámetros:" …)</code></td><td>Parámetros totales y entrenables: la CNN congelada no cuenta.</td></tr>
+        <tr data-lines="27-29"><td><code>hib.compile(…); hist = hib.fit(…, epochs=3); print(…)</code></td><td>Entrena 3 épocas y muestra el acierto de cada una.</td></tr>
+        <tr data-lines="30"><td><code>hib.evaluate(Xte, yte)</code></td><td>Acierto en test.</td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>mapa: (None, 8, 8, 32) -&gt; tokens: (None, 65, 32)
+parámetros: 16930 | entrenables (sin la CNN congelada): 11842
+acierto por época: [0.543 0.819 1.   ]
+híbrido -&gt; test 1.0</pre>
+    <p>El mapa 8×8×32 se convierte en 65 tokens. De 16.930 parámetros, 5.088 son de la CNN congelada y entrenan 11.842. En 3 épocas llega a 1,000 en test. Unos 10 segundos.</p>
+  </div>
+</article>
+
+<article class="snippet" data-lang="python">
+  <header>
+    <h3>10 · PyTorch: el híbrido como un solo nn.Module</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Escribir el híbrido en PyTorch (CNN + 2 bloques Transformer), ver las formas y entrenarlo 5 épocas. Usa <code>posters</code> del fragmento 4 (lección 2). Define <code>Hibrido</code>, que usa la lección 6.</p>
+  </header>
+  <pre class="code"><code>import torch, torch.nn as nn
+
+class Hibrido(nn.Module):
+    def __init__(s, d=32):
+        super().__init__()
+        s.cnn = nn.Sequential(                                   # 32x32 -&gt; 16x16 -&gt; 8x8
+            nn.Conv2d(3, 16, 3, padding=1), nn.ReLU(), nn.MaxPool2d(2),
+            nn.Conv2d(16, 32, 3, padding=1), nn.ReLU(), nn.MaxPool2d(2))
+        s.proy = nn.Linear(32, d)                                # cada casilla del mapa -&gt; 1 token
+        s.cls = nn.Parameter(torch.zeros(1, 1, d))
+        s.pos = nn.Parameter(torch.randn(1, 65, d) * 0.02)      # 64 casillas + CLS
+        capa = nn.TransformerEncoderLayer(d, 2, 64, dropout=0.0, batch_first=True, norm_first=True)
+        s.bloques = nn.TransformerEncoder(capa, 2, enable_nested_tensor=False)
+        s.cabeza = nn.Linear(d, 2)
+    def forward(s, x, ver=False):
+        mapa = s.cnn(x)                                          # (B, 32, 8, 8)
+        t = s.proy(mapa.flatten(2).transpose(1, 2))              # (B, 64, d)
+        t = torch.cat([s.cls.expand(len(x), -1, -1), t], dim=1) + s.pos
+        if ver: print("mapa CNN:", tuple(mapa.shape), "-&gt; tokens:", tuple(t.shape))
+        return s.cabeza(s.bloques(t)[:, 0])
+
+torch.manual_seed(0)
+Xtr, ytr = posters(800, seed=1); Xte, yte = posters(400, seed=2)
+m = Hibrido()
+m(Xtr[:2], ver=True)
+print("parámetros: CNN", sum(p.numel() for p in m.cnn.parameters()),
+      "| total", sum(p.numel() for p in m.parameters()))
+opt = torch.optim.Adam(m.parameters(), lr=1e-3)
+for epoca in range(5):
+    for i in range(0, 800, 32):
+        loss = nn.functional.cross_entropy(m(Xtr[i:i+32]), ytr[i:i+32])
+        opt.zero_grad(); loss.backward(); opt.step()
+    with torch.no_grad(): acc = (m(Xte).argmax(1) == yte).float().mean().item()
+    print(f"época {epoca + 1}: pérdida {loss.item():.3f}  acierto test {acc:.3f}")</code></pre>
+  <details class="linea-a-linea" open>
+    <summary>Línea por línea</summary>
+    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+      <tbody>
+        <tr data-lines="1"><td><code>import torch, torch.nn as nn</code></td><td>PyTorch y sus capas.</td></tr>
+        <tr data-lines="3-5"><td><code>class Hibrido(nn.Module): def __init__(s, d=32)</code></td><td>El modelo; <code>d</code> es el tamaño de los tokens.</td></tr>
+        <tr data-lines="6-8"><td><code>s.cnn = nn.Sequential(Conv2d …, MaxPool2d(2) …)</code></td><td>La parte CNN: dos convoluciones 3×3 con <code>padding=1</code> (no encogen) y dos poolings: 32 → 16 → 8.</td></tr>
+        <tr data-lines="9"><td><code>s.proy = nn.Linear(32, d)</code></td><td>Proyecta los 32 canales de cada casilla a d.</td></tr>
+        <tr data-lines="10-11"><td><code>s.cls = …; s.pos = … (1, 65, d)</code></td><td>CLS y tabla de 65 posiciones (64 casillas + CLS).</td></tr>
+        <tr data-lines="12-13"><td><code>TransformerEncoderLayer …; TransformerEncoder(capa, 2 …)</code></td><td>Dos bloques Transformer como los del <code>ViTMini</code>.</td></tr>
+        <tr data-lines="14"><td><code>s.cabeza = nn.Linear(d, 2)</code></td><td>La cabeza de 2 clases.</td></tr>
+        <tr data-lines="15-16"><td><code>def forward(s, x, ver=False): mapa = s.cnn(x)</code></td><td>Pasa el lote por la CNN: (B, 32, 8, 8). <code>ver</code> sirve para imprimir formas.</td></tr>
+        <tr data-lines="17"><td><code>s.proy(mapa.flatten(2).transpose(1, 2))</code></td><td>Casillas en fila con los canales al final, (B, 64, 32), y proyección a d.</td></tr>
+        <tr data-lines="18"><td><code>torch.cat([s.cls.expand(…), t], dim=1) + s.pos</code></td><td>CLS delante y posición: (B, 65, d).</td></tr>
+        <tr data-lines="19"><td><code>if ver: print(…)</code></td><td>Imprime las formas si se pide.</td></tr>
+        <tr data-lines="20"><td><code>return s.cabeza(s.bloques(t)[:, 0])</code></td><td>Bloques y cabeza sobre el CLS.</td></tr>
+        <tr data-lines="22-24"><td><code>torch.manual_seed(0); Xtr, ytr = …; m = Hibrido()</code></td><td>Semilla, datos y modelo.</td></tr>
+        <tr data-lines="25"><td><code>m(Xtr[:2], ver=True)</code></td><td>Pasa 2 miniaturas solo para ver las formas.</td></tr>
+        <tr data-lines="26-27"><td><code>print("parámetros: CNN" …, "| total" …)</code></td><td>Parámetros de la parte CNN y del total.</td></tr>
+        <tr data-lines="28-32"><td><code>opt = Adam(…); for epoca …: … step()</code></td><td>Entrena 5 épocas en lotes de 32.</td></tr>
+        <tr data-lines="33-34"><td><code>with torch.no_grad(): acc = …; print(…)</code></td><td>Al final de cada época: pérdida del último lote y acierto en test.</td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>mapa CNN: (2, 32, 8, 8) -&gt; tokens: (2, 65, 32)
+parámetros: CNN 5088 | total 25410
+época 1: pérdida 0.308  acierto test 1.000
+época 2: pérdida 0.000  acierto test 1.000
+época 3: pérdida 0.000  acierto test 1.000
+época 4: pérdida 0.000  acierto test 1.000
+época 5: pérdida 0.000  acierto test 1.000</pre>
+    <p>El mapa (2, 32, 8, 8) se convierte en (2, 65, 32). De 25.410 parámetros, 5.088 son de la CNN. Acierta todo desde la primera época: la CNN le da los rasgos hechos. Unos 6 segundos.</p>
+  </div>
+</article>
+</section>
+
+</div>
+</main>
+</body>
+</html>

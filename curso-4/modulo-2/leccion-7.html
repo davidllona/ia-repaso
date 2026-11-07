@@ -1,213 +1,338 @@
-<!DOCTYPE html>
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lección 7 · Cómo se fabrica cada bandeja: collate_fn apila y num_workers adelanta · Módulo 2 · Curso 4 · Cuaderno de IA</title>
+<meta name="description" content="collate_fn: de muestras sueltas a un lote (B, …), el error de tamaños distintos y el padding; num_workers: procesos que preparan lotes en paralelo; resto de parámetros del DataLoader.">
+<script>try{var t=localStorage.getItem('cuaderno-ia:tema');if(t)document.documentElement.setAttribute('data-theme',t)}catch(e){}</script>
+<link rel="stylesheet" href="../../assets/css/style.css">
+<script src="../../assets/js/curriculum.js"></script>
+<script src="../../assets/js/lab.js"></script>
+<script src="../../assets/js/app.js" defer></script>
+</head>
+<body data-root="../../" data-course="4" data-module="2" data-lesson="7">
+<main>
+<div class="page">
 
-<html lang="es"><head><meta charset="utf-8"/><meta content="width=device-width,initial-scale=1" name="viewport"/><title>Lección 7 · Entrenamiento, validación y prueba: random_split y Subset · Curso 4 · Cuaderno de IA</title><meta content="random_split(dataset, lengths, generator=…) baraja los índices del dataset y los reparte en conjuntos del tamaño pedido." name="description"/><script>try{var t=localStorage.getItem('cuaderno-ia:tema');if(t)document.documentElement.setAttribute('data-theme',t)}catch(e){}</script><link href="../../assets/css/style.css" rel="stylesheet"/><script src="../../assets/js/curriculum.js"></script><script src="../../assets/js/lab.js"></script><script defer="" src="../../assets/js/app.js"></script><script defer="" src="../../assets/js/microanimations.js"></script></head><body data-course="4" data-lesson="7" data-module="2" data-root="../../"><main><div class="page" data-micro="3min"><header class="hero leccion"><div class="hero-grid"><div><p class="eyebrow">Curso 4 · Módulo 2 · Lección 7 de 8</p><h1>Entrenamiento, validación y prueba: random_split y Subset</h1><p class="lead">random_split(dataset, lengths, generator=…) baraja los índices del dataset y los reparte en conjuntos del tamaño pedido.</p><p class="meta-line"><span class="read-time" data-render="read-time"></span><a href="../modulo-2.html">Índice del módulo</a></p></div><div aria-hidden="true" class="hero-tile"></div></div></header><details class="predice"><summary>Quiero medir cómo generaliza mi modelo, así que necesito películas que no haya visto. ¿Cómo reparto el catálogo en tres conjuntos con PyTorch, sin que se filtre información de unos a otros?<span class="hint"></span></summary><div><p>random_split(dataset, lengths, generator=…) baraja los índices del dataset y los reparte en conjuntos del tamaño pedido.</p></div></details><section aria-label="Explicación breve" class="micro-core"><div class="micro-kicker">01 · ENTENDER <span>≈ 45 s</span></div><h2>La idea en palabras sencillas</h2><p>random_split(dataset, lengths, generator=…) baraja los índices del dataset y los reparte en conjuntos del tamaño pedido.</p><div class="micro-example"><span aria-hidden="true" class="micro-example-icon">🐾</span><div><strong>Otro ejemplo · Mascotas</strong><p>Con 100 fotos, puedes entrenar con 80 y reservar 20 que el modelo nunca ha visto.</p></div></div></section><div class="micro-kicker micro-checkpoint">02 · RESPONDER <span>≈ 15 s</span></div><section aria-label="Pregunta intercalada" class="quiz mini micro-check"><script class="quiz-data" type="application/json">{"titulo": "Pausa rápida · Comprueba la idea", "preguntas": [{"q": "Entrenas con 80 fotos. ¿Cuál es la mejor forma de medir si generaliza?", "opciones": ["Cambiar las etiquetas del test", "Evaluarlo con esas mismas 80", "Probarlo con fotos nuevas reservadas"], "correcta": 2, "porque": "TEST debe contener ejemplos no utilizados para entrenar."}]}</script></section><section aria-label="Animación interactiva" class="micro-viz" data-index="13" data-micro-viz="split"><div class="micro-kicker">03 · EXPERIMENTAR <span>≈ 45 s</span></div><div class="micro-viz-title"><div><h2>Entrenar no es examinar</h2><p>Cambia la proporción y observa qué ejemplos se reservan para el test.</p></div><span aria-hidden="true" class="micro-viz-symbol">✦</span></div><div aria-live="polite" class="micro-viz-stage"><p>Animación interactiva: Entrenar no es examinar</p></div></section><div class="micro-kicker micro-checkpoint">04 · APLICAR <span>≈ 15 s</span></div><section aria-label="Pregunta intercalada" class="quiz mini micro-check"><script class="quiz-data" type="application/json">{"titulo": "Pausa rápida · ¿Lo aplicarías?", "preguntas": [{"q": "¿Para qué sirve un conjunto de validación?", "opciones": ["Para elegir ajustes durante el desarrollo", "Para ocultar errores al final", "Para reemplazar las entradas de entrenamiento"], "correcta": 0, "porque": "Validación permite comparar y seleccionar configuraciones sin gastar el test final."}]}</script></section><div class="micro-finish"><strong>Idea que te llevas</strong><span>random_split(dataset, lengths, generator=…) baraja los índices del dataset y los reparte en conjuntos del tamaño pedido</span><small>¿Quieres más ejemplos, fórmulas o código? Los tienes justo debajo, sin límite de tiempo.</small></div><details class="profundizar micro-legacy"><summary><span>Explorar más: explicación y simulaciones completas<small>Todo el texto original, tablas y demos avanzadas. Opcional.</small></span></summary><div class="prof-body"><section><h2>Entrenamiento, validación y prueba: random_split y Subset</h2>
-<p><code>random_split(dataset, lengths, generator=…)</code> baraja los índices del dataset y los reparte en conjuntos del tamaño pedido. Devuelve una lista de objetos <code>Subset</code>, que son datasets “de vista”: guardan una referencia al dataset original (<code>.dataset</code>) y la lista de índices que les tocaron (<code>.indices</code>), de modo que <strong>no se copian datos</strong>. Se puede pedir con números enteros (que deben sumar \( N \)) o con <strong>fracciones</strong> (que deben sumar 1).</p>
-<p><code>random_split</code> reparte al azar sin mirar las etiquetas. Con clases equilibradas basta, pero con una clase rara la validación puede quedarse con muy pocos ejemplos suyos. La herramienta para repartir <em>conservando la proporción de clases</em> es <code>train_test_split(..., stratify=etiquetas)</code> de scikit-learn aplicado a los <strong>índices</strong>; con esos índices se crean los <code>Subset</code> (fragmento 20).</p>
-<p>Un dataset con aumento de datos (transformaciones aleatorias) repartido con <code>random_split</code> sigue siendo <em>un solo dataset</em>: los tres <code>Subset</code> apuntan al mismo objeto y por tanto <strong>aplican la misma transformación</strong>. La validación recibiría imágenes volteadas o giradas al azar. La solución es crear <strong>dos datasets</strong> con los mismos datos y distinta transformación (uno de entrenamiento con aumento, otro de validación sin él) y crear los <code>Subset</code> a mano con los mismos índices (fragmento 21).</p>
-<div class="callout ejemplo"><span class="lbl">Ejemplo tomado del módulo</span><p>· cómo se redondean las fracciones Con fracciones, PyTorch toma la parte entera de \( N\cdot\text{fracción} \) para cada conjunto y reparte las muestras sobrantes de una en una, empezando por el primer conjunto .</p></div></section><figure class="demo" data-demo="curso4/c4m2-reparto-split" data-titulo="random_split: tamaños, redondeo y reproducibilidad">
-<div class="haz">Cada casilla es una ficha del catálogo (aquí, 1797 imágenes de dígitos). Con N = 1797 y 70 / 15 / 15 comprueba que salen 1258 / 270 / 269. Cambia N a 11 y a 7 con otros porcentajes. Con «con generator» activado pulsa «Ejecutar otra vez» varias veces; luego desactívalo y repite.</div>
-<div class="observa">Los tamaños siempre suman N: la parte entera deja un resto que se reparte de una en una desde el primer conjunto. Con semilla fija (<code>generator</code>) las primeras muestras caen siempre en los mismos conjuntos, lo que permite reproducir un experimento; sin ella, cada ejecución reparte distinto y los resultados cambian de una vez a otra por el simple azar del reparto.</div>
-</figure><div class="resumen"><h2 class="sin-num sin-toc">En pocas líneas</h2><ul><li><strong>Entrenamiento, validación y prueba: random_split y Subset:</strong> random_split(dataset, lengths, generator=…) baraja los índices del dataset y los reparte en conjuntos del tamaño pedido.</li><li>Antes de continuar, intenta explicar la demo sin mirar su resultado.</li></ul></div><section class="quiz mini"><script class="quiz-data" type="application/json">{"titulo": "¿Lo tienes?", "preguntas": [{"q": "¿Qué concepto estamos trabajando en esta lección?", "opciones": ["Entrenamiento, validación y prueba: random_split y Subset", "El camino de los datos hasta el modelo (y por qué en lotes)", "Transformaciones: preparar cada muestra al sacarla"], "correcta": 0, "porque": "random_split(dataset, lengths, generator=…) baraja los índices del dataset y los reparte en conjuntos del tamaño pedido."}, {"q": "¿Cuál de estas afirmaciones recoge lo que acabas de estudiar?", "opciones": ["Lo importante es comprender la idea y comprobarla con ejemplos, no memorizar términos.", "random_split(dataset, lengths, generator=…) baraja los índices del dataset y los reparte en conjuntos del tamaño pedido.", "Siempre hay un único método que sirve para todos los problemas."], "correcta": 1, "porque": "La explicación central es: random_split(dataset, lengths, generator=…) baraja los índices del dataset y los reparte en conjuntos del tamaño pedido."}, {"q": "Si una demo o un ejemplo te desconcierta, ¿cuál es la mejor forma de aprenderlo?", "opciones": ["Memorizar el nombre sin entender la operación.", "Volver a los números, cambiar un valor y explicar qué ocurre.", "Ignorar los resultados que no coinciden con tu intuición."], "correcta": 1, "porque": "Explorar qué cambia y por qué ayuda a conectar el concepto con su resultado."}]}</script></section></div></details><details class="profundizar"><summary><span>Profundizar: explicación completa<small>Matices, fórmulas, tablas, otros ejemplos y experimentos del módulo original.</small></span></summary><div class="prof-body"><section>
-<h2 id="particion">Entrenamiento, validación y prueba: random_split y Subset</h2>
-<p class="pregunta">Quiero medir cómo generaliza mi modelo, así que necesito películas que no haya visto. ¿Cómo reparto el catálogo en tres conjuntos con PyTorch, sin que se filtre información de unos a otros?</p>
-<div class="callout recuerda">
-<span class="lbl">Recuerda (<a href="../../curso-1/modulo-5.html">Curso 1, módulo 5</a>)</span>
-<p>Se usan tres conjuntos con trabajos distintos: <strong>entrenamiento</strong> (el modelo aprende de él), <strong>validación</strong> (para elegir hiperparámetros y detener el entrenamiento) y <strong>prueba</strong> (se usa una sola vez, al final, para dar la nota real). Un reparto habitual es 70/15/15 u 80/10/10. Es como estudiar con unas películas (entrenamiento), ensayar tu opinión con otras (validación) y examinarte al final con estrenos que nunca has visto (prueba). La <em>fuga de datos</em> ocurre cuando información de validación o prueba influye en el entrenamiento (por ejemplo, normalizando con estadísticas de todo el dataset).</p>
-</div>
-<h3>random_split y Subset</h3>
-<p><code>random_split(dataset, lengths, generator=…)</code> baraja los índices del dataset y los reparte en conjuntos del tamaño pedido. Devuelve una lista de objetos <code>Subset</code>, que son datasets “de vista”: guardan una referencia al dataset original (<code>.dataset</code>) y la lista de índices que les tocaron (<code>.indices</code>), de modo que <strong>no se copian datos</strong>. Se puede pedir con números enteros (que deben sumar \( N \)) o con <strong>fracciones</strong> (que deben sumar 1).</p>
+<header class="hero leccion">
+  <div class="hero-grid">
+    <div>
+      <p class="eyebrow">Curso 4 · Módulo 2 · Lección 7 de 8</p>
+      <h1>Cómo se fabrica cada bandeja: collate_fn apila y num_workers adelanta</h1>
+      <p class="lead">El cargador pide <em>B</em> fichas sueltas y las <strong>apila</strong> en un solo tensor. Si tarda en prepararlas, varios <strong>ayudantes</strong> pueden ir adelantando las bandejas siguientes.</p>
+      <p class="meta-line"><span class="read-time" data-render="read-time"></span><a href="../modulo-2.html">Índice del módulo</a></p>
+    </div>
+    <div class="hero-tile" aria-hidden="true"></div>
+  </div>
+</header>
+
+<details class="predice">
+  <summary>Los subtítulos de dos películas, codificados como listas de palabras, miden 3 y 2. Los pides en un lote de 2 con el <code>collate</code> por defecto. ¿Qué pasa?<span class="hint"></span></summary>
+  <div>
+    <p><strong>Error</strong>: <code>stack expects each tensor to be equal size, but got [3] at entry 0 and [2] at entry 1</code>. Apilar exige que todas midan lo mismo. Se arregla con una <code>collate_fn</code> propia que <strong>rellene</strong> con ceros hasta la más larga (<em>padding</em>) y guarde las longitudes reales.</p>
+  </div>
+</details>
+
+<section>
+<h2 id="idea">Apilar y adelantar</h2>
+<p><strong><code>collate_fn</code></strong> recibe la lista de <em>B</em> muestras y las convierte en el lote. La de por defecto apila cada parte por separado: las muestras <code>(x, y)</code> se convierten en <code>(lote_x, lote_y)</code>, con una dimensión nueva delante. <em>B</em> pósters de forma (C, H, W) dan un lote (B, C, H, W). Los números sueltos dan un tensor (B,). Una imagen PIL, en cambio, no se puede apilar: falta <code>ToTensor</code>.</p>
+<p>Si las muestras miden distinto, como los subtítulos, escribes tu propia <code>collate_fn</code> con <code>pad_sequence</code>: es la técnica estándar con texto.</p>
+<p><strong><code>num_workers = W</code></strong> crea <em>W</em> procesos que preparan lotes completos por turnos (el lote 0 el trabajador 0, el 1 el trabajador 1…) mientras el modelo trabaja, y los entrega en orden. Con 0 (por defecto) todo va en el proceso principal. En Windows y macOS hay que proteger el código con <code>if __name__ == "__main__":</code>.</p>
+</section>
+
+<figure class="demo" data-demo="curso4/c4m2-collate" data-titulo="collate_fn: apilar muestras en un lote">
+  <div class="haz">En «frases» con «por defecto», lee el error; cambia a «con padding». Después pasa a «pósters».</div>
+  <div class="observa">El padding rellena con ceros (naranja) hasta la frase más larga. Los pósters del mismo tamaño solo ganan una dimensión delante: (B, C, H, W).</div>
+</figure>
+
+<figure class="demo" data-demo="curso4/c4m2-workers" data-titulo="num_workers: quién prepara cada lote y cuándo">
+  <div class="haz">Con 60 ms para preparar y 30 ms de modelo, pasa num_workers de 0 a 1, 2 y 3.</div>
+  <div class="observa">Con 2 trabajadores el modelo ya casi no espera; con 3 no mejora. Los tiempos son inventados.</div>
+</figure>
+
+<section>
+<h2 id="numeros">Con números: 8 lotes de pósters</h2>
 <div class="callout ejemplo">
-<span class="lbl">Ejemplo numérico · cómo se redondean las fracciones</span>
-<p>Con fracciones, PyTorch toma la parte entera de \( N\cdot\text{fracción} \) para cada conjunto y reparte las muestras sobrantes <strong>de una en una, empezando por el primer conjunto</strong>. Los dígitos, \( N = 1797 \), con <code>[0.7, 0.15, 0.15]</code>:</p>
+  <span class="lbl">Ejemplo numérico · cuánto se gana con 2 trabajadores (tiempos ficticios)</span>
+  <p>Preparar un lote cuesta 60 ms; un paso del modelo, 30 ms; hay 8 lotes.</p>
+  <ol class="pasos">
+    <li><strong>Sin trabajadores</strong>, todo en serie: \( 8\,(60 + 30) = 720 \) ms.</li>
+    <li><strong>Con 2 trabajadores</strong>, entre los dos sale un lote cada 30 ms, justo el ritmo del modelo. Tras el primer lote (60 ms), el modelo trabaja sin parar: \( 60 + 8\cdot 30 = 300 \) ms.</li>
+  </ol>
+</div>
+</section>
+
+<details class="predice">
+  <summary>En el ejemplo de arriba subes de 2 a 4 trabajadores. ¿Baja el total de 300 ms?<span class="hint"></span></summary>
+  <div>
+    <p><strong>No.</strong> Ahora el cuello de botella es el modelo: necesita \( 8\cdot 30 = 240 \) ms pase lo que pase, más los 60 ms del primer lote. Más trabajadores de los necesarios no aceleran nada, y si preparar un lote es casi instantáneo (datos pequeños en memoria), <code>num_workers=0</code> es lo mejor.</p>
+  </div>
+</details>
+
+<div class="resumen">
+  <h2 class="sin-num sin-toc">En tres líneas</h2>
+  <ul>
+    <li><code>collate_fn</code> apila <em>B</em> muestras en un lote con una dimensión nueva delante: (B, …).</li>
+    <li>Tamaños distintos → error al apilar: <code>Resize</code> o una <code>collate_fn</code> con padding.</li>
+    <li><code>num_workers</code> prepara lotes en paralelo; solo compensa si cargar es lento.</li>
+  </ul>
+</div>
+
+<section class="quiz mini">
+<script type="application/json" class="quiz-data">
+{
+ "titulo": "¿Lo tienes?",
+ "preguntas": [
+  {
+   "q": "Un <code>DataLoader</code> lanza <code>RuntimeError: stack expects each tensor to be equal size, but got [3] at entry 0 and [2] at entry 1</code>. ¿Qué ocurre y cómo se arregla?",
+   "opciones": [
+    "Faltan etiquetas: hay que usar <code>drop_last=True</code>",
+    "El modelo tiene demasiadas capas: hay que reducirlo",
+    "Las muestras del lote (por ejemplo, subtítulos) tienen longitudes distintas: se escribe una <code>collate_fn</code> que rellene (padding) o se igualan los tamaños",
+    "<code>num_workers</code> es demasiado grande: hay que ponerlo a 0"
+   ],
+   "correcta": 2,
+   "porque": "La <code>collate_fn</code> por defecto usa <code>torch.stack</code>, que exige muestras del mismo tamaño; aquí hay una de longitud 3 y otra de longitud 2. Se arregla con una <code>collate_fn</code> propia (por ejemplo con <code>pad_sequence</code>) o igualando los tamaños en el <code>transform</code> (<code>Resize</code>, <code>CenterCrop</code>). Ni <code>drop_last</code> ni <code>num_workers</code> ni el modelo tienen que ver con el apilado."
+  },
+  {
+   "q": "¿Qué afirmación sobre <code>num_workers</code> es cierta?",
+   "opciones": [
+    "Con <code>num_workers &gt; 0</code> el entrenamiento siempre es más rápido, incluso con datasets diminutos",
+    "Con <code>num_workers=2</code> los dos trabajadores se reparten cada lote, preparando la mitad cada uno",
+    "<code>num_workers</code> indica cuántas GPU se usan para entrenar",
+    "Cada trabajador prepara lotes completos por turnos y se entregan en orden; en Windows/macOS hay que proteger el código con <code>if __name__ == \"__main__\":</code>"
+   ],
+   "correcta": 3,
+   "porque": "Los trabajadores son procesos de CPU que preparan lotes enteros por turnos (lote 0 al trabajador 0, lote 1 al 1…) y el cargador los entrega en orden. Como se crean procesos nuevos que reimportan el archivo, hace falta la protección <code>__main__</code> en Windows/macOS. Con datos diminutos en memoria, crear procesos cuesta más de lo que ahorra, y nada tiene que ver con las GPU."
+  },
+  {
+   "q": "Tu dataset devuelve imágenes PIL sin pasar por <code>ToTensor</code>. ¿Qué ocurre al pedir un lote?",
+   "opciones": [
+    "Funciona: el DataLoader las convierte solo",
+    "<code>TypeError: default_collate: batch must contain tensors, numpy arrays, numbers, dicts or lists; found &lt;class 'PIL.Image.Image'&gt;</code>",
+    "Sale un lote de forma (B, H, W, C)",
+    "El DataLoader las descarta en silencio"
+   ],
+   "correcta": 1,
+   "porque": "<code>default_collate</code> sabe apilar tensores, arrays, números, diccionarios y listas, pero no imágenes PIL. Hay que añadir <code>ToTensor()</code> al <code>Compose</code>."
+  }
+ ]
+}
+</script>
+</section>
+
+<details class="profundizar">
+  <summary><span>Profundizar: la explicación completa<small>La tabla de reglas de default_collate, el padding, los detalles y avisos de num_workers y la tabla completa de parámetros del DataLoader.</small></span></summary>
+  <div class="prof-body">
+<h2 id="collate-workers">DataLoader: collate_fn, num_workers y el resto de parámetros</h2>
+
+<h3>collate_fn: de muestras sueltas a un lote</h3>
+<p>El cargador obtiene \( B \) muestras llamando \( B \) veces a <code>ds[i]</code> y las entrega a la función de <strong>collate</strong> (<em>collate</em> = «ensamblar»), que las convierte en el lote. La que se usa por defecto, <code>default_collate</code>, sigue estas reglas:</p>
 <table>
-<thead><tr><th></th><th>Entrenamiento</th><th>Validación</th><th>Prueba</th><th>Suma</th></tr></thead>
-<tbody>
-<tr><th scope="row">\( N\cdot\text{fracción} \)</th><td>1257,9</td><td>269,55</td><td>269,55</td><td></td></tr>
-<tr><th scope="row">Parte entera</th><td>1257</td><td>269</td><td>269</td><td>1795 (sobran 2)</td></tr>
-<tr><th scope="row">Reparto de las 2 sobrantes</th><td>+1</td><td>+1</td><td>0</td><td></td></tr>
-<tr><th scope="row">Tamaño final</th><td class="res">1258</td><td class="res">270</td><td class="res">269</td><td class="res">1797</td></tr>
-</tbody>
+  <thead><tr><th>Cada muestra contiene…</th><th>El lote contiene…</th></tr></thead>
+  <tbody>
+    <tr><td>un tensor de forma \( S \)</td><td>un tensor (<code>torch.stack</code>) de forma \( (B, S) \): <strong>todas deben medir lo mismo</strong></td></tr>
+    <tr><td>un número de Python (<code>int</code>, <code>float</code>)</td><td>un tensor de forma \( (B,) \) (<code>int64</code> o <code>float64</code>)</td></tr>
+    <tr><td>un array de NumPy</td><td>un tensor apilado</td></tr>
+    <tr><td>una tupla o lista de elementos</td><td>una tupla o lista con cada elemento apilado por separado: <code>(x, y)</code> → <code>(lote_x, lote_y)</code></td></tr>
+    <tr><td>un diccionario</td><td>un diccionario con cada clave apilada</td></tr>
+    <tr><td>una cadena de texto</td><td>una lista de cadenas</td></tr>
+    <tr><td>cualquier otra cosa (por ejemplo una imagen PIL)</td><td><strong>error</strong> (<code>default_collate: batch must contain tensors…</code>)</td></tr>
+  </tbody>
 </table>
-<p>Otros casos que calcula PyTorch: \( N = 10 \), <code>[0.5, 0.3, 0.2]</code> → 5, 3, 2; \( N = 11 \) → 5, 3, 2 y sobra 1 que va al primero: <strong>6, 3, 2</strong>; \( N = 7 \), <code>[0.5, 0.5]</code> → 3, 3 y sobra 1: <strong>4, 3</strong>. Es el fragmento 19.</p>
+<p>Cuando las muestras tienen tamaños distintos (por ejemplo, los subtítulos de cada película, frases de longitud variable) el apilado falla. La solución es una <code>collate_fn</code> propia que reciba la lista de muestras y las junte como quieras; lo más frecuente es <strong>rellenar</strong> (<em>padding</em>) hasta la longitud máxima del lote con <code>pad_sequence</code> y devolver también las longitudes reales (fragmento 16). Es la técnica estándar en texto (Curso 7) y la verás de nuevo cuando trabajemos con frases.</p>
+
+<div class="callout recuerda">
+  <span class="lbl">Experimento de arriba: «collate_fn: apilar muestras en un lote», con todo detalle</span>
+  <p><strong>Haz esto.</strong> En «frases (subtítulos de longitud variable)» con «por defecto» y batch_size 2, lee el error. Cambia a «con padding» y mira el lote relleno. Baja batch_size a 1 con «por defecto». Después pasa a «pósters (tamaño fijo)» y cambia canales, tamaño y batch_size.</p>
+  <p><strong>Fíjate en.</strong> Con muestras de tamaños distintos, <code>torch.stack</code> no puede formar una matriz rectangular y el error dice qué dos longitudes chocaron. El padding rellena con ceros (naranja) hasta la frase más larga del lote, y se guardan las longitudes reales para que el modelo no tome el relleno por datos. Con pósters del mismo tamaño no hace falta nada: el lote es el póster con <strong>una dimensión nueva delante</strong>, (B, C, H, W). Cada número de una frase es una palabra codificada (cada película tiene sus subtítulos, con más o menos palabras).</p>
 </div>
-<h3>Estratificar: mantener la proporción de clases</h3>
-<p><code>random_split</code> reparte al azar sin mirar las etiquetas. Con clases equilibradas basta, pero con una clase rara la validación puede quedarse con muy pocos ejemplos suyos. La herramienta para repartir <em>conservando la proporción de clases</em> es <code>train_test_split(..., stratify=etiquetas)</code> de scikit-learn aplicado a los <strong>índices</strong>; con esos índices se crean los <code>Subset</code> (fragmento 20).</p>
-<h3>La trampa del aumento de datos en la validación</h3>
-<p>Un dataset con aumento de datos (transformaciones aleatorias) repartido con <code>random_split</code> sigue siendo <em>un solo dataset</em>: los tres <code>Subset</code> apuntan al mismo objeto y por tanto <strong>aplican la misma transformación</strong>. La validación recibiría imágenes volteadas o giradas al azar. La solución es crear <strong>dos datasets</strong> con los mismos datos y distinta transformación (uno de entrenamiento con aumento, otro de validación sin él) y crear los <code>Subset</code> a mano con los mismos índices (fragmento 21).</p>
-<pre class="ascii">ds_ent = MiDataset(transform=con_aumento)       # para entrenamiento
-ds_val = MiDataset(transform=sin_aumento)       # para validación y prueba
-indices = (reparto de 0..N-1 en conjuntos que no se solapan)
-entrenamiento = Subset(ds_ent, indices_ent)
-validacion    = Subset(ds_val, indices_val)</pre>
+
+<h3>num_workers: ayudantes que preparan lotes por adelantado</h3>
+<p>Mientras el modelo hace su paso de entrenamiento, el procesador que prepara los datos (abrir los archivos de los pósters, decodificarlos, aplicar transformaciones) se queda esperando, y viceversa. Con <code>num_workers = W &gt; 0</code> el <code>DataLoader</code> crea \( W \) <strong>procesos trabajadores</strong> que preparan lotes completos en paralelo y los dejan listos en una cola. El reparto es por turnos: el lote 0 lo prepara el trabajador 0, el 1 el trabajador 1, y así sucesivamente, y se entregan <em>en orden</em> (fragmento 17). Con <code>num_workers=0</code> (por defecto) todo se hace en el proceso principal, sin paralelismo.</p>
+<div class="callout ejemplo">
+  <span class="lbl">Ejemplo numérico · cuánto se gana (con tiempos ficticios)</span>
+  <p>Supón que preparar un lote cuesta 60 ms (leer y transformar los pósters) y que un paso del modelo con un lote cuesta 30 ms, y que hay 8 lotes. <strong>Sin trabajadores</strong>, todo va en serie: \( 8\,(60 + 30) = 720 \) ms. <strong>Con 2 trabajadores</strong>, cada uno tarda 60 ms por lote pero entre los dos entregan un lote nuevo cada 30 ms, justo el ritmo del modelo, que ya no espera: tras el primer lote (60 ms) el modelo trabaja sin parar \( 8\cdot 30 = 240 \) ms, total \( 60 + 240 = 300 \) ms. Los números exactos los calcula la simulación de abajo.</p>
+</div>
+
+<div class="callout recuerda">
+  <span class="lbl">Experimento de arriba: «num_workers: quién prepara cada lote y cuándo», con todo detalle</span>
+  <p><strong>Haz esto.</strong> Deja «preparar un lote» en 60 ms y «paso del modelo» en 30 ms. Pasa num_workers de 0 a 1, 2 y 3 y mira el tiempo total y el porcentaje de tiempo en que el modelo trabaja. Luego sube el paso del modelo a 100 ms con 4 trabajadores, y baja «preparar un lote» a 5 ms con 0 trabajadores.</p>
+  <p><strong>Fíjate en.</strong> Con 0 trabajadores los bloques azul (preparar) y naranja (modelo) se alternan en una sola fila. Con 2 trabajadores el modelo casi no espera (como una cocina con dos ayudantes que van sacando bandejas de palomitas justo cuando las necesitas). Más trabajadores que los necesarios no aceleran nada (con 3 o 4 ya no mejora). Y si preparar un lote es casi instantáneo (5 ms), crear procesos no compensa: <code>num_workers=0</code> es lo mejor para datasets pequeños en memoria. Los tiempos son inventados para ilustrar el reparto, no mediciones de tu máquina.</p>
+</div>
+
 <div class="callout ojo">
-<span class="lbl">Ojo</span>
-<p><strong>(1)</strong> Fija siempre el <code>generator</code> del reparto y guarda los índices: si la validación cambia entre ejecuciones, no puedes comparar modelos. <strong>(2)</strong> El conjunto de <strong>prueba</strong> se mira una sola vez al final; si ajustas el modelo mirando la prueba, deja de ser una medida honesta. <strong>(3)</strong> En datos temporales (precios, visionados por fecha) no se baraja: se corta por fecha (Curso 1, módulo 6). <strong>(4)</strong> Si tienes varios fotogramas o pósters de la misma película, ponlos todos en el mismo conjunto, o la validación tendrá “casi copias” de lo visto en entrenamiento.</p>
+  <span class="lbl">Ojo · num_workers &gt; 0</span>
+  <p><strong>(1)</strong> En Windows y macOS (y desde Python 3.14 también en Linux) los procesos nuevos se crean volviendo a importar tu archivo. Si no proteges el código principal con <code>if __name__ == "__main__":</code> (como en el fragmento 17), obtendrás <code>RuntimeError: An attempt has been made to start a new process before the current process has finished its bootstrapping phase</code>. <strong>(2)</strong> Cada trabajador tiene su <em>propia copia</em> del dataset: lo que guardes en <code>__init__</code> se duplica, y si <code>__getitem__</code> cambia el estado del objeto, ese cambio se pierde en el proceso principal. <strong>(3)</strong> Los lotes se pasan al proceso principal por memoria compartida; en un contenedor Docker con poca memoria compartida aparece <code>DataLoader worker (pid …) is killed by signal: Bus error</code>: baja <code>num_workers</code>. <strong>(4)</strong> No pongas más trabajadores que núcleos de CPU. <strong>(5)</strong> En Jupyter con Windows suele ser necesario <code>num_workers=0</code>. (Estos mensajes los dan las versiones actuales de PyTorch según el sistema; aquí no se pueden provocar todos.)</p>
 </div>
-</section></div></details><details class="profundizar" id="codigo"><summary><span>Ver código explicado paso a paso<small>3 fragmento(s) original(es), con cada línea comentada y salida esperada.</small></span></summary><div class="prof-body"><article class="snippet" data-lang="python" id="frag-mnist">
-<header>
-<h3>11 · MNIST con torchvision.datasets (el flujo del curso, no ejecutado)</h3>
-<p class="para-que"><strong>Para qué sirve</strong> Es el código que usa el curso para cargar MNIST (60 000 dígitos de entrenamiento y 10 000 de validación): <code>torchvision.datasets.MNIST</code> descarga los archivos la primera vez y devuelve un <code>Dataset</code> listo para un <code>DataLoader</code>.</p>
-</header>
-<pre class="code"><code>from torchvision import datasets, transforms
 
-composicion = transforms.Compose([transforms.CenterCrop(20), transforms.ToTensor()])
-
-dataset_entrenamiento = datasets.MNIST(root="./data", train=True, download=True, transform=composicion)
-dataset_validacion = datasets.MNIST(root="./data", train=False, download=True, transform=composicion)
-
-print(len(dataset_entrenamiento), len(dataset_validacion))
-imagen, etiqueta = dataset_entrenamiento[0]
-print(imagen.shape, etiqueta)</code></pre>
-<details class="linea-a-linea" open="">
-<summary>Línea por línea</summary>
-<p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
-<table class="lineas">
-<thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
-<tbody>
-<tr data-lines="1"><td><code>from torchvision import datasets, transforms</code></td><td>Importa los datasets integrados de torchvision y las transformaciones.</td></tr>
-<tr data-lines="3"><td><code>composicion = transforms.Compose([transforms.CenterCrop(20), transforms.ToTensor()])</code></td><td>Una composición de dos pasos: <code>CenterCrop(20)</code> recorta el cuadrado central de 20×20 de la imagen original de 28×28 (se quitan 4 píxeles por cada lado, normalmente vacíos) y <code>ToTensor()</code> la convierte en tensor <code>float32</code> de forma (1, 20, 20) con valores entre 0 y 1.</td></tr>
-<tr data-lines="5"><td><code>dataset_entrenamiento = datasets.MNIST(root="./data", train=True, download=True, transform=composicion)</code></td><td><code>datasets.MNIST(root="./data", train=True, download=True, transform=…)</code>: <code>root</code> es la carpeta donde se guardan los archivos; <code>train=True</code> elige las 60 000 imágenes de entrenamiento; <code>download=True</code> las descarga si no están; <code>transform</code> es la transformación que se aplicará a cada imagen al sacarla.</td></tr>
-<tr data-lines="6"><td><code>dataset_validacion = datasets.MNIST(root="./data", train=False, download=True, transform=composicion)</code></td><td>Lo mismo con <code>train=False</code>: las 10 000 imágenes de prueba (en el curso se usan como validación).</td></tr>
-<tr data-lines="8"><td><code>print(len(dataset_entrenamiento), len(dataset_validacion))</code></td><td>Tamaños de los dos conjuntos.</td></tr>
-<tr data-lines="9-10"><td><code>imagen, etiqueta = dataset_entrenamiento[0] …</code></td><td>Saca la primera imagen de entrenamiento y enseña su forma y su etiqueta.</td></tr>
-</tbody>
+<h3>El resto de los parámetros, de un vistazo</h3>
+<table>
+  <caption>Parámetros de <code>DataLoader</code> (firma de torch 2.14)</caption>
+  <thead><tr><th>Parámetro</th><th>Por defecto</th><th>Para qué sirve</th></tr></thead>
+  <tbody>
+    <tr><td><code>dataset</code></td><td>(obligatorio)</td><td>El <code>Dataset</code> (de estilo mapa o iterable).</td></tr>
+    <tr><td><code>batch_size</code></td><td><code>1</code></td><td>Muestras por lote. Con <code>None</code> no se agrupa (cada muestra sale tal cual).</td></tr>
+    <tr><td><code>shuffle</code></td><td><code>None</code> (como <code>False</code>)</td><td>Baraja los índices al empezar cada época.</td></tr>
+    <tr><td><code>sampler</code></td><td><code>None</code></td><td>Objeto que decide qué índices se piden y en qué orden. Excluye a <code>shuffle</code>.</td></tr>
+    <tr><td><code>batch_sampler</code></td><td><code>None</code></td><td>Decide lotes enteros de índices. Excluye <code>batch_size</code>, <code>shuffle</code>, <code>sampler</code> y <code>drop_last</code>.</td></tr>
+    <tr><td><code>num_workers</code></td><td><code>0</code></td><td>Procesos trabajadores que preparan lotes. 0 = en el proceso principal.</td></tr>
+    <tr><td><code>collate_fn</code></td><td><code>None</code> (→ <code>default_collate</code>)</td><td>Función que convierte la lista de muestras en un lote.</td></tr>
+    <tr><td><code>pin_memory</code></td><td><code>False</code></td><td>Con una GPU, deja los lotes en memoria «fijada» del ordenador para copiarlos más rápido a la GPU (se usa con <code>True</code> cuando hay GPU).</td></tr>
+    <tr><td><code>drop_last</code></td><td><code>False</code></td><td>Descarta el último lote si es incompleto.</td></tr>
+    <tr><td><code>timeout</code></td><td><code>0</code></td><td>Segundos máximos que se espera a que un trabajador entregue un lote (0 = sin límite).</td></tr>
+    <tr><td><code>worker_init_fn</code></td><td><code>None</code></td><td>Función que se ejecuta al arrancar cada trabajador (por ejemplo, para fijar sus semillas).</td></tr>
+    <tr><td><code>generator</code></td><td><code>None</code></td><td>Generador aleatorio usado para barajar y para derivar las semillas de los trabajadores.</td></tr>
+    <tr><td><code>prefetch_factor</code></td><td><code>None</code> (2 con trabajadores)</td><td>Lotes que cada trabajador prepara por adelantado.</td></tr>
+    <tr><td><code>persistent_workers</code></td><td><code>False</code></td><td>Mantiene vivos los trabajadores entre épocas (evita recrearlos).</td></tr>
+    <tr><td><code>multiprocessing_context</code>, <code>pin_memory_device</code>, <code>in_order</code></td><td>—</td><td>Opciones avanzadas (cómo se crean los procesos, en qué dispositivo se fija la memoria y si los lotes se entregan en el orden en que se piden).</td></tr>
+  </tbody>
 </table>
-</details>
-<div class="salida">
-<strong>Salida esperada</strong>
-<p><strong>No ejecutado:</strong> necesita descargar los archivos de internet y este entorno no tiene acceso. Al intentarlo aquí, lo que ocurre de verdad es un <code>RuntimeError: Error downloading train-images-idx3-ubyte.gz</code> con <code>urlopen error Tunnel connection failed: 403 Forbidden</code>. Con conexión verías: <code>60000 10000</code> y <code>torch.Size([1, 20, 20]) 5</code>.</p>
-<p>Con conexión, los tamaños son los del conjunto oficial MNIST (60 000 y 10 000), la forma sale de aplicar <code>CenterCrop(20)</code> a una imagen de 28×28 (un canal, 20×20) y la etiqueta de la primera imagen de entrenamiento es el dígito 5 (la conocida primera imagen de MNIST; no hemos podido comprobarlo aquí). La primera vez se crea una carpeta <code>data/MNIST/raw/</code> con cuatro archivos; las siguientes ejecuciones no vuelven a descargar. En este módulo, sin internet, hacemos lo mismo con los dígitos de scikit-learn (fragmento 19).</p>
+
+<div class="callout regla">
+  <span class="lbl">Regla fácil</span>
+  <p><strong>Entrenamiento: <code>shuffle=True</code>. Validación y prueba: <code>shuffle=False</code>.</strong> Empieza con <code>num_workers=0</code> y súbelo (2, 4) solo si cargar los datos es lento (imágenes en disco). <code>drop_last=True</code> en entrenamiento si el último lote sale muy pequeño. Y si el modelo y los datos están en una GPU, <code>pin_memory=True</code>.</p>
 </div>
-</article><article class="snippet" data-lang="python" id="frag-estratificado">
-<header>
-<h3>20 · Repartir sin perder la proporción de clases (estratificar)</h3>
-<p class="para-que"><strong>Para qué sirve</strong> Ver que <code>random_split</code> reparte al azar sin mirar las etiquetas, así que con una clase poco frecuente la validación puede quedarse con muy pocos ejemplos; y arreglarlo con <code>train_test_split(stratify=…)</code> de scikit-learn combinado con <code>Subset</code>.</p>
-</header>
-<pre class="code"><code>import numpy as np
-import torch
-from sklearn.model_selection import train_test_split
-from torch.utils.data import TensorDataset, Subset, random_split
-
-etiquetas = torch.tensor([0] * 90 + [1] * 10)
-ds = TensorDataset(torch.arange(100, dtype=torch.float32).reshape(100, 1), etiquetas)
-
-def resumen(subconjunto):
-    clases = [int(ds[i][1]) for i in subconjunto.indices]
-    return f"{len(clases)} muestras, {sum(clases)} de la clase 1"
-
-for semilla in (0, 1, 2):
-    entrenamiento, validacion = random_split(ds, [80, 20], generator=torch.Generator().manual_seed(semilla))
-    print(f"random_split, semilla {semilla}: validación = {resumen(validacion)}")
-
-indices = np.arange(len(ds))
-idx_ent, idx_val = train_test_split(indices, test_size=0.2, stratify=etiquetas.numpy(), random_state=0)
-print("estratificado       : validación =", resumen(Subset(ds, idx_val.tolist())))
-print("estratificado       : entrenamiento =", resumen(Subset(ds, idx_ent.tolist())))</code></pre>
-<details class="linea-a-linea" open="">
-<summary>Línea por línea</summary>
-<p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
-<table class="lineas">
-<thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
-<tbody>
-<tr data-lines="1-4"><td><code>import numpy as np …</code></td><td>Importa NumPy, PyTorch, <code>train_test_split</code> de scikit-learn y <code>TensorDataset</code>, <code>Subset</code> y <code>random_split</code>.</td></tr>
-<tr data-lines="6"><td><code>etiquetas = torch.tensor([0] * 90 + [1] * 10)</code></td><td>Etiquetas <strong>desbalanceadas</strong>: 90 muestras de la clase 0 y solo 10 de la clase 1.</td></tr>
-<tr data-lines="7"><td><code>ds = TensorDataset(torch.arange(100, dtype=torch.float32).reshape(100, 1), etiquetas)</code></td><td>Un dataset de 100 muestras (entradas 0 a 99) con esas etiquetas.</td></tr>
-<tr data-lines="9-11"><td><code>def resumen(subconjunto): …</code></td><td>Función auxiliar: dado un <code>Subset</code>, mira las etiquetas de sus muestras (por sus <code>indices</code>) y devuelve un texto con cuántas muestras tiene y cuántas son de la clase 1.</td></tr>
-<tr data-lines="13-15"><td><code>for semilla in (0, 1, 2): …</code></td><td>Repite tres veces un reparto 80 / 20 con <code>random_split</code> y semillas distintas, y escribe cómo queda la validación.</td></tr>
-<tr data-lines="17"><td><code>indices = np.arange(len(ds))</code></td><td>Los índices de todas las muestras: 0, 1, …, 99.</td></tr>
-<tr data-lines="18"><td><code>idx_ent, idx_val = train_test_split(indices, test_size=0.2, stratify=etiquetas.numpy(), random_state=0)</code></td><td><code>train_test_split</code> reparte esos índices (20 % para validación) con <code>stratify=</code> las etiquetas: mantiene en cada parte la <strong>misma proporción de clases</strong> que en el total.</td></tr>
-<tr data-lines="19-20"><td><code>print("estratificado       : validación =", resumen(Subset(ds, idx_val.tolist()))) …</code></td><td>Convierte cada lista de índices en un <code>Subset</code> del dataset original y muestra su contenido.</td></tr>
-</tbody>
-</table>
+  </div>
 </details>
-<div class="salida">
-<strong>Salida esperada</strong>
-<pre>random_split, semilla 0: validación = 20 muestras, 1 de la clase 1
-random_split, semilla 1: validación = 20 muestras, 3 de la clase 1
-random_split, semilla 2: validación = 20 muestras, 1 de la clase 1
-estratificado       : validación = 20 muestras, 2 de la clase 1
-estratificado       : entrenamiento = 80 muestras, 8 de la clase 1</pre>
-<p>La clase 1 es el 10 % del total, así que en una validación de 20 muestras lo ideal son <strong>2</strong>. Con <code>random_split</code> y distintas semillas la validación recibe <strong>1</strong>, <strong>3</strong> y <strong>1</strong> muestras de la clase 1: según la semilla, la métrica de validación se estima con muy pocos ejemplos de la clase rara (y a veces con el doble de lo debido). Con el reparto estratificado salen exactamente <strong>2</strong> en validación y <strong>8</strong> en entrenamiento (10 % y 10 % en los dos). Con datasets equilibrados (como los dígitos, ~10 % de cada clase) <code>random_split</code> basta; con clases raras conviene estratificar.</p>
-</div>
-</article><article class="snippet" data-lang="python" id="frag-split-trampa">
-<header>
-<h3>21 · La trampa del aumento de datos en validación</h3>
-<p class="para-que"><strong>Para qué sirve</strong> Demostrar un error muy frecuente: si repartes <em>un solo</em> dataset con aumento de datos usando <code>random_split</code>, el conjunto de validación <strong>también recibe el aumento</strong>. La solución son dos datasets (uno por transformación) y <code>Subset</code> con los mismos índices.</p>
-</header>
-<p>Reutiliza la clase <code>Digitos</code> del fragmento 19 (se copia para que el fragmento sea autónomo). Para que la diferencia sea visible, el «aumento» es un volteo que ocurre <strong>siempre</strong> (<code>p=1.0</code>).</p>
-<pre class="code"><code>import numpy as np
-import torch
-from PIL import Image
-from sklearn.datasets import load_digits
-from torch.utils.data import Dataset, Subset, random_split
-from torchvision import transforms
 
-class Digitos(Dataset):
-    def __init__(self, transform=None):
-        d = load_digits()
-        self.imagenes = np.round(d.images / 16 * 255).astype(np.uint8)
-        self.etiquetas = d.target
-        self.transform = transform
+<section>
+<h2 class="sin-num">Código</h2>
+<!-- ---------- Fragmento 16 ---------- -->
+<article class="snippet" data-lang="python" id="frag-collate">
+  <header>
+    <h3>16 · collate_fn: cómo se apilan las muestras</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Ver cómo el <code>DataLoader</code> convierte una lista de muestras en un lote (<em>collate</em>), qué pasa cuando las muestras tienen tamaños distintos (frases de longitud variable) y cómo se arregla con tu propia <code>collate_fn</code> que rellena (<em>padding</em>).</p>
+  </header>
+  <pre class="code"><code>import torch
+from torch.utils.data import Dataset, DataLoader
+from torch.nn.utils.rnn import pad_sequence
+
+class Frases(Dataset):
+    def __init__(self):
+        self.frases = [[5, 2, 9], [7, 1], [3, 8, 4, 6], [2]]
+        self.etiquetas = [1, 0, 1, 0]
+
     def __len__(self):
-        return len(self.etiquetas)
+        return len(self.frases)
+
     def __getitem__(self, i):
-        imagen = Image.fromarray(self.imagenes[i])
-        if self.transform is not None:
-            imagen = self.transform(imagen)
-        return imagen, int(self.etiquetas[i])
+        return torch.tensor(self.frases[i]), self.etiquetas[i]
 
-con_aumento = transforms.Compose([transforms.RandomHorizontalFlip(p=1.0), transforms.ToTensor()])
-sin_aumento = transforms.ToTensor()
+ds = Frases()
+try:
+    next(iter(DataLoader(ds, batch_size=2)))
+except RuntimeError as error:
+    print(&quot;collate por defecto falla -&gt;&quot;, str(error).splitlines()[0])
 
-ds = Digitos(transform=con_aumento)
-entrenamiento, validacion = random_split(ds, [0.8, 0.2], generator=torch.Generator().manual_seed(0))
-print("MAL: validación comparte el dataset con aumento:", validacion.dataset is entrenamiento.dataset)
-indice = validacion.indices[0]
-plano = sin_aumento(Image.fromarray(ds.imagenes[indice]))
-print("  imagen de validación igual a la original?", bool(torch.equal(validacion[0][0], plano)))
+def juntar(lote):
+    secuencias = [s for s, _ in lote]
+    etiquetas = torch.tensor([e for _, e in lote])
+    longitudes = torch.tensor([len(s) for s in secuencias])
+    relleno = pad_sequence(secuencias, batch_first=True, padding_value=0)
+    return relleno, longitudes, etiquetas
 
-ds_ent = Digitos(transform=con_aumento)
-ds_val = Digitos(transform=sin_aumento)
-entrenamiento = Subset(ds_ent, entrenamiento.indices)
-validacion = Subset(ds_val, validacion.indices)
-print("BIEN: son datasets distintos:", validacion.dataset is not entrenamiento.dataset)
-plano = sin_aumento(Image.fromarray(ds_val.imagenes[validacion.indices[0]]))
-print("  imagen de validación igual a la original?", bool(torch.equal(validacion[0][0], plano)))
-print("  tamaños:", len(entrenamiento), len(validacion))
-print("  ¿ninguna imagen está en los dos conjuntos?", set(entrenamiento.indices).isdisjoint(validacion.indices))</code></pre>
-<details class="linea-a-linea" open="">
-<summary>Línea por línea</summary>
-<p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
-<table class="lineas">
-<thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
-<tbody>
-<tr data-lines="1-6"><td><code>import numpy as np …</code></td><td>Importa NumPy, PyTorch, Pillow, los dígitos, <code>Dataset</code>, <code>Subset</code>, <code>random_split</code> y las transformaciones.</td></tr>
-<tr data-lines="8-20"><td><code>class Digitos(Dataset): …</code></td><td>La misma clase <code>Digitos</code> del fragmento 19.</td></tr>
-<tr data-lines="22"><td><code>con_aumento = transforms.Compose([transforms.RandomHorizontalFlip(p=1.0), transforms.ToTensor()])</code></td><td>Una transformación con aumento: voltear horizontalmente siempre y pasar a tensor.</td></tr>
-<tr data-lines="23"><td><code>sin_aumento = transforms.ToTensor()</code></td><td>Una transformación sin aumento: solo pasar a tensor.</td></tr>
-<tr data-lines="25"><td><code>ds = Digitos(transform=con_aumento)</code></td><td>Un único dataset <strong>con aumento</strong>.</td></tr>
-<tr data-lines="26"><td><code>entrenamiento, validacion = random_split(ds, [0.8, 0.2], generator=torch.Generator().manual_seed(0))</code></td><td>Lo reparte 80 % / 20 % con semilla fija.</td></tr>
-<tr data-lines="27"><td><code>print("MAL: validación comparte el dataset con aumento:", validacion.dataset is entrenamiento.dataset)</code></td><td>Comprueba que <code>validacion.dataset</code> y <code>entrenamiento.dataset</code> son <strong>el mismo objeto</strong> (<code>is</code> compara identidad): validación hereda el aumento.</td></tr>
-<tr data-lines="28"><td><code>indice = validacion.indices[0]</code></td><td>El índice de la primera imagen de validación (dentro del dataset completo).</td></tr>
-<tr data-lines="29"><td><code>plano = sin_aumento(Image.fromarray(ds.imagenes[indice]))</code></td><td>Esa misma imagen, convertida a tensor <em>sin</em> aumento.</td></tr>
-<tr data-lines="30"><td><code>print("  imagen de validación igual a la original?", bool(torch.equal(validacion[0][0], plano)))</code></td><td>Compara la imagen de validación con la original con <code>torch.equal</code>: no son iguales, porque la de validación está volteada.</td></tr>
-<tr data-lines="32-33"><td><code>ds_ent = Digitos(transform=con_aumento) …</code></td><td>La solución: dos datasets con el mismo contenido pero distinta transformación.</td></tr>
-<tr data-lines="34-35"><td><code>entrenamiento = Subset(ds_ent, entrenamiento.indices) …</code></td><td><code>Subset(dataset, indices)</code> crea un subconjunto con los índices que se le dan: reutilizamos los índices del reparto anterior, cada uno sobre su propio dataset.</td></tr>
-<tr data-lines="36"><td><code>print("BIEN: son datasets distintos:", validacion.dataset is not entrenamiento.dataset)</code></td><td>Ahora los dos conjuntos proceden de datasets distintos.</td></tr>
-<tr data-lines="37-38"><td><code>plano = sin_aumento(Image.fromarray(ds_val.imagenes[validacion.indices[0]])) …</code></td><td>Repite la comparación: la imagen de validación ya coincide con la original.</td></tr>
-<tr data-lines="39"><td><code>print("  tamaños:", len(entrenamiento), len(validacion))</code></td><td>Tamaños de los conjuntos.</td></tr>
-<tr data-lines="40"><td><code>print("  ¿ninguna imagen está en los dos conjuntos?", set(entrenamiento.indices).isdisjoint(validacion.indices))</code></td><td>Comprueba que ninguna imagen está a la vez en entrenamiento y validación (conjuntos de índices disjuntos): no hay fuga de datos.</td></tr>
-</tbody>
-</table>
-</details>
-<div class="salida">
-<strong>Salida esperada</strong>
-<pre>MAL: validación comparte el dataset con aumento: True
-  imagen de validación igual a la original? False
-BIEN: son datasets distintos: True
-  imagen de validación igual a la original? True
-  tamaños: 1438 359
-  ¿ninguna imagen está en los dos conjuntos? True</pre>
-<p>Con un único dataset, <code>validacion.dataset is entrenamiento.dataset</code> es <code>True</code> y la imagen de validación <strong>no</strong> coincide con la original (<code>False</code>): está volteada. Con dos datasets (uno con aumento y otro sin él) y <code>Subset</code>, la validación sí es igual a la original (<code>True</code>), los tamaños son 1438 y 359 (0,8·1797 = 1437,6 → 1437 y 0,2·1797 = 359,4 → 359, y la muestra sobrante va al primer conjunto) y los índices son disjuntos (<code>True</code>). Un aumento aleatorio en validación no rompe nada de forma evidente, pero hace que la métrica de validación sea más ruidosa y menos comparable entre ejecuciones.</p>
+for relleno, longitudes, etiquetas in DataLoader(ds, batch_size=2, collate_fn=juntar):
+    print(&quot;lote:&quot;, relleno.tolist(), &quot; longitudes:&quot;, longitudes.tolist(), &quot; etiquetas:&quot;, etiquetas.tolist())
+
+class Fichas(Dataset):
+    def __len__(self):
+        return 4
+    def __getitem__(self, i):
+        return {&quot;x&quot;: torch.full((2,), float(i)), &quot;id&quot;: i}
+
+lote = next(iter(DataLoader(Fichas(), batch_size=4)))
+print(&quot;lote de diccionarios:&quot;, {clave: valor.tolist() for clave, valor in lote.items()})</code></pre>
+  <details class="linea-a-linea" open>
+    <summary>Línea por línea</summary>
+    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+      <tbody>
+        <tr data-lines="1-3"><td><code>import torch …</code></td><td>Importa PyTorch, <code>Dataset</code>, <code>DataLoader</code> y <code>pad_sequence</code> (función que rellena secuencias con ceros hasta igualarlas).</td></tr>
+        <tr data-lines="5-8"><td><code>class Frases(Dataset): …</code></td><td>Un dataset de 4 «frases» ya convertidas en números, de longitudes 3, 2, 4 y 1, con una etiqueta (0 o 1) cada una.</td></tr>
+        <tr data-lines="10-11"><td><code>def __len__(self): …</code></td><td><code>__len__</code>: 4 frases.</td></tr>
+        <tr data-lines="13-14"><td><code>def __getitem__(self, i): …</code></td><td><code>__getitem__</code>: devuelve la frase como tensor de enteros y su etiqueta.</td></tr>
+        <tr data-lines="16"><td><code>ds = Frases()</code></td><td>Crea el dataset.</td></tr>
+        <tr data-lines="17-20"><td><code>try: …</code></td><td>Intenta sacar un lote de 2 con la <code>collate_fn</code> por defecto, que quiere <em>apilar</em> los tensores con <code>torch.stack</code>. Como miden 3 y 2, falla con un <code>RuntimeError</code>. Mostramos solo la primera línea del mensaje.</td></tr>
+        <tr data-lines="22-27"><td><code>def juntar(lote): …</code></td><td>Nuestra <code>collate_fn</code>: recibe <code>lote</code>, la <strong>lista</strong> de muestras que el cargador ha sacado con <code>__getitem__</code> (cada elemento es un par frase, etiqueta). Separa las frases, convierte las etiquetas en un tensor, mide cada longitud y rellena las frases con <code>pad_sequence</code> (<code>batch_first=True</code> pone el lote en la primera dimensión; <code>padding_value=0</code> es el valor de relleno). Devuelve tres tensores.</td></tr>
+        <tr data-lines="29-30"><td><code>for relleno, longitudes, etiquetas in DataLoader(ds, batch_size=2, collate_fn=juntar): …</code></td><td>Entrega la función al cargador con <code>collate_fn=juntar</code> y muestra cada lote: ahora sí funciona.</td></tr>
+        <tr data-lines="32-36"><td><code>class Fichas(Dataset): …</code></td><td>Otro dataset cuyas muestras son <strong>diccionarios</strong> (un tensor <code>x</code> de dos números y un entero <code>id</code>).</td></tr>
+        <tr data-lines="38-39"><td><code>lote = next(iter(DataLoader(Fichas(), batch_size=4))) …</code></td><td>La <code>collate_fn</code> por defecto sabe apilar diccionarios: devuelve un diccionario con los mismos nombres, cada valor ya apilado. <code>valor.tolist()</code> lo hace legible.</td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>collate por defecto falla -&gt; stack expects each tensor to be equal size, but got [3] at entry 0 and [2] at entry 1
+lote: [[5, 2, 9], [7, 1, 0]]  longitudes: [3, 2]  etiquetas: [1, 0]
+lote: [[3, 8, 4, 6], [2, 0, 0, 0]]  longitudes: [4, 1]  etiquetas: [1, 0]
+lote de diccionarios: {&#x27;x&#x27;: [[0.0, 0.0], [1.0, 1.0], [2.0, 2.0], [3.0, 3.0]], &#x27;id&#x27;: [0, 1, 2, 3]}</pre>
+    <p>Con la <code>collate_fn</code> por defecto, un lote con frases de longitud 3 y 2 falla: <code>stack expects each tensor to be equal size, but got [3] at entry 0 and [2] at entry 1</code>. Con <code>juntar</code> el primer lote es <code>[[5,2,9],[7,1,0]]</code> (la frase de 2 palabras se completa con un 0), con longitudes <code>[3, 2]</code> y etiquetas <code>[1, 0]</code>; el segundo es <code>[[3,8,4,6],[2,0,0,0]]</code> con longitudes <code>[4, 1]</code>. Guardar las longitudes permite que el modelo ignore el relleno. Con diccionarios, el lote es <code>{'x': [[0,0],[1,1],[2,2],[3,3]], 'id': [0,1,2,3]}</code>: cada clave se apila por separado. Esta técnica se usa muchísimo en texto (Curso 7).</p>
+  </div>
+</article>
+
+<!-- ---------- Fragmento 17 ---------- -->
+<article class="snippet" data-lang="python" id="frag-workers">
+  <header>
+    <h3>17 · num_workers: varios procesos preparando lotes</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Comprobar qué hace <code>num_workers</code>: con 0 todo se hace en el proceso principal; con 2 hay dos procesos «trabajadores» que preparan lotes por turnos mientras el modelo calcula.</p>
+  </header>
+  <pre class="code"><code>import torch
+from torch.utils.data import Dataset, DataLoader, get_worker_info
+
+class ConTrabajador(Dataset):
+    def __len__(self):
+        return 8
+
+    def __getitem__(self, i):
+        info = get_worker_info()
+        trabajador = -1 if info is None else info.id
+        return torch.tensor([i, trabajador])
+
+if __name__ == &quot;__main__&quot;:
+    for nw in (0, 2):
+        cargador = DataLoader(ConTrabajador(), batch_size=2, num_workers=nw)
+        print(f&quot;num_workers={nw}:&quot;)
+        for k, lote in enumerate(cargador):
+            print(f&quot;  lote {k}: muestras {lote[:, 0].tolist()}  generado por el trabajador {lote[:, 1].unique().tolist()}&quot;)</code></pre>
+  <details class="linea-a-linea" open>
+    <summary>Línea por línea</summary>
+    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+      <tbody>
+        <tr data-lines="1-2"><td><code>import torch …</code></td><td>Importa PyTorch, <code>Dataset</code>, <code>DataLoader</code> y <code>get_worker_info</code> (devuelve datos del proceso trabajador actual, o <code>None</code> si estamos en el proceso principal).</td></tr>
+        <tr data-lines="4-6"><td><code>class ConTrabajador(Dataset): …</code></td><td>Dataset de 8 muestras.</td></tr>
+        <tr data-lines="8-11"><td><code>def __getitem__(self, i): …</code></td><td>Cada muestra devuelve un tensor con dos números: su índice y el número del trabajador que la ha preparado (−1 si ha sido el proceso principal).</td></tr>
+        <tr data-lines="13"><td><code>if __name__ == &quot;__main__&quot;:</code></td><td><code>if __name__ == "__main__":</code> hace que el código de abajo solo se ejecute al lanzar el archivo directamente. Es <strong>obligatorio</strong> cuando se usa <code>num_workers &gt; 0</code> en Windows y macOS, porque cada trabajador vuelve a importar el archivo y, sin esa protección, crearía más trabajadores sin fin.</td></tr>
+        <tr data-lines="14"><td><code>for nw in (0, 2):</code></td><td>Prueba dos configuraciones: 0 trabajadores y 2.</td></tr>
+        <tr data-lines="15"><td><code>cargador = DataLoader(ConTrabajador(), batch_size=2, num_workers=nw)</code></td><td>Un cargador de lotes de 2 con <code>nw</code> trabajadores.</td></tr>
+        <tr data-lines="16"><td><code>print(f&quot;num_workers={nw}:&quot;)</code></td><td>Escribe cuántos trabajadores se usan.</td></tr>
+        <tr data-lines="17-18"><td><code>for k, lote in enumerate(cargador): …</code></td><td>Recorre los lotes: <code>lote[:, 0]</code> son los índices de las muestras y <code>lote[:, 1].unique()</code> el trabajador que las preparó.</td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>num_workers=0:
+  lote 0: muestras [0, 1]  generado por el trabajador [-1]
+  lote 1: muestras [2, 3]  generado por el trabajador [-1]
+  lote 2: muestras [4, 5]  generado por el trabajador [-1]
+  lote 3: muestras [6, 7]  generado por el trabajador [-1]
+num_workers=2:
+  lote 0: muestras [0, 1]  generado por el trabajador [0]
+  lote 1: muestras [2, 3]  generado por el trabajador [1]
+  lote 2: muestras [4, 5]  generado por el trabajador [0]
+  lote 3: muestras [6, 7]  generado por el trabajador [1]</pre>
+    <p>Con <code>num_workers=0</code> todos los lotes los prepara el proceso principal (trabajador <code>−1</code>). Con 2 trabajadores se reparten los <em>lotes enteros</em> por turnos: el lote 0 lo prepara el trabajador 0, el lote 1 el trabajador 1, el 2 otra vez el 0 y el 3 el 1, y el <code>DataLoader</code> los entrega en orden (0, 1, 2, 3), así que la salida no cambia salvo por el nombre del trabajador. Para un dataset tan pequeño no hay ninguna ventaja (crear procesos cuesta tiempo): el beneficio llega cuando <code>__getitem__</code> es lento (leer y decodificar imágenes del disco).</p>
+  </div>
+</article>
+
+</section>
+
 </div>
-</article></div></details></div></main></body></html>
+</main>
+</body>
+</html>

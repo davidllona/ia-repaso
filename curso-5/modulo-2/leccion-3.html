@@ -1,102 +1,288 @@
-<!DOCTYPE html>
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lección 3 · Los gradientes se apagan capa a capa: mídelos · Módulo 2 · Curso 5 · Cuaderno de IA</title>
+<meta name="description" content="Por qué el gradiente se desvanece (o explota) en redes profundas, cómo medir su norma por capa en PyTorch y qué hace clip_grad_norm_.">
+<script>try{var t=localStorage.getItem('cuaderno-ia:tema');if(t)document.documentElement.setAttribute('data-theme',t)}catch(e){}</script>
+<link rel="stylesheet" href="../../assets/css/style.css">
+<script src="../../assets/js/curriculum.js"></script>
+<script src="../../assets/js/lab.js"></script>
+<script src="../../assets/js/app.js" defer></script>
+</head>
+<body data-root="../../" data-course="5" data-module="2" data-lesson="3">
+<main>
+<div class="page">
 
-<html lang="es"><head><meta charset="utf-8"/><meta content="width=device-width,initial-scale=1" name="viewport"/><title>Lección 3 · Cómo lo hace PyTorch: el grafo de autograd · Curso 5 · Cuaderno de IA</title><meta content="Cada vez que haces una operación con un tensor que tiene requires_grad=True , PyTorch apunta en el resultado qué operación lo creó ( grad_fn ) y de qué tensores venía." name="description"/><script>try{var t=localStorage.getItem('cuaderno-ia:tema');if(t)document.documentElement.setAttribute('data-theme',t)}catch(e){}</script><link href="../../assets/css/style.css" rel="stylesheet"/><script src="../../assets/js/curriculum.js"></script><script src="../../assets/js/lab.js"></script><script defer="" src="../../assets/js/app.js"></script><script defer="" src="../../assets/js/microanimations.js"></script></head><body data-course="5" data-lesson="3" data-module="2" data-root="../../"><main><div class="page" data-micro="3min"><header class="hero leccion"><div class="hero-grid"><div><p class="eyebrow">Curso 5 · Módulo 2 · Lección 3 de 11</p><h1>Cómo lo hace PyTorch: el grafo de autograd</h1><p class="lead">Cada vez que haces una operación con un tensor que tiene requires_grad=True , PyTorch apunta en el resultado qué operación lo creó ( grad_fn ) y de qué tensores venía.</p><p class="meta-line"><span class="read-time" data-render="read-time"></span><a href="../modulo-2.html">Índice del módulo</a></p></div><div aria-hidden="true" class="hero-tile"></div></div></header><details class="predice"><summary>¿Cómo sabe loss.backward() qué derivadas aplicar si no le has dicho nada de la red?<span class="hint"></span></summary><div><p>Cada vez que haces una operación con un tensor que tiene requires_grad=True , PyTorch apunta en el resultado qué operación lo creó ( grad_fn ) y de qué tensores venía.</p></div></details><section aria-label="Explicación breve" class="micro-core"><div class="micro-kicker">01 · ENTENDER <span>≈ 45 s</span></div><h2>La idea en palabras sencillas</h2><p>Cada vez que haces una operación con un tensor que tiene requires_grad=True, PyTorch apunta en el resultado qué operación lo creó ( grad_fn ) y de qué tensores venía.</p><div class="micro-example"><span aria-hidden="true" class="micro-example-icon">🛍️</span><div><strong>Otro ejemplo · Tienda</strong><p>La talla «M» es texto. Para ciertos algoritmos hay que codificarla en números sin inventar distancias.</p></div></div></section><div class="micro-kicker micro-checkpoint">02 · RESPONDER <span>≈ 15 s</span></div><section aria-label="Pregunta intercalada" class="quiz mini micro-check"><script class="quiz-data" type="application/json">{"titulo": "Pausa rápida · Comprueba la idea", "preguntas": [{"q": "En una tabla de temperatura aparece NaN. ¿Qué significa?", "opciones": ["La temperatura es muy alta", "La temperatura fue 0 °C", "No hay valor registrado"], "correcta": 2, "porque": "NaN representa un valor faltante, no cero."}]}</script></section><section aria-label="Animación interactiva" class="micro-viz" data-index="10" data-micro-viz="data"><div class="micro-kicker">03 · EXPERIMENTAR <span>≈ 45 s</span></div><div class="micro-viz-title"><div><h2>De datos imperfectos a datos útiles</h2><p>Pulsa «Preparar datos» y descubre qué se transforma.</p></div><span aria-hidden="true" class="micro-viz-symbol">✦</span></div><div aria-live="polite" class="micro-viz-stage"><p>Animación interactiva: De datos imperfectos a datos útiles</p></div></section><div class="micro-kicker micro-checkpoint">04 · APLICAR <span>≈ 15 s</span></div><section aria-label="Pregunta intercalada" class="quiz mini micro-check"><script class="quiz-data" type="application/json">{"titulo": "Pausa rápida · ¿Lo aplicarías?", "preguntas": [{"q": "¿Por qué conviene preparar los datos ANTES de entrenar?", "opciones": ["Para que el modelo reciba información coherente", "Para garantizar un 100 % de aciertos", "Para evitar siempre hacer pruebas"], "correcta": 0, "porque": "Las transformaciones y los datos faltantes afectan a lo que aprende el modelo."}]}</script></section><div class="micro-finish"><strong>Idea que te llevas</strong><span>Cada vez que haces una operación con un tensor que tiene requires_grad=True, PyTorch apunta en el resultado qué operación lo creó ( grad_fn ) y de qué</span><small>¿Quieres más ejemplos, fórmulas o código? Los tienes justo debajo, sin límite de tiempo.</small></div><details class="profundizar micro-legacy"><summary><span>Explorar más: explicación y simulaciones completas<small>Todo el texto original, tablas y demos avanzadas. Opcional.</small></span></summary><div class="prof-body"><section><h2>Cómo lo hace PyTorch: el grafo de autograd</h2>
-<p>Cada vez que haces una operación con un tensor que tiene <code>requires_grad=True</code>, PyTorch apunta en el resultado <strong>qué operación lo creó</strong> (<code>grad_fn</code>) y de qué tensores venía. Esas notas forman el <abbr class="t" data-def="Grafo computacional: red de nodos (operaciones) y aristas (tensores) que PyTorch construye durante el forward. El backward lo recorre al revés aplicando la regla de la cadena en cada nodo.">grafo computacional</abbr>, que se construye <em>sobre la marcha</em> en cada forward. <code>backward()</code> lo recorre al revés y, en cada nodo, aplica la derivada local que ese nodo conoce (<code>ReluBackward0</code> sabe que la derivada de ReLU es 1 o 0, <code>MvBackward0</code> sabe derivar un producto matriz-vector, etc.).</p>
-<p>El <a href="#codigo">fragmento 3</a> imprime ese grafo para la red 2-2-1: <code>PowBackward0</code> (la pérdida) ← <code>SubBackward0</code> ← <code>DotBackward0</code> ← <code>ReluBackward0</code> ← <code>MvBackward0</code>, con los <code>AccumulateGrad</code> en las hojas (los pesos), que es donde acaban los gradientes. Lo mismo, sin los nombres, es lo que viste con <code>tf.GradientTape</code> en el <a href="../../curso-3/modulo-5.html#gradientes">Curso 3</a>.</p>
-<div class="callout ejemplo"><span class="lbl">Con números</span><p>Cada vez que haces una operación con un tensor que tiene requires_grad=True , PyTorch apunta en el resultado qué operación lo creó ( grad_fn ) y de qué tensores venía.</p></div></section><div class="resumen"><h2 class="sin-num sin-toc">En pocas líneas</h2><ul><li><strong>Cómo lo hace PyTorch: el grafo de autograd:</strong> Cada vez que haces una operación con un tensor que tiene requires_grad=True , PyTorch apunta en el resultado qué operación lo creó (…</li><li>Antes de continuar, intenta explicar la demo sin mirar su resultado.</li></ul></div><section class="quiz mini"><script class="quiz-data" type="application/json">{"titulo": "¿Lo tienes?", "preguntas": [{"q": "¿Qué concepto estamos trabajando en esta lección?", "opciones": ["La receta completa: qué aporta cada pieza", "Cómo lo hace PyTorch: el grafo de autograd", "Batch normalization: normalizar lo que ve cada capa"], "correcta": 1, "porque": "Cada vez que haces una operación con un tensor que tiene requires_grad=True , PyTorch apunta en el resultado qué operación lo creó ( grad_fn ) y de qué tensores venía."}, {"q": "¿Cuál de estas afirmaciones recoge lo que acabas de estudiar?", "opciones": ["Siempre hay un único método que sirve para todos los problemas.", "Lo importante es comprender la idea y comprobarla con ejemplos, no memorizar términos.", "Cada vez que haces una operación con un tensor que tiene requires_grad=True , PyTorch apunta en el resultado qué operación lo creó ( grad_fn ) y de qué tensores venía."], "correcta": 2, "porque": "La explicación central es: Cada vez que haces una operación con un tensor que tiene requires_grad=True , PyTorch apunta en el resultado qué operación lo creó ( grad_fn ) y de qué tensores venía."}, {"q": "Si una demo o un ejemplo te desconcierta, ¿cuál es la mejor forma de aprenderlo?", "opciones": ["Ignorar los resultados que no coinciden con tu intuición.", "Memorizar el nombre sin entender la operación.", "Volver a los números, cambiar un valor y explicar qué ocurre."], "correcta": 2, "porque": "Explorar qué cambia y por qué ayuda a conectar el concepto con su resultado."}]}</script></section></div></details><details class="profundizar"><summary><span>Profundizar: explicación completa<small>Matices, fórmulas, tablas, otros ejemplos y experimentos del módulo original.</small></span></summary><div class="prof-body"><section>
-<h2 id="autograd">Cómo lo hace PyTorch: el grafo de autograd</h2>
-<p class="pregunta">¿Cómo sabe <code>loss.backward()</code> qué derivadas aplicar si no le has dicho nada de la red?</p>
-<p>Cada vez que haces una operación con un tensor que tiene <code>requires_grad=True</code>, PyTorch apunta en el resultado <strong>qué operación lo creó</strong> (<code>grad_fn</code>) y de qué tensores venía. Esas notas forman el <abbr class="t" data-def="Grafo computacional: red de nodos (operaciones) y aristas (tensores) que PyTorch construye durante el forward. El backward lo recorre al revés aplicando la regla de la cadena en cada nodo.">grafo computacional</abbr>, que se construye <em>sobre la marcha</em> en cada forward. <code>backward()</code> lo recorre al revés y, en cada nodo, aplica la derivada local que ese nodo conoce (<code>ReluBackward0</code> sabe que la derivada de ReLU es 1 o 0, <code>MvBackward0</code> sabe derivar un producto matriz-vector, etc.).</p>
-<div class="callout analogia">
-<span class="lbl">Analogía</span>
-<p>Es como grabar el «cómo se hizo» (el <em>making of</em>) mientras ruedas una película, apuntando cada escena («rodé esto», «monté aquello»). Cuando el público odia el final, rebobinas la grabación hacia atrás y cada escena te dice cuánto influyó. Si no grabaste (<code>torch.no_grad()</code>), no puedes rebobinar, pero tampoco gastas memoria.</p>
-</div>
-<p>El <a href="#codigo">fragmento 3</a> imprime ese grafo para la red 2-2-1: <code>PowBackward0</code> (la pérdida) ← <code>SubBackward0</code> ← <code>DotBackward0</code> ← <code>ReluBackward0</code> ← <code>MvBackward0</code>, con los <code>AccumulateGrad</code> en las hojas (los pesos), que es donde acaban los gradientes. Lo mismo, sin los nombres, es lo que viste con <code>tf.GradientTape</code> en el <a href="../../curso-3/modulo-5.html#gradientes">Curso 3</a>.</p>
-<h3>Tres detalles que importan al entrenar</h3>
-<ul>
-<li><strong>Los gradientes se acumulan.</strong> <code>backward()</code> <em>suma</em> el nuevo gradiente a lo que ya hubiera en <code>.grad</code>. Por eso el bucle de entrenamiento empieza cada paso con <code>optimizer.zero_grad()</code>: sin él, cada paso usaría el gradiente de todos los lotes anteriores sumados. En el fragmento 3, \( \partial(w^2)/\partial w=4 \) sale 4, 8, 12 si no lo pones a cero.</li>
-<li><strong>La neurona muerta.</strong> Si \( z&lt;0 \) la derivada de ReLU es 0 y no pasa ningún gradiente: ni a los pesos de esa neurona ni a lo que hay detrás de ella. Con \( z_2=-2 \), el fragmento 3 da <code>W1.grad = [[2, 4], [0, 0]]</code>: la segunda fila (la neurona 2) no aprende nada para este dato. Si una neurona queda en \( z&lt;0 \) para <em>todos</em> los datos, está muerta para siempre.</li>
-<li><strong>Evaluar sin grafo.</strong> Para medir (no entrenar) se usa <code>with torch.no_grad():</code>, que no construye el grafo y ahorra memoria.</li>
-</ul>
-<div class="callout ojo">
-<span class="lbl">Ojo</span>
-<p>Orden del bucle de entrenamiento en PyTorch: <code>optimizer.zero_grad()</code> → forward → pérdida → <code>loss.backward()</code> → <code>optimizer.step()</code>. Si olvidas el <code>zero_grad()</code> el modelo no da error: simplemente entrena mal, con gradientes acumulados. En Keras todo eso lo hacía <code>fit</code> por dentro (<a href="../../curso-2/modulo-1.html#bucle">bucle de entrenamiento</a>).</p>
-</div>
-</section></div></details><details class="profundizar" id="codigo"><summary><span>Ver código explicado paso a paso<small>1 fragmento(s) original(es), con cada línea comentada y salida esperada.</small></span></summary><div class="prof-body"><article class="snippet" data-lang="python">
-<header>
-<h3>3 · El grafo de autograd, la neurona muerta y la acumulación de gradientes</h3>
-<p class="para-que"><strong>Para qué sirve</strong> Ver el grafo que PyTorch construye al hacer el forward, comprobar que una neurona con ReLU en la zona plana no recibe gradiente y entender por qué hay que llamar a <code>zero_grad()</code>.</p>
+<header class="hero leccion">
+  <div class="hero-grid">
+    <div>
+      <p class="eyebrow">Curso 5 · Módulo 2 · Lección 3 de 8</p>
+      <h1>Los gradientes se apagan capa a capa: mídelos</h1>
+      <p class="lead">En una red profunda la culpa llega a las primeras capas multiplicada por un factor por cada capa. Si esos factores son pequeños, a la entrada no llega nada. Se ve imprimiendo la norma del gradiente de cada capa.</p>
+      <p class="meta-line"><span class="read-time" data-render="read-time"></span><a href="../modulo-2.html">Índice del módulo</a></p>
+    </div>
+    <div class="hero-tile" aria-hidden="true"></div>
+  </div>
 </header>
-<pre class="code"><code>import torch
 
-# 1) El grafo que PyTorch construye durante el forward
-x = torch.tensor([1.0, 2.0])
-W1 = torch.tensor([[1.0, 0.5], [-1.0, 1.0]], requires_grad=True)
-v = torch.tensor([2.0, -1.0], requires_grad=True)
-loss = ((v @ torch.relu(W1 @ x) - 2.0) ** 2)
-
-
-def cadena(fn, nivel=0):
-    print("  " * nivel + fn.name())
-    for siguiente, _ in fn.next_functions:
-        if siguiente is not None:
-            cadena(siguiente, nivel + 1)
-
-
-cadena(loss.grad_fn)
-
-# 2) Neurona muerta: con z &lt; 0 la ReLU corta el gradiente de su fila de pesos
-b1 = torch.tensor([-1.0, -3.0], requires_grad=True)     # la segunda neurona queda en z = -2
-W1.grad = None
-h = torch.relu(W1 @ x + b1)
-((v @ h + 0.5 - 2.0) ** 2).backward()
-print("z1 =", (W1 @ x + b1).tolist(), " h =", h.tolist())
-print("W1.grad =", W1.grad.tolist(), " b1.grad =", b1.grad.tolist())
-
-# 3) Los gradientes se acumulan: por eso existe zero_grad()
-w = torch.tensor(2.0, requires_grad=True)
-for i in range(3):
-    (w ** 2).backward()
-    print("tras el backward", i + 1, "-&gt; w.grad =", w.grad.item())
-w.grad.zero_()
-(w ** 2).backward()
-print("tras zero_() y otro backward -&gt; w.grad =", w.grad.item())</code></pre>
-<details class="linea-a-linea" open="">
-<summary>Línea por línea</summary>
-<p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
-<table class="lineas">
-<thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
-<tbody>
-<tr data-lines="1"><td><code>import torch</code></td><td>Importamos <code>torch</code>.</td></tr>
-<tr data-lines="3-6"><td><code># 1) El grafo que PyTorch construye durante el forward …</code></td><td>Los mismos datos y pesos del fragmento anterior (<code>x</code>, <code>W1</code>, <code>v</code>), con gradiente activado en los pesos.</td></tr>
-<tr data-lines="7"><td><code>loss = ((v @ torch.relu(W1 @ x) - 2.0) ** 2)</code></td><td>Calcula la pérdida de una sola vez: \((v\cdot \mathrm{relu}(W_1x)-2)^2\). Al hacerlo, cada operación deja una nota en el grafo.</td></tr>
-<tr data-lines="10-14"><td><code>def cadena(fn, nivel=0): …</code></td><td><code>cadena</code> recorre el grafo hacia atrás: imprime el nombre de cada nodo (<code>fn.name()</code>) con sangría según su profundidad y baja por <code>fn.next_functions</code> (los nodos que alimentan a éste), saltando los vacíos (<code>None</code>).</td></tr>
-<tr data-lines="17"><td><code>cadena(loss.grad_fn)</code></td><td>Empieza por <code>loss.grad_fn</code>, el nodo que produjo la pérdida: el último paso del forward.</td></tr>
-<tr data-lines="19-20"><td><code># 2) Neurona muerta: con z &lt; 0 la ReLU corta el gradiente de su fila de pesos …</code></td><td>Nuevo sesgo <code>b1</code> con segundo valor muy negativo: la segunda neurona tendrá \(z=-1\cdot1+1\cdot2-3=-2\), por debajo de cero.</td></tr>
-<tr data-lines="21"><td><code>W1.grad = None</code></td><td><code>W1.grad = None</code> borra los gradientes anteriores de <code>W1</code>.</td></tr>
-<tr data-lines="22-23"><td><code>h = torch.relu(W1 @ x + b1) …</code></td><td>Forward con los nuevos sesgos y <code>backward()</code> en la misma línea; el 0.5 y el −2.0 de la pérdida son <code>c</code> e <code>y</code> del ejemplo.</td></tr>
-<tr data-lines="24-25"><td><code>print("z1 =", (W1 @ x + b1).tolist(), " h =", h.tolist()) …</code></td><td>Imprime <code>z1</code>, <code>h</code> y los gradientes: la segunda fila de <code>W1.grad</code> y el segundo valor de <code>b1.grad</code> saldrán 0.</td></tr>
-<tr data-lines="27-28"><td><code># 3) Los gradientes se acumulan: por eso existe zero_grad() …</code></td><td>Un peso suelto <code>w = 2</code> para ver cómo se acumulan los gradientes.</td></tr>
-<tr data-lines="29-31"><td><code>for i in range(3): …</code></td><td>Tres veces seguidas: calcula \(w^2\), llama a <code>backward()</code> e imprime <code>w.grad</code>. La derivada de \(w^2\) en 2 es 4, pero PyTorch <strong>suma</strong> cada nuevo gradiente al anterior.</td></tr>
-<tr data-lines="32-34"><td><code>w.grad.zero_() …</code></td><td><code>w.grad.zero_()</code> pone el gradiente a cero (el guion bajo final significa «modifica en el sitio»); un nuevo <code>backward()</code> vuelve a dar 4.</td></tr>
-</tbody>
-</table>
+<details class="predice">
+  <summary>Tu recomendador de 8 capas sigmoides decide «¿le gustará esta película?» y su pérdida se queda en 0,693 sin moverse. ¿Lo arreglas subiendo el learning rate?<span class="hint"></span></summary>
+  <div>
+    <p><strong>Casi seguro que no.</strong> 0,693 = ln 2 es lanzar una moneda: la red no aprende nada. Si la primera capa recibe un gradiente millones de veces menor que la última, multiplicar el paso por 10 no cambia eso. Es un problema de activación, inicialización o profundidad.</p>
+  </div>
 </details>
-<div class="salida">
-<strong>Salida esperada</strong>
-<pre>PowBackward0
-  SubBackward0
-    DotBackward0
-      torch::autograd::AccumulateGrad
-      ReluBackward0
-        MvBackward0
-          torch::autograd::AccumulateGrad
-z1 = [1.0, -2.0]  h = [1.0, 0.0]
-W1.grad = [[2.0, 4.0], [0.0, 0.0]]  b1.grad = [2.0, 0.0]
-tras el backward 1 -&gt; w.grad = 4.0
-tras el backward 2 -&gt; w.grad = 8.0
-tras el backward 3 -&gt; w.grad = 12.0
-tras zero_() y otro backward -&gt; w.grad = 4.0</pre>
-<p>El grafo se lee de arriba abajo: <code>PowBackward0</code> (el cuadrado) ← <code>SubBackward0</code> (la resta) ← <code>DotBackward0</code> (el producto <code>v @ h</code>), que se alimenta de <code>AccumulateGrad</code> (el peso <code>v</code>) y de <code>ReluBackward0</code> ← <code>MvBackward0</code> (<code>W1 @ x</code>) ← <code>AccumulateGrad</code> (<code>W1</code>). Con \(z=(1,-2)\), \(h=(1,0)\): la segunda neurona está «muerta» y su fila de <code>W1.grad</code> y su <code>b1.grad</code> valen 0. Y el gradiente de \(w^2\) sale 4, 8, 12 si no lo pones a cero: <strong>se acumula</strong>.</p>
+
+<section>
+<h2 id="idea">Una multiplicación muy larga</h2>
+<p>Piensa en una cola de 8 personas para entrar al cine. La última acaba de salir de la sala y susurra su opinión a la de delante, que la repite a un cuarto del volumen, y así hasta la puerta. A la primera no le llega nada. En una red, la opinión es el gradiente y la persona de la puerta es la capa 1.</p>
+<p>Cada capa multiplica el gradiente por sus pesos y por la derivada de su activación. La de la <strong>sigmoide</strong> vale como mucho 0,25; la de <strong>ReLU</strong>, 1 en las neuronas activas. Por eso la sigmoide apaga la señal en redes profundas y ReLU no.</p>
+<p>Diagnóstico: tras un <code>backward()</code>, mira <code>p.grad.norm()</code> de cada capa y divide la de la capa 1 entre la de la última. Cerca de 1, bien; por debajo de \( 10^{-3} \), se desvanece; por encima de 100, <strong>explota</strong>. Para lo segundo existe <code>clip_grad_norm_</code>, que recorta el tamaño del gradiente sin cambiar su dirección (después de <code>backward()</code> y antes de <code>step()</code>).</p>
+</section>
+
+<figure class="demo" data-demo="curso5/c5m2-grad-capas" data-titulo="la norma del gradiente de cada capa, midiéndola de verdad">
+  <div class="haz">Con sigmoide, inicialización por defecto y 8 capas, pulsa «Entrenar». Luego cambia a ReLU + He y vuelve a entrenar.</div>
+  <div class="observa">Con sigmoide la capa 1 recibe un gradiente millones de veces menor y la pérdida se queda en 0,693. Con ReLU + He las barras se igualan.</div>
+</figure>
+
+<section>
+<h2 id="numeros">Con números: 0,25 multiplicado ocho veces</h2>
+<div class="callout ejemplo">
+  <span class="lbl">Ejemplo numérico · el mejor caso de la sigmoide</span>
+  <p>Pesos de tamaño 1 y todas las sigmoides en su mejor punto (derivada 0,25):</p>
+  <table>
+    <thead><tr><th>Capas que retrocede</th><th>Factor</th></tr></thead>
+    <tbody>
+      <tr><td>1</td><td class="res">0,25</td></tr>
+      <tr><td>4</td><td class="res">0,25⁴ = 0,0039</td></tr>
+      <tr><td>8</td><td class="res">0,25⁸ ≈ 1,5·10⁻⁵</td></tr>
+    </tbody>
+  </table>
+  <p>Y eso en el <em>mejor</em> caso. Al revés, si el gradiente es demasiado grande, por ejemplo \( g=(6,\,8) \) con norma \( \sqrt{36+64}=10 \), <code>clip_grad_norm_</code> con <code>max_norm=5</code> lo multiplica por 0,5: queda <span class="res">(3, 4)</span>, la misma dirección con la mitad de tamaño.</p>
 </div>
-</article></div></details></div></main></body></html>
+</section>
+
+<details class="predice">
+  <summary>Añades <code>clip_grad_norm_(…, max_norm=1)</code> a la red de 8 sigmoides. ¿Deja de estar clavada en 0,693?<span class="hint"></span></summary>
+  <div>
+    <p><strong>No.</strong> El clipping solo <em>encoge</em> los gradientes demasiado grandes; a uno diminuto lo deja igual. Contra el desvanecimiento sirven ReLU, una buena inicialización y BatchNorm, que verás en las próximas lecciones.</p>
+  </div>
+</details>
+
+<div class="resumen">
+  <h2 class="sin-num sin-toc">En tres líneas</h2>
+  <ul>
+    <li>Cada capa multiplica el gradiente por un factor; con sigmoides (≤ 0,25) las primeras capas no reciben casi nada.</li>
+    <li>Se mide con <code>p.grad.norm()</code> por capa: cociente capa 1 / última &lt; \( 10^{-3} \) = se desvanece.</li>
+    <li>Si explota, <code>clip_grad_norm_</code> recorta la norma; no cura el desvanecimiento.</li>
+  </ul>
+</div>
+
+<section class="quiz mini">
+<script type="application/json" class="quiz-data">
+{
+ "titulo": "¿Lo tienes?",
+ "preguntas": [
+  {
+   "q": "La derivada de la sigmoide vale como máximo 0,25. En el mejor de los casos, ¿por cuánto se multiplica el gradiente al retroceder por 8 capas sigmoides (ignorando los pesos)?",
+   "opciones": [
+    "\\( 8\\cdot0{,}25=2 \\)",
+    "\\( 0{,}25\\cdot0{,}25=0{,}0625 \\)",
+    "\\( 0{,}25^8\\approx1{,}5\\cdot10^{-5} \\)",
+    "0,25"
+   ],
+   "correcta": 2,
+   "porque": "Cada capa añade un factor ≤ 0,25 y los factores <strong>se multiplican</strong>: \\( 0{,}25^8=1{,}5\\cdot10^{-5} \\). Sumar (opción 1) o multiplicar solo dos veces (opción 2) no corresponde a una cadena de 8 capas. Por eso la sigmoide en redes profundas hace que las primeras capas apenas reciban gradiente."
+  },
+  {
+   "q": "Un gradiente vale \\( g=(6,\\,8) \\) y aplicas <code>clip_grad_norm_</code> con <code>max_norm=5</code>. ¿Qué gradiente queda?",
+   "opciones": [
+    "(6, 8): no se toca",
+    "(3, 4)",
+    "(5, 5)",
+    "(0,6; 0,8)"
+   ],
+   "correcta": 1,
+   "porque": "La norma es \\( \\sqrt{36+64}=10 \\) &gt; 5, así que se multiplica por 5/10 = 0,5: (3, 4). Misma dirección, la mitad de tamaño. (5, 5) cambiaría la dirección; (0,6; 0,8) sería normalizar a norma 1."
+  },
+  {
+   "q": "Mides el cociente «norma del gradiente en la capa 1 / norma en la última capa» y sale \\( 4{,}5\\cdot10^{-7} \\). ¿Qué diagnóstico haces?",
+   "opciones": [
+    "Los gradientes explotan",
+    "Todo va bien",
+    "Se desvanecen: las primeras capas casi no aprenden",
+    "El learning rate es demasiado grande"
+   ],
+   "correcta": 2,
+   "porque": "Muy por debajo de \\( 10^{-3} \\): el gradiente se apaga al retroceder. Es lo que mide el fragmento 4 con sigmoide e inicialización por defecto; con ReLU + He el cociente ronda 2."
+  }
+ ]
+}
+</script>
+</section>
+
+<details class="profundizar">
+  <summary><span>Profundizar: la explicación completa<small>La fórmula del producto de factores, la derivada de la sigmoide punto a punto, cómo medirlo en PyTorch, el problema de los gradientes que explotan y el gradient clipping.</small></span></summary>
+  <div class="prof-body">
+<h2 id="desvanece">Gradientes que se desvanecen (y que explotan): medirlos capa por capa</h2>
+
+<p class="pregunta">Mi recomendador de 8 capas decide «¿le gustará esta película?» y su pérdida se queda en 0,693 (como tirar una moneda) sin moverse. ¿Está roto o simplemente no le llega señal a las primeras capas?</p>
+
+<div class="callout recuerda">
+  <span class="lbl">Recuerda (<a href="../../curso-2/modulo-1/leccion-7.html#desvanece">Curso 2 · módulo 1</a>)</span>
+  <p>Viste que con muchas capas sigmoides el gradiente se hace pequeñísimo al retroceder y las primeras capas casi no aprenden, y que ReLU lo alivia. Aquí lo <strong>medimos</strong>: tomamos la norma del gradiente de los pesos de cada capa y miramos cómo cambia de la salida a la entrada.</p>
+</div>
+
+<div class="callout analogia">
+  <span class="lbl">Analogía</span>
+  <p>Una cola de 8 personas para entrar al cine. La última acaba de salir de la sala y grita su opinión sobre la película; cada persona se la susurra a la de delante a un cuarto del volumen. A la primera de la cola, la que está en la puerta, no le llega nada. En una red, la opinión es el gradiente que viaja hacia atrás, y quien tiene que aprender de ella es la capa que está junto a la entrada.</p>
+</div>
+
+<h3>Por qué ocurre: una multiplicación larga</h3>
+
+<p>En la sección de backpropagation viste que cada capa multiplica el gradiente por sus pesos y por la derivada de su activación. Para llegar a la capa 1 desde la salida hay que multiplicar por <strong>un factor por cada capa</strong>:</p>
+
+<div class="formula">\[ \frac{\partial L}{\partial W_1}\;\propto\;\prod_{l=2}^{L}\Big(W_l^{\top}\,\mathrm{diag}\big(f'(z_{l-1})\big)\Big)\;\cdots \]</div>
+
+<p>Aquí \( f' \) es la derivada de la activación y \( \mathrm{diag}(\cdot) \) indica que se multiplica elemento a elemento. La derivada de la <strong>sigmoide</strong> es \( \sigma'(z)=\sigma(z)\,(1-\sigma(z)) \): vale <strong>como máximo 0,25</strong> (en \( z=0 \)) y baja deprisa al alejarte (0,197 en \( z=1 \); 0,105 en \( z=2 \); 0,0066 en \( z=5 \)).</p>
+
+<div class="callout ejemplo">
+  <span class="lbl">Ejemplo numérico</span>
+  <p>Si los pesos fueran de tamaño 1 y todas las sigmoides estuvieran en su mejor caso (\( z=0 \), derivada 0,25), el gradiente se multiplica por 0,25 en cada capa que retrocede:</p>
+  <table>
+    <thead><tr><th>Capas que retrocede</th><th>Factor</th></tr></thead>
+    <tbody>
+      <tr><td>1</td><td class="res">0,25</td></tr>
+      <tr><td>4</td><td class="res">0,25⁴ = 0,0039</td></tr>
+      <tr><td>8</td><td class="res">0,25⁸ = 0,000015 (1,5·10⁻⁵)</td></tr>
+    </tbody>
+  </table>
+  <p>Y eso en el <em>mejor</em> caso. Con pesos pequeños o neuronas saturadas es mucho peor. Con <strong>ReLU</strong> la derivada es 1 para las neuronas activas, así que no hay ese factor de 0,25 encogiendo cada capa. La <strong>tanh</strong> tiene derivada máxima 1 (en \( z=0 \)).</p>
+</div>
+
+<div class="callout recuerda">
+  <span class="lbl">Experimento de arriba: «la norma del gradiente de cada capa, midiéndola de verdad», con todo detalle</span>
+  <p><strong>Haz esto.</strong> Cada punto de entrenamiento es una película con dos rasgos (humor y tensión) y la red debe decidir su género. Con sigmoide, inicialización «por defecto» y 8 capas, pulsa «Entrenar». Mira las barras (escala logarítmica: cada marca es ×100) y los círculos huecos (el valor en el paso 1). Luego cambia a ReLU + inicialización He y a tanh + Xavier, y vuelve a entrenar. Prueba también a subir las capas ocultas.</p>
+  <p><strong>Fíjate en.</strong> Con sigmoide, la capa 1 recibe un gradiente millones de veces menor que la última, y la pérdida se queda en 0,693 (el valor de lanzar una moneda para decidir entre dos géneros). Con ReLU + He las barras tienen alturas parecidas y la pérdida baja. Esta demo entrena de verdad una mini red de 10 neuronas por capa con backpropagation en tu navegador: cada punto es una película descrita con dos rasgos (humor y tensión) y el color es su género.</p>
+</div>
+
+<h3>Medirlo en PyTorch</h3>
+
+<p>La técnica es sencilla: haz un <code>backward()</code> y mira <code>p.grad.norm()</code> de cada capa. El <a href="#frag-4">fragmento 4</a> la aplica a 5 combinaciones de activación e inicialización, con una red de 8 capas ocultas de 32 neuronas sobre los dígitos. Una regla práctica para leer el cociente «capa 1 / última capa»: cerca de 1, bien; por debajo de \( 10^{-3} \), el gradiente se está desvaneciendo; por encima de 100, está explotando.</p>
+
+<div class="callout regla">
+  <span class="lbl">Regla fácil</span>
+  <p>Antes de ajustar hiperparámetros a ciegas, <strong>imprime la norma del gradiente de cada capa</strong>. Si la primera es millones de veces menor que la última, no es un problema de learning rate: es un problema de activación, inicialización o profundidad.</p>
+</div>
+
+<h3>El problema contrario: gradientes que explotan</h3>
+
+<p>Si los factores son mayores que 1, el gradiente crece capa a capa y un solo paso puede lanzar los pesos muy lejos (la pérdida salta o aparece <code>nan</code>). El remedio habitual es <strong>recortar la norma del gradiente</strong> (<abbr class="t" data-def="Gradient clipping: si la norma total del gradiente supera un máximo, se reescala el gradiente entero para que la norma sea justo ese máximo. Cambia su tamaño, no su dirección.">gradient clipping</abbr>) con <code>torch.nn.utils.clip_grad_norm_(parametros, max_norm)</code>, que se llama <em>después</em> de <code>backward()</code> y <em>antes</em> de <code>step()</code>.</p>
+
+<div class="formula">\[ g\;\leftarrow\; g\cdot\min\!\Big(1,\ \frac{\text{max\_norm}}{\lVert g\rVert}\Big) \]</div>
+
+<div class="callout ejemplo">
+  <span class="lbl">Ejemplo numérico</span>
+  <p>Un gradiente de dos pesos del recomendador, \( g=(6,\,8) \) (cifras inventadas), tiene norma \( \sqrt{36+64}=10 \). Con <code>max_norm=5</code> se multiplica por \( 5/10=0{,}5 \) y queda \( (3,\,4) \): la misma dirección, la mitad de tamaño. Si la norma ya fuera menor que 5, no se toca. La función <strong>devuelve la norma original</strong> (10), que es una buena cifra para vigilar durante el entrenamiento (el fragmento 15 la usa).</p>
+</div>
+
+<div class="callout ojo">
+  <span class="lbl">Ojo</span>
+  <p>El gradient clipping arregla gradientes <em>demasiado grandes</em>, no demasiado pequeños: no cura el desvanecimiento. Para eso están las activaciones tipo ReLU, la inicialización correcta y la normalización por lotes, que veremos enseguida.</p>
+</div>
+  </div>
+</details>
+
+
+<section>
+<h2 class="sin-num">Código</h2>
+<article class="snippet" data-lang="python" id="frag-4">
+  <header>
+    <h3>4 · Medir el gradiente de cada capa (sigmoide frente a ReLU)</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Medir <em>de verdad</em> cuánto gradiente llega a cada capa de una red de 8 capas ocultas con distintas activaciones e inicializaciones, para ver el problema del gradiente que se desvanece con números.</p>
+  </header>
+  <pre class="code"><code>import torch
+import torch.nn as nn
+from sklearn.datasets import load_digits
+
+X, y = load_digits(return_X_y=True)          # 1797 dígitos de 8x8 = 64 píxeles
+X = torch.tensor(X / 16.0, dtype=torch.float32)
+y = torch.tensor(y)
+xb, yb = X[:256], y[:256]
+perdida = nn.CrossEntropyLoss()
+
+
+def construir(activacion, init, capas_ocultas=8, ancho=32):
+    torch.manual_seed(0)
+    tamanos = [64] + [ancho] * capas_ocultas + [10]
+    modulos = []
+    for i in range(len(tamanos) - 1):
+        lineal = nn.Linear(tamanos[i], tamanos[i + 1])
+        if init == "xavier":
+            nn.init.xavier_uniform_(lineal.weight)
+        elif init == "he":
+            nn.init.kaiming_normal_(lineal.weight, nonlinearity="relu")
+        modulos.append(lineal)
+        if i &lt; len(tamanos) - 2:
+            modulos.append(activacion())
+    return nn.Sequential(*modulos)
+
+
+def normas_gradiente(modelo):
+    modelo.zero_grad()
+    perdida(modelo(xb), yb).backward()
+    return [m.weight.grad.norm().item() for m in modelo if isinstance(m, nn.Linear)]
+
+
+n = normas_gradiente(construir(nn.Sigmoid, "defecto"))
+print("Sigmoide, normas por capa (1 = junto a la entrada):")
+print("  ", ["%.0e" % v for v in n])
+
+casos = [("Sigmoide + defecto", nn.Sigmoid, "defecto"), ("Sigmoide + Xavier", nn.Sigmoid, "xavier"),
+         ("Tanh + Xavier", nn.Tanh, "xavier"), ("ReLU + defecto", nn.ReLU, "defecto"),
+         ("ReLU + He", nn.ReLU, "he")]
+for nombre, act, init in casos:
+    n = normas_gradiente(construir(act, init))
+    print(f"{nombre:19s} capa 1 = {n[0]:.1e}  capa 9 = {n[-1]:.1e}  cociente = {n[0] / n[-1]:.1e}")</code></pre>
+  <details class="linea-a-linea" open>
+    <summary>Línea por línea</summary>
+    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+      <tbody>
+        <tr data-lines="1-3"><td><code>import torch …</code></td><td>Importamos <code>torch</code>, <code>nn</code> y <code>load_digits</code> de scikit-learn (1797 imágenes de 8×8 píxeles; no necesita internet).</td></tr>
+        <tr data-lines="5-8"><td><code>X, y = load_digits(return_X_y=True)          # 1797 dígitos de 8x8 = 64 píxeles …</code></td><td>Cargamos los dígitos, escalamos los píxeles de 0-16 a 0-1 (<code>/ 16.0</code>), los convertimos a tensores y nos quedamos con un lote de 256 muestras (<code>xb</code>, <code>yb</code>).</td></tr>
+        <tr data-lines="9"><td><code>perdida = nn.CrossEntropyLoss()</code></td><td>Pérdida de clasificación multiclase <code>CrossEntropyLoss</code> (recibe logits y etiquetas enteras).</td></tr>
+        <tr data-lines="12-14"><td><code>def construir(activacion, init, capas_ocultas=8, ancho=32): …</code></td><td><code>construir</code> crea una red con <code>capas_ocultas</code> capas de <code>ancho</code> neuronas; <code>torch.manual_seed(0)</code> hace que todas las variantes partan de los mismos números aleatorios. <code>tamanos</code> es <code>[64, 32, …, 32, 10]</code>.</td></tr>
+        <tr data-lines="15-17"><td><code>modulos = [] …</code></td><td>Lista de módulos vacía y, para cada par de tamaños, una <code>nn.Linear</code>.</td></tr>
+        <tr data-lines="18-21"><td><code>if init == "xavier": …</code></td><td>Según <code>init</code>: <code>xavier_uniform_</code> para Xavier, <code>kaiming_normal_</code> (con <code>nonlinearity="relu"</code>) para He, y si es «defecto» no se toca (PyTorch ya inicializó la capa al crearla).</td></tr>
+        <tr data-lines="22"><td><code>modulos.append(lineal)</code></td><td>Añade la capa a la lista (con los pesos ya inicializados).</td></tr>
+        <tr data-lines="23-24"><td><code>if i &lt; len(tamanos) - 2: …</code></td><td>Si no es la última, añade una instancia de la activación elegida (<code>activacion()</code>: <code>nn.Sigmoid()</code>, <code>nn.ReLU()</code>…).</td></tr>
+        <tr data-lines="25"><td><code>return nn.Sequential(*modulos)</code></td><td>Empaqueta todo en un <code>nn.Sequential</code>.</td></tr>
+        <tr data-lines="28-31"><td><code>def normas_gradiente(modelo): …</code></td><td><code>normas_gradiente</code>: pone a cero los gradientes, calcula la pérdida del lote, hace <code>backward()</code> y devuelve la <strong>norma</strong> (tamaño) del gradiente del peso de cada capa lineal. <code>isinstance(m, nn.Linear)</code> se salta las activaciones, que no tienen pesos.</td></tr>
+        <tr data-lines="34-36"><td><code>n = normas_gradiente(construir(nn.Sigmoid, "defecto")) …</code></td><td>Primer caso: sigmoide con inicialización por defecto, e imprime las 9 normas de la capa 1 (junto a la entrada) a la 9 (la salida) en notación científica.</td></tr>
+        <tr data-lines="38-40"><td><code>casos = [("Sigmoide + defecto", nn.Sigmoid, "defecto"), ("Sigmoide + Xavier", nn.Sigmoid, "xavier"), …</code></td><td>Lista de los cinco casos que se comparan: nombre, activación e inicialización.</td></tr>
+        <tr data-lines="41-43"><td><code>for nombre, act, init in casos: …</code></td><td>Para cada caso, mide las normas e imprime la de la capa 1, la de la capa 9 y su cociente (primera entre última): si es ≪ 1, el gradiente se desvanece hacia la entrada.</td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>Sigmoide, normas por capa (1 = junto a la entrada):
+   ['1e-07', '3e-07', '2e-06', '1e-05', '9e-05', '7e-04', '5e-03', '3e-02', '2e-01']
+Sigmoide + defecto  capa 1 = 1.1e-07  capa 9 = 2.3e-01  cociente = 4.5e-07
+Sigmoide + Xavier   capa 1 = 7.9e-06  capa 9 = 4.9e-01  cociente = 1.6e-05
+Tanh + Xavier       capa 1 = 3.1e-01  capa 9 = 1.7e-01  cociente = 1.7e+00
+ReLU + defecto      capa 1 = 4.9e-04  capa 9 = 1.3e-02  cociente = 3.7e-02
+ReLU + He           capa 1 = 1.9e+00  capa 9 = 9.5e-01  cociente = 2.0e+00</pre>
+    <p>Con sigmoide y los pesos por defecto, la norma baja capa a capa desde \(0.2\) en la salida hasta \(10^{-7}\) en la entrada: la primera capa recibe una millonésima del gradiente de la última (cociente \(4.5\cdot10^{-7}\)). Xavier lo mejora a \(1.6\cdot10^{-5}\), pero la sigmoide sigue ahogando la señal. <code>tanh + Xavier</code> (1.7) y <code>ReLU + He</code> (2.0) mantienen gradientes del mismo orden en todas las capas. <code>ReLU + defecto</code> (0.037) queda en medio.</p>
+  </div>
+</article>
+</section>
+
+
+</div>
+</main>
+</body>
+</html>

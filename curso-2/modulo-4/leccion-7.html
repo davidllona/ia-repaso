@@ -1,135 +1,478 @@
-<!DOCTYPE html>
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lección 7 · Atención: cada título de tu historial decide a quién mirar · Módulo 4 · Curso 2 · Cuaderno de IA</title>
+<meta name="description" content="Self-attention con tu historial de Netflix: consulta, clave y valor, la softmax de las puntuaciones, por qué dividir entre la raíz de d_k y el bloque Transformer.">
+<script>try{var t=localStorage.getItem('cuaderno-ia:tema');if(t)document.documentElement.setAttribute('data-theme',t)}catch(e){}</script>
+<link rel="stylesheet" href="../../assets/css/style.css">
+<script src="../../assets/js/curriculum.js"></script>
+<script src="../../assets/js/lab.js"></script>
+<script src="../../assets/js/app.js" defer></script>
+</head>
+<body data-root="../../" data-course="2" data-module="4" data-lesson="7">
+<main>
+<div class="page">
 
-<html lang="es"><head><meta charset="utf-8"/><meta content="width=device-width,initial-scale=1" name="viewport"/><title>Lección 7 · GPT: un Transformer que predice la siguiente palabra · Curso 2 · Cuaderno de IA</title><meta content="GPT significa Generative Pre-trained Transformer :" name="description"/><script>try{var t=localStorage.getItem('cuaderno-ia:tema');if(t)document.documentElement.setAttribute('data-theme',t)}catch(e){}</script><link href="../../assets/css/style.css" rel="stylesheet"/><script src="../../assets/js/curriculum.js"></script><script src="../../assets/js/lab.js"></script><script defer="" src="../../assets/js/app.js"></script><script defer="" src="../../assets/js/microanimations.js"></script></head><body data-course="2" data-lesson="7" data-module="4" data-root="../../"><main><div class="page" data-micro="3min"><header class="hero leccion"><div class="hero-grid"><div><p class="eyebrow">Curso 2 · Módulo 4 · Lección 7 de 8</p><h1>GPT: un Transformer que predice la siguiente palabra</h1><p class="lead">GPT significa Generative Pre-trained Transformer :</p><p class="meta-line"><span class="read-time" data-render="read-time"></span><a href="../modulo-4.html">Índice del módulo</a></p></div><div aria-hidden="true" class="hero-tile"></div></div></header><details class="predice"><summary>Si le escribes «El detective persigue al…» a un chatbot y te contesta con un párrafo coherente (con su ladrón y su persecución), ¿qué ha hecho por dentro? ¿Cómo se pasa de «una capa de atención» a «una IA que escribe»?<span class="hint"></span></summary><div><p>GPT significa Generative Pre-trained Transformer :</p></div></details><section aria-label="Explicación breve" class="micro-core"><div class="micro-kicker">01 · ENTENDER <span>≈ 45 s</span></div><h2>La idea en palabras sencillas</h2><p>Un GPT hace una sola cosa, una y otra vez: dado el texto que hay hasta ahora, calcular la probabilidad de cada posible siguiente token. Para escribir un párrafo repite el ciclo:</p><div class="micro-example"><span aria-hidden="true" class="micro-example-icon">🐾</span><div><strong>Otro ejemplo · Mascotas</strong><p>En «el perro persigue la pelota y la atrapa», «la» se relaciona con «pelota».</p></div></div></section><div class="micro-kicker micro-checkpoint">02 · RESPONDER <span>≈ 15 s</span></div><section aria-label="Pregunta intercalada" class="quiz mini micro-check"><script class="quiz-data" type="application/json">{"titulo": "Pausa rápida · Comprueba la idea", "preguntas": [{"q": "En «Fui al banco a retirar dinero», ¿qué ayuda a interpretar «banco»?", "opciones": ["El contexto «retirar dinero»", "Solo la longitud de la palabra", "Únicamente su primera letra"], "correcta": 0, "porque": "La atención permite relacionar términos y su contexto."}]}</script></section><section aria-label="Animación interactiva" class="micro-viz" data-index="13" data-micro-viz="attention"><div class="micro-kicker">03 · EXPERIMENTAR <span>≈ 45 s</span></div><div class="micro-viz-title"><div><h2>Qué parte del contexto importa</h2><p>Selecciona otra palabra y observa qué conexiones destacan.</p></div><span aria-hidden="true" class="micro-viz-symbol">✦</span></div><div aria-live="polite" class="micro-viz-stage"><p>Animación interactiva: Qué parte del contexto importa</p></div></section><div class="micro-kicker micro-checkpoint">04 · APLICAR <span>≈ 15 s</span></div><section aria-label="Pregunta intercalada" class="quiz mini micro-check"><script class="quiz-data" type="application/json">{"titulo": "Pausa rápida · ¿Lo aplicarías?", "preguntas": [{"q": "¿Qué busca un mecanismo de atención?", "opciones": ["Borrar toda la información anterior", "Convertir siempre imágenes en texto", "Ponderar qué elementos de la entrada son relevantes"], "correcta": 2, "porque": "La atención asigna importancia relativa a diferentes elementos del contexto."}]}</script></section><div class="micro-finish"><strong>Idea que te llevas</strong><span>Un GPT hace una sola cosa, una y otra vez: dado el texto que hay hasta ahora, calcular la probabilidad de cada posible siguiente token</span><small>¿Quieres más ejemplos, fórmulas o código? Los tienes justo debajo, sin límite de tiempo.</small></div><details class="profundizar micro-legacy"><summary><span>Explorar más: explicación y simulaciones completas<small>Todo el texto original, tablas y demos avanzadas. Opcional.</small></span></summary><div class="prof-body"><section><h2>GPT: un Transformer que predice la siguiente palabra</h2>
-<p><strong>GPT</strong> significa <em>Generative Pre-trained Transformer</em>:</p>
-<p>Un GPT hace una sola cosa, una y otra vez: <strong>dado el texto que hay hasta ahora, calcular la probabilidad de cada posible siguiente token</strong>. Para escribir un párrafo repite el ciclo:</p>
-<p>…y se vuelve al principio con el contexto ampliado, hasta que el modelo elige un token especial de «fin» o se alcanza el límite. Se llama generación <strong>autorregresiva</strong>: cada token que el modelo produce pasa a ser parte de la entrada del siguiente.</p>
-<ul class="flow">
-<li class="a">Contexto<small>«El detective persigue al»</small></li>
-<li class="d">Transformer<small>bloques con atención causal</small></li>
-<li class="b">Probabilidades<small>de cada token del vocabulario</small></li>
-<li class="c">Se elige uno<small>«ladrón»</small></li>
-<li>Nuevo contexto<small>«El detective persigue al ladrón»</small></li>
-</ul>
-<div class="callout ejemplo"><span class="lbl">Ejemplo tomado del módulo</span><p>El modelo ve «El detective persigue al…» y, para simplificar, solo considera cuatro candidatas.</p></div></section><figure class="demo" data-demo="curso2/c2m4-generacion" data-titulo="Generar texto palabra a palabra (con un modelo de juguete)">
-<div class="haz">Pulsa «Generar la siguiente palabra» varias veces con T = 1. Después baja T a 0,3 y sube a 3. Pon top-k = 1 y pulsa «Generar hasta el punto» dos veces. Cambia el contexto a «2 palabras».</div>
-<div class="observa">Tras «el» el corpus tiene 8 candidatas (capitán y puerto, 19,5 % cada una; loro, 17,1 %…). Con T = 0,3, capitán y puerto suben a 32,3 % y «sol» baja a 0,3 %; con T = 3 casi se igualan (entre 9,3 % y 14,8 %). Con top-k = 1 siempre sale lo mismo. Con 2 palabras de contexto, en 45 de los 59 contextos distintos del corpus (76 %) solo existe una continuación posible: apenas puede elegir y acaba copiando frases enteras. <strong>Ojo:</strong> este modelo NO es un Transformer, es una tabla de conteos de 30 líneas de subtítulos de una película de piratas, y por eso cabe en una pantalla. Lo que sí es idéntico al de un GPT es el final del proceso: probabilidades → temperatura → top-k → top-p → sorteo.</div>
-</figure><div class="resumen"><h2 class="sin-num sin-toc">En pocas líneas</h2><ul><li><strong>GPT: un Transformer que predice la siguiente palabra:</strong> GPT significa Generative Pre-trained Transformer :</li><li>Antes de continuar, intenta explicar la demo sin mirar su resultado.</li></ul></div><section class="quiz mini"><script class="quiz-data" type="application/json">{"titulo": "¿Lo tienes?", "preguntas": [{"q": "¿Qué concepto estamos trabajando en esta lección?", "opciones": ["GPT: un Transformer que predice la siguiente palabra", "LSTM: una memoria con puertas", "Datos secuenciales: cuando el orden importa"], "correcta": 0, "porque": "GPT significa Generative Pre-trained Transformer :"}, {"q": "¿Cuál de estas afirmaciones recoge lo que acabas de estudiar?", "opciones": ["Lo importante es comprender la idea y comprobarla con ejemplos, no memorizar términos.", "GPT significa Generative Pre-trained Transformer :", "Siempre hay un único método que sirve para todos los problemas."], "correcta": 1, "porque": "La explicación central es: GPT significa Generative Pre-trained Transformer :"}, {"q": "Si una demo o un ejemplo te desconcierta, ¿cuál es la mejor forma de aprenderlo?", "opciones": ["Memorizar el nombre sin entender la operación.", "Volver a los números, cambiar un valor y explicar qué ocurre.", "Ignorar los resultados que no coinciden con tu intuición."], "correcta": 1, "porque": "Explorar qué cambia y por qué ayuda a conectar el concepto con su resultado."}]}</script></section></div></details><details class="profundizar"><summary><span>Profundizar: explicación completa<small>Matices, fórmulas, tablas, otros ejemplos y experimentos del módulo original.</small></span></summary><div class="prof-body"><section>
-<h2 id="gpt">GPT: un Transformer que predice la siguiente palabra</h2>
-<p class="pregunta">Si le escribes «El detective persigue al…» a un chatbot y te contesta con un párrafo coherente (con su ladrón y su persecución), ¿qué ha hecho por dentro? ¿Cómo se pasa de «una capa de atención» a «una IA que escribe»?</p>
-<h3>El nombre ya lo explica todo</h3>
-<p><strong>GPT</strong> significa <em>Generative Pre-trained Transformer</em>:</p>
-<ul>
-<li><strong>Generative</strong> (generativo): su trabajo es <em>producir</em> texto, no solo clasificarlo.</li>
-<li><strong>Pre-trained</strong> (preentrenado): primero aprende, con una cantidad gigantesca de texto, a completar frases; después se adapta a tareas concretas.</li>
-<li><strong>Transformer</strong>: la arquitectura de la sección anterior. En concreto, un Transformer de <strong>solo decoder</strong>: una pila de bloques con atención <em>con máscara causal</em>, de modo que cada token solo ve los anteriores.</li>
-</ul>
-<h3>El bucle: una palabra, otra palabra, otra palabra…</h3>
-<p>Un GPT hace una sola cosa, una y otra vez: <strong>dado el texto que hay hasta ahora, calcular la probabilidad de cada posible siguiente token</strong>. Para escribir un párrafo repite el ciclo:</p>
-<ul class="flow">
-<li class="a">Contexto<small>«El detective persigue al»</small></li>
-<li class="d">Transformer<small>bloques con atención causal</small></li>
-<li class="b">Probabilidades<small>de cada token del vocabulario</small></li>
-<li class="c">Se elige uno<small>«ladrón»</small></li>
-<li>Nuevo contexto<small>«El detective persigue al ladrón»</small></li>
-</ul>
-<p>…y se vuelve al principio con el contexto ampliado, hasta que el modelo elige un token especial de «fin» o se alcanza el límite. Se llama generación <strong>autorregresiva</strong>: cada token que el modelo produce pasa a ser parte de la entrada del siguiente.</p>
-<h3>Del último vector a una probabilidad por token</h3>
-<p>Tras el último bloque, cada posición tiene un vector de \(d_{model}\) números. Para predecir el siguiente token se toma el vector de la <strong>última posición</strong>, se multiplica por una matriz \(d_{model} \times V\) (donde \(V\) es el tamaño del vocabulario) y salen \(V\) números sueltos llamados <strong><abbr class="t" data-def="Logits: las puntuaciones sin normalizar que da la última capa, una por cada token del vocabulario. Pueden ser negativas y no suman 1.">logits</abbr></strong>. Una <strong>softmax</strong> (módulo 1) los convierte en probabilidades que suman 1. En GPT-2, \(V = 50.257\) tokens.</p>
-<div class="callout ejemplo">
-<span class="lbl">Ejemplo numérico</span>
-<p>El modelo ve «El detective persigue al…» y, para simplificar, solo considera cuatro candidatas. Logits (cifras inventadas): ladrón = 2, asesino = 1, fantasma = 0, dragón = −1.</p>
-<ol class="pasos">
-<li>Exponenciales: \(e^{2} = 7{,}389\), \(e^{1} = 2{,}718\), \(e^{0} = 1\), \(e^{-1} = 0{,}368\). Suma \(= 11{,}475\).</li>
-<li>Probabilidades: \(7{,}389/11{,}475 = 0{,}644\); \(2{,}718/11{,}475 = 0{,}237\); \(1/11{,}475 = 0{,}087\); \(0{,}368/11{,}475 = 0{,}032\). Suman 1.</li>
-</ol>
-</div>
-<h3>Cómo se entrena: acertar el siguiente token</h3>
-<p>Se toma texto real, se esconde el siguiente token y se le pide al modelo que lo prediga. La <strong>pérdida</strong> es el logaritmo negativo de la probabilidad que el modelo dio al token correcto:</p>
-<div class="formula">\[ \text{pérdida} = -\ln p_{\text{correcto}} \]</div>
-<ul>
-<li>Si dio \(p = 0{,}9\) a la palabra correcta: pérdida \(= -\ln 0{,}9 = 0{,}105\) (casi nada: acertó).</li>
-<li>Si dio \(p = 0{,}2\): pérdida \(= 1{,}609\).</li>
-<li>Si dio \(p = 0{,}01\): pérdida \(= 4{,}605\) (mucho: casi ni lo consideraba).</li>
-<li>Un modelo que no sabe nada y reparte por igual entre 50.257 tokens tiene pérdida \(\ln 50.257 = 10{,}825\).</li>
-</ul>
-<p>Es la misma entropía cruzada del módulo 1. La <strong>perplejidad</strong> es \(e^{\text{pérdida media}}\): con pérdida 1,609 la perplejidad es 5, es decir, el modelo duda como si tuviera que elegir entre 5 palabras igual de probables.</p>
-<p>Gracias a la máscara causal, <strong>una sola pasada por una frase entrena muchas predicciones a la vez</strong>. Con el subtítulo «El detective corre rápido» se aprenden tres ejemplos en paralelo: «El» → detective; «El detective» → corre; «El detective corre» → rápido. Ninguno puede espiar su propia respuesta, porque cada posición solo ve a las anteriores.</p>
-<h3>Preentrenamiento, ajuste y alineación (la idea general)</h3>
-<ol>
-<li><strong>Preentrenamiento</strong>: predecir el siguiente token sobre cantidades enormes de texto. Aquí el modelo aprende gramática, datos del mundo, estilos y patrones de razonamiento <em>como efecto secundario</em> de predecir bien.</li>
-<li><strong>Ajuste fino con ejemplos</strong> (<em>fine-tuning</em>): se sigue entrenando con ejemplos de conversaciones o instrucciones bien resueltas, para que responda en lugar de limitarse a continuar el texto.</li>
-<li><strong>Alineación con preferencias humanas</strong> (por ejemplo, RLHF: aprendizaje por refuerzo a partir de valoraciones humanas): personas comparan respuestas y se entrena al modelo para preferir las mejores.</li>
-</ol>
-<p>Es el esquema general publicado. Los detalles exactos de los modelos comerciales más recientes no son públicos, así que no los afirmo aquí.</p>
-<h3>Elegir el siguiente token: temperatura, top-k y top-p</h3>
-<p>El modelo no da «la palabra»; da <strong>una distribución</strong>. Qué hacer con ella es decisión nuestra, y cambia mucho el resultado:</p>
-<ul>
-<li><strong>Voraz (<em>greedy</em>)</strong>: siempre la más probable. Es determinista y tiende a repetirse.</li>
-<li><strong>Muestreo</strong>: sortear según las probabilidades (el 64 % de las veces «ladrón», el 24 % «asesino»…). Da variedad.</li>
-</ul>
-<p>Y tres botones para controlar el muestreo:</p>
-<div class="formula">\[ p_i = \frac{e^{z_i / T}}{\sum_j e^{z_j / T}} \]</div>
-<ul>
-<li>\(z_i\): el logit del token \(i\); \(T\): la <strong>temperatura</strong>. Con \(T &lt; 1\) las diferencias se agrandan (el favorito gana más); con \(T &gt; 1\) se aplanan; con \(T \to 0\) equivale a voraz; con \(T \to \infty\), a elegir al azar.</li>
-<li><strong>top-k</strong>: se descartan todas menos las \(k\) más probables y se renormaliza.</li>
-<li><strong>top-p</strong> (<em>nucleus</em>): se queda el grupo más pequeño de candidatas cuya probabilidad acumulada llega a \(p\) y se renormaliza.</li>
-</ul>
-<div class="callout ejemplo">
-<span class="lbl">Ejemplo numérico</span>
-<p>Con los logits \((2, 1, 0, -1)\) de antes:</p>
-<table>
-<thead><tr><th>Ajuste</th><th>ladrón</th><th>asesino</th><th>fantasma</th><th>dragón</th></tr></thead>
-<tbody>
-<tr><td>\(T = 0{,}5\) (dividir los logits entre 0,5 da \((4, 2, 0, -2)\))</td><td>0,865</td><td>0,117</td><td>0,016</td><td>0,002</td></tr>
-<tr><td>\(T = 1\)</td><td>0,644</td><td>0,237</td><td>0,087</td><td>0,032</td></tr>
-<tr><td>\(T = 2\) (logits \((1; 0{,}5; 0; -0{,}5)\))</td><td>0,455</td><td>0,276</td><td>0,167</td><td>0,102</td></tr>
-<tr><td>\(T = 1\) y top-k = 2</td><td>0,731</td><td>0,269</td><td>0</td><td>0</td></tr>
-<tr><td>\(T = 1\) y top-p = 0,8</td><td>0,731</td><td>0,269</td><td>0</td><td>0</td></tr>
-<tr><td>\(T = 1\) y top-p = 0,95</td><td>0,665</td><td>0,245</td><td>0,090</td><td>0</td></tr>
-</tbody>
-</table>
-<ol class="pasos">
-<li>top-k = 2: se quedan ladrón y asesino (0,644 y 0,237, suman 0,881); renormalizando, 0,644/0,881 = 0,731 y 0,237/0,881 = 0,269.</li>
-<li>top-p = 0,8: las acumuladas son 0,644 (no llega) y 0,881 (ya pasa de 0,8) → bastan 2 candidatas; el mismo resultado que top-k = 2. Con top-p = 0,95 hacen falta 3 (0,644 + 0,237 + 0,087 = 0,968).</li>
-</ol>
-</div>
-<div class="callout regla">
-<span class="lbl">Regla fácil</span>
-<p><strong>T baja</strong> → texto seguro pero repetitivo (bueno para código o datos). <strong>T alta</strong> → texto más variado pero más propenso a errores (bueno para ideas). <strong>top-k/top-p</strong> sirven para cortar la «cola» de palabras absurdas con probabilidades minúsculas antes de sortear, sin perder la variedad entre las razonables.</p>
-</div>
-<h3>Por dentro: el tamaño de un GPT de verdad</h3>
-<p>Un GPT es el bloque Transformer repetido muchas veces, más una capa de embeddings de entrada (token + posición) y la proyección final a \(V\) logits. GPT-2 pequeño (publicado por OpenAI en 2019) tiene 12 bloques, \(d_{model} = 768\), 12 cabezas, contexto de 1.024 tokens y \(V = 50.257\). Con lo que has aprendido puedes <strong>contar sus parámetros</strong>:</p>
-<table>
-<thead><tr><th>Parte</th><th>Cuenta</th><th>Parámetros</th></tr></thead>
-<tbody>
-<tr><td>Embedding de tokens</td><td>50.257 × 768</td><td>38.597.376</td></tr>
-<tr><td>Embedding de posición (aprendido)</td><td>1.024 × 768</td><td>786.432</td></tr>
-<tr><td>Un bloque: atención</td><td>4·768² + 4·768</td><td>2.362.368</td></tr>
-<tr><td>Un bloque: feed-forward</td><td>768·3.072 + 3.072 + 3.072·768 + 768</td><td>4.722.432</td></tr>
-<tr><td>Un bloque: dos LayerNorm</td><td>2 · (2·768)</td><td>3.072</td></tr>
-<tr><td>12 bloques</td><td>12 × 7.087.872</td><td>85.054.464</td></tr>
-<tr><td>LayerNorm final</td><td>2·768</td><td>1.536</td></tr>
-<tr><td><strong>Total</strong></td><td></td><td class="res">124.439.808</td></tr>
-</tbody>
-</table>
-<p>Es el «124 M» (124 millones) que se publica de GPT-2 pequeño. La capa final reutiliza la matriz de embeddings de tokens (se llama <em>weight tying</em>), así que no añade parámetros. Una regla rápida: <strong>cada bloque pesa unas \(12\,d_{model}^2\) parámetros</strong> (\(4d^2\) de atención y \(8d^2\) de feed-forward). Con ella, GPT-3 (publicado: 96 bloques, \(d_{model} = 12.288\), 96 cabezas) sale \(12 \cdot 96 \cdot 12.288^2 = 173.946.175.488\) ≈ 174 mil millones; sumando sus embeddings se acerca a los 175 mil millones publicados.</p>
-<p>Para generar rápido, los modelos guardan las claves y valores (K y V) ya calculados de todos los tokens anteriores (la <strong>caché KV</strong>): como la máscara causal impide que los tokens pasados cambien, al añadir uno nuevo solo hay que calcular su propia Q, K y V.</p>
-<h3>BERT, la otra familia, y el ecosistema</h3>
-<ul>
-<li><strong>BERT</strong> (2018) usa solo la parte <strong>encoder</strong>: atención sin máscara causal, donde cada token ve a izquierda y derecha. Se entrena escondiendo palabras al azar (≈ 15 %) y pidiendo adivinarlas (<em>masked language modeling</em>). Sirve para <em>entender</em> texto (clasificar, buscar, extraer entidades), no para generarlo. BERT-base tiene 12 bloques, \(d_{model} = 768\), 12 cabezas y unos 110 millones de parámetros (publicado).</li>
-<li><strong>Herramientas</strong>: lo habitual no es entrenar un Transformer desde cero, sino cargar uno preentrenado. La librería <code>transformers</code> de Hugging Face lo hace en una línea (por ejemplo <code>pipeline("text-generation", model="gpt2")</code>) y Keras tiene su propio catálogo (KerasHub). No los ejecutamos aquí porque descargan los pesos de internet; en el módulo 5 verás el uso práctico de modelos preentrenados.</li>
-</ul>
-<div class="callout ojo">
-<span class="lbl">Ojo: predice texto probable, no verdadero</span>
-<p>Un GPT no consulta una base de datos de hechos: elige tokens plausibles según lo que vio al entrenar. Por eso puede <strong>inventar con total seguridad</strong> un dato, una cita o una función de una librería que no existe (a esto se le llama «alucinación»). Y como aprende de textos humanos, hereda sus <strong>sesgos</strong>. Úsalo como un colaborador rápido al que hay que verificar, no como un oráculo.</p>
-</div>
-</section></div></details><details class="profundizar" id="codigo"><summary><span>Ver código explicado paso a paso<small>2 fragmento(s) original(es), con cada línea comentada y salida esperada.</small></span></summary><div class="prof-body"><article class="snippet" data-lang="python">
-<header>
-<h3>12 · Un bloque Transformer en Keras: TokenAndPositionEmbedding y TransformerBlock</h3>
-<p class="para-que"><strong>Para qué sirve</strong> Construir un mini-Transformer (embedding de token + posición, un bloque de atención, pooling y clasificador), contar sus parámetros pieza por pieza y entrenarlo sobre el mismo conjunto del fragmento 5.</p>
+<header class="hero leccion">
+  <div class="hero-grid">
+    <div>
+      <p class="eyebrow">Curso 2 · Módulo 4 · Lección 7 de 8</p>
+      <h1>Atención: cada título de tu historial decide a quién mirar</h1>
+      <p class="lead">En vez de pasar la memoria de paso en paso, cada token compara su pregunta (Q) con la etiqueta (K) de todos los demás y se lleva una mezcla de sus contenidos (V).</p>
+      <p class="meta-line"><span class="read-time" data-render="read-time"></span><a href="../modulo-4.html">Índice del módulo</a></p>
+    </div>
+    <div class="hero-tile" aria-hidden="true"></div>
+  </div>
 </header>
-<pre class="code"><code>import numpy as np
+
+<details class="predice">
+  <summary>En tu historial están «Saw», «Toy Story» y «Shrek». Para recomendarte lo siguiente, ¿a qué título crees que debería mirar más «Shrek»?<span class="hint"></span></summary>
+  <div>
+    <p>A «Toy Story», con quien comparte perfil de animación familiar. La atención lo calcula: compara la consulta de Shrek con la clave de cada título y reparte el peso con una softmax: ≈ 74 % para Toy Story, ≈ 25 % para sí misma y casi nada para Saw.</p>
+  </div>
+</details>
+
+<section>
+<h2 id="idea">Pregunta, etiqueta y contenido</h2>
+<p>En una RNN, para que el capítulo 1 influya en el 50 el mensaje atraviesa 49 pasos. Los <strong>Transformers</strong> (2017, <em>«Attention Is All You Need»</em>) quitan la recurrencia: <strong>cada token mira directamente a todos los demás</strong>. Para eso calcula tres vectores, cada uno con su propia matriz de pesos aprendida:</p>
+<ul>
+  <li><strong>Q, consulta</strong>: «¿qué estoy buscando?»</li>
+  <li><strong>K, clave</strong>: «¿qué etiqueta me describe?»</li>
+  <li><strong>V, valor</strong>: «¿qué información aporto?»</li>
+</ul>
+<p>Es como buscar en el catálogo: comparas tu pregunta con las etiquetas de todas las películas y te llevas un resumen mezclado, con mucho de las que encajan y casi nada de las demás.</p>
+<ul class="flow">
+  <li class="d">Q·Kᵀ<small>puntuaciones</small></li>
+  <li>÷ √d<sub>k</sub><small>que no se disparen</small></li>
+  <li class="b">softmax<small>pesos que suman 1</small></li>
+  <li class="c">· V<small>mezcla ponderada</small></li>
+</ul>
+<div class="formula">\[ \text{Attention}(Q, K, V) = \operatorname{softmax}\Big( \frac{Q K^{\top}}{\sqrt{d_k}} \Big) V \]</div>
+<p>Encima se añaden piezas: <strong>varias cabezas</strong> (varias preguntas a la vez: género, reparto, director), una <strong>máscara causal</strong> para no mirar al futuro (sin spoilers) y, alrededor, el <strong>bloque Transformer</strong>: atención, suma residual, normalización y una pequeña red por token. El detalle está en «Profundizar».</p>
+</section>
+<figure class="demo" data-demo="curso2/c2m4-atencion" data-titulo="Mapa de atención de un subtítulo de 6 tokens">
+  <div class="haz">Haz clic en la fila «persigue» del mapa, cambia entre la Cabeza 1 y la 2 y activa la máscara causal.</div>
+  <div class="observa">Cada fila es un reparto de pesos que suma 1; cada cabeza busca una relación distinta.</div>
+</figure>
+
+<section>
+<h2 id="numeros">Con números: Shrek mira tu historial</h2>
+<div class="callout ejemplo">
+  <span class="lbl">Ejemplo numérico</span>
+  <table>
+    <thead><tr><th>Título</th><th>Q<sub>Shrek</sub>·K</th><th>e<sup>puntuación</sup></th><th>Peso</th></tr></thead>
+    <tbody>
+      <tr><td>Saw</td><td>0,5</td><td>1,6487</td><td>1,8 %</td></tr>
+      <tr><td>Toy Story</td><td>4,2</td><td>66,6863</td><td class="res">73,7 %</td></tr>
+      <tr><td>Shrek</td><td>3,1</td><td>22,1980</td><td>24,5 %</td></tr>
+    </tbody>
+  </table>
+  <ol class="pasos">
+    <li>Suma de exponenciales: 90,533. Cada peso = su exponencial / 90,533.</li>
+    <li>Con valores V<sub>Saw</sub> = (0, 1), V<sub>Toy Story</sub> = (1, 0), V<sub>Shrek</sub> = (0,5; 0,5) (animación, terror): \(0{,}0182\cdot(0,1) + 0{,}7366\cdot(1,0) + 0{,}2452\cdot(0{,}5;0{,}5) = (0{,}8592;\; 0{,}1408)\).</li>
+  </ol>
+  <p>Shrek, leído en el contexto de tu historial, es un 86 % «animación familiar»: lo siguiente que te recomendaría sería animación.</p>
+</div>
+</section>
+<details class="predice">
+  <summary>Sin dividir entre \(\sqrt{d_k}\), con \(d_k = 64\), unas puntuaciones salen (8, 0, −8). ¿La softmax reparte el peso o se lo da todo a uno?<span class="hint"></span></summary>
+  <div>
+    <p>Casi todo a uno: (0,9997; 0,0003; 0). Y el gradiente, proporcional a \(p(1-p)\), vale ≈ 0,0003: la red no aprende. Dividiendo entre \(\sqrt{64} = 8\) quedan (1, 0, −1) → (0,665; 0,245; 0,090), y los demás siguen contando.</p>
+  </div>
+</details>
+<div class="resumen">
+  <h2 class="sin-num sin-toc">En tres líneas</h2>
+  <ul>
+    <li>Cada token calcula Q (qué busco), K (qué etiqueta tengo) y V (qué aporto).</li>
+    <li>Pesos = softmax(Q·Kᵀ / √d_k); salida = mezcla ponderada de los V.</li>
+    <li>Multi-cabeza, máscara causal y bloque con residual + LayerNorm completan el Transformer.</li>
+  </ul>
+</div>
+<section class="quiz mini">
+<script type="application/json" class="quiz-data">
+{
+ "titulo": "¿Lo tienes?",
+ "preguntas": [
+  {
+   "q": "Las puntuaciones (ya divididas entre √d_k) de un título de tu historial sobre dos claves son 0 y 1,1 (con e¹·¹ ≈ 3). ¿Qué pesos de atención da la softmax?",
+   "opciones": [
+    "50 % y 50 %",
+    "10 % y 90 %",
+    "25 % y 75 %",
+    "33 % y 67 %"
+   ],
+   "correcta": 2,
+   "porque": "e⁰ = 1 y e¹·¹ ≈ 3; la suma es 4. Los pesos son 1/4 = 25 % y 3/4 = 75 %. La clave con mayor puntuación se lleva más peso, pero la otra no se descarta del todo."
+  },
+  {
+   "q": "¿Para qué se dividen las puntuaciones Q·Kᵀ entre √d_k?",
+   "opciones": [
+    "Para que la matriz de atención sea simétrica",
+    "Para que cada fila sume 1",
+    "Para ahorrar memoria",
+    "Para que no crezcan con d_k: sin dividir la softmax se satura (un peso ≈ 1) y el gradiente casi no llega"
+   ],
+   "correcta": 3,
+   "porque": "Un producto escalar de d_k términos tiene una desviación de √d_k. Con d_k = 64 las puntuaciones oscilan en ±8 y la softmax da casi todo el peso a una clave, con gradiente ≈ 0. Dividir deja la dispersión en ≈ 1. Que cada fila sume 1 ya lo hace la softmax."
+  },
+  {
+   "q": "¿Qué hace la máscara causal?",
+   "opciones": [
+    "Borra los tokens de relleno",
+    "Pone −∞ en las puntuaciones de los tokens futuros, que acaban con peso 0",
+    "Divide las puntuaciones entre √d_k"
+   ],
+   "correcta": 1,
+   "porque": "Como e<sup>−∞</sup> = 0, cada token solo reparte peso entre él mismo y los anteriores: no puede leer la respuesta (el spoiler) al aprender a predecir la siguiente palabra."
+  },
+  {
+   "q": "En el código de <code>TransformerBlock</code>, la línea <code>x = self.norm1(inputs + atencion)</code> hace…",
+   "opciones": [
+    "Una concatenación de la entrada con la atención",
+    "Una conexión residual (suma de la entrada y la salida de la atención) seguida de LayerNorm",
+    "Una resta para quitar el ruido",
+    "La atención cruzada entre dos secuencias"
+   ],
+   "correcta": 1,
+   "porque": "El <code>+</code> suma la entrada original a lo que calculó la atención (conexión residual: crea un atajo por el que el gradiente pasa intacto) y <code>norm1</code> normaliza cada token. Es lo que permite apilar muchos bloques."
+  }
+ ]
+}
+</script>
+</section>
+<details class="profundizar">
+  <summary><span>Profundizar: la explicación completa<small>La idea completa, Q, K y V con la analogía del catálogo, el ejemplo de tres títulos, los pasos con matrices, un ejemplo entero a mano (3 tokens, d = 2), por qué dividir entre √d_k (con su experimento), multi-cabeza, máscara causal, el bloque Transformer y LayerNorm (con su experimento de formas), encoder/decoder y atención cruzada, y el precio n².</small></span></summary>
+  <div class="prof-body">
+<h2 id="atencion">Self-attention: Q, K y V</h2>
+
+<p class="pregunta">En un subtítulo de <em>La casa de papel</em> oyes «el atraco al banco» y, en otra escena, «se sentaron en un banco del parque». La palabra «banco» no significa lo mismo en las dos. ¿Cómo puede una red decidir qué significa cada palabra mirando las <em>otras</em> palabras de la frase?</p>
+
+<h3>La idea: que cada token mire directamente a los demás</h3>
+<p>Una RNN pasa toda la información por un cuello de botella (el estado \(h\)) y, para que la palabra 1 influya en la palabra 50, el mensaje tiene que atravesar 49 pasos, deteriorándose en el camino. La innovación de los <strong>Transformers</strong> (2017, el artículo se llama <em>«Attention Is All You Need»</em>) fue eliminar la recurrencia y dejar que <strong>cada token se relacione directamente con cualquier otro token del contexto</strong>, sin importar la distancia. A este mecanismo se le llama <strong><abbr class="t" data-def="Atención: un mecanismo por el que cada elemento de una secuencia decide cuánto 'mira' a cada uno de los demás y construye su nueva representación como una mezcla ponderada.">attention</abbr></strong> y, cuando todos los tokens miran a los de su misma secuencia, <strong>self-attention</strong> (auto-atención).</p>
+<p>El resultado: cada token pasa de tener un vector «genérico» (el del embedding) a tener uno <strong>contextualizado</strong>. El «banco» del atraco y el «banco» del parque empiezan con el mismo embedding, pero, tras mirar a «atraco», «dinero» o «parque», acaban con vectores distintos.</p>
+
+<h3>Consulta, clave y valor (Q, K, V)</h3>
+<p>Para decidir a quién mirar, cada token juega tres papeles a la vez. Se calculan tres vectores distintos a partir de su embedding (cada uno con su propia matriz de pesos, que se aprende):</p>
+<ul>
+  <li><strong>Q (<em>query</em>, consulta)</strong>: <em>«¿qué estoy buscando?»</em></li>
+  <li><strong>K (<em>key</em>, clave)</strong>: <em>«¿soy relevante para esa búsqueda?»</em> (una etiqueta que me describe)</li>
+  <li><strong>V (<em>value</em>, valor)</strong>: <em>«¿qué información aporto?»</em> (mi contenido)</li>
+</ul>
+<div class="callout analogia">
+  <span class="lbl">Analogía: el catálogo de Netflix</span>
+  <p>Abres Netflix con una <strong>pregunta</strong> en la cabeza (Q): «quiero algo divertido para ver en familia». Cada película del catálogo tiene una <strong>etiqueta</strong> (K: «comedia», «familiar», «terror»…) y un <strong>contenido</strong> (V: la película en sí). Comparas tu pregunta con todas las etiquetas y ves cuánto encaja cada una (las <em>puntuaciones</em>). Luego no te llevas una sola película: te llevas <strong>un resumen mezclado de todas</strong>, aportando mucho de las que encajan bien y casi nada de las demás. Eso que te llevas es la nueva representación de tu token. Y cada token de la frase hace lo mismo con su propia pregunta, a la vez.</p>
+</div>
+
+<h3>Un primer ejemplo con tres títulos</h3>
+<p>Has visto, en este orden, tres películas: «Saw», «Toy Story» y «Shrek». Netflix quiere recomendarte la siguiente y se pregunta, con la última («Shrek»): <em>«¿qué títulos de tu historial importan para esto?»</em>. Cogemos la consulta de «Shrek» y la comparamos con las claves de los tres títulos (incluida ella misma). El <strong>producto escalar</strong> \(Q \cdot K\) mide cuánto encajan (cuanto mayor, más relevante). Supón que sale (cifras inventadas):</p>
+<div class="callout ejemplo">
+  <span class="lbl">Ejemplo numérico</span>
+  <table>
+    <thead><tr><th>Título del historial</th><th>Puntuación \(Q_{\text{Shrek}} \cdot K\)</th><th>\(e^{\text{puntuación}}\)</th><th>Peso (softmax)</th></tr></thead>
+    <tbody>
+      <tr><td>Saw</td><td>0,5</td><td>1,6487</td><td>1,6487 / 90,533 = 0,0182 → <strong>1,8 %</strong></td></tr>
+      <tr><td>Toy Story</td><td>4,2</td><td>66,6863</td><td>66,6863 / 90,533 = 0,7366 → <strong>73,7 %</strong></td></tr>
+      <tr><td>Shrek</td><td>3,1</td><td>22,1980</td><td>22,1980 / 90,533 = 0,2452 → <strong>24,5 %</strong></td></tr>
+      <tr><td><em>Suma</em></td><td></td><td>90,533</td><td>100 %</td></tr>
+    </tbody>
+  </table>
+  <ol class="pasos">
+    <li>La <strong>softmax</strong> (módulo 1) convierte las puntuaciones en pesos que son positivos y suman 1. A «Shrek» le importa sobre todo «Toy Story» (≈ 74 %), algo él mismo (≈ 25 %) y casi nada «Saw».</li>
+    <li>Cada título tiene un vector valor. Con valores de ejemplo en 2 dimensiones (imagina que el primer número es el «perfil de animación familiar» y el segundo el «perfil de terror»), \(V_{\text{Saw}} = (0, 1)\), \(V_{\text{Toy Story}} = (1, 0)\), \(V_{\text{Shrek}} = (0{,}5;\, 0{,}5)\), la nueva representación de «Shrek» es la <strong>suma ponderada</strong>: \(0{,}0182\cdot(0,1) + 0{,}7366\cdot(1,0) + 0{,}2452\cdot(0{,}5;0{,}5) = (0{,}8592;\; 0{,}1408)\).</li>
+  </ol>
+  <p>Ese vector es «Shrek» <em>contextualizado</em> por tu historial: se parece sobre todo al valor de «Toy Story» (86 % de perfil de animación familiar y 14 % de terror), así que lo siguiente que te recomendaría sería algo de animación. (Las notas del curso redondean los pesos a 2 %, 73 % y 25 %; con más decimales sale lo de la tabla, que puedes comprobar en el fragmento 11.)</p>
+</div>
+
+<h3>Los pasos, con matrices</h3>
+<p>Hecho para todos los tokens a la vez, con matrices. Llamamos \(X\) a la matriz de entrada: una fila por token (\(n\) tokens, \(d_{model}\) columnas).</p>
+<ul class="flow">
+  <li class="a">X<small>n × d_model</small></li>
+  <li class="d">Q = X·W<sub>Q</sub><br>K = X·W<sub>K</sub><br>V = X·W<sub>V</sub><small>tres matrices que se aprenden</small></li>
+  <li class="b">Q·Kᵀ<small>n × n puntuaciones</small></li>
+  <li>÷ √d<sub>k</sub><small>escalar</small></li>
+  <li class="b">softmax<small>por filas</small></li>
+  <li class="c">·V<small>mezcla ponderada</small></li>
+</ul>
+<div class="formula">\[ \text{Attention}(Q, K, V) = \operatorname{softmax}\!\Big( \frac{Q K^{\top}}{\sqrt{d_k}} \Big)\, V \]</div>
+<ul>
+  <li>\(Q K^{\top}\): la matriz \(n \times n\) de <strong>puntuaciones</strong>. La entrada \((i, j)\) es el producto escalar de la consulta del token \(i\) con la clave del token \(j\): <em>cuánto le interesa el token \(j\) al token \(i\)</em>.</li>
+  <li>\(d_k\): la dimensión de las claves (y consultas). Dividimos entre \(\sqrt{d_k}\) para que las puntuaciones no se disparen (se explica más abajo).</li>
+  <li>softmax <strong>por filas</strong>: cada fila (cada token que consulta) queda como un reparto de pesos que suma 1.</li>
+  <li>Multiplicar por \(V\): la salida del token \(i\) es la suma de los valores \(V_j\) ponderada con la fila \(i\) de pesos.</li>
+</ul>
+
+<h3>Un ejemplo completo a mano (3 tokens, \(d = 2\))</h3>
+<div class="callout ejemplo">
+  <span class="lbl">Ejemplo numérico</span>
+  <p>Tres títulos de tu historial (tres tokens) descritos con 2 rasgos, una fila por título: el primer rasgo es cuánta <em>acción</em> tiene y el segundo cuánto <em>humor</em>. Así, «Rápidos y Furiosos» es \((1, 0)\), «Shrek» es \((0, 1)\) y «Los Vengadores» es \((1, 1)\) (cifras inventadas). Y tres matrices de pesos pequeñas (en un modelo real las aprende la red):</p>
+  <div class="formula">\[ X = \begin{bmatrix} 1 & 0 \\ 0 & 1 \\ 1 & 1 \end{bmatrix},\quad
+  W_Q = \begin{bmatrix} 1 & 0 \\ 1 & 1 \end{bmatrix},\quad
+  W_K = \begin{bmatrix} 1 & 1 \\ 0 & 1 \end{bmatrix},\quad
+  W_V = \begin{bmatrix} 1 & 0 \\ 0 & 2 \end{bmatrix} \]</div>
+  <ol class="pasos">
+    <li><strong>Q, K y V.</strong> Cada fila de \(X\) se multiplica por la matriz. Por ejemplo, la fila 3 de Q es \((1,1)\cdot W_Q = (1\cdot 1 + 1\cdot 1,\; 1\cdot 0 + 1\cdot 1) = (2, 1)\). Haciendo lo mismo con todas:
+      <div class="formula">\[ Q = \begin{bmatrix} 1 & 0 \\ 1 & 1 \\ 2 & 1 \end{bmatrix},\quad
+      K = \begin{bmatrix} 1 & 1 \\ 0 & 1 \\ 1 & 2 \end{bmatrix},\quad
+      V = \begin{bmatrix} 1 & 0 \\ 0 & 2 \\ 1 & 2 \end{bmatrix} \]</div></li>
+    <li><strong>Puntuaciones \(QK^{\top}\).</strong> La entrada \((i,j)\) es \(Q_i \cdot K_j\). Por ejemplo, \(Q_3 \cdot K_3 = 2\cdot 1 + 1 \cdot 2 = 4\):
+      <div class="formula">\[ Q K^{\top} = \begin{bmatrix} 1 & 0 & 1 \\ 2 & 1 & 3 \\ 3 & 1 & 4 \end{bmatrix} \]</div></li>
+    <li><strong>Escalar.</strong> \(d_k = 2\), así que se divide entre \(\sqrt{2} = 1{,}4142\):
+      <div class="formula">\[ \frac{Q K^{\top}}{\sqrt{2}} = \begin{bmatrix} 0{,}7071 & 0 & 0{,}7071 \\ 1{,}4142 & 0{,}7071 & 2{,}1213 \\ 2{,}1213 & 0{,}7071 & 2{,}8284 \end{bmatrix} \]</div></li>
+    <li><strong>Softmax por filas.</strong> Fila 1: \(e^{0{,}7071} = 2{,}0281\), \(e^{0} = 1\), \(e^{0{,}7071} = 2{,}0281\); suma \(= 5{,}0562\); pesos \(= (0{,}4011;\; 0{,}1978;\; 0{,}4011)\). Fila 2: \(e^{\cdot} = (4{,}1133;\; 2{,}0281;\; 8{,}3421)\), suma \(14{,}4835\). Fila 3: \(e^{\cdot} = (8{,}3421;\; 2{,}0281;\; 16{,}9188)\), suma \(27{,}289\):
+      <div class="formula">\[ A = \begin{bmatrix} 0{,}4011 & 0{,}1978 & 0{,}4011 \\ 0{,}2840 & 0{,}1400 & 0{,}5760 \\ 0{,}3057 & 0{,}0743 & 0{,}6200 \end{bmatrix} \]</div>
+      Cada fila suma 1. Fíjate en la fila 3: «Los Vengadores» (\(Q = (2,1)\)) puntúa mucho con su propia clave (la 3) y por eso se pone el 62 % del peso.</li>
+    <li><strong>Mezcla de valores \(A\,V\).</strong> Fila 1: \(0{,}4011\cdot(1,0) + 0{,}1978\cdot(0,2) + 0{,}4011\cdot(1,2) = (0{,}8022;\; 1{,}1978)\). Resultado completo:
+      <div class="formula">\[ \text{Salida} = A\,V = \begin{bmatrix} 0{,}8022 & 1{,}1978 \\ 0{,}8600 & 1{,}4320 \\ 0{,}9257 & 1{,}3886 \end{bmatrix} \]</div></li>
+  </ol>
+  <p>Resultado: tres vectores de 2 números, uno por título (token), cada uno <strong>mezcla de los valores de todos</strong> según lo que cada título «preguntó». Esta cuenta está comprobada con NumPy y con la capa <code>MultiHeadAttention</code> de Keras en el fragmento 11.</p>
+</div>
+
+<div class="callout recuerda">
+  <span class="lbl">Experimento de arriba: «Mapa de atención de un subtítulo de 6 tokens», con todo detalle</span>
+  <p><strong>Haz esto.</strong> Haz clic en una fila del mapa (por ejemplo «El», «persigue» o «al») o elígela en el desplegable. Cambia entre la Cabeza 1 y la Cabeza 2. Mueve la temperatura. Activa la máscara causal y, por último, desactiva «Con información de posición».</p>
+  <p><strong>Fíjate en.</strong> Cada fila es un reparto de pesos que suma 1. Con la Cabeza 1, «El» y «astuto» miran sobre todo a «detective», y «al» a «ladrón»; «persigue» reparte su atención entre sus dos sustantivos. La Cabeza 2 hace otra cosa: los sustantivos buscan al verbo. La tabla de abajo muestra el cálculo de q·k, la división entre √3 y el peso. Sin posición, «El» no sabe distinguir entre «detective» y «ladrón»: reparte el peso a partes iguales. <strong>Ojo:</strong> las matrices W_Q y W_K de este experimento están elegidas a mano para que el mecanismo se vea; en un modelo real las aprende el entrenamiento.</p>
+</div>
+
+<h3>Por qué se divide entre \(\sqrt{d_k}\)</h3>
+<p>Supón que las componentes de \(q\) y de \(k\) son números «normales» (media 0 y varianza 1). El producto escalar \(q\cdot k\) es una suma de \(d_k\) productos, y la varianza de una suma de términos independientes es la suma de varianzas: <strong>varianza \(d_k\), desviación \(\sqrt{d_k}\)</strong>. Con \(d_k = 64\) las puntuaciones oscilan alrededor de ±8; con \(d_k = 256\), de ±16.</p>
+<p>¿Y qué le pasa a la softmax con puntuaciones tan grandes? Se <strong>satura</strong>:</p>
+<div class="callout ejemplo">
+  <span class="lbl">Ejemplo numérico</span>
+  <ol class="pasos">
+    <li>Imagina que un título puntúa así a tres títulos de tu historial, sin escalar: \((8,\, 0,\, -8)\): \(e^{8} = 2981\), \(e^{0} = 1\), \(e^{-8} = 0{,}0003\). Pesos: \((0{,}9997;\; 0{,}0003;\; 0{,}0000)\). Un solo token se lo lleva todo.</li>
+    <li>Las mismas puntuaciones divididas entre \(\sqrt{64} = 8\): \((1,\, 0,\, -1)\) → \(e^{1} = 2{,}718\), \(e^{0} = 1\), \(e^{-1} = 0{,}368\). Pesos: \((0{,}665;\; 0{,}245;\; 0{,}090)\). Hay un favorito, pero los demás siguen contando.</li>
+    <li>El gradiente de una softmax es proporcional a \(p(1-p)\): en el primer caso vale \(0{,}9997 \cdot 0{,}0003 \approx 0{,}0003\) (casi nada: la red <em>no puede aprender</em>); en el segundo, \(0{,}665 \cdot 0{,}335 = 0{,}22\).</li>
+  </ol>
+</div>
+
+<figure class="demo" data-demo="curso2/c2m4-escala-dk" data-titulo="Por qué dividir entre la raíz de d_k">
+  <div class="haz">Sube d_k hasta 256 con «Dividir entre √d_k» apagado. Luego enciéndelo. Pulsa «Otra muestra al azar» varias veces.</div>
+  <div class="observa">Sin dividir, la campana se ensancha como √d_k (con d_k = 64, ±8) y el softmax casi siempre da un peso cercano a 1 a una sola clave: el «peso máximo medio» se dispara y la «pendiente» se hunde. Dividiendo, la campana mide siempre ±1 sea cual sea d_k.</div>
+</figure>
+
+<h3>Atención multi-cabeza</h3>
+<p>Una sola atención solo puede hacer <em>una pregunta</em> a la vez. Pero para entender una frase hacen falta varias a la vez: «¿quién hace la acción?», «¿qué adjetivo describe a este nombre?», «¿qué palabra va justo antes?». Es como elegir qué ver: miras el género, el reparto y el director a la vez, y cada una de esas miradas es una cabeza. La <strong>atención multi-cabeza</strong> (<em>multi-head attention</em>) ejecuta <strong>\(h\) atenciones en paralelo</strong>, cada una con sus propias matrices \(W_Q, W_K, W_V\) y con dimensión reducida \(d_k = d_{model} / h\). Después se <em>concatenan</em> las \(h\) salidas y se pasan por una última matriz \(W_O\) que devuelve el tamaño \(d_{model}\).</p>
+<div class="callout ejemplo">
+  <span class="lbl">Ejemplo numérico</span>
+  <p>\(d_{model} = 8\) y \(h = 2\) cabezas → \(d_k = 4\). Cada cabeza produce una salida de 4 números por token; se concatenan 2 × 4 = 8 y \(W_O\) (8 × 8) las mezcla.</p>
+  <p>Parámetros: tres proyecciones \(d_{model} \to h\cdot d_k = 8\) (con sesgo): \(3\cdot(8\cdot 8 + 8) = 216\), más la de salida \(8 \cdot 8 + 8 = 72\): <strong>288</strong> en total, es decir \(4 d_{model}^2 + 4 d_{model}\). <em>No depende del número de cabezas</em>: con \(h = 1\) serían los mismos (la diferencia es que las cabezas dividen el trabajo). El fragmento 11 lo comprueba con <code>MultiHeadAttention(num_heads=2, key_dim=4)</code>.</p>
+</div>
+<p>En Keras, <code>key_dim</code> es el tamaño de cada cabeza \(d_k\) (<strong>no</strong> el total). Por eso se suele escribir <code>key_dim = embed_dim // num_heads</code>. (Algunos tutoriales de Keras ponen <code>key_dim = embed_dim</code>: funciona, pero cada cabeza es tan ancha como todo el modelo, con más parámetros. Con \(d_{model} = 32\) y 2 cabezas: 4.224 parámetros con <code>key_dim=16</code> frente a 8.416 con <code>key_dim=32</code>.)</p>
+
+<h3>Máscara causal: no mirar al futuro</h3>
+<p>Cuando un modelo genera texto, al predecir la palabra \(t\) solo conoce las palabras anteriores. Es como recomendarte el capítulo 4 sabiendo solo los capítulos 1 a 3. Si durante el entrenamiento dejáramos a cada token mirar a los siguientes, <em>haría trampa</em>: leería la respuesta, como quien lee el final de la serie antes de adivinar qué pasa (un <em>spoiler</em>). La <strong>máscara causal</strong> lo evita: antes de la softmax, se pone \(-\infty\) en las puntuaciones de las posiciones futuras (el triángulo superior de la matriz). Como \(e^{-\infty} = 0\), esos pesos valen exactamente 0.</p>
+<div class="callout ejemplo">
+  <span class="lbl">Ejemplo numérico</span>
+  <p>Con las puntuaciones escaladas del ejemplo anterior:</p>
+  <ul>
+    <li>Fila 1 (solo puede ver el token 1): peso \((1, 0, 0)\).</li>
+    <li>Fila 2 (ve los tokens 1 y 2): \(e^{1{,}4142} = 4{,}1133\) y \(e^{0{,}7071} = 2{,}0281\), suma \(6{,}1414\) → \((0{,}6698;\; 0{,}3302;\; 0)\).</li>
+    <li>Fila 3 (ve los tres): igual que antes, \((0{,}3057;\; 0{,}0743;\; 0{,}6200)\).</li>
+  </ul>
+  <p>En Keras: <code>MultiHeadAttention(...)(x, x, use_causal_mask=True)</code> (fragmento 11). Una consecuencia práctica: el modelo puede entrenarse con <strong>toda la frase a la vez</strong> y aprender a predecir cada siguiente palabra en paralelo, sin que ninguna vea la suya.</p>
+</div>
+
+<h3>El bloque Transformer</h3>
+<p>La atención sola no es un Transformer. Un <strong>bloque</strong> añade tres ingredientes y se repite muchas veces (6, 12, 96…):</p>
+
+<figure class="figura">
+<svg viewBox="-30 0 600 440" role="img" aria-label="Un bloque Transformer de encoder: atención multi-cabeza, suma residual y normalización, red feed-forward, suma residual y normalización"><defs><marker id="ah-blk" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--ink)"/></marker></defs><rect x="180" y="388" width="160" height="34" rx="6" class="fill-a"/><text x="260.0" y="409.0" text-anchor="middle" font-size="13" font-weight="600">Entrada (n × d)</text><line class="stroke" x1="260" y1="388" x2="260" y2="352" marker-end="url(#ah-blk)"/><rect x="150" y="300" width="220" height="52" rx="6" class="fill-d"/><text x="260.0" y="323.0" text-anchor="middle" font-size="14" font-weight="600">Atención multi-cabeza</text><text x="260.0" y="339.0" text-anchor="middle" font-size="12" class="muted">Q, K, V salen de la misma entrada</text><line class="stroke" x1="260" y1="300" x2="260" y2="268" marker-end="url(#ah-blk)"/><rect x="180" y="232" width="160" height="36" rx="6" class="fill-b"/><text x="260.0" y="254.0" text-anchor="middle" font-size="13" font-weight="600">Suma + LayerNorm</text><line class="stroke" x1="260" y1="232" x2="260" y2="196" marker-end="url(#ah-blk)"/><rect x="150" y="144" width="220" height="52" rx="6" class="fill-d"/><text x="260.0" y="167.0" text-anchor="middle" font-size="14" font-weight="600">Feed-forward</text><text x="260.0" y="183.0" text-anchor="middle" font-size="12" class="muted">Dense(d_ff) + ReLU → Dense(d)</text><line class="stroke" x1="260" y1="144" x2="260" y2="112" marker-end="url(#ah-blk)"/><rect x="180" y="76" width="160" height="36" rx="6" class="fill-b"/><text x="260.0" y="98.0" text-anchor="middle" font-size="13" font-weight="600">Suma + LayerNorm</text><line class="stroke" x1="260" y1="76" x2="260" y2="44" marker-end="url(#ah-blk)"/><rect x="180" y="10" width="160" height="34" rx="6" class="fill-c"/><text x="260.0" y="31.0" text-anchor="middle" font-size="13" font-weight="600">Salida (n × d)</text><path class="stroke" d="M140,405 L90,405 L90,250 L178,250" marker-end="url(#ah-blk)" stroke-dasharray="5 4"/><text x="84" y="330" text-anchor="end" font-size="12" font-weight="400" class="muted">atajo (residual)</text><path class="stroke" d="M90,250 L90,94 L178,94" marker-end="url(#ah-blk)" stroke-dasharray="5 4"/><text x="390" y="170" text-anchor="start" font-size="12" font-weight="400" class="muted">cada token por separado</text><text x="380" y="326" text-anchor="start" font-size="12" font-weight="400" class="muted">mezcla tokens entre sí</text></svg>
+  <figcaption>Un bloque Transformer de encoder. La entrada y la salida tienen la misma forma (n × d), así que los bloques se pueden apilar.</figcaption>
+</figure>
+
+<ol>
+  <li><strong>Atención multi-cabeza</strong>: los tokens se <em>mezclan</em> entre sí.</li>
+  <li><strong>Conexión residual + <abbr class="t" data-def="Layer Normalization: normaliza cada token por separado (media 0 y desviación 1 a lo largo de sus d números) y luego aplica una escala y un desplazamiento que se aprenden.">LayerNorm</abbr></strong>: se <em>suma</em> la entrada del sub-bloque a su salida (\(y = x + F(x)\)) y se normaliza. La suma crea un atajo por el que el gradiente pasa intacto (\(\partial y/\partial x = 1 + \partial F/\partial x\)): la misma idea de «autopista» de la cinta de la LSTM, y es lo que permite apilar decenas de bloques.</li>
+  <li><strong>Red feed-forward</strong>: dos capas <code>Dense</code> (\(d_{model} \to d_{ff} \to d_{model}\), con ReLU en medio y normalmente \(d_{ff} = 4\,d_{model}\)) aplicadas <em>a cada token por separado</em>, con los mismos pesos para todos. La atención mezcla tokens; el feed-forward «piensa» sobre cada uno.</li>
+  <li><strong>Otra residual + LayerNorm</strong>.</li>
+</ol>
+<div class="callout ejemplo">
+  <span class="lbl">Ejemplo numérico: LayerNorm</span>
+  <p>Un token con \(d = 4\) números: \(x = (2, 4, 6, 8)\). Media: \(\mu = 5\). Varianza: \(((-3)^2 + (-1)^2 + 1^2 + 3^2)/4 = 5\). Desviación: \(\sqrt{5} = 2{,}236\). Normalizado: \((x - \mu)/\sigma = (-1{,}342;\; -0{,}447;\; 0{,}447;\; 1{,}342)\). Después se aplica \(\gamma \cdot \hat{x} + \beta\) (dos vectores que se aprenden, al principio 1 y 0). A diferencia de <em>BatchNorm</em> (que normaliza cada variable a lo largo del lote), <strong>LayerNorm normaliza cada token por dentro</strong>: no depende del tamaño del lote ni de la longitud de la frase, y por eso es la normalización de los Transformers.</p>
+</div>
+<div class="callout ojo">
+  <span class="lbl">Ojo</span>
+  <p>El dibujo y el código de este módulo colocan la LayerNorm <em>después</em> de la suma (el esquema del artículo original, «post-LN»). Muchos modelos actuales la ponen <em>antes</em> de cada sub-bloque («pre-LN») porque entrena con más estabilidad cuando hay muchas capas. Es un detalle de ingeniería: el mecanismo es el mismo.</p>
+</div>
+
+<figure class="demo" data-demo="curso2/c2m4-forma-bloque" data-titulo="Las formas y los parámetros dentro de un bloque Transformer">
+  <div class="haz">Pon la longitud en 4096 con d_model = 768, 12 cabezas y lote 32. Después baja la longitud a 128 y sube y baja d_model.</div>
+  <div class="observa">Mira que la matriz de atención tiene forma (lote, cabezas, n, n): con n = 4096 y 12 cabezas son unos 25,8 GB solo en puntuaciones. Los cuadrados del dibujo están a escala: duplicar n multiplica por 4 el área. En cambio, el número de parámetros no cambia con n: el feed-forward se lleva dos tercios de ellos y la atención el tercio restante.</div>
+</figure>
+
+<h3>Encoder, decoder y atención cruzada</h3>
+<p>Combinando bloques salen tres familias:</p>
+<table>
+  <thead><tr><th>Arquitectura</th><th>Atención</th><th>Para qué</th><th>Ejemplos</th></tr></thead>
+  <tbody>
+    <tr><td><strong>Solo encoder</strong></td><td>Cada token mira a <em>todos</em> (izquierda y derecha)</td><td>Entender un texto: clasificar, etiquetar, buscar</td><td>BERT</td></tr>
+    <tr><td><strong>Solo decoder</strong></td><td>Con <em>máscara causal</em>: cada token mira solo hacia atrás</td><td>Generar texto, un token detrás de otro</td><td>GPT</td></tr>
+    <tr><td><strong>Encoder + decoder</strong></td><td>El encoder lee todo; el decoder genera y además «consulta» al encoder</td><td>Traducir, resumir (muchos a muchos con distinta longitud)</td><td>El Transformer original, T5</td></tr>
+  </tbody>
+</table>
+<p>Ese «consultar al encoder» se llama <strong>cross-attention</strong> (atención cruzada): las consultas Q vienen de una secuencia (la que se está generando) y las claves y valores K y V vienen de <em>otra</em>. Es lo que permite relacionar <strong>dos fuentes distintas</strong>: texto ↔ texto en una traducción, o <strong>texto ↔ imagen</strong> en un modelo que describe fotos (lo verás con BLIP en el módulo 5: las palabras que se generan «miran» a zonas de la imagen). En la <em>self-attention</em>, en cambio, Q, K y V salen de la misma secuencia (texto ↔ texto).</p>
+
+<h3>Atención frente a RNN: paralelismo y precio</h3>
+<table>
+  <thead><tr><th></th><th>RNN / LSTM</th><th>Self-attention</th></tr></thead>
+  <tbody>
+    <tr><td>Pasos que no se pueden hacer a la vez</td><td>\(n\) (cada paso espera al anterior)</td><td>1 (todo es multiplicar matrices)</td></tr>
+    <tr><td>Camino entre dos tokens cualesquiera</td><td>hasta \(n\) pasos</td><td>1 paso (se miran directamente)</td></tr>
+    <tr><td>Coste de cálculo por capa</td><td>\(n \cdot d^2\)</td><td>\(n^2 \cdot d\)</td></tr>
+    <tr><td>Memoria que crece</td><td>con \(n\) (un estado por paso)</td><td>con \(n^2\) (la matriz de puntuaciones)</td></tr>
+  </tbody>
+</table>
+<p>Dos grandes ventajas: <strong>dependencias largas</strong> (una palabra puede relacionarse directamente con otra muy lejana) y <strong>paralelización</strong> (todas las posiciones se calculan a la vez, ideal para una GPU: por eso se pudieron entrenar modelos con billones de palabras). El precio: la matriz \(n \times n\) crece al cuadrado. Con 512 tokens son 262.144 puntuaciones por cabeza; con 4.096 (8 veces más), 16.777.216 (64 veces más).</p>
+
+<div class="callout ojo">
+  <span class="lbl">Limitaciones</span>
+  <ul>
+    <li><strong>Datos, potencia y memoria</strong>: los Transformers grandes necesitan cantidades enormes de texto y GPUs; con pocos datos, una LSTM o un modelo sencillo suele funcionar igual o mejor.</li>
+    <li><strong>Contexto limitado</strong>: solo ven una ventana de \(n\) tokens (miles, no infinitos).</li>
+    <li><strong>Sesgos</strong>: aprenden de los textos que ven; si los datos contienen prejuicios o errores, el modelo puede reproducirlos.</li>
+  </ul>
+</div>
+  </div>
+</details>
+
+<section>
+<h2 class="sin-num">Código</h2>
+<p class="codigo-intro">El fragmento 12 entrena sobre el mismo conjunto de datos del fragmento 5 (<a href="leccion-4.html">lección 4</a>): ejecuta antes ese fragmento en el mismo cuaderno.</p>
+<article class="snippet" data-lang="python">
+  <header>
+    <h3>11 · Self-attention paso a paso: NumPy, MultiHeadAttention y máscara causal</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Calcular a mano con NumPy el ejemplo de tres tokens, comprobar que la capa <code>MultiHeadAttention</code> de Keras da lo mismo con los mismos pesos, ver la máscara causal y contar los parámetros de una capa real.</p>
+  </header>
+  <pre class="code"><code>import numpy as np
+from tensorflow import keras
+from tensorflow.keras import layers
+
+np.set_printoptions(precision=4, suppress=True)
+
+def softmax(z):
+    e = np.exp(z - z.max(axis=-1, keepdims=True))     # restar el máximo evita desbordamientos
+    return e / e.sum(axis=-1, keepdims=True)
+
+# 3 tokens, d_model = 2 (una fila por token) y tres matrices de pesos pequeñas
+X = np.array([[1, 0], [0, 1], [1, 1]], dtype="float32")
+W_Q = np.array([[1, 0], [1, 1]], dtype="float32")
+W_K = np.array([[1, 1], [0, 1]], dtype="float32")
+W_V = np.array([[1, 0], [0, 2]], dtype="float32")
+
+Q, K, V = X @ W_Q, X @ W_K, X @ W_V                  # consultas, claves y valores
+puntuaciones = Q @ K.T                                # (3 x 3): q_i · k_j
+escaladas = puntuaciones / np.sqrt(K.shape[1])        # dividir entre raíz de d_k
+A = softmax(escaladas)                                # cada fila suma 1
+salida = A @ V                                        # mezcla ponderada de los valores
+print("Q:\n", Q, "\nK:\n", K, "\nV:\n", V)
+print("puntuaciones:\n", puntuaciones)
+print("escaladas:\n", escaladas)
+print("pesos A:\n", A, "\nsuma por filas:", A.sum(axis=1))
+print("salida:\n", salida)
+
+# La misma cuenta con la capa de Keras (1 cabeza, sin sesgos, con NUESTROS pesos)
+mha = layers.MultiHeadAttention(num_heads=1, key_dim=2, use_bias=False)
+mha(X[None], X[None])                                 # construye la capa (lote de 1 frase)
+mha.query_dense.set_weights([W_Q.reshape(2, 1, 2)])   # forma (d_model, cabezas, key_dim)
+mha.key_dense.set_weights([W_K.reshape(2, 1, 2)])
+mha.value_dense.set_weights([W_V.reshape(2, 1, 2)])
+mha.output_dense.set_weights([np.eye(2, dtype="float32").reshape(1, 2, 2)])   # identidad: sin mezcla final
+salida_k, pesos_k = mha(X[None], X[None], return_attention_scores=True)
+print("¿salida igual a la de NumPy?", np.allclose(salida_k[0], salida, atol=1e-5))
+print("¿pesos iguales a los de NumPy?", np.allclose(pesos_k[0, 0], A, atol=1e-5))
+
+# Máscara causal: cada token solo mira hacia atrás (y a sí mismo)
+_, pesos_c = mha(X[None], X[None], return_attention_scores=True, use_causal_mask=True)
+print("pesos con máscara causal:\n", pesos_c[0, 0].numpy())
+
+# El ejemplo del historial: la consulta de «Shrek» frente a «Saw», «Toy Story», «Shrek»
+print("softmax([0.5, 4.2, 3.1]) =", softmax(np.array([0.5, 4.2, 3.1])).round(3))
+
+# Parámetros de una capa "de verdad" (con sesgos): d_model = 8, 2 cabezas de key_dim = 4
+mha2 = layers.MultiHeadAttention(num_heads=2, key_dim=4)
+mha2(np.zeros((1, 3, 8), "float32"), np.zeros((1, 3, 8), "float32"))
+print("parámetros con d_model=8, 2 cabezas, key_dim=4:", mha2.count_params(), "= 4*8*8 + 4*8 =", 4 * 8 * 8 + 4 * 8)</code></pre>
+  <details class="linea-a-linea" open>
+    <summary>Línea por línea</summary>
+    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+      <tbody>
+        <tr data-lines="1-3"><td><code>import numpy as np / from tensorflow import keras / ...</code></td><td>NumPy para la cuenta a mano; Keras y capas para la comparación.</td></tr>
+        <tr data-lines="5"><td><code>np.set_printoptions(precision=4, suppress=True)</code></td><td>Imprime los arrays con 4 decimales y sin notación científica.</td></tr>
+        <tr data-lines="7-9"><td><code>def softmax(z): ...</code></td><td>La softmax por filas. Restar el máximo de cada fila (<code>z.max(axis=-1, keepdims=True)</code>) no cambia el resultado, pero evita que <code>np.exp</code> se desborde con números grandes. <code>axis=-1</code> es «a lo largo de la última dimensión», es decir, cada fila.</td></tr>
+        <tr data-lines="11-15"><td><code>X = np.array([[1, 0], [0, 1], [1, 1]], dtype="float32") ...</code></td><td>Las entradas y las tres matrices de pesos del ejemplo hecho a mano. <code>X</code> tiene una fila por token.</td></tr>
+        <tr data-lines="17"><td><code>Q, K, V = X @ W_Q, X @ W_K, X @ W_V</code></td><td>Calcula las consultas, las claves y los valores con tres multiplicaciones de matrices.</td></tr>
+        <tr data-lines="18"><td><code>puntuaciones = Q @ K.T</code></td><td>La matriz 3 × 3 de productos escalares \(Q_i \cdot K_j\). <code>K.T</code> es la traspuesta.</td></tr>
+        <tr data-lines="19"><td><code>escaladas = puntuaciones / np.sqrt(K.shape[1])</code></td><td>Divide entre \(\sqrt{d_k}\); <code>K.shape[1]</code> es \(d_k = 2\).</td></tr>
+        <tr data-lines="20"><td><code>A = softmax(escaladas)</code></td><td>Los pesos de atención: cada fila suma 1.</td></tr>
+        <tr data-lines="21"><td><code>salida = A @ V</code></td><td>La mezcla ponderada de los valores: la nueva representación de cada token.</td></tr>
+        <tr data-lines="22-26"><td><code>print("Q:\n", Q, ...) ...</code></td><td>Escribe cada paso intermedio para poder compararlo con la mano. <code>\n</code> es un salto de línea.</td></tr>
+        <tr data-lines="28-29"><td><code>mha = layers.MultiHeadAttention(num_heads=1, key_dim=2, use_bias=False)</code></td><td>La capa de Keras con 1 cabeza de tamaño 2 y <strong>sin sesgos</strong>, para que haga exactamente \(Q = XW_Q\), etc.</td></tr>
+        <tr data-lines="30"><td><code>mha(X[None], X[None])</code></td><td>Una primera llamada con datos (<code>X[None]</code> añade la dimensión de lote: forma (1, 3, 2)) para que Keras cree los pesos. Los dos argumentos son <em>query</em> y <em>value</em>; la clave toma por defecto el valor.</td></tr>
+        <tr data-lines="31-33"><td><code>mha.query_dense.set_weights([W_Q.reshape(2, 1, 2)]) ...</code></td><td>Copia nuestras matrices en las proyecciones de consulta, clave y valor. Keras guarda cada una con forma <code>(d_model, cabezas, key_dim)</code>, por eso el <code>reshape(2, 1, 2)</code>.</td></tr>
+        <tr data-lines="34"><td><code>mha.output_dense.set_weights([np.eye(2, ...).reshape(1, 2, 2)])</code></td><td>La proyección de salida \(W_O\), que Keras aplica al final, se fija a la <strong>identidad</strong> para que no mezcle nada más.</td></tr>
+        <tr data-lines="35"><td><code>salida_k, pesos_k = mha(X[None], X[None], return_attention_scores=True)</code></td><td>Ejecuta la capa. Con <code>return_attention_scores=True</code> devuelve también los pesos de atención, con forma <code>(lote, cabezas, tokens, tokens)</code>.</td></tr>
+        <tr data-lines="36-37"><td><code>print("¿salida igual a la de NumPy?", np.allclose(...))</code></td><td>Comprueba, con una tolerancia pequeña, que la salida y los pesos de Keras coinciden con los de NumPy.</td></tr>
+        <tr data-lines="39-41"><td><code>_, pesos_c = mha(..., use_causal_mask=True)</code></td><td><code>use_causal_mask=True</code> aplica la máscara causal: cada token solo atiende a sí mismo y a los anteriores. Se imprimen los pesos resultantes.</td></tr>
+        <tr data-lines="43-44"><td><code>print("softmax([0.5, 4.2, 3.1]) =", ...)</code></td><td>El ejemplo del historial «Saw, Toy Story, Shrek»: las tres puntuaciones de la consulta «Shrek» convertidas en pesos.</td></tr>
+        <tr data-lines="46-47"><td><code>mha2 = layers.MultiHeadAttention(num_heads=2, key_dim=4)</code></td><td>Ahora una capa «de verdad» (con sesgos): 2 cabezas de tamaño 4 para un modelo de \(d_{model} = 8\).</td></tr>
+        <tr data-lines="48"><td><code>mha2(np.zeros((1, 3, 8), "float32"), np.zeros((1, 3, 8), "float32"))</code></td><td>La llama una vez con ceros solo para que Keras construya los pesos (query y value; la clave toma por defecto el valor): lote 1, 3 tokens, 8 números por token.</td></tr>
+        <tr data-lines="49"><td><code>print("parámetros ...", mha2.count_params(), ...)</code></td><td>Cuenta los parámetros de la capa y los compara con \(4\,d_{model}^2 + 4\,d_{model}\).</td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada (valores aproximados)</strong>
+    <pre>Q:
+ [[1. 0.]
+ [1. 1.]
+ [2. 1.]]
+K:
+ [[1. 1.]
+ [0. 1.]
+ [1. 2.]]
+V:
+ [[1. 0.]
+ [0. 2.]
+ [1. 2.]]
+puntuaciones:
+ [[1. 0. 1.]
+ [2. 1. 3.]
+ [3. 1. 4.]]
+escaladas:
+ [[0.7071 0.     0.7071]
+ [1.4142 0.7071 2.1213]
+ [2.1213 0.7071 2.8284]]
+pesos A:
+ [[0.4011 0.1978 0.4011]
+ [0.284  0.14   0.576 ]
+ [0.3057 0.0743 0.62  ]]
+suma por filas: [1. 1. 1.]
+salida:
+ [[0.8022 1.1978]
+ [0.86   1.432 ]
+ [0.9257 1.3886]]
+¿salida igual a la de NumPy? True
+¿pesos iguales a los de NumPy? True
+pesos con máscara causal:
+ [[1.     0.     0.    ]
+ [0.6698 0.3302 0.    ]
+ [0.3057 0.0743 0.62  ]]
+softmax([0.5, 4.2, 3.1]) = [0.018 0.737 0.245]
+parámetros con d_model=8, 2 cabezas, key_dim=4: 288 = 4*8*8 + 4*8 = 288</pre>
+    <p>Q, K, V, las puntuaciones, los pesos y la salida coinciden con los de la sección de atención (por ejemplo la salida del primer token es \((0{,}8022;\ 1{,}1978)\)). Las dos comprobaciones de Keras dan <code>True</code>: la capa hace justo esta cuenta. Con la máscara causal, la fila 1 es \((1, 0, 0)\), la 2 reparte entre los dos primeros tokens \((0{,}6698;\ 0{,}3302)\) y la 3 queda igual que sin máscara, porque ya podía ver a todos. La softmax de las puntuaciones del ejemplo de «Shrek» da \((0{,}018;\ 0{,}737;\ 0{,}245)\). Finalmente, la capa con 2 cabezas y \(d_{model} = 8\) tiene 288 parámetros, que es \(4 \cdot 8^2 + 4 \cdot 8\).</p>
+  </div>
+</article>
+
+<article class="snippet" data-lang="python">
+  <header>
+    <h3>12 · Un bloque Transformer en Keras: TokenAndPositionEmbedding y TransformerBlock</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Construir un mini-Transformer (embedding de token + posición, un bloque de atención, pooling y clasificador), contar sus parámetros pieza por pieza y entrenarlo sobre el mismo conjunto del fragmento 5.</p>
+  </header>
+  <pre class="code"><code>import numpy as np
 import tensorflow as tf
 from tensorflow import keras
 from tensorflow.keras import layers
@@ -182,47 +525,47 @@ print("5 épocas  -&gt; accuracy entreno:", round(hist.history["accuracy"][-1], 
 model30, hist30 = transformer_demo(X, y, epochs=30)
 print("30 épocas -&gt; accuracy entreno:", round(hist30.history["accuracy"][-1], 3),
       "| validación:", round(hist30.history["val_accuracy"][-1], 3))</code></pre>
-<details class="linea-a-linea" open="">
-<summary>Línea por línea</summary>
-<p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
-<table class="lineas">
-<thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
-<tbody>
-<tr data-lines="1-4"><td><code>import numpy as np / import tensorflow as tf / ...</code></td><td>NumPy, TensorFlow (para <code>tf.range</code> y <code>tf.shape</code>), Keras y capas.</td></tr>
-<tr data-lines="6"><td><code>keras.utils.set_random_seed(42)</code></td><td>Misma semilla que en el fragmento 5.</td></tr>
-<tr data-lines="7-8"><td><code>X = np.random.randint(1, 100, size=(1500, 20)); y = ...</code></td><td>Reconstruye <strong>exactamente</strong> el conjunto del fragmento 5 (mismos datos, misma regla de etiquetado) para poder comparar la LSTM con el Transformer.</td></tr>
-<tr data-lines="10-11"><td><code>class TokenAndPositionEmbedding(layers.Layer):</code></td><td>Define una capa propia. Heredar de <code>layers.Layer</code> permite que Keras la use como cualquier otra y entrene sus pesos.</td></tr>
-<tr data-lines="12-15"><td><code>def __init__(self, maxlen, vocab_size, embed_dim):</code></td><td>El constructor crea las dos tablas: <code>token_emb</code> (una fila de <code>embed_dim</code> números por palabra) y <code>pos_emb</code> (una fila por posición, hasta <code>maxlen</code>). <code>super().__init__()</code> es obligatorio: inicializa la parte común de las capas de Keras. Aquí la posición es <strong>aprendida</strong>, la alternativa a la sinusoidal.</td></tr>
-<tr data-lines="17"><td><code>def call(self, inputs):</code></td><td><code>call</code> es lo que hace la capa cuando recibe datos (el paso hacia delante).</td></tr>
-<tr data-lines="18"><td><code>positions = tf.range(start=0, limit=tf.shape(inputs)[-1], delta=1)</code></td><td>Genera los números 0, 1, 2, …, n − 1, donde <code>n</code> es la longitud de la secuencia (<code>tf.shape(inputs)[-1]</code>, la última dimensión de la entrada).</td></tr>
-<tr data-lines="19"><td><code>return self.token_emb(inputs) + self.pos_emb(positions)</code></td><td>Busca el vector de cada token (forma <code>(lote, 20, 32)</code>), busca el de cada posición (forma <code>(20, 32)</code>) y los <strong>suma</strong>; NumPy y TensorFlow repiten la parte de posición para todo el lote (<em>broadcasting</em>). Cada token lleva ahora «qué palabra soy» y «en qué sitio estoy».</td></tr>
-<tr data-lines="21-22"><td><code>class TransformerBlock(layers.Layer):</code></td><td>Otra capa propia: un bloque Transformer completo. La cadena entre comillas triples es su documentación.</td></tr>
-<tr data-lines="23-24"><td><code>def __init__(self, embed_dim, num_heads, ff_dim):</code></td><td>El constructor del bloque (con <code>super().__init__()</code>, igual que antes) crea las cuatro piezas siguientes.</td></tr>
-<tr data-lines="25"><td><code>self.att = layers.MultiHeadAttention(num_heads=num_heads, key_dim=embed_dim // num_heads)</code></td><td>La atención multi-cabeza. <code>key_dim</code> es el tamaño de <em>cada cabeza</em>; lo normal es repartir el ancho del modelo entre las cabezas: 32 // 2 = 16. (El tutorial de Keras usa <code>key_dim=embed_dim</code>, que también funciona pero con más del doble de parámetros en la atención.)</td></tr>
-<tr data-lines="26"><td><code>self.ffn = keras.Sequential([layers.Dense(ff_dim, activation="relu"), layers.Dense(embed_dim)])</code></td><td>El feed-forward: se expande de 32 a 64 con ReLU y se vuelve a comprimir a 32. Se aplica a cada token por separado, con los mismos pesos.</td></tr>
-<tr data-lines="27-28"><td><code>self.norm1 = layers.LayerNormalization(epsilon=1e-6)</code></td><td>Dos capas de normalización, una por sub-bloque. <code>epsilon</code> es un número minúsculo que evita dividir entre cero.</td></tr>
-<tr data-lines="30"><td><code>def call(self, inputs):</code></td><td>El paso hacia delante del bloque.</td></tr>
-<tr data-lines="31"><td><code>atencion = self.att(query=inputs, value=inputs, key=inputs)</code></td><td><strong>Self-attention</strong>: la consulta, la clave y el valor salen de la misma entrada. Todos los tokens se miran entre sí.</td></tr>
-<tr data-lines="32"><td><code>x = self.norm1(inputs + atencion)</code></td><td>Conexión residual (suma de la entrada y la salida de la atención) seguida de LayerNorm.</td></tr>
-<tr data-lines="33"><td><code>return self.norm2(x + self.ffn(x))</code></td><td>Lo mismo con el feed-forward: suma residual y normalización. La forma de salida es igual a la de entrada, así que se pueden apilar bloques.</td></tr>
-<tr data-lines="35"><td><code>def transformer_demo(X, y, epochs, maxlen=20, vocab=100, embed_dim=32, heads=2, ff=64):</code></td><td>Función que construye y entrena el modelo completo, con los hiperparámetros como argumentos: contexto de 20, vocabulario de 100, ancho 32, 2 cabezas y feed-forward de 64.</td></tr>
-<tr data-lines="36"><td><code>inputs = keras.Input(shape=(maxlen,))</code></td><td>La entrada: 20 enteros.</td></tr>
-<tr data-lines="37"><td><code>x = TokenAndPositionEmbedding(maxlen, vocab, embed_dim)(inputs)</code></td><td>Embedding de token + posición: forma (lote, 20, 32).</td></tr>
-<tr data-lines="38"><td><code>x = TransformerBlock(embed_dim, heads, ff)(x)</code></td><td>Un bloque Transformer: la forma sigue siendo (lote, 20, 32).</td></tr>
-<tr data-lines="39"><td><code>x = layers.GlobalAveragePooling1D()(x)</code></td><td>Promedia los 20 vectores de token en uno solo de 32 números (un resumen de toda la secuencia). Así tenemos un vector por ejemplo para clasificar.</td></tr>
-<tr data-lines="40"><td><code>x = layers.Dense(32, activation="relu")(x)</code></td><td>Una capa densa oculta.</td></tr>
-<tr data-lines="41"><td><code>outputs = layers.Dense(1, activation="sigmoid")(x)</code></td><td>La probabilidad de clase 1.</td></tr>
-<tr data-lines="42-44"><td><code>model = keras.Model(inputs, outputs) / model.compile(...) / hist = model.fit(...)</code></td><td>Une el modelo, lo compila con Adam y la entropía cruzada binaria, y lo entrena con el 20 % de validación, como en el fragmento 5.</td></tr>
-<tr data-lines="45"><td><code>return model, hist</code></td><td>Devuelve el modelo y el historial.</td></tr>
-<tr data-lines="47-48"><td><code>model, hist = transformer_demo(X, y, epochs=5) / model.summary()</code></td><td>Entrena 5 épocas y muestra la tabla de capas y parámetros.</td></tr>
-<tr data-lines="49-50"><td><code>print("5 épocas -&gt; ...")</code></td><td>Acierto de la última época en entrenamiento y validación.</td></tr>
-<tr data-lines="51-53"><td><code>model30, hist30 = transformer_demo(X, y, epochs=30) ...</code></td><td>Lo mismo con un modelo nuevo entrenado 30 épocas.</td></tr>
-</tbody>
-</table>
-</details>
-<div class="salida">
-<strong>Salida esperada (valores aproximados)</strong>
-<pre>Model: "functional_1"
+  <details class="linea-a-linea" open>
+    <summary>Línea por línea</summary>
+    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+      <tbody>
+        <tr data-lines="1-4"><td><code>import numpy as np / import tensorflow as tf / ...</code></td><td>NumPy, TensorFlow (para <code>tf.range</code> y <code>tf.shape</code>), Keras y capas.</td></tr>
+        <tr data-lines="6"><td><code>keras.utils.set_random_seed(42)</code></td><td>Misma semilla que en el fragmento 5.</td></tr>
+        <tr data-lines="7-8"><td><code>X = np.random.randint(1, 100, size=(1500, 20)); y = ...</code></td><td>Reconstruye <strong>exactamente</strong> el conjunto del fragmento 5 (mismos datos, misma regla de etiquetado) para poder comparar la LSTM con el Transformer.</td></tr>
+        <tr data-lines="10-11"><td><code>class TokenAndPositionEmbedding(layers.Layer):</code></td><td>Define una capa propia. Heredar de <code>layers.Layer</code> permite que Keras la use como cualquier otra y entrene sus pesos.</td></tr>
+        <tr data-lines="12-15"><td><code>def __init__(self, maxlen, vocab_size, embed_dim):</code></td><td>El constructor crea las dos tablas: <code>token_emb</code> (una fila de <code>embed_dim</code> números por palabra) y <code>pos_emb</code> (una fila por posición, hasta <code>maxlen</code>). <code>super().__init__()</code> es obligatorio: inicializa la parte común de las capas de Keras. Aquí la posición es <strong>aprendida</strong>, la alternativa a la sinusoidal.</td></tr>
+        <tr data-lines="17"><td><code>def call(self, inputs):</code></td><td><code>call</code> es lo que hace la capa cuando recibe datos (el paso hacia delante).</td></tr>
+        <tr data-lines="18"><td><code>positions = tf.range(start=0, limit=tf.shape(inputs)[-1], delta=1)</code></td><td>Genera los números 0, 1, 2, …, n − 1, donde <code>n</code> es la longitud de la secuencia (<code>tf.shape(inputs)[-1]</code>, la última dimensión de la entrada).</td></tr>
+        <tr data-lines="19"><td><code>return self.token_emb(inputs) + self.pos_emb(positions)</code></td><td>Busca el vector de cada token (forma <code>(lote, 20, 32)</code>), busca el de cada posición (forma <code>(20, 32)</code>) y los <strong>suma</strong>; NumPy y TensorFlow repiten la parte de posición para todo el lote (<em>broadcasting</em>). Cada token lleva ahora «qué palabra soy» y «en qué sitio estoy».</td></tr>
+        <tr data-lines="21-22"><td><code>class TransformerBlock(layers.Layer):</code></td><td>Otra capa propia: un bloque Transformer completo. La cadena entre comillas triples es su documentación.</td></tr>
+        <tr data-lines="23-24"><td><code>def __init__(self, embed_dim, num_heads, ff_dim):</code></td><td>El constructor del bloque (con <code>super().__init__()</code>, igual que antes) crea las cuatro piezas siguientes.</td></tr>
+        <tr data-lines="25"><td><code>self.att = layers.MultiHeadAttention(num_heads=num_heads, key_dim=embed_dim // num_heads)</code></td><td>La atención multi-cabeza. <code>key_dim</code> es el tamaño de <em>cada cabeza</em>; lo normal es repartir el ancho del modelo entre las cabezas: 32 // 2 = 16. (El tutorial de Keras usa <code>key_dim=embed_dim</code>, que también funciona pero con más del doble de parámetros en la atención.)</td></tr>
+        <tr data-lines="26"><td><code>self.ffn = keras.Sequential([layers.Dense(ff_dim, activation="relu"), layers.Dense(embed_dim)])</code></td><td>El feed-forward: se expande de 32 a 64 con ReLU y se vuelve a comprimir a 32. Se aplica a cada token por separado, con los mismos pesos.</td></tr>
+        <tr data-lines="27-28"><td><code>self.norm1 = layers.LayerNormalization(epsilon=1e-6)</code></td><td>Dos capas de normalización, una por sub-bloque. <code>epsilon</code> es un número minúsculo que evita dividir entre cero.</td></tr>
+        <tr data-lines="30"><td><code>def call(self, inputs):</code></td><td>El paso hacia delante del bloque.</td></tr>
+        <tr data-lines="31"><td><code>atencion = self.att(query=inputs, value=inputs, key=inputs)</code></td><td><strong>Self-attention</strong>: la consulta, la clave y el valor salen de la misma entrada. Todos los tokens se miran entre sí.</td></tr>
+        <tr data-lines="32"><td><code>x = self.norm1(inputs + atencion)</code></td><td>Conexión residual (suma de la entrada y la salida de la atención) seguida de LayerNorm.</td></tr>
+        <tr data-lines="33"><td><code>return self.norm2(x + self.ffn(x))</code></td><td>Lo mismo con el feed-forward: suma residual y normalización. La forma de salida es igual a la de entrada, así que se pueden apilar bloques.</td></tr>
+        <tr data-lines="35"><td><code>def transformer_demo(X, y, epochs, maxlen=20, vocab=100, embed_dim=32, heads=2, ff=64):</code></td><td>Función que construye y entrena el modelo completo, con los hiperparámetros como argumentos: contexto de 20, vocabulario de 100, ancho 32, 2 cabezas y feed-forward de 64.</td></tr>
+        <tr data-lines="36"><td><code>inputs = keras.Input(shape=(maxlen,))</code></td><td>La entrada: 20 enteros.</td></tr>
+        <tr data-lines="37"><td><code>x = TokenAndPositionEmbedding(maxlen, vocab, embed_dim)(inputs)</code></td><td>Embedding de token + posición: forma (lote, 20, 32).</td></tr>
+        <tr data-lines="38"><td><code>x = TransformerBlock(embed_dim, heads, ff)(x)</code></td><td>Un bloque Transformer: la forma sigue siendo (lote, 20, 32).</td></tr>
+        <tr data-lines="39"><td><code>x = layers.GlobalAveragePooling1D()(x)</code></td><td>Promedia los 20 vectores de token en uno solo de 32 números (un resumen de toda la secuencia). Así tenemos un vector por ejemplo para clasificar.</td></tr>
+        <tr data-lines="40"><td><code>x = layers.Dense(32, activation="relu")(x)</code></td><td>Una capa densa oculta.</td></tr>
+        <tr data-lines="41"><td><code>outputs = layers.Dense(1, activation="sigmoid")(x)</code></td><td>La probabilidad de clase 1.</td></tr>
+        <tr data-lines="42-44"><td><code>model = keras.Model(inputs, outputs) / model.compile(...) / hist = model.fit(...)</code></td><td>Une el modelo, lo compila con Adam y la entropía cruzada binaria, y lo entrena con el 20 % de validación, como en el fragmento 5.</td></tr>
+        <tr data-lines="45"><td><code>return model, hist</code></td><td>Devuelve el modelo y el historial.</td></tr>
+        <tr data-lines="47-48"><td><code>model, hist = transformer_demo(X, y, epochs=5) / model.summary()</code></td><td>Entrena 5 épocas y muestra la tabla de capas y parámetros.</td></tr>
+        <tr data-lines="49-50"><td><code>print("5 épocas -&gt; ...")</code></td><td>Acierto de la última época en entrenamiento y validación.</td></tr>
+        <tr data-lines="51-53"><td><code>model30, hist30 = transformer_demo(X, y, epochs=30) ...</code></td><td>Lo mismo con un modelo nuevo entrenado 30 épocas.</td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada (valores aproximados)</strong>
+    <pre>Model: "functional_1"
 ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━┓
 ┃ Layer (type)                    ┃ Output Shape           ┃       Param # ┃
 ┡━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━┩
@@ -247,118 +590,12 @@ print("30 épocas -&gt; accuracy entreno:", round(hist30.history["accuracy"][-1]
  Optimizer params: 26,948 (105.27 KB)
 5 épocas  -&gt; accuracy entreno: 0.931 | validación: 0.893
 30 épocas -&gt; accuracy entreno: 0.99 | validación: 0.897</pre>
-<p><strong>Los parámetros</strong>: el embedding de token y posición tiene \(100 \cdot 32 + 20 \cdot 32 = 3.840\); la atención, 4.224 (con \(d_{model} = 32\) y 2 cabezas de 16); el feed-forward, \(32 \cdot 64 + 64 + 64 \cdot 32 + 32 = 4.192\); las dos LayerNorm, \(2 \cdot 64 = 128\): el bloque suma 8.544. Después, \(32 \cdot 32 + 32 = 1.056\) de la capa densa y 33 de la última: <strong>13.473 parámetros entrenables</strong>. (El «Total» de 40.421 incluye además 26.948 números del optimizador Adam, que guarda dos medias móviles por parámetro.) <strong>El resultado, con honestidad</strong>: 5 épocas dan 93 % en entrenamiento y 89 % en validación (la LSTM del fragmento 5 daba 90 % y 89 %), y 30 épocas, 99 % y 90 %. Es decir, <strong>el Transformer diminuto no mejora a la LSTM en esta tarea</strong>: con 1.500 ejemplos, sin reglas de orden y con un solo semilla, las diferencias de uno o dos puntos son ruido. No se queda cerca del azar. Las ventajas del Transformer aparecen cuando la tarea relaciona posiciones concretas (fragmento 13) o cuando hay muchos datos.</p>
+    <p><strong>Los parámetros</strong>: el embedding de token y posición tiene \(100 \cdot 32 + 20 \cdot 32 = 3.840\); la atención, 4.224 (con \(d_{model} = 32\) y 2 cabezas de 16); el feed-forward, \(32 \cdot 64 + 64 + 64 \cdot 32 + 32 = 4.192\); las dos LayerNorm, \(2 \cdot 64 = 128\): el bloque suma 8.544. Después, \(32 \cdot 32 + 32 = 1.056\) de la capa densa y 33 de la última: <strong>13.473 parámetros entrenables</strong>. (El «Total» de 40.421 incluye además 26.948 números del optimizador Adam, que guarda dos medias móviles por parámetro.) <strong>El resultado, con honestidad</strong>: 5 épocas dan 93 % en entrenamiento y 89 % en validación (la LSTM del fragmento 5 daba 90 % y 89 %), y 30 épocas, 99 % y 90 %. Es decir, <strong>el Transformer diminuto no mejora a la LSTM en esta tarea</strong>: con 1.500 ejemplos, sin reglas de orden y con un solo semilla, las diferencias de uno o dos puntos son ruido. No se queda cerca del azar. Las ventajas del Transformer aparecen cuando la tarea relaciona posiciones concretas (fragmento 13) o cuando hay muchos datos.</p>
+  </div>
+</article>
+</section>
+
 </div>
-</article><article class="snippet" data-lang="python">
-<header>
-<h3>14 · Cómo se elige la siguiente palabra: temperatura, top-k, top-p y un modelo de juguete</h3>
-<p class="para-que"><strong>Para qué sirve</strong> Implementar desde cero el último paso de un GPT (logits → temperatura → top-k/top-p → sorteo) y probarlo con un modelo de bigramas diminuto que se puede entender entero.</p>
-</header>
-<pre class="code"><code>import numpy as np
-
-def softmax(logits, T=1.0):
-    z = np.asarray(logits, dtype=float) / T            # la temperatura divide los logits
-    z = z - z.max()                                    # estabilidad numérica
-    e = np.exp(z)
-    return e / e.sum()
-
-# 1) El ejemplo de cuatro palabras candidatas tras «el detective persigue al…»: ladrón, asesino, fantasma, dragón
-logits = [2.0, 1.0, 0.0, -1.0]
-for T in (0.5, 1.0, 2.0):
-    print(f"T = {T}:", softmax(logits, T).round(3))
-
-def filtrar(p, top_k=None, top_p=None):
-    """Pone a 0 las candidatas descartadas por top-k y/o top-p, y renormaliza."""
-    p = p.copy()
-    orden = np.argsort(p)[::-1]                        # de más a menos probable
-    if top_k is not None:
-        p[orden[top_k:]] = 0.0
-    if top_p is not None:
-        acumulada = np.cumsum(p[orden]) / p.sum()
-        corte = np.searchsorted(acumulada, top_p) + 1  # cuántas hacen falta para llegar a top_p
-        p[orden[corte:]] = 0.0
-    return p / p.sum()
-
-p1 = softmax(logits, 1.0)
-print("top-k=2        :", filtrar(p1, top_k=2).round(3))
-print("top-p=0.8      :", filtrar(p1, top_p=0.8).round(3))
-print("top-p=0.95     :", filtrar(p1, top_p=0.95).round(3))
-
-# 2) Un modelo de lenguaje JUGUETE: bigramas contados en un corpus diminuto
-corpus = ("el capitán duerme en el camarote . el capitán bebe ron en la cubierta . el loro duerme en el puerto . "
-          "el loro corre por el barco . la sirena lee un mapa en el camarote . la sirena corre por el barco . "
-          "el capitán corre por el puerto . el loro come carne en la cubierta . la sirena bebe ron en la cubierta .")
-palabras = corpus.split()
-vocab = sorted(set(palabras))
-id_de = {w: i for i, w in enumerate(vocab)}
-conteos = np.zeros((len(vocab), len(vocab)))
-for a, b in zip(palabras[:-1], palabras[1:]):
-    conteos[id_de[a], id_de[b]] += 1
-logits_sig = np.log(conteos + 1e-9)                    # log-probabilidades: las parejas nunca vistas quedan muy abajo
-
-def siguiente_distribucion(palabra, T=1.0, top_k=None):
-    return filtrar(softmax(logits_sig[id_de[palabra]], T), top_k=top_k)
-
-def generar(inicio, rng, T=1.0, top_k=None, max_palabras=10):
-    texto = [inicio]
-    while texto[-1] != "." and len(texto) &lt; max_palabras:
-        p = siguiente_distribucion(texto[-1], T, top_k)
-        texto.append(vocab[rng.choice(len(vocab), p=p)])   # muestrea según las probabilidades
-    return " ".join(texto)
-
-rng = np.random.default_rng(0)
-print("tras «el» el corpus tiene:", {vocab[i]: int(conteos[id_de["el"], i]) for i in np.nonzero(conteos[id_de["el"]])[0]})
-for T, k in [(0.2, None), (1.0, None), (3.0, None), (1.0, 2)]:
-    p = siguiente_distribucion("el", T, k)
-    muestras = rng.choice(len(vocab), size=1000, p=p)
-    cuenta = {vocab[i]: int((muestras == i).sum()) for i in np.argsort(p)[::-1][:4]}
-    print(f"T={T:&lt;4} top_k={str(k):&lt;5} 1000 muestras tras «el»: {cuenta}")
-for T in (0.2, 1.0, 3.0):
-    print(f"T={T:&lt;4}", generar("la", rng, T))</code></pre>
-<details class="linea-a-linea" open="">
-<summary>Línea por línea</summary>
-<p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
-<table class="lineas">
-<thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
-<tbody>
-<tr data-lines="1"><td><code>import numpy as np</code></td><td>NumPy.</td></tr>
-<tr data-lines="3-7"><td><code>def softmax(logits, T=1.0): ...</code></td><td>Softmax con temperatura. Divide los logits entre <code>T</code> (<code>z = logits / T</code>), resta el máximo por estabilidad numérica y normaliza. Con <code>T = 1</code> es la softmax de siempre.</td></tr>
-<tr data-lines="9-12"><td><code>logits = [2.0, 1.0, 0.0, -1.0] / for T in (0.5, 1.0, 2.0):</code></td><td>Los cuatro logits del ejemplo (ladrón, asesino, fantasma, dragón) probados con tres temperaturas.</td></tr>
-<tr data-lines="14-16"><td><code>def filtrar(p, top_k=None, top_p=None):</code></td><td>Función que descarta candidatas según top-k y/o top-p y renormaliza. Primero hace una copia y ordena los índices de más a menos probable (<code>argsort</code>, invertido con <code>[::-1]</code>).</td></tr>
-<tr data-lines="17-19"><td><code>orden = np.argsort(p)[::-1] / if top_k is not None: ...</code></td><td><strong>Top-k</strong>: pone a cero todo lo que está más allá de las <code>k</code> primeras de la lista ordenada.</td></tr>
-<tr data-lines="20-23"><td><code>if top_p is not None: ...</code></td><td><strong>Top-p</strong>: calcula la probabilidad acumulada en orden (<code>cumsum</code>), busca con <code>searchsorted</code> cuántas candidatas hacen falta para llegar a <code>top_p</code> (+ 1 para incluir la que cruza el umbral) y descarta el resto.</td></tr>
-<tr data-lines="24"><td><code>return p / p.sum()</code></td><td>Renormaliza para que lo que queda sume 1.</td></tr>
-<tr data-lines="26"><td><code>p1 = softmax(logits, 1.0)</code></td><td>Las probabilidades con T = 1.</td></tr>
-<tr data-lines="27-29"><td><code>print("top-k=2 ...") / print("top-p=0.8 ...") / ...</code></td><td>Muestra el efecto de top-k = 2, top-p = 0,8 y top-p = 0,95.</td></tr>
-<tr data-lines="31-34"><td><code>corpus = (...)</code></td><td>Un corpus diminuto de 9 frases (líneas de subtítulos de una película de piratas), para construir un modelo de lenguaje de juguete.</td></tr>
-<tr data-lines="35-37"><td><code>palabras = corpus.split() / vocab = sorted(set(palabras)) / id_de = ...</code></td><td>Separa por espacios, saca el vocabulario ordenado y crea el diccionario palabra → id.</td></tr>
-<tr data-lines="38-40"><td><code>conteos = np.zeros(...) / for a, b in zip(...): ...</code></td><td>Cuenta, para cada palabra, cuántas veces va detrás cada otra (bigramas). <code>zip(palabras[:-1], palabras[1:])</code> recorre las parejas consecutivas.</td></tr>
-<tr data-lines="41"><td><code>logits_sig = np.log(conteos + 1e-9)</code></td><td>Convierte los conteos en «logits» (logaritmos). El <code>1e-9</code> evita el logaritmo de cero: las parejas nunca vistas quedan con un logit muy bajo, no con −∞.</td></tr>
-<tr data-lines="43-44"><td><code>def siguiente_distribucion(palabra, T=1.0, top_k=None):</code></td><td>La distribución sobre la siguiente palabra dada la anterior: softmax con temperatura de su fila de logits y después el filtro top-k.</td></tr>
-<tr data-lines="46-51"><td><code>def generar(inicio, rng, T=1.0, top_k=None, max_palabras=10):</code></td><td>El bucle autorregresivo: mientras la última palabra no sea el punto, calcula la distribución, <strong>sortea</strong> una palabra con esas probabilidades (<code>rng.choice(..., p=p)</code>) y la añade al texto.</td></tr>
-<tr data-lines="53"><td><code>rng = np.random.default_rng(0)</code></td><td>Generador con semilla para que el sorteo se repita.</td></tr>
-<tr data-lines="54"><td><code>print("tras «el» el corpus tiene:", ...)</code></td><td>Los conteos reales de lo que viene después de «el» en el corpus.</td></tr>
-<tr data-lines="55-59"><td><code>for T, k in [...]: ... muestras = rng.choice(...)</code></td><td>Para cuatro ajustes, sortea 1.000 veces la palabra que sigue a «el» y cuenta cuántas veces sale cada una (las cuatro más probables).</td></tr>
-<tr data-lines="60-61"><td><code>for T in (0.2, 1.0, 3.0): print(f"T={T:&lt;4}", generar("la", rng, T))</code></td><td>Genera una frase completa empezando por «la» con tres temperaturas.</td></tr>
-</tbody>
-</table>
-</details>
-<div class="salida">
-<strong>Salida esperada (valores aproximados)</strong>
-<pre>T = 0.5: [0.865 0.117 0.016 0.002]
-T = 1.0: [0.644 0.237 0.087 0.032]
-T = 2.0: [0.455 0.276 0.167 0.102]
-top-k=2        : [0.731 0.269 0.    0.   ]
-top-p=0.8      : [0.731 0.269 0.    0.   ]
-top-p=0.95     : [0.665 0.245 0.09  0.   ]
-tras «el» el corpus tiene: {'barco': 2, 'camarote': 2, 'capitán': 3, 'loro': 3, 'puerto': 2}
-T=0.2  top_k=None  1000 muestras tras «el»: {'loro': 453, 'capitán': 403, 'camarote': 48, 'barco': 46}
-T=1.0  top_k=None  1000 muestras tras «el»: {'loro': 218, 'capitán': 244, 'camarote': 176, 'barco': 193}
-T=3.0  top_k=None  1000 muestras tras «el»: {'loro': 197, 'capitán': 232, 'camarote': 180, 'barco': 194}
-T=1.0  top_k=2     1000 muestras tras «el»: {'loro': 495, 'capitán': 505, 'ron': 0, 'sirena': 0}
-T=0.2  la sirena corre por el loro corre por el capitán
-T=1.0  la sirena bebe ron en la cubierta .
-T=3.0  la cubierta puerto .</pre>
-<p>Las seis primeras líneas coinciden con la tabla de la sección GPT: con T = 0,5 la favorita sube a 0,865; con T = 2 baja a 0,455. Top-k = 2 y top-p = 0,8 dan el mismo resultado (0,731 y 0,269). Tras «el», el corpus (un puñado de líneas de subtítulos de una película de piratas) tiene capitán 3, loro 3, barco 2, camarote 2 y puerto 2. Con T = 0,2, los sorteos se concentran en las dos más frecuentes (loro 453, capitán 403 de 1.000); con T = 1 siguen aproximadamente los conteos (218 / 244 / 176 / 193) y con T = 3 todo se aplana (entre 180 y 232, cerca de 200 cada una). Con top-k = 2 solo salen loro y capitán (495 y 505). Las tres frases generadas ilustran lo mismo: con T = 0,2 es repetitiva y se sale del tema («la sirena corre por el loro corre por el capitán»), con T = 1 sale una frase del corpus y con T = 3 se desordena. Este modelo no es un Transformer, pero el último paso (elegir una palabra con temperatura, top-k y top-p) es idéntico al de un GPT.</p>
-</div>
-</article></div></details></div></main></body></html>
+</main>
+</body>
+</html>

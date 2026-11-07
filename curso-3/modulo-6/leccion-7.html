@@ -1,249 +1,495 @@
-<!DOCTYPE html>
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lección 7 · DQN: una red sustituye a la tabla, y dos trucos evitan que se descontrole · Módulo 6 · Curso 3 · Cuaderno de IA</title>
+<meta name="description" content="Deep Q-Networks en Keras: la red Q con una salida por acción, el objetivo y = r + γ(1−d)·max Q⁻, la pérdida de Huber, el replay buffer y la red objetivo, y resultados reales en CartPole.">
+<script>try{var t=localStorage.getItem('cuaderno-ia:tema');if(t)document.documentElement.setAttribute('data-theme',t)}catch(e){}</script>
+<link rel="stylesheet" href="../../assets/css/style.css">
+<script src="../../assets/js/curriculum.js"></script>
+<script src="../../assets/js/lab.js"></script>
+<script src="../../assets/js/app.js" defer></script>
+</head>
+<body data-root="../../" data-course="3" data-module="6" data-lesson="7">
+<main>
+<div class="page">
 
-<html lang="es"><head><meta charset="utf-8"/><meta content="width=device-width,initial-scale=1" name="viewport"/><title>Lección 7 · On-policy y off-policy: SARSA frente a Q-learning · Curso 3 · Cuaderno de IA</title><meta content="En todo agente conviven dos políticas." name="description"/><script>try{var t=localStorage.getItem('cuaderno-ia:tema');if(t)document.documentElement.setAttribute('data-theme',t)}catch(e){}</script><link href="../../assets/css/style.css" rel="stylesheet"/><script src="../../assets/js/curriculum.js"></script><script src="../../assets/js/lab.js"></script><script defer="" src="../../assets/js/app.js"></script><script defer="" src="../../assets/js/microanimations.js"></script></head><body data-course="3" data-lesson="7" data-module="6" data-root="../../"><main><div class="page" data-micro="3min"><header class="hero leccion"><div class="hero-grid"><div><p class="eyebrow">Curso 3 · Módulo 6 · Lección 7 de 12</p><h1>On-policy y off-policy: SARSA frente a Q-learning</h1><p class="lead">En todo agente conviven dos políticas.</p><p class="meta-line"><span class="read-time" data-render="read-time"></span><a href="../modulo-6.html">Índice del módulo</a></p></div><div aria-hidden="true" class="hero-tile"></div></div></header><details class="predice"><summary>Un recomendador de StreamFlix a veces explora y enseña una película al azar. Si es una película muy rara, el usuario puede enfadarse y cancelar (−100). ¿Valora sus estrategias suponiendo que nunca se equivocará al explorar, o contando con esos despistes?<span class="hint"></span></summary><div><p>En todo agente conviven dos políticas.</p></div></details><section aria-label="Explicación breve" class="micro-core"><div class="micro-kicker">01 · ENTENDER <span>≈ 45 s</span></div><h2>La idea en palabras sencillas</h2><p>En todo agente conviven dos políticas. La política de comportamiento es la que genera la experiencia (la ε-greedy, que a veces explora y recomienda al azar). La política objetivo es la que queremos evaluar y mejorar. Si son la misma, el algoritmo es on-policy («sobre la política»); si son distintas, es off-policy.</p><div class="micro-example"><span aria-hidden="true" class="micro-example-icon">🐾</span><div><strong>Otro ejemplo · Mascotas</strong><p>Una red combina tamaño, orejas y pelaje para distinguir patrones que no dependen de una sola regla.</p></div></div></section><div class="micro-kicker micro-checkpoint">02 · RESPONDER <span>≈ 15 s</span></div><section aria-label="Pregunta intercalada" class="quiz mini micro-check"><script class="quiz-data" type="application/json">{"titulo": "Pausa rápida · Comprueba la idea", "preguntas": [{"q": "Una neurona recibe dos entradas. ¿Qué hace con los pesos?", "opciones": ["Elige siempre la entrada mayor", "Borra las entradas al entrenar", "Multiplica cada entrada por su peso y combina resultados"], "correcta": 2, "porque": "La suma ponderada combina entradas, pesos y bias antes de la activación."}]}</script></section><section aria-label="Animación interactiva" class="micro-viz" data-index="16" data-micro-viz="neural"><div class="micro-kicker">03 · EXPERIMENTAR <span>≈ 45 s</span></div><div class="micro-viz-title"><div><h2>Señales que atraviesan una red</h2><p>Pulsa «Propagar» para seguir el recorrido de entradas a salida.</p></div><span aria-hidden="true" class="micro-viz-symbol">✦</span></div><div aria-live="polite" class="micro-viz-stage"><p>Animación interactiva: Señales que atraviesan una red</p></div></section><div class="micro-kicker micro-checkpoint">04 · APLICAR <span>≈ 15 s</span></div><section aria-label="Pregunta intercalada" class="quiz mini micro-check"><script class="quiz-data" type="application/json">{"titulo": "Pausa rápida · ¿Lo aplicarías?", "preguntas": [{"q": "¿Cuándo se actualizan los pesos de una red?", "opciones": ["Nunca: los pesos son fijos", "Al aplicar el optimizador durante el entrenamiento", "Cada vez que se abre la página"], "correcta": 1, "porque": "El optimizador utiliza los gradientes para ajustar parámetros durante el aprendizaje."}]}</script></section><div class="micro-finish"><strong>Idea que te llevas</strong><span>En todo agente conviven dos políticas</span><small>¿Quieres más ejemplos, fórmulas o código? Los tienes justo debajo, sin límite de tiempo.</small></div><details class="profundizar micro-legacy"><summary><span>Explorar más: explicación y simulaciones completas<small>Todo el texto original, tablas y demos avanzadas. Opcional.</small></span></summary><div class="prof-body"><section><h2>On-policy y off-policy: SARSA frente a Q-learning</h2>
-<p>En todo agente conviven dos políticas. La <strong>política de comportamiento</strong> es la que genera la experiencia (la ε-greedy, que a veces explora y recomienda al azar). La <strong>política objetivo</strong> es la que queremos evaluar y mejorar. Si son la misma, el algoritmo es <strong><em>on-policy</em></strong> («sobre la política»); si son distintas, es <strong><em>off-policy</em></strong>.</p>
-<p>SARSA se llama así por la secuencia que necesita para cada actualización: \( (s,\, a,\, r,\, s',\, a') \): estado, acción, recompensa, estado siguiente y acción siguiente.</p>
-<p>El entorno clásico para verlo: una cuadrícula de 4×12. Hay que ir de la salida (abajo a la izquierda) a la meta (abajo a la derecha). Cada paso cuesta −1. Entre las dos hay un <strong>acantilado</strong>: pisarlo cuesta −100 y devuelve al agente a la salida. El camino más corto bordea el acantilado; uno más largo da un rodeo por arriba. Para llevarlo a StreamFlix, piensa que el acantilado son los «botones de cancelar suscripción» (−100) y que un paso al azar junto a ellos es una recomendación arriesgada.</p>
-<div class="callout ejemplo"><span class="lbl">Ejemplo tomado del módulo</span><p>: el mismo paso, dos objetivos \( \alpha = 0{,}5 \), \( \gamma = 1 \), \( r = -1 \), \( Q(s,a) = 0 \).</p></div></section><figure class="demo" data-demo="curso3/c3m6-cliff" data-titulo="El acantilado: SARSA prudente, Q-learning atrevido">
-<div class="haz">La fila de abajo es el borde del acantilado (✖ = «cancelar suscripción», −100; S = la salida; G = la meta). Mira los dos caminos dibujados (naranja: Q-learning, azul: SARSA) y las dos curvas. Baja ε hasta 0 y observa qué pasa con la diferencia. Sube ε hasta 0,3. Pulsa «Otro entrenamiento» para repetir con otras semillas.</div>
-<div class="observa">Con ε = 0,1 el camino naranja pasa pegado al acantilado y el azul da un rodeo; la curva de Q-learning queda por debajo (cae más veces). Cuanto más sube ε, más prudente se vuelve SARSA y más se hunde Q-learning <em>durante el entrenamiento</em>. Con ε muy pequeño casi desaparece la diferencia: no hay despistes que temer.</div>
-</figure><div class="resumen"><h2 class="sin-num sin-toc">En pocas líneas</h2><ul><li><strong>On-policy y off-policy: SARSA frente a Q-learning:</strong> En todo agente conviven dos políticas.</li><li>Antes de continuar, intenta explicar la demo sin mirar su resultado.</li></ul></div><section class="quiz mini"><script class="quiz-data" type="application/json">{"titulo": "¿Lo tienes?", "preguntas": [{"q": "¿Qué concepto estamos trabajando en esta lección?", "opciones": ["On-policy y off-policy: SARSA frente a Q-learning", "El bucle agente–entorno: aprender probando", "Procesos de decisión de Markov: el mapa matemático"], "correcta": 0, "porque": "En todo agente conviven dos políticas."}, {"q": "¿Cuál de estas afirmaciones recoge lo que acabas de estudiar?", "opciones": ["Lo importante es comprender la idea y comprobarla con ejemplos, no memorizar términos.", "En todo agente conviven dos políticas.", "Siempre hay un único método que sirve para todos los problemas."], "correcta": 1, "porque": "La explicación central es: En todo agente conviven dos políticas."}, {"q": "Si una demo o un ejemplo te desconcierta, ¿cuál es la mejor forma de aprenderlo?", "opciones": ["Memorizar el nombre sin entender la operación.", "Volver a los números, cambiar un valor y explicar qué ocurre.", "Ignorar los resultados que no coinciden con tu intuición."], "correcta": 1, "porque": "Explorar qué cambia y por qué ayuda a conectar el concepto con su resultado."}]}</script></section></div></details><details class="profundizar"><summary><span>Profundizar: explicación completa<small>Matices, fórmulas, tablas, otros ejemplos y experimentos del módulo original.</small></span></summary><div class="prof-body"><section>
-<h2 id="on-off">On-policy y off-policy: SARSA frente a Q-learning</h2>
-<p class="pregunta">Un recomendador de StreamFlix a veces explora y enseña una película al azar. Si es una película muy rara, el usuario puede enfadarse y cancelar (−100). ¿Valora sus estrategias suponiendo que nunca se equivocará al explorar, o contando con esos despistes?</p>
-<p>En todo agente conviven dos políticas. La <strong>política de comportamiento</strong> es la que genera la experiencia (la ε-greedy, que a veces explora y recomienda al azar). La <strong>política objetivo</strong> es la que queremos evaluar y mejorar. Si son la misma, el algoritmo es <strong><em>on-policy</em></strong> («sobre la política»); si son distintas, es <strong><em>off-policy</em></strong>.</p>
-<table>
-<caption>Dos algoritmos, una sola diferencia</caption>
-<thead><tr><th></th><th>Q-learning (off-policy)</th><th>SARSA (on-policy)</th></tr></thead>
-<tbody>
-<tr><th scope="row">Objetivo</th><td>\( r + \gamma \max_{a'} Q(s',a') \)</td><td>\( r + \gamma\, Q(s',a') \), con \( a' \) la acción que <strong>de verdad</strong> se hará después</td></tr>
-<tr><th scope="row">Supone que luego…</th><td>actuará de forma óptima</td><td>seguirá explorando como hasta ahora (con ε)</td></tr>
-<tr><th scope="row">Aprende</th><td>el valor del mejor camino posible</td><td>el valor del camino que realmente recorre, con sus despistes</td></tr>
-</tbody>
-</table>
-<p>SARSA se llama así por la secuencia que necesita para cada actualización: \( (s,\, a,\, r,\, s',\, a') \): estado, acción, recompensa, estado siguiente y acción siguiente.</p>
-<div class="callout ejemplo">
-<span class="lbl">Ejemplo numérico: el mismo paso, dos objetivos</span>
-<p>\( \alpha = 0{,}5 \), \( \gamma = 1 \), \( r = -1 \), \( Q(s,a) = 0 \). En el estado siguiente \( s' \), el recomendador puede enseñar una comedia o un thriller: \( Q(s', \text{comedia}) = 2 \) y \( Q(s', \text{thriller}) = 5 \). El agente va a explorar y elige \( a' = \) comedia (valor 2).</p>
-<table>
-<thead><tr><th></th><th>Objetivo</th><th>Error TD</th><th>\( Q(s,a) \) nuevo</th></tr></thead>
-<tbody>
-<tr><th scope="row">Q-learning</th><td>\( -1 + 1 \cdot \max(2,5) = 4 \)</td><td>\( 4 - 0 = 4 \)</td><td class="res">\( 0 + 0{,}5 \cdot 4 = 2 \)</td></tr>
-<tr><th scope="row">SARSA</th><td>\( -1 + 1 \cdot 2 = 1 \)</td><td>\( 1 - 0 = 1 \)</td><td class="res">\( 0 + 0{,}5 \cdot 1 = 0{,}5 \)</td></tr>
-</tbody>
-</table>
-<p>Q-learning se queda con el 5: «si desde aquí hago lo mejor, voy muy bien». SARSA dice: «voy a hacer una recomendación torpe de exploración, así que este paso vale menos». Si la exploración es peligrosa, SARSA lo «nota».</p>
-</div>
-<h3>El acantilado</h3>
-<p>El entorno clásico para verlo: una cuadrícula de 4×12. Hay que ir de la salida (abajo a la izquierda) a la meta (abajo a la derecha). Cada paso cuesta −1. Entre las dos hay un <strong>acantilado</strong>: pisarlo cuesta −100 y devuelve al agente a la salida. El camino más corto bordea el acantilado; uno más largo da un rodeo por arriba. Para llevarlo a StreamFlix, piensa que el acantilado son los «botones de cancelar suscripción» (−100) y que un paso al azar junto a ellos es una recomendación arriesgada.</p>
-<ul>
-<li><strong>Q-learning</strong> aprende el camino óptimo: el que va pegado al borde (13 pasos), el de las recomendaciones más arriesgadas. Pero como entrena con ε = 0,1, cada diez pasos aproximadamente uno es al azar, y a esa distancia del borde un paso al azar es peligroso: cae al precipicio de vez en cuando (el usuario cancela).</li>
-<li><strong>SARSA</strong> tiene en cuenta que explorará: su objetivo usa la acción que de verdad elegirá, que a veces será un movimiento al azar. Los estados junto al acantilado salen peor valorados, así que aprende el rodeo de 17 pasos, más seguro.</li>
-</ul>
-<p>El <a href="#frag-10">fragmento 10</a> lo mide con 5 semillas: durante el entrenamiento, SARSA gana de media <strong>−32,84</strong> por episodio y Q-learning <strong>−51,25</strong> (más negativo: se cae más). Pero sin explorar, el camino de Q-learning cuesta −13 y el de SARSA −17. Cada uno es mejor según con qué vara se mida.</p>
-<div class="callout regla">
-<span class="lbl">Regla fácil</span>
-<p><strong>Q-learning aprende cómo jugar si fuera perfecto; SARSA aprende cómo jugar siendo como eres.</strong> Si más tarde vas a desplegar la política sin exploración (ε = 0), Q-learning es lo que quieres. Si lo que importa es lo que ganas <em>mientras aprendes</em> y explorar es peligroso (un robot real o un recomendador con usuarios reales que pueden cancelar), conviene SARSA, o hacer que ε baje a 0. Existe una variante, <em>Expected SARSA</em>, que en vez de la acción elegida usa el promedio de los valores según la política, con menos ruido.</p>
-</div>
-<p>Dos consecuencias para lo que viene: los algoritmos <em>off-policy</em> pueden reutilizar experiencia vieja (el replay buffer de DQN solo tiene sentido porque Q-learning es off-policy), mientras que los <em>on-policy</em> (SARSA, A2C, PPO) necesitan datos recién generados por la política actual.</p>
-</section></div></details><details class="profundizar" id="codigo"><summary><span>Ver código explicado paso a paso<small>2 fragmento(s) original(es), con cada línea comentada y salida esperada.</small></span></summary><div class="prof-body"><article class="snippet" data-lang="python" id="frag-7">
-<header>
-<h3>7 · Una actualización de Q-learning (la regla TD), con las cuentas visibles</h3>
-<p class="para-que"><strong>Para qué sirve</strong> Aplicar la regla \( Q(s,a) \leftarrow Q(s,a) + \alpha\,[\,r + \gamma \max_{a'} Q(s',a') - Q(s,a)\,] \) a mano y en código, incluyendo el caso de un paso terminal. Es el núcleo de cualquier algoritmo de Q-learning.</p>
+<header class="hero leccion">
+  <div class="hero-grid">
+    <div>
+      <p class="eyebrow">Curso 3 · Módulo 6 · Lección 7 de 8</p>
+      <h1>DQN: una red sustituye a la tabla, y dos trucos evitan que se descontrole</h1>
+      <p class="lead">Cuando los estados no caben en una tabla, una red neuronal aprende la «fórmula» de Q. Entrenarla tal cual se descontrola; el replay buffer y la red objetivo la estabilizan.</p>
+      <p class="meta-line"><span class="read-time" data-render="read-time"></span><a href="../modulo-6.html">Índice del módulo</a></p>
+    </div>
+    <div class="hero-tile" aria-hidden="true"></div>
+  </div>
 </header>
-<pre class="code"><code>import numpy as np
-
-alpha, gamma = 0.1, 0.9
-
-Q = np.zeros((3, 2))
-Q[0, 1] = 0.40
-Q[1] = [0.2, 0.9]
-
-def actualizar(Q, s, a, r, s_sig, terminado):
-    objetivo = r + gamma * Q[s_sig].max() * (not terminado)
-    error_td = objetivo - Q[s, a]
-    Q[s, a] += alpha * error_td
-    return objetivo, error_td
-
-objetivo, error_td = actualizar(Q, s=0, a=1, r=0.0, s_sig=1, terminado=False)
-print("objetivo  r + γ·max Q(s',·) =", round(objetivo, 4))
-print("error TD  objetivo - Q(s,a) =", round(error_td, 4))
-print("Q(0,1) nuevo =", round(Q[0, 1], 4))
-
-objetivo, error_td = actualizar(Q, s=1, a=1, r=1.0, s_sig=2, terminado=True)
-print("paso terminal: objetivo =", objetivo, "| Q(1,1) nuevo =", round(Q[1, 1], 4))</code></pre>
-<details class="linea-a-linea">
-<summary>Línea por línea</summary>
-<p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
-<table class="lineas">
-<thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
-<tbody>
-<tr data-lines="1"><td><code>import numpy as np</code></td><td>NumPy.</td></tr>
-<tr data-lines="3"><td><code>alpha, gamma = 0.1, 0.9</code></td><td>Tasa de aprendizaje \( \alpha \) (cuánto se corrige cada vez) y factor de descuento \( \gamma \).</td></tr>
-<tr data-lines="5"><td><code>Q = np.zeros((3, 2))</code></td><td>Tabla Q de 3 estados × 2 acciones, inicialmente a cero.</td></tr>
-<tr data-lines="6"><td><code>Q[0, 1] = 0.40</code></td><td>Suponemos que el agente ya cree que hacer la acción 1 en el estado 0 vale 0,40.</td></tr>
-<tr data-lines="7"><td><code>Q[1] = [0.2, 0.9]</code></td><td>Y que en el estado 1 la acción 0 vale 0,2 y la acción 1 vale 0,9.</td></tr>
-<tr data-lines="9"><td><code>def actualizar(Q, s, a, r, s_sig, terminado):</code></td><td>Función que aplica una actualización con la transición (s, a, r, s′) y un indicador de si s′ es final.</td></tr>
-<tr data-lines="10"><td><code>objetivo = r + gamma * Q[s_sig].max() * (not terminado)</code></td><td>El <strong>objetivo</strong>: recompensa inmediata más el valor descontado de lo mejor que se puede hacer desde s′ (<code>Q[s_sig].max()</code>). Si s′ es final, <code>(not terminado)</code> vale <code>False</code> (= 0) y desaparece el futuro.</td></tr>
-<tr data-lines="11"><td><code>error_td = objetivo - Q[s, a]</code></td><td>El <strong>error TD</strong> (<em>temporal difference</em>): lo que la realidad (objetivo) difiere de lo que creíamos.</td></tr>
-<tr data-lines="12"><td><code>Q[s, a] += alpha * error_td</code></td><td>Mueve la estimación hacia el objetivo una fracción \( \alpha \) del error.</td></tr>
-<tr data-lines="13"><td><code>return objetivo, error_td</code></td><td>Devuelve ambos para poder imprimirlos.</td></tr>
-<tr data-lines="15"><td><code>objetivo, error_td = actualizar(Q, s=0, a=1, r=0.0, s_sig= …</code></td><td>Primera transición: en el estado 0 se hizo la acción 1, la recompensa fue 0 y se llegó al estado 1 (no final).</td></tr>
-<tr data-lines="16"><td><code>print("objetivo  r + γ·max Q(s',·) =", round(objetivo, 4))</code></td><td>Objetivo: \( 0 + 0{,}9 \cdot \max(0{,}2;\,0{,}9) = 0{,}81 \).</td></tr>
-<tr data-lines="17"><td><code>print("error TD  objetivo - Q(s,a) =", round(error_td, 4))</code></td><td>Error: \( 0{,}81 - 0{,}40 = 0{,}41 \).</td></tr>
-<tr data-lines="18"><td><code>print("Q(0,1) nuevo =", round(Q[0, 1], 4))</code></td><td>Valor nuevo: \( 0{,}40 + 0{,}1 \cdot 0{,}41 = 0{,}441 \).</td></tr>
-<tr data-lines="20"><td><code>objetivo, error_td = actualizar(Q, s=1, a=1, r=1.0, s_sig= …</code></td><td>Segunda transición: en el estado 1 se hizo la acción 1, se cobró 1 y se llegó a un estado final.</td></tr>
-<tr data-lines="21"><td><code>print("paso terminal: objetivo =", objetivo, "| Q(1,1) nue …</code></td><td>Con estado final, el objetivo es solo la recompensa (1,0). Q(1,1) pasa de 0,9 a \( 0{,}9 + 0{,}1 \cdot (1 - 0{,}9) = 0{,}91 \).</td></tr>
-</tbody>
-</table>
+<details class="predice">
+  <summary>El estado de CartPole son 4 números reales. Si partieras cada uno en 20 tramos para usar una tabla Q, ¿cuántas filas tendría?<span class="hint"></span></summary>
+  <div>
+    <p><strong>\( 20^4 = 160\,000 \) filas</strong>, y casi ninguna se visitaría nunca. En StreamFlix serían millones de usuarios. Hace falta algo que <strong>generalice</strong>: que lo aprendido en un estado sirva para los parecidos. Eso hace una red neuronal.</p>
+  </div>
 </details>
-<div class="salida">
-<strong>Salida esperada</strong>
-<pre>objetivo  r + γ·max Q(s',·) = 0.81
-error TD  objetivo - Q(s,a) = 0.41
-Q(0,1) nuevo = 0.441
-paso terminal: objetivo = 1.0 | Q(1,1) nuevo = 0.91</pre>
-<p>Las cuentas coinciden con las que se hacen a mano: objetivo 0,81, error TD 0,41 y valor nuevo 0,441 (se mueve un 10 % del camino hacia el objetivo, porque \( \alpha = 0{,}1 \)). En el paso terminal el objetivo es exactamente la recompensa, 1,0, porque después de un estado final no hay futuro que descontar; el valor sube de 0,90 a 0,91. Olvidar ese <code>(not terminado)</code> es uno de los fallos más frecuentes: el agente creería que tras la meta sigue habiendo recompensas y los valores se inflan.</p>
+
+<section>
+<h2 id="idea">Regresión hacia un objetivo, con la diana quieta</h2>
+<p>Una tabla Q es memorizar la nota que cada usuario daría a cada película; una red es aprender una <em>fórmula de los gustos</em>. La <strong>red Q</strong> recibe el estado (4 números en CartPole) y devuelve <strong>un valor por acción</strong> (2), sin activación final; se actúa con <code>argmax</code>.</p>
+<p>Se entrena como una regresión: que \( Q(s,a) \) se acerque al objetivo de Bellman, con pérdida de Huber (cuadrática para errores pequeños, lineal para los grandes):</p>
+<div class="formula">\[ y = r + \gamma\,(1-d)\,\max_{a'} Q^{-}(s', a') \]</div>
+<p>\( d = 1 \) si el episodio <em>terminó</em> de verdad (<code>terminated</code>). Hecho tal cual, se descontrola por dos motivos, y DQN trae dos arreglos:</p>
+<ul>
+  <li><strong>Datos correlacionados</strong> (veinte capítulos seguidos de la misma serie) → <strong>replay buffer</strong>: guarda las últimas transiciones y entrena con minilotes al azar.</li>
+  <li><strong>Objetivo móvil</strong> (\( y \) depende de la red que entrenas) → <strong>red objetivo</strong> \( Q^{-} \): una copia congelada que solo se actualiza cada \( C \) pasos.</li>
+</ul>
+</section>
+
+<figure class="demo" data-demo="curso3/c3m6-dqn-mini" data-titulo="Mini-DQN: sin replay se olvida; sin red objetivo, se oscila">
+  <div class="haz">Con replay sí y red objetivo no, pulsa «+1000 pasos» tres o cuatro veces. Activa «Red objetivo» y repite.</div>
+  <div class="observa">Sin red objetivo el error medio se queda en 3,65 y el objetivo naranja salta sin parar; con las dos piezas baja a 0,00 y se queda en 4,58.</div>
+</figure>
+
+<section>
+<h2 id="numeros">Con números: el objetivo de una transición</h2>
+<div class="callout ejemplo">
+  <span class="lbl">Ejemplo numérico</span>
+  <p>CartPole: \( r = 1 \) (el palo sigue en pie), \( \gamma = 0{,}99 \) y la red objetivo da \( Q^{-}(s',\cdot) = [\,2;\; 5\,] \).</p>
+  <ol class="pasos">
+    <li><strong>Episodio sigue</strong> (\( d = 0 \)): \( y = 1 + 0{,}99 \cdot 5 = \) <span class="res">5,95</span>.</li>
+    <li><strong>El palo cayó</strong> (<code>terminated</code>, \( d = 1 \)): \( y = 1 + 0 = \) <span class="res">1</span>: no hay futuro.</li>
+    <li><strong>Se acabó el tiempo</strong> (<code>truncated</code> a 500 pasos): el futuro seguía existiendo, así que \( d = 0 \) y \( y = 5{,}95 \).</li>
+  </ol>
 </div>
-</article><article class="snippet" data-lang="python" id="frag-10">
-<header>
-<h3>10 · SARSA frente a Q-learning en el acantilado (<code>CliffWalking-v1</code>)</h3>
-<p class="para-que"><strong>Para qué sirve</strong> Entrenar los dos algoritmos con el mismo código, cambiando solo una línea (el objetivo), y comparar el camino que aprende cada uno y lo que gana mientras entrena. Es la prueba en código de la diferencia entre <em>on-policy</em> y <em>off-policy</em>.</p>
-</header>
-<pre class="code"><code>import numpy as np
+</section>
+
+<details class="predice">
+  <summary>Entrenas el DQN de CartPole durante 300 episodios (un minuto de CPU). ¿Habrá «resuelto» el entorno (media de 475 sobre un máximo de 500)?<span class="hint"></span></summary>
+  <div>
+    <p><strong>No.</strong> Con la semilla 0 llega a 192 de media sin explorar (el azar consigue unos 22); con las semillas 1 y 2 la media final ronda 106–110. DQN aprende, pero es inestable y varía mucho entre semillas: por eso siempre se muestran varias.</p>
+  </div>
+</details>
+
+<div class="resumen">
+  <h2 class="sin-num sin-toc">En tres líneas</h2>
+  <ul>
+    <li>Red Q: entra el estado, sale un valor por acción; se entrena hacia \( y = r + \gamma(1-d)\max Q^{-} \) con Huber.</li>
+    <li>Replay buffer rompe la correlación; red objetivo deja la diana quieta entre copias.</li>
+    <li>Solo <code>terminated</code> anula el futuro; <code>truncated</code>, no.</li>
+  </ul>
+</div>
+
+<section class="quiz mini">
+<script type="application/json" class="quiz-data">
+{
+ "titulo": "¿Lo tienes?",
+ "preguntas": [
+  {
+   "q": "En DQN, ¿para qué sirven el <strong>replay buffer</strong> y la <strong>red objetivo</strong>?",
+   "opciones": [
+    "El buffer acelera el cálculo en la GPU y la red objetivo reduce el número de parámetros",
+    "El buffer sirve para visualizar el entrenamiento y la red objetivo para evaluar al final",
+    "El buffer garantiza que el agente explore y la red objetivo que sea determinista",
+    "El buffer rompe la correlación entre ejemplos consecutivos y reutiliza experiencia; la red objetivo mantiene quieto el objetivo y calcula y estable entre copias"
+   ],
+   "correcta": 3,
+   "porque": "Sin buffer se entrena con ejemplos casi idénticos seguidos (olvido y desestabilización). Sin red objetivo, el objetivo y cambia con cada actualización de la misma red («diana móvil»). Ninguna de las dos acelera hardware, sirve de visualización ni controla la exploración (eso lo hace ε)."
+  },
+  {
+   "q": "Lectura de código: <code>y = r + gamma * q_sig.max(axis=1) * (1 - f)</code>. Para una transición con r = 1, γ = 0,99, <code>q_sig.max</code> = 3,0, ¿qué valor de <code>y</code> sale si <code>f = 0</code> y si <code>f = 1</code> (estado final)?",
+   "opciones": [
+    "f = 0 → 3,97 · f = 1 → 1",
+    "f = 0 → 1 · f = 1 → 3,97",
+    "f = 0 → 4,0 · f = 1 → 4,0",
+    "f = 0 → 2,97 · f = 1 → 0"
+   ],
+   "correcta": 0,
+   "porque": "Con f = 0: 1 + 0,99·3,0·(1 − 0) = 1 + 2,97 = <strong>3,97</strong>. Con f = 1 el factor (1 − f) vale 0 y desaparece el futuro: <strong>y = 1</strong>. Si olvidaras el (1 − f), el estado final tendría un valor inflado de 3,97 aunque después de él ya no haya nada."
+  },
+  {
+   "q": "CartPole termina porque el episodio llegó a 500 pasos con el palo aún en pie (<code>truncated = True</code>, <code>terminated = False</code>). Al calcular el objetivo de DQN para esa última transición, ¿qué es lo correcto?",
+   "opciones": [
+    "Anular el futuro, porque el episodio acabó: <code>y = r</code>",
+    "Seguir sumando el valor futuro, <code>y = r + γ·max Q⁻(s′,·)</code>, porque el palo no cayó y el futuro seguía existiendo",
+    "Descartar la transición del buffer",
+    "Usar <code>y = −100</code> como castigo por agotar el tiempo"
+   ],
+   "correcta": 1,
+   "porque": "<code>truncated</code> es un corte externo (el reloj), no un final del problema: desde ese estado habría seguido habiendo recompensas. Solo <code>terminated</code> anula el futuro. Tratar el truncado como un final enseña al agente que «tras 500 pasos no hay nada» y subestima los valores cerca del límite. Tampoco hay motivo para descartar la transición ni castigar al agente: no ha hecho nada mal."
+  },
+  {
+   "q": "Con la pérdida de Huber (\\( \\delta = 1 \\)), ¿cuánto aporta un error \\( e = 4 \\), comparado con el MSE?",
+   "opciones": [
+    "Huber 3,5 frente a MSE 16",
+    "Huber 8 frente a MSE 16",
+    "Los dos 16",
+    "Huber 16 frente a MSE 3,5"
+   ],
+   "correcta": 0,
+   "porque": "Para \\( |e| > \\delta \\), Huber es lineal: \\( \\delta(|e| - \\delta/2) = 4 - 0{,}5 = 3{,}5 \\). El MSE da \\( 4^2 = 16 \\). Así, un objetivo disparatado no se lleva el entrenamiento por delante."
+  }
+ ]
+}
+</script>
+</section>
+
+<details class="profundizar">
+  <summary><span>Profundizar: la explicación completa<small>La red Q y su cuenta de parámetros (1282), el objetivo móvil, la pérdida de Huber con su ejemplo, los dos problemas y sus soluciones, el algoritmo completo, los hiperparámetros, el bucle con GradientTape, los resultados reales y la curva de aprendizaje de 3 semillas.</small></span></summary>
+  <div class="prof-body">
+<h2 id="dqn">Deep Q-Networks (DQN): una red neuronal en lugar de la tabla</h2>
+
+<p class="pregunta">La tabla Q necesita una fila por estado. En StreamFlix los estados serían millones de usuarios con historiales distintos; en CartPole son 4 números reales, y en un juego de Atari, imágenes: ¿cómo se aprende \( Q \) cuando no cabe en una tabla?</p>
+
+<div class="callout analogia">
+  <span class="lbl">Analogía</span>
+  <p>Una tabla Q es como memorizar qué nota daría cada usuario del mundo a cada película del catálogo. Una red neuronal es como aprender una <em>fórmula de los gustos</em> (género, actores, duración): con ella puedes valorar para un usuario películas que nunca ha visto. Si dos estados se parecen, sus valores Q se parecen, y lo aprendido en uno ayuda en el otro. A eso se llama <strong>generalizar</strong>.</p>
+</div>
+
+<h3>La red Q</h3>
+<p>Se sustituye la tabla por una red \( Q(s, a;\, \theta) \), con pesos \( \theta \). Para CartPole: la <strong>entrada</strong> es el estado (4 números) y la <strong>salida</strong> tiene <strong>una neurona por acción</strong> (2), <em>sin activación</em>, porque los valores Q son números reales de cualquier tamaño. De una pasada se obtienen los valores de todas las acciones, y se actúa con <code>argmax</code>.</p>
+<ul class="flow">
+  <li class="a">ESTADO s<small>4 números</small></li>
+  <li class="b">Dense 32 · ReLU</li>
+  <li class="b">Dense 32 · ReLU</li>
+  <li class="c">Q(s, ·)<small>2 valores, sin activación</small></li>
+</ul>
+<p>Cuenta de parámetros de esa red: \( 4 \cdot 32 + 32 = 160 \) (primera capa) \( + 32 \cdot 32 + 32 = 1056 \) (segunda) \( + 32 \cdot 2 + 2 = 66 \) (salida) \( = 1282 \), lo mismo que informa <code>summary()</code> en el <a href="#frag-11">fragmento 11</a>. Si lo comparas con la tabla de FrozenLake (64 números), la red es más grande, pero cubre un espacio continuo entero.</p>
+
+<h3>Cómo se entrena: regresión hacia un objetivo móvil</h3>
+<p>Es un problema de regresión: queremos que \( Q(s,a;\theta) \) se parezca al <strong>objetivo</strong> de Bellman, igual que en Q-learning tabular. Para una transición \( (s,a,r,s',d) \), donde \( d = 1 \) si \( s' \) es final:</p>
+<div class="formula">\[ y \;=\; r + \gamma\,(1-d)\,\max_{a'} Q(s', a';\, \theta^{-}), \qquad L(\theta) = \mathrm{Huber}\big(\, y - Q(s,a;\theta) \,\big) \]</div>
+<ul>
+  <li>\( y \) es el objetivo («lo que debería valer»). El factor \( (1-d) \) lo reduce a \( r \) en los finales.</li>
+  <li>\( \theta^{-} \) son los pesos de una <strong>segunda red</strong>, la red objetivo (más abajo).</li>
+  <li>\( L \) mide el error entre la predicción y el objetivo, y se minimiza con descenso de gradiente (Adam), como en cualquier regresión del Curso 2.</li>
+</ul>
+
+<h3>La pérdida de Huber (y por qué no solo MSE)</h3>
+<p>El error cuadrático (MSE) castiga al cuadrado: un error de 4 cuesta 16, tanto que un único objetivo disparatado se lleva el entrenamiento por delante. La pérdida de <strong>Huber</strong> es cuadrática para errores pequeños y <em>lineal</em> para los grandes:</p>
+<div class="formula">\[ \mathrm{Huber}_{\delta}(e) = \begin{cases} \tfrac{1}{2}\,e^{2} & \text{si } |e| \le \delta \\[2pt] \delta\,\big(|e| - \tfrac{1}{2}\delta\big) & \text{si } |e| > \delta \end{cases} \qquad (\text{con } \delta = 1) \]</div>
+<div class="callout ejemplo">
+  <span class="lbl">Ejemplo numérico: tres errores</span>
+  <p>Tu red predice lo buena que es una recomendación y se equivoca en tres casos: errores \( e = 0{,}5;\; 0{,}2;\; 4{,}0 \) (el último, por ejemplo, predijo 5 estrellas y el usuario puso 1).</p>
+  <table>
+    <thead><tr><th>Error</th><th>MSE (\( e^2 \))</th><th>Huber</th></tr></thead>
+    <tbody>
+      <tr><td>0,5</td><td>0,25</td><td>\( \tfrac12 \cdot 0{,}25 = 0{,}125 \)</td></tr>
+      <tr><td>0,2</td><td>0,04</td><td>\( \tfrac12 \cdot 0{,}04 = 0{,}02 \)</td></tr>
+      <tr><td>4,0</td><td>16</td><td>\( 4 - 0{,}5 = 3{,}5 \)</td></tr>
+      <tr><td><strong>Media</strong></td><td class="res">\( 16{,}29/3 = 5{,}43 \)</td><td class="res">\( 3{,}645/3 = 1{,}215 \)</td></tr>
+    </tbody>
+  </table>
+  <p>El error de 4 aporta 16 al MSE y solo 3,5 a Huber. Es lo que calcula el <a href="#frag-11">fragmento 11</a>. En la práctica, Huber equivale a recortar el gradiente a ±1: ningún objetivo extremo puede dar un paso gigante. (Otra práctica habitual en Atari es recortar las recompensas a −1, 0, +1.)</p>
+</div>
+
+<h3>Por qué la receta ingenua falla, y las dos piezas que la arreglan</h3>
+<p>Si entrenas la red en línea, con cada transición tal como llega y usando la propia red para calcular el objetivo, el entrenamiento se descontrola. Hay dos causas, y DQN (el trabajo de DeepMind de 2013–2015 que aprendió a jugar a Atari desde los píxeles) las ataca con dos ideas:</p>
+
+<div class="cards">
+  <div class="card">
+    <h4>Problema 1: datos correlacionados</h4>
+    <p>Los pasos consecutivos se parecen muchísimo (veinte capítulos seguidos de la misma serie), y una red entrenada con muchos ejemplos casi idénticos seguidos olvida todo lo demás (<em>olvido catastrófico</em>). Una red espera ejemplos independientes.</p>
+    <p><strong>Solución: replay buffer.</strong> Guarda las últimas \( N \) transiciones \( (s,a,r,s',d) \) en una cola (<code>deque(maxlen=N)</code>). En cada paso de entrenamiento toma un <strong>minilote al azar</strong> de ahí. Mezcla experiencias de distintos momentos y reutiliza cada una muchas veces.</p>
+  </div>
+  <div class="card">
+    <h4>Problema 2: el objetivo se mueve</h4>
+    <p>El objetivo \( y \) depende de la misma red que estamos entrenando. Cada actualización cambia los pesos, y con ello cambia también el objetivo: es como disparar a una diana que se desplaza cada vez que disparas.</p>
+    <p><strong>Solución: red objetivo.</strong> Una copia congelada \( \theta^{-} \) de la red, que solo se usa para calcular \( y \) y que se actualiza cada \( C \) pasos copiando los pesos (<code>set_weights</code>). Entre copias, la diana está quieta.</p>
+  </div>
+</div>
+
+<div class="callout analogia">
+  <span class="lbl">Analogía</span>
+  <p>El replay buffer es como un cuaderno con reseñas de las películas que has visto este mes: para aprender tus gustos repasas reseñas barajadas de días distintos, en vez de releer sin parar la del último capítulo que viste. La red objetivo es corregir tus quinielas con la lista de un crítico que solo la actualiza cada semana, en vez de reescribirla cada vez que te equivocas.</p>
+</div>
+
+<div class="callout recuerda">
+  <span class="lbl">Experimento de arriba: «Mini-DQN: sin replay se olvida; sin red objetivo, se oscila», con todo detalle</span>
+  <p><strong>Haz esto.</strong> El mundo es un embudo de 8 pantallas de StreamFlix (portada, ficha, tráiler…) y, tras la última, la película vista (+10): la red aprende lo valioso que es «avanzar» o «retroceder» en cada pantalla. Con la configuración inicial (replay sí, red objetivo no, learning rate 0,30), pulsa «+1000 pasos» tres o cuatro veces. Luego activa «Red objetivo» (esto reinicia la red) y repite. Después apaga el replay (con la red objetivo puesta) y repite. Por último, con replay y red objetivo, baja el learning rate a 0,05.</p>
+  <p><strong>Fíjate en.</strong> Arriba, las líneas continuas (la red) deberían alcanzar las discontinuas (el valor verdadero). Abajo, el error medio (azul) debe bajar hacia 0 y el objetivo de una transición fija (naranja) debería quedarse en 4,58. Tras 4000 pasos, con learning rate 0,30 y los ajustes por defecto (replay sí, red objetivo no) el error medio sigue en 3,65 y la naranja salta sin parar. Con replay y red objetivo baja a 0,00 y la naranja se queda en 4,58. Sin replay (con red objetivo) llega a 0,46: aprende, pero olvida, porque solo ve la última experiencia. Si bajas el learning rate a 0,05, hasta la versión sin red objetivo queda en 0,13. <strong>En este mundo diminuto</strong> la red objetivo hace falta sobre todo cuando el learning rate es alto; en CartPole y Atari es mucho más importante. (Las cifras son las de esta semilla fija; «Red nueva» las repite.)</p>
+</div>
+
+<h3>El algoritmo DQN completo</h3>
+<pre class="ascii">Crear red Q (pesos θ) y red objetivo Q⁻ (pesos θ⁻ = θ).  Buffer vacío.
+repetir para cada EPISODIO:
+    s = estado inicial
+    repetir hasta fin del episodio:
+        a = ε-greedy sobre Q(s, ·)                  # explorar / explotar
+        (s', r, terminated, truncated) = entorno.paso(a)
+        guardar (s, a, r, s', terminated) en el buffer
+        si el buffer tiene suficientes transiciones:
+            tomar un minilote al azar del buffer
+            y = r + γ · (1 − terminated) · máx Q⁻(s', ·)     # con la red objetivo
+            θ ← θ − η · ∇θ  Huber( y − Q(s, a; θ) )          # un paso de descenso
+        cada C pasos:  θ⁻ ← θ                               # copiar a la red objetivo
+        s = s'
+    bajar ε</pre>
+
+<table>
+  <caption>Hiperparámetros del DQN de CartPole que verás en el código</caption>
+  <thead><tr><th>Valor</th><th>Para qué</th></tr></thead>
+  <tbody>
+    <tr><td>red 4 → 64 → 64 → 2</td><td>Q(s, ·) para las 2 acciones</td></tr>
+    <tr><td>\( \gamma = 0{,}99 \)</td><td>mira unos 100 pasos hacia delante</td></tr>
+    <tr><td>Adam, learning rate 0,001; minilote de 64</td><td>el paso de descenso</td></tr>
+    <tr><td>buffer de 10 000; empieza a entrenar con 1000</td><td>replay (hay que llenarlo un poco antes de muestrear)</td></tr>
+    <tr><td>\( \varepsilon \): 1 → 0,05 en 5000 pasos</td><td>exploración decreciente (lineal)</td></tr>
+    <tr><td>copia a la red objetivo cada 500 pasos</td><td>diana quieta entre copias</td></tr>
+  </tbody>
+</table>
+
+<h3>En Keras: un bucle propio con <code>GradientTape</code></h3>
+<p>No se puede usar <code>model.fit()</code>: el «dato de entrada» (los estados) y la «etiqueta» (el objetivo \( y \)) no existen de antemano, sino que se calculan en cada paso con la red objetivo, a partir de lo que acaba de hacer el agente. Por eso se escribe el bucle a mano con <code>tf.GradientTape</code>, justo la técnica del <a href="../modulo-1/leccion-3.html#autodiff">módulo 1</a> (y su <a href="../modulo-1/leccion-4.html#tf-function">tf.function</a> para compilar el paso). Hay tres detalles que dan problemas:</p>
+<ul>
+  <li><strong>El objetivo \( y \) se calcula fuera de la cinta</strong> (o equivale a ello), para que el gradiente no atraviese la red objetivo.</li>
+  <li><strong>La máscara <code>one_hot</code></strong>: la red devuelve un valor por acción, pero la pérdida solo se calcula para la acción que de verdad se hizo. <code>tf.reduce_sum(q(s) * tf.one_hot(a, 2), axis=1)</code> se queda con ese valor.</li>
+  <li><strong>Evita <code>model.predict</code> para decidir cada acción</strong>: tiene mucha sobrecarga por llamada. Es más rápido llamar a la red directamente, <code>q(estado[None, :])</code>, y compilar con <code>@tf.function</code>.</li>
+</ul>
+<p>Los fragmentos <a href="#frag-12">12</a> y <a href="leccion-8.html#frag-13">13</a> muestran cada pieza y el DQN entero.</p>
+
+<h3>Resultados reales, con honestidad</h3>
+<p>Un agente que juega al azar consigue unos 22 pasos (<a href="leccion-2.html#frag-3">fragmento 3</a>). El DQN del <a href="leccion-8.html#frag-13">fragmento 13</a>, con solo 300 episodios (23 591 pasos, un minuto de CPU), sube hasta un retorno medio de 197,5 en los últimos 30 episodios y, sin explorar, 192 de media en 10 episodios (entre 171 y 212). <strong>No ha resuelto CartPole</strong> (se considera resuelto con una media de 475 de máximo 500): aprendió bastante, pero tiene altibajos. Y eso con la semilla 0. Con las semillas 1 y 2, la media de los últimos 30 episodios fue de solo 105,8 y 110,2; solo la semilla 0 llegó al máximo de 500 pasos (en tres episodios). Es un comportamiento normal del DQN: aprende, pero es inestable, y la variación entre semillas es grande. Los investigadores siempre muestran varias semillas por eso.</p>
+
+<figure class="demo" data-demo="curso3/c3m6-curva-dqn" data-titulo="Curva de aprendizaje real de un DQN en CartPole (3 semillas)">
+  <div class="haz">Deja la ventana en 20 y mira las tres semillas. Luego sube la ventana a 60 para suavizar. Desactiva dos semillas y quédate con una. Fíjate en la línea punteada gris de ε.</div>
+  <div class="observa">Mientras ε es grande (hasta ≈ episodio 150-180) el retorno ronda 15–25, como el azar: aún se está explorando y llenando el buffer. Después sube, pero con muchos altibajos: un episodio de 200 puede ir seguido de uno de 30. Cada semilla cuenta una historia distinta (la primera vez que superan 100: episodios 171, 135 y 165). Una sola curva no basta para juzgar un algoritmo de refuerzo. Estos datos no se calculan en el navegador: son los retornos reales del entrenamiento del fragmento 13 (y de otras dos semillas).</div>
+</figure>
+
+<div class="callout ojo">
+  <span class="lbl">Ojo</span>
+  <p>Los cinco errores de DQN que más tiempo hacen perder: (1) olvidar el <code>(1 - terminated)</code> del objetivo; (2) guardar <code>truncated</code> como si fuera un final; (3) empezar a entrenar con un buffer casi vacío; (4) no pasar el estado con la forma de lote <code>(1, 4)</code> al predecir; (5) usar la misma red para el objetivo y la predicción (inestable) o copiarla con demasiada frecuencia. Hay más en la sección de errores.</p>
+</div>
+  </div>
+</details>
+
+<section>
+<h2 class="sin-num">Código</h2>
+<article class="snippet" data-lang="python" id="frag-11">
+  <header>
+    <h3>11 · La red Q de Keras: entrada = estado, salida = un valor por acción, y la pérdida de Huber</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Construir la red que sustituye a la tabla Q, ver sus formas y su número de parámetros, elegir una acción con <code>argmax</code> y comprobar a mano la pérdida de Huber frente al error cuadrático medio.</p>
+  </header>
+  <pre class="code"><code>import numpy as np
+import keras
+from keras import layers
+
+keras.utils.set_random_seed(0)
+
+red_q = keras.Sequential([
+    keras.Input(shape=(4,)),
+    layers.Dense(32, activation="relu"),
+    layers.Dense(32, activation="relu"),
+    layers.Dense(2),
+], name="red_q")
+red_q.summary()
+
+estado = np.array([[0.02, -0.5, 0.05, 0.8]], dtype="float32")
+valores_q = red_q.predict(estado, verbose=0)
+print("forma de la entrada:", estado.shape, "| forma de la salida:", valores_q.shape)
+print("Q(s, izquierda), Q(s, derecha) =", valores_q.round(4)[0])
+print("acción greedy (argmax):", int(valores_q.argmax()))
+
+lote = np.random.default_rng(0).normal(size=(5, 4)).astype("float32")
+print("salida para un lote de 5 estados:", red_q.predict(lote, verbose=0).shape)
+
+y_objetivo = np.array([1.5, 0.2, 3.0])
+q_actual = np.array([1.0, 0.0, -1.0])
+error = y_objetivo - q_actual
+mse = np.mean(error ** 2)
+huber = np.mean(np.where(np.abs(error) &lt;= 1, 0.5 * error ** 2, np.abs(error) - 0.5))
+print("errores:", error, "| MSE =", round(mse, 4), "| Huber =", round(huber, 4))
+print("Huber de Keras:", round(float(keras.losses.Huber()(y_objetivo, q_actual)), 4))</code></pre>
+  <details class="linea-a-linea">
+    <summary>Línea por línea</summary>
+    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+      <tbody>
+        <tr data-lines="1"><td><code>import numpy as np</code></td><td>NumPy.</td></tr>
+        <tr data-lines="2"><td><code>import keras</code></td><td>Keras 3.</td></tr>
+        <tr data-lines="3"><td><code>from keras import layers</code></td><td>Las capas de Keras (<code>Dense</code>, etc.).</td></tr>
+        <tr data-lines="5"><td><code>keras.utils.set_random_seed(0)</code></td><td>Fija la semilla de Python, NumPy y del backend de una vez, para que los pesos iniciales sean siempre los mismos.</td></tr>
+        <tr data-lines="7-12"><td><code>red_q = keras.Sequential([ …</code></td><td>Una red de capas apiladas (<code>Sequential</code>) con nombre. <code>Input(shape=(4,))</code>: el estado de CartPole son 4 números. Dos capas ocultas <code>Dense(32, activation="relu")</code>. La capa final, <code>Dense(2)</code>, <strong>sin activación</strong>: da un número real por acción (los valores Q), que pueden ser negativos o enormes; una sigmoide o un softmax estropearían la escala.</td></tr>
+        <tr data-lines="13"><td><code>red_q.summary()</code></td><td>Imprime la tabla de capas, formas de salida y número de parámetros.</td></tr>
+        <tr data-lines="15"><td><code>estado = np.array([[0.02, -0.5, 0.05, 0.8]], dtype="float3 …</code></td><td>Un estado inventado, con la forma <code>(1, 4)</code>: una fila (un estado) y cuatro columnas. Las redes siempre esperan un <em>lote</em> de ejemplos, aunque sea de uno.</td></tr>
+        <tr data-lines="16"><td><code>valores_q = red_q.predict(estado, verbose=0)</code></td><td><code>predict</code> calcula la salida de la red. <code>verbose=0</code> silencia la barra de progreso.</td></tr>
+        <tr data-lines="17"><td><code>print("forma de la entrada:", estado.shape, "| forma de la …</code></td><td>Entrada <code>(1, 4)</code> y salida <code>(1, 2)</code>: dos valores Q.</td></tr>
+        <tr data-lines="18"><td><code>print("Q(s, izquierda), Q(s, derecha) =", valores_q.round( …</code></td><td>Los dos valores Q de ese estado (la red aún no ha aprendido nada: son casi 0).</td></tr>
+        <tr data-lines="19"><td><code>print("acción greedy (argmax):", int(valores_q.argmax()))</code></td><td><code>argmax</code> devuelve la posición del mayor: la acción que elegiría el agente.</td></tr>
+        <tr data-lines="21"><td><code>lote = np.random.default_rng(0).normal(size=(5, 4)).astype …</code></td><td>Cinco estados aleatorios, forma <code>(5, 4)</code>.</td></tr>
+        <tr data-lines="22"><td><code>print("salida para un lote de 5 estados:", red_q.predict(l …</code></td><td>Con 5 estados, la red devuelve <code>(5, 2)</code>: una pasada por la red da los valores Q de <em>todas</em> las acciones de <em>todos</em> los estados del lote.</td></tr>
+        <tr data-lines="24"><td><code>y_objetivo = np.array([1.5, 0.2, 3.0])</code></td><td>Tres objetivos \( y \) inventados.</td></tr>
+        <tr data-lines="25"><td><code>q_actual = np.array([1.0, 0.0, -1.0])</code></td><td>Las predicciones actuales \( Q(s,a) \) de la red para esas tres transiciones.</td></tr>
+        <tr data-lines="26"><td><code>error = y_objetivo - q_actual</code></td><td>Los errores: 0,5; 0,2 y 4,0 (el tercero es grande).</td></tr>
+        <tr data-lines="27"><td><code>mse = np.mean(error ** 2)</code></td><td>Error cuadrático medio: eleva al cuadrado y promedia.</td></tr>
+        <tr data-lines="28"><td><code>huber = np.mean(np.where(np.abs(error) &lt;= 1, 0.5 * error * …</code></td><td>Pérdida de Huber (con \( \delta = 1 \)) escrita a mano: <code>np.where(condición, a, b)</code> elige <code>a</code> donde el error es pequeño (≤ 1) y aplica \( \tfrac12 e^2 \); donde es grande aplica \( |e| - \tfrac12 \).</td></tr>
+        <tr data-lines="29"><td><code>print("errores:", error, "| MSE =", round(mse, 4), "| Hube …</code></td><td>Imprime los errores y las dos pérdidas.</td></tr>
+        <tr data-lines="30"><td><code>print("Huber de Keras:", round(float(keras.losses.Huber()( …</code></td><td>Comprueba que <code>keras.losses.Huber()</code> da el mismo número que nuestra fórmula.</td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>Model: "red_q"
+┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━┓
+┃ Layer (type)                    ┃ Output Shape           ┃       Param # ┃
+┡━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━┩
+│ dense (Dense)                   │ (None, 32)             │           160 │
+├─────────────────────────────────┼────────────────────────┼───────────────┤
+│ dense_1 (Dense)                 │ (None, 32)             │         1,056 │
+├─────────────────────────────────┼────────────────────────┼───────────────┤
+│ dense_2 (Dense)                 │ (None, 2)              │            66 │
+└─────────────────────────────────┴────────────────────────┴───────────────┘
+ Total params: 1,282 (5.01 KB)
+ Trainable params: 1,282 (5.01 KB)
+ Non-trainable params: 0 (0.00 B)
+forma de la entrada: (1, 4) | forma de la salida: (1, 2)
+Q(s, izquierda), Q(s, derecha) = [ 0.0697 -0.026 ]
+acción greedy (argmax): 0
+salida para un lote de 5 estados: (5, 2)
+errores: [0.5 0.2 4. ] | MSE = 5.43 | Huber = 1.215
+Huber de Keras: 1.215</pre>
+    <p>La tabla de parámetros: la primera capa tiene \( 4 \cdot 32 + 32 = 160 \), la segunda \( 32 \cdot 32 + 32 = 1056 \) y la de salida \( 32 \cdot 2 + 2 = 66 \); en total <strong>1282 parámetros</strong>, frente a los 16·4 = 64 números de la tabla de FrozenLake, pero ahora sirven para <em>cualquier</em> estado real, no solo para 16. Los valores Q iniciales son casi 0 (0,0697 y −0,026) porque la red no ha aprendido nada. La pérdida: con errores 0,5; 0,2 y 4,0, el MSE es 5,43 (dominado por el error de 4, al cuadrado: 16) y la Huber vale 1,215 (el error grande solo aporta 3,5, un crecimiento lineal). Por eso se usa Huber en DQN: un solo objetivo disparatado no arrastra todo el entrenamiento. Keras da exactamente el mismo valor que la fórmula a mano.</p>
+  </div>
+</article>
+
+<article class="snippet" data-lang="python" id="frag-12">
+  <header>
+    <h3>12 · Replay buffer, objetivo con red objetivo y un paso de entrenamiento</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Montar a pequeña escala las tres piezas de DQN que no son «la red»: guardar transiciones en un <code>deque</code>, muestrear un minilote, calcular el objetivo \( y = r + \gamma \max_{a'} Q_{obj}(s',a')\,(1-\text{fin}) \) con una <em>segunda</em> red, y entrenar con <code>GradientTape</code>. Se imprime cada cifra para poder seguirla.</p>
+  </header>
+  <pre class="code"><code>import random
+from collections import deque
+import numpy as np
+import tensorflow as tf
+import keras
+from keras import layers
 import gymnasium as gym
 
-env = gym.make("CliffWalking-v1")
-FILAS, COLS = 4, 12
-alpha, gamma, epsilon = 0.5, 1.0, 0.1
+keras.utils.set_random_seed(0)
+random.seed(0)
+gamma = 0.99
 
-def elegir(Q, s, rng):
-    if rng.random() &lt; epsilon:
-        return int(rng.integers(4))
-    return int(rng.choice(np.flatnonzero(Q[s] == Q[s].max())))
+def crear_red():
+    return keras.Sequential([keras.Input(shape=(4,)),
+                             layers.Dense(16, activation="relu"),
+                             layers.Dense(2)])
 
-def entrenar(algoritmo, episodios=500, semilla=0):
-    rng = np.random.default_rng(semilla)
-    Q = np.zeros((48, 4))
-    recompensas = []
-    for ep in range(episodios):
-        s, _ = env.reset(seed=semilla if ep == 0 else None)
-        a = elegir(Q, s, rng)
-        total, pasos, fin = 0.0, 0, False
-        while not fin and pasos &lt; 500:
-            s2, r, terminado, truncado, _ = env.step(a)
-            a2 = elegir(Q, s2, rng)
-            if algoritmo == "sarsa":
-                siguiente = Q[s2, a2]
-            else:
-                siguiente = Q[s2].max()
-            Q[s, a] += alpha * (r + gamma * siguiente * (not terminado) - Q[s, a])
-            s, a = s2, a2
-            total += r
-            pasos += 1
-            fin = terminado or truncado
-        recompensas.append(total)
-    return Q, np.array(recompensas)
+q, q_obj = crear_red(), crear_red()
+print("¿pesos iguales al crearlas?", np.allclose(q.get_weights()[0], q_obj.get_weights()[0]))
+q_obj.set_weights(q.get_weights())
+print("¿pesos iguales tras set_weights?", np.allclose(q.get_weights()[0], q_obj.get_weights()[0]))
+copia_objetivo = [w.copy() for w in q_obj.get_weights()]
 
-def camino_greedy(Q):
-    s, _ = env.reset()
-    ruta = [s]
-    while s != 47 and len(ruta) &lt; 50:
-        s, _, _, _, _ = env.step(int(Q[s].argmax()))
-        ruta.append(s)
-    return ruta
+env = gym.make("CartPole-v1")
+env.action_space.seed(0)
+buffer = deque(maxlen=12)
+obs, _ = env.reset(seed=3)
+fin = False
+while not fin:
+    a = env.action_space.sample()
+    obs2, r, terminated, truncated, _ = env.step(a)
+    buffer.append((obs, a, r, obs2, float(terminated)))
+    obs, fin = obs2, terminated or truncated
+print("transiciones guardadas (capacidad 12):", len(buffer), "| la última es final:", buffer[-1][4])
 
-def dibujar(ruta):
-    tablero = [["."] * COLS for _ in range(FILAS)]
-    for c in range(1, COLS - 1):
-        tablero[3][c] = "C"
-    for celda in ruta:
-        tablero[celda // COLS][celda % COLS] = "*"
-    tablero[3][0], tablero[3][11] = "S", "G"
-    return ["".join(f) for f in tablero]
+lote = random.sample(list(buffer)[:-1], 3) + [buffer[-1]]
+s, a, r, s2, f = [np.array(x, dtype="float32") for x in zip(*lote)]
+a = a.astype("int32")
 
-for alg in ["sarsa", "qlearning"]:
-    medias = []
-    for semilla in range(5):
-        Q, rec = entrenar(alg, semilla=semilla)
-        medias.append(rec[-100:].mean())
-    Q, rec = entrenar(alg, semilla=0)
-    ruta = camino_greedy(Q)
-    print(f"{alg}: recompensa media por episodio (últimos 100, 5 semillas) = {np.mean(medias):.2f}")
-    print(f"{alg}: camino greedy de {len(ruta) - 1} pasos")
-    print("\n".join(dibujar(ruta)))</code></pre>
-<details class="linea-a-linea">
-<summary>Línea por línea</summary>
-<p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
-<table class="lineas">
-<thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
-<tbody>
-<tr data-lines="1"><td><code>import numpy as np</code></td><td>NumPy.</td></tr>
-<tr data-lines="2"><td><code>import gymnasium as gym</code></td><td>Gymnasium.</td></tr>
-<tr data-lines="4"><td><code>env = gym.make("CliffWalking-v1")</code></td><td>El acantilado: una cuadrícula de 4×12 con 48 estados. Cada paso da −1, y pisar el acantilado da −100 y devuelve al agente a la salida.</td></tr>
-<tr data-lines="5"><td><code>FILAS, COLS = 4, 12</code></td><td>Dimensiones del tablero, para dibujarlo.</td></tr>
-<tr data-lines="6"><td><code>alpha, gamma, epsilon = 0.5, 1.0, 0.1</code></td><td>\( \gamma = 1 \) es válido aquí porque el episodio acaba siempre al llegar a la meta; \( \varepsilon = 0{,}1 \) fijo, igual para los dos algoritmos.</td></tr>
-<tr data-lines="8"><td><code>def elegir(Q, s, rng):</code></td><td>Política ε-greedy con desempate al azar.</td></tr>
-<tr data-lines="9-10"><td><code>if rng.random() &lt; epsilon: …</code></td><td>Con probabilidad \( \varepsilon \), acción al azar.</td></tr>
-<tr data-lines="11"><td><code>return int(rng.choice(np.flatnonzero(Q[s] == Q[s].max())))</code></td><td>Si no, una de las acciones con mayor valor.</td></tr>
-<tr data-lines="13"><td><code>def entrenar(algoritmo, episodios=500, semilla=0):</code></td><td>Entrena con <code>"sarsa"</code> o <code>"qlearning"</code> y devuelve la tabla y las recompensas de cada episodio.</td></tr>
-<tr data-lines="14"><td><code>rng = np.random.default_rng(semilla)</code></td><td>Azar con semilla.</td></tr>
-<tr data-lines="15"><td><code>Q = np.zeros((48, 4))</code></td><td>Tabla Q: 48 estados × 4 acciones.</td></tr>
-<tr data-lines="16"><td><code>recompensas = []</code></td><td>Aquí se guarda la recompensa total de cada episodio <em>durante el entrenamiento</em>.</td></tr>
-<tr data-lines="17"><td><code>for ep in range(episodios):</code></td><td>Bucle de episodios.</td></tr>
-<tr data-lines="18"><td><code>s, _ = env.reset(seed=semilla if ep == 0 else None)</code></td><td>Reinicia: el agente vuelve a la salida.</td></tr>
-<tr data-lines="19"><td><code>a = elegir(Q, s, rng)</code></td><td>SARSA necesita elegir la <em>primera</em> acción antes del bucle, porque en cada paso escogerá la siguiente por adelantado.</td></tr>
-<tr data-lines="20"><td><code>total, pasos, fin = 0.0, 0, False</code></td><td>Acumuladores del episodio.</td></tr>
-<tr data-lines="21"><td><code>while not fin and pasos &lt; 500:</code></td><td>Hasta que acabe (con un tope de 500 pasos por seguridad).</td></tr>
-<tr data-lines="22"><td><code>s2, r, terminado, truncado, _ = env.step(a)</code></td><td>Ejecuta la acción elegida.</td></tr>
-<tr data-lines="23"><td><code>a2 = elegir(Q, s2, rng)</code></td><td>Elige ya la acción siguiente \( a' \) con la política ε-greedy (la que de verdad se va a ejecutar).</td></tr>
-<tr data-lines="24-27"><td><code>if algoritmo == "sarsa": …</code></td><td><strong>La única diferencia entre los dos algoritmos.</strong> SARSA (<em>on-policy</em>) usa el valor de la acción \( a' \) que de verdad va a hacer, que puede ser una exploración; Q-learning (<em>off-policy</em>) usa el valor de la <em>mejor</em> acción, haga lo que haga después.</td></tr>
-<tr data-lines="28"><td><code>Q[s, a] += alpha * (r + gamma * siguiente * (not terminado …</code></td><td>La actualización TD con el valor <code>siguiente</code> elegido arriba.</td></tr>
-<tr data-lines="29"><td><code>s, a = s2, a2</code></td><td>El estado y la acción siguientes pasan a ser los actuales (así SARSA no tiene que elegir dos veces).</td></tr>
-<tr data-lines="30"><td><code>total += r</code></td><td>Suma la recompensa.</td></tr>
-<tr data-lines="31"><td><code>pasos += 1</code></td><td>Cuenta el paso.</td></tr>
-<tr data-lines="32"><td><code>fin = terminado or truncado</code></td><td>¿Acabó el episodio?</td></tr>
-<tr data-lines="33"><td><code>recompensas.append(total)</code></td><td>Guarda la recompensa total del episodio.</td></tr>
-<tr data-lines="34"><td><code>return Q, np.array(recompensas)</code></td><td>Devuelve la tabla y las recompensas como array.</td></tr>
-<tr data-lines="36"><td><code>def camino_greedy(Q):</code></td><td>Función que recorre el camino que seguiría el agente sin explorar.</td></tr>
-<tr data-lines="37"><td><code>s, _ = env.reset()</code></td><td>Empieza en la salida.</td></tr>
-<tr data-lines="38"><td><code>ruta = [s]</code></td><td>Lista de casillas visitadas.</td></tr>
-<tr data-lines="39"><td><code>while s != 47 and len(ruta) &lt; 50:</code></td><td>Hasta llegar a la meta (la casilla 47) o 50 casillas.</td></tr>
-<tr data-lines="40"><td><code>s, _, _, _, _ = env.step(int(Q[s].argmax()))</code></td><td>Un paso con la acción de mayor valor; descartamos con <code>_</code> todo menos el estado.</td></tr>
-<tr data-lines="41"><td><code>ruta.append(s)</code></td><td>Anota la casilla.</td></tr>
-<tr data-lines="42"><td><code>return ruta</code></td><td>Devuelve el camino.</td></tr>
-<tr data-lines="44"><td><code>def dibujar(ruta):</code></td><td>Función auxiliar para pintar el tablero en texto.</td></tr>
-<tr data-lines="45"><td><code>tablero = [["."] * COLS for _ in range(FILAS)]</code></td><td>Crea 4 filas de 12 puntos.</td></tr>
-<tr data-lines="46-47"><td><code>for c in range(1, COLS - 1): …</code></td><td>Marca con C las 10 casillas del acantilado (fila inferior, columnas 1 a 10).</td></tr>
-<tr data-lines="48-49"><td><code>for celda in ruta: …</code></td><td>Marca con * las casillas del camino. <code>celda // COLS</code> es la fila (división entera) y <code>celda % COLS</code> es la columna (resto).</td></tr>
-<tr data-lines="50"><td><code>tablero[3][0], tablero[3][11] = "S", "G"</code></td><td>Marca la salida (S) y la meta (G).</td></tr>
-<tr data-lines="51"><td><code>return ["".join(f) for f in tablero]</code></td><td>Une cada fila en un texto.</td></tr>
-<tr data-lines="53"><td><code>for alg in ["sarsa", "qlearning"]:</code></td><td>Repite el experimento con cada algoritmo.</td></tr>
-<tr data-lines="54"><td><code>medias = []</code></td><td>Aquí se acumulan las medias de varias semillas.</td></tr>
-<tr data-lines="55"><td><code>for semilla in range(5):</code></td><td>Entrena con 5 semillas para no depender de la suerte.</td></tr>
-<tr data-lines="56"><td><code>Q, rec = entrenar(alg, semilla=semilla)</code></td><td>Entrena.</td></tr>
-<tr data-lines="57"><td><code>medias.append(rec[-100:].mean())</code></td><td>Media de la recompensa de los últimos 100 episodios (<code>rec[-100:]</code> son los 100 últimos).</td></tr>
-<tr data-lines="58"><td><code>Q, rec = entrenar(alg, semilla=0)</code></td><td>Entrena otra vez con la semilla 0 para dibujar su camino.</td></tr>
-<tr data-lines="59"><td><code>ruta = camino_greedy(Q)</code></td><td>Calcula el camino sin explorar.</td></tr>
-<tr data-lines="60"><td><code>print(f"{alg}: recompensa media por episodio (últimos 100, …</code></td><td>Imprime la media de las 5 semillas.</td></tr>
-<tr data-lines="61"><td><code>print(f"{alg}: camino greedy de {len(ruta) - 1} pasos")</code></td><td>Imprime la longitud del camino (<code>len(ruta) - 1</code> pasos).</td></tr>
-<tr data-lines="62"><td><code>print("\n".join(dibujar(ruta)))</code></td><td>Dibuja el tablero con el camino.</td></tr>
-</tbody>
-</table>
-</details>
-<div class="salida">
-<strong>Salida esperada</strong>
-<pre>sarsa: recompensa media por episodio (últimos 100, 5 semillas) = -32.84
-sarsa: camino greedy de 17 pasos
-..*********.
-***.......**
-*..........*
-SCCCCCCCCCCG
-qlearning: recompensa media por episodio (últimos 100, 5 semillas) = -51.25
-qlearning: camino greedy de 13 pasos
-............
-............
-************
-SCCCCCCCCCCG</pre>
-<p>Mientras entrenan (con ε = 0,1), SARSA gana de media <strong>−32,84</strong> por episodio y Q-learning <strong>−51,25</strong>. Pero el camino que aprende cada uno explica por qué: Q-learning aprende el camino óptimo, el que bordea el acantilado (13 pasos, la fila inmediatamente superior), pero como sigue explorando un 10 % de las veces, de vez en cuando un paso al azar lo tira al precipicio (−100). SARSA «sabe» que va a explorar, así que aprende un camino más largo y seguro, que sube hasta la fila superior y se aleja del riesgo (17 pasos). Sin explorar, el de Q-learning es mejor (−13 frente a −17); durante el entrenamiento, el de SARSA. Con \( \varepsilon \to 0 \) los dos se parecerían.</p>
+q_sig = q_obj.predict(s2, verbose=0)
+y = r + gamma * q_sig.max(axis=1) * (1 - f)
+for i in range(4):
+    print(f"transición {i}: r={r[i]:.0f} fin={f[i]:.0f} max Q_obj(s')={q_sig[i].max():7.4f} -&gt; y={y[i]:.4f}")
+
+optimizador = keras.optimizers.Adam(1e-2)
+huber = keras.losses.Huber()
+for paso in range(51):
+    with tf.GradientTape() as cinta:
+        q_sa = tf.reduce_sum(q(s) * tf.one_hot(a, 2), axis=1)
+        perdida = huber(y, q_sa)
+    grads = cinta.gradient(perdida, q.trainable_variables)
+    optimizador.apply_gradients(zip(grads, q.trainable_variables))
+    if paso in (0, 10, 50):
+        print(f"paso {paso:2d}: pérdida Huber = {float(perdida):.4f}")
+
+objetivo_quieta = all(np.allclose(a, b) for a, b in zip(copia_objetivo, q_obj.get_weights()))
+print("¿la red objetivo sigue sin moverse tras 51 pasos?", objetivo_quieta)
+print("¿la red principal sí ha cambiado?", not np.allclose(q.get_weights()[0], q_obj.get_weights()[0]))</code></pre>
+  <details class="linea-a-linea">
+    <summary>Línea por línea</summary>
+    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+      <tbody>
+        <tr data-lines="1"><td><code>import random</code></td><td>Módulo estándar para elegir elementos al azar (<code>random.sample</code>).</td></tr>
+        <tr data-lines="2"><td><code>from collections import deque</code></td><td><code>deque</code> es una lista de longitud máxima: al llenarse, cada elemento nuevo expulsa al más antiguo. Es el replay buffer.</td></tr>
+        <tr data-lines="3"><td><code>import numpy as np</code></td><td>NumPy.</td></tr>
+        <tr data-lines="4"><td><code>import tensorflow as tf</code></td><td>TensorFlow: lo usamos para <code>GradientTape</code> y <code>one_hot</code>.</td></tr>
+        <tr data-lines="5"><td><code>import keras</code></td><td>Keras.</td></tr>
+        <tr data-lines="6"><td><code>from keras import layers</code></td><td>Capas.</td></tr>
+        <tr data-lines="7"><td><code>import gymnasium as gym</code></td><td>Entornos.</td></tr>
+        <tr data-lines="9"><td><code>keras.utils.set_random_seed(0)</code></td><td>Semilla de Keras/NumPy/TensorFlow.</td></tr>
+        <tr data-lines="10"><td><code>random.seed(0)</code></td><td>Semilla del módulo <code>random</code> (el de <code>random.sample</code>), que Keras no controla.</td></tr>
+        <tr data-lines="11"><td><code>gamma = 0.99</code></td><td>Factor de descuento.</td></tr>
+        <tr data-lines="13-16"><td><code>def crear_red(): …</code></td><td>Función que construye una red pequeña (4 → 16 → 2). Se usa para crear las dos redes con la misma arquitectura.</td></tr>
+        <tr data-lines="18"><td><code>q, q_obj = crear_red(), crear_red()</code></td><td>Dos redes: <code>q</code> (la que se entrena) y <code>q_obj</code> (la <strong>red objetivo</strong>, que solo se usa para calcular objetivos).</td></tr>
+        <tr data-lines="19"><td><code>print("¿pesos iguales al crearlas?", np.allclose(q.get_wei …</code></td><td><code>get_weights()</code> devuelve la lista de arrays de pesos; <code>[0]</code> es la matriz de la primera capa. Al crearlas, cada red tiene pesos distintos: <code>False</code>.</td></tr>
+        <tr data-lines="20"><td><code>q_obj.set_weights(q.get_weights())</code></td><td><strong>Copia los pesos</strong> de <code>q</code> a <code>q_obj</code>. Esto es lo que se repite cada cierto número de pasos en un DQN.</td></tr>
+        <tr data-lines="21"><td><code>print("¿pesos iguales tras set_weights?", np.allclose(q.ge …</code></td><td>Ahora son iguales: <code>True</code>.</td></tr>
+        <tr data-lines="22"><td><code>copia_objetivo = [w.copy() for w in q_obj.get_weights()]</code></td><td>Guarda una copia de los pesos de la red objetivo para comprobar al final que no se ha movido.</td></tr>
+        <tr data-lines="24"><td><code>env = gym.make("CartPole-v1")</code></td><td>Entorno CartPole.</td></tr>
+        <tr data-lines="25"><td><code>env.action_space.seed(0)</code></td><td>Semilla del muestreo de acciones (si no, <code>sample()</code> daría resultados distintos cada vez).</td></tr>
+        <tr data-lines="26"><td><code>buffer = deque(maxlen=12)</code></td><td>Buffer con capacidad para 12 transiciones (en un DQN real serían decenas de miles).</td></tr>
+        <tr data-lines="27"><td><code>obs, _ = env.reset(seed=3)</code></td><td>Empieza un episodio.</td></tr>
+        <tr data-lines="28"><td><code>fin = False</code></td><td>Indicador de fin.</td></tr>
+        <tr data-lines="29"><td><code>while not fin:</code></td><td>Juega con acciones al azar hasta que el palo caiga.</td></tr>
+        <tr data-lines="30"><td><code>a = env.action_space.sample()</code></td><td>Acción aleatoria.</td></tr>
+        <tr data-lines="31"><td><code>obs2, r, terminated, truncated, _ = env.step(a)</code></td><td>Ejecuta la acción.</td></tr>
+        <tr data-lines="32"><td><code>buffer.append((obs, a, r, obs2, float(terminated)))</code></td><td>Guarda la <strong>transición</strong> completa: (estado, acción, recompensa, estado siguiente, ¿fin?). Se guarda <code>terminated</code> (caída real) y no <code>truncated</code>: la distinción importa para el objetivo.</td></tr>
+        <tr data-lines="33"><td><code>obs, fin = obs2, terminated or truncated</code></td><td>El estado siguiente pasa a ser el actual; el bucle se para en cualquiera de los dos fines.</td></tr>
+        <tr data-lines="34"><td><code>print("transiciones guardadas (capacidad 12):", len(buffer …</code></td><td>Cuántas transiciones hay (12, el máximo: las más antiguas se han expulsado) y si la última es final.</td></tr>
+        <tr data-lines="36"><td><code>lote = random.sample(list(buffer)[:-1], 3) + [buffer[-1]]</code></td><td>Minilote de 4 transiciones: 3 al azar entre las no finales y, a propósito, la última (que es final) para ver el efecto de ese indicador. En un DQN real se muestrean todas al azar.</td></tr>
+        <tr data-lines="37"><td><code>s, a, r, s2, f = [np.array(x, dtype="float32") for x in zi …</code></td><td><code>zip(*lote)</code> «transpone» la lista de tuplas: agrupa todos los estados, todas las acciones, etc. Cada grupo se convierte en un array <code>float32</code>.</td></tr>
+        <tr data-lines="38"><td><code>a = a.astype("int32")</code></td><td>Las acciones deben ser enteros, para usarlas como índice en <code>one_hot</code>.</td></tr>
+        <tr data-lines="40"><td><code>q_sig = q_obj.predict(s2, verbose=0)</code></td><td>Valores Q de los estados siguientes, calculados con la <strong>red objetivo</strong>: forma <code>(4, 2)</code>.</td></tr>
+        <tr data-lines="41"><td><code>y = r + gamma * q_sig.max(axis=1) * (1 - f)</code></td><td><strong>El objetivo de DQN</strong>: <code>q_sig.max(axis=1)</code> es el mejor valor de cada fila (<code>axis=1</code> recorre las acciones); <code>(1 - f)</code> lo anula en las transiciones finales.</td></tr>
+        <tr data-lines="42"><td><code>for i in range(4):</code></td><td>Recorre las 4 transiciones del lote...</td></tr>
+        <tr data-lines="43"><td><code>print(f"transición {i}: r={r[i]:.0f} fin={f[i]:.0f} max Q_ …</code></td><td>...e imprime su recompensa, su indicador de fin, el valor futuro y el objetivo \( y \).</td></tr>
+        <tr data-lines="45"><td><code>optimizador = keras.optimizers.Adam(1e-2)</code></td><td>Optimizador Adam con un learning rate algo alto (0,01) para ver bajar la pérdida rápido.</td></tr>
+        <tr data-lines="46"><td><code>huber = keras.losses.Huber()</code></td><td>Pérdida de Huber.</td></tr>
+        <tr data-lines="47"><td><code>for paso in range(51):</code></td><td>51 pasos de descenso sobre este mismo lote.</td></tr>
+        <tr data-lines="48-50"><td><code>with tf.GradientTape() as cinta: …</code></td><td>La <strong>cinta</strong> graba el cálculo hacia delante. <code>q(s)</code> da los Q de todas las acciones, <code>tf.one_hot(a, 2)</code> crea una máscara (1 en la acción realmente hecha, 0 en la otra) y <code>reduce_sum(..., axis=1)</code> se queda con \( Q(s,a) \). La pérdida compara el objetivo <code>y</code> con ese valor.</td></tr>
+        <tr data-lines="51"><td><code>grads = cinta.gradient(perdida, q.trainable_variables)</code></td><td>Derivadas de la pérdida respecto a cada peso de <code>q</code> (solo de <code>q</code>: la red objetivo no está en la cuenta).</td></tr>
+        <tr data-lines="52"><td><code>optimizador.apply_gradients(zip(grads, q.trainable_variabl …</code></td><td>Aplica el paso de Adam a cada peso.</td></tr>
+        <tr data-lines="53"><td><code>if paso in (0, 10, 50):</code></td><td>En tres momentos...</td></tr>
+        <tr data-lines="54"><td><code>print(f"paso {paso:2d}: pérdida Huber = {float(perdida):.4 …</code></td><td>...imprime la pérdida.</td></tr>
+        <tr data-lines="56"><td><code>objetivo_quieta = all(np.allclose(a, b) for a, b in zip(co …</code></td><td>Compara los pesos actuales de <code>q_obj</code> con la copia guardada: <code>all(...)</code> es verdadero si <em>todos</em> los arrays son iguales.</td></tr>
+        <tr data-lines="57"><td><code>print("¿la red objetivo sigue sin moverse tras 51 pasos?", …</code></td><td>La red objetivo no se ha movido: <code>True</code>.</td></tr>
+        <tr data-lines="58"><td><code>print("¿la red principal sí ha cambiado?", not np.allclose …</code></td><td>En cambio, la principal sí ha cambiado (sus pesos ya no coinciden con los de la objetivo).</td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>¿pesos iguales al crearlas? False
+¿pesos iguales tras set_weights? True
+transiciones guardadas (capacidad 12): 12 | la última es final: 1.0
+transición 0: r=1 fin=0 max Q_obj(s')= 0.0840 -&gt; y=1.0831
+transición 1: r=1 fin=0 max Q_obj(s')=-0.0196 -&gt; y=0.9806
+transición 2: r=1 fin=0 max Q_obj(s')= 0.0482 -&gt; y=1.0477
+transición 3: r=1 fin=1 max Q_obj(s')= 0.1586 -&gt; y=1.0000
+paso  0: pérdida Huber = 0.5026
+paso 10: pérdida Huber = 0.1260
+paso 50: pérdida Huber = 0.0061
+¿la red objetivo sigue sin moverse tras 51 pasos? True
+¿la red principal sí ha cambiado? True</pre>
+    <p>Primero, dos redes recién creadas tienen pesos distintos (<code>False</code>) y <code>set_weights</code> las deja idénticas (<code>True</code>). El buffer guardó 12 transiciones (las 12 más recientes del episodio). En el lote, las tres primeras transiciones tienen \( r = 1 \) y un valor futuro pequeño (entre −0,02 y 0,08), de modo que \( y \) es algo mayor o menor que 1 (1,0831; 0,9806; 1,0477). La cuarta, la <strong>final</strong>, tiene un valor futuro de 0,1586 según la red objetivo, pero el objetivo es exactamente <strong>1,0000</strong>: el indicador <code>fin = 1</code> lo ha apagado. Después, 51 pasos sobre el mismo lote bajan la pérdida de Huber de 0,5026 a 0,1260 y a 0,0061: la red principal aprende a reproducir los objetivos. Mientras tanto, la red objetivo ha estado quieta (<code>True</code>): ese es precisamente su trabajo.</p>
+  </div>
+</article>
+</section>
+
 </div>
-</article></div></details></div></main></body></html>
+</main>
+</body>
+</html>

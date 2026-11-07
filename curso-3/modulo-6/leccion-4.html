@@ -1,240 +1,373 @@
-<!DOCTYPE html>
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lección 4 · Para encontrar la mejor película hay que probar, a veces, una al azar · Módulo 6 · Curso 3 · Cuaderno de IA</title>
+<meta name="description" content="El dilema exploración–explotación con un bandido de películas: media incremental, la política ε-greedy, ε decreciente y por qué ni ε = 0 ni ε grande funcionan.">
+<script>try{var t=localStorage.getItem('cuaderno-ia:tema');if(t)document.documentElement.setAttribute('data-theme',t)}catch(e){}</script>
+<link rel="stylesheet" href="../../assets/css/style.css">
+<script src="../../assets/js/curriculum.js"></script>
+<script src="../../assets/js/lab.js"></script>
+<script src="../../assets/js/app.js" defer></script>
+</head>
+<body data-root="../../" data-course="3" data-module="6" data-lesson="4">
+<main>
+<div class="page">
 
-<html lang="es"><head><meta charset="utf-8"/><meta content="width=device-width,initial-scale=1" name="viewport"/><title>Lección 4 · La ecuación de Bellman: el valor de hoy en función del valor de mañana · Curso 3 · Cuaderno de IA</title><meta content="Sí, y es el truco más importante de todo el refuerzo." name="description"/><script>try{var t=localStorage.getItem('cuaderno-ia:tema');if(t)document.documentElement.setAttribute('data-theme',t)}catch(e){}</script><link href="../../assets/css/style.css" rel="stylesheet"/><script src="../../assets/js/curriculum.js"></script><script src="../../assets/js/lab.js"></script><script defer="" src="../../assets/js/app.js"></script><script defer="" src="../../assets/js/microanimations.js"></script></head><body data-course="3" data-lesson="4" data-module="6" data-root="../../"><main><div class="page" data-micro="3min"><header class="hero leccion"><div class="hero-grid"><div><p class="eyebrow">Curso 3 · Módulo 6 · Lección 4 de 12</p><h1>La ecuación de Bellman: el valor de hoy en función del valor de mañana</h1><p class="lead">Sí, y es el truco más importante de todo el refuerzo.</p><p class="meta-line"><span class="read-time" data-render="read-time"></span><a href="../modulo-6.html">Índice del módulo</a></p></div><div aria-hidden="true" class="hero-tile"></div></div></header><details class="predice"><summary>Para saber cuánto vale que un usuario esté ahora en la ficha de una película hay que sumar todo lo que puede pasar después: otra película, otra serie, renovar o cancelar… Son infinitos caminos posibles. ¿Hay un atajo?<span class="hint"></span></summary><div><p>Sí, y es el truco más importante de todo el refuerzo.</p></div></details><section aria-label="Explicación breve" class="micro-core"><div class="micro-kicker">01 · ENTENDER <span>≈ 45 s</span></div><h2>La idea en palabras sencillas</h2><p>Sí, y es el truco más importante de todo el refuerzo.</p><div class="micro-example"><span aria-hidden="true" class="micro-example-icon">🐾</span><div><strong>Otro ejemplo · Mascotas</strong><p>Una red combina tamaño, orejas y pelaje para distinguir patrones que no dependen de una sola regla.</p></div></div></section><div class="micro-kicker micro-checkpoint">02 · RESPONDER <span>≈ 15 s</span></div><section aria-label="Pregunta intercalada" class="quiz mini micro-check"><script class="quiz-data" type="application/json">{"titulo": "Pausa rápida · Comprueba la idea", "preguntas": [{"q": "Una neurona recibe dos entradas. ¿Qué hace con los pesos?", "opciones": ["Elige siempre la entrada mayor", "Borra las entradas al entrenar", "Multiplica cada entrada por su peso y combina resultados"], "correcta": 2, "porque": "La suma ponderada combina entradas, pesos y bias antes de la activación."}]}</script></section><section aria-label="Animación interactiva" class="micro-viz" data-index="13" data-micro-viz="neural"><div class="micro-kicker">03 · EXPERIMENTAR <span>≈ 45 s</span></div><div class="micro-viz-title"><div><h2>Señales que atraviesan una red</h2><p>Pulsa «Propagar» para seguir el recorrido de entradas a salida.</p></div><span aria-hidden="true" class="micro-viz-symbol">✦</span></div><div aria-live="polite" class="micro-viz-stage"><p>Animación interactiva: Señales que atraviesan una red</p></div></section><div class="micro-kicker micro-checkpoint">04 · APLICAR <span>≈ 15 s</span></div><section aria-label="Pregunta intercalada" class="quiz mini micro-check"><script class="quiz-data" type="application/json">{"titulo": "Pausa rápida · ¿Lo aplicarías?", "preguntas": [{"q": "¿Cuándo se actualizan los pesos de una red?", "opciones": ["Nunca: los pesos son fijos", "Al aplicar el optimizador durante el entrenamiento", "Cada vez que se abre la página"], "correcta": 1, "porque": "El optimizador utiliza los gradientes para ajustar parámetros durante el aprendizaje."}]}</script></section><div class="micro-finish"><strong>Idea que te llevas</strong><span>Sí, y es el truco más importante de todo el refuerzo</span><small>¿Quieres más ejemplos, fórmulas o código? Los tienes justo debajo, sin límite de tiempo.</small></div><details class="profundizar micro-legacy"><summary><span>Explorar más: explicación y simulaciones completas<small>Todo el texto original, tablas y demos avanzadas. Opcional.</small></span></summary><div class="prof-body"><section><h2>La ecuación de Bellman: el valor de hoy en función del valor de mañana</h2>
-<p>Sí, y es el truco más importante de todo el refuerzo. Mira otra vez la recursión que viste al calcular el retorno: \( G_t = r_t + \gamma\, G_{t+1} \). El retorno de hoy es «lo que cobro ahora» más «el retorno de mañana, descontado». Si lo promediamos sobre todo lo que puede pasar, obtenemos lo mismo para los valores:</p>
-<p>Léela de fuera hacia dentro, igual que se calcula:</p>
-<p>En palabras: <em>el valor de un estado es la media de «lo que cobro ahora + \( \gamma \) por el valor de donde aterrizo»</em>. Es una ecuación de <strong>consistencia</strong>: los valores de todos los estados tienen que ser coherentes entre sí. La derivación de una línea: \( V(s) = \mathbb{E}[G_t] = \mathbb{E}[r_t + \gamma G_{t+1}] = \mathbb{E}[r_t] + \gamma\, \mathbb{E}[V(s_{t+1})] \).</p>
-<div class="callout ejemplo"><span class="lbl">Ejemplo tomado del módulo</span><p>: calcular V(A) y V(B) Escribe Bellman para A: \( V(A) = 0{,}5\,[\,0 + 0{,}5\,V(A)\,] + 0{,}5\,[\,4 + 0{,}5\,V(B)\,] = 0{,}25\,V(A) + 2 + 0{,}25\,V(B) \).</p></div></section><figure class="demo" data-demo="curso3/c3m6-bellman" data-titulo="Resuelve Bellman tú: ¿qué valores cumplen la ecuación?">
-<div class="haz">Con γ = 0,5, mueve los sliders V(A) (la portada) y V(B) (la ficha) hasta que los dos «desfases» se queden en 0 (pista: el cálculo a mano dio 5 y 7). Luego pulsa «Todo a cero» y usa «Un barrido de Bellman» varias veces. Por último cambia γ y compara con la solución exacta.</div>
-<div class="observa">Cuando un estado se pone verde, su valor es coherente con los de sus vecinos. Pero cambiar V(A) descuadra V(B) y al revés: están encadenados. Los barridos los arreglan solos y llegan a la solución sin resolver ningún sistema. Con γ alto (0,95) hacen falta muchos más barridos: el futuro pesa más.</div>
-</figure><div class="resumen"><h2 class="sin-num sin-toc">En pocas líneas</h2><ul><li><strong>La ecuación de Bellman: el valor de hoy en función del valor de mañana:</strong> Sí, y es el truco más importante de todo el refuerzo.</li><li>Antes de continuar, intenta explicar la demo sin mirar su resultado.</li></ul></div><section class="quiz mini"><script class="quiz-data" type="application/json">{"titulo": "¿Lo tienes?", "preguntas": [{"q": "¿Qué concepto estamos trabajando en esta lección?", "opciones": ["La ecuación de Bellman: el valor de hoy en función del valor de mañana", "Otra familia: aprender directamente la política (policy gradient y actor-crítico)", "El bucle agente–entorno: aprender probando"], "correcta": 0, "porque": "Sí, y es el truco más importante de todo el refuerzo."}, {"q": "¿Cuál de estas afirmaciones recoge lo que acabas de estudiar?", "opciones": ["Lo importante es comprender la idea y comprobarla con ejemplos, no memorizar términos.", "Sí, y es el truco más importante de todo el refuerzo.", "Siempre hay un único método que sirve para todos los problemas."], "correcta": 1, "porque": "La explicación central es: Sí, y es el truco más importante de todo el refuerzo."}, {"q": "Si una demo o un ejemplo te desconcierta, ¿cuál es la mejor forma de aprenderlo?", "opciones": ["Memorizar el nombre sin entender la operación.", "Volver a los números, cambiar un valor y explicar qué ocurre.", "Ignorar los resultados que no coinciden con tu intuición."], "correcta": 1, "porque": "Explorar qué cambia y por qué ayuda a conectar el concepto con su resultado."}]}</script></section></div></details><details class="profundizar"><summary><span>Profundizar: explicación completa<small>Matices, fórmulas, tablas, otros ejemplos y experimentos del módulo original.</small></span></summary><div class="prof-body"><section>
-<h2 id="bellman">La ecuación de Bellman: el valor de hoy en función del valor de mañana</h2>
-<p class="pregunta">Para saber cuánto vale que un usuario esté ahora en la ficha de una película hay que sumar todo lo que puede pasar después: otra película, otra serie, renovar o cancelar… Son infinitos caminos posibles. ¿Hay un atajo?</p>
-<p>Sí, y es el truco más importante de todo el refuerzo. Mira otra vez la recursión que viste al calcular el retorno: \( G_t = r_t + \gamma\, G_{t+1} \). El retorno de hoy es «lo que cobro ahora» más «el retorno de mañana, descontado». Si lo promediamos sobre todo lo que puede pasar, obtenemos lo mismo para los valores:</p>
-<div class="callout analogia">
-<span class="lbl">Analogía</span>
-<p>Lo bien que te lo pasarás viendo una serie desde el capítulo 3 es «lo que disfrutas en el capítulo 3» más «lo que te espera a partir del capítulo 4» (un poco menos ilusionante, porque queda más lejos). No hace falta imaginar toda la serie hasta el final: basta con saber cuánto vale el capítulo siguiente. Cada estado se explica con el que tiene delante.</p>
-</div>
-<div class="formula">\[ V^{\pi}(s) \;=\; \sum_{a} \pi(a \mid s) \sum_{s'} P(s' \mid s, a)\,\Big[\, r(s,a,s') + \gamma\, V^{\pi}(s') \,\Big] \]</div>
-<p>Léela de fuera hacia dentro, igual que se calcula:</p>
-<ul>
-<li>\( \sum_{a} \pi(a \mid s) \): promedio sobre las <strong>acciones</strong> que la política puede elegir en \( s \).</li>
-<li>\( \sum_{s'} P(s' \mid s, a) \): promedio sobre los <strong>estados a los que puedo ir</strong> si hago esa acción (el azar del entorno).</li>
-<li>\( r(s,a,s') \): la <strong>recompensa inmediata</strong> de esa transición.</li>
-<li>\( \gamma\, V^{\pi}(s') \): el <strong>valor del estado de llegada</strong>, descontado una vez.</li>
-</ul>
-<p>En palabras: <em>el valor de un estado es la media de «lo que cobro ahora + \( \gamma \) por el valor de donde aterrizo»</em>. Es una ecuación de <strong>consistencia</strong>: los valores de todos los estados tienen que ser coherentes entre sí. La derivación de una línea: \( V(s) = \mathbb{E}[G_t] = \mathbb{E}[r_t + \gamma G_{t+1}] = \mathbb{E}[r_t] + \gamma\, \mathbb{E}[V(s_{t+1})] \).</p>
-<h3>Resuelta a mano en un MDP de tres estados</h3>
-<p>Un usuario de StreamFlix puede estar en dos situaciones: <strong>A</strong>, la portada, y <strong>B</strong>, la ficha de una película. Cuando termina la película, la sesión acaba: es el estado final <strong>T</strong>. Hay una sola acción por estado (la política está fijada: el recomendador siempre enseña lo mismo), así que solo queda el azar del usuario. Los números son (cifras inventadas):</p>
-<ul>
-<li>Desde <strong>A</strong> (portada): con probabilidad 0,5 abre la ficha de la película (B) y cobramos +4; con probabilidad 0,5 se queda mirando la portada (A) y cobramos 0.</li>
-<li>Desde <strong>B</strong> (ficha): con probabilidad 0,6 pulsa «Ver», termina la película (T) y cobramos +10; con probabilidad 0,4 vuelve atrás a la portada (A) y cobramos 0.</li>
-<li>\( \gamma = 0{,}5 \), y \( V(T) = 0 \) (el final no tiene futuro).</li>
-</ul>
-<div class="callout ejemplo">
-<span class="lbl">Ejemplo numérico: calcular V(A) y V(B)</span>
-<ol class="pasos">
-<li><strong>Escribe Bellman para A:</strong> \( V(A) = 0{,}5\,[\,0 + 0{,}5\,V(A)\,] + 0{,}5\,[\,4 + 0{,}5\,V(B)\,] = 0{,}25\,V(A) + 2 + 0{,}25\,V(B) \).</li>
-<li><strong>Escribe Bellman para B:</strong> \( V(B) = 0{,}6\,[\,10 + 0{,}5 \cdot 0\,] + 0{,}4\,[\,0 + 0{,}5\,V(A)\,] = 6 + 0{,}2\,V(A) \).</li>
-<li><strong>Sustituye</strong> \( V(B) \) en la primera: \( V(A) = 0{,}25\,V(A) + 2 + 0{,}25\,(6 + 0{,}2\,V(A)) = 0{,}25\,V(A) + 3{,}5 + 0{,}05\,V(A) \).</li>
-<li><strong>Despeja:</strong> \( V(A)\,(1 - 0{,}25 - 0{,}05) = 3{,}5 \;\Rightarrow\; 0{,}7\,V(A) = 3{,}5 \;\Rightarrow\; V(A) = \) <span class="res">5</span>.</li>
-<li><strong>Vuelve a B:</strong> \( V(B) = 6 + 0{,}2 \cdot 5 = \) <span class="res">7</span>.</li>
-<li><strong>Comprueba</strong> que cumplen la ecuación: \( 0{,}25 \cdot 5 + 2 + 0{,}25 \cdot 7 = 1{,}25 + 2 + 1{,}75 = 5 \) ✓ y \( 6 + 0{,}2 \cdot 5 = 7 \) ✓.</li>
-</ol>
-</div>
-<p>Resolver el sistema de ecuaciones solo es posible si el MDP es pequeño. Hay otra manera que funciona siempre y que es la base de los algoritmos reales: <strong>empezar con una suposición cualquiera (por ejemplo, todo a 0) y aplicar la ecuación como si fuera una receta</strong>: «valor nuevo = lado derecho calculado con los valores viejos». A cada pasada se le llama <em>barrido</em>.</p>
-<table>
-<caption>Barridos de Bellman en el ejemplo (empezando con V = 0)</caption>
-<thead><tr><th>Barrido</th><th>\( V(A) \)</th><th>\( V(B) \)</th><th>Error máximo frente a (5, 7)</th></tr></thead>
-<tbody>
-<tr><th scope="row">0 (suposición)</th><td>0</td><td>0</td><td>7</td></tr>
-<tr><th scope="row">1</th><td>2</td><td>6</td><td>3</td></tr>
-<tr><th scope="row">2</th><td>4</td><td>6,4</td><td>1</td></tr>
-<tr><th scope="row">3</th><td>4,6</td><td>6,8</td><td>0,4</td></tr>
-<tr><th scope="row">4</th><td>4,85</td><td>6,92</td><td>0,15</td></tr>
-<tr><th scope="row">5</th><td>4,9425</td><td>6,97</td><td>0,0575</td></tr>
-<tr><th scope="row">…</th><td>→ 5</td><td>→ 7</td><td>→ 0</td></tr>
-</tbody>
-</table>
-<p>Por ejemplo, el barrido 2 para A: \( 0{,}5\,(0 + 0{,}5 \cdot 2) + 0{,}5\,(4 + 0{,}5 \cdot 6) = 0{,}5 + 3{,}5 = 4 \). Mira la última columna: el error se multiplica por menos de \( \gamma = 0{,}5 \) en cada barrido (3 → 1 → 0,4 → 0,15 → 0,0575). Es un resultado general: con \( \gamma &lt; 1 \), repetir el barrido <strong>siempre</strong> converge al mismo valor, sea cual sea la suposición inicial. Y el valor verdadero es, justamente, el único que no cambia al aplicar la ecuación. El <a href="#frag-6">fragmento 6</a> hace estas cuentas con NumPy.</p>
-<h3>La versión de optimalidad: poner un máximo</h3>
-<p>Hasta ahora la política estaba fijada. Lo que de verdad queremos es la <strong>mejor</strong> política. La mejor política, en cada estado, elige la acción que más vale, así que el promedio sobre acciones se convierte en un <strong>máximo</strong>:</p>
-<div class="formula">\[ V^{*}(s) = \max_{a} \sum_{s'} P(s' \mid s, a)\,\big[\, r + \gamma\, V^{*}(s') \,\big], \qquad Q^{*}(s,a) = \sum_{s'} P(s' \mid s, a)\,\big[\, r + \gamma \max_{a'} Q^{*}(s', a') \,\big] \]</div>
-<p>\( Q^{*}(s,a) \) es el valor de hacer \( a \) en \( s \) y después jugar lo mejor posible. Una vez que tienes \( Q^{*} \), la política óptima sale sola: \( \pi^{*}(s) = \arg\max_a Q^{*}(s,a) \). Fíjate en que la segunda ecuación es justo la que vas a ver en Q-learning, con la esperanza sustituida por experiencias reales.</p>
-<h3>Un mundo de cuadrículas resuelto a mano (iteración de valor)</h3>
-<p>Imagina la pantalla de inicio de StreamFlix como una cuadrícula de 4×3 carátulas y un cursor de mando: un anuncio en el centro que no se puede cruzar (el «muro»), tu película favorita arriba a la derecha (+10), el botón «Salir» debajo de ella (−10) y cada pulsación cuesta −1 (tu paciencia). Con \( \gamma = 0{,}9 \), los valores óptimos se calculan hacia atrás desde la película:</p>
-<div class="callout ejemplo">
-<span class="lbl">Ejemplo numérico: de la meta hacia atrás</span>
-<ol class="pasos">
-<li><strong>La casilla de al lado de la película</strong>, arriba en el centro-derecha (fila 0, columna 2): ir a la película da +10 y termina: \( V^* = 10 \).</li>
-<li>Una casilla más allá (fila 0, columna 1): \( -1 + 0{,}9 \cdot 10 = 8 \).</li>
-<li>Otra más (fila 0, columna 0): \( -1 + 0{,}9 \cdot 8 = 6{,}2 \).</li>
-<li>Bajando por la izquierda (fila 1, columna 0): \( -1 + 0{,}9 \cdot 6{,}2 = 4{,}58 \); y la salida (fila 2, columna 0): \( -1 + 0{,}9 \cdot 4{,}58 = \) <span class="res">3,122</span>.</li>
-<li>La casilla de debajo de la de al lado de la película (fila 1, columna 2) sube directa: \( -1 + 0{,}9 \cdot 10 = 8 \). Y la (fila 2, columna 2): \( -1 + 0{,}9 \cdot 8 = 6{,}2 \). La (fila 2, columna 3) evita el botón «Salir» (que está justo encima, −10) y va a la izquierda: \( -1 + 0{,}9 \cdot 6{,}2 = 4{,}58 \).</li>
-</ol>
-</div>
-<p>Hacer esto a mano casilla a casilla funciona porque sabemos el orden. Un ordenador no sabe el orden de antemano: simplemente aplica el máximo a <em>todas</em> las casillas a la vez, una y otra vez (<strong>iteración de valor</strong>). En cada barrido el valor de la película «se corre» una casilla hacia atrás.</p>
-<figure class="demo" data-demo="curso3/c3m6-valor-iter" data-titulo="Iteración de valor: el premio se propaga hacia atrás">
-<div class="haz">Pulsa «Un barrido» una sola vez y mira qué casillas (carátulas) cambian. Pulsa otras 3 o 4 veces. Después toca varias casillas para ver sus cuatro opciones. Por último, baja γ a 0,5 y vuelve a barrer hasta converger.</div>
-<div class="observa">Tras el primer barrido solo la casilla junto a tu película vale 10 y las demás −1: el valor viaja <strong>una casilla por barrido</strong>. Al converger salen exactamente los números de la cuenta a mano (3,122; 4,58; 6,2; 8; 10). Las flechas son la política óptima: en cada casilla, la opción que da el máximo. Con γ pequeño los valores se aplanan: lo lejano casi no cuenta.</div>
+<header class="hero leccion">
+  <div class="hero-grid">
+    <div>
+      <p class="eyebrow">Curso 3 · Módulo 6 · Lección 4 de 8</p>
+      <h1>Para encontrar la mejor película hay que probar, a veces, una al azar</h1>
+      <p class="lead">Si el recomendador siempre enseña la película que hoy le parece mejor, puede quedarse para siempre con una mediocre. La solución más sencilla: casi siempre la mejor y, con probabilidad ε, una al azar.</p>
+      <p class="meta-line"><span class="read-time" data-render="read-time"></span><a href="../modulo-6.html">Índice del módulo</a></p>
+    </div>
+    <div class="hero-tile" aria-hidden="true"></div>
+  </div>
+</header>
+<details class="predice">
+  <summary>Si el recomendador <strong>nunca</strong> prueba nada nuevo (siempre enseña la película que hoy le parece mejor), ¿acabará encontrando la mejor del catálogo?<span class="hint"></span></summary>
+  <div>
+    <p><strong>No siempre.</strong> Se aferra a la primera película que le dio buen resultado y nunca descubre que había otra mejor. En una simulación de 4000 catálogos, tras 100 recomendaciones acertaba la mejor el 57 % de las veces sin explorar, frente al 71 % explorando un 10 %.</p>
+  </div>
+</details>
+
+<section>
+<h2 id="idea">Explotar casi siempre, explorar un poco</h2>
+<p><strong>Explotar</strong> es repetir lo que sabes que funciona (otra vez <em>Shrek</em>); <strong>explorar</strong> es probar algo desconocido, que puede ser peor… o mucho mejor. Sin explorar, el agente se atasca; explorando siempre, nunca aprovecha lo aprendido.</p>
+<p>El caso más pequeño es el <strong>bandido multi-brazo</strong>: un solo estado y \( K \) películas para la portada, cada una con un premio medio desconocido. El agente guarda una estimación \( Q(a) \) de cada una y la corrige con cada premio \( R \): \( Q \leftarrow Q + \tfrac{1}{N}(R - Q) \), la media sin guardar la lista.</p>
+<p>La política <strong>ε-greedy</strong>: con probabilidad \( 1-\varepsilon \), la película de mayor \( Q \); con probabilidad \( \varepsilon \), una al azar. Lo habitual es empezar con \( \varepsilon \) alto y <strong>bajarlo</strong> poco a poco (por ejemplo, de 1 a 0,05): explorar al principio, cuando no sabes nada, y explotar al final.</p>
+</section>
+
+<figure class="demo" data-demo="curso3/c3m6-bandido" data-titulo="Cinco películas en portada: explorar para no quedarse atascado">
+  <div class="haz">Con ε = 0 pulsa «Recomendar 100 veces» y luego «Nuevas medias» varias veces. Después sube ε a 0,1, 0,5 y 1.</div>
+  <div class="observa">Con ε = 0 suele quedarse con una película que no es la mejor (la raya verde). Con ε = 1 elige al azar y acierta 1 de cada 5.</div>
 </figure>
+
+<section>
+<h2 id="numeros">Con números: ε = 0,1 con 4 películas</h2>
+<div class="callout ejemplo">
+  <span class="lbl">Ejemplo numérico</span>
+  <ol class="pasos">
+    <li>Con probabilidad 0,9 recomienda la que parece mejor.</li>
+    <li>Con probabilidad 0,1 elige al azar entre las 4: cada una, incluida la mejor, sale con \( 0{,}1/4 = 0{,}025 \).</li>
+    <li>La que parece mejor: \( 0{,}9 + 0{,}025 = \) <span class="res">0,925</span>. Cada una de las otras tres: <span class="res">0,025</span>. Suman \( 0{,}925 + 3 \cdot 0{,}025 = 1 \) ✓.</li>
+  </ol>
+</div>
+</section>
+
+<details class="predice">
+  <summary>Con 10 películas y 1000 recomendaciones, ¿ganará más un agente con \( \varepsilon = 0{,}3 \) que uno con \( \varepsilon = 0{,}1 \)? Explora más…<span class="hint"></span></summary>
+  <div>
+    <p><strong>No: gana menos.</strong> En el fragmento 5, \( \varepsilon = 0{,}1 \) gana 1,06 por recomendación y \( \varepsilon = 0{,}3 \) baja a 0,71: desperdicia casi un tercio en películas al azar. Y \( \varepsilon = 0 \) se queda en 0,62. Explorar demasiado poco y demasiado cuestan caro.</p>
+  </div>
+</details>
+
+<div class="resumen">
+  <h2 class="sin-num sin-toc">En tres líneas</h2>
+  <ul>
+    <li>Sin explorar, el agente se queda con lo primero que funcionó; explorando siempre, no aprovecha nada.</li>
+    <li>ε-greedy: con probabilidad ε una acción al azar, si no la de mayor \( Q \).</li>
+    <li>Lo habitual: ε decreciente (de 1 a 0,05) y evaluar aparte con ε = 0.</li>
+  </ul>
+</div>
+
+<section class="quiz mini">
+<script type="application/json" class="quiz-data">
+{
+ "titulo": "¿Lo tienes?",
+ "preguntas": [
+  {
+   "q": "Un recomendador tiene 5 películas candidatas (un bandido de 5 brazos) y usa ε-greedy con ε = 0,2 (con probabilidad ε elige una de las 5 al azar, sin excluir ninguna). ¿Con qué probabilidad recomienda la que ahora le parece la mejor?",
+   "opciones": [
+    "0,80",
+    "0,84",
+    "0,96",
+    "0,20"
+   ],
+   "correcta": 1,
+   "porque": "Con probabilidad 0,8 explotas y recomiendas esa película; con probabilidad 0,2 exploras y, de las 5 películas, esa sale con probabilidad 1/5: 0,2·0,2 = 0,04. Total <strong>0,84</strong>. Las otras cuatro tienen 0,04 cada una (0,84 + 4·0,04 = 1). El 0,80 olvida que la exploración también puede elegirlo."
+  },
+  {
+   "q": "Llevas 2 recomendaciones de una película con media \\( Q = 4 \\). La tercera da un premio \\( R = 7 \\). Con la media incremental, ¿cuánto vale el nuevo \\( Q \\)?",
+   "opciones": [
+    "5,5",
+    "5",
+    "7",
+    "4,5"
+   ],
+   "correcta": 1,
+   "porque": "\\( Q \\leftarrow Q + \\tfrac{1}{N}(R - Q) = 4 + \\tfrac13(7-4) = 4 + 1 = 5 \\). Es la media de los tres premios sin guardar la lista: estimación vieja + paso × error, el molde de casi todo lo que aprende."
+  },
+  {
+   "q": "Durante el entrenamiento con ε-greedy, tu agente gana menos de lo que esperabas. ¿Cómo sabes lo bueno que es de verdad?",
+   "opciones": [
+    "Subiendo ε a 1",
+    "Evaluándolo aparte con ε = 0 (sin explorar)",
+    "Mirando solo la última recompensa",
+    "No se puede saber"
+   ],
+   "correcta": 1,
+   "porque": "La recompensa de entrenamiento incluye los movimientos al azar de la exploración, así que es peor que la de la política aprendida. Se evalúa aparte con la política greedy pura (ε = 0)."
+  }
+ ]
+}
+</script>
+</section>
+
+<details class="profundizar">
+  <summary><span>Profundizar: la explicación completa<small>El bandido multi-brazo, la media incremental con su tabla, ε-greedy con la tabla de efectos de ε, los resultados del fragmento 5, el ε decreciente con sus fórmulas y la demo del pasillo de cine con cuatro formas de explorar.</small></span></summary>
+  <div class="prof-body">
+<h2 id="explorar">Exploración y explotación: la política ε-greedy</h2>
+
+<p class="pregunta">Es viernes por la noche. ¿Pones otra vez <em>Shrek</em>, que sabes que te encanta, o pruebas una película que no conoces (puede ser peor… o mucho mejor)?</p>
+
+<p>Si siempre repites la de siempre, <strong>explotas</strong> lo que sabes, pero jamás descubrirás que había una mejor. Si siempre pruebas películas nuevas, <strong>exploras</strong>, pero te pasas la vida viendo cosas malas. Es el <em>dilema exploración–explotación</em> y aparece en cualquier agente: sin explorar queda atrapado en lo primero que le funcionó; explorando todo el rato nunca aprovecha lo aprendido.</p>
+
+<h3>El bandido multi-brazo: el refuerzo más pequeño que existe</h3>
+<p>Un recomendador tiene \( K \) películas que puede enseñar en la portada. Cada una engancha de media a los usuarios de forma distinta, y el recomendador no sabe cuánto: cada vez que recomienda una, el usuario la ve más o menos minutos (un premio aleatorio). Solo hay <strong>un estado</strong> y \( K \) acciones (qué película recomendar): no hay mapa ni futuro, solo el dilema puro. Se llama <em>bandido multi-brazo</em> (<em>bandit</em>) por las tragaperras de los casinos, «bandidos de un solo brazo», cada una con un premio medio desconocido: aquí cada «brazo» es una película. Para decidir, el agente va guardando una estimación \( Q(a) \) del premio medio de cada brazo.</p>
+
+<h3>Estimar una media sin guardar todos los premios</h3>
+<p>La estimación natural es la media de los premios cobrados con ese brazo. Pero se puede actualizar <em>al vuelo</em>. Si \( N \) es el número de veces que has recomendado esa película (has «tirado de ese brazo») y \( R \) el último premio:</p>
+<div class="formula">\[ Q_{\text{nuevo}} \;=\; Q_{\text{viejo}} + \frac{1}{N}\,\big(\, R - Q_{\text{viejo}} \,\big) \]</div>
+<div class="callout ejemplo">
+  <span class="lbl">Ejemplo numérico: tres recomendaciones de la misma película</span>
+  <p>Premios (en decenas de minutos vistos, cifras inventadas): 4, 6 y 5, es decir, 40, 60 y 50 minutos.</p>
+  <table>
+    <thead><tr><th>Recomendación \( N \)</th><th>Premio \( R \)</th><th>Cuenta</th><th>\( Q \) nuevo</th></tr></thead>
+    <tbody>
+      <tr><td>1</td><td>4</td><td>\( 0 + \tfrac{1}{1}(4 - 0) \)</td><td>4</td></tr>
+      <tr><td>2</td><td>6</td><td>\( 4 + \tfrac{1}{2}(6 - 4) \)</td><td>5</td></tr>
+      <tr><td>3</td><td>5</td><td>\( 5 + \tfrac{1}{3}(5 - 5) \)</td><td class="res">5</td></tr>
+    </tbody>
+  </table>
+  <p>Y la media de 4, 6 y 5 es \( (4+6+5)/3 = 5 \) (50 minutos): sale lo mismo, sin guardar la lista.</p>
+</div>
+<p>Fíjate en la forma: <em>estimación nueva = estimación vieja + paso × (lo observado − estimación vieja)</em>. Esa «corrección proporcional al error» es el esqueleto de Q-learning, de SGD y de casi todo lo que aprende en este curso. Si en vez de \( 1/N \) usas un paso fijo \( \alpha \), pesas más lo reciente: útil si el mundo cambia.</p>
+
+<h3>ε-greedy: casi siempre lo mejor, a veces un dado</h3>
+<p>La estrategia más sencilla: con probabilidad \( 1-\varepsilon \) haz la acción que parece mejor (<em>greedy</em>, «codiciosa»: <code>argmax</code>), y con probabilidad \( \varepsilon \) (la letra <em>épsilon</em>, un número pequeño) elige una acción <strong>al azar</strong>.</p>
+<div class="callout ejemplo">
+  <span class="lbl">Ejemplo numérico: ε = 0,1 con 4 películas</span>
+  <ol class="pasos">
+    <li>Con probabilidad 0,9 recomienda la que parece mejor.</li>
+    <li>Con probabilidad 0,1 elige al azar entre las 4: cada película, incluida la mejor, tiene 0,1/4 = 0,025.</li>
+    <li>Probabilidad total de la película que parece mejor: \( 0{,}9 + 0{,}025 = \) <span class="res">0,925</span>. Cada una de las otras tres: <span class="res">0,025</span>. Suman \( 0{,}925 + 3 \cdot 0{,}025 = 1 \) ✓.</li>
+  </ol>
+</div>
+
+<table>
+  <caption>Efecto de \( \varepsilon \)</caption>
+  <thead><tr><th>\( \varepsilon \)</th><th>Comportamiento</th><th>Riesgo</th></tr></thead>
+  <tbody>
+    <tr><td>0</td><td>Siempre explota</td><td>Se queda con la primera película que parece buena y no se entera de que hay otra mejor</td></tr>
+    <tr><td>0,01–0,1</td><td>Explota casi siempre y prueba de vez en cuando</td><td>Valores típicos de DQN</td></tr>
+    <tr><td>0,3 o más</td><td>Explora mucho</td><td>Desperdicia casi un tercio de las recomendaciones</td></tr>
+    <tr><td>1</td><td>Todo azar</td><td>No aprovecha nada de lo aprendido</td></tr>
+  </tbody>
+</table>
+
+<div class="callout recuerda">
+  <span class="lbl">Experimento de arriba: «Cinco películas en portada: explorar para no quedarse atascado», con todo detalle</span>
+  <p><strong>Haz esto.</strong> Cada barra es una película que el recomendador puede enseñar (la recompensa son «puntos de satisfacción» inventados). Con ε = 0 pulsa «Recomendar 100 veces» y mira qué película se ha llevado casi todas las recomendaciones. Pulsa «Nuevas medias» y repite varias veces. Luego sube ε a 0,1 y compara con 0,5 y con 1.</p>
+  <p><strong>Fíjate en.</strong> Con ε = 0 el agente se aferra a la primera película que le dio buena recompensa, que no siempre es la mejor (la raya verde): se ve en la columna N=… y en la curva. En una simulación aparte de 4000 catálogos como este, tras 100 recomendaciones la película más recomendada era la mejor el 57 % de las veces con ε = 0, el 71 % con ε = 0,1 y el 83 % con ε = 0,5. Con ε = 1 elige al azar y acierta el 20 % (una de cada cinco películas), y su recompensa media es la de una película cualquiera. Pulsa «Nuevas medias» varias veces para ver los dos casos.</p>
+</div>
+
+<p>El <a href="#frag-5">fragmento 5</a> reproduce este experimento con 10 brazos (10 películas) y 1000 tiradas (recomendaciones): con \( \varepsilon = 0 \) el agente gana 0,62 por tirada (se queda en un brazo mediocre), con 0,01 y 0,1 gana 1,11 y 1,06, y con 0,3 baja a 0,71. <em>Demasiado poco y demasiado explorar cuestan caro.</em></p>
+
+<h3>ε decreciente: explorar al principio, explotar al final</h3>
+<p>Al principio no sabes nada, así que explorar es barato y valioso; al final ya conoces los gustos del usuario y cada recomendación al azar es una oportunidad perdida. Por eso lo habitual es empezar con \( \varepsilon \) alto y <strong>bajarlo</strong> poco a poco hasta un mínimo:</p>
+<div class="formula">\[ \varepsilon_{\text{ep}} = \max\big(\varepsilon_{\min},\; \varepsilon_0 \cdot d^{\,\text{ep}}\big) \qquad\text{o, linealmente:}\qquad \varepsilon_t = \max\big(\varepsilon_{\min},\; 1 - t / T\big) \]</div>
+<p>Con \( \varepsilon_0 = 1 \) y \( d = 0{,}99 \) por episodio: tras 100 episodios \( \varepsilon = 0{,}99^{100} = 0{,}366 \) y tras 300 sería \( 0{,}049 \), así que se queda en el mínimo \( 0{,}05 \) (es lo que ves en la salida del <a href="leccion-5.html#frag-8">fragmento 8</a>). El DQN de CartPole que entrenarás al final usa la versión lineal, de 1 a 0,05 en 5000 pasos.</p>
+
+<figure class="demo" data-demo="curso3/c3m6-explorar" data-titulo="Cuatro formas de explorar en un pasillo de cine con trampa dulce">
+  <div class="haz">Imagina un pasillo con 9 puertas. A la izquierda del todo está la sala donde ponen la película de siempre (+1); a la derecha del todo, la del estreno genial (+10). El agente empieza en la tercera puerta y en cada paso avanza o retrocede una. Mira la curva de cada estrategia. Luego mueve el slider de decaimiento: acércalo a 0,9 (ε cae rápido) y a 0,999 (ε cae muy despacio). Pulsa «Otras 30 semillas» para ver que no es casualidad.</div>
+  <div class="observa">El pasillo tiene un premio pequeño (+1, la película de siempre) a dos pasos y uno grande (+10, el estreno) a seis. Con ε = 0 el agente se queda con el +1 en las 30 semillas (media 1,00: ninguna descubre el +10). Con ε = 0,1 fijo apenas mejora (1,28 y solo 1 semilla de 30 encuentra el camino largo): explorar un 10 % no basta para cruzar seis casillas seguidas. Con ε = 1 la tabla sí aprende el camino bueno (30 de 30), pero el agente <em>juega</em> al azar y gana solo 3,20. Con el decaimiento 0,99 la media sube a 9,08 y 27 de 30 semillas terminan yendo al +10. Si lo bajas a 0,9 (ε cae demasiado rápido) vuelve a 1,60, y con 0,999 (cae demasiado despacio) se queda en 6,90 porque sigue tirando al azar casi todo el entrenamiento. «Llega al +10» cuenta cuántas de las 30 semillas aprendieron el camino bueno.</div>
+</figure>
+
 <div class="callout ojo">
-<span class="lbl">Ojo</span>
-<p>Todo esto necesita conocer \( P \) y \( r \): el «mapa». En la vida real el agente no los conoce; tiene que descubrirlos viviendo. El truco es sustituir la media sobre \( s' \) por <strong>una sola muestra</strong> (lo que realmente ocurrió) y corregir poco a poco. Eso es Q-learning (sección 6). Pero antes hay un problema previo: ¿cómo se descubre cuál es el buen camino?</p>
+  <span class="lbl">Ojo</span>
+  <p>Durante el entrenamiento, la recompensa que ves incluye los movimientos al azar de ε: es <em>peor</em> que lo que haría el agente sin explorar. Para saber lo bueno que es de verdad, <strong>evalúalo aparte con ε = 0</strong> (política greedy pura), como hacen los fragmentos 9 y 13. Otras técnicas de exploración: empezar con valores optimistas, UCB (explorar más lo menos probado), elegir con probabilidades proporcionales a Q (<em>softmax</em>) o añadir ruido a los pesos de la red.</p>
 </div>
-</section></div></details><details class="profundizar" id="codigo"><summary><span>Ver código explicado paso a paso<small>2 fragmento(s) original(es), con cada línea comentada y salida esperada.</small></span></summary><div class="prof-body"><article class="snippet" data-lang="python" id="frag-6">
-<header>
-<h3>6 · La ecuación de Bellman en el MDP de 3 estados: sistema lineal e iteración</h3>
-<p class="para-que"><strong>Para qué sirve</strong> Calcular los valores \( V(A) \) y \( V(B) \) del ejemplo de la sección de Bellman de dos maneras: resolviendo el sistema de ecuaciones de golpe y aplicando la ecuación una y otra vez (barridos). Es la versión en código de lo que hiciste a mano.</p>
-</header>
-<pre class="code"><code>import numpy as np
-
-gamma = 0.5
-# Estados: 0 = A, 1 = B, 2 = T (final). Una sola acción por estado (política fija).
-# Desde A: 50 % pasa a B con recompensa +4, 50 % se queda en A con recompensa 0.
-# Desde B: 60 % pasa a T con recompensa +10, 40 % vuelve a A con recompensa 0.
-P = np.array([[0.5, 0.5, 0.0],
-              [0.4, 0.0, 0.6],
-              [0.0, 0.0, 0.0]])
-R = np.array([0.5 * 4 + 0.5 * 0,
-              0.6 * 10 + 0.4 * 0,
-              0.0])
-print("recompensa esperada inmediata R:", R)
-
-V = np.linalg.solve(np.eye(3) - gamma * P, R)
-print("solución exacta V:", V.round(4))
-
-V = np.zeros(3)
-for k in range(1, 6):
-    V = R + gamma * P @ V
-    print(f"barrido {k}: V =", V.round(4))
-for _ in range(100):
-    V = R + gamma * P @ V
-print("tras 105 barridos:", V.round(4))
-print("Bellman en A:", R[0] + gamma * P[0] @ V, "| Bellman en B:", R[1] + gamma * P[1] @ V)</code></pre>
-<details class="linea-a-linea">
-<summary>Línea por línea</summary>
-<p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
-<table class="lineas">
-<thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
-<tbody>
-<tr data-lines="1"><td><code>import numpy as np</code></td><td>NumPy, para las matrices.</td></tr>
-<tr data-lines="3"><td><code>gamma = 0.5</code></td><td>Factor de descuento del ejemplo.</td></tr>
-<tr data-lines="4-6"><td><code># Estados: 0 = A, 1 = B, 2 = T (final). Una sola acción po …</code></td><td>Comentarios que describen el MDP: tres estados (A, B y el final T), una sola acción por estado (la política está fijada) y qué pasa desde A y desde B.</td></tr>
-<tr data-lines="7-9"><td><code>P = np.array([[0.5, 0.5, 0.0], …</code></td><td>Matriz de transición \( P \): la fila <em>i</em> dice con qué probabilidad se pasa del estado <em>i</em> a cada estado. Desde A: 0,5 a A y 0,5 a B. Desde B: 0,4 a A y 0,6 a T. Desde T no se va a ninguna parte (fila de ceros).</td></tr>
-<tr data-lines="10-12"><td><code>R = np.array([0.5 * 4 + 0.5 * 0, …</code></td><td>Recompensa <strong>esperada</strong> inmediata de cada estado: en A, 50 % de cobrar 4 y 50 % de cobrar 0 (= 2); en B, 60 % de cobrar 10 y 40 % de cobrar 0 (= 6); en T, 0.</td></tr>
-<tr data-lines="13"><td><code>print("recompensa esperada inmediata R:", R)</code></td><td>Muestra el vector \( R \): <code>[2. 6. 0.]</code>.</td></tr>
-<tr data-lines="15"><td><code>V = np.linalg.solve(np.eye(3) - gamma * P, R)</code></td><td>La ecuación de Bellman escrita con matrices es \( V = R + \gamma P V \), es decir, \( (I - \gamma P)\,V = R \). <code>np.eye(3)</code> es la matriz identidad y <code>np.linalg.solve</code> resuelve el sistema lineal exacto.</td></tr>
-<tr data-lines="16"><td><code>print("solución exacta V:", V.round(4))</code></td><td>Imprime la solución exacta con 4 decimales.</td></tr>
-<tr data-lines="18"><td><code>V = np.zeros(3)</code></td><td>Segunda vía: empezamos con una suposición, todos los valores a 0.</td></tr>
-<tr data-lines="19"><td><code>for k in range(1, 6):</code></td><td>Cinco barridos numerados del 1 al 5.</td></tr>
-<tr data-lines="20"><td><code>V = R + gamma * P @ V</code></td><td>Un <strong>barrido de Bellman</strong>: el valor nuevo de cada estado es la recompensa esperada más \( \gamma \) por el valor medio de los estados a los que se va (<code>@</code> es el producto de matriz por vector).</td></tr>
-<tr data-lines="21"><td><code>print(f"barrido {k}: V =", V.round(4))</code></td><td>Muestra cómo evolucionan los valores barrido a barrido.</td></tr>
-<tr data-lines="22"><td><code>for _ in range(100):</code></td><td>Cien barridos más, sin imprimir (el guion bajo <code>_</code> indica que no usamos el contador).</td></tr>
-<tr data-lines="23"><td><code>V = R + gamma * P @ V</code></td><td>El mismo barrido.</td></tr>
-<tr data-lines="24"><td><code>print("tras 105 barridos:", V.round(4))</code></td><td>Valores tras 5 + 100 barridos.</td></tr>
-<tr data-lines="25"><td><code>print("Bellman en A:", R[0] + gamma * P[0] @ V, "| Bellman …</code></td><td>Comprobación: si aplicamos la ecuación una vez más sobre el resultado, debemos recuperar los mismos valores en A y en B (<code>R[0] + gamma * P[0] @ V</code> es el lado derecho para A).</td></tr>
-</tbody>
-</table>
+  </div>
 </details>
-<div class="salida">
-<strong>Salida esperada</strong>
-<pre>recompensa esperada inmediata R: [2. 6. 0.]
-solución exacta V: [5. 7. 0.]
-barrido 1: V = [2. 6. 0.]
-barrido 2: V = [4.  6.4 0. ]
-barrido 3: V = [4.6 6.8 0. ]
-barrido 4: V = [4.85 6.92 0.  ]
-barrido 5: V = [4.9425 6.97   0.    ]
-tras 105 barridos: [5. 7. 0.]
-Bellman en A: 5.0 | Bellman en B: 7.0</pre>
-<p>La solución exacta es \( V(A) = 5 \) y \( V(B) = 7 \): coincide con lo que sale a mano en la sección de Bellman. Con barridos, empezando en cero, el primer barrido da simplemente la recompensa inmediata esperada (2 y 6); en el segundo A sube a 4 y B a 6,4; los valores se acercan a 5 y 7 sin llegar nunca a tocarlos en un número finito de barridos, pero tras 105 son indistinguibles. La última línea comprueba el criterio de parada de todo el módulo: <strong>el valor verdadero es el que no cambia al aplicar Bellman</strong>.</p>
+
+<section>
+<h2 class="sin-num">Código</h2>
+<article class="snippet" data-lang="python" id="frag-5">
+  <header>
+    <h3>5 · Bandido de 10 brazos con ε-greedy</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Simular el problema de exploración más pequeño que existe: diez «máquinas tragaperras» con premios medios desconocidos (piensa en diez películas del catálogo, cada una con unos minutos medios vistos que el recomendador no conoce). Se compara cuánto se gana con distintos valores de \( \varepsilon \) y se ve la estimación incremental de la media.</p>
+  </header>
+  <pre class="code"><code>import numpy as np
+
+rng = np.random.default_rng(0)
+medias_reales = rng.normal(0, 1, 10)
+print("medias reales:", medias_reales.round(2))
+print("mejor brazo  :", medias_reales.argmax(), "con media", medias_reales.max().round(2))
+
+def jugar(epsilon, pasos=1000, semilla=1):
+    r = np.random.default_rng(semilla)
+    Q = np.zeros(10)
+    N = np.zeros(10)
+    total = 0.0
+    for t in range(pasos):
+        if r.random() &lt; epsilon:
+            a = int(r.integers(10))
+        else:
+            a = int(Q.argmax())
+        recompensa = r.normal(medias_reales[a], 1)
+        N[a] += 1
+        Q[a] += (recompensa - Q[a]) / N[a]
+        total += recompensa
+    return total / pasos, int(Q.argmax()), int(N.argmax())
+
+for eps in [0.0, 0.01, 0.1, 0.3]:
+    media, mejor_est, mas_usado = jugar(eps)
+    print(f"epsilon={eps:&lt;4}: recompensa media={media:5.2f} | brazo estimado mejor={mejor_est} | brazo más usado={mas_usado}")</code></pre>
+  <details class="linea-a-linea">
+    <summary>Línea por línea</summary>
+    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+      <tbody>
+        <tr data-lines="1"><td><code>import numpy as np</code></td><td>NumPy.</td></tr>
+        <tr data-lines="3"><td><code>rng = np.random.default_rng(0)</code></td><td>Generador con semilla, para que todos veamos las mismas máquinas.</td></tr>
+        <tr data-lines="4"><td><code>medias_reales = rng.normal(0, 1, 10)</code></td><td>Sortea el premio medio verdadero de cada uno de los 10 brazos de una distribución normal de media 0 y desviación 1. El agente <strong>no</strong> conoce estos números.</td></tr>
+        <tr data-lines="5"><td><code>print("medias reales:", medias_reales.round(2))</code></td><td>Los imprime (redondeados a 2 decimales).</td></tr>
+        <tr data-lines="6"><td><code>print("mejor brazo  :", medias_reales.argmax(), "con media …</code></td><td><code>argmax</code> da la posición del mayor: el brazo que un agente perfecto elegiría siempre.</td></tr>
+        <tr data-lines="8"><td><code>def jugar(epsilon, pasos=1000, semilla=1):</code></td><td>Función que juega 1000 tiradas con un \( \varepsilon \) dado y devuelve cómo le fue.</td></tr>
+        <tr data-lines="9"><td><code>r = np.random.default_rng(semilla)</code></td><td>Generador propio de esta partida (separado del que sorteó las medias).</td></tr>
+        <tr data-lines="10"><td><code>Q = np.zeros(10)</code></td><td>Estimación del valor de cada brazo; al principio todo vale 0.</td></tr>
+        <tr data-lines="11"><td><code>N = np.zeros(10)</code></td><td>Contador de cuántas veces se ha tirado de cada brazo.</td></tr>
+        <tr data-lines="12"><td><code>total = 0.0</code></td><td>Recompensa total ganada.</td></tr>
+        <tr data-lines="13"><td><code>for t in range(pasos):</code></td><td>Bucle de tiradas.</td></tr>
+        <tr data-lines="14-15"><td><code>if r.random() &lt; epsilon: …</code></td><td>Con probabilidad \( \varepsilon \) <strong>explora</strong>: elige un brazo cualquiera de los 10 al azar.</td></tr>
+        <tr data-lines="16-17"><td><code>else: …</code></td><td>En el resto de los casos <strong>explota</strong>: elige el brazo con mayor estimación <code>Q</code> (en caso de empate, <code>argmax</code> devuelve el primero).</td></tr>
+        <tr data-lines="18"><td><code>recompensa = r.normal(medias_reales[a], 1)</code></td><td>El premio de esa tirada: una normal centrada en la media real del brazo, con ruido de desviación 1 (el mismo brazo no siempre da lo mismo).</td></tr>
+        <tr data-lines="19"><td><code>N[a] += 1</code></td><td>Anota una tirada más en ese brazo.</td></tr>
+        <tr data-lines="20"><td><code>Q[a] += (recompensa - Q[a]) / N[a]</code></td><td><strong>Media incremental</strong>: mueve la estimación hacia el premio recibido un paso de tamaño \( 1/N \). Equivale exactamente a recalcular la media de todos los premios, sin guardarlos.</td></tr>
+        <tr data-lines="21"><td><code>total += recompensa</code></td><td>Acumula lo ganado.</td></tr>
+        <tr data-lines="22"><td><code>return total / pasos, int(Q.argmax()), int(N.argmax())</code></td><td>Devuelve la recompensa media por tirada, el brazo que cree mejor y el que más ha usado.</td></tr>
+        <tr data-lines="24"><td><code>for eps in [0.0, 0.01, 0.1, 0.3]:</code></td><td>Prueba cuatro valores de \( \varepsilon \).</td></tr>
+        <tr data-lines="25"><td><code>media, mejor_est, mas_usado = jugar(eps)</code></td><td>Juega una partida y recoge los tres resultados.</td></tr>
+        <tr data-lines="26"><td><code>print(f"epsilon={eps:&lt;4}: recompensa media={media:5.2f} | …</code></td><td>Imprime una línea por valor de \( \varepsilon \); <code>:&lt;4</code> alinea el texto a la izquierda en 4 caracteres.</td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>medias reales: [ 0.13 -0.13  0.64  0.1  -0.54  0.36  1.3   0.95 -0.7  -1.27]
+mejor brazo  : 6 con media 1.3
+epsilon=0.0 : recompensa media= 0.62 | brazo estimado mejor=2 | brazo más usado=2
+epsilon=0.01: recompensa media= 1.11 | brazo estimado mejor=6 | brazo más usado=6
+epsilon=0.1 : recompensa media= 1.06 | brazo estimado mejor=6 | brazo más usado=6
+epsilon=0.3 : recompensa media= 0.71 | brazo estimado mejor=6 | brazo más usado=7</pre>
+    <p>El mejor brazo es el 6 (media 1,30). Con <strong>ε = 0</strong> el agente se queda enganchado al brazo 2 (media real 0,64): sus primeras tiradas le hicieron creer que era el mejor y nunca volvió a mirar otro; gana 0,62 por tirada. Con <strong>ε = 0,01</strong> y <strong>0,1</strong> descubre el brazo 6 y lo explota (1,11 y 1,06). Con <strong>ε = 0,3</strong> también lo encuentra, pero desperdicia casi un tercio de las tiradas en brazos al azar (0,71), y el brazo que más usa es el 7, que en una sola partida le pareció mejor. Es una única semilla: no demuestra que 0,01 sea mejor que 0,1 en general, solo muestra la forma de la curva: <em>demasiado poco explorar y demasiado explorar cuestan caro</em>.</p>
+  </div>
+</article>
+
+<article class="snippet" data-lang="python" id="frag-9">
+  <header>
+    <h3>9 · FrozenLake resbaladizo: cuatro estrategias de exploración</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Entrenar Q-learning en el lago con hielo resbaladizo (resultado incierto) con cuatro formas de explorar y medir el porcentaje de episodios que llegan a la meta con la política aprendida. Muestra con números por qué explorar es imprescindible. Tarda unos 30 segundos.</p>
+  </header>
+  <pre class="code"><code>import numpy as np
+import gymnasium as gym
+
+def entrenar(esquema, episodios=5000, semilla=0, alpha=0.1, gamma=0.99):
+    env = gym.make("FrozenLake-v1", is_slippery=True)
+    rng = np.random.default_rng(semilla)
+    Q = np.zeros((16, 4))
+    for ep in range(episodios):
+        eps = esquema(ep)
+        estado, _ = env.reset(seed=semilla if ep == 0 else None)
+        fin = False
+        while not fin:
+            if rng.random() &lt; eps:
+                a = int(rng.integers(4))
+            else:
+                a = int(rng.choice(np.flatnonzero(Q[estado] == Q[estado].max())))
+            sig, r, terminado, truncado, _ = env.step(a)
+            Q[estado, a] += alpha * (r + gamma * Q[sig].max() * (not terminado) - Q[estado, a])
+            estado, fin = sig, terminado or truncado
+    return Q
+
+def evaluar(Q, n=1000, semilla=123):
+    env = gym.make("FrozenLake-v1", is_slippery=True)
+    exitos = 0
+    for i in range(n):
+        estado, _ = env.reset(seed=semilla if i == 0 else None)
+        fin = False
+        while not fin:
+            estado, r, terminado, truncado, _ = env.step(int(Q[estado].argmax()))
+            fin = terminado or truncado
+        exitos += r
+    return exitos / n
+
+esquemas = {
+    "ε = 0 (nunca explora)":   lambda ep: 0.0,
+    "ε = 0.1 fijo":            lambda ep: 0.1,
+    "ε = 1.0 fijo (azar)":     lambda ep: 1.0,
+    "ε de 1.0 a 0.05":         lambda ep: max(0.05, 1.0 * 0.999 ** ep),
+}
+for nombre, esquema in esquemas.items():
+    tasas = [evaluar(entrenar(esquema, semilla=s)) for s in range(3)]
+    print(f"{nombre:24s} éxito con política greedy: {np.round(tasas, 3)}  media={np.mean(tasas):.3f}")</code></pre>
+  <details class="linea-a-linea">
+    <summary>Línea por línea</summary>
+    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+      <tbody>
+        <tr data-lines="1"><td><code>import numpy as np</code></td><td>NumPy.</td></tr>
+        <tr data-lines="2"><td><code>import gymnasium as gym</code></td><td>Gymnasium.</td></tr>
+        <tr data-lines="4"><td><code>def entrenar(esquema, episodios=5000, semilla=0, alpha=0.1 …</code></td><td>Función que entrena una tabla Q. <code>esquema</code> es una función que, dado el número de episodio, devuelve el valor de \( \varepsilon \). Así se pueden probar estrategias distintas con el mismo código.</td></tr>
+        <tr data-lines="5"><td><code>env = gym.make("FrozenLake-v1", is_slippery=True)</code></td><td>Lago con hielo resbaladizo.</td></tr>
+        <tr data-lines="6"><td><code>rng = np.random.default_rng(semilla)</code></td><td>Azar con semilla propia de cada entrenamiento.</td></tr>
+        <tr data-lines="7"><td><code>Q = np.zeros((16, 4))</code></td><td>Tabla Q vacía.</td></tr>
+        <tr data-lines="8"><td><code>for ep in range(episodios):</code></td><td>Bucle de episodios (5000).</td></tr>
+        <tr data-lines="9"><td><code>eps = esquema(ep)</code></td><td>Pregunta a la estrategia cuánto vale \( \varepsilon \) en este episodio.</td></tr>
+        <tr data-lines="10"><td><code>estado, _ = env.reset(seed=semilla if ep == 0 else None)</code></td><td>Reinicia el episodio.</td></tr>
+        <tr data-lines="11"><td><code>fin = False</code></td><td>Indicador de fin del episodio.</td></tr>
+        <tr data-lines="12"><td><code>while not fin:</code></td><td>Hasta que acabe...</td></tr>
+        <tr data-lines="13-14"><td><code>if rng.random() &lt; eps: …</code></td><td>Explorar: acción al azar.</td></tr>
+        <tr data-lines="15-16"><td><code>else: …</code></td><td>Explotar: la mejor acción conocida, con desempate al azar.</td></tr>
+        <tr data-lines="17"><td><code>sig, r, terminado, truncado, _ = env.step(a)</code></td><td>Ejecuta la acción (el hielo puede desviarla).</td></tr>
+        <tr data-lines="18"><td><code>Q[estado, a] += alpha * (r + gamma * Q[sig].max() * (not t …</code></td><td>La regla de Q-learning en una sola línea, con \( \alpha = 0{,}1 \) y \( \gamma = 0{,}99 \) (más bajos que antes porque ahora el entorno es aleatorio y conviene promediar muchas experiencias).</td></tr>
+        <tr data-lines="19"><td><code>estado, fin = sig, terminado or truncado</code></td><td>Avanza al estado siguiente y actualiza el indicador de fin.</td></tr>
+        <tr data-lines="20"><td><code>return Q</code></td><td>Devuelve la tabla aprendida.</td></tr>
+        <tr data-lines="22"><td><code>def evaluar(Q, n=1000, semilla=123):</code></td><td>Función que mide qué tal funciona una tabla Q: juega 1000 episodios <strong>sin explorar</strong>.</td></tr>
+        <tr data-lines="23"><td><code>env = gym.make("FrozenLake-v1", is_slippery=True)</code></td><td>Crea el entorno de evaluación.</td></tr>
+        <tr data-lines="24"><td><code>exitos = 0</code></td><td>Contador de episodios con meta.</td></tr>
+        <tr data-lines="25"><td><code>for i in range(n):</code></td><td>Bucle de evaluación.</td></tr>
+        <tr data-lines="26"><td><code>estado, _ = env.reset(seed=semilla if i == 0 else None)</code></td><td>Reinicia (semilla fija solo en el primero).</td></tr>
+        <tr data-lines="27"><td><code>fin = False</code></td><td>Indicador de fin.</td></tr>
+        <tr data-lines="28"><td><code>while not fin:</code></td><td>Hasta que acabe...</td></tr>
+        <tr data-lines="29"><td><code>estado, r, terminado, truncado, _ = env.step(int(Q[estado] …</code></td><td>Siempre la acción con mayor Q: política greedy pura.</td></tr>
+        <tr data-lines="30"><td><code>fin = terminado or truncado</code></td><td>Fin por cualquier motivo.</td></tr>
+        <tr data-lines="31"><td><code>exitos += r</code></td><td>Suma 1 si llegó a la meta.</td></tr>
+        <tr data-lines="32"><td><code>return exitos / n</code></td><td>Fracción de episodios con éxito.</td></tr>
+        <tr data-lines="34-39"><td><code>esquemas = { …</code></td><td>Diccionario con las cuatro estrategias, cada una como una función <code>lambda</code> (una función sin nombre de una línea): \( \varepsilon = 0 \) fijo, 0,1 fijo, 1,0 fijo (todo azar) y decreciente de 1,0 a 0,05 con <code>0.999 ** ep</code>.</td></tr>
+        <tr data-lines="40"><td><code>for nombre, esquema in esquemas.items():</code></td><td>Recorre las estrategias.</td></tr>
+        <tr data-lines="41"><td><code>tasas = [evaluar(entrenar(esquema, semilla=s)) for s in ra …</code></td><td>Para cada estrategia: entrena con 3 semillas distintas y evalúa cada tabla (una <em>list comprehension</em>: un bucle escrito dentro de corchetes).</td></tr>
+        <tr data-lines="42"><td><code>print(f"{nombre:24s} éxito con política greedy: {np.round( …</code></td><td>Imprime las tres tasas de éxito y su media.</td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>ε = 0 (nunca explora)    éxito con política greedy: [0.066 0.043 0.063]  media=0.057
+ε = 0.1 fijo             éxito con política greedy: [0.744 0.741 0.753]  media=0.746
+ε = 1.0 fijo (azar)      éxito con política greedy: [0.741 0.662 0.508]  media=0.637
+ε de 1.0 a 0.05          éxito con política greedy: [0.744 0.745 0.753]  media=0.747</pre>
+    <p>Para este lago resbaladizo, la mejor política posible gana alrededor de un 74 % de las veces (calculada con programación dinámica y jugada 5000 veces con el entorno, da 0,744; el hielo y el límite de 100 pasos hacen que nunca sea seguro): con <strong>ε = 0,1 fijo</strong> y con <strong>ε decreciente</strong> se obtiene 0,746 y 0,747 de media, es decir, el agente ha aprendido la política casi óptima. Con <strong>ε = 0</strong> el agente solo explota lo poco que sabe y se queda en 0,057: nunca llega a descubrir bien dónde está la recompensa. Con <strong>ε = 1</strong> (siempre al azar) Q-learning aún aprende algo bueno, porque aprende de lo que hace sin depender de ello (<em>off-policy</em>), pero es inestable: 0,741, 0,662 y 0,508 según la semilla. La exploración no es un adorno: sin ella no hay aprendizaje.</p>
+  </div>
+</article>
+</section>
+
 </div>
-</article><article class="snippet" data-lang="python" id="frag-11">
-<header>
-<h3>11 · La red Q de Keras: entrada = estado, salida = un valor por acción, y la pérdida de Huber</h3>
-<p class="para-que"><strong>Para qué sirve</strong> Construir la red que sustituye a la tabla Q, ver sus formas y su número de parámetros, elegir una acción con <code>argmax</code> y comprobar a mano la pérdida de Huber frente al error cuadrático medio.</p>
-</header>
-<pre class="code"><code>import numpy as np
-import keras
-from keras import layers
-
-keras.utils.set_random_seed(0)
-
-red_q = keras.Sequential([
-    keras.Input(shape=(4,)),
-    layers.Dense(32, activation="relu"),
-    layers.Dense(32, activation="relu"),
-    layers.Dense(2),
-], name="red_q")
-red_q.summary()
-
-estado = np.array([[0.02, -0.5, 0.05, 0.8]], dtype="float32")
-valores_q = red_q.predict(estado, verbose=0)
-print("forma de la entrada:", estado.shape, "| forma de la salida:", valores_q.shape)
-print("Q(s, izquierda), Q(s, derecha) =", valores_q.round(4)[0])
-print("acción greedy (argmax):", int(valores_q.argmax()))
-
-lote = np.random.default_rng(0).normal(size=(5, 4)).astype("float32")
-print("salida para un lote de 5 estados:", red_q.predict(lote, verbose=0).shape)
-
-y_objetivo = np.array([1.5, 0.2, 3.0])
-q_actual = np.array([1.0, 0.0, -1.0])
-error = y_objetivo - q_actual
-mse = np.mean(error ** 2)
-huber = np.mean(np.where(np.abs(error) &lt;= 1, 0.5 * error ** 2, np.abs(error) - 0.5))
-print("errores:", error, "| MSE =", round(mse, 4), "| Huber =", round(huber, 4))
-print("Huber de Keras:", round(float(keras.losses.Huber()(y_objetivo, q_actual)), 4))</code></pre>
-<details class="linea-a-linea">
-<summary>Línea por línea</summary>
-<p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
-<table class="lineas">
-<thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
-<tbody>
-<tr data-lines="1"><td><code>import numpy as np</code></td><td>NumPy.</td></tr>
-<tr data-lines="2"><td><code>import keras</code></td><td>Keras 3.</td></tr>
-<tr data-lines="3"><td><code>from keras import layers</code></td><td>Las capas de Keras (<code>Dense</code>, etc.).</td></tr>
-<tr data-lines="5"><td><code>keras.utils.set_random_seed(0)</code></td><td>Fija la semilla de Python, NumPy y del backend de una vez, para que los pesos iniciales sean siempre los mismos.</td></tr>
-<tr data-lines="7-12"><td><code>red_q = keras.Sequential([ …</code></td><td>Una red de capas apiladas (<code>Sequential</code>) con nombre. <code>Input(shape=(4,))</code>: el estado de CartPole son 4 números. Dos capas ocultas <code>Dense(32, activation="relu")</code>. La capa final, <code>Dense(2)</code>, <strong>sin activación</strong>: da un número real por acción (los valores Q), que pueden ser negativos o enormes; una sigmoide o un softmax estropearían la escala.</td></tr>
-<tr data-lines="13"><td><code>red_q.summary()</code></td><td>Imprime la tabla de capas, formas de salida y número de parámetros.</td></tr>
-<tr data-lines="15"><td><code>estado = np.array([[0.02, -0.5, 0.05, 0.8]], dtype="float3 …</code></td><td>Un estado inventado, con la forma <code>(1, 4)</code>: una fila (un estado) y cuatro columnas. Las redes siempre esperan un <em>lote</em> de ejemplos, aunque sea de uno.</td></tr>
-<tr data-lines="16"><td><code>valores_q = red_q.predict(estado, verbose=0)</code></td><td><code>predict</code> calcula la salida de la red. <code>verbose=0</code> silencia la barra de progreso.</td></tr>
-<tr data-lines="17"><td><code>print("forma de la entrada:", estado.shape, "| forma de la …</code></td><td>Entrada <code>(1, 4)</code> y salida <code>(1, 2)</code>: dos valores Q.</td></tr>
-<tr data-lines="18"><td><code>print("Q(s, izquierda), Q(s, derecha) =", valores_q.round( …</code></td><td>Los dos valores Q de ese estado (la red aún no ha aprendido nada: son casi 0).</td></tr>
-<tr data-lines="19"><td><code>print("acción greedy (argmax):", int(valores_q.argmax()))</code></td><td><code>argmax</code> devuelve la posición del mayor: la acción que elegiría el agente.</td></tr>
-<tr data-lines="21"><td><code>lote = np.random.default_rng(0).normal(size=(5, 4)).astype …</code></td><td>Cinco estados aleatorios, forma <code>(5, 4)</code>.</td></tr>
-<tr data-lines="22"><td><code>print("salida para un lote de 5 estados:", red_q.predict(l …</code></td><td>Con 5 estados, la red devuelve <code>(5, 2)</code>: una pasada por la red da los valores Q de <em>todas</em> las acciones de <em>todos</em> los estados del lote.</td></tr>
-<tr data-lines="24"><td><code>y_objetivo = np.array([1.5, 0.2, 3.0])</code></td><td>Tres objetivos \( y \) inventados.</td></tr>
-<tr data-lines="25"><td><code>q_actual = np.array([1.0, 0.0, -1.0])</code></td><td>Las predicciones actuales \( Q(s,a) \) de la red para esas tres transiciones.</td></tr>
-<tr data-lines="26"><td><code>error = y_objetivo - q_actual</code></td><td>Los errores: 0,5; 0,2 y 4,0 (el tercero es grande).</td></tr>
-<tr data-lines="27"><td><code>mse = np.mean(error ** 2)</code></td><td>Error cuadrático medio: eleva al cuadrado y promedia.</td></tr>
-<tr data-lines="28"><td><code>huber = np.mean(np.where(np.abs(error) &lt;= 1, 0.5 * error * …</code></td><td>Pérdida de Huber (con \( \delta = 1 \)) escrita a mano: <code>np.where(condición, a, b)</code> elige <code>a</code> donde el error es pequeño (≤ 1) y aplica \( \tfrac12 e^2 \); donde es grande aplica \( |e| - \tfrac12 \).</td></tr>
-<tr data-lines="29"><td><code>print("errores:", error, "| MSE =", round(mse, 4), "| Hube …</code></td><td>Imprime los errores y las dos pérdidas.</td></tr>
-<tr data-lines="30"><td><code>print("Huber de Keras:", round(float(keras.losses.Huber()( …</code></td><td>Comprueba que <code>keras.losses.Huber()</code> da el mismo número que nuestra fórmula.</td></tr>
-</tbody>
-</table>
-</details>
-<div class="salida">
-<strong>Salida esperada</strong>
-<pre>Model: "red_q"
-┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━┓
-┃ Layer (type)                    ┃ Output Shape           ┃       Param # ┃
-┡━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━┩
-│ dense (Dense)                   │ (None, 32)             │           160 │
-├─────────────────────────────────┼────────────────────────┼───────────────┤
-│ dense_1 (Dense)                 │ (None, 32)             │         1,056 │
-├─────────────────────────────────┼────────────────────────┼───────────────┤
-│ dense_2 (Dense)                 │ (None, 2)              │            66 │
-└─────────────────────────────────┴────────────────────────┴───────────────┘
- Total params: 1,282 (5.01 KB)
- Trainable params: 1,282 (5.01 KB)
- Non-trainable params: 0 (0.00 B)
-forma de la entrada: (1, 4) | forma de la salida: (1, 2)
-Q(s, izquierda), Q(s, derecha) = [ 0.0697 -0.026 ]
-acción greedy (argmax): 0
-salida para un lote de 5 estados: (5, 2)
-errores: [0.5 0.2 4. ] | MSE = 5.43 | Huber = 1.215
-Huber de Keras: 1.215</pre>
-<p>La tabla de parámetros: la primera capa tiene \( 4 \cdot 32 + 32 = 160 \), la segunda \( 32 \cdot 32 + 32 = 1056 \) y la de salida \( 32 \cdot 2 + 2 = 66 \); en total <strong>1282 parámetros</strong>, frente a los 16·4 = 64 números de la tabla de FrozenLake, pero ahora sirven para <em>cualquier</em> estado real, no solo para 16. Los valores Q iniciales son casi 0 (0,0697 y −0,026) porque la red no ha aprendido nada. La pérdida: con errores 0,5; 0,2 y 4,0, el MSE es 5,43 (dominado por el error de 4, al cuadrado: 16) y la Huber vale 1,215 (el error grande solo aporta 3,5, un crecimiento lineal). Por eso se usa Huber en DQN: un solo objetivo disparatado no arrastra todo el entrenamiento. Keras da exactamente el mismo valor que la fórmula a mano.</p>
-</div>
-</article></div></details></div></main></body></html>
+</main>
+</body>
+</html>

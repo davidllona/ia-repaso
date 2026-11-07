@@ -1,242 +1,416 @@
-<!DOCTYPE html>
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lección 8 · Los hiperparámetros se eligen con validación cruzada, nunca con el test: el flujo completo · Módulo 5 · Curso 1 · Cuaderno de IA</title>
+<meta name="description" content="Buscar hiperparámetros con GridSearchCV y RandomizedSearchCV, diagnosticar con curvas de validación y de aprendizaje, guardar el modelo con joblib y el flujo completo de evaluación paso a paso.">
+<script>try{var t=localStorage.getItem('cuaderno-ia:tema');if(t)document.documentElement.setAttribute('data-theme',t)}catch(e){}</script>
+<link rel="stylesheet" href="../../assets/css/style.css">
+<script src="../../assets/js/curriculum.js"></script>
+<script src="../../assets/js/lab.js"></script>
+<script src="../../assets/js/app.js" defer></script>
+</head>
+<body data-root="../../" data-course="1" data-module="5" data-lesson="8">
+<main>
+<div class="page">
 
-<html lang="es"><head><meta charset="utf-8"/><meta content="width=device-width,initial-scale=1" name="viewport"/><title>Lección 8 · Validación cruzada: no fiarse de un solo reparto · Curso 1 · Cuaderno de IA</title><meta content="Ninguna de las dos, y las dos a la vez." name="description"/><script>try{var t=localStorage.getItem('cuaderno-ia:tema');if(t)document.documentElement.setAttribute('data-theme',t)}catch(e){}</script><link href="../../assets/css/style.css" rel="stylesheet"/><script src="../../assets/js/curriculum.js"></script><script src="../../assets/js/lab.js"></script><script defer="" src="../../assets/js/app.js"></script><script defer="" src="../../assets/js/microanimations.js"></script></head><body data-course="1" data-lesson="8" data-module="5" data-root="../../"><main><div class="page" data-micro="3min"><header class="hero leccion"><div class="hero-grid"><div><p class="eyebrow">Curso 1 · Módulo 5 · Lección 8 de 15</p><h1>Validación cruzada: no fiarse de un solo reparto</h1><p class="lead">Ninguna de las dos, y las dos a la vez.</p><p class="meta-line"><span class="read-time" data-render="read-time"></span><a href="../modulo-5.html">Índice del módulo</a></p></div><div aria-hidden="true" class="hero-tile"></div></div></header><details class="predice"><summary>Cambias random_state de 42 a 7 y la nota de tu modelo pasa de 0,86 a 0,81. ¿Cuál es la «verdadera»?<span class="hint"></span></summary><div><p>Ninguna de las dos, y las dos a la vez.</p></div></details><section aria-label="Explicación breve" class="micro-core"><div class="micro-kicker">01 · ENTENDER <span>≈ 45 s</span></div><h2>La idea en palabras sencillas</h2><p>Ninguna de las dos, y las dos a la vez. Cada reparto en train/test da una estimación de cómo funcionará el modelo, y esa estimación tiene ruido: depende de qué filas cayeron en el test. Con pocos datos, ese ruido es enorme. La solución es repetir el examen varias veces con repartos distintos y quedarse con el promedio y con cuánto varía.</p><div class="micro-example"><span aria-hidden="true" class="micro-example-icon">🛍️</span><div><strong>Otro ejemplo · Tienda</strong><p>Guardas pedidos de otro mes para comprobar si el modelo sigue funcionando fuera del entrenamiento.</p></div></div></section><div class="micro-kicker micro-checkpoint">02 · RESPONDER <span>≈ 15 s</span></div><section aria-label="Pregunta intercalada" class="quiz mini micro-check"><script class="quiz-data" type="application/json">{"titulo": "Pausa rápida · Comprueba la idea", "preguntas": [{"q": "Entrenas con 80 fotos. ¿Cuál es la mejor forma de medir si generaliza?", "opciones": ["Evaluarlo con esas mismas 80", "Probarlo con fotos nuevas reservadas", "Cambiar las etiquetas del test"], "correcta": 1, "porque": "TEST debe contener ejemplos no utilizados para entrenar."}]}</script></section><section aria-label="Animación interactiva" class="micro-viz" data-index="14" data-micro-viz="split"><div class="micro-kicker">03 · EXPERIMENTAR <span>≈ 45 s</span></div><div class="micro-viz-title"><div><h2>Entrenar no es examinar</h2><p>Cambia la proporción y observa qué ejemplos se reservan para el test.</p></div><span aria-hidden="true" class="micro-viz-symbol">✦</span></div><div aria-live="polite" class="micro-viz-stage"><p>Animación interactiva: Entrenar no es examinar</p></div></section><div class="micro-kicker micro-checkpoint">04 · APLICAR <span>≈ 15 s</span></div><section aria-label="Pregunta intercalada" class="quiz mini micro-check"><script class="quiz-data" type="application/json">{"titulo": "Pausa rápida · ¿Lo aplicarías?", "preguntas": [{"q": "¿Para qué sirve un conjunto de validación?", "opciones": ["Para ocultar errores al final", "Para reemplazar las entradas de entrenamiento", "Para elegir ajustes durante el desarrollo"], "correcta": 2, "porque": "Validación permite comparar y seleccionar configuraciones sin gastar el test final."}]}</script></section><div class="micro-finish"><strong>Idea que te llevas</strong><span>Ninguna de las dos, y las dos a la vez</span><small>¿Quieres más ejemplos, fórmulas o código? Los tienes justo debajo, sin límite de tiempo.</small></div><details class="profundizar micro-legacy"><summary><span>Explorar más: explicación y simulaciones completas<small>Todo el texto original, tablas y demos avanzadas. Opcional.</small></span></summary><div class="prof-body"><section><h2>Validación cruzada: no fiarse de un solo reparto</h2>
-<p>Ninguna de las dos, y las dos a la vez. Cada reparto en train/test da una <em>estimación</em> de cómo funcionará el modelo, y esa estimación tiene ruido: depende de qué filas cayeron en el test. Con pocos datos, ese ruido es enorme. La solución es repetir el examen varias veces con repartos distintos y quedarse con el promedio <strong>y</strong> con cuánto varía.</p>
-<p>Resultado: <strong>cada muestra se usa exactamente una vez para validar y \( K - 1 \) veces para entrenar</strong>. No se desperdicia ningún dato, y tienes K notas en lugar de una. Con K = 5 y el train partido en cinco trozos A, B, C, D y E:</p>
-<p>donde \( s_k \) es la puntuación de la ronda \( k \), \( \bar s \) su media (la estimación del rendimiento) y \( \sigma \) la desviación típica (cuánto cambia la nota de una ronda a otra). Un ejemplo con K = 5:</p>
-<div class="callout ejemplo"><span class="lbl">Ejemplo tomado del módulo</span><p>Pruebas el recomendador en cinco rondas, cada una con un grupo distinto de usuarios, y salen estas accuracies: 0,80 · 0,90 · 0,70 · 0,85 · 0,75.</p></div></section><figure class="demo" data-demo="curso1/c1m5-kfold" data-titulo="Cada ronda, un trozo distinto hace de examen">
-<div class="haz">Pulsa «Ronda a ronda» y fíjate en qué usuarios se resaltan en cada fila (son la validación de esa ronda). Luego «Calcular todas». Después cambia K, activa «Mezclar antes» y por último «Estratificar».</div>
-<div class="observa">Mira la línea de abajo: sin mezclar ni estratificar (con los datos ordenados por clase), algunas rondas de validación no contienen <strong>ningún</strong> usuario que abandonó la serie y otra contiene casi todos, y los aciertos oscilan muchísimo. Con «Estratificar», cada ronda tiene la misma proporción de usuarios que terminan y que abandonan. También verás que 25 repartos hold-out al azar dan aciertos en un rango enorme: una sola partición es una lotería.</div>
-</figure><div class="resumen"><h2 class="sin-num sin-toc">En pocas líneas</h2><ul><li><strong>Validación cruzada: no fiarse de un solo reparto:</strong> Ninguna de las dos, y las dos a la vez.</li><li>Antes de continuar, intenta explicar la demo sin mirar su resultado.</li></ul></div><section class="quiz mini"><script class="quiz-data" type="application/json">{"titulo": "¿Lo tienes?", "preguntas": [{"q": "¿Qué concepto estamos trabajando en esta lección?", "opciones": ["Buscar hiperparámetros: GridSearchCV y RandomizedSearchCV", "El flujo completo, paso a paso", "Validación cruzada: no fiarse de un solo reparto"], "correcta": 2, "porque": "Ninguna de las dos, y las dos a la vez."}, {"q": "¿Cuál de estas afirmaciones recoge lo que acabas de estudiar?", "opciones": ["Ninguna de las dos, y las dos a la vez.", "Siempre hay un único método que sirve para todos los problemas.", "Lo importante es comprender la idea y comprobarla con ejemplos, no memorizar términos."], "correcta": 0, "porque": "La explicación central es: Ninguna de las dos, y las dos a la vez."}, {"q": "Si una demo o un ejemplo te desconcierta, ¿cuál es la mejor forma de aprenderlo?", "opciones": ["Volver a los números, cambiar un valor y explicar qué ocurre.", "Ignorar los resultados que no coinciden con tu intuición.", "Memorizar el nombre sin entender la operación."], "correcta": 0, "porque": "Explorar qué cambia y por qué ayuda a conectar el concepto con su resultado."}]}</script></section></div></details><details class="profundizar"><summary><span>Profundizar: explicación completa<small>Matices, fórmulas, tablas, otros ejemplos y experimentos del módulo original.</small></span></summary><div class="prof-body"><section>
-<h2 id="validacion-cruzada">Validación cruzada: no fiarse de un solo reparto</h2>
-<p class="pregunta">Cambias <code>random_state</code> de 42 a 7 y la nota de tu modelo pasa de 0,86 a 0,81. ¿Cuál es la «verdadera»?</p>
-<p>Ninguna de las dos, y las dos a la vez. Cada reparto en train/test da una <em>estimación</em> de cómo funcionará el modelo, y esa estimación tiene ruido: depende de qué filas cayeron en el test. Con pocos datos, ese ruido es enorme. La solución es repetir el examen varias veces con repartos distintos y quedarse con el promedio <strong>y</strong> con cuánto varía.</p>
+<header class="hero leccion">
+  <div class="hero-grid">
+    <div>
+      <p class="eyebrow">Curso 1 · Módulo 5 · Lección 8 de 8</p>
+      <h1>Los hiperparámetros se eligen con validación cruzada, nunca con el test: el flujo completo</h1>
+      <p class="lead">¿Cuántos vecinos, qué profundidad, qué C? Ni con el train (ganaría el que memoriza) ni con el test (sería hacer trampa): con validación cruzada. Y cuando la nota no te gusta, dos curvas te dicen si necesitas más datos, más complejidad o más freno.</p>
+      <p class="meta-line"><span class="read-time" data-render="read-time"></span><a href="../modulo-5.html">Índice del módulo</a></p>
+    </div>
+    <div class="hero-tile" aria-hidden="true"></div>
+  </div>
+</header>
+<details class="predice">
+  <summary>Buscas 5 hiperparámetros con 10 valores cada uno y validación cruzada de 5 folds, 2 segundos por entrenamiento. ¿Tarda minutos, horas o días?<span class="hint"></span></summary>
+  <div>
+    <p><strong>Días</strong>: \( 10^5 = 100\,000 \) combinaciones × 5 folds = 500 000 entrenamientos × 2 s ≈ un millón de segundos, <strong>11,6 días</strong>. Cada hiperparámetro que añades multiplica el trabajo. Por eso existe la búsqueda aleatoria: tú fijas el presupuesto (<code>n_iter=50</code> → 250 entrenamientos) sea cual sea el tamaño del espacio.</p>
+  </div>
+</details>
+
+<section>
+<h2 id="idea">Rejilla completa o sorteo</h2>
+<p>Los <strong>parámetros</strong> los aprende el modelo; los <strong>hiperparámetros</strong> (K, profundidad, <code>C</code>, <code>alpha</code>) los eliges tú antes, y se eligen con <strong>validación cruzada sobre el train</strong>. <code>GridSearchCV</code> prueba <em>todas</em> las combinaciones de una rejilla; <code>RandomizedSearchCV</code> sortea <code>n_iter</code> combinaciones de distribuciones (<code>loguniform(0.001, 100)</code> para <code>C</code>). Ambos devuelven <code>best_params_</code>, <code>best_score_</code>, <code>best_estimator_</code> (ya reentrenado con todo el train) y <code>cv_results_</code> con el detalle de cada combinación.</p>
 <div class="callout analogia">
-<span class="lbl">Analogía</span>
-<p>Para saber si una serie es buena de verdad no la juzgas por un solo capítulo (el piloto puede ser flojísimo o brillante por casualidad): ves varios y haces la media. Si les pones 8, 9, 7, 8,5 y 7,5, sabes que la serie anda por el 8 y que un capítulo concreto puede quedar un punto arriba o abajo. Con un solo capítulo, un 9 de suerte te habría engañado.</p>
+  <span class="lbl">Analogía</span>
+  <p>Ajustar las palomitas para la noche de cine. <strong>Rejilla:</strong> 4 potencias × 4 tiempos, 16 bolsas. <strong>Azar:</strong> 16 pares cualesquiera. Con dos ajustes la tabla es perfecta; con seis se hace inabarcable, y el azar funciona casi igual porque solo unos pocos ajustes importan de verdad.</p>
 </div>
-<h3>K-Fold, paso a paso</h3>
-<ol class="pasos">
-<li><strong>Parte el conjunto de entrenamiento en K trozos</strong> (los <em>folds</em>) del mismo tamaño. Lo habitual es K = 5 o 10.</li>
-<li><strong>Ronda 1:</strong> el trozo 1 hace de validación y los otros K − 1 trozos juntos hacen de entrenamiento. Entrenas un modelo nuevo desde cero y lo evalúas en el trozo 1. Anotas la puntuación.</li>
-<li><strong>Rondas 2 a K:</strong> repites cambiando el trozo que hace de validación. Cada ronda entrena un modelo <em>nuevo</em>.</li>
-<li><strong>Promedia las K puntuaciones</strong> y calcula también su desviación típica.</li>
-</ol>
-<p>Resultado: <strong>cada muestra se usa exactamente una vez para validar y \( K - 1 \) veces para entrenar</strong>. No se desperdicia ningún dato, y tienes K notas en lugar de una. Con K = 5 y el train partido en cinco trozos A, B, C, D y E:</p>
-<pre class="ascii">Ronda 1: [A] B  C  D  E   A valida
-Ronda 2:  A [B] C  D  E   B valida
-Ronda 3:  A  B [C] D  E   C valida
-Ronda 4:  A  B  C [D] E   D valida
-Ronda 5:  A  B  C  D [E]  E valida
-(los demás trozos entrenan; el
-resultado es la media de las 5 notas)</pre>
-<h3>Leer el resultado: media ± desviación</h3>
-<div class="formula">\[ \bar s = \frac{1}{K}\sum_{k=1}^{K} s_k \qquad\qquad \sigma = \sqrt{\frac{1}{K}\sum_{k=1}^{K} (s_k - \bar s)^2} \]</div>
-<p>donde \( s_k \) es la puntuación de la ronda \( k \), \( \bar s \) su media (la estimación del rendimiento) y \( \sigma \) la desviación típica (cuánto cambia la nota de una ronda a otra). Un ejemplo con K = 5:</p>
+</section>
+
+<figure class="demo" data-demo="curso1/c1m5-gridsearch" data-titulo="Rejilla completa frente a azar: ¿cuánto esfuerzo hace falta?">
+  <div class="haz">Con «GridSearchCV» mira el mapa completo (grado del polinomio × alpha). Cambia a «RandomizedSearchCV», baja «n_iter» a 10 y pulsa «Nuevo sorteo» varias veces.</div>
+  <div class="observa">El aro grueso es <code>best_params_</code>; el verde, el mejor de toda la rejilla. Con unas decenas de pruebas el azar suele acercarse mucho. Y <code>best_score_</code> es algo <strong>optimista</strong>.</div>
+</figure>
+
+<section>
+<h2 id="numeros">Con números: leer una curva de validación</h2>
 <div class="callout ejemplo">
-<span class="lbl">Ejemplo numérico</span>
-<p>Pruebas el recomendador en cinco rondas, cada una con un grupo distinto de usuarios, y salen estas accuracies: 0,80 · 0,90 · 0,70 · 0,85 · 0,75.</p>
+  <span class="lbl">Ejemplo numérico</span>
+  <p>Un árbol con distintas profundidades sobre datos con ruido (fragmento 18):</p>
+  <table>
+    <thead><tr><th><code>max_depth</code></th><th>1</th><th>2</th><th>4</th><th>8</th><th>12</th></tr></thead>
+    <tbody>
+      <tr><th scope="row">Train</th><td>0,746</td><td>0,795</td><td>0,840</td><td>0,949</td><td>0,988</td></tr>
+      <tr><th scope="row">Validación</th><td>0,728</td><td class="res">0,762</td><td>0,738</td><td>0,693</td><td>0,680</td></tr>
+    </tbody>
+  </table>
+  <p>Train sube siempre (memoriza más); validación sube hasta profundidad 2 y luego <strong>baja</strong>. El hueco creciente es la firma del sobreajuste. La <strong>curva de aprendizaje</strong> hace lo mismo variando el número de muestras: si las dos notas son malas y están juntas, el modelo es demasiado simple y <em>más datos no ayudan</em>; si hay un hueco grande que se cierra al añadir datos, <em>más datos sí ayudan</em>.</p>
+</div>
+</section>
+
+<figure class="demo" data-demo="curso1/c1m5-curva-aprendizaje" data-titulo="¿Más datos, más complejidad o más regularización?">
+  <div class="haz">Pulsa «Demasiado simple (grado 1)», luego «Adecuado (grado 3)» y «Demasiado flexible (grado 9)». Después sube el ruido de los datos.</div>
+  <div class="observa">Grado 1: las curvas se juntan arriba, más datos no ayudan. Grado 9: hueco grande que se cierra con más muestras. Grado 3: ambas se acercan al ruido irreducible, el error que ningún modelo evita.</div>
+</figure>
+
+<section>
+<h2 id="flujo">El flujo completo y el modelo guardado</h2>
+<ul class="flow">
+  <li class="a">PARTIR<small>apartar el test</small></li>
+  <li class="d">CONSTRUIR Y COMPARAR<small>pipeline + validación cruzada</small></li>
+  <li class="b">AFINAR Y DIAGNOSTICAR<small>hiperparámetros, curvas, umbral</small></li>
+  <li class="c">EXAMEN FINAL<small>test, una sola vez</small></li>
+</ul>
+<p>Al acabar, guarda el <strong>pipeline entero</strong> con <code>joblib.dump</code> (no solo el clasificador: el preprocesado también), junto con las versiones de las librerías y las métricas de test. Y nunca cargues un <code>pickle</code> de origen desconocido: puede ejecutar código.</p>
+</section>
+
+<details class="predice">
+  <summary><code>best_params_</code> dice <code>C=10</code>, y 10 era el valor más alto de tu rejilla. ¿Das por buena la búsqueda?<span class="hint"></span></summary>
+  <div>
+    <p>No: el óptimo puede estar <strong>más allá del borde</strong>. Amplía la rejilla y busca de grueso a fino: primero en escala logarítmica (0,001 … 100) y luego más fino alrededor del ganador. Y mira <code>cv_results_</code>: en el fragmento 16, las cuatro mejores combinaciones son todas <code>class_weight="balanced"</code> (F1 0,513–0,518) y las cuatro sin ello puntúan 0,24–0,44; lo que importa es <code>class_weight</code>, no <code>C</code>.</p>
+  </div>
+</details>
+
+<div class="resumen">
+  <h2 class="sin-num sin-toc">En tres líneas</h2>
+  <ul>
+    <li>Hiperparámetros con validación cruzada sobre el train: rejilla si son pocos, azar con presupuesto si son muchos; pasa el pipeline entero.</li>
+    <li>Curva de validación → qué complejidad; curva de aprendizaje → si ayudan más datos. Hueco grande = varianza; ambas bajas y juntas = sesgo.</li>
+    <li>Partir → pipeline + CV → afinar y diagnosticar → test una vez → guardar el pipeline con joblib.</li>
+  </ul>
+</div>
+<section class="quiz mini">
+<script type="application/json" class="quiz-data">
+{
+ "titulo": "¿Lo tienes?",
+ "preguntas": [
+  {
+   "q": "Un recomendador saca 0,99 en train y 0,70 en validación, y al ir dándole más datos el hueco se va cerrando poco a poco. ¿Qué diagnóstico y qué ayuda?",
+   "opciones": [
+    "Varianza alta (sobreajuste): ayudan más datos, regularización o un modelo más simple",
+    "Sesgo alto: hace falta un modelo más complejo",
+    "Buen ajuste: no hay que tocar nada",
+    "Leakage del test: no tiene arreglo"
+   ],
+   "correcta": 0,
+   "porque": "Un train casi perfecto con una validación mucho peor es la firma del sobreajuste (varianza alta): el modelo memoriza. Que el hueco se cierre con más datos confirma que más datos ayudan. En sesgo alto las dos notas serían malas y estarían juntas. Y nada indica que el test se haya usado para decidir."
+  },
+  {
+   "q": "Rejilla con <code>C</code> en [0,01; 0,1; 1; 10] y <code>class_weight</code> en [None, \"balanced\"], con 5 folds. ¿Cuántos entrenamientos hace <code>GridSearchCV</code> (sin contar el refit final)?",
+   "opciones": [
+    "8",
+    "40",
+    "400"
+   ],
+   "correcta": 1,
+   "porque": "4 × 2 = 8 combinaciones, y cada una se entrena una vez por fold: 8 × 5 = 40. Después, con refit=True, un entrenamiento más con todo el train."
+  },
+  {
+   "q": "Has entrenado el mejor pipeline tras una búsqueda de media hora. ¿Qué guardas para usarlo mañana sin reentrenar?",
+   "opciones": [
+    "Solo el clasificador final, que es lo que predice",
+    "El pipeline entero (preprocesado incluido) con joblib, junto con las versiones de las librerías",
+    "El fichero cv_results_"
+   ],
+   "correcta": 1,
+   "porque": "Si guardas solo el clasificador, tendrás que reproducir a mano el escalado, la imputación y el One-Hot exactos, y ahí se cometen los errores. El fragmento 19 comprueba que el pipeline recargado da las mismas probabilidades."
+  }
+ ]
+}
+</script>
+</section>
+<details class="profundizar">
+  <summary><span>Profundizar: la explicación completa<small>La analogía de las palomitas, GridSearchCV paso a paso con la explosión combinatoria, RandomizedSearchCV con distribuciones y la figura de Bergstra y Bengio, la tabla de atributos (best_params_, cv_results_…), las tablas de las curvas de validación y de aprendizaje, joblib y pickle con sus avisos, el flujo completo en nueve pasos, los errores que más cuestan y el resumen del módulo.</small></span></summary>
+  <div class="prof-body">
+<h2 id="hiperparametros">Buscar hiperparámetros: GridSearchCV y RandomizedSearchCV</h2>
+
+<p class="pregunta">¿Cuántos vecinos en el KNN? ¿Qué profundidad máxima en el árbol? ¿Qué valor de <code>C</code> o de <code>alpha</code>? ¿Los pruebas a mano uno por uno?</p>
+
+<p>Recuerda la diferencia del módulo 1: los <strong>parámetros</strong> los aprende el modelo al entrenar (los pesos); los <strong>hiperparámetros</strong> los eliges tú <em>antes</em> de entrenar (K, la profundidad, <code>C</code>, <code>alpha</code>…). Y hay que elegirlos con cabeza: no con el train (siempre ganaría el modelo más complejo, que memoriza) ni con el test (sería data snooping). Se eligen con <strong>validación cruzada sobre el train</strong>.</p>
+
+<div class="callout analogia">
+  <span class="lbl">Analogía</span>
+  <p>Ajustar la receta de las palomitas para la noche de cine: potencia del microondas y minutos. <strong>Búsqueda en rejilla:</strong> haces una tabla con 4 potencias × 4 tiempos, preparas las 16 bolsas y te quedas con las mejores palomitas. <strong>Búsqueda aleatoria:</strong> eliges 16 pares al azar. Con pocos ajustes, la tabla es perfecta; con muchos (potencia, tiempo, cantidad de aceite, de sal, de mantequilla…), la tabla se hace inabarcable.</p>
+</div>
+
+<h3>GridSearchCV: probarlo todo</h3>
 <ol class="pasos">
-<li><strong>Media:</strong> \( (0{,}80 + 0{,}90 + 0{,}70 + 0{,}85 + 0{,}75)/5 = 4{,}00/5 = 0{,}80 \).</li>
-<li><strong>Desviaciones respecto a la media:</strong> 0 · +0,10 · −0,10 · +0,05 · −0,05.</li>
-<li><strong>Al cuadrado y sumadas:</strong> \( 0 + 0{,}01 + 0{,}01 + 0{,}0025 + 0{,}0025 = 0{,}025 \). Entre 5: 0,005.</li>
-<li><strong>Raíz:</strong> \( \sqrt{0{,}005} \approx 0{,}071 \).</li>
+  <li><strong>Defines una rejilla</strong>: un diccionario <code>{hiperparámetro: lista de valores}</code>.</li>
+  <li><strong>Prueba todas las combinaciones.</strong> Para cada una hace una validación cruzada de K folds y anota la puntuación media.</li>
+  <li><strong>Elige la mejor</strong> combinación (<code>best_params_</code>, con su puntuación <code>best_score_</code>).</li>
+  <li><strong>Reentrena</strong> el modelo con esa combinación usando <em>todo</em> el train (<code>refit=True</code>) y lo deja en <code>best_estimator_</code>.</li>
+  <li>Tú usas el test <strong>una vez</strong> con ese <code>best_estimator_</code>.</li>
 </ol>
-<p>Se escribe <strong>0,80 ± 0,07</strong>. Lectura: «espero un 80 %, y según el reparto puede quedar entre el 70 % y el 90 %». (NumPy calcula esta desviación dividiendo entre K; otras herramientas dividen entre K − 1 y darían 0,079. A estos efectos da igual: lo importante es el orden de magnitud.)</p>
+
+<div class="callout ejemplo">
+  <span class="lbl">Ejemplo numérico</span>
+  <ol class="pasos">
+    <li><strong>Un caso mínimo.</strong> Para un Random Forest: <code>n_estimators</code> en [50, 100] y <code>max_depth</code> en [10, 20] son \( 2 \times 2 = 4 \) combinaciones, y cada una con su validación cruzada de 5 folds: 20 entrenamientos.</li>
+    <li><strong>Una rejilla pequeña.</strong> <code>C</code> en [0,01; 0,1; 1; 10] y <code>class_weight</code> en [None, "balanced"] → \( 4 \times 2 = 8 \) combinaciones. Con 5 folds, cada una se entrena 5 veces: \( 8 \times 5 = 40 \) entrenamientos (más uno final de <code>refit</code>).</li>
+    <li><strong>La explosión combinatoria.</strong> Con 5 hiperparámetros y 10 valores cada uno: \( 10^5 = 100\,000 \) combinaciones, \( \times 5 \) folds = <strong>500 000</strong> entrenamientos. Si cada uno tarda 2 segundos, son un millón de segundos: <strong>11,6 días</strong> de cómputo.</li>
+  </ol>
+  <p>Cada hiperparámetro que añades multiplica el trabajo. La rejilla es perfecta para 2 o 3 hiperparámetros y se vuelve imposible enseguida.</p>
 </div>
-<p>Esa desviación tiene un uso práctico muy importante: <strong>si dos modelos se diferencian menos que la desviación, no puedes decir que uno sea mejor</strong>. Un 0,812 ± 0,03 frente a un 0,808 ± 0,03 es un empate técnico.</p>
-<h3>Hacerlo con Scikit-learn</h3>
+
+<h3>RandomizedSearchCV: probar al azar, con distribuciones</h3>
+<p>En lugar de una lista de valores se le da, a cada hiperparámetro, una <strong>distribución</strong> de la que sortear (<code>randint(2, 12)</code>: enteros del 2 al 11; <code>loguniform(0.001, 100)</code>: decimales repartidos por <em>órdenes de magnitud</em>, ideal para <code>C</code> o <code>alpha</code>; <code>uniform(0, 1)</code>: decimales uniformes). Con <code>n_iter=50</code> sortea <strong>50</strong> combinaciones, sea cual sea el tamaño del espacio: tú fijas el presupuesto. 50 combinaciones × 5 folds = 250 entrenamientos, no 500 000. Y con un espacio de 10 000 combinaciones posibles, <code>n_iter=100</code> prueba solo 100 (un 1 %): 100 × 5 = 500 entrenamientos en lugar de 50 000.</p>
+
+<p>Parece una chapuza, pero suele funcionar tan bien como la rejilla por una razón geométrica: de todos los hiperparámetros, <strong>casi siempre solo unos pocos importan mucho</strong>. Mira el dibujo con 9 pruebas en cada caso:</p>
+
+<figure class="figura">
+  <svg viewBox="0 0 480 300" role="img" aria-label="Dos cuadrados con nueve puntos cada uno. En la búsqueda en rejilla, los nueve puntos solo prueban tres valores distintos del parámetro importante. En la búsqueda aleatoria, prueban nueve valores distintos y uno cae cerca del máximo de la curva.">
+<text x="30" y="16" font-size="13" font-weight="600">Rejilla 3 × 3 (9 combinaciones)</text>
+<path d="M30.0,50.0 L32.8,50.0 L35.7,50.0 L38.5,49.9 L41.3,49.9 L44.2,49.9 L47.0,49.8 L49.8,49.8 L52.7,49.7 L55.5,49.5 L58.3,49.4 L61.2,49.2 L64.0,48.9 L66.8,48.6 L69.7,48.2 L72.5,47.7 L75.3,47.0 L78.2,46.3 L81.0,45.4 L83.8,44.4 L86.7,43.2 L89.5,41.8 L92.3,40.3 L95.2,38.6 L98.0,36.8 L100.8,34.8 L103.7,32.8 L106.5,30.7 L109.3,28.5 L112.2,26.4 L115.0,24.3 L117.8,22.4 L120.7,20.6 L123.5,19.1 L126.3,17.8 L129.2,16.9 L132.0,16.3 L134.8,16.0 L137.7,16.1 L140.5,16.6 L143.3,17.4 L146.2,18.6 L149.0,20.0 L151.8,21.7 L154.7,23.5 L157.5,25.6 L160.3,27.7 L163.2,29.8 L166.0,31.9 L168.8,34.0 L171.7,36.0 L174.5,37.9 L177.3,39.6 L180.2,41.2 L183.0,42.6 L185.8,43.9 L188.7,45.0 L191.5,45.9 L194.3,46.7 L197.2,47.4 L200.0,48.0" class="fill-a" style="fill:none;stroke-width:2"/>
+<line x1="30" y1="50" x2="200" y2="50" style="stroke:var(--line);stroke-width:1"/>
+<rect class="stroke" x="30" y="66" width="170" height="170" style="stroke-width:1.4"/>
+<line x1="58.9" y1="49.3" x2="58.9" y2="66" style="stroke:var(--line);stroke-width:1;stroke-dasharray:3 3"/>
+<circle cx="58.9" cy="49.3" r="3" class="fill-a"/>
+<circle cx="58.9" cy="207.1" r="5" class="fill-d"/>
+<line x1="58.9" y1="49.3" x2="58.9" y2="66" style="stroke:var(--line);stroke-width:1;stroke-dasharray:3 3"/>
+<circle cx="58.9" cy="49.3" r="3" class="fill-a"/>
+<circle cx="58.9" cy="151.0" r="5" class="fill-d"/>
+<line x1="58.9" y1="49.3" x2="58.9" y2="66" style="stroke:var(--line);stroke-width:1;stroke-dasharray:3 3"/>
+<circle cx="58.9" cy="49.3" r="3" class="fill-a"/>
+<circle cx="58.9" cy="94.9" r="5" class="fill-d"/>
+<line x1="115.0" y1="24.3" x2="115.0" y2="66" style="stroke:var(--line);stroke-width:1;stroke-dasharray:3 3"/>
+<circle cx="115.0" cy="24.3" r="3" class="fill-a"/>
+<circle cx="115.0" cy="207.1" r="6" class="fill-b"/>
+<line x1="115.0" y1="24.3" x2="115.0" y2="66" style="stroke:var(--line);stroke-width:1;stroke-dasharray:3 3"/>
+<circle cx="115.0" cy="24.3" r="3" class="fill-a"/>
+<circle cx="115.0" cy="151.0" r="6" class="fill-b"/>
+<line x1="115.0" y1="24.3" x2="115.0" y2="66" style="stroke:var(--line);stroke-width:1;stroke-dasharray:3 3"/>
+<circle cx="115.0" cy="24.3" r="3" class="fill-a"/>
+<circle cx="115.0" cy="94.9" r="6" class="fill-b"/>
+<line x1="171.1" y1="35.6" x2="171.1" y2="66" style="stroke:var(--line);stroke-width:1;stroke-dasharray:3 3"/>
+<circle cx="171.1" cy="35.6" r="3" class="fill-a"/>
+<circle cx="171.1" cy="207.1" r="5" class="fill-d"/>
+<line x1="171.1" y1="35.6" x2="171.1" y2="66" style="stroke:var(--line);stroke-width:1;stroke-dasharray:3 3"/>
+<circle cx="171.1" cy="35.6" r="3" class="fill-a"/>
+<circle cx="171.1" cy="151.0" r="5" class="fill-d"/>
+<line x1="171.1" y1="35.6" x2="171.1" y2="66" style="stroke:var(--line);stroke-width:1;stroke-dasharray:3 3"/>
+<circle cx="171.1" cy="35.6" r="3" class="fill-a"/>
+<circle cx="171.1" cy="94.9" r="5" class="fill-d"/>
+<text x="115.0" y="253" font-size="12" text-anchor="middle" class="muted">parámetro importante →</text>
+<text transform="translate(22,151.0) rotate(-90)" font-size="12" text-anchor="middle" class="muted">parámetro poco importante →</text>
+<text x="115.0" y="272" font-size="13" text-anchor="middle" font-weight="600">3 valores distintos probados</text>
+<text x="280" y="16" font-size="13" font-weight="600">Al azar (9 combinaciones)</text>
+<path d="M280.0,50.0 L282.8,50.0 L285.7,50.0 L288.5,49.9 L291.3,49.9 L294.2,49.9 L297.0,49.8 L299.8,49.8 L302.7,49.7 L305.5,49.5 L308.3,49.4 L311.2,49.2 L314.0,48.9 L316.8,48.6 L319.7,48.2 L322.5,47.7 L325.3,47.0 L328.2,46.3 L331.0,45.4 L333.8,44.4 L336.7,43.2 L339.5,41.8 L342.3,40.3 L345.2,38.6 L348.0,36.8 L350.8,34.8 L353.7,32.8 L356.5,30.7 L359.3,28.5 L362.2,26.4 L365.0,24.3 L367.8,22.4 L370.7,20.6 L373.5,19.1 L376.3,17.8 L379.2,16.9 L382.0,16.3 L384.8,16.0 L387.7,16.1 L390.5,16.6 L393.3,17.4 L396.2,18.6 L399.0,20.0 L401.8,21.7 L404.7,23.5 L407.5,25.6 L410.3,27.7 L413.2,29.8 L416.0,31.9 L418.8,34.0 L421.7,36.0 L424.5,37.9 L427.3,39.6 L430.2,41.2 L433.0,42.6 L435.8,43.9 L438.7,45.0 L441.5,45.9 L444.3,46.7 L447.2,47.4 L450.0,48.0" class="fill-a" style="fill:none;stroke-width:2"/>
+<line x1="280" y1="50" x2="450" y2="50" style="stroke:var(--line);stroke-width:1"/>
+<rect class="stroke" x="280" y="66" width="170" height="170" style="stroke-width:1.4"/>
+<line x1="293.6" y1="49.9" x2="293.6" y2="66" style="stroke:var(--line);stroke-width:1;stroke-dasharray:3 3"/>
+<circle cx="293.6" cy="49.9" r="3" class="fill-a"/>
+<circle cx="293.6" cy="142.5" r="5" class="fill-d"/>
+<line x1="317.4" y1="48.5" x2="317.4" y2="66" style="stroke:var(--line);stroke-width:1;stroke-dasharray:3 3"/>
+<circle cx="317.4" cy="48.5" r="3" class="fill-a"/>
+<circle cx="317.4" cy="215.6" r="5" class="fill-d"/>
+<line x1="332.7" y1="44.8" x2="332.7" y2="66" style="stroke:var(--line);stroke-width:1;stroke-dasharray:3 3"/>
+<circle cx="332.7" cy="44.8" r="3" class="fill-a"/>
+<circle cx="332.7" cy="94.9" r="5" class="fill-d"/>
+<line x1="354.8" y1="31.9" x2="354.8" y2="66" style="stroke:var(--line);stroke-width:1;stroke-dasharray:3 3"/>
+<circle cx="354.8" cy="31.9" r="3" class="fill-a"/>
+<circle cx="354.8" cy="176.5" r="5" class="fill-d"/>
+<line x1="376.9" y1="17.6" x2="376.9" y2="66" style="stroke:var(--line);stroke-width:1;stroke-dasharray:3 3"/>
+<circle cx="376.9" cy="17.6" r="3" class="fill-a"/>
+<circle cx="376.9" cy="83.0" r="5" class="fill-d"/>
+<line x1="387.1" y1="16.1" x2="387.1" y2="66" style="stroke:var(--line);stroke-width:1;stroke-dasharray:3 3"/>
+<circle cx="387.1" cy="16.1" r="3" class="fill-a"/>
+<circle cx="387.1" cy="202.0" r="6" class="fill-b"/>
+<line x1="400.7" y1="21.0" x2="400.7" y2="66" style="stroke:var(--line);stroke-width:1;stroke-dasharray:3 3"/>
+<circle cx="400.7" cy="21.0" r="3" class="fill-a"/>
+<circle cx="400.7" cy="130.6" r="5" class="fill-d"/>
+<line x1="426.2" y1="39.0" x2="426.2" y2="66" style="stroke:var(--line);stroke-width:1;stroke-dasharray:3 3"/>
+<circle cx="426.2" cy="39.0" r="3" class="fill-a"/>
+<circle cx="426.2" cy="168.0" r="5" class="fill-d"/>
+<line x1="441.5" y1="45.9" x2="441.5" y2="66" style="stroke:var(--line);stroke-width:1;stroke-dasharray:3 3"/>
+<circle cx="441.5" cy="45.9" r="3" class="fill-a"/>
+<circle cx="441.5" cy="103.4" r="5" class="fill-d"/>
+<text x="365.0" y="253" font-size="12" text-anchor="middle" class="muted">parámetro importante →</text>
+<text transform="translate(272,151.0) rotate(-90)" font-size="12" text-anchor="middle" class="muted">parámetro poco importante →</text>
+<text x="365.0" y="272" font-size="13" text-anchor="middle" font-weight="600">9 valores distintos probados</text>
+</svg>
+  <figcaption>La curva superior es la puntuación según el hiperparámetro importante (el otro apenas influye). La rejilla 3 × 3 gasta 9 pruebas pero solo mira <strong>3</strong> valores distintos del parámetro importante y se pierde el pico. Las 9 pruebas al azar miran <strong>9</strong> valores distintos y una cae cerca del máximo. Es la idea del artículo de Bergstra y Bengio (2012) sobre búsqueda aleatoria.</figcaption>
+</figure>
+
+
+<h3>Los atributos que hay que conocer</h3>
 <table>
-<thead><tr><th>Función</th><th>Qué hace</th></tr></thead>
-<tbody>
-<tr><td><code>cross_val_score(modelo, X, y, cv=5, scoring="f1")</code></td><td>Hace la validación cruzada y devuelve un array con las K puntuaciones de <em>una</em> métrica. La más usada.</td></tr>
-<tr><td><code>cross_validate(modelo, X, y, cv=5, scoring=[...], return_train_score=True)</code></td><td>Como la anterior, pero con <em>varias métricas</em> a la vez y, si quieres, también la puntuación en train de cada ronda. Devuelve un diccionario (<code>test_accuracy</code>, <code>train_accuracy</code>, <code>fit_time</code>…).</td></tr>
-<tr><td><code>cross_val_predict(modelo, X, y, cv=5)</code></td><td>Devuelve la predicción de cada muestra hecha por el modelo que <em>no la vio</em> al entrenar («fuera de bolsa»). Sirve para dibujar una matriz de confusión o una curva ROC con todos los datos de train.</td></tr>
-</tbody>
+  <thead><tr><th>Atributo o argumento</th><th>Qué contiene</th></tr></thead>
+  <tbody>
+    <tr><td><code>param_grid</code> / <code>param_distributions</code></td><td>La rejilla (lista de valores por hiperparámetro) o las distribuciones de las que sortear. Puede ser una lista de diccionarios si hay combinaciones incompatibles.</td></tr>
+    <tr><td><code>scoring</code></td><td>La métrica con la que se elige (<code>"f1"</code>, <code>"roc_auc"</code>, <code>"neg_mean_squared_error"</code>…). <strong>Debe reflejar lo que te importa.</strong> Puede ser una lista de métricas, pero entonces <code>refit</code> debe nombrar la que decide.</td></tr>
+    <tr><td><code>cv</code></td><td>Folds (un entero) o un objeto de validación cruzada (<code>StratifiedKFold(...)</code>).</td></tr>
+    <tr><td><code>refit</code></td><td>Si es <code>True</code> (por defecto), reentrena el mejor con todo el train.</td></tr>
+    <tr><td><code>n_iter</code> (solo Randomized)</td><td>Cuántas combinaciones sortea. <code>random_state</code> fija el sorteo.</td></tr>
+    <tr><td><code>n_jobs=-1</code></td><td>Reparte las rondas entre todos los núcleos del ordenador.</td></tr>
+    <tr><td><code>best_params_</code></td><td>Diccionario con la combinación ganadora.</td></tr>
+    <tr><td><code>best_score_</code></td><td>Su puntuación media en validación cruzada.</td></tr>
+    <tr><td><code>best_estimator_</code></td><td>El modelo (o pipeline) ya reentrenado con la mejor combinación. <code>busqueda.predict(...)</code> lo usa directamente.</td></tr>
+    <tr><td><code>cv_results_</code></td><td>Diccionario con el detalle de <em>cada</em> combinación (<code>params</code>, <code>mean_test_score</code>, <code>std_test_score</code>, <code>rank_test_score</code>, tiempos). Con <code>pd.DataFrame(...)</code> se lee muy bien.</td></tr>
+  </tbody>
 </table>
-<p>En el fragmento 9 hacemos <code>cross_val_score(cv=5)</code> con la regresión logística sobre el dataset de cáncer de mama: 0,982 · 0,982 · 0,974 · 0,974 · 0,991, o sea <strong>0,981 ± 0,007</strong>: un modelo estable. En el fragmento 10, <code>cross_validate</code> con cinco métricas muestra que el accuracy en train (0,988) y en validación (0,974 ± 0,017) están muy cerca (no hay sobreajuste), y <code>cross_val_predict</code> construye una matriz de confusión con los 569 casos: <code>[[200, 12], [3, 354]]</code>.</p>
+
+<p>En el fragmento 16 buscamos <code>C</code> y <code>class_weight</code> en el pipeline del apartado anterior, eligiendo por F1: 8 combinaciones × 5 folds = <strong>40</strong> entrenamientos. Gana <code>C=0,01</code> con <code>"balanced"</code> (F1 de validación cruzada 0,518 ± 0,022). La tabla de <code>cv_results_</code> enseña algo valioso: las cuatro mejores son todas <code>"balanced"</code> y casi empatadas (0,513 a 0,518), mientras las cuatro sin <code>"balanced"</code> puntúan entre 0,24 y 0,44. Es decir: aquí lo que importa es <code>class_weight</code>, no <code>C</code>, y mirar <code>cv_results_</code> te lo cuenta mejor que el solo <code>best_params_</code>. El F1 en test, 0,562, queda en el mismo orden de magnitud. En el fragmento 17, <code>RandomizedSearchCV</code> prueba 12 combinaciones de un Random Forest (48 entrenamientos): la mejor tiene AUC de validación cruzada 0,767 y de test 0,785, parecido a la regresión logística (0,783 y 0,800): el modelo más complejo no gana porque el problema es sencillo.</p>
+
 <div class="callout ojo">
-<span class="lbl">Ojo</span>
-<p>En ese dataset la clase <code>1</code> es <strong>benigno</strong> y la <code>0</code> es <strong>maligno</strong>. Por eso el «recall = 0,992» del fragmento 10 es la fracción de tumores <em>benignos</em> reconocidos, no malignos. Si te importa detectar los malignos, tienes que usar <code>pos_label=0</code> o dar la vuelta a las etiquetas: es el aviso de «elige bien tu clase positiva» de la sección anterior.</p>
+  <span class="lbl">Ojo</span>
+  <p><strong>Si la mejor combinación está en el borde de tu rejilla, amplía la rejilla.</strong> Si <code>best_params_</code> dice <code>C=10</code> y 10 era tu valor más alto, el verdadero óptimo puede estar más allá. Una buena práctica es buscar de <em>grueso a fino</em>: primero una rejilla amplia en escala logarítmica (0,001; 0,01; 0,1; 1; 10; 100) y luego otra más fina alrededor del ganador.</p>
 </div>
-<h3>Estratificada, con mezcla y otras variantes</h3>
-<p>Si pasas un entero a <code>cv</code> en un problema de <strong>clasificación</strong>, Scikit-learn usa por defecto <code>StratifiedKFold</code> (conserva la proporción de clases en cada fold). Con regresión usa <code>KFold</code> normal. Y ambos, por defecto, <strong>no mezclan</strong> las filas: toman los folds en el orden en que están los datos. Si tu tabla viene ordenada (por fecha, por clase, por cliente), eso puede ser un problema; la solución es construir tú el objeto:</p>
-<pre class="ascii">cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
-cross_val_score(modelo, X, y, cv=cv)</pre>
-<p>El fragmento 9 lo pone a prueba ordenando los datos por clase a propósito: <code>KFold</code> sin mezclar produce folds de validación con [0, 16, 114, 114, 113] tumores benignos (¡el primero no tiene ninguno!), mientras que <code>StratifiedKFold</code> da [71, 71, 72, 72, 71]. Una nota honesta: en este dataset concreto el efecto sobre la media es pequeño (0,968 frente a 0,972), porque el modelo es muy bueno y casi no se confunde; pero la composición de cada fold es claramente injusta y con un modelo más débil o con clases más desequilibradas la diferencia sería grande.</p>
+<div class="callout ojo">
+  <span class="lbl">Ojo</span>
+  <p><strong>Pasa el pipeline entero</strong> como estimador (no datos ya preprocesados), para que el preprocesado se reajuste en cada fold sin leakage; por eso los nombres llevan el paso delante (<code>clf__C</code>). Y no abuses: cuantas más combinaciones comparas contra los mismos datos de validación, más probable es que la «mejor» sea simplemente la más afortunada. Para una comparación rigurosa de modelos ya afinados existe la <em>validación cruzada anidada</em>: un bucle externo que evalúa y un bucle interno que elige hiperparámetros.</p>
+</div>
+<h2 id="curvas-diagnostico">Diagnosticar: curvas de validación y de aprendizaje</h2>
+
+<p class="pregunta">Tu modelo puntúa un 0,74 y no te gusta. ¿Qué haces: recoges más datos, usas un modelo más potente o lo simplificas?</p>
+
+<p>Las tres respuestas pueden ser correctas o inútiles según el caso, y trabajar a ciegas es muy caro (recoger datos cuesta semanas). Dos gráficos lo diagnostican con datos que ya tienes:</p>
+<ul>
+  <li><strong>Curva de validación</strong> (<code>validation_curve</code>): la nota en train y en validación al variar <em>un hiperparámetro</em> (profundidad, <code>alpha</code>, K…). Responde a «¿qué complejidad necesito?».</li>
+  <li><strong>Curva de aprendizaje</strong> (<code>learning_curve</code>): la nota en train y en validación al aumentar <em>el número de muestras de entrenamiento</em>. Responde a «¿me ayudarían más datos?».</li>
+</ul>
+
+<h3>Los tres diagnósticos</h3>
 <table>
-<thead><tr><th>Estrategia</th><th>Cuándo usarla</th></tr></thead>
-<tbody>
-<tr><td><code>KFold</code></td><td>Regresión, datos desordenados, sin grupos. Con <code>shuffle=True</code> si el orden no es aleatorio.</td></tr>
-<tr><td><code>StratifiedKFold</code></td><td>Clasificación (es el valor por defecto). Imprescindible con clases desequilibradas.</td></tr>
-<tr><td><code>RepeatedKFold</code>, <code>RepeatedStratifiedKFold</code></td><td>Repite el K-Fold varias veces con mezclas distintas: estimación más estable con pocos datos.</td></tr>
-<tr><td><code>ShuffleSplit</code>, <code>StratifiedShuffleSplit</code></td><td>Repartos aleatorios independientes (los conjuntos de validación de distintas rondas pueden solaparse).</td></tr>
-<tr><td><code>LeaveOneOut</code></td><td>K = número de muestras: una muestra de validación por ronda. Solo con datasets diminutos (es muy caro).</td></tr>
-<tr><td><code>GroupKFold</code></td><td>Cuando hay varias filas por usuario (por ejemplo, varias valoraciones del mismo usuario): todas las filas de un mismo grupo van al mismo fold, para que el modelo no «reconozca» al usuario.</td></tr>
-<tr><td><code>TimeSeriesSplit</code></td><td>Series temporales: el entrenamiento siempre es el pasado y la validación el futuro inmediato. Nunca mezcla.</td></tr>
-</tbody>
+  <thead><tr><th>Lo que ves</th><th>Train</th><th>Validación</th><th>Diagnóstico</th><th>Qué probar</th></tr></thead>
+  <tbody>
+    <tr><td>Las dos notas son malas y están juntas</td><td>Baja</td><td>Baja</td><td><strong>Sesgo alto</strong> (infraajuste): el modelo es demasiado simple</td><td>Modelo más flexible, más o mejores variables, menos regularización. <em>Más datos no ayudan.</em></td></tr>
+    <tr><td>Train muy bueno, validación mucho peor</td><td>Alta</td><td>Baja, con un hueco grande</td><td><strong>Varianza alta</strong> (sobreajuste): memoriza</td><td>Más datos, regularización, modelo más simple, menos variables.</td></tr>
+    <tr><td>Las dos son buenas y están juntas</td><td>Alta</td><td>Alta</td><td><strong>Buen ajuste</strong></td><td>Probablemente ya está; revisa el umbral y la métrica.</td></tr>
+  </tbody>
 </table>
-<h3>Cuántos folds: K = 5 o 10</h3>
-<p>Un K grande entrena cada modelo con casi todos los datos (menos sesgo), pero cuesta K entrenamientos y los modelos de cada ronda se parecen mucho entre sí. Un K pequeño es barato pero entrena con menos datos y es más pesimista. K = 5 o K = 10 son la convención por buenas razones prácticas. Y recuerda el coste: <strong>K veces el tiempo de entrenar</strong>; con modelos lentos, K = 3 o 5 y <code>n_jobs=-1</code> para repartir las rondas entre los núcleos.</p>
-<div class="callout regla">
-<span class="lbl">Regla fácil</span>
-<p>La validación cruzada sirve para <strong>elegir y comparar</strong> modelos durante el desarrollo, y se hace <em>solo con el train</em>. Cuando has elegido, reentrenas con todo el train y haces el examen final <strong>una vez</strong> con el test apartado al principio. La CV no sustituye al test: lo que lo hace honesto es que nadie lo haya mirado antes.</p>
+<p>Es el compromiso <em>sesgo–varianza</em> del módulo 3 visto desde la práctica: el hueco entre las dos curvas es la varianza; lo bajo que quedan ambas es el sesgo.</p>
+
+<h3>Leer una curva de validación</h3>
+<p>El fragmento 18 entrena un árbol de decisión con distintas profundidades sobre los datos con ruido del fragmento 2:</p>
+<table>
+  <thead><tr><th><code>max_depth</code></th><th>1</th><th>2</th><th>3</th><th>4</th><th>6</th><th>8</th><th>12</th></tr></thead>
+  <tbody>
+    <tr><th scope="row">Train</th><td>0,746</td><td>0,795</td><td>0,814</td><td>0,840</td><td>0,907</td><td>0,949</td><td>0,988</td></tr>
+    <tr><th scope="row">Validación</th><td>0,728</td><td class="res">0,762</td><td>0,737</td><td>0,738</td><td>0,717</td><td>0,693</td><td>0,680</td></tr>
+    <tr><th scope="row">Hueco (train − val.)</th><td>0,018</td><td>0,033</td><td>0,077</td><td>0,102</td><td>0,190</td><td>0,256</td><td>0,308</td></tr>
+  </tbody>
+</table>
+<p>La nota en train sube siempre (cuanto más profundo, más memoriza). En validación sube hasta la profundidad 2 (0,762) y a partir de ahí <strong>baja</strong>: la profundidad 12 acierta el 99 % en train y solo el 68 % en validación. El mejor equilibrio está en profundidad 2, y el hueco creciente es la firma del sobreajuste.</p>
+
+<h3>Leer una curva de aprendizaje</h3>
+<table>
+  <thead><tr><th>Muestras de entrenamiento</th><th>48</th><th>120</th><th>240</th><th>360</th><th>480</th></tr></thead>
+  <tbody>
+    <tr><th scope="row">Train</th><td>0,954</td><td>0,895</td><td>0,842</td><td>0,823</td><td>0,814</td></tr>
+    <tr><th scope="row">Validación</th><td>0,663</td><td>0,705</td><td>0,743</td><td>0,755</td><td>0,737</td></tr>
+    <tr><th scope="row">Hueco</th><td>0,291</td><td>0,190</td><td>0,099</td><td>0,068</td><td>0,077</td></tr>
+  </tbody>
+</table>
+<p>Con 48 muestras el árbol (profundidad 3) acierta el 95 % en train y solo el 66 % en validación: con tan pocos ejemplos <em>memoriza</em>. Al darle más datos, el train baja (es más difícil memorizar muchos) y la validación sube; las dos curvas se acercan. A partir de unas 360 muestras la validación se estanca (0,755 → 0,737): ya <strong>más datos no mejorarán mucho</strong>, y lo que limita es la complejidad del modelo y el ruido de las etiquetas.</p>
+
+
+<div class="callout ojo">
+  <span class="lbl">Ojo</span>
+  <p>Estas curvas son diagnósticos, no vara de medir: se calculan con validación cruzada <em>sobre el train</em>, no con el test. Y una curva de aprendizaje con pocos puntos es ruidosa; antes de decidir «hacen falta más datos», comprueba que la tendencia es clara y no una fluctuación entre dos folds.</p>
+</div>
+<h2 id="guardar-modelo">Guardar y cargar un modelo: joblib y pickle</h2>
+
+<p class="pregunta">Has entrenado el mejor pipeline tras una búsqueda de media hora. ¿Tienes que repetirla cada vez que quieras usarlo?</p>
+
+<p>No: un modelo entrenado es un objeto de Python, y se puede <strong>guardar en un fichero</strong> y volver a cargarlo después, en otro programa o en otro ordenador, sin reentrenar. Hay dos herramientas habituales:</p>
+<ul>
+  <li><code>joblib.dump(objeto, "fichero.joblib")</code> y <code>joblib.load("fichero.joblib")</code>: la recomendada para Scikit-learn, porque guarda eficientemente los arrays grandes de NumPy.</li>
+  <li><code>pickle</code>, de la biblioteca estándar de Python: <code>pickle.dump(objeto, fichero)</code> y <code>pickle.load(fichero)</code>, con el fichero abierto en modo binario (<code>"wb"</code> / <code>"rb"</code>).</li>
+</ul>
+<p>Detalle fundamental: <strong>guarda el pipeline entero</strong>, con el preprocesado, no solo el modelo final. Si guardas solo el clasificador, tendrás que reproducir a mano el escalado, la imputación y el One-Hot exactos al predecir, y es donde se cometen los errores. El fragmento 19 guarda y recarga el pipeline del apartado anterior y comprueba que el modelo recargado devuelve <strong>las mismas probabilidades</strong> (con <code>joblib</code> y con <code>pickle</code>).</p>
+
+<div class="callout ojo">
+  <span class="lbl">Ojo</span>
+  <p><strong>Seguridad.</strong> Cargar un fichero <code>pickle</code> o <code>joblib</code> puede <em>ejecutar código arbitrario</em> contenido en él. Jamás cargues uno que venga de una fuente que no controles (un archivo descargado, un adjunto): sería como ejecutar un programa desconocido. Para compartir modelos hay formatos más seguros, como <code>skops</code> o ONNX.</p>
 </div>
 <div class="callout ojo">
-<span class="lbl">Ojo</span>
-<p>Si el preprocesado (escalar, imputar, seleccionar variables) se hace <strong>antes</strong> de la validación cruzada con todos los datos, cada fold de validación ya ha «influido» en el escalador: es <em>leakage</em>. La solución es meter el preprocesado dentro de un <code>Pipeline</code> y pasar <strong>el pipeline entero</strong> a <code>cross_val_score</code> (así se reajusta en cada ronda solo con su train). Lo desarrollamos en las secciones de <a href="leccion-10.html#leakage">leakage</a> y <a href="leccion-11.html#pipeline">Pipeline</a>.</p>
+  <span class="lbl">Ojo</span>
+  <p><strong>Versiones.</strong> El fichero guarda la estructura interna del objeto, que depende de la versión de Python y de Scikit-learn con las que se creó. Cargarlo con otra versión puede dar un error o, peor, comportarse distinto sin avisar. Anota las versiones (<code>pip freeze</code>) junto al fichero. Y guarda también la fecha, las métricas de test y el nombre del conjunto de datos: dentro de un año nadie recordará con qué se entrenó.</p>
 </div>
-</section></div></details><details class="profundizar" id="codigo"><summary><span>Ver código explicado paso a paso<small>3 fragmento(s) original(es), con cada línea comentada y salida esperada.</small></span></summary><div class="prof-body"><article class="snippet" data-lang="python">
-<header>
-<h3>9 · Validación cruzada con <code>cross_val_score</code>, <code>KFold</code> y <code>StratifiedKFold</code></h3>
-<p class="para-que"><strong>Para qué sirve</strong> Medir un modelo con 5 repartos distintos (en lugar de uno solo) y ver por qué hay que mezclar y estratificar los folds cuando los datos están ordenados por clase.</p>
-</header>
-<pre class="code"><code>import numpy as np
-from sklearn.datasets import load_breast_cancer
-from sklearn.linear_model import LogisticRegression
-from sklearn.model_selection import KFold, StratifiedKFold, cross_val_score
-from sklearn.pipeline import make_pipeline
-from sklearn.preprocessing import StandardScaler
+<h2 id="flujo-final">El flujo completo, paso a paso</h2>
 
-X, y = load_breast_cancer(return_X_y=True)
-modelo = make_pipeline(StandardScaler(), LogisticRegression(max_iter=1000))
+<p>Todo lo del módulo encaja en una sola secuencia (las escenas 9 a 12 de la película del Machine Learning del principio). Si solo te llevas una cosa, que sea esta:</p>
 
-scores = cross_val_score(modelo, X, y, cv=5, scoring="accuracy")
-print("Puntuación de cada fold:", scores.round(3))
-print(f"Media ± desviación     : {scores.mean():.3f} ± {scores.std():.3f}")
+<ul class="flow">
+  <li class="a">PARTIR<small>apartar el test</small></li>
+  <li class="d">CONSTRUIR Y COMPARAR<small>pipeline + validación cruzada</small></li>
+  <li class="b">AFINAR Y DIAGNOSTICAR<small>hiperparámetros, curvas, umbral</small></li>
+  <li class="c">EXAMEN FINAL<small>test, una sola vez</small></li>
+</ul>
 
-# Peligro: datos ordenados por clase (primero todos los malignos, luego los benignos)
-orden = np.argsort(y)
-Xo, yo = X[orden], y[orden]
+<ol class="pasos">
+  <li><strong>Define el problema y la métrica.</strong> ¿Qué clase es la positiva? ¿Qué error cuesta más? Eso decide si miras recall, precision, F1, AUC o un coste en euros (<a href="leccion-3.html#metricas-clasificacion">métricas</a>, <a href="leccion-4.html#umbral">umbral</a>).</li>
+  <li><strong>Aparta el test</strong> con <code>train_test_split(..., stratify=y, random_state=...)</code> y guárdalo en un cajón. No lo toques hasta el paso 8.</li>
+  <li><strong>Construye un <code>Pipeline</code></strong> con <code>ColumnTransformer</code> (imputar, escalar, codificar) y el modelo. Todo lo que haga <code>fit</code> va dentro.</li>
+  <li><strong>Calcula una línea base</strong> (por ejemplo, <code>DummyClassifier</code>, que siempre predice la clase más frecuente): cualquier modelo serio debe superarla en la métrica que importa. Es la prueba contra el modelo perezoso.</li>
+  <li><strong>Compara candidatos con validación cruzada sobre el train</strong> (<code>cross_validate</code> con varias métricas, <code>StratifiedKFold</code>) y mira <em>media ± desviación</em>, no solo la media.</li>
+  <li><strong>Afina</strong> el mejor con <code>GridSearchCV</code> o <code>RandomizedSearchCV</code> sobre el pipeline, con el <code>scoring</code> adecuado. Si hay sobreajuste, regulariza (<code>Ridge</code>, <code>Lasso</code>, <code>C</code>, profundidad máxima…).</li>
+  <li><strong>Diagnostica</strong> con curvas de validación y de aprendizaje: ¿más datos, más complejidad o más regularización? Y <strong>elige el umbral</strong> con las predicciones de validación (<code>cross_val_predict</code>) y los costes de cada error.</li>
+  <li><strong>Examen final: el test, una sola vez</strong>, con el modelo y el umbral ya decididos. Informa de la matriz de confusión y de las métricas elegidas, no solo del accuracy.</li>
+  <li><strong>Guarda el modelo</strong> con <code>joblib</code> (pipeline entero) junto a las versiones de las librerías y las métricas, y planea cómo vigilar que siga funcionando con datos nuevos.</li>
+</ol>
 
-kf = KFold(n_splits=5)                                             # sin mezclar
-skf = StratifiedKFold(n_splits=5, shuffle=True, random_state=0)    # estratificado y mezclado
-for nombre, cv in (("KFold sin mezclar", kf), ("StratifiedKFold", skf)):
-    benignos = [int(yo[val].sum()) for _, val in cv.split(Xo, yo)]
-    print(f"{nombre:18s} benignos en cada fold de validación: {benignos}")
-    s = cross_val_score(modelo, Xo, yo, cv=cv)
-    print(f"{'':18s} accuracy por fold: {s.round(3)}  media = {s.mean():.3f}")</code></pre>
-<details class="linea-a-linea" open="">
-<summary>Línea por línea</summary>
-<p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
-<table class="lineas">
-<thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
-<tbody>
-<tr data-lines="1"><td><code>import numpy as np</code></td><td>Importa NumPy.</td></tr>
-<tr data-lines="2"><td><code>from sklearn.datasets import load_breast_cancer</code></td><td>Importa un conjunto de datos real incluido en scikit-learn: 569 tumores descritos con 30 medidas (maligno = 0, benigno = 1).</td></tr>
-<tr data-lines="3"><td><code>from sklearn.linear_model import LogisticRegression</code></td><td>Importa la regresión logística.</td></tr>
-<tr data-lines="4"><td><code>from sklearn.model_selection import KFold, StratifiedKFold, cross_val_score</code></td><td>Importa dos formas de partir en folds y la función que evalúa con validación cruzada.</td></tr>
-<tr data-lines="5"><td><code>from sklearn.pipeline import make_pipeline</code></td><td>Importa <code>make_pipeline</code>, que encadena pasos (lo veremos a fondo más adelante).</td></tr>
-<tr data-lines="6"><td><code>from sklearn.preprocessing import StandardScaler</code></td><td>Importa el escalador.</td></tr>
-<tr data-lines="8"><td><code>X, y = load_breast_cancer(return_X_y=True)</code></td><td>Carga las medidas (<code>X</code>) y el diagnóstico (<code>y</code>) como arrays de NumPy.</td></tr>
-<tr data-lines="9"><td><code>modelo = make_pipeline(StandardScaler(), LogisticRegression(max_iter=1000))</code></td><td>Un <strong>pipeline</strong> de dos pasos: escalar y luego regresión logística. Dentro de la validación cruzada se vuelve a ajustar el escalador en cada fold solo con su parte de train: sin fugas.</td></tr>
-<tr data-lines="11"><td><code>scores = cross_val_score(modelo, X, y, cv=5, scoring="accuracy")</code></td><td>Hace la validación cruzada de 5 folds: parte los datos en 5 trozos, entrena 5 veces (cada vez con 4 trozos) y mide el <code>accuracy</code> en el trozo que quedó fuera. Devuelve un array con las 5 puntuaciones.</td></tr>
-<tr data-lines="12"><td><code>print("Puntuación de cada fold:", scores.round(3))</code></td><td>Muestra las 5 puntuaciones.</td></tr>
-<tr data-lines="13"><td><code>print(f"Media ± desviación     : {scores.mean():.3f} ± {scores.std():.3f}")</code></td><td>Resume: la media es la estimación del rendimiento y la desviación dice cuánto varía de un fold a otro.</td></tr>
-<tr data-lines="15"><td><code># Peligro: datos ordenados por clase (primero todos los malignos, luego los benignos)</code></td><td>Comentario: ahora ordenamos los datos por clase a propósito para provocar un problema.</td></tr>
-<tr data-lines="16"><td><code>orden = np.argsort(y)</code></td><td><code>argsort</code> devuelve las posiciones que ordenarían <code>y</code>: primero todos los 0 (malignos) y luego todos los 1 (benignos).</td></tr>
-<tr data-lines="17"><td><code>Xo, yo = X[orden], y[orden]</code></td><td>Reordena <code>X</code> e <code>y</code> con ese orden.</td></tr>
-<tr data-lines="19"><td><code>kf = KFold(n_splits=5)                                             # sin mezclar</code></td><td><code>KFold</code> corta los datos en 5 trozos consecutivos, <strong>sin mezclar</strong>.</td></tr>
-<tr data-lines="20"><td><code>skf = StratifiedKFold(n_splits=5, shuffle=True, random_state=0)    # estratificado y mezclado</code></td><td><code>StratifiedKFold</code> mantiene la proporción de clases en cada fold; <code>shuffle=True</code> mezcla antes de partir y <code>random_state</code> fija esa mezcla.</td></tr>
-<tr data-lines="21"><td><code>for nombre, cv in (("KFold sin mezclar", kf), ("StratifiedKFold", skf)):</code></td><td>Prueba los dos modos de partir con el mismo modelo.</td></tr>
-<tr data-lines="22"><td><code>benignos = [int(yo[val].sum()) for _, val in cv.split(Xo, yo)]</code></td><td><code>cv.split(Xo, yo)</code> genera, fold a fold, las posiciones de train y de validación. Contamos cuántos benignos (clase 1) hay en cada fold de validación (<code>yo[val].sum()</code>).</td></tr>
-<tr data-lines="23"><td><code>print(f"{nombre:18s} benignos en cada fold de validación: {benignos}")</code></td><td>Muestra el reparto de la clase 1 por fold.</td></tr>
-<tr data-lines="24"><td><code>s = cross_val_score(modelo, Xo, yo, cv=cv)</code></td><td>Pasamos el propio objeto <code>cv</code> al argumento <code>cv=</code> para usar esa partición.</td></tr>
-<tr data-lines="25"><td><code>print(f"{'':18s} accuracy por fold: {s.round(3)}  media = {s.mean():.3f}")</code></td><td>Muestra el accuracy de cada fold y su media.</td></tr>
-</tbody>
+<h3>Los errores que más cuestan</h3>
+<table>
+  <thead><tr><th>Error</th><th>Consecuencia</th><th>Remedio</th></tr></thead>
+  <tbody>
+    <tr><td>Medir con los datos de entrenamiento</td><td>Nota inflada: el modelo memoriza</td><td>Separar test; validación cruzada</td></tr>
+    <tr><td>Fiarse del accuracy con clases desequilibradas</td><td>El modelo perezoso «gana»</td><td>Matriz de confusión, F1, recall, PR-AUC, <code>stratify</code></td></tr>
+    <tr><td>Dejar el umbral en 0,5 sin pensar</td><td>Se escapan los casos caros o sobran falsas alarmas</td><td>Elegir el umbral con los costes</td></tr>
+    <tr><td>Pasar <code>predict</code> a <code>roc_auc_score</code></td><td>AUC mucho peor que el real</td><td>Pasar <code>predict_proba(X)[:, 1]</code></td></tr>
+    <tr><td>Escalar, imputar o seleccionar con todos los datos</td><td>Leakage: nota demasiado buena</td><td><code>Pipeline</code>, <code>fit</code> solo con train</td></tr>
+    <tr><td>Incluir una variable que no existirá al predecir</td><td>Leakage del target</td><td>Preguntar «¿cuándo se conoce este dato?»</td></tr>
+    <tr><td>Reparto aleatorio en series temporales o con grupos</td><td>Futuro o personas repetidas en el entrenamiento</td><td><code>TimeSeriesSplit</code>, <code>GroupKFold</code></td></tr>
+    <tr><td>Regularizar sin escalar</td><td>Se penaliza por unidades, no por importancia</td><td><code>StandardScaler</code> dentro del pipeline</td></tr>
+    <tr><td>Afinar y evaluar con el mismo test</td><td>Data snooping</td><td>Elegir con validación cruzada; test una sola vez</td></tr>
+    <tr><td>Cargar un <code>pickle</code> desconocido</td><td>Ejecución de código ajeno</td><td>Solo ficheros de confianza; formatos seguros</td></tr>
+  </tbody>
 </table>
+<section class="resumen">
+<h2 class="sin-num sin-toc">Resumen del módulo</h2>
+<ul>
+  <li><strong>Un modelo se juzga con datos que no ha visto</strong> y que no han influido en ninguna decisión. Se reparte en <strong>train / validación / test</strong> (<code>train_test_split</code>, con <code>stratify</code> y <code>random_state</code>); el test se mira <strong>una sola vez</strong>. Mirarlo muchas veces para decidir es <em>data snooping</em>.</li>
+  <li>La <strong>matriz de confusión</strong> cuenta TP, FP, FN y TN (en Scikit-learn: <code>[[TN, FP], [FN, TP]]</code>, filas = realidad). Con ella: accuracy = (TP + TN) / total; <strong>precision</strong> = TP / (TP + FP); <strong>recall</strong> = TP / (TP + FN); especificidad = TN / (TN + FP); <strong>F1</strong> = 2TP / (2TP + FP + FN), una media armónica que no se deja engañar.</li>
+  <li>Con clases desequilibradas el <strong>accuracy engaña</strong> (el modelo que siempre dice «no será un éxito» acierta el 95 %). En multiclase, <code>average</code> es <em>macro</em>, <em>weighted</em> o <em>micro</em>; <code>classification_report</code> lo resume todo.</li>
+  <li><code>predict_proba</code> da probabilidades y el <strong>umbral</strong> reparte los errores: bajarlo sube el recall y baja la precision. Con probabilidades calibradas, el umbral de menor coste es \( p^* = c_{FP} / (c_{FP} + c_{FN}) \).</li>
+  <li><strong>ROC y AUC</strong>: el AUC es la probabilidad de ordenar bien un positivo y un negativo al azar (0,5 = azar, 1 = perfecto). Con clases muy desequilibradas, mira la curva <strong>precision-recall</strong> (average precision). <code>roc_auc_score</code> necesita puntuaciones, no etiquetas.</li>
+  <li><strong>Regresión</strong>: MAE, MSE, RMSE y R²; en las validaciones de Scikit-learn los errores salen con signo cambiado (<code>neg_mean_squared_error</code>).</li>
+  <li><strong>Validación cruzada</strong> (<code>cross_val_score</code>, <code>cross_validate</code>, <code>cross_val_predict</code>): K rondas, cada muestra valida una vez; se informa <em>media ± desviación</em>. Estratificada en clasificación; <code>TimeSeriesSplit</code> y <code>GroupKFold</code> para series y grupos.</li>
+  <li><strong>Regularización</strong>: Ridge (L2) encoge los pesos sin anularlos; Lasso (L1) lleva algunos a exactamente 0 (selecciona variables); ElasticNet mezcla. Se escalan las variables antes, y <code>alpha</code> se elige con <code>RidgeCV</code>, <code>LassoCV</code> o <code>ElasticNetCV</code>. En clasificación, <code>C</code> es aproximadamente 1/alpha.</li>
+  <li><strong>Data leakage</strong>: información que no existirá al predecir se cuela en el entrenamiento o en la evaluación (columna que contiene la respuesta, preprocesado ajustado con todos los datos, futuro, duplicados). Un resultado «demasiado bueno» es la primera pista. La defensa: partir primero y meter todo en un <code>Pipeline</code> con <code>ColumnTransformer</code>.</li>
+  <li><strong>Hiperparámetros</strong>: <code>GridSearchCV</code> prueba todas las combinaciones y <code>RandomizedSearchCV</code> sortea <code>n_iter</code> de distribuciones; <code>best_params_</code>, <code>best_score_</code>, <code>best_estimator_</code>, <code>cv_results_</code>. Los nombres dentro de un pipeline son <code>paso__parametro</code>.</li>
+  <li><strong>Diagnóstico</strong>: la curva de validación dice qué complejidad conviene; la de aprendizaje, si ayudan más datos. Hueco grande = varianza alta; las dos notas bajas y juntas = sesgo alto.</li>
+  <li>El modelo final se guarda entero (<code>joblib</code>, <code>pickle</code>) con las versiones de las librerías, y nunca se carga un fichero de origen desconocido.</li>
+</ul>
+<p>Siguiente paso: en el <a href="../modulo-6.html">módulo 6</a> reunimos todo el curso en un proyecto completo: del dato en bruto a una decisión, con un pipeline que evalúa y valida cada pieza como has aprendido aquí.</p>
+</section>
+  </div>
 </details>
-<div class="salida">
-<strong>Salida esperada</strong>
-<pre>Puntuación de cada fold: [0.982 0.982 0.974 0.974 0.991]
-Media ± desviación     : 0.981 ± 0.007
-KFold sin mezclar  benignos en cada fold de validación: [0, 16, 114, 114, 113]
-                   accuracy por fold: [0.956 0.939 0.991 0.982 0.973]  media = 0.968
-StratifiedKFold    benignos en cada fold de validación: [71, 71, 72, 72, 71]
-                   accuracy por fold: [0.956 0.982 0.974 0.947 1.   ]  media = 0.972</pre>
-<p>Con <code>cv=5</code> el accuracy es 0,982 · 0,982 · 0,974 · 0,974 · 0,991, de media 0,981 ± 0,007: el modelo es estable. Con los datos ordenados, <code>KFold</code> sin mezclar produce folds de validación con [0, 16, 114, 114, 113] benignos: el primero no tiene ninguno y el tercero y el cuarto son solo benignos, así que cada puntuación mide cosas distintas. <code>StratifiedKFold</code> reparte [71, 71, 72, 72, 71]: todos los folds son parecidos a la población. (En este conjunto fácil la media apenas se resiente, pero en datos reales difíciles el efecto puede ser enorme.)</p>
-</div>
-</article><article class="snippet" data-lang="python">
-<header>
-<h3>12 · <code>RidgeCV</code>, <code>LassoCV</code> y <code>ElasticNetCV</code>: elegir <code>alpha</code> con validación cruzada</h3>
-<p class="para-que"><strong>Para qué sirve</strong> Con pocos datos y muchas variables, la regresión normal sobreajusta por completo. Ver cómo las versiones «CV» eligen el <code>alpha</code> solas y cómo Lasso recupera las variables que importan.</p>
-</header>
-<pre class="code"><code>import numpy as np
-from sklearn.datasets import make_regression
-from sklearn.linear_model import ElasticNetCV, LassoCV, LinearRegression, RidgeCV
-from sklearn.model_selection import cross_val_score, train_test_split
-from sklearn.pipeline import make_pipeline
-from sklearn.preprocessing import StandardScaler
 
-# 80 muestras, 40 variables, pero solo las 5 primeras influyen de verdad
-X, y = make_regression(n_samples=80, n_features=40, n_informative=5, noise=25,
-                       shuffle=False, random_state=0)
-X_tr, X_te, y_tr, y_te = train_test_split(X, y, test_size=0.5, random_state=1)
-
-ridge = make_pipeline(StandardScaler(), RidgeCV(alphas=np.logspace(-2, 3, 11)))
-lasso = make_pipeline(StandardScaler(), LassoCV(cv=5, random_state=0))
-enet = make_pipeline(StandardScaler(), ElasticNetCV(l1_ratio=[0.2, 0.5, 0.8], cv=5, random_state=0))
-
-for nombre, m in (("OLS", make_pipeline(StandardScaler(), LinearRegression())),
-                  ("RidgeCV", ridge), ("LassoCV", lasso), ("ElasticNetCV", enet)):
-    m.fit(X_tr, y_tr)
-    print(f"{nombre:13s} R2 train = {m.score(X_tr, y_tr):.3f} | R2 test = {m.score(X_te, y_te):.3f}")
-
-print("alpha elegido por RidgeCV:", ridge[-1].alpha_)
-print(f"alpha elegido por LassoCV: {lasso[-1].alpha_:.3f}")
-print("Variables que Lasso conserva:", np.flatnonzero(lasso[-1].coef_))
-
-# Convención de scikit-learn: las métricas de error se devuelven en NEGATIVO
-neg = cross_val_score(lasso, X_tr, y_tr, cv=5, scoring="neg_mean_squared_error")
-print("neg_mean_squared_error:", neg.round(0), "-&gt; MSE medio =", round(-neg.mean(), 0))</code></pre>
-<details class="linea-a-linea" open="">
-<summary>Línea por línea</summary>
-<p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
-<table class="lineas">
-<thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
-<tbody>
-<tr data-lines="1"><td><code>import numpy as np</code></td><td>Importa NumPy.</td></tr>
-<tr data-lines="2"><td><code>from sklearn.datasets import make_regression</code></td><td>Generador de problemas de regresión de juguete.</td></tr>
-<tr data-lines="3"><td><code>from sklearn.linear_model import ElasticNetCV, LassoCV, LinearRegression, RidgeCV</code></td><td>Importa la regresión normal y las tres versiones con validación cruzada incorporada.</td></tr>
-<tr data-lines="4"><td><code>from sklearn.model_selection import cross_val_score, train_test_split</code></td><td>Importa la validación cruzada y el reparto.</td></tr>
-<tr data-lines="5"><td><code>from sklearn.pipeline import make_pipeline</code></td><td>Importa el constructor de pipelines.</td></tr>
-<tr data-lines="6"><td><code>from sklearn.preprocessing import StandardScaler</code></td><td>Importa el escalador.</td></tr>
-<tr data-lines="8"><td><code># 80 muestras, 40 variables, pero solo las 5 primeras influyen de verdad</code></td><td>Comentario: el escenario difícil, casi tantas variables como muestras.</td></tr>
-<tr data-lines="9-10"><td><code>X, y = make_regression(n_samples=80, n_features=40, n_inf …</code></td><td>80 muestras y 40 variables, de las que solo 5 influyen (<code>n_informative=5</code>); <code>noise=25</code> añade ruido al objetivo; <code>shuffle=False</code> deja las 5 informativas en las columnas 0 a 4, para poder comprobarlo.</td></tr>
-<tr data-lines="11"><td><code>X_tr, X_te, y_tr, y_te = train_test_split(X, y, test_size=0.5, random_state=1)</code></td><td>Reparto 50 / 50: solo 40 muestras para entrenar con 40 variables.</td></tr>
-<tr data-lines="13"><td><code>ridge = make_pipeline(StandardScaler(), RidgeCV(alphas=np.logspace(-2, 3, 11)))</code></td><td>Pipeline: escalar + <code>RidgeCV</code>, que prueba los 11 valores de <code>alpha</code> de <code>np.logspace(-2, 3, 11)</code> (de 0,01 a 1000, espaciados en escala logarítmica) y se queda con el mejor según validación cruzada.</td></tr>
-<tr data-lines="14"><td><code>lasso = make_pipeline(StandardScaler(), LassoCV(cv=5, random_state=0))</code></td><td>Lo mismo con <code>LassoCV</code>: él mismo genera una rejilla de <code>alpha</code> y usa 5 folds (<code>cv=5</code>).</td></tr>
-<tr data-lines="15"><td><code>enet = make_pipeline(StandardScaler(), ElasticNetCV(l1_ratio=[0.2, 0.5, 0.8], cv=5, random_state=0))</code></td><td><code>ElasticNetCV</code> mezcla las dos penalizaciones: <code>l1_ratio</code> es la proporción de Lasso (0 = Ridge puro, 1 = Lasso puro) y también se elige por validación cruzada.</td></tr>
-<tr data-lines="17-18"><td><code>for nombre, m in (("OLS", make_pipeline(StandardScaler(), …</code></td><td>Recorre cuatro modelos: la regresión sin regularizar y las tres regularizadas.</td></tr>
-<tr data-lines="19"><td><code>m.fit(X_tr, y_tr)</code></td><td>Entrena (la validación cruzada de <code>alpha</code> ocurre dentro de este <code>fit</code>, solo con train).</td></tr>
-<tr data-lines="20"><td><code>print(f"{nombre:13s} R2 train = {m.score(X_tr, y_tr):.3f} | R2 test = {m.score(X_te, y_te):.3f}")</code></td><td>R² en train y en test.</td></tr>
-<tr data-lines="22"><td><code>print("alpha elegido por RidgeCV:", ridge[-1].alpha_)</code></td><td><code>ridge[-1]</code> es el último paso del pipeline (el <code>RidgeCV</code>) y <code>alpha_</code> el valor que eligió.</td></tr>
-<tr data-lines="23"><td><code>print(f"alpha elegido por LassoCV: {lasso[-1].alpha_:.3f}")</code></td><td>Lo mismo con Lasso.</td></tr>
-<tr data-lines="24"><td><code>print("Variables que Lasso conserva:", np.flatnonzero(lasso[-1].coef_))</code></td><td><code>np.flatnonzero</code> devuelve las posiciones de los coeficientes distintos de cero: las variables que Lasso decidió conservar.</td></tr>
-<tr data-lines="26"><td><code># Convención de scikit-learn: las métricas de error se devuelven en NEGATIVO</code></td><td>Comentario: scikit-learn siempre maximiza, así que los errores se devuelven con signo negativo.</td></tr>
-<tr data-lines="27"><td><code>neg = cross_val_score(lasso, X_tr, y_tr, cv=5, scoring="neg_mean_squared_error")</code></td><td>Validación cruzada con <code>scoring="neg_mean_squared_error"</code>: el MSE multiplicado por −1 (así «más alto es mejor» para todas las métricas).</td></tr>
-<tr data-lines="28"><td><code>print("neg_mean_squared_error:", neg.round(0), "-&gt; MSE medio =", round(-neg.mean(), 0))</code></td><td>Muestra las 5 puntuaciones negativas y el MSE real (cambiando el signo).</td></tr>
-</tbody>
-</table>
-</details>
-<div class="salida">
-<strong>Salida esperada</strong>
-<pre>OLS           R2 train = 1.000 | R2 test = 0.009
-RidgeCV       R2 train = 0.991 | R2 test = 0.471
-LassoCV       R2 train = 0.956 | R2 test = 0.877
-ElasticNetCV  R2 train = 0.989 | R2 test = 0.574
-alpha elegido por RidgeCV: 3.1622776601683795
-alpha elegido por LassoCV: 4.515
-Variables que Lasso conserva: [ 0  1  2  3 26 29 31 32 34 35 36 38]
-neg_mean_squared_error: [ -980.  -896. -2463. -1023. -1469.] -&gt; MSE medio = 1366.0</pre>
-<p>La regresión normal «memoriza» el train (R² = 1,000) y en test casi no explica nada (0,009): el sobreajuste en estado puro. <code>RidgeCV</code> elige <code>alpha</code> = 3,16 y llega a 0,471 en test; <code>ElasticNetCV</code> a 0,574; <code>LassoCV</code> (alpha = 4,515) a <strong>0,877</strong>, porque conserva 12 variables: las columnas 0, 1, 2 y 3 (4 de las 5 informativas) y 8 de ruido. Las puntuaciones <code>neg_mean_squared_error</code> son negativas (≈ −980, −896, −2463…) y su MSE medio es 1366.</p>
-</div>
-</article><article class="snippet" data-lang="python">
-<header>
-<h3>16 · <code>GridSearchCV</code>: probar todas las combinaciones con validación cruzada</h3>
-<p class="para-que"><strong>Para qué sirve</strong> Buscar el mejor valor de <code>C</code> y de <code>class_weight</code> en el pipeline anterior, ver <code>best_params_</code>, <code>best_score_</code> y las primeras filas de <code>cv_results_</code>, y usar el test una sola vez al final. Usa <code>pipe</code>, <code>X_tr</code>, <code>X_te</code>, <code>y_tr</code> e <code>y_te</code> del fragmento 15.</p>
-</header>
-<pre class="code"><code>import pandas as pd
+<section>
+<h2 class="sin-num">Código</h2>
+<p class="codigo-intro">Los fragmentos 14 a 19 comparten objetos (<code>df</code>, <code>pre</code>, <code>pipe</code>, <code>X_tr</code>…): ejecuta antes el 14 (abajo, en «Código: el resto del módulo») y el 15 de la <a href="leccion-7.html">lección 7</a> en el mismo cuaderno.</p>
+<article class="snippet" data-lang="python">
+  <header>
+    <h3>16 · <code>GridSearchCV</code>: probar todas las combinaciones con validación cruzada</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Buscar el mejor valor de <code>C</code> y de <code>class_weight</code> en el pipeline anterior, ver <code>best_params_</code>, <code>best_score_</code> y las primeras filas de <code>cv_results_</code>, y usar el test una sola vez al final. Usa <code>pipe</code>, <code>X_tr</code>, <code>X_te</code>, <code>y_tr</code> e <code>y_te</code> del fragmento 15.</p>
+  </header>
+  <pre class="code"><code>import pandas as pd
 from sklearn.metrics import f1_score
 from sklearn.model_selection import GridSearchCV
 
@@ -262,36 +436,36 @@ print(res[cols].sort_values("rank_test_score").head(4).round(4).to_string(index=
 # El test se usa UNA sola vez, con el mejor modelo ya reentrenado con todo train (refit=True)
 mejor = busqueda.best_estimator_
 print("F1 en test (primera y única vez):", round(f1_score(y_te, mejor.predict(X_te)), 4))</code></pre>
-<details class="linea-a-linea" open="">
-<summary>Línea por línea</summary>
-<p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
-<table class="lineas">
-<thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
-<tbody>
-<tr data-lines="1"><td><code>import pandas as pd</code></td><td>Importa Pandas para ordenar los resultados.</td></tr>
-<tr data-lines="2"><td><code>from sklearn.metrics import f1_score</code></td><td>Importa el F1, la métrica por la que vamos a elegir.</td></tr>
-<tr data-lines="3"><td><code>from sklearn.model_selection import GridSearchCV</code></td><td>Importa la búsqueda en rejilla.</td></tr>
-<tr data-lines="5"><td><code># ¿Cómo se llaman los hiperparámetros dentro de un Pipeline? "paso__subpaso__parametro"</code></td><td>Comentario: los hiperparámetros dentro de un pipeline se nombran con dobles guiones bajos.</td></tr>
-<tr data-lines="6"><td><code>print([k for k in pipe.get_params() if k.endswith("strategy")])</code></td><td><code>get_params()</code> lista todos los parámetros del pipeline y de sus pasos. Filtramos los que acaban en <code>strategy</code> para ver el patrón <code>paso__subpaso__parámetro</code>.</td></tr>
-<tr data-lines="8-11"><td><code>param_grid = { …</code></td><td>La rejilla: un diccionario <code>{nombre_del_parámetro: lista_de_valores}</code>. <code>clf__C</code> es el parámetro <code>C</code> del paso <code>clf</code> (la fuerza inversa de la regularización); <code>clf__class_weight</code> decide si se da más peso a la clase poco frecuente. 4 × 2 = 8 combinaciones.</td></tr>
-<tr data-lines="12"><td><code>busqueda = GridSearchCV(pipe, param_grid, scoring="f1", cv=5, refit=True)</code></td><td>Crea la búsqueda: el modelo (<code>pipe</code>), la rejilla, la métrica de elección (<code>scoring="f1"</code>), 5 folds y <code>refit=True</code>: al terminar, reentrena la mejor combinación con todo el train.</td></tr>
-<tr data-lines="13"><td><code>busqueda.fit(X_tr, y_tr)</code></td><td>Lanza la búsqueda: para cada combinación hace una validación cruzada de 5 folds.</td></tr>
-<tr data-lines="15"><td><code>n_comb = len(busqueda.cv_results_["params"])</code></td><td>Número de combinaciones probadas.</td></tr>
-<tr data-lines="16"><td><code>print("Combinaciones x folds =", n_comb, "x 5 =", n_comb * 5, "entrenamientos")</code></td><td>8 combinaciones × 5 folds = 40 entrenamientos.</td></tr>
-<tr data-lines="17"><td><code>print("best_params_:", busqueda.best_params_)</code></td><td><code>best_params_</code>: la combinación ganadora.</td></tr>
-<tr data-lines="18"><td><code>print("best_score_ :", round(busqueda.best_score_, 4))</code></td><td><code>best_score_</code>: su puntuación media en validación cruzada.</td></tr>
-<tr data-lines="20"><td><code>res = pd.DataFrame(busqueda.cv_results_)</code></td><td><code>cv_results_</code> es un diccionario con el detalle de cada combinación; en una tabla de Pandas se lee mejor.</td></tr>
-<tr data-lines="21"><td><code>cols = ["param_clf__C", "param_clf__class_weight", "mean_test_score", "std_test_score", "rank_test_score"]</code></td><td>Las columnas que nos interesan: los valores probados, la media y desviación de la puntuación y el <em>ranking</em>.</td></tr>
-<tr data-lines="22"><td><code>print(res[cols].sort_values("rank_test_score").head(4).round(4).to_string(index=False))</code></td><td>Ordena por ranking, enseña las 4 mejores y redondea.</td></tr>
-<tr data-lines="24"><td><code># El test se usa UNA sola vez, con el mejor modelo ya reentrenado con todo train (refit=True)</code></td><td>Comentario: el momento de la verdad.</td></tr>
-<tr data-lines="25"><td><code>mejor = busqueda.best_estimator_</code></td><td><code>best_estimator_</code>: el pipeline ya reentrenado con la mejor combinación (existe porque <code>refit=True</code>).</td></tr>
-<tr data-lines="26"><td><code>print("F1 en test (primera y única vez):", round(f1_score(y_te, mejor.predict(X_te)), 4))</code></td><td>F1 con el test, por primera y única vez.</td></tr>
-</tbody>
-</table>
-</details>
-<div class="salida">
-<strong>Salida esperada</strong>
-<pre>['pre__num__imp__strategy', 'pre__cat__imp__strategy']
+  <details class="linea-a-linea" open>
+    <summary>Línea por línea</summary>
+    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+      <tbody>
+        <tr data-lines="1"><td><code>import pandas as pd</code></td><td>Importa Pandas para ordenar los resultados.</td></tr>
+        <tr data-lines="2"><td><code>from sklearn.metrics import f1_score</code></td><td>Importa el F1, la métrica por la que vamos a elegir.</td></tr>
+        <tr data-lines="3"><td><code>from sklearn.model_selection import GridSearchCV</code></td><td>Importa la búsqueda en rejilla.</td></tr>
+        <tr data-lines="5"><td><code># ¿Cómo se llaman los hiperparámetros dentro de un Pipeline? "paso__subpaso__parametro"</code></td><td>Comentario: los hiperparámetros dentro de un pipeline se nombran con dobles guiones bajos.</td></tr>
+        <tr data-lines="6"><td><code>print([k for k in pipe.get_params() if k.endswith("strategy")])</code></td><td><code>get_params()</code> lista todos los parámetros del pipeline y de sus pasos. Filtramos los que acaban en <code>strategy</code> para ver el patrón <code>paso__subpaso__parámetro</code>.</td></tr>
+        <tr data-lines="8-11"><td><code>param_grid = { …</code></td><td>La rejilla: un diccionario <code>{nombre_del_parámetro: lista_de_valores}</code>. <code>clf__C</code> es el parámetro <code>C</code> del paso <code>clf</code> (la fuerza inversa de la regularización); <code>clf__class_weight</code> decide si se da más peso a la clase poco frecuente. 4 × 2 = 8 combinaciones.</td></tr>
+        <tr data-lines="12"><td><code>busqueda = GridSearchCV(pipe, param_grid, scoring="f1", cv=5, refit=True)</code></td><td>Crea la búsqueda: el modelo (<code>pipe</code>), la rejilla, la métrica de elección (<code>scoring="f1"</code>), 5 folds y <code>refit=True</code>: al terminar, reentrena la mejor combinación con todo el train.</td></tr>
+        <tr data-lines="13"><td><code>busqueda.fit(X_tr, y_tr)</code></td><td>Lanza la búsqueda: para cada combinación hace una validación cruzada de 5 folds.</td></tr>
+        <tr data-lines="15"><td><code>n_comb = len(busqueda.cv_results_["params"])</code></td><td>Número de combinaciones probadas.</td></tr>
+        <tr data-lines="16"><td><code>print("Combinaciones x folds =", n_comb, "x 5 =", n_comb * 5, "entrenamientos")</code></td><td>8 combinaciones × 5 folds = 40 entrenamientos.</td></tr>
+        <tr data-lines="17"><td><code>print("best_params_:", busqueda.best_params_)</code></td><td><code>best_params_</code>: la combinación ganadora.</td></tr>
+        <tr data-lines="18"><td><code>print("best_score_ :", round(busqueda.best_score_, 4))</code></td><td><code>best_score_</code>: su puntuación media en validación cruzada.</td></tr>
+        <tr data-lines="20"><td><code>res = pd.DataFrame(busqueda.cv_results_)</code></td><td><code>cv_results_</code> es un diccionario con el detalle de cada combinación; en una tabla de Pandas se lee mejor.</td></tr>
+        <tr data-lines="21"><td><code>cols = ["param_clf__C", "param_clf__class_weight", "mean_test_score", "std_test_score", "rank_test_score"]</code></td><td>Las columnas que nos interesan: los valores probados, la media y desviación de la puntuación y el <em>ranking</em>.</td></tr>
+        <tr data-lines="22"><td><code>print(res[cols].sort_values("rank_test_score").head(4).round(4).to_string(index=False))</code></td><td>Ordena por ranking, enseña las 4 mejores y redondea.</td></tr>
+        <tr data-lines="24"><td><code># El test se usa UNA sola vez, con el mejor modelo ya reentrenado con todo train (refit=True)</code></td><td>Comentario: el momento de la verdad.</td></tr>
+        <tr data-lines="25"><td><code>mejor = busqueda.best_estimator_</code></td><td><code>best_estimator_</code>: el pipeline ya reentrenado con la mejor combinación (existe porque <code>refit=True</code>).</td></tr>
+        <tr data-lines="26"><td><code>print("F1 en test (primera y única vez):", round(f1_score(y_te, mejor.predict(X_te)), 4))</code></td><td>F1 con el test, por primera y única vez.</td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>['pre__num__imp__strategy', 'pre__cat__imp__strategy']
 Combinaciones x folds = 8 x 5 = 40 entrenamientos
 best_params_: {'clf__C': 0.01, 'clf__class_weight': 'balanced'}
 best_score_ : 0.518
@@ -301,6 +475,330 @@ best_score_ : 0.518
          1.00                balanced           0.5131          0.0198                3
         10.00                balanced           0.5131          0.0221                4
 F1 en test (primera y única vez): 0.5622</pre>
-<p>Los hiperparámetros del pipeline se llaman <code>pre__num__imp__strategy</code> y <code>pre__cat__imp__strategy</code>. Se hacen 8 × 5 = 40 entrenamientos. La mejor combinación es <code>C=0,01</code> con <code>class_weight="balanced"</code>, con un F1 de 0,518 en validación cruzada (± 0,022). La tabla muestra algo importante: las cuatro mejores filas son todas <code>balanced</code> (0,513 a 0,518) y apenas difieren entre sí; los cuatro modelos sin <code>balanced</code> (que no se ven en la tabla recortada) puntúan entre 0,24 y 0,44, porque con un 21 % de positivos y umbral 0,5 detectan pocos. El F1 en test, 0,562, queda en el mismo orden que el de validación cruzada.</p>
+    <p>Los hiperparámetros del pipeline se llaman <code>pre__num__imp__strategy</code> y <code>pre__cat__imp__strategy</code>. Se hacen 8 × 5 = 40 entrenamientos. La mejor combinación es <code>C=0,01</code> con <code>class_weight="balanced"</code>, con un F1 de 0,518 en validación cruzada (± 0,022). La tabla muestra algo importante: las cuatro mejores filas son todas <code>balanced</code> (0,513 a 0,518) y apenas difieren entre sí; los cuatro modelos sin <code>balanced</code> (que no se ven en la tabla recortada) puntúan entre 0,24 y 0,44, porque con un 21 % de positivos y umbral 0,5 detectan pocos. El F1 en test, 0,562, queda en el mismo orden que el de validación cruzada.</p>
+  </div>
+</article>
+<article class="snippet" data-lang="python">
+  <header>
+    <h3>18 · <code>validation_curve</code> y <code>learning_curve</code>: diagnosticar sobreajuste y falta de datos</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Dibujar (en forma de tabla) cómo cambian el acierto en train y en validación al variar un hiperparámetro (curva de validación) y al aumentar el número de muestras (curva de aprendizaje).</p>
+  </header>
+  <pre class="code"><code>import numpy as np
+from sklearn.datasets import make_classification
+from sklearn.model_selection import learning_curve, validation_curve
+from sklearn.tree import DecisionTreeClassifier
+
+X, y = make_classification(n_samples=600, n_features=20, n_informative=4, n_redundant=0,
+                           flip_y=0.2, class_sep=0.8, random_state=7)
+
+# Curva de validación: ¿cómo cambia el acierto al variar UN hiperparámetro?
+profundidades = [1, 2, 3, 4, 6, 8, 12]
+tr, va = validation_curve(DecisionTreeClassifier(random_state=0), X, y,
+                          param_name="max_depth", param_range=profundidades, cv=5)
+print("max_depth | train | validación")
+for p, a, b in zip(profundidades, tr.mean(axis=1), va.mean(axis=1)):
+    print(f"{p:9d} | {a:.3f} | {b:.3f}")
+
+# Curva de aprendizaje: ¿cómo cambia el acierto al tener más datos?
+tamanos, tr, va = learning_curve(DecisionTreeClassifier(max_depth=3, random_state=0), X, y,
+                                 train_sizes=np.array([0.1, 0.25, 0.5, 0.75, 1.0]), cv=5)
+print("\nmuestras de train | train | validación")
+for t, a, b in zip(tamanos, tr.mean(axis=1), va.mean(axis=1)):
+    print(f"{t:17d} | {a:.3f} | {b:.3f}")</code></pre>
+  <details class="linea-a-linea" open>
+    <summary>Línea por línea</summary>
+    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+      <tbody>
+        <tr data-lines="1"><td><code>import numpy as np</code></td><td>Importa NumPy.</td></tr>
+        <tr data-lines="2"><td><code>from sklearn.datasets import make_classification</code></td><td>Los mismos datos de juguete del fragmento 2 (20 % de etiquetas ruidosas).</td></tr>
+        <tr data-lines="3"><td><code>from sklearn.model_selection import learning_curve, validation_curve</code></td><td>Importa las dos funciones de curvas.</td></tr>
+        <tr data-lines="4"><td><code>from sklearn.tree import DecisionTreeClassifier</code></td><td>Importa el árbol de decisión.</td></tr>
+        <tr data-lines="6-7"><td><code>X, y = make_classification(n_samples=600, n_features=20,  …</code></td><td>600 muestras con un 20 % de etiquetas ruidosas.</td></tr>
+        <tr data-lines="9"><td><code># Curva de validación: ¿cómo cambia el acierto al variar UN hiperparámetro?</code></td><td>Comentario: variamos <em>un hiperparámetro</em>.</td></tr>
+        <tr data-lines="10"><td><code>profundidades = [1, 2, 3, 4, 6, 8, 12]</code></td><td>Los valores de <code>max_depth</code> que vamos a probar.</td></tr>
+        <tr data-lines="11-12"><td><code>tr, va = validation_curve(DecisionTreeClassifier(random_s …</code></td><td>Para cada profundidad hace una validación cruzada de 5 folds y devuelve dos matrices (filas = profundidades, columnas = folds): las puntuaciones de train y las de validación. <code>param_name</code> es el nombre del hiperparámetro y <code>param_range</code> los valores.</td></tr>
+        <tr data-lines="13"><td><code>print("max_depth | train | validación")</code></td><td>Cabecera de la tabla.</td></tr>
+        <tr data-lines="14"><td><code>for p, a, b in zip(profundidades, tr.mean(axis=1), va.mean(axis=1)):</code></td><td>Recorre profundidad, media de train (<code>mean(axis=1)</code>: media de cada fila, es decir de los 5 folds) y media de validación.</td></tr>
+        <tr data-lines="15"><td><code>print(f"{p:9d} | {a:.3f} | {b:.3f}")</code></td><td>Imprime una fila por profundidad.</td></tr>
+        <tr data-lines="17"><td><code># Curva de aprendizaje: ¿cómo cambia el acierto al tener más datos?</code></td><td>Comentario: variamos <em>el tamaño del train</em>.</td></tr>
+        <tr data-lines="18-19"><td><code>tamanos, tr, va = learning_curve(DecisionTreeClassifier(m …</code></td><td>Con un árbol de profundidad 3, entrena con el 10 %, 25 %, 50 %, 75 % y 100 % de los datos de train de cada fold y mide en train y en validación. Devuelve los tamaños reales y las dos matrices de puntuaciones.</td></tr>
+        <tr data-lines="20"><td><code>print("\nmuestras de train | train | validación")</code></td><td>Cabecera (el <code>\n</code> deja una línea en blanco antes).</td></tr>
+        <tr data-lines="21"><td><code>for t, a, b in zip(tamanos, tr.mean(axis=1), va.mean(axis=1)):</code></td><td>Recorre tamaño, media de train y media de validación.</td></tr>
+        <tr data-lines="22"><td><code>print(f"{t:17d} | {a:.3f} | {b:.3f}")</code></td><td>Imprime una fila por tamaño.</td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>max_depth | train | validación
+        1 | 0.746 | 0.728
+        2 | 0.795 | 0.762
+        3 | 0.814 | 0.737
+        4 | 0.840 | 0.738
+        6 | 0.907 | 0.717
+        8 | 0.949 | 0.693
+       12 | 0.988 | 0.680
+
+muestras de train | train | validación
+               48 | 0.954 | 0.663
+              120 | 0.895 | 0.705
+              240 | 0.842 | 0.743
+              360 | 0.823 | 0.755
+              480 | 0.814 | 0.737</pre>
+    <p><strong>Curva de validación:</strong> el acierto en train sube sin parar con la profundidad (de 0,746 a 0,988), pero en validación sube hasta profundidad 2 (0,762) y a partir de ahí <em>baja</em> (0,680 con profundidad 12): la separación entre las dos curvas es el sobreajuste, y la mejor profundidad es 2. <strong>Curva de aprendizaje:</strong> con pocas muestras (48) el árbol acierta 0,954 en train y solo 0,663 en validación (memoriza); al aumentar los datos las dos curvas se acercan (0,814 y 0,737 con 480) y la validación se estanca: más datos ya no mejoran mucho, el límite lo pone la complejidad del modelo y el ruido.</p>
+  </div>
+</article>
+<h2 class="sin-num" id="resto">Código: el resto del módulo</h2>
+<p class="codigo-intro">Aquí tienes los 19 fragmentos de código del módulo. Cada uno se ejecutó de verdad y su <strong>salida esperada</strong> es la que salió, no una aproximación. Cada fragmento trae una tabla <strong>línea por línea</strong>: pasa el ratón (o toca) una fila y se iluminan las líneas del código a las que se refiere; también funciona al revés. Los fragmentos 1 a 13 son independientes. Los fragmentos <strong>14 a 19 comparten objetos</strong> (<code>df</code>, <code>pre</code>, <code>pipe</code>, <code>X_tr</code>, <code>X_te</code>, <code>y_tr</code>, <code>y_te</code>, <code>mejor</code>), así que ejecútalos en orden dentro del mismo cuaderno.</p>
+<p class="codigo-intro">Necesitas Python con <code>numpy</code>, <code>pandas</code>, <code>scipy</code> y <code>scikit-learn</code> (<code>pip install numpy pandas scipy scikit-learn</code>), por ejemplo en Jupyter Notebook o Google Colab. Las salidas se obtuvieron con Python 3.13 y scikit-learn 1.9; con otra versión pueden cambiar algunos decimales. Todos los datos son sintéticos o vienen incluidos en scikit-learn (no hace falta conexión a internet), y el ejemplo de la lluvia en Australia se reconstruye a partir de sus recuentos.</p>
+<article class="snippet" data-lang="python">
+  <header>
+    <h3>8 · Métricas de regresión: MAE, MSE, RMSE y R² a mano y con scikit-learn</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Comprobar que las cuatro métricas de regresión son cuentas sencillas con los errores. Repaso del módulo 2 con 4 usuarios (las horas de series que ven a la semana).</p>
+  </header>
+  <pre class="code"><code>import numpy as np
+from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
+
+y_real = np.array([3.0, 5.0, 2.5, 7.0])
+y_pred = np.array([2.5, 5.0, 4.0, 8.0])
+
+# A mano
+error = y_pred - y_real
+mae = np.mean(np.abs(error))
+mse = np.mean(error ** 2)
+rmse = np.sqrt(mse)
+r2 = 1 - np.sum(error ** 2) / np.sum((y_real - y_real.mean()) ** 2)
+print("a mano :", mae, mse, round(rmse, 4), round(r2, 4))
+
+# Con scikit-learn
+print("sklearn:", mean_absolute_error(y_real, y_pred),
+      mean_squared_error(y_real, y_pred),
+      round(mean_squared_error(y_real, y_pred) ** 0.5, 4),
+      round(r2_score(y_real, y_pred), 4))</code></pre>
+  <details class="linea-a-linea" open>
+    <summary>Línea por línea</summary>
+    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+      <tbody>
+        <tr data-lines="1"><td><code>import numpy as np</code></td><td>Importa NumPy.</td></tr>
+        <tr data-lines="2"><td><code>from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score</code></td><td>Importa las tres funciones de regresión de scikit-learn (el RMSE se obtiene de la raíz del MSE).</td></tr>
+        <tr data-lines="4"><td><code>y_real = np.array([3.0, 5.0, 2.5, 7.0])</code></td><td>Horas de series que vieron de verdad 4 usuarios esta semana.</td></tr>
+        <tr data-lines="5"><td><code>y_pred = np.array([2.5, 5.0, 4.0, 8.0])</code></td><td>Lo que predijo el modelo.</td></tr>
+        <tr data-lines="7"><td><code># A mano</code></td><td>Comentario: primero las cuentas explícitas.</td></tr>
+        <tr data-lines="8"><td><code>error = y_pred - y_real</code></td><td>El error de cada usuario: predicho − real = [−0,5, 0, 1,5, 1].</td></tr>
+        <tr data-lines="9"><td><code>mae = np.mean(np.abs(error))</code></td><td>MAE: la media de los errores en valor absoluto (el signo no importa).</td></tr>
+        <tr data-lines="10"><td><code>mse = np.mean(error ** 2)</code></td><td>MSE: la media de los errores al cuadrado (castiga mucho más los errores grandes).</td></tr>
+        <tr data-lines="11"><td><code>rmse = np.sqrt(mse)</code></td><td>RMSE: la raíz del MSE, para volver a las unidades originales.</td></tr>
+        <tr data-lines="12"><td><code>r2 = 1 - np.sum(error ** 2) / np.sum((y_real - y_real.mean()) ** 2)</code></td><td>R² = 1 − (suma de errores²) / (suma de las distancias² de cada valor real a su media). Compara el modelo con el «modelo tonto» que siempre predice la media.</td></tr>
+        <tr data-lines="13"><td><code>print("a mano :", mae, mse, round(rmse, 4), round(r2, 4))</code></td><td>Imprime las cuatro métricas (el RMSE y R² redondeados).</td></tr>
+        <tr data-lines="15"><td><code># Con scikit-learn</code></td><td>Comentario: ahora con las funciones de la librería.</td></tr>
+        <tr data-lines="16-19"><td><code>print("sklearn:", mean_absolute_error(...), …)</code></td><td>Las mismas cuatro cifras con <code>mean_absolute_error</code>, <code>mean_squared_error</code>, la raíz de este último y <code>r2_score</code>.</td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>a mano : 0.75 0.875 0.9354 0.7241
+sklearn: 0.75 0.875 0.9354 0.7241</pre>
+    <p>Las dos líneas coinciden: MAE = 0,75, MSE = 0,875, RMSE = 0,9354 y R² = 0,7241. El modelo se equivoca de media 0,75 y la penalización cuadrática pesa más los errores de 1,5 y 1 que los de 0,5. R² = 0,72 quiere decir que el modelo explica el 72 % de la variación de las horas vistas que el «modelo tonto de la media» no explica.</p>
+  </div>
+</article>
+<article class="snippet" data-lang="python">
+  <header>
+    <h3>14 · Un dataset de clientes con huecos y texto (para los fragmentos siguientes)</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Fabricar una tabla sintética de clientes de una plataforma de streaming con columnas numéricas, columnas de texto y datos que faltan, como en un proyecto real. Los fragmentos 15 a 19 reutilizan este <code>df</code>, así que ejecuta este primero.</p>
+  </header>
+  <pre class="code"><code>import numpy as np
+import pandas as pd
+
+rng = np.random.default_rng(0)
+n = 1500
+df = pd.DataFrame({
+    "edad": rng.integers(18, 70, n).astype(float),
+    "horas_mes": rng.gamma(2.0, 9.0, n).round(1),
+    "dias_sin_entrar": rng.exponential(12, n).round(0),
+    "plan": rng.choice(["Basic", "Standard", "Premium"], n, p=[0.5, 0.3, 0.2]),
+    "pais": rng.choice(["ES", "MX", "AR", "CO"], n),
+})
+
+# El target se calcula con las columnas COMPLETAS: más días sin entrar y menos horas -&gt; más bajas
+z = (-2.2 + 0.09 * df["dias_sin_entrar"] - 0.035 * df["horas_mes"]
+     + 0.8 * (df["plan"] == "Basic") - 0.8 * (df["plan"] == "Premium"))
+df["baja"] = (rng.random(n) &lt; 1 / (1 + np.exp(-z))).astype(int)
+
+# Ahora estropeamos los datos como en la vida real: huecos
+df.loc[rng.random(n) &lt; 0.08, "edad"] = np.nan
+df.loc[rng.random(n) &lt; 0.05, "plan"] = np.nan
+
+print(df.head(4).to_string())
+print("Forma:", df.shape)
+print("Huecos por columna:", df.isna().sum()[df.isna().sum() &gt; 0].to_dict())
+print("Proporción de bajas:", df["baja"].mean().round(3))</code></pre>
+  <details class="linea-a-linea" open>
+    <summary>Línea por línea</summary>
+    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+      <tbody>
+        <tr data-lines="1"><td><code>import numpy as np</code></td><td>Importa NumPy.</td></tr>
+        <tr data-lines="2"><td><code>import pandas as pd</code></td><td>Importa Pandas.</td></tr>
+        <tr data-lines="4"><td><code>rng = np.random.default_rng(0)</code></td><td>Generador aleatorio con semilla (para que el dataset sea siempre el mismo).</td></tr>
+        <tr data-lines="5"><td><code>n = 1500</code></td><td>Número de clientes.</td></tr>
+        <tr data-lines="6-12"><td><code>df = pd.DataFrame({…})</code></td><td>Crea cinco columnas: <code>edad</code> (de 18 a 69, como decimal para poder tener huecos), <code>horas_mes</code> (una distribución <em>gamma</em>: siempre positiva y con cola larga), <code>dias_sin_entrar</code> (distribución exponencial: muchos valores bajos y pocos muy altos) y dos columnas de texto, <code>plan</code> y <code>pais</code>, elegidas al azar con las probabilidades indicadas.</td></tr>
+        <tr data-lines="14"><td><code># El target se calcula con las columnas COMPLETAS: más días sin entrar y menos horas -&gt; más bajas</code></td><td>Comentario: ahora fabricamos el objetivo con una regla conocida.</td></tr>
+        <tr data-lines="15-16"><td><code>z = (-2.2 + 0.09 * df["dias_sin_entrar"] - 0.035 * df["ho …</code></td><td>Una «puntuación de riesgo»: sube con los días sin entrar, baja con las horas de uso, sube con el plan Basic y baja con el Premium. Es lo que el modelo tendrá que descubrir.</td></tr>
+        <tr data-lines="17"><td><code>df["baja"] = (rng.random(n) &lt; 1 / (1 + np.exp(-z))).astype(int)</code></td><td>Convierte la puntuación en probabilidad con la función sigmoide (<code>1 / (1 + e^-z)</code>) y sortea si cada cliente se da de baja (1) o no (0). Así el objetivo es aleatorio pero depende de las columnas.</td></tr>
+        <tr data-lines="19"><td><code># Ahora estropeamos los datos como en la vida real: huecos</code></td><td>Comentario: ahora los huecos.</td></tr>
+        <tr data-lines="20"><td><code>df.loc[rng.random(n) &lt; 0.08, "edad"] = np.nan</code></td><td>Borra (pone <code>NaN</code> en) la edad de un ~8 % de clientes elegidos al azar.</td></tr>
+        <tr data-lines="21"><td><code>df.loc[rng.random(n) &lt; 0.05, "plan"] = np.nan</code></td><td>Borra el plan de un ~5 % de clientes.</td></tr>
+        <tr data-lines="23"><td><code>print(df.head(4).to_string())</code></td><td>Primeras 4 filas.</td></tr>
+        <tr data-lines="24"><td><code>print("Forma:", df.shape)</code></td><td>Filas y columnas.</td></tr>
+        <tr data-lines="25"><td><code>print("Huecos por columna:", df.isna().sum()[df.isna().sum() &gt; 0].to_dict())</code></td><td>Cuántos <code>NaN</code> hay en cada columna que los tenga.</td></tr>
+        <tr data-lines="26"><td><code>print("Proporción de bajas:", df["baja"].mean().round(3))</code></td><td>Qué fracción de clientes se da de baja (clase positiva).</td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>   edad  horas_mes  dias_sin_entrar      plan pais  baja
+0  62.0        8.4              3.0     Basic   MX     0
+1  51.0       15.5             57.0  Standard   CO     0
+2  44.0       12.0              0.0     Basic   MX     0
+3  32.0        9.3             14.0  Standard   ES     0
+Forma: (1500, 6)
+Huecos por columna: {'edad': 125, 'plan': 85}
+Proporción de bajas: 0.215</pre>
+    <p>Una tabla de 1500 clientes y 6 columnas; la columna <code>edad</code> tiene 125 huecos y <code>plan</code> 85, y el 21,5 % de los clientes se da de baja (clases algo desequilibradas). Fíjate en que <code>edad</code> y <code>pais</code> no intervienen en la regla que fabrica la baja: son ruido, y un buen modelo debería darles poco peso. El orden de los valores y los huecos son siempre los mismos gracias a la semilla.</p>
+  </div>
+</article>
+<article class="snippet" data-lang="python">
+  <header>
+    <h3>17 · <code>RandomizedSearchCV</code>: probar combinaciones al azar con distribuciones</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Buscar hiperparámetros de un Random Forest sin recorrer toda la rejilla: se sortean 12 combinaciones a partir de distribuciones. Usa <code>pre</code>, <code>X_tr</code>, <code>X_te</code>, <code>y_tr</code>, <code>y_te</code> y <code>roc_auc_score</code> de los fragmentos 15 y 16.</p>
+  </header>
+  <pre class="code"><code>from scipy.stats import loguniform, randint
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.model_selection import RandomizedSearchCV
+from sklearn.pipeline import Pipeline
+
+pipe_rf = Pipeline([("pre", pre), ("rf", RandomForestClassifier(random_state=0))])
+
+distribuciones = {
+    "rf__n_estimators": randint(30, 120),          # entero entre 30 y 119
+    "rf__max_depth": randint(2, 12),               # entero entre 2 y 11
+    "rf__min_samples_leaf": randint(1, 15),
+    "rf__max_features": loguniform(0.1, 1.0),      # fracción de columnas por árbol
+}
+azar = RandomizedSearchCV(pipe_rf, distribuciones, n_iter=12, scoring="roc_auc",
+                          cv=4, random_state=0)
+azar.fit(X_tr, y_tr)
+
+print("Entrenamientos:", 12 * 4, "(en lugar de miles que tendría una rejilla completa)")
+print("best_params_:", {k: float(round(v, 3)) if isinstance(v, float) else v
+                     for k, v in azar.best_params_.items()})
+print("best_score_ :", round(azar.best_score_, 4))
+print("AUC en test :", round(roc_auc_score(y_te, azar.predict_proba(X_te)[:, 1]), 4))</code></pre>
+  <details class="linea-a-linea" open>
+    <summary>Línea por línea</summary>
+    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+      <tbody>
+        <tr data-lines="1"><td><code>from scipy.stats import loguniform, randint</code></td><td>Importa dos <em>distribuciones</em> de SciPy: <code>randint(a, b)</code> da enteros entre <em>a</em> y <em>b</em>−1; <code>loguniform(a, b)</code> da números decimales cuyo <em>logaritmo</em> es uniforme (útil cuando el parámetro cambia de escala, como <code>C</code> o <code>alpha</code>).</td></tr>
+        <tr data-lines="2"><td><code>from sklearn.ensemble import RandomForestClassifier</code></td><td>Importa el bosque aleatorio (módulo 3), un modelo con muchos hiperparámetros.</td></tr>
+        <tr data-lines="3"><td><code>from sklearn.model_selection import RandomizedSearchCV</code></td><td>Importa la búsqueda aleatoria.</td></tr>
+        <tr data-lines="4"><td><code>from sklearn.pipeline import Pipeline</code></td><td>Importa el pipeline.</td></tr>
+        <tr data-lines="6"><td><code>pipe_rf = Pipeline([("pre", pre), ("rf", RandomForestClassifier(random_state=0))])</code></td><td>El mismo preprocesado <code>pre</code> del fragmento 15 seguido de un <code>RandomForestClassifier</code> llamado <code>rf</code>.</td></tr>
+        <tr data-lines="8-13"><td><code>distribuciones = { …</code></td><td>En lugar de listas, <strong>distribuciones</strong> de las que se sortean valores: el número de árboles (30 a 119), la profundidad máxima (2 a 11), el mínimo de muestras por hoja (1 a 14) y la fracción de columnas que mira cada árbol (de 0,1 a 1, en escala logarítmica).</td></tr>
+        <tr data-lines="14-15"><td><code>azar = RandomizedSearchCV(pipe_rf, distribuciones, n_iter …</code></td><td>Igual que <code>GridSearchCV</code>, pero con <code>n_iter=12</code>: solo se sortean 12 combinaciones (cada una con 4 folds). <code>random_state</code> fija el sorteo.</td></tr>
+        <tr data-lines="16"><td><code>azar.fit(X_tr, y_tr)</code></td><td>Lanza la búsqueda.</td></tr>
+        <tr data-lines="18"><td><code>print("Entrenamientos:", 12 * 4, "(en lugar de miles que tendría una rejilla completa)")</code></td><td>12 combinaciones × 4 folds = 48 entrenamientos.</td></tr>
+        <tr data-lines="19-20"><td><code>print("best_params_:", {k: float(round(v, 3)) if isinstan …</code></td><td>Muestra la mejor combinación, redondeando los decimales (<code>float(round(v, 3))</code>) para que se lea bien. El <code>if isinstance(v, float)</code> deja los enteros tal cual.</td></tr>
+        <tr data-lines="21"><td><code>print("best_score_ :", round(azar.best_score_, 4))</code></td><td>Su AUC medio en validación cruzada.</td></tr>
+        <tr data-lines="22"><td><code>print("AUC en test :", round(roc_auc_score(y_te, azar.predict_proba(X_te)[:, 1]), 4))</code></td><td>AUC en test del mejor modelo (<code>RandomizedSearchCV</code> también reentrena el mejor con <code>refit=True</code> y sabe hacer <code>predict_proba</code>).</td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>Entrenamientos: 48 (en lugar de miles que tendría una rejilla completa)
+best_params_: {'rf__max_depth': 3, 'rf__max_features': 0.619, 'rf__min_samples_leaf': 8, 'rf__n_estimators': 76}
+best_score_ : 0.7674
+AUC en test : 0.785</pre>
+    <p>Solo 48 entrenamientos para un espacio de miles de combinaciones. La mejor encontrada usa 76 árboles de profundidad 3, <code>min_samples_leaf=8</code> y <code>max_features≈0,619</code>, con AUC de validación cruzada 0,767 y de test 0,785: parecido a la regresión logística (0,783 y 0,800), lo cual tiene sentido porque los datos se generaron con una regla casi lineal. El Random Forest más complejo no gana a un modelo sencillo cuando el problema es sencillo.</p>
+  </div>
+</article>
+<article class="snippet" data-lang="python">
+  <header>
+    <h3>19 · Guardar y cargar un modelo con <code>joblib</code> y <code>pickle</code></h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Guardar en un fichero el pipeline ya entrenado para usarlo más tarde sin reentrenar, y comprobar que el modelo cargado hace exactamente las mismas predicciones. Usa <code>mejor</code> y <code>X_te</code> de los fragmentos anteriores.</p>
+  </header>
+  <pre class="code"><code>import os
+import pickle
+import joblib
+import numpy as np
+
+joblib.dump(mejor, "modelo_baja.joblib")             # guardar el pipeline ENTERO
+print("Fichero creado:", os.path.exists("modelo_baja.joblib"))
+
+cargado = joblib.load("modelo_baja.joblib")          # en otro programa, otro día...
+print("Lo cargado es un", type(cargado).__name__, "con los pasos", list(cargado.named_steps))
+print("Probabilidades de 3 clientes:", cargado.predict_proba(X_te.head(3))[:, 1].round(4))
+print("Mismas predicciones que el original:",
+      np.allclose(cargado.predict_proba(X_te), mejor.predict_proba(X_te)))
+os.remove("modelo_baja.joblib")                      # limpiamos el fichero de la demo
+
+# Lo mismo con pickle, que viene con Python
+with open("modelo_baja.pkl", "wb") as f:             # wb = escribir en binario
+    pickle.dump(mejor, f)
+with open("modelo_baja.pkl", "rb") as f:             # rb = leer en binario
+    cargado2 = pickle.load(f)
+print("pickle también conserva el modelo:",
+      np.allclose(cargado2.predict_proba(X_te), mejor.predict_proba(X_te)))
+os.remove("modelo_baja.pkl")</code></pre>
+  <details class="linea-a-linea" open>
+    <summary>Línea por línea</summary>
+    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+      <tbody>
+        <tr data-lines="1"><td><code>import os</code></td><td>Importa <code>os</code>, para comprobar y borrar ficheros.</td></tr>
+        <tr data-lines="2"><td><code>import pickle</code></td><td>Importa <code>pickle</code>, la librería estándar de Python para guardar objetos.</td></tr>
+        <tr data-lines="3"><td><code>import joblib</code></td><td>Importa <code>joblib</code>, parecida a <code>pickle</code> pero más eficiente con arrays de NumPy (la recomendada para modelos de scikit-learn).</td></tr>
+        <tr data-lines="4"><td><code>import numpy as np</code></td><td>Importa NumPy.</td></tr>
+        <tr data-lines="6"><td><code>joblib.dump(mejor, "modelo_baja.joblib")             # guardar el pipeline ENTERO</code></td><td><code>dump(objeto, nombre_de_fichero)</code> guarda el objeto en disco. Guardamos el <strong>pipeline entero</strong> (con el preprocesado), no solo el modelo: así se aplican las mismas transformaciones al usarlo.</td></tr>
+        <tr data-lines="7"><td><code>print("Fichero creado:", os.path.exists("modelo_baja.joblib"))</code></td><td>Comprueba que el fichero existe.</td></tr>
+        <tr data-lines="9"><td><code>cargado = joblib.load("modelo_baja.joblib")          # en otro programa, otro día...</code></td><td><code>load</code> lee el fichero y reconstruye el objeto (en otro programa o al día siguiente).</td></tr>
+        <tr data-lines="10"><td><code>print("Lo cargado es un", type(cargado).__name__, "con los pasos", list(cargado.named_steps))</code></td><td>Muestra el tipo del objeto y los pasos que contiene.</td></tr>
+        <tr data-lines="11"><td><code>print("Probabilidades de 3 clientes:", cargado.predict_proba(X_te.head(3))[:, 1].round(4))</code></td><td>Usa el modelo cargado para predecir 3 clientes nuevos, sin haber entrenado nada.</td></tr>
+        <tr data-lines="12-13"><td><code>print("Mismas predicciones que el original:", …</code></td><td>Compara todas las predicciones del modelo cargado con las del original. <code>np.allclose</code> dice si dos arrays son iguales salvo diferencias minúsculas de decimales.</td></tr>
+        <tr data-lines="14"><td><code>os.remove("modelo_baja.joblib")                      # limpiamos el fichero de la demo</code></td><td>Borra el fichero de la demostración.</td></tr>
+        <tr data-lines="16"><td><code># Lo mismo con pickle, que viene con Python</code></td><td>Comentario.</td></tr>
+        <tr data-lines="17"><td><code>with open("modelo_baja.pkl", "wb") as f:             # wb = escribir en binario</code></td><td>Abre un fichero para escribir en binario (<code>wb</code>); <code>with</code> lo cierra solo al terminar el bloque.</td></tr>
+        <tr data-lines="18"><td><code>pickle.dump(mejor, f)</code></td><td>Guarda el objeto en el fichero abierto.</td></tr>
+        <tr data-lines="19"><td><code>with open("modelo_baja.pkl", "rb") as f:             # rb = leer en binario</code></td><td>Abre el fichero para leer en binario (<code>rb</code>).</td></tr>
+        <tr data-lines="20"><td><code>cargado2 = pickle.load(f)</code></td><td>Reconstruye el objeto.</td></tr>
+        <tr data-lines="21-22"><td><code>print("pickle también…", np.allclose(…))</code></td><td>Comprueba que también conserva el modelo.</td></tr>
+        <tr data-lines="23"><td><code>os.remove("modelo_baja.pkl")</code></td><td>Borra el fichero.</td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>Fichero creado: True
+Lo cargado es un Pipeline con los pasos ['pre', 'clf']
+Probabilidades de 3 clientes: [0.8346 0.4206 0.3439]
+Mismas predicciones que el original: True
+pickle también conserva el modelo: True</pre>
+    <p>El fichero se crea, al cargarlo se obtiene de nuevo un <code>Pipeline</code> con los pasos <code>pre</code> y <code>clf</code>, las probabilidades de los tres clientes son 0,8346 · 0,4206 · 0,3439 y todas las predicciones coinciden con las del modelo original, tanto con <code>joblib</code> como con <code>pickle</code>. (Los ficheros se borran al final; en un proyecto real los guardarías.)</p>
+  </div>
+</article>
+</section>
+
 </div>
-</article></div></details></div></main></body></html>
+</main>
+</body>
+</html>

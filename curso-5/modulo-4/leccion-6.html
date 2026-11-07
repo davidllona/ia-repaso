@@ -1,116 +1,267 @@
-<!DOCTYPE html>
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lección 6 · Congelar los pesos no congela la BatchNorm · Módulo 4 · Curso 5 · Cuaderno de IA</title>
+<meta name="description" content="La trampa de BatchNorm al congelar en PyTorch: requires_grad_(False) no detiene running_mean y running_var, que se siguen moviendo en train(). Cómo ponerlas en eval() y cuándo dejarlas libres.">
+<script>try{var t=localStorage.getItem('cuaderno-ia:tema');if(t)document.documentElement.setAttribute('data-theme',t)}catch(e){}</script>
+<link rel="stylesheet" href="../../assets/css/style.css">
+<script src="../../assets/js/curriculum.js"></script>
+<script src="../../assets/js/lab.js"></script>
+<script src="../../assets/js/app.js" defer></script>
+</head>
+<body data-root="../../" data-course="5" data-module="4" data-lesson="6">
+<main>
+<div class="page">
 
-<html lang="es"><head><meta charset="utf-8"/><meta content="width=device-width,initial-scale=1" name="viewport"/><title>Lección 6 · Predecir con la red: eval() , no_grad() y softmax · Curso 5 · Cuaderno de IA</title><meta content="Fíjate en que eval() y no_grad() son cosas distintas que se suelen confundir: eval() cambia cómo se calcula la salida; no_grad() cambia si se guarda lo necesario para derivar." name="description"/><script>try{var t=localStorage.getItem('cuaderno-ia:tema');if(t)document.documentElement.setAttribute('data-theme',t)}catch(e){}</script><link href="../../assets/css/style.css" rel="stylesheet"/><script src="../../assets/js/curriculum.js"></script><script src="../../assets/js/lab.js"></script><script defer="" src="../../assets/js/app.js"></script><script defer="" src="../../assets/js/microanimations.js"></script></head><body data-course="5" data-lesson="6" data-module="4" data-root="../../"><main><div class="page" data-micro="3min"><header class="hero leccion"><div class="hero-grid"><div><p class="eyebrow">Curso 5 · Módulo 4 · Lección 6 de 13</p><h1>Predecir con la red: eval() , no_grad() y softmax</h1><p class="lead">Fíjate en que eval() y no_grad() son cosas distintas que se suelen confundir: eval() cambia cómo se calcula la salida; no_grad() cambia si se guarda lo necesario para derivar.</p><p class="meta-line"><span class="read-time" data-render="read-time"></span><a href="../modulo-4.html">Índice del módulo</a></p></div><div aria-hidden="true" class="hero-tile"></div></div></header><details class="predice"><summary>Ya tengo la carátula preparada. ¿Qué tres cosas tengo que hacer antes de llamar a la red, y por qué las dos primeras no son opcionales?<span class="hint"></span></summary><div><p>Fíjate en que eval() y no_grad() son cosas distintas que se suelen confundir: eval() cambia cómo se calcula la salida; no_grad() cambia si se guarda lo necesario para derivar.</p></div></details><section aria-label="Explicación breve" class="micro-core"><div class="micro-kicker">01 · ENTENDER <span>≈ 45 s</span></div><h2>La idea en palabras sencillas</h2><p>El fragmento 5 hace una inferencia completa con una ResNet-18 sin pesos entrenados (con pesos al azar, así que las clases que salen no significan nada: lo que importa es la mecánica), y mide train() == eval() ( False ), el efecto de olvidar no_grad() y el de inference_mode(). Con los pesos de ImageNet, la secuencia sería la misma línea por línea.</p><div class="micro-example"><span aria-hidden="true" class="micro-example-icon">🐾</span><div><strong>Otro ejemplo · Mascotas</strong><p>El clasificador devuelve gato 70 %, perro 20 % y conejo 10 %. Las probabilidades suman 100 %.</p></div></div></section><div class="micro-kicker micro-checkpoint">02 · RESPONDER <span>≈ 15 s</span></div><section aria-label="Pregunta intercalada" class="quiz mini micro-check"><script class="quiz-data" type="application/json">{"titulo": "Pausa rápida · Comprueba la idea", "preguntas": [{"q": "Un modelo devuelve 20 %, 30 % y 50 %. ¿Cuál es la clase elegida?", "opciones": ["La primera", "La tercera", "La segunda"], "correcta": 1, "porque": "Se elige la clase con más probabilidad: 50 %."}]}</script></section><section aria-label="Animación interactiva" class="micro-viz" data-index="15" data-micro-viz="probability"><div class="micro-kicker">03 · EXPERIMENTAR <span>≈ 45 s</span></div><div class="micro-viz-title"><div><h2>De puntuaciones a probabilidades</h2><p>Modifica una puntuación y compara las tres probabilidades.</p></div><span aria-hidden="true" class="micro-viz-symbol">✦</span></div><div aria-live="polite" class="micro-viz-stage"><p>Animación interactiva: De puntuaciones a probabilidades</p></div></section><div class="micro-kicker micro-checkpoint">04 · APLICAR <span>≈ 15 s</span></div><section aria-label="Pregunta intercalada" class="quiz mini micro-check"><script class="quiz-data" type="application/json">{"titulo": "Pausa rápida · ¿Lo aplicarías?", "preguntas": [{"q": "¿Qué debe sumar una salida softmax?", "opciones": ["1 (100 %)", "0 (0 %)", "3 (300 %)"], "correcta": 0, "porque": "Softmax normaliza todos los valores para que su suma sea 1."}]}</script></section><div class="micro-finish"><strong>Idea que te llevas</strong><span>El fragmento 5 hace una inferencia completa con una ResNet-18 sin pesos entrenados (con pesos al azar, así que las clases que salen no significan nada</span><small>¿Quieres más ejemplos, fórmulas o código? Los tienes justo debajo, sin límite de tiempo.</small></div><details class="profundizar micro-legacy"><summary><span>Explorar más: explicación y simulaciones completas<small>Todo el texto original, tablas y demos avanzadas. Opcional.</small></span></summary><div class="prof-body"><section><h2>Predecir con la red: eval() , no_grad() y softmax</h2>
-<p>Fíjate en que <code>eval()</code> y <code>no_grad()</code> son cosas <strong>distintas</strong> que se suelen confundir: <code>eval()</code> cambia <em>cómo se calcula</em> la salida; <code>no_grad()</code> cambia <em>si se guarda</em> lo necesario para derivar. Para predecir se usan las dos. Al entrenar, <code>train()</code> y gradientes activados.</p>
-<p>El <a href="#frag-5">fragmento 5</a> hace una inferencia completa con una ResNet-18 sin pesos entrenados (con pesos al azar, así que las clases que salen no significan nada: lo que importa es la mecánica), y mide <code>train() == eval()</code> (<code>False</code>), el efecto de olvidar <code>no_grad()</code> y el de <code>inference_mode()</code>. Con los pesos de ImageNet, la secuencia sería la misma línea por línea.</p>
-<div class="callout ejemplo"><span class="lbl">Ejemplo tomado del módulo</span><p>: la misma muestra, dos respuestas distintas Una BatchNorm en train() normaliza cada valor con la media y la desviación del lote , como un crítico que puntúa cada película «en relación con las que ha visto hoy».</p></div></section><figure class="demo" data-demo="curso5/c5m4-train-eval" data-titulo="la misma muestra en train() y en eval()">
-<div class="haz">En modo <code>train()</code> cambia las otras películas de la sesión (parecidas, variadas, muy altas) y mira qué pasa con la primera barra. Pulsa «Otra máscara de Dropout». Después pasa a <code>eval()</code> (el crítico usa su criterio de siempre, no el de la sesión de hoy) y repite.</div>
-<div class="observa">En <code>train()</code> la salida de tu película cambia con las otras de la sesión y, con Dropout, con la máscara aleatoria. En <code>eval()</code> no cambia nunca: la red es una función fija de su entrada, que es lo que quieres al predecir.</div>
-</figure><div class="resumen"><h2 class="sin-num sin-toc">En pocas líneas</h2><ul><li><strong>Predecir con la red: eval() , no_grad() y softmax:</strong> Fíjate en que eval() y no_grad() son cosas distintas que se suelen confundir: eval() cambia cómo se calcula la salida; no_grad()…</li><li>Antes de continuar, intenta explicar la demo sin mirar su resultado.</li></ul></div><section class="quiz mini"><script class="quiz-data" type="application/json">{"titulo": "¿Lo tienes?", "preguntas": [{"q": "¿Qué concepto estamos trabajando en esta lección?", "opciones": ["Congelar, sustituir la última capa y entrenar solo la cabeza", "Predecir con la red: eval() , no_grad() y softmax", "El bloque residual: por qué ResNet puede ser profunda"], "correcta": 1, "porque": "Fíjate en que eval() y no_grad() son cosas distintas que se suelen confundir: eval() cambia cómo se calcula la salida; no_grad() cambia si se guarda lo necesario para derivar."}, {"q": "¿Cuál de estas afirmaciones recoge lo que acabas de estudiar?", "opciones": ["Siempre hay un único método que sirve para todos los problemas.", "Lo importante es comprender la idea y comprobarla con ejemplos, no memorizar términos.", "Fíjate en que eval() y no_grad() son cosas distintas que se suelen confundir: eval() cambia cómo se calcula la salida; no_grad() cambia si se guarda lo necesario para derivar."], "correcta": 2, "porque": "La explicación central es: Fíjate en que eval() y no_grad() son cosas distintas que se suelen confundir: eval() cambia cómo se calcula la salida; no_grad() cambia si se guarda lo necesario para derivar."}, {"q": "Si una demo o un ejemplo te desconcierta, ¿cuál es la mejor forma de aprenderlo?", "opciones": ["Ignorar los resultados que no coinciden con tu intuición.", "Memorizar el nombre sin entender la operación.", "Volver a los números, cambiar un valor y explicar qué ocurre."], "correcta": 2, "porque": "Explorar qué cambia y por qué ayuda a conectar el concepto con su resultado."}]}</script></section></div></details><details class="profundizar"><summary><span>Profundizar: explicación completa<small>Matices, fórmulas, tablas, otros ejemplos y experimentos del módulo original.</small></span></summary><div class="prof-body"><section>
-<h2 id="inferencia">Predecir con la red: <code>eval()</code>, <code>no_grad()</code> y <code>softmax</code></h2>
-<p class="pregunta">Ya tengo la carátula preparada. ¿Qué tres cosas tengo que hacer antes de llamar a la red, y por qué las dos primeras no son opcionales?</p>
-<ol class="pasos">
-<li><strong><code>modelo.eval()</code></strong>: pone la red en <em>modo evaluación</em>. Cambia el comportamiento de dos tipos de capa: <code>BatchNorm</code> pasa de normalizar con las estadísticas del lote a usar sus medias móviles guardadas, y <code>Dropout</code> deja de apagar neuronas.</li>
-<li><strong><code>with torch.no_grad():</code></strong>: le dice a PyTorch que no construya el grafo de autograd (el registro de operaciones para poder derivar después). Ahorra memoria y tiempo; no cambia el resultado. Existe también <code>torch.inference_mode()</code>, más estricto y algo más rápido.</li>
-<li><strong><code>softmax</code></strong>: la red devuelve 1.000 puntuaciones sin escala (<em>logits</em>); <code>softmax</code> las convierte en probabilidades que suman 1, y <code>topk</code> da las mejores.</li>
-</ol>
-<p>Fíjate en que <code>eval()</code> y <code>no_grad()</code> son cosas <strong>distintas</strong> que se suelen confundir: <code>eval()</code> cambia <em>cómo se calcula</em> la salida; <code>no_grad()</code> cambia <em>si se guarda</em> lo necesario para derivar. Para predecir se usan las dos. Al entrenar, <code>train()</code> y gradientes activados.</p>
-<div class="callout ejemplo">
-<span class="lbl">Ejemplo numérico: la misma muestra, dos respuestas distintas</span>
-<p>Una BatchNorm en <code>train()</code> normaliza cada valor con la media y la desviación <strong>del lote</strong>, como un crítico que puntúa cada película «en relación con las que ha visto hoy». Toma una película con valor 3 en una sesión de tres películas (el lote):</p>
-<ol class="pasos">
-<li>Sesión (1, 2, 3): media 2, varianza \( ((-1)^2+0^2+1^2)/3 = 0{,}667 \), desviación 0,8165. El 3 pasa a \( (3-2)/0{,}8165 = \) <strong>+1,22</strong>.</li>
-<li>Sesión (3, 4, 5): media 4, misma desviación. El mismo 3 pasa a \( (3-4)/0{,}8165 = \) <strong>−1,22</strong>.</li>
-<li>La película es idéntica, pero la salida depende de qué otras pelis haya en la sesión: el mismo 3 es «la mejor del día» o «la peor del día». En <code>eval()</code> se usa la media y desviación fijas guardadas durante el entrenamiento, y la respuesta es siempre la misma.</li>
-</ol>
-</div>
-<p>El <a href="#frag-5">fragmento 5</a> hace una inferencia completa con una ResNet-18 sin pesos entrenados (con pesos al azar, así que las clases que salen no significan nada: lo que importa es la mecánica), y mide <code>train() == eval()</code> (<code>False</code>), el efecto de olvidar <code>no_grad()</code> y el de <code>inference_mode()</code>. Con los pesos de ImageNet, la secuencia sería la misma línea por línea.</p>
-<div class="callout ojo">
-<span class="lbl">Ojo</span>
-<p>Olvidar <code>model.eval()</code> es el fallo silencioso más frecuente: no da error, las predicciones salen algo distintas en cada ejecución y peores, y dependen del tamaño del lote. Si una red preentrenada «funciona raro», lo primero que se mira es si está en <code>eval()</code>. Y al volver a entrenar hay que acordarse de <code>model.train()</code>.</p>
-</div>
-</section></div></details><details class="profundizar" id="codigo"><summary><span>Ver código explicado paso a paso<small>1 fragmento(s) original(es), con cada línea comentada y salida esperada.</small></span></summary><div class="prof-body"><article class="snippet" data-lang="python" id="frag-5">
-<header>
-<h3>5 · Usar la red para predecir: eval(), no_grad(), softmax y las cinco mejores clases</h3>
-<p class="para-que"><strong>Para qué sirve</strong> Hacer una inferencia completa con una ResNet-18: poner el modelo en modo evaluación, desactivar el grafo de gradientes, convertir las puntuaciones en probabilidades con <code>softmax</code>, leer las clases más probables con <code>topk</code> y ver qué cambia entre <code>train()</code> y <code>eval()</code> y entre <code>no_grad()</code> e <code>inference_mode()</code>. Con pesos al azar las respuestas no significan nada; lo que importa es la mecánica.</p>
+<header class="hero leccion">
+  <div class="hero-grid">
+    <div>
+      <p class="eyebrow">Curso 5 · Módulo 4 · Lección 6 de 8</p>
+      <h1>Congelar los pesos no congela la BatchNorm</h1>
+      <p class="lead">Pones <code>requires_grad_(False)</code> a toda la red y crees que está quieta. Pero si sigue en <code>train()</code>, cada BatchNorm va cambiando su idea de lo «normal» con tus carátulas.</p>
+      <p class="meta-line"><span class="read-time" data-render="read-time"></span><a href="../modulo-4.html">Índice del módulo</a></p>
+    </div>
+    <div class="hero-tile" aria-hidden="true"></div>
+  </div>
 </header>
-<pre class="code"><code>import torch
+
+<details class="predice">
+  <summary>Toda la ResNet tiene <code>requires_grad_(False)</code> y le pasas 50 lotes en <code>train()</code>. ¿Cambia algún número dentro de la red?<span class="hint"></span></summary>
+  <div>
+    <p><strong>Sí:</strong> el <code>running_mean</code> y el <code>running_var</code> de cada BatchNorm. No son parámetros (no usan gradiente), son <em>buffers</em> que se actualizan solos en cada pasada en <code>train()</code>. El candado solo afecta a los parámetros.</p>
+  </div>
+</details>
+
+<section>
+<h2 id="idea">Parámetros con candado, buffers sin él</h2>
+<p>Una BatchNorm guarda dos clases de números: los <strong>parámetros</strong> \( \gamma \) y \( \beta \), que se aprenden con gradiente, y los <strong>buffers</strong> <code>running_mean</code> y <code>running_var</code>, que se actualizan solos en cada pasada en <code>train()</code>. <code>requires_grad_(False)</code> solo toca los primeros. Cada pasada hace \( \mu_{\text{móvil}} \leftarrow 0{,}9\,\mu_{\text{móvil}} + 0{,}1\,\mu_{\text{lote}} \) (momentum 0,1 en PyTorch; Keras usa 0,99 al revés).</p>
+<p>Hay dos opciones. <strong>Mantener las estadísticas de ImageNet</strong> (lo recomendado si congelas o tienes pocos datos): poner las BatchNorm en <code>eval()</code> aunque el resto entrene. O <strong>dejar que se adapten</strong>, si tu conjunto es grande y muy distinto de ImageNet; con lotes de menos de unas 8–16 imágenes, las estadísticas salen ruidosas.</p>
+<p>En Keras no existía esta trampa: <code>trainable=False</code> ya ponía la BatchNorm en inferencia. PyTorch no lo hace solo.</p>
+</section>
+
+<figure class="demo" data-demo="curso5/c5m4-bn-estadisticas" data-titulo="las medias móviles de BatchNorm con las carátulas nuevas">
+  <div class="haz">Pon media 2 y desviación 1,5 y pulsa «Procesar 10 lotes» en <code>train()</code>. Luego cambia a <code>eval()</code> y repite.</div>
+  <div class="observa">En <code>train()</code> las medias móviles se acercan a los datos nuevos un 10 % por lote; en <code>eval()</code> se quedan quietas.</div>
+</figure>
+
+<section>
+<h2 id="con-numeros">Con números: el crítico cambia su idea de lo «normal»</h2>
+<div class="callout ejemplo">
+  <span class="lbl">Ejemplo numérico</span>
+  <p>La media móvil empieza en 0 y cada lote de carátulas nuevas tiene media 3:</p>
+  <ol class="pasos">
+    <li>Pasada 1: 0,9 · 0 + 0,1 · 3 = <strong>0,3</strong>.</li>
+    <li>Pasada 2: 0,9 · 0,3 + 0,3 = <strong>0,57</strong>. Pasada 3: 0,9 · 0,57 + 0,3 = <strong>0,813</strong>.</li>
+    <li>Tras <em>t</em> pasadas: 3 · (1 − 0,9<sup><em>t</em></sup>). Con <em>t</em> = 22, 2,70; con <em>t</em> = 51, <strong>2,99</strong>.</li>
+  </ol>
+  <p>Ningún parámetro ha cambiado, y la red ya no usa las estadísticas de ImageNet.</p>
+</div>
+</section>
+
+<details class="predice">
+  <summary>Solo entrenas la cabeza (una <code>Linear</code>) y dejas todo el modelo en <code>eval()</code>. ¿Aprende la cabeza?<span class="hint"></span></summary>
+  <div>
+    <p><strong>Sí.</strong> <code>eval()</code> no apaga los gradientes: solo cambia BatchNorm y Dropout, y una <code>Linear</code> no tiene ninguna de las dos. Es lo que hace el <a href="leccion-5.html#frag-8">fragmento 8</a> en la fase 1.</p>
+  </div>
+</details>
+
+<div class="resumen">
+  <h2 class="sin-num sin-toc">En tres líneas</h2>
+  <ul>
+    <li><code>requires_grad_(False)</code> congela \( \gamma \) y \( \beta \), no <code>running_mean</code> ni <code>running_var</code>.</li>
+    <li>En <code>train()</code> la media móvil avanza un 10 % por lote hacia la de tus datos.</li>
+    <li>Si congelas el cuerpo, pon también las BatchNorm en <code>eval()</code>; si afinas, déjalas o compara.</li>
+  </ul>
+</div>
+
+<section class="quiz mini">
+<script type="application/json" class="quiz-data">
+{
+ "titulo": "¿Lo tienes?",
+ "preguntas": [
+  {
+   "q": "Haces <code>modelo.requires_grad_(False)</code> y llamas a <code>modelo(x)</code> con la red en <code>train()</code>. ¿Qué cambia dentro de la red?",
+   "opciones": [
+    "Nada: todo está congelado",
+    "Los pesos de las convoluciones, por el gradiente del lote",
+    "Los <code>running_mean</code>, <code>running_var</code> y <code>num_batches_tracked</code> de las capas BatchNorm",
+    "Solo el learning rate efectivo del optimizador"
+   ],
+   "correcta": 2,
+   "porque": "<code>requires_grad_(False)</code> detiene los gradientes de los parámetros, pero las estadísticas de BatchNorm son <em>buffers</em> que se actualizan en cada pasada en <code>train()</code> sin necesitar gradiente. El fragmento 11 lo mide: el <code>running_mean</code> de <code>bn1</code> pasa de 0 a −0,1073 tras una pasada y a −1,0678 tras 51. La solución es poner las BatchNorm en <code>eval()</code>."
+  },
+  {
+   "q": "¿Cómo dejas solo las BatchNorm en modo evaluación mientras el resto entrena?",
+   "opciones": [
+    "Llamar a <code>modelo.eval()</code> antes de <code>modelo.train()</code>",
+    "Tras <code>modelo.train()</code>, recorrer <code>modelo.modules()</code> y llamar a <code>.eval()</code> en cada <code>nn.BatchNorm2d</code>",
+    "Poner <code>requires_grad_(False)</code> en las BatchNorm"
+   ],
+   "correcta": 1,
+   "porque": "<code>modelo.train()</code> lo pone todo en entrenamiento, así que el orden importa: primero <code>train()</code> y después <code>eval()</code> capa a capa. <code>requires_grad_(False)</code> no detiene los buffers."
+  },
+  {
+   "q": "Con momentum 0,1, la media móvil empieza en 0 y cada lote tiene media 3. ¿Cuánto vale tras 2 pasadas?",
+   "opciones": [
+    "0,3",
+    "0,57",
+    "3"
+   ],
+   "correcta": 1,
+   "porque": "Pasada 1: 0,9 · 0 + 0,1 · 3 = 0,3. Pasada 2: 0,9 · 0,3 + 0,3 = 0,57. Se acerca a 3 poco a poco: 3 · (1 − 0,9²) = 0,57."
+  }
+ ]
+}
+</script>
+</section>
+
+<details class="profundizar">
+  <summary><span>Profundizar: la explicación completa<small>Parámetros y buffers, la fórmula del momentum, la cuenta de las pasadas, las dos opciones con su código, por qué en nuestro experimento dejarla libre no perjudicó y la regla para congelar del todo.</small></span></summary>
+  <div class="prof-body">
+<h2 id="batchnorm">BatchNorm al congelar: la trampa de las estadísticas</h2>
+
+<p class="pregunta">He puesto <code>requires_grad_(False)</code> en toda la red. ¿Está de verdad congelada?</p>
+
+<p>No del todo. Piensa en la BatchNorm como la idea que tiene el crítico de lo que es una película «normal» (la oscuridad media de un póster, por ejemplo). Una capa <code>BatchNorm</code> tiene dos clases de números: los <strong>parámetros</strong> \( \gamma \) y \( \beta \) (que se aprenden con gradiente) y los <strong>buffers</strong> <code>running_mean</code> y <code>running_var</code> (que no se aprenden con gradiente, sino que se <em>actualizan solos</em> en cada pasada en modo <code>train()</code>). <code>requires_grad_(False)</code> solo afecta a los primeros. Si el modelo está en <code>train()</code>, los buffers se siguen moviendo con tus imágenes nuevas, aunque el cuerpo esté «congelado». En cada pasada la media móvil se actualiza así:</p>
+
+<div class="formula">\[ \mu_{\text{móvil}} \leftarrow (1-m)\,\mu_{\text{móvil}} + m\,\mu_{\text{lote}}, \qquad m = 0{,}1 \]</div>
+
+<p>Donde \( \mu_{\text{lote}} \) es la media de los datos del lote actual y \( m \) es el <em>momentum</em> de la BatchNorm (0,1 por defecto en PyTorch: ojo, es lo contrario del de Keras, que usa 0,99).</p>
+
+<div class="callout ejemplo">
+  <span class="lbl">Ejemplo numérico</span>
+  <p>El crítico recuerda como «nivel normal» el valor 0, y cada sesión de carátulas nuevas (cada lote) le da siempre una media de 3 (cifras inventadas):</p>
+  <ol class="pasos">
+    <li>Pasada 1: \( 0{,}9\cdot0 + 0{,}1\cdot3 = \) <strong>0,3</strong>.</li>
+    <li>Pasada 2: \( 0{,}9\cdot0{,}3 + 0{,}3 = \) <strong>0,57</strong>.</li>
+    <li>Pasada 3: \( 0{,}9\cdot0{,}57 + 0{,}3 = \) <strong>0,813</strong>.</li>
+    <li>Tras \( t \) pasadas: \( 3\,(1-0{,}9^{t}) \). Con \( t=22 \): 2,70 (el 90 % del camino); con \( t=51 \): 2,99.</li>
+  </ol>
+  <p>La red ha «olvidado» las estadísticas de ImageNet y las ha cambiado por las de tus carátulas, sin que ningún parámetro cambiara: el crítico ha cambiado su idea de lo «normal» solo por haber visto tus pósters. Es lo que muestra el <a href="#frag-11">fragmento 11</a> con una ResNet-18: tras 51 pasadas en <code>train()</code>, el <code>running_mean</code> de <code>bn1</code> deja de ser 0 y converge a la media real de los datos.</p>
+</div>
+
+<div class="callout recuerda">
+  <span class="lbl">Experimento de arriba: «las medias móviles de BatchNorm con las carátulas nuevas», con todo detalle</span>
+  <p><strong>Haz esto.</strong> Pon la media de las carátulas nuevas en 2 y la desviación en 1,5. Pulsa «Procesar 10 lotes» con la BatchNorm en <code>train()</code> y mira las dos curvas. Luego cambia a <code>eval()</code> y vuelve a procesar.</p>
+  <p><strong>Fíjate en.</strong> En <code>train()</code>, <code>running_mean</code> y <code>running_var</code> se acercan a la media y la varianza de los datos nuevos (a un ritmo del 10 % por lote); en <code>eval()</code> se quedan quietas. Con lotes pequeños, la varianza estimada es más ruidosa.</p>
+</div>
+
+<h3>Qué hacer: dos opciones y cuándo cada una</h3>
+
+<ul>
+  <li><strong>Mantener las estadísticas de ImageNet</strong> (lo recomendado cuando congelas o tienes pocos datos: que el crítico siga con su idea de lo «normal»): poner a las BatchNorm del cuerpo en <code>eval()</code> aunque el resto entrene. Se hace tras <code>modelo.train()</code> (que lo pondría todo en entrenamiento): <code>for capa in modelo.modules(): if isinstance(capa, nn.BatchNorm2d): capa.eval()</code>. O, si solo entrenas la cabeza, dejar todo el modelo en <code>eval()</code>, como hace el <a href="leccion-5.html#frag-8">fragmento 8</a> (la cabeza <code>Linear</code> no tiene BatchNorm ni Dropout, así que da igual el modo).</li>
+  <li><strong>Dejar que se adapten</strong> (<code>train()</code> normal; que el crítico recalibre su idea de lo «normal» con tus pósters): tiene sentido si tu conjunto es grande y se parece poco a ImageNet. Con lotes pequeños (menos de unos 8–16) las estadísticas de cada lote son ruidosas y pueden perjudicar.</li>
+</ul>
+
+<div class="callout ojo">
+  <span class="lbl">Ojo</span>
+  <p>Dos matices que desmienten el folklore. <strong>(1)</strong> En Keras no existía este problema: <code>trainable=False</code> en una BatchNorm la ponía en modo inferencia. PyTorch no hace eso solo. <strong>(2)</strong> En el experimento propio de este módulo, dejar la BatchNorm suelta <em>no</em> perjudicó: el ajuste fino con la BatchNorm libre fue mejor o igual que con ella fija en las dos tareas y en casi todos los tamaños (<a href="leccion-8.html#frag-15">fragmentos 15</a> y <a href="leccion-8.html#frag-16">16</a>). La razón probable: las estadísticas de nuestra red se calcularon con cifras 0–4 y la tarea nueva tiene cifras con otras estadísticas, así que dejarlas adaptarse ayudó. Con ImageNet y fotos corrientes, la recomendación sigue siendo fijarlas. Como siempre: mide.</p>
+</div>
+
+<div class="callout regla">
+  <span class="lbl">Regla fácil</span>
+  <p>Si congelas el cuerpo, congélalo del todo: <code>requires_grad_(False)</code> <strong>y</strong> BatchNorm en <code>eval()</code>. Si afinas el cuerpo, deja que las BatchNorm entrenen con él, o fíjalas todas y compara.</p>
+</div>
+  </div>
+</details>
+
+<section>
+<h2 class="sin-num">Código</h2>
+<article class="snippet" data-lang="python" id="frag-11">
+      <header>
+        <h3>11 · La trampa de BatchNorm: congelar los pesos no congela las estadísticas</h3>
+        <p class="para-que"><strong>Para qué sirve</strong> Demostrar con números que, aunque todos los parámetros estén con <code>requires_grad=False</code>, una BatchNorm en modo <code>train()</code> sigue actualizando sus medias móviles con tus datos nuevos; ver la solución (poner esas capas en <code>eval()</code>) y el error de los lotes de una sola muestra.</p>
+      </header>
+      <pre class="code"><code>import torch
+from torch import nn
 from torchvision import models
-from torchvision.models import ResNet18_Weights
 
 torch.manual_seed(0)
 modelo = models.resnet18(weights=None)
-categorias = ResNet18_Weights.DEFAULT.meta["categories"]
-x = torch.randn(1, 3, 224, 224)
+modelo.requires_grad_(False)
+bn = modelo.bn1
+print("bn1.weight entrenable:", bn.weight.requires_grad)
+print("antes:", bn.running_mean[:3].tolist(), bn.num_batches_tracked.item())
 
-modelo.eval()
-with torch.no_grad():
-    logits = modelo(x)
-print(logits.shape, logits.requires_grad)
-
-probs = torch.softmax(logits, dim=1)
-print(round(probs.sum().item(), 4), round(probs.max().item(), 4))
-top = probs.topk(3)
-for p, i in zip(top.values[0], top.indices[0]):
-    print(f"{i.item():4d} {categorias[i]:&lt;26s} {p.item():.4f}")
-
-salida = modelo(x)
-print("sin no_grad:", salida.requires_grad, salida.grad_fn is not None)
-
+x = torch.randn(8, 3, 64, 64) * 2 + 3
 modelo.train()
-a = modelo(x)
-modelo.eval()
-b = modelo(x)
-print("train() == eval():", torch.allclose(a, b))
+with torch.no_grad():
+    modelo(x)
+print("1 pasada en train():", [round(v, 4) for v in bn.running_mean[:3].tolist()], bn.num_batches_tracked.item())
+for _ in range(50):
+    with torch.no_grad():
+        modelo(x)
+print("51 pasadas:", [round(v, 4) for v in bn.running_mean[:3].tolist()], bn.num_batches_tracked.item())
 
-with torch.inference_mode():
-    c = modelo(x)
-print("inference_mode:", c.requires_grad, c.is_inference())</code></pre>
-<details class="linea-a-linea" open="">
-<summary>Línea por línea</summary>
-<p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
-<table class="lineas">
-<thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
-<tbody>
-<tr data-lines="1"><td><code>import torch</code></td><td>PyTorch.</td></tr>
-<tr data-lines="2"><td><code>from torchvision import models</code></td><td>Catálogo de modelos.</td></tr>
-<tr data-lines="3"><td><code>from torchvision.models import ResNet18_Weights</code></td><td>Los pesos, de los que solo vamos a leer los nombres de las clases.</td></tr>
-<tr data-lines="5"><td><code>torch.manual_seed(0)</code></td><td>Semilla, para que los pesos aleatorios y la entrada sean siempre los mismos.</td></tr>
-<tr data-lines="6"><td><code>modelo = models.resnet18(weights=None)</code></td><td>ResNet-18 con pesos al azar (sin internet no hay otros).</td></tr>
-<tr data-lines="7"><td><code>categorias = ResNet18_Weights.DEFAULT.meta["categories"]</code></td><td>Los 1.000 nombres de clase de ImageNet, leídos de los metadatos (esto no descarga nada).</td></tr>
-<tr data-lines="8"><td><code>x = torch.randn(1, 3, 224, 224)</code></td><td>Una imagen inventada ya «preprocesada»: lote de 1, 3 canales, 224×224.</td></tr>
-<tr data-lines="10"><td><code>modelo.eval()</code></td><td>Modo evaluación: BatchNorm usa sus estadísticas guardadas y Dropout (si hubiera) no apaga nada. Es obligatorio antes de predecir.</td></tr>
-<tr data-lines="11"><td><code>with torch.no_grad():</code></td><td>Dentro de este bloque PyTorch no registra operaciones para calcular gradientes: menos memoria y más rapidez, y el resultado queda desconectado del grafo.</td></tr>
-<tr data-lines="12"><td><code>logits = modelo(x)</code></td><td>Las 1.000 puntuaciones crudas (<em>logits</em>), una por clase.</td></tr>
-<tr data-lines="13"><td><code>print(logits.shape, logits.requires_grad)</code></td><td>Forma del resultado y si seguiría conectado al grafo de gradientes.</td></tr>
-<tr data-lines="15"><td><code>probs = torch.softmax(logits, dim=1)</code></td><td>Convierte las puntuaciones en probabilidades que suman 1. <code>dim=1</code> es el eje de las clases.</td></tr>
-<tr data-lines="16"><td><code>print(round(probs.sum().item(), 4), round(probs.max().item(), 4))</code></td><td>Comprobación: las probabilidades suman 1 y se imprime la mayor.</td></tr>
-<tr data-lines="17"><td><code>top = probs.topk(3)</code></td><td>Las 3 probabilidades mayores y sus índices de clase.</td></tr>
-<tr data-lines="18"><td><code>for p, i in zip(top.values[0], top.indices[0]):</code></td><td>Recorre las tres a la vez (<code>[0]</code> = primera imagen del lote).</td></tr>
-<tr data-lines="19"><td><code>print(f"{i.item():4d} {categorias[i]:&lt;26s} {p.item():.4f}")</code></td><td>Índice de clase, nombre (leído de la lista de categorías) y probabilidad.</td></tr>
-<tr data-lines="21"><td><code>salida = modelo(x)</code></td><td>Lo mismo pero <strong>fuera</strong> de <code>no_grad</code>.</td></tr>
-<tr data-lines="22"><td><code>print("sin no_grad:", salida.requires_grad, salida.grad_fn is not None)</code></td><td>Ahora la salida sí está conectada al grafo (<code>requires_grad=True</code> y tiene <code>grad_fn</code>): se está gastando memoria para algo que no se va a entrenar.</td></tr>
-<tr data-lines="24"><td><code>modelo.train()</code></td><td>Cambia a modo entrenamiento.</td></tr>
-<tr data-lines="25"><td><code>a = modelo(x)</code></td><td>Predicción en modo entrenamiento: BatchNorm normaliza con las estadísticas <em>de este lote</em>.</td></tr>
-<tr data-lines="26"><td><code>modelo.eval()</code></td><td>Vuelve a modo evaluación.</td></tr>
-<tr data-lines="27"><td><code>b = modelo(x)</code></td><td>Predicción en modo evaluación: BatchNorm usa sus estadísticas guardadas.</td></tr>
-<tr data-lines="28"><td><code>print("train() == eval():", torch.allclose(a, b))</code></td><td>Misma imagen, mismo modelo, resultados distintos según el modo.</td></tr>
-<tr data-lines="30"><td><code>with torch.inference_mode():</code></td><td>Una versión todavía más estricta de <code>no_grad</code> pensada para producción.</td></tr>
-<tr data-lines="31"><td><code>c = modelo(x)</code></td><td>Predicción dentro de ese bloque.</td></tr>
-<tr data-lines="32"><td><code>print("inference_mode:", c.requires_grad, c.is_inference())</code></td><td>El resultado no tiene gradientes y está marcado como «tensor de inferencia» (no se podrá usar luego para entrenar).</td></tr>
-</tbody>
-</table>
-</details>
-<div class="salida">
-<strong>Salida esperada</strong>
-<pre>torch.Size([1, 1000]) False
-1.0 0.0865
- 238 Greater Swiss Mountain dog 0.0865
-  58 water snake                0.0560
- 381 spider monkey              0.0468
-sin no_grad: True True
-train() == eval(): False
-inference_mode: False True</pre>
-<p>Con <code>no_grad()</code> la salida tiene forma <code>(1, 1000)</code> y <code>requires_grad=False</code>; sin él, <code>requires_grad=True</code>. Las probabilidades suman 1,0 y la mayor es 0,0865: con pesos aleatorios la red reparte la probabilidad sin criterio, y que la «mejor clase» sea <em>Greater Swiss Mountain dog</em> (índice 238) no significa nada. <strong>Con los pesos de ImageNet descargados</strong>, la misma secuencia de líneas (preprocesar la foto, <code>eval()</code>, <code>no_grad()</code>, <code>softmax</code>, <code>topk</code>) daría las clases reales; eso no se ha podido ejecutar aquí. Lo que sí se comprueba es el efecto de los modos: <code>train() == eval()</code> da <code>False</code> (BatchNorm normaliza distinto) y <code>inference_mode</code> devuelve un tensor sin gradientes marcado como de inferencia.</p>
+modelo2 = models.resnet18(weights=None)
+modelo2.requires_grad_(False)
+modelo2.train()
+for capa in modelo2.modules():
+    if isinstance(capa, nn.BatchNorm2d):
+        capa.eval()
+modelo2(x)
+print("con BN en eval():", modelo2.bn1.running_mean[:3].tolist(), modelo2.bn1.num_batches_tracked.item())
+
+try:
+    nn.BatchNorm1d(4).train()(torch.randn(1, 4))
+except ValueError as e:
+    print("ValueError:", e)</code></pre>
+      <details class="linea-a-linea" open>
+        <summary>Línea por línea</summary>
+        <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+        <table class="lineas">
+          <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+          <tbody>
+        <tr data-lines="1"><td><code>import torch</code></td><td>PyTorch.</td></tr>
+        <tr data-lines="2"><td><code>from torch import nn</code></td><td>Capas.</td></tr>
+        <tr data-lines="3"><td><code>from torchvision import models</code></td><td>Modelos.</td></tr>
+        <tr data-lines="5"><td><code>torch.manual_seed(0)</code></td><td>Semilla.</td></tr>
+        <tr data-lines="6"><td><code>modelo = models.resnet18(weights=None)</code></td><td>Una ResNet-18.</td></tr>
+        <tr data-lines="7"><td><code>modelo.requires_grad_(False)</code></td><td>La congelamos entera.</td></tr>
+        <tr data-lines="8"><td><code>bn = modelo.bn1</code></td><td>Nos quedamos con su primera capa BatchNorm.</td></tr>
+        <tr data-lines="9"><td><code>print("bn1.weight entrenable:", bn.weight.requires_grad)</code></td><td>Confirma que sus parámetros (γ) están congelados.</td></tr>
+        <tr data-lines="10"><td><code>print("antes:", bn.running_mean[:3].tolist(), bn.num_batches_tracked.item())</code></td><td>Las tres primeras medias móviles y el contador de lotes vistos, antes de usar la red.</td></tr>
+        <tr data-lines="12"><td><code>x = torch.randn(8, 3, 64, 64) * 2 + 3</code></td><td>Un lote de 8 imágenes inventadas cuyos valores no se parecen a los de entrenamiento (media 3, desviación 2): hace de «fotos de un dominio nuevo».</td></tr>
+        <tr data-lines="13"><td><code>modelo.train()</code></td><td>La red en modo entrenamiento (el descuido típico).</td></tr>
+        <tr data-lines="14"><td><code>with torch.no_grad():</code></td><td>Sin gradientes (no estamos entrenando pesos).</td></tr>
+        <tr data-lines="15"><td><code>modelo(x)</code></td><td>Una pasada hacia delante.</td></tr>
+        <tr data-lines="16"><td><code>print("1 pasada en train():", [round(v, 4) for v in bn.running_mean[:3].tolist()], bn.num_batches_tracked.item())</code></td><td>Las medias móviles ya no son 0 y el contador vale 1: la BatchNorm ha cambiado aunque «todo estaba congelado».</td></tr>
+        <tr data-lines="17"><td><code>for _ in range(50):</code></td><td>50 pasadas más.</td></tr>
+        <tr data-lines="18"><td><code>with torch.no_grad():</code></td><td>Sin gradientes.</td></tr>
+        <tr data-lines="19"><td><code>modelo(x)</code></td><td>Forward con los mismos datos.</td></tr>
+        <tr data-lines="20"><td><code>print("51 pasadas:", [round(v, 4) for v in bn.running_mean[:3].tolist()], bn.num_batches_tracked.item())</code></td><td>Las medias móviles se han ido acercando a las medias reales de <em>estos</em> datos.</td></tr>
+        <tr data-lines="22"><td><code>modelo2 = models.resnet18(weights=None)</code></td><td>Otra red para probar la solución.</td></tr>
+        <tr data-lines="23"><td><code>modelo2.requires_grad_(False)</code></td><td>También congelada.</td></tr>
+        <tr data-lines="24"><td><code>modelo2.train()</code></td><td>En modo entrenamiento…</td></tr>
+        <tr data-lines="25"><td><code>for capa in modelo2.modules():</code></td><td>…pero recorremos <strong>todos</strong> sus submódulos (<code>modules()</code> baja hasta lo más profundo)…</td></tr>
+        <tr data-lines="26"><td><code>if isinstance(capa, nn.BatchNorm2d):</code></td><td>…y si alguno es una BatchNorm 2D…</td></tr>
+        <tr data-lines="27"><td><code>capa.eval()</code></td><td>…lo ponemos en modo evaluación: usará y respetará sus estadísticas guardadas.</td></tr>
+        <tr data-lines="28"><td><code>modelo2(x)</code></td><td>Una pasada hacia delante.</td></tr>
+        <tr data-lines="29"><td><code>print("con BN en eval():", modelo2.bn1.running_mean[:3].tolist(), modelo2.bn1.num_batches_tracked.item())</code></td><td>Las medias siguen en 0 y el contador en 0: no se tocó nada.</td></tr>
+        <tr data-lines="31"><td><code>try:</code></td><td>Bloque protegido.</td></tr>
+        <tr data-lines="32"><td><code>nn.BatchNorm1d(4).train()(torch.randn(1, 4))</code></td><td>Una BatchNorm1d en modo entrenamiento con un lote de <strong>una</strong> muestra de 4 características: no se puede estimar una varianza con un solo dato.</td></tr>
+        <tr data-lines="33"><td><code>except ValueError as e:</code></td><td>Captura el error.</td></tr>
+        <tr data-lines="34"><td><code>print("ValueError:", e)</code></td><td>Imprime el mensaje.</td></tr>
+          </tbody>
+        </table>
+      </details>
+      <div class="salida">
+        <strong>Salida esperada</strong>
+    <pre>bn1.weight entrenable: False
+antes: [0.0, 0.0, 0.0] 0
+1 pasada en train(): [-0.1073, -0.0538, 0.1762] 1
+51 pasadas: [-1.0678, -0.5352, 1.7535] 51
+con BN en eval(): [0.0, 0.0, 0.0] 0
+ValueError: Expected more than 1 value per channel when training, got input size torch.Size([1, 4])</pre>
+        <p>La trampa en tres números. Los parámetros de <code>bn1</code> están congelados (<code>requires_grad=False</code>), pero tras <strong>una</strong> pasada en <code>train()</code> su <code>running_mean</code> ya no es 0 sino \( [-0{,}1073, -0{,}0538, 0{,}1762] \) y <code>num_batches_tracked</code> pasa de 0 a 1; tras 51 pasadas vale \( [-1{,}0678, -0{,}5352, 1{,}7535] \), que es casi la media real de los datos (cada pasada acerca la media un 10 %: \( 1-0{,}9^{51}\approx99{,}5\,\% \) del camino, y \( -0{,}1073/0{,}1\approx-1{,}07 \)). Las estadísticas se actualizan <em>sin gradiente alguno</em>: por eso <code>requires_grad_(False)</code> no basta. Con las BatchNorm en <code>eval()</code> la media sigue en 0 y el contador en 0. La última línea es otro error clásico, el de un lote de una sola muestra con BatchNorm en <code>train()</code>: no se puede calcular una varianza con un único valor. (En la ResNet-18 completa ese error no salta con lotes de una imagen porque cada canal tiene muchos píxeles por imagen; sí salta en <code>BatchNorm1d</code> y en las capas con mapas de 1×1.)</p>
+      </div>
+    </article>
+
+</section>
+
 </div>
-</article></div></details></div></main></body></html>
+</main>
+</body>
+</html>

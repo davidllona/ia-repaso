@@ -1,185 +1,214 @@
-<!DOCTYPE html>
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lección 5 · zero_grad, backward, step: el bucle de todo PyTorch · Módulo 3 · Curso 4 · Cuaderno de IA</title>
+<meta name="description" content="El bucle estándar con nn.Linear, nn.MSELoss y torch.optim.SGD, por qué se vacían los gradientes y qué añade el momentum.">
+<script>try{var t=localStorage.getItem('cuaderno-ia:tema');if(t)document.documentElement.setAttribute('data-theme',t)}catch(e){}</script>
+<link rel="stylesheet" href="../../assets/css/style.css">
+<script src="../../assets/js/curriculum.js"></script>
+<script src="../../assets/js/lab.js"></script>
+<script src="../../assets/js/app.js" defer></script>
+</head>
+<body data-root="../../" data-course="4" data-module="3" data-lesson="5">
+<main>
+<div class="page">
 
-<html lang="es"><head><meta charset="utf-8"/><meta content="width=device-width,initial-scale=1" name="viewport"/><title>Lección 5 · Descenso del gradiente a mano: el bucle de verdad · Curso 4 · Cuaderno de IA</title><meta content="El descenso del gradiente ( gradient descent ) es repetir muchas veces estos cinco pasos." name="description"/><script>try{var t=localStorage.getItem('cuaderno-ia:tema');if(t)document.documentElement.setAttribute('data-theme',t)}catch(e){}</script><link href="../../assets/css/style.css" rel="stylesheet"/><script src="../../assets/js/curriculum.js"></script><script src="../../assets/js/lab.js"></script><script defer="" src="../../assets/js/app.js"></script><script defer="" src="../../assets/js/microanimations.js"></script></head><body data-course="4" data-lesson="5" data-module="3" data-root="../../"><main><div class="page" data-micro="3min"><header class="hero leccion"><div class="hero-grid"><div><p class="eyebrow">Curso 4 · Módulo 3 · Lección 5 de 11</p><h1>Descenso del gradiente a mano: el bucle de verdad</h1><p class="lead">El descenso del gradiente ( gradient descent ) es repetir muchas veces estos cinco pasos.</p><p class="meta-line"><span class="read-time" data-render="read-time"></span><a href="../modulo-3.html">Índice del módulo</a></p></div><div aria-hidden="true" class="hero-tile"></div></div></header><details class="predice"><summary>Un paso mejora el coste, pero no llega al fondo. ¿Qué hay que repetir, y hasta cuándo?<span class="hint"></span></summary><div><p>El descenso del gradiente ( gradient descent ) es repetir muchas veces estos cinco pasos.</p></div></details><section aria-label="Explicación breve" class="micro-core"><div class="micro-kicker">01 · ENTENDER <span>≈ 45 s</span></div><h2>La idea en palabras sencillas</h2><p>El descenso del gradiente ( gradient descent ) es repetir muchas veces estos cinco pasos.</p><div class="micro-example"><span aria-hidden="true" class="micro-example-icon">💡</span><div><strong>Otro ejemplo · Termostato</strong><p>Ajustas la temperatura varias veces: mides cuánto te alejas de 21 °C y corriges hacia ese objetivo.</p></div></div></section><div class="micro-kicker micro-checkpoint">02 · RESPONDER <span>≈ 15 s</span></div><section aria-label="Pregunta intercalada" class="quiz mini micro-check"><script class="quiz-data" type="application/json">{"titulo": "Pausa rápida · Comprueba la idea", "preguntas": [{"q": "Si el learning rate es demasiado grande, ¿qué puede pasar?", "opciones": ["Siempre aprende mejor", "La función loss desaparece", "Los saltos impiden converger"], "correcta": 2, "porque": "Pasos grandes pueden provocar oscilaciones."}]}</script></section><section aria-label="Animación interactiva" class="micro-viz" data-index="12" data-micro-viz="gradient"><div class="micro-kicker">03 · EXPERIMENTAR <span>≈ 45 s</span></div><div class="micro-viz-title"><div><h2>Bajar el error, paso a paso</h2><p>Da pasos y mira cómo el punto se acerca al mínimo de la curva.</p></div><span aria-hidden="true" class="micro-viz-symbol">✦</span></div><div aria-live="polite" class="micro-viz-stage"><p>Animación interactiva: Bajar el error, paso a paso</p></div></section><div class="micro-kicker micro-checkpoint">04 · APLICAR <span>≈ 15 s</span></div><section aria-label="Pregunta intercalada" class="quiz mini micro-check"><script class="quiz-data" type="application/json">{"titulo": "Pausa rápida · ¿Lo aplicarías?", "preguntas": [{"q": "¿Qué suelen indicar los gradientes?", "opciones": ["El idioma del modelo", "Cómo cambia la pérdida cuando cambian parámetros", "Cuántas filas faltan de la tabla"], "correcta": 1, "porque": "Orientan la actualización de los parámetros."}]}</script></section><div class="micro-finish"><strong>Idea que te llevas</strong><span>El descenso del gradiente ( gradient descent ) es repetir muchas veces estos cinco pasos</span><small>¿Quieres más ejemplos, fórmulas o código? Los tienes justo debajo, sin límite de tiempo.</small></div><details class="profundizar micro-legacy"><summary><span>Explorar más: explicación y simulaciones completas<small>Todo el texto original, tablas y demos avanzadas. Opcional.</small></span></summary><div class="prof-body"><section><h2>Descenso del gradiente a mano: el bucle de verdad</h2>
-<p>El <strong>descenso del gradiente</strong> (<em>gradient descent</em>) es repetir muchas veces estos cinco pasos. Cada repetición con todos los datos se llama <strong>época</strong> (<em>epoch</em>):</p>
-<p>Se repite hasta que el coste deja de bajar o se agota el número de épocas elegido.</p>
-<p>En el experimento, el descenso con los datos \( x = 1, 2, 3 \) tarda <strong>546 pasos</strong> en llegar al fondo (MSE por debajo de 0,000001), ¡para tres películas! Y sin embargo con los datos de los laboratorios (\( x \) entre −3 y 3) bastan 30 épocas. ¿Por qué? Cerca del mínimo el paisaje se parece a un cuenco, y en cada «dirección» del cuenco la distancia al fondo se multiplica, en cada paso, por \( (1 - lr\cdot\lambda) \), donde \( \lambda \) es la <strong>curvatura</strong> de esa dirección (lo empinada que es la pared). Si \( |1 - lr\cdot\lambda| &lt; 1 \), esa dirección converge; si no, diverge.</p>
-<div class="callout ejemplo"><span class="lbl">Ejemplo tomado del módulo</span><p>· el mismo problema con \( x \) sin centrar y centrada curvaturas \( \lambda \) del cuenco factor por paso con \( lr = 0{,}05 \) \( lr \) máximo estable \( 2/\lambda_{\max} \) pasos para acercarse un 99,9 % \( x = 1,2,3 \) 11,09 y 0,24…</p></div></section><figure class="demo" data-demo="curso4/c4m3-gd-paso" data-titulo="Descenso del gradiente con dos parámetros, paso a paso">
-<div class="haz">Pulsa «Un paso» varias veces con lr = 0,05 y compara la línea «siguiente» con las cuentas del ejemplo (1,2 y 0,5 en el primer paso; 1,74 y 0,71 en el segundo). Luego pulsa «Ejecutar» y mira cuántos pasos tarda. Activa «Centrar x» y repite. Después sube lr a 0,2 con x sin centrar: ¿qué pasa? Haz clic en el mapa para cambiar el punto de partida.</div>
-<div class="observa">Sin centrar, el camino cae rápido al fondo del valle y luego <strong>se arrastra</strong> por él (546 pasos); con la variable centrada baja casi en línea recta y en 114. La curva de aprendizaje (abajo, en escala logarítmica) es casi una recta descendente: el error se multiplica por el mismo factor en cada paso. Con lr = 0,2 el descenso diverge porque supera el límite 2/λ de la pared empinada (0,18).</div>
-</figure><div class="resumen"><h2 class="sin-num sin-toc">En pocas líneas</h2><ul><li><strong>Descenso del gradiente a mano: el bucle de verdad:</strong> El descenso del gradiente ( gradient descent ) es repetir muchas veces estos cinco pasos.</li><li>Antes de continuar, intenta explicar la demo sin mirar su resultado.</li></ul></div><section class="quiz mini"><script class="quiz-data" type="application/json">{"titulo": "¿Lo tienes?", "preguntas": [{"q": "¿Qué concepto estamos trabajando en esta lección?", "opciones": ["Elegir el learning rate, y entrenar / validar / probar", "Evaluar con datos nuevos y guardar el modelo", "Descenso del gradiente a mano: el bucle de verdad"], "correcta": 2, "porque": "El descenso del gradiente ( gradient descent ) es repetir muchas veces estos cinco pasos."}, {"q": "¿Cuál de estas afirmaciones recoge lo que acabas de estudiar?", "opciones": ["El descenso del gradiente ( gradient descent ) es repetir muchas veces estos cinco pasos.", "Siempre hay un único método que sirve para todos los problemas.", "Lo importante es comprender la idea y comprobarla con ejemplos, no memorizar términos."], "correcta": 0, "porque": "La explicación central es: El descenso del gradiente ( gradient descent ) es repetir muchas veces estos cinco pasos."}, {"q": "Si una demo o un ejemplo te desconcierta, ¿cuál es la mejor forma de aprenderlo?", "opciones": ["Volver a los números, cambiar un valor y explicar qué ocurre.", "Ignorar los resultados que no coinciden con tu intuición.", "Memorizar el nombre sin entender la operación."], "correcta": 0, "porque": "Explorar qué cambia y por qué ayuda a conectar el concepto con su resultado."}]}</script></section></div></details><details class="profundizar"><summary><span>Profundizar: explicación completa<small>Matices, fórmulas, tablas, otros ejemplos y experimentos del módulo original.</small></span></summary><div class="prof-body"><section>
-<h2 id="descenso">Descenso del gradiente a mano: el bucle de verdad</h2>
-<p class="pregunta">Un paso mejora el coste, pero no llega al fondo. ¿Qué hay que repetir, y hasta cuándo?</p>
-<p>El <strong>descenso del gradiente</strong> (<em>gradient descent</em>) es repetir muchas veces estos cinco pasos. Cada repetición con todos los datos se llama <strong>época</strong> (<em>epoch</em>):</p>
-<ol class="pasos">
-<li><strong>Forward</strong>: calcular las predicciones con los parámetros actuales, \( \hat{y} = w x + b \).</li>
-<li><strong>Coste</strong>: calcular el MSE con esas predicciones.</li>
-<li><strong>Backward</strong>: <code>loss.backward()</code> deja los gradientes en <code>w.grad</code> y <code>b.grad</code>.</li>
-<li><strong>Actualizar</strong>: \( w \leftarrow w - lr\cdot \partial\mathrm{MSE}/\partial w \) y lo mismo con \( b \), dentro de <code>torch.no_grad()</code>.</li>
-<li><strong>Vaciar</strong> los gradientes para la siguiente vuelta.</li>
-</ol>
-<p>Se repite hasta que el coste deja de bajar o se agota el número de épocas elegido. Con los datos de los laboratorios del curso (60 puntos de la recta \( y = -3x \) más un poco de ruido, partiendo de \( w = -10 \) y \( b = -20 \), muy lejos de la solución) el fragmento 7 hace exactamente eso: el coste cae de 533,56 a menos de 0,01 en 30 épocas y los parámetros llegan a \( w \approx -2{,}994 \) y \( b \approx -0{,}02 \), casi idénticos a la solución exacta de mínimos cuadrados (−2,9937 y 0,0056; el ruido de los datos impide que sea exactamente −3 y 0). Puedes comprobar el coste inicial a mano: con \( \hat{y} = -10x - 20 \) y \( y \approx -3x \), el error es \( -7x - 20 \), y el MSE es \( 49\cdot\overline{x^2} + 280\cdot\bar{x} + 400 = 49\cdot 3{,}0017 - 14 + 400 = 533{,}08 \); el ruido añade 0,48 hasta 533,56.</p>
-<h3>Por qué a veces el descenso es lentísimo: variables sin centrar</h3>
-<p>En el experimento, el descenso con los datos \( x = 1, 2, 3 \) tarda <strong>546 pasos</strong> en llegar al fondo (MSE por debajo de 0,000001), ¡para tres películas! Y sin embargo con los datos de los laboratorios (\( x \) entre −3 y 3) bastan 30 épocas. ¿Por qué? Cerca del mínimo el paisaje se parece a un cuenco, y en cada «dirección» del cuenco la distancia al fondo se multiplica, en cada paso, por \( (1 - lr\cdot\lambda) \), donde \( \lambda \) es la <strong>curvatura</strong> de esa dirección (lo empinada que es la pared). Si \( |1 - lr\cdot\lambda| &lt; 1 \), esa dirección converge; si no, diverge.</p>
+<header class="hero leccion">
+  <div class="hero-grid">
+    <div>
+      <p class="eyebrow">Curso 4 · Módulo 3 · Lección 5 de 8</p>
+      <h1>zero_grad, backward, step: el bucle de todo PyTorch</h1>
+      <p class="lead">Lo que hacías a mano tiene su pieza en PyTorch: <code>nn.Linear</code> predice, <code>nn.MSELoss</code> mide y <code>optim.SGD</code> mueve los parámetros. Son cinco líneas que verás en <strong>todos</strong> los programas que entrenan algo.</p>
+      <p class="meta-line"><span class="read-time" data-render="read-time"></span><a href="../modulo-3.html">Índice del módulo</a></p>
+    </div>
+    <div class="hero-tile" aria-hidden="true"></div>
+  </div>
+</header>
+
+<details class="predice">
+  <summary>Quitas <code>optimizer.zero_grad()</code> del bucle. ¿Qué pasa: da un error, entrena igual o el coste empieza a oscilar?<span class="hint"></span></summary>
+  <div>
+    <p><strong>Oscila, sin ningún error.</strong> Cada <code>backward()</code> suma su gradiente a los de las vueltas anteriores, así que los pasos son cada vez más grandes y el modelo se pasa de largo. PyTorch no vacía solo porque acumular a veces es útil (sumar varios lotes pequeños para simular uno enorme).</p>
+  </div>
+</details>
+
+<section>
+<h2 id="idea">Cada línea a mano tiene su pieza</h2>
+<p>El modelo es <code>model = nn.Linear(1, 1)</code>, el coste <code>criterion = nn.MSELoss()</code> y el <strong>optimizador</strong> <code>optimizer = torch.optim.SGD(model.parameters(), lr=0.1)</code>: recibe los parámetros que debe mover y el tamaño del paso. Con ellos el bucle queda así:</p>
+<pre class="ascii">for epoch in range(epochs):
+  yhat = model(x)            # 1
+  loss = criterion(yhat, y)  # 2
+  optimizer.zero_grad()      # 3
+  loss.backward()            # 4
+  optimizer.step()           # 5</pre>
+<p>Son (1) forward, (2) coste, (3) vaciar, (4) gradientes y (5) mover. <code>step()</code> hace exactamente \( p \leftarrow p - lr\cdot p.\mathrm{grad} \) en cada parámetro: entrenando así salen <strong>los mismos</strong> \( w \) y \( b \) que con el bucle a mano. El orden importa: <code>step()</code> va <em>después</em> de <code>backward()</code> (necesita los gradientes nuevos) y <code>zero_grad()</code> <em>antes</em> del <code>backward()</code> siguiente. En PyTorch 2.x, <code>zero_grad()</code> no pone ceros sino <code>None</code>.</p>
+<p>Con <code>SGD(..., momentum=0.9)</code> el paso tiene <strong>inercia</strong>, como una bola pesada: guarda una velocidad \( v \leftarrow \mu\,v + g \) y avanza \( p \leftarrow p - lr\cdot v \). En un valle estrecho las sacudidas de un lado a otro se cancelan y el avance a lo largo del valle se acumula.</p>
+</section>
+
+<figure class="demo" data-demo="curso4/c4m3-bucle-lineas" data-titulo="El bucle de entrenamiento, línea a línea">
+  <div class="haz">Pulsa «Ejecutar la línea ▶» cinco veces. Luego activa «Quitar optimizer.zero_grad()» y pulsa «10 épocas».</div>
+  <div class="observa">Solo <code>step()</code> cambia w y b. Sin <code>zero_grad()</code> los gradientes crecen y el coste oscila (curva roja).</div>
+</figure>
+
+<section>
+<h2 id="numeros">Con números: dos pasos con momentum</h2>
 <div class="callout ejemplo">
-<span class="lbl">Ejemplo numérico · el mismo problema con \( x \) sin centrar y centrada</span>
+  <span class="lbl">Ejemplo numérico · \( lr = 0{,}1 \), \( \mu = 0{,}9 \)</span>
+  <p>El recomendador tiene un único mando \( p \) («cuánto peso da al género de lo que ves»), el mejor ajuste es \( p = 5 \) y el coste es \( (p - 5)^2 \), con gradiente \( g = 2(p - 5) \). Partimos de \( p = 0 \):</p>
+  <ol class="pasos">
+    <li><strong>Paso 1.</strong> \( g = -10 \); \( v = 0{,}9\cdot 0 - 10 = -10 \); \( p = 0 - 0{,}1\cdot(-10) = 1 \).</li>
+    <li><strong>Paso 2.</strong> \( g = 2(1 - 5) = -8 \); \( v = 0{,}9\cdot(-10) - 8 = -17 \); \( p = 1 + 1{,}7 = \) <span class="res">2,7</span>.</li>
+  </ol>
+  <p>Sin momentum, el paso 2 usaría solo \( g = -8 \) y llegaría a \( p = 1{,}8 \). La velocidad acumulada (−17 en vez de −8) empuja más.</p>
+</div>
+</section>
+
+<details class="predice">
+  <summary>Con \( \mu = 0{,}9 \), si el gradiente fuera siempre el mismo, ¿cuánto más largos acabarían siendo los pasos que sin momentum?<span class="hint"></span></summary>
+  <div>
+    <p><strong>10 veces.</strong> La velocidad crece hasta \( g/(1-\mu) = g/0{,}1 \). Por eso al principio el momentum se pasa de largo (en el fragmento 12 el coste sube a 63 en el paso 5) y luego avanza mucho más deprisa: <code>lr</code> y <code>momentum</code> se eligen juntos.</p>
+  </div>
+</details>
+
+<div class="resumen">
+  <h2 class="sin-num sin-toc">En tres líneas</h2>
+  <ul>
+    <li>Bucle estándar: <code>model(x)</code>, <code>criterion</code>, <code>zero_grad()</code>, <code>backward()</code>, <code>step()</code>.</li>
+    <li><code>step()</code> es el mismo \( p \leftarrow p - lr\cdot p.\mathrm{grad} \) del bucle a mano; sin <code>zero_grad()</code> los gradientes se acumulan.</li>
+    <li>El momentum suma inercia: \( v \leftarrow \mu v + g \); acelera en los valles largos, pero al principio se pasa.</li>
+  </ul>
+</div>
+
+<section class="quiz mini">
+<script type="application/json" class="quiz-data">
+{
+ "titulo": "¿Lo tienes?",
+ "preguntas": [
+  {
+   "q": "Usas <code>SGD(lr=0.1, momentum=0.9)</code> en el coste <code>(p − 5)²</code>, empezando en <code>p = 0</code>. ¿Cuánto vale <code>p</code> tras el segundo paso? (<code>v = 0.9·v + g</code>, <code>p = p − lr·v</code>)",
+   "opciones": [
+    "1,8",
+    "2,0",
+    "3,4",
+    "2,7"
+   ],
+   "correcta": 3,
+   "porque": "Paso 1: g = 2(0 − 5) = −10; v = −10; p = 0 − 0,1·(−10) = 1,0. Paso 2: g = 2(1 − 5) = −8; v = 0,9·(−10) + (−8) = −17; p = 1 + 1,7 = <strong>2,7</strong>. Sin momentum sería 1,8 (v = g = −8): el momentum recuerda la dirección anterior y avanza más."
+  },
+  {
+   "q": "En el bucle estándar, ¿qué línea cambia los valores de <code>w</code> y <code>b</code>?",
+   "opciones": [
+    "<code>loss.backward()</code>",
+    "<code>optimizer.zero_grad()</code>",
+    "<code>optimizer.step()</code>",
+    "<code>criterion(yhat, y)</code>"
+   ],
+   "correcta": 2,
+   "porque": "<code>backward()</code> solo rellena los <code>.grad</code>, <code>zero_grad()</code> solo los borra y <code>criterion</code> solo calcula el coste. El único que toca los parámetros es <code>step()</code>, con \\( p \\leftarrow p - lr\\cdot p.\\mathrm{grad} \\)."
+  },
+  {
+   "q": "En PyTorch 2.x imprimes <code>w.grad</code> justo después de <code>optimizer.zero_grad()</code>. ¿Qué ves?",
+   "opciones": [
+    "<code>None</code>",
+    "<code>tensor(0.)</code>",
+    "El gradiente de la vuelta anterior",
+    "Un error"
+   ],
+   "correcta": 0,
+   "porque": "Desde PyTorch 2.0, <code>zero_grad()</code> usa <code>set_to_none=True</code> por defecto: en vez de escribir ceros, borra el tensor del gradiente (es más rápido). El siguiente <code>backward()</code> lo vuelve a crear."
+  }
+ ]
+}
+</script>
+</section>
+
+<details class="profundizar">
+  <summary><span>Profundizar: la explicación completa<small>La tabla «a mano frente a PyTorch», los argumentos de SGD (lr, momentum, weight_decay, nesterov), param_groups, por qué PyTorch no vacía solo, la analogía de la bola pesada y el experimento de SGD con y sin momentum.</small></span></summary>
+  <div class="prof-body">
+<h2 id="optimizador">Dejar que PyTorch haga el trabajo: <code>nn.Module</code>, <code>MSELoss</code> y <code>optim.SGD</code></h2>
+
+<p class="pregunta">El bucle a mano funciona, pero con 50 parámetros ya no querrás escribir <code>w -= lr * w.grad</code> para cada uno. ¿Cómo lo hace PyTorch por ti?</p>
+
+<p>Cada línea del bucle a mano tiene su pieza en PyTorch:</p>
 <table>
-<thead><tr><th></th><th>curvaturas \( \lambda \) del cuenco</th><th>factor por paso con \( lr = 0{,}05 \)</th><th>\( lr \) máximo estable \( 2/\lambda_{\max} \)</th><th>pasos para acercarse un 99,9 %</th></tr></thead>
-<tbody>
-<tr><th scope="row">\( x = 1,2,3 \)</th><td>11,09 y 0,24</td><td>0,445 y <strong>0,988</strong></td><td>0,18</td><td>\( \ln 0{,}001/\ln 0{,}988 \approx \) <span class="res">570</span></td></tr>
-<tr><th scope="row">\( x = -1,0,1 \) (centrada: presupuesto menos la media)</th><td>2 y 1,33</td><td>0,9 y 0,933</td><td>1</td><td>\( \ln 0{,}001/\ln 0{,}933 \approx \) <span class="res">100</span></td></tr>
-</tbody>
+  <thead><tr><th>Paso</th><th>A mano</th><th>Con PyTorch</th></tr></thead>
+  <tbody>
+    <tr><td>modelo</td><td><code>w * X + b</code></td><td><code>model = nn.Linear(1, 1)</code>, <code>yhat = model(X)</code></td></tr>
+    <tr><td>coste</td><td><code>torch.mean((Yhat - Y) ** 2)</code></td><td><code>criterion = nn.MSELoss()</code>, <code>loss = criterion(yhat, Y)</code></td></tr>
+    <tr><td>vaciar gradientes</td><td><code>w.grad.zero_(); b.grad.zero_()</code></td><td><code>optimizer.zero_grad()</code></td></tr>
+    <tr><td>gradientes</td><td><code>loss.backward()</code></td><td><code>loss.backward()</code> (igual)</td></tr>
+    <tr><td>actualizar</td><td><code>with torch.no_grad(): w -= lr * w.grad ...</code></td><td><code>optimizer.step()</code></td></tr>
+  </tbody>
 </table>
-<p>Con \( x \) sin centrar, el cuenco es un valle larguísimo (una pared muy empinada, \( \lambda = 11 \), y otra casi plana, \( \lambda = 0{,}24 \)): el \( lr \) está limitado por la pared empinada (0,18) pero la dirección plana, con factor 0,988, avanza solo un 1,2 % de lo que le falta en cada paso. Al restar la media de \( x \), el cuenco se vuelve casi redondo, las dos curvaturas se parecen y se puede usar un \( lr \) mucho mayor. Centrar es tan simple como esto: el presupuesto medio es 2 (20 M€), así que Shrek pasa a \( -1 \) («10 M€ por debajo de la media»), Toy Story a 0 («justo la media») y El Rey León a \( +1 \).</p>
-</div>
-<div class="callout regla">
-<span class="lbl">Regla fácil</span>
-<p>El descenso del gradiente va tan despacio como la dirección más «plana» del paisaje, y el learning rate está limitado por la más «empinada». <strong>Centrar o estandarizar las variables de entrada</strong> (media 0, desviación 1) acerca las dos y hace el entrenamiento mucho más rápido y fácil de ajustar. Lo verás de nuevo con la regresión múltiple.</p>
-</div>
-</section></div></details><details class="profundizar" id="codigo"><summary><span>Ver código explicado paso a paso<small>4 fragmento(s) original(es), con cada línea comentada y salida esperada.</small></span></summary><div class="prof-body"><article class="snippet" data-lang="python" id="frag-6">
-<header>
-<h3>6 · Gradientes con <code>backward()</code> y con la fórmula, y un paso de descenso</h3>
-<p class="para-que"><strong>Para qué sirve</strong> Calcular las derivadas del MSE con autograd, comprobar que coinciden con la fórmula a mano (−24 y −10), dar un paso de descenso con <code>lr = 0.05</code> y ver el coste y el gradiente siguientes.</p>
-</header>
-<pre class="code"><code>import torch
+<p>El <strong>optimizador</strong> se crea con los parámetros que debe mover y el learning rate: <code>optimizer = torch.optim.SGD(model.parameters(), lr=0.1)</code>. SGD son las siglas de <em>Stochastic Gradient Descent</em>; en PyTorch la clase <code>SGD</code> es la que implementa el descenso del gradiente (con un solo lote, es el «batch GD»; con lotes más pequeños, el SGD y el mini-batch del apartado siguiente). Su <code>step()</code> hace exactamente \( p \leftarrow p - lr\cdot p.\mathrm{grad} \) para cada parámetro. El fragmento 9 lo demuestra: entrena con <code>nn.Linear</code> + <code>MSELoss</code> + <code>SGD</code> y comprueba que los \( w \) y \( b \) finales son <strong>los mismos</strong> que los del bucle a mano.</p>
 
-x = torch.tensor([1.0, 2.0, 3.0])
-y = torch.tensor([2.0, 5.0, 8.0])
-w = torch.tensor(0.0, requires_grad=True)
-b = torch.tensor(0.0, requires_grad=True)
-
-yhat = w * x + b
-loss = torch.mean((yhat - y) ** 2)
-print("MSE inicial:", loss.item())
-
-loss.backward()                                  # calcula d(loss)/dw y d(loss)/db
-print("autograd  : dw =", w.grad.item(), " db =", b.grad.item())
-
-err = (yhat - y).detach()                        # las mismas derivadas, con la fórmula
-print("a mano    : dw =", (2 * (err * x).mean()).item(), " db =", (2 * err.mean()).item())
-
-lr = 0.05
-with torch.no_grad():                            # un paso de descenso del gradiente
-    w -= lr * w.grad
-    b -= lr * b.grad
-print("tras 1 paso: w =", round(w.item(), 4), " b =", round(b.item(), 4))
-
-w.grad.zero_(); b.grad.zero_()                   # vaciar antes del siguiente backward
-loss2 = torch.mean((w * x + b - y) ** 2)
-print("MSE tras el paso:", round(loss2.item(), 4))
-loss2.backward()
-print("2.º gradiente: dw =", round(w.grad.item(), 4), " db =", round(b.grad.item(), 4))</code></pre>
-<details class="linea-a-linea">
-<summary>Línea por línea</summary>
-<p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
-<table class="lineas">
-<thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
-<tbody>
-<tr data-lines="1"><td><code>import torch</code></td><td>Importa PyTorch.</td></tr>
-<tr data-lines="3-4"><td><code>x = torch.tensor([1.0, 2.0, 3.0]) …</code></td><td>Los datos del ejemplo como tensores planos.</td></tr>
-<tr data-lines="5-6"><td><code>w = torch.tensor(0.0, requires_grad=True) …</code></td><td><em>w</em> y <em>b</em> empiezan en 0 y llevan <code>requires_grad=True</code>.</td></tr>
-<tr data-lines="8"><td><code>yhat = w * x + b</code></td><td>La predicción de las tres muestras.</td></tr>
-<tr data-lines="9"><td><code>loss = torch.mean((yhat - y) ** 2)</code></td><td>El MSE como un tensor de un solo elemento, enlazado al grafo.</td></tr>
-<tr data-lines="10"><td><code>print("MSE inicial:", loss.item())</code></td><td>Imprime el coste inicial: 31.</td></tr>
-<tr data-lines="12"><td><code>loss.backward()                                  # …</code></td><td><code>backward()</code> recorre el grafo hacia atrás y deja la derivada del coste en <code>w.grad</code> y <code>b.grad</code>.</td></tr>
-<tr data-lines="13"><td><code>print("autograd  : dw =", w.grad.item(), " db =",  …</code></td><td>Imprime los dos gradientes de autograd (<code>.item()</code> los convierte en números).</td></tr>
-<tr data-lines="15"><td><code>err = (yhat - y).detach()                        # …</code></td><td>Los errores sin el grafo (<code>detach()</code>): se usan en la fórmula.</td></tr>
-<tr data-lines="16"><td><code>print("a mano    : dw =", (2 * (err * x).mean()).i …</code></td><td>La fórmula a mano: ∂MSE/∂w = 2·media(error·x) y ∂MSE/∂b = 2·media(error).</td></tr>
-<tr data-lines="18"><td><code>lr = 0.05</code></td><td>El learning rate.</td></tr>
-<tr data-lines="19-21"><td><code>with torch.no_grad():                            # …</code></td><td>Un paso de descenso: se resta <code>lr × gradiente</code> a cada parámetro, <strong>en el sitio</strong> (<code>-=</code>) y dentro de <code>torch.no_grad()</code>.</td></tr>
-<tr data-lines="22"><td><code>print("tras 1 paso: w =", round(w.item(), 4), " b  …</code></td><td>Imprime los parámetros nuevos.</td></tr>
-<tr data-lines="24"><td><code>w.grad.zero_(); b.grad.zero_()                   # …</code></td><td>Vacía los gradientes (<code>zero_()</code> los pone a 0 en el sitio; el <code>;</code> separa dos instrucciones en la misma línea). Si no, el siguiente <code>backward()</code> <em>sumaría</em>.</td></tr>
-<tr data-lines="25-26"><td><code>loss2 = torch.mean((w * x + b - y) ** 2) …</code></td><td>Recalcula el MSE con los parámetros nuevos y lo imprime.</td></tr>
-<tr data-lines="27"><td><code>loss2.backward()</code></td><td>Un nuevo <code>backward()</code>.</td></tr>
-<tr data-lines="28"><td><code>print("2.º gradiente: dw =", round(w.grad.item(),  …</code></td><td>Imprime el segundo gradiente.</td></tr>
-</tbody>
+<p>Los argumentos de <code>SGD</code> que debes conocer:</p>
+<table>
+  <thead><tr><th>Argumento</th><th>Qué hace</th><th>Valor por defecto</th></tr></thead>
+  <tbody>
+    <tr><td><code>params</code></td><td>los parámetros a mover (normalmente <code>model.parameters()</code>)</td><td>(obligatorio)</td></tr>
+    <tr><td><code>lr</code></td><td>el <em>learning rate</em>: tamaño del paso</td><td>0,001 en PyTorch 2.14 (en versiones antiguas era obligatorio: escríbelo siempre)</td></tr>
+    <tr><td><code>momentum</code></td><td>«inercia» (apartado siguiente)</td><td>0</td></tr>
+    <tr><td><code>weight_decay</code></td><td>penaliza los pesos grandes (regularización L2, <a href="../../curso-1/modulo-5/leccion-6.html#regularizacion">Curso 1, módulo 5</a>)</td><td>0</td></tr>
+    <tr><td><code>nesterov</code></td><td>variante de momentum que «mira un poco hacia delante»</td><td>False</td></tr>
+  </tbody>
 </table>
+<p>El optimizador guarda su configuración en <code>optimizer.param_groups</code> (una lista de grupos de parámetros, cada uno con su <code>lr</code>, <code>momentum</code>…): el fragmento 9 la imprime. Así se puede, más adelante, dar un learning rate distinto a cada capa.</p>
+
+<h3>El bucle estándar, y por qué ese orden</h3>
+<p>Las cinco líneas que verás en <em>todos</em> los programas de PyTorch:</p>
+<pre class="ascii">for epoch in range(epochs):
+    yhat = model(x)               # 1. forward
+    loss = criterion(yhat, y)     # 2. coste
+    optimizer.zero_grad()         # 3. vaciar los .grad de la vuelta anterior
+    loss.backward()               # 4. calcular los gradientes de ESTA vuelta
+    optimizer.step()              # 5. mover los parámetros con esos gradientes</pre>
+<p>El orden importa en dos sitios: <code>step()</code> tiene que ir <em>después</em> de <code>backward()</code> (necesita los gradientes recién calculados) y <code>zero_grad()</code> tiene que ir <em>antes</em> de <code>backward()</code> (puede estar al principio o al final de la vuelta, pero siempre antes del <code>backward()</code> siguiente; lo que no vale es no ponerlo). <strong>¿Por qué PyTorch no vacía los gradientes solo?</strong> Porque acumular es útil a veces: sumar los gradientes de varios lotes pequeños para simular un lote enorme que no cabe en memoria, o entrenar con dos costes a la vez. Como PyTorch no sabe cuál es tu caso, te deja a ti decidir cuándo vaciar. En PyTorch 2.x, <code>optimizer.zero_grad()</code> no pone ceros sino <code>None</code> (<code>set_to_none=True</code> por defecto, más rápido): si imprimes <code>w.grad</code> justo después verás <code>None</code>, no <code>0</code>.</p>
+
+<div class="callout recuerda">
+  <span class="lbl">Experimento de arriba: «El bucle de entrenamiento, línea a línea», con todo detalle</span>
+  <p><strong>Haz esto.</strong> Pulsa «Ejecutar la línea ▶» cinco veces y observa qué cambia en el recuadro de abajo con cada línea (¿cuándo cambian los parámetros w y b? ¿cuándo aparecen los gradientes? ¿cuándo vuelven a None?). Luego activa «Quitar optimizer.zero_grad()» y pulsa «10 épocas».</p>
+  <p><strong>Fíjate en.</strong> Solo <code>optimizer.step()</code> cambia w y b; <code>backward()</code> solo rellena los gradientes y <code>zero_grad()</code> solo los borra. Sin <code>zero_grad()</code> cada <code>backward()</code> <strong>suma</strong> su gradiente a los anteriores (se ve cómo crecen): el paso es cada vez más grande y el coste oscila en lugar de bajar (curva roja). En la primera época con <code>lr = 0,05</code> verás w = 1,2, b = 0,5 y MSE 31, justo el ejemplo del apartado anterior.</p>
+</div>
+
+<h3>Momentum: darle inercia a la bola</h3>
+<div class="callout analogia">
+  <span class="lbl">Analogía</span>
+  <p>El descenso normal es como bajar por una ladera embarrada notando la pendiente con el pie y dando un paso de tamaño fijo en esa dirección: si la ladera es una zanja larga y estrecha, zigzagueas entre las paredes. El <strong>momentum</strong> es soltar una <strong>bola pesada</strong>: no solo siente la pendiente de ahora, también conserva la velocidad que traía. Las sacudidas laterales se cancelan unas con otras (la bola sube y baja la pared) y la componente a lo largo de la zanja se acumula (la bola va cogiendo velocidad).</p>
+</div>
+<p>En PyTorch, <code>SGD(..., momentum=mu)</code> mantiene una <strong>velocidad</strong> \( v \) por cada parámetro, que mezcla la anterior con el gradiente de ahora:</p>
+<div class="formula">\[ v \leftarrow \mu\, v + g \qquad\quad p \leftarrow p - lr\cdot v \]</div>
+<p>\( g \) es el gradiente actual, \( \mu \) (entre 0 y 1; típicamente 0,9) es cuánto se conserva de la velocidad anterior y \( lr \) el learning rate. Con \( \mu = 0 \) es el SGD normal. Si el gradiente fuera siempre el mismo, la velocidad crecería hasta \( g/(1-\mu) \): con \( \mu = 0{,}9 \), pasos <strong>10 veces mayores</strong>.</p>
+
+<div class="callout ejemplo">
+  <span class="lbl">Ejemplo numérico · dos pasos con momentum, a mano</span>
+  <p>Imagina que el recomendador de Netflix tiene un único mando \( p \) («cuánto peso da al género de lo que ves») y que el mejor ajuste es \( p = 5 \). Su coste es \( (p - 5)^2 \) (gradiente \( 2(p-5) \)); partimos de \( p = 0 \), con \( lr = 0{,}1 \) y \( \mu = 0{,}9 \).</p>
+  <ol class="pasos">
+    <li><strong>Paso 1.</strong> \( g = 2(0 - 5) = -10 \); \( v = 0{,}9\cdot 0 + (-10) = -10 \); \( p = 0 - 0{,}1\cdot(-10) = 1 \).</li>
+    <li><strong>Paso 2.</strong> \( g = 2(1 - 5) = -8 \); \( v = 0{,}9\cdot(-10) + (-8) = -17 \); \( p = 1 - 0{,}1\cdot(-17) = 2{,}7 \).</li>
+  </ol>
+  <p>Sin momentum, el paso 2 habría llegado a \( p = 1 + 0{,}8 = 1{,}8 \). Con él, a \( 2{,}7 \): la velocidad acumulada (−17 en vez de −8) ya empuja más. El fragmento 12 comprueba que el optimizador da exactamente 1,0 y 2,7.</p>
+</div>
+
+<figure class="demo" data-demo="curso4/c4m3-momentum" data-titulo="SGD con y sin momentum en un valle estrecho">
+  <div class="haz">Pulsa «Ejecutar 300 pasos» con lr = 0,008 y μ = 0,9. Compara el camino azul (sin momentum) con el rojo (con momentum) y las curvas de coste. Prueba μ = 0,5 y μ = 0,99, y sube el learning rate.</div>
+  <div class="observa">Al principio el momentum <strong>empeora</strong> (la bola se pasa de largo y el coste se dispara), pero luego avanza por el valle mucho más deprisa que el SGD normal, que se arrastra con los gradientes minúsculos del fondo plano. Con μ muy alto (0,99) la bola oscila mucho y tarda en asentarse. Es un ajuste más: <code>lr</code> y <code>momentum</code> se eligen juntos.</div>
+</figure>
+
+<p>Con datos reales del fragmento 12 (50 puntos de \( y = 2x + 1 \) más ruido, con \( x \) entre 0 y 10, sin centrar, lr = 0,01 y 100 pasos), el MSE final es 0,053 sin momentum, 0,026 con \( \mu = 0{,}5 \) y 0,015 con \( \mu = 0{,}9 \); y el sesgo, que debería valer 0,976, llega a 0,577, 0,736 y 0,977 respectivamente. Fíjate en que con \( \mu = 0{,}9 \) el coste empieza mucho <em>peor</em> (63 en el paso 5) y acaba mejor: es la firma del momentum. En el <a href="../../curso-5/modulo-2.html">módulo 2 del Curso 5</a> lo verás de nuevo junto a otros optimizadores (Adam, RMSprop).</p>
+  </div>
 </details>
-<div class="salida">
-<strong>Salida esperada</strong>
-<pre>MSE inicial: 31.0
-autograd  : dw = -24.0  db = -10.0
-a mano    : dw = -24.0  db = -10.0
-tras 1 paso: w = 1.2  b = 0.5
-MSE tras el paso: 6.57
-2.º gradiente: dw = -10.8  db = -4.2</pre>
-<p>El coste inicial es <strong>31</strong>. Autograd da <code>dw = -24.0</code> y <code>db = -10.0</code> y la fórmula a mano da exactamente lo mismo: no hay magia, <code>backward()</code> solo hace esas cuentas por ti. Tras un paso con <code>lr = 0.05</code>: <em>w</em> = 0 − 0,05·(−24) = <strong>1.2</strong> y <em>b</em> = 0 − 0,05·(−10) = <strong>0.5</strong>. El MSE baja de 31 a <strong>6.57</strong> y los nuevos gradientes (−10.8 y −4.2) siguen siendo negativos pero más pequeños: aún queda camino. Todo coincide con el ejemplo del texto.</p>
-</div>
-</article><article class="snippet" data-lang="python" id="frag-7">
-<header>
-<h3>7 · El bucle de entrenamiento a mano con los datos del laboratorio</h3>
-<p class="para-que"><strong>Para qué sirve</strong> Entrenar una regresión lineal sin <code>nn.Linear</code> ni optimizador: solo tensores, <code>backward()</code> y la actualización a mano, partiendo de <em>w</em> = −10 y <em>b</em> = −20, y comparar el resultado con la solución exacta.</p>
-</header>
-<pre class="code"><code>import torch
 
-torch.manual_seed(0)
-X = torch.arange(-3, 3, 0.1).view(-1, 1)         # 60 puntos entre -3 y 2.9
-f = -3 * X                                       # la recta verdadera: y = -3x
-Y = f + 0.1 * torch.randn(X.size())              # más un poco de ruido
-print("X:", tuple(X.shape), " Y:", tuple(Y.shape))
-
-w = torch.tensor(-10.0, requires_grad=True)      # empezamos lejos de la verdad
-b = torch.tensor(-20.0, requires_grad=True)
-lr = 0.1
-
-for epoch in range(30):
-    Yhat = w * X + b                             # 1. hacia delante
-    loss = torch.mean((Yhat - Y) ** 2)           # 2. coste
-    loss.backward()                              # 3. gradientes
-    with torch.no_grad():                        # 4. actualizar los parámetros
-        w -= lr * w.grad
-        b -= lr * b.grad
-    w.grad.zero_()                               # 5. vaciar los gradientes
-    b.grad.zero_()
-    if epoch in (0, 3, 6, 10, 20, 29):
-        print(f"época {epoch:2d}  loss = {loss.item():9.4f}  w = {w.item():7.4f}  b = {b.item():8.4f}")
-
-A = torch.cat([X, torch.ones_like(X)], dim=1)    # solución exacta de mínimos cuadrados
-print("lstsq:", [round(v, 4) for v in torch.linalg.lstsq(A, Y).solution.flatten().tolist()])</code></pre>
-<details class="linea-a-linea">
-<summary>Línea por línea</summary>
-<p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
-<table class="lineas">
-<thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
-<tbody>
-<tr data-lines="1"><td><code>import torch</code></td><td>Importa PyTorch.</td></tr>
-<tr data-lines="3"><td><code>torch.manual_seed(0)</code></td><td>Semilla, para que el ruido sea siempre el mismo.</td></tr>
-<tr data-lines="4"><td><code>X = torch.arange(-3, 3, 0.1).view(-1, 1)         # …</code></td><td>60 puntos <em>x</em> entre −3 y 2,9 (<code>arange</code> con paso 0,1), convertidos en columna con <code>view(-1, 1)</code>.</td></tr>
-<tr data-lines="5"><td><code>f = -3 * X                                       # …</code></td><td>La recta verdadera que queremos descubrir: <em>y</em> = −3<em>x</em>.</td></tr>
-<tr data-lines="6"><td><code>Y = f + 0.1 * torch.randn(X.size())              # …</code></td><td>Le sumamos ruido gaussiano (<code>randn</code>, de desviación 1) multiplicado por 0,1.</td></tr>
-<tr data-lines="7"><td><code>print("X:", tuple(X.shape), " Y:", tuple(Y.shape))</code></td><td>Imprime las formas: <code>(60, 1)</code> las dos.</td></tr>
-<tr data-lines="9-10"><td><code>w = torch.tensor(-10.0, requires_grad=True)      # …</code></td><td>Parámetros iniciales, muy lejos de la verdad (−10 y −20 en lugar de −3 y 0).</td></tr>
-<tr data-lines="11"><td><code>lr = 0.1</code></td><td>Learning rate 0,1.</td></tr>
-<tr data-lines="13"><td><code>for epoch in range(30):</code></td><td>Una vuelta del bucle = una <strong>época</strong> (aquí con todos los datos).</td></tr>
-<tr data-lines="14"><td><code>Yhat = w * X + b                             # 1.  …</code></td><td>Paso 1: hacia delante, predicción de las 60 muestras.</td></tr>
-<tr data-lines="15"><td><code>loss = torch.mean((Yhat - Y) ** 2)           # 2.  …</code></td><td>Paso 2: el MSE.</td></tr>
-<tr data-lines="16"><td><code>loss.backward()                              # 3.  …</code></td><td>Paso 3: los gradientes.</td></tr>
-<tr data-lines="17-19"><td><code>with torch.no_grad():                        # 4.  …</code></td><td>Paso 4: actualizar los parámetros, en el sitio y sin apuntar en el grafo.</td></tr>
-<tr data-lines="20-21"><td><code>w.grad.zero_()                               # 5.  …</code></td><td>Paso 5: vaciar los gradientes de las dos variables.</td></tr>
-<tr data-lines="22-23"><td><code>if epoch in (0, 3, 6, 10, 20, 29): …</code></td><td>Imprime el estado en las épocas 0, 3, 6, 10, 20 y 29 (<code>:9.4f</code> = 9 caracteres con 4 decimales).</td></tr>
-<tr data-lines="25"><td><code>A = torch.cat([X, torch.ones_like(X)], dim=1)    # …</code></td><td>Construye <code>[X | 1]</code> para la solución exacta (<code>ones_like</code> hace una columna de unos con la forma de <code>X</code>).</td></tr>
-<tr data-lines="26"><td><code>print("lstsq:", [round(v, 4) for v in torch.linalg …</code></td><td>Imprime la solución exacta de mínimos cuadrados, redondeada.</td></tr>
-</tbody>
-</table>
-</details>
-<div class="salida">
-<strong>Salida esperada</strong>
-<pre>X: (60, 1)  Y: (60, 1)
-época  0  loss =  533.5634  w = -5.9939  b = -16.0689
-época  3  loss =  107.2833  w = -3.3657  b =  -8.2613
-época  6  loss =   28.0490  w = -3.1101  b =  -4.2329
-época 10  loss =    4.7240  w = -3.0374  b =  -1.7327
-época 20  loss =    0.0628  w = -2.9984  b =  -0.1816
-época 29  loss =    0.0091  w = -2.9943  b =  -0.0196
-lstsq: [-2.9937, 0.0056]</pre>
-<p>El coste cae de <strong>533.56</strong> (época 0) a 107.28, 28.05, 4.72, 0.0628 y <strong>0.0091</strong> en la época 29, y los parámetros se acercan a la verdad: <em>w</em> pasa de −10 a −2.994 y <em>b</em> de −20 a −0.020. La solución exacta, <code>[-2.9937, 0.0056]</code>, no es exactamente (−3, 0) por el ruido de los datos, y el descenso se queda muy cerca. Fíjate en que <em>b</em> se acerca más despacio que <em>w</em> (en la época 29 está a 0,025 de la solución exacta, mientras que <em>w</em> está a 0,0006): su «cuenco» es menos empinado, así que con el mismo <code>lr</code> avanza menos por paso.</p>
-</div>
-</article><article class="snippet" data-lang="python" id="frag-9">
-<header>
-<h3>9 · El bucle estándar: <code>nn.Linear</code> + <code>MSELoss</code> + <code>SGD</code>, y comprobación contra el bucle a mano</h3>
-<p class="para-que"><strong>Para qué sirve</strong> Entrenar el mismo problema con las tres piezas de PyTorch y demostrar que el resultado es el mismo que el del bucle a mano (mismos valores iniciales, mismo <code>lr</code>).</p>
-</header>
-<pre class="code"><code>import torch
+<section>
+<h2 class="sin-num">Código</h2>
+<article class="snippet" data-lang="python" id="frag-9">
+  <header>
+    <h3>9 · El bucle estándar: <code>nn.Linear</code> + <code>MSELoss</code> + <code>SGD</code>, y comprobación contra el bucle a mano</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Entrenar el mismo problema con las tres piezas de PyTorch y demostrar que el resultado es el mismo que el del bucle a mano (mismos valores iniciales, mismo <code>lr</code>).</p>
+  </header>
+  <pre class="code"><code>import torch
 from torch import nn
 
 torch.manual_seed(0)
@@ -215,35 +244,35 @@ for epoch in range(30):
         b -= 0.1 * b.grad
     w.grad.zero_(); b.grad.zero_()
 print("¿mismos w y b que a mano?", abs(model.weight.item() - w.item()) &lt; 1e-5 and abs(model.bias.item() - b.item()) &lt; 1e-5)</code></pre>
-<details class="linea-a-linea">
-<summary>Línea por línea</summary>
-<p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
-<table class="lineas">
-<thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
-<tbody>
-<tr data-lines="1-2"><td><code>import torch …</code></td><td>Importa <code>torch</code> y <code>nn</code>.</td></tr>
-<tr data-lines="4-6"><td><code>torch.manual_seed(0) …</code></td><td>Los mismos datos que el fragmento 7 (misma semilla): 60 puntos de <em>y</em> = −3<em>x</em> más ruido.</td></tr>
-<tr data-lines="8"><td><code>model = nn.Linear(1, 1)                          # …</code></td><td>El <strong>modelo</strong>: una capa lineal 1 → 1.</td></tr>
-<tr data-lines="9-11"><td><code>with torch.no_grad(): …</code></td><td>Le fijamos los mismos valores iniciales que a mano (−10 y −20), en el sitio y sin apuntar en el grafo.</td></tr>
-<tr data-lines="12"><td><code>criterion = nn.MSELoss()                         # …</code></td><td>El <strong>coste</strong>: un objeto <code>MSELoss</code> (promedio de cuadrados).</td></tr>
-<tr data-lines="13"><td><code>optimizer = torch.optim.SGD(model.parameters(), lr …</code></td><td>El <strong>optimizador</strong>: SGD, al que se le entregan los parámetros del modelo y el learning rate.</td></tr>
-<tr data-lines="15"><td><code>for epoch in range(30):</code></td><td>El bucle: 30 épocas con todos los datos a la vez.</td></tr>
-<tr data-lines="16"><td><code>yhat = model(X)                              # 1.  …</code></td><td>1. Forward: <code>model(X)</code>.</td></tr>
-<tr data-lines="17"><td><code>loss = criterion(yhat, Y)                    # 2.  …</code></td><td>2. Coste.</td></tr>
-<tr data-lines="18"><td><code>optimizer.zero_grad()                        # 3.  …</code></td><td>3. <code>zero_grad()</code> vacía los gradientes de la vuelta anterior.</td></tr>
-<tr data-lines="19"><td><code>loss.backward()                              # 4.  …</code></td><td>4. <code>backward()</code> calcula los nuevos.</td></tr>
-<tr data-lines="20"><td><code>optimizer.step()                             # 5.  …</code></td><td>5. <code>step()</code> mueve los parámetros: <code>p -= lr * p.grad</code> para cada uno.</td></tr>
-<tr data-lines="21-22"><td><code>if epoch in (0, 3, 6, 10, 20, 29): …</code></td><td>Imprime el estado en algunas épocas (<code>.item()</code> extrae el número de un tensor de un elemento).</td></tr>
-<tr data-lines="24"><td><code>print("param_groups:", {k: v for k, v in optimizer …</code></td><td>Muestra solo algunas claves de la configuración del optimizador: <code>param_groups[0]</code> es el primer (y único) grupo de parámetros.</td></tr>
-<tr data-lines="26-28"><td><code># comprobación: lo mismo a mano con w -= lr * grad …</code></td><td>Comprobación: los mismos parámetros iniciales, ahora como tensores sueltos.</td></tr>
-<tr data-lines="29-35"><td><code>for epoch in range(30): …</code></td><td>El bucle a mano del fragmento 7 con 30 épocas (cálculo del coste con la fórmula, <code>backward()</code>, actualización y vaciado).</td></tr>
-<tr data-lines="36"><td><code>print("¿mismos w y b que a mano?", abs(model.weigh …</code></td><td>Compara los parámetros finales de las dos versiones con una tolerancia de 10⁻⁵.</td></tr>
-</tbody>
-</table>
-</details>
-<div class="salida">
-<strong>Salida esperada</strong>
-<pre>época  0  loss =  533.5634  w = -5.9939  b = -16.0689
+  <details class="linea-a-linea">
+    <summary>Línea por línea</summary>
+    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+      <tbody>
+        <tr data-lines="1-2"><td><code>import torch …</code></td><td>Importa <code>torch</code> y <code>nn</code>.</td></tr>
+        <tr data-lines="4-6"><td><code>torch.manual_seed(0) …</code></td><td>Los mismos datos que el fragmento 7 (misma semilla): 60 puntos de <em>y</em> = −3<em>x</em> más ruido.</td></tr>
+        <tr data-lines="8"><td><code>model = nn.Linear(1, 1)                          # …</code></td><td>El <strong>modelo</strong>: una capa lineal 1 → 1.</td></tr>
+        <tr data-lines="9-11"><td><code>with torch.no_grad(): …</code></td><td>Le fijamos los mismos valores iniciales que a mano (−10 y −20), en el sitio y sin apuntar en el grafo.</td></tr>
+        <tr data-lines="12"><td><code>criterion = nn.MSELoss()                         # …</code></td><td>El <strong>coste</strong>: un objeto <code>MSELoss</code> (promedio de cuadrados).</td></tr>
+        <tr data-lines="13"><td><code>optimizer = torch.optim.SGD(model.parameters(), lr …</code></td><td>El <strong>optimizador</strong>: SGD, al que se le entregan los parámetros del modelo y el learning rate.</td></tr>
+        <tr data-lines="15"><td><code>for epoch in range(30):</code></td><td>El bucle: 30 épocas con todos los datos a la vez.</td></tr>
+        <tr data-lines="16"><td><code>yhat = model(X)                              # 1.  …</code></td><td>1. Forward: <code>model(X)</code>.</td></tr>
+        <tr data-lines="17"><td><code>loss = criterion(yhat, Y)                    # 2.  …</code></td><td>2. Coste.</td></tr>
+        <tr data-lines="18"><td><code>optimizer.zero_grad()                        # 3.  …</code></td><td>3. <code>zero_grad()</code> vacía los gradientes de la vuelta anterior.</td></tr>
+        <tr data-lines="19"><td><code>loss.backward()                              # 4.  …</code></td><td>4. <code>backward()</code> calcula los nuevos.</td></tr>
+        <tr data-lines="20"><td><code>optimizer.step()                             # 5.  …</code></td><td>5. <code>step()</code> mueve los parámetros: <code>p -= lr * p.grad</code> para cada uno.</td></tr>
+        <tr data-lines="21-22"><td><code>if epoch in (0, 3, 6, 10, 20, 29): …</code></td><td>Imprime el estado en algunas épocas (<code>.item()</code> extrae el número de un tensor de un elemento).</td></tr>
+        <tr data-lines="24"><td><code>print("param_groups:", {k: v for k, v in optimizer …</code></td><td>Muestra solo algunas claves de la configuración del optimizador: <code>param_groups[0]</code> es el primer (y único) grupo de parámetros.</td></tr>
+        <tr data-lines="26-28"><td><code># comprobación: lo mismo a mano con w -= lr * grad …</code></td><td>Comprobación: los mismos parámetros iniciales, ahora como tensores sueltos.</td></tr>
+        <tr data-lines="29-35"><td><code>for epoch in range(30): …</code></td><td>El bucle a mano del fragmento 7 con 30 épocas (cálculo del coste con la fórmula, <code>backward()</code>, actualización y vaciado).</td></tr>
+        <tr data-lines="36"><td><code>print("¿mismos w y b que a mano?", abs(model.weigh …</code></td><td>Compara los parámetros finales de las dos versiones con una tolerancia de 10⁻⁵.</td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>época  0  loss =  533.5634  w = -5.9939  b = -16.0689
 época  3  loss =  107.2833  w = -3.3657  b =  -8.2613
 época  6  loss =   28.0490  w = -3.1101  b =  -4.2329
 época 10  loss =    4.7240  w = -3.0374  b =  -1.7327
@@ -251,14 +280,16 @@ print("¿mismos w y b que a mano?", abs(model.weight.item() - w.item()) &lt; 1e-
 época 29  loss =    0.0091  w = -2.9943  b =  -0.0196
 param_groups: {'lr': 0.1, 'momentum': 0, 'weight_decay': 0}
 ¿mismos w y b que a mano? True</pre>
-<p>Las líneas impresas del bucle estándar son <strong>idénticas</strong> a las del fragmento 7 (mismo coste 533.56 → 0.0091, mismos <em>w</em> y <em>b</em>). La configuración muestra <code>lr: 0.1</code>, <code>momentum: 0</code> y <code>weight_decay: 0</code> (los valores por defecto de lo que no pasamos). Y la última línea, <code>True</code>, confirma que <code>optimizer.step()</code> hace <em>exactamente</em> <code>w -= lr * w.grad</code> para cada parámetro: el optimizador es solo comodidad.</p>
-</div>
-</article><article class="snippet" data-lang="python" id="frag-12">
-<header>
-<h3>12 · SGD con momentum: la fórmula a mano frente al optimizador</h3>
-<p class="para-que"><strong>Para qué sirve</strong> Comparar <code>momentum = 0, 0.5 y 0.9</code> en un problema con la variable sin centrar, y comprobar a mano dos pasos de la fórmula v ← μ·v + g; p ← p − lr·v.</p>
-</header>
-<pre class="code"><code>import torch
+    <p>Las líneas impresas del bucle estándar son <strong>idénticas</strong> a las del fragmento 7 (mismo coste 533.56 → 0.0091, mismos <em>w</em> y <em>b</em>). La configuración muestra <code>lr: 0.1</code>, <code>momentum: 0</code> y <code>weight_decay: 0</code> (los valores por defecto de lo que no pasamos). Y la última línea, <code>True</code>, confirma que <code>optimizer.step()</code> hace <em>exactamente</em> <code>w -= lr * w.grad</code> para cada parámetro: el optimizador es solo comodidad.</p>
+  </div>
+</article>
+
+<article class="snippet" data-lang="python" id="frag-12">
+  <header>
+    <h3>12 · SGD con momentum: la fórmula a mano frente al optimizador</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Comparar <code>momentum = 0, 0.5 y 0.9</code> en un problema con la variable sin centrar, y comprobar a mano dos pasos de la fórmula v ← μ·v + g; p ← p − lr·v.</p>
+  </header>
+  <pre class="code"><code>import torch
 
 torch.manual_seed(0)
 x = torch.linspace(0, 10, 50)
@@ -294,42 +325,49 @@ for paso in (1, 2):
     esperado = p.item() - 0.1 * v
     opt.step()
     print(f"paso {paso}: grad = {g:.4f}  v = {v:.4f}  p a mano = {esperado:.4f}  p del optimizador = {p.item():.4f}")</code></pre>
-<details class="linea-a-linea">
-<summary>Línea por línea</summary>
-<p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
-<table class="lineas">
-<thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
-<tbody>
-<tr data-lines="1"><td><code>import torch</code></td><td>Importa PyTorch.</td></tr>
-<tr data-lines="3-5"><td><code>torch.manual_seed(0) …</code></td><td>50 puntos de <em>y</em> = 2<em>x</em> + 1 con ruido, con <em>x</em> entre 0 y 10 (sin centrar: valle largo y estrecho).</td></tr>
-<tr data-lines="7"><td><code>def entrenar(momentum, lr=0.01, pasos=100):</code></td><td>Una función que entrena con un valor de <code>momentum</code> dado.</td></tr>
-<tr data-lines="8-9"><td><code>w = torch.tensor(0.0, requires_grad=True) …</code></td><td><em>w</em> y <em>b</em> empiezan en 0.</td></tr>
-<tr data-lines="10"><td><code>opt = torch.optim.SGD([w, b], lr=lr, momentum=mome …</code></td><td>El optimizador recibe una <strong>lista</strong> de tensores (no hace falta un modelo) y el argumento <code>momentum</code>.</td></tr>
-<tr data-lines="11"><td><code>historia = []</code></td><td>Lista donde anotar el coste de cada paso.</td></tr>
-<tr data-lines="12-15"><td><code>for _ in range(pasos): …</code></td><td>100 pasos: coste, <code>zero_grad</code>, <code>backward</code>, <code>step</code> (en una sola línea separados por <code>;</code>) y anota el coste.</td></tr>
-<tr data-lines="16"><td><code>return historia, w.item(), b.item()</code></td><td>Devuelve la historia del coste y los parámetros finales.</td></tr>
-<tr data-lines="18-19"><td><code>A = torch.stack([x, torch.ones(50)], dim=1) …</code></td><td>La solución exacta con <code>lstsq</code>, para saber a dónde deberíamos llegar.</td></tr>
-<tr data-lines="20"><td><code>print("momentum  loss(5)  loss(10) loss(20) loss(5 …</code></td><td>Cabecera de la tabla.</td></tr>
-<tr data-lines="21-23"><td><code>for mu in (0.0, 0.5, 0.9): …</code></td><td>Para tres valores de momentum, entrena e imprime el coste en los pasos 5, 10, 20, 50 y 100 (<code>h[4]</code> es el paso 5) y los parámetros finales.</td></tr>
-<tr data-lines="25"><td><code># dos pasos de momentum a mano: v = mu*v + grad ;  …</code></td><td>Comentario con la fórmula que vamos a comprobar a mano.</td></tr>
-<tr data-lines="26-28"><td><code>p = torch.tensor(0.0, requires_grad=True) …</code></td><td>Un parámetro <em>p</em> = 0, un optimizador con <code>lr=0.1</code> y <code>momentum=0.9</code>, y la velocidad inicial <em>v</em> = 0.</td></tr>
-<tr data-lines="29-30"><td><code>for paso in (1, 2): …</code></td><td>Dos pasos; el coste es (<em>p</em> − 5)², cuyo gradiente es 2(<em>p</em> − 5).</td></tr>
-<tr data-lines="31-32"><td><code>opt.zero_grad(); loss.backward() …</code></td><td>Calcula el gradiente (<code>backward</code>) y lo lee.</td></tr>
-<tr data-lines="33-34"><td><code>v = 0.9 * v + g …</code></td><td>La fórmula a mano: nueva velocidad <em>v</em> = 0,9·<em>v</em> + <em>g</em> y el valor esperado de <em>p</em>.</td></tr>
-<tr data-lines="35"><td><code>opt.step()</code></td><td>El paso real del optimizador.</td></tr>
-<tr data-lines="36"><td><code>print(f"paso {paso}: grad = {g:.4f}  v = {v:.4f}   …</code></td><td>Imprime el valor esperado frente al del optimizador.</td></tr>
-</tbody>
-</table>
-</details>
-<div class="salida">
-<strong>Salida esperada</strong>
-<pre>exacto (lstsq): w, b = [2.0057, 0.9762]
+  <details class="linea-a-linea">
+    <summary>Línea por línea</summary>
+    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+      <tbody>
+        <tr data-lines="1"><td><code>import torch</code></td><td>Importa PyTorch.</td></tr>
+        <tr data-lines="3-5"><td><code>torch.manual_seed(0) …</code></td><td>50 puntos de <em>y</em> = 2<em>x</em> + 1 con ruido, con <em>x</em> entre 0 y 10 (sin centrar: valle largo y estrecho).</td></tr>
+        <tr data-lines="7"><td><code>def entrenar(momentum, lr=0.01, pasos=100):</code></td><td>Una función que entrena con un valor de <code>momentum</code> dado.</td></tr>
+        <tr data-lines="8-9"><td><code>w = torch.tensor(0.0, requires_grad=True) …</code></td><td><em>w</em> y <em>b</em> empiezan en 0.</td></tr>
+        <tr data-lines="10"><td><code>opt = torch.optim.SGD([w, b], lr=lr, momentum=mome …</code></td><td>El optimizador recibe una <strong>lista</strong> de tensores (no hace falta un modelo) y el argumento <code>momentum</code>.</td></tr>
+        <tr data-lines="11"><td><code>historia = []</code></td><td>Lista donde anotar el coste de cada paso.</td></tr>
+        <tr data-lines="12-15"><td><code>for _ in range(pasos): …</code></td><td>100 pasos: coste, <code>zero_grad</code>, <code>backward</code>, <code>step</code> (en una sola línea separados por <code>;</code>) y anota el coste.</td></tr>
+        <tr data-lines="16"><td><code>return historia, w.item(), b.item()</code></td><td>Devuelve la historia del coste y los parámetros finales.</td></tr>
+        <tr data-lines="18-19"><td><code>A = torch.stack([x, torch.ones(50)], dim=1) …</code></td><td>La solución exacta con <code>lstsq</code>, para saber a dónde deberíamos llegar.</td></tr>
+        <tr data-lines="20"><td><code>print("momentum  loss(5)  loss(10) loss(20) loss(5 …</code></td><td>Cabecera de la tabla.</td></tr>
+        <tr data-lines="21-23"><td><code>for mu in (0.0, 0.5, 0.9): …</code></td><td>Para tres valores de momentum, entrena e imprime el coste en los pasos 5, 10, 20, 50 y 100 (<code>h[4]</code> es el paso 5) y los parámetros finales.</td></tr>
+        <tr data-lines="25"><td><code># dos pasos de momentum a mano: v = mu*v + grad ;  …</code></td><td>Comentario con la fórmula que vamos a comprobar a mano.</td></tr>
+        <tr data-lines="26-28"><td><code>p = torch.tensor(0.0, requires_grad=True) …</code></td><td>Un parámetro <em>p</em> = 0, un optimizador con <code>lr=0.1</code> y <code>momentum=0.9</code>, y la velocidad inicial <em>v</em> = 0.</td></tr>
+        <tr data-lines="29-30"><td><code>for paso in (1, 2): …</code></td><td>Dos pasos; el coste es (<em>p</em> − 5)², cuyo gradiente es 2(<em>p</em> − 5).</td></tr>
+        <tr data-lines="31-32"><td><code>opt.zero_grad(); loss.backward() …</code></td><td>Calcula el gradiente (<code>backward</code>) y lo lee.</td></tr>
+        <tr data-lines="33-34"><td><code>v = 0.9 * v + g …</code></td><td>La fórmula a mano: nueva velocidad <em>v</em> = 0,9·<em>v</em> + <em>g</em> y el valor esperado de <em>p</em>.</td></tr>
+        <tr data-lines="35"><td><code>opt.step()</code></td><td>El paso real del optimizador.</td></tr>
+        <tr data-lines="36"><td><code>print(f"paso {paso}: grad = {g:.4f}  v = {v:.4f}   …</code></td><td>Imprime el valor esperado frente al del optimizador.</td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>exacto (lstsq): w, b = [2.0057, 0.9762]
 momentum  loss(5)  loss(10) loss(20) loss(50) loss(100)   w       b
 0.0           0.133    0.114    0.104    0.080    0.053    2.065   0.577
 0.5           4.394    0.312    0.090    0.054    0.026    2.042   0.736
 0.9          63.264   12.433    1.107    0.748    0.015    1.994   0.977
 paso 1: grad = -10.0000  v = -10.0000  p a mano = 1.0000  p del optimizador = 1.0000
 paso 2: grad = -8.0000  v = -17.0000  p a mano = 2.7000  p del optimizador = 2.7000</pre>
-<p>La solución exacta es <em>w</em> = 2,0057, <em>b</em> = 0,9762. Sin momentum el coste baja lento (0,053 tras 100 pasos y <em>b</em> = 0,577, todavía lejos). Con μ = 0,9 empieza <strong>peor</strong> (63,3 en el paso 5: la bola se pasa de largo) pero acaba mucho mejor: coste 0,015 y <em>b</em> = 0,977. Y los dos pasos a mano coinciden con el optimizador: <em>g</em> = −10, <em>v</em> = −10, <em>p</em> = 1,0; luego <em>g</em> = −8, <em>v</em> = 0,9·(−10) − 8 = −17 y <em>p</em> = 1 + 1,7 = <strong>2,7</strong>.</p>
+    <p>La solución exacta es <em>w</em> = 2,0057, <em>b</em> = 0,9762. Sin momentum el coste baja lento (0,053 tras 100 pasos y <em>b</em> = 0,577, todavía lejos). Con μ = 0,9 empieza <strong>peor</strong> (63,3 en el paso 5: la bola se pasa de largo) pero acaba mucho mejor: coste 0,015 y <em>b</em> = 0,977. Y los dos pasos a mano coinciden con el optimizador: <em>g</em> = −10, <em>v</em> = −10, <em>p</em> = 1,0; luego <em>g</em> = −8, <em>v</em> = 0,9·(−10) − 8 = −17 y <em>p</em> = 1 + 1,7 = <strong>2,7</strong>.</p>
+  </div>
+</article>
+
+</section>
+
 </div>
-</article></div></details></div></main></body></html>
+</main>
+</body>
+</html>

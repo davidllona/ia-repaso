@@ -264,11 +264,9 @@
       var clone = page.cloneNode(true);
       $$(".profundizar,.snippet,pre,.quiz,.demo,.done-bar,.modnav,script,style", clone).forEach(function (n) { n.remove(); });
       var words = clone.textContent.trim().split(/\s+/).length, min = Math.max(1, Math.round(words / 200));
-      if (page.getAttribute("data-micro") === "3min") {
-        b.textContent = "≈ 3 min · lectura + animación + 2 preguntas";
-      } else {
-        b.textContent = min + " min de lectura";
-      }
+      var lj = lessonsOf(curCourse, curModule).filter(function (l) { return l.n === curLesson; })[0];
+      if (lj && lj.min) min = lj.min;
+      b.textContent = min + " min de lectura";
     });
   }
 
@@ -518,7 +516,9 @@
             answered++;
             if (oi === item.correcta) { b.classList.add("ok"); correct++; } else { b.classList.add("ko"); btns[item.correcta].classList.add("ok"); }
             score.textContent = correct + " / " + qs.length + (answered === qs.length ? " · ¡hecho!" : "");
-            box.appendChild(el("p", { class: "q-why", html: "<strong>" + (oi === item.correcta ? "Correcto. " : "No exactamente. ") + "</strong>" + item.porque }));
+            var why = el("p", { class: "q-why", html: "<strong>" + (oi === item.correcta ? "Correcto. " : "No exactamente. ") + "</strong>" + item.porque });
+            box.appendChild(why);
+            if (window.renderMathInElement) window.renderMathInElement(why, { delimiters: [{ left: "\\(", right: "\\)", display: false }, { left: "\\[", right: "\\]", display: true }], throwOnError: false });
           });
           btns.push(b); ul.appendChild(el("li", {}, b));
         });
@@ -552,6 +552,17 @@
     buildHero();
     buildModuleFooter();
     buildLessonFooter();
+    /* Si se llega con un #ancla que está dentro de un bloque plegado (Profundizar, predicción), ábrelo */
+    function openForHash() {
+      if (!location.hash) return;
+      var t; try { t = document.getElementById(decodeURIComponent(location.hash.slice(1))); } catch (e) { return; }
+      if (!t) return;
+      var d = t.closest ? t.closest("details") : null, opened = false;
+      while (d) { if (!d.open) { d.open = true; opened = true; } d = d.parentElement ? d.parentElement.closest("details") : null; }
+      if (opened) setTimeout(function () { t.scrollIntoView(); }, 60);
+    }
+    openForHash();
+    window.addEventListener("hashchange", openForHash);
     renderLists();
     buildCode();
     buildQuizzes();

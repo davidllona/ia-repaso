@@ -1,225 +1,348 @@
-<!DOCTYPE html>
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lección 5 · Dropout: rodar cada día con medio reparto para no memorizar · Módulo 2 · Curso 5 · Cuaderno de IA</title>
+<meta name="description" content="Cómo funciona nn.Dropout, por qué reescala por 1/(1−p), la diferencia entre model.train() y model.eval() y la trampa de F.dropout.">
+<script>try{var t=localStorage.getItem('cuaderno-ia:tema');if(t)document.documentElement.setAttribute('data-theme',t)}catch(e){}</script>
+<link rel="stylesheet" href="../../assets/css/style.css">
+<script src="../../assets/js/curriculum.js"></script>
+<script src="../../assets/js/lab.js"></script>
+<script src="../../assets/js/app.js" defer></script>
+</head>
+<body data-root="../../" data-course="5" data-module="2" data-lesson="5">
+<main>
+<div class="page">
 
-<html lang="es"><head><meta charset="utf-8"/><meta content="width=device-width,initial-scale=1" name="viewport"/><title>Lección 5 · Inicialización de pesos: que la señal no se apague ni se sature · Curso 5 · Cuaderno de IA</title><meta content="¿Por qué no ceros?" name="description"/><script>try{var t=localStorage.getItem('cuaderno-ia:tema');if(t)document.documentElement.setAttribute('data-theme',t)}catch(e){}</script><link href="../../assets/css/style.css" rel="stylesheet"/><script src="../../assets/js/curriculum.js"></script><script src="../../assets/js/lab.js"></script><script defer="" src="../../assets/js/app.js"></script><script defer="" src="../../assets/js/microanimations.js"></script></head><body data-course="5" data-lesson="5" data-module="2" data-root="../../"><main><div class="page" data-micro="3min"><header class="hero leccion"><div class="hero-grid"><div><p class="eyebrow">Curso 5 · Módulo 2 · Lección 5 de 11</p><h1>Inicialización de pesos: que la señal no se apague ni se sature</h1><p class="lead">¿Por qué no ceros?</p><p class="meta-line"><span class="read-time" data-render="read-time"></span><a href="../modulo-2.html">Índice del módulo</a></p></div><div aria-hidden="true" class="hero-tile"></div></div></header><details class="predice"><summary>Antes de entrenar, los pesos de nuestro recomendador hay que rellenarlos con algo: es como la opinión de partida de cada neurona sobre cuánto importa cada dato. ¿Da igual con qué? ¿Y por qué no con ceros?<span class="hint"></span></summary><div><p>¿Por qué no ceros?</p></div></details><section aria-label="Explicación breve" class="micro-core"><div class="micro-kicker">01 · ENTENDER <span>≈ 45 s</span></div><h2>La idea en palabras sencillas</h2><p>En esta lección descubrirás cómo funciona «Inicialización de pesos: que la señal no se apague ni se sature» con un caso sencillo. Observa el cambio en la demostración antes de elegir una respuesta.</p><div class="micro-example"><span aria-hidden="true" class="micro-example-icon">🏠</span><div><strong>Otro ejemplo · Casa</strong><p>Una neurona combina metros y habitaciones; cada dato tiene un peso y produce una salida.</p></div></div></section><div class="micro-kicker micro-checkpoint">02 · RESPONDER <span>≈ 15 s</span></div><section aria-label="Pregunta intercalada" class="quiz mini micro-check"><script class="quiz-data" type="application/json">{"titulo": "Pausa rápida · Comprueba la idea", "preguntas": [{"q": "Una neurona recibe dos entradas. ¿Qué hace con los pesos?", "opciones": ["Elige siempre la entrada mayor", "Borra las entradas al entrenar", "Multiplica cada entrada por su peso y combina resultados"], "correcta": 2, "porque": "La suma ponderada combina entradas, pesos y bias antes de la activación."}]}</script></section><section aria-label="Animación interactiva" class="micro-viz" data-index="12" data-micro-viz="neural"><div class="micro-kicker">03 · EXPERIMENTAR <span>≈ 45 s</span></div><div class="micro-viz-title"><div><h2>Señales que atraviesan una red</h2><p>Pulsa «Propagar» para seguir el recorrido de entradas a salida.</p></div><span aria-hidden="true" class="micro-viz-symbol">✦</span></div><div aria-live="polite" class="micro-viz-stage"><p>Animación interactiva: Señales que atraviesan una red</p></div></section><div class="micro-kicker micro-checkpoint">04 · APLICAR <span>≈ 15 s</span></div><section aria-label="Pregunta intercalada" class="quiz mini micro-check"><script class="quiz-data" type="application/json">{"titulo": "Pausa rápida · ¿Lo aplicarías?", "preguntas": [{"q": "¿Cuándo se actualizan los pesos de una red?", "opciones": ["Nunca: los pesos son fijos", "Al aplicar el optimizador durante el entrenamiento", "Cada vez que se abre la página"], "correcta": 1, "porque": "El optimizador utiliza los gradientes para ajustar parámetros durante el aprendizaje."}]}</script></section><div class="micro-finish"><strong>Idea que te llevas</strong><span>En esta lección descubrirás cómo funciona «Inicialización de pesos: que la señal no se apague ni se sature» con un caso sencillo</span><small>¿Quieres más ejemplos, fórmulas o código? Los tienes justo debajo, sin límite de tiempo.</small></div><details class="profundizar micro-legacy"><summary><span>Explorar más: explicación y simulaciones completas<small>Todo el texto original, tablas y demos avanzadas. Opcional.</small></span></summary><div class="prof-body"><section><h2>Inicialización de pesos: que la señal no se apague ni se sature</h2>
-<p><strong>¿Por qué no ceros?</strong> Si todos los pesos de una capa valen lo mismo (cero o cualquier constante), todas sus neuronas calculan exactamente lo mismo, reciben exactamente el mismo gradiente y siguen siendo idénticas para siempre: la capa se comporta como una sola neurona. Es como un panel de 10 críticos que empiezan con la misma opinión y reciben las mismas quejas: cambian igual y acaban siendo 10 copias del mismo crítico. Los pesos iniciales deben ser <em>aleatorios</em> para romper esa simetría. (Los sesgos sí pueden empezar en cero.)</p>
-<p>Una neurona calcula \( z=\sum_{i=1}^{n} w_i x_i \) con \( n \) entradas (el <abbr class="t" data-def="fan_in: número de entradas de una neurona. En nn.Linear(100, 50), fan_in = 100 y fan_out (número de salidas de la capa) = 50. En PyTorch weight tiene forma (fan_out, fan_in).">fan_in</abbr>). Si los pesos y las entradas son independientes y de media cero, la <strong>varianza</strong> (el cuadrado de la desviación típica) de la salida es:</p>
-<p>Para que la señal mantenga su tamaño de una capa a la siguiente necesitamos \( n\cdot\mathrm{Var}(w)\approx 1 \), es decir, \( \mathrm{Var}(w)\approx 1/n \).</p>
-<div class="callout ejemplo"><span class="lbl">Ejemplo tomado del módulo</span><p>Capas de \( n=100 \) entradas (por ejemplo, las notas ya normalizadas que un usuario ha puesto a 100 películas) y entrada con varianza 1: Desviación σ de los pesos \( n\,\sigma^2 \) (factor de varianza) Desviación de la señal por capa Tras…</p></div></section><figure class="demo" data-demo="curso5/c5m2-init-varianza" data-titulo="cómo viaja la señal por las capas según la inicialización">
-<div class="haz">La entrada son las notas normalizadas de un usuario a 100 películas, y cada capa es un amplificador. Elige tanh y pulsa el botón de pesos pequeños N(0; 0,01): mira la curva de la desviación de la señal por capa. Luego prueba N(0; 1) y fíjate en los histogramas. Después pulsa Xavier. Cambia a ReLU y compara Xavier con He. Mueve el deslizador de σ para encontrar a mano el valor «estable».</div>
-<div class="observa">Con σ pequeña la señal se apaga capa a capa; con σ grande se satura (tanh) o crece (ReLU); con Xavier (tanh) y He (ReLU) se mantiene. El valor estable de σ para 100 neuronas está cerca de 0,1 (la cuenta de arriba: \( n\sigma^2=1 \)). Los histogramas muestran cómo se reparten las activaciones en tres capas.</div>
-</figure><div class="resumen"><h2 class="sin-num sin-toc">En pocas líneas</h2><ul><li><strong>Inicialización de pesos: que la señal no se apague ni se sature:</strong> ¿Por qué no ceros?</li><li>Antes de continuar, intenta explicar la demo sin mirar su resultado.</li></ul></div><section class="quiz mini"><script class="quiz-data" type="application/json">{"titulo": "¿Lo tienes?", "preguntas": [{"q": "¿Qué concepto estamos trabajando en esta lección?", "opciones": ["Cómo lo hace PyTorch: el grafo de autograd", "Dropout: apagar neuronas al azar para que no memoricen", "Inicialización de pesos: que la señal no se apague ni se sature"], "correcta": 2, "porque": "¿Por qué no ceros?"}, {"q": "¿Cuál de estas afirmaciones recoge lo que acabas de estudiar?", "opciones": ["¿Por qué no ceros?", "Siempre hay un único método que sirve para todos los problemas.", "Lo importante es comprender la idea y comprobarla con ejemplos, no memorizar términos."], "correcta": 0, "porque": "La explicación central es: ¿Por qué no ceros?"}, {"q": "Si una demo o un ejemplo te desconcierta, ¿cuál es la mejor forma de aprenderlo?", "opciones": ["Volver a los números, cambiar un valor y explicar qué ocurre.", "Ignorar los resultados que no coinciden con tu intuición.", "Memorizar el nombre sin entender la operación."], "correcta": 0, "porque": "Explorar qué cambia y por qué ayuda a conectar el concepto con su resultado."}]}</script></section></div></details><details class="profundizar"><summary><span>Profundizar: explicación completa<small>Matices, fórmulas, tablas, otros ejemplos y experimentos del módulo original.</small></span></summary><div class="prof-body"><section>
-<h2 id="inicializacion">Inicialización de pesos: que la señal no se apague ni se sature</h2>
-<p class="pregunta">Antes de entrenar, los pesos de nuestro recomendador hay que rellenarlos con algo: es como la opinión de partida de cada neurona sobre cuánto importa cada dato. ¿Da igual con qué? ¿Y por qué no con ceros?</p>
-<div class="callout analogia">
-<span class="lbl">Analogía</span>
-<p>El sonido de una película pasa por una fila de amplificadores antes de llegar a los altavoces de la sala: cada capa multiplica el volumen por un factor (su «ganancia»). Si la ganancia es 0,5 de media, tras 10 amplificadores no se oye nada; si es 2, el sonido se satura y distorsiona. Necesitas una ganancia de aproximadamente <strong>1</strong> en cada etapa, y los pesos iniciales son el mando de esa ganancia.</p>
-</div>
-<p><strong>¿Por qué no ceros?</strong> Si todos los pesos de una capa valen lo mismo (cero o cualquier constante), todas sus neuronas calculan exactamente lo mismo, reciben exactamente el mismo gradiente y siguen siendo idénticas para siempre: la capa se comporta como una sola neurona. Es como un panel de 10 críticos que empiezan con la misma opinión y reciben las mismas quejas: cambian igual y acaban siendo 10 copias del mismo crítico. Los pesos iniciales deben ser <em>aleatorios</em> para romper esa simetría. (Los sesgos sí pueden empezar en cero.)</p>
-<h3>La cuenta de la varianza</h3>
-<p>Una neurona calcula \( z=\sum_{i=1}^{n} w_i x_i \) con \( n \) entradas (el <abbr class="t" data-def="fan_in: número de entradas de una neurona. En nn.Linear(100, 50), fan_in = 100 y fan_out (número de salidas de la capa) = 50. En PyTorch weight tiene forma (fan_out, fan_in).">fan_in</abbr>). Si los pesos y las entradas son independientes y de media cero, la <strong>varianza</strong> (el cuadrado de la desviación típica) de la salida es:</p>
-<div class="formula">\[ \mathrm{Var}(z)\;=\;n\cdot\mathrm{Var}(w)\cdot\mathrm{Var}(x) \]</div>
-<p>Para que la señal mantenga su tamaño de una capa a la siguiente necesitamos \( n\cdot\mathrm{Var}(w)\approx 1 \), es decir, \( \mathrm{Var}(w)\approx 1/n \).</p>
-<div class="callout ejemplo">
-<span class="lbl">Ejemplo numérico</span>
-<p>Capas de \( n=100 \) entradas (por ejemplo, las notas ya normalizadas que un usuario ha puesto a 100 películas) y entrada con varianza 1:</p>
-<table>
-<thead><tr><th>Desviación σ de los pesos</th><th>\( n\,\sigma^2 \) (factor de varianza)</th><th>Desviación de la señal por capa</th><th>Tras 10 capas</th></tr></thead>
-<tbody>
-<tr><td>0,01</td><td>100 · 0,0001 = 0,01</td><td>× 0,1</td><td class="res">10⁻¹⁰ (se apaga)</td></tr>
-<tr><td>0,1</td><td>100 · 0,01 = 1</td><td>× 1</td><td class="res">1 (estable)</td></tr>
-<tr><td>1</td><td>100 · 1 = 100</td><td>× 10</td><td class="res">10¹⁰ (explota o satura)</td></tr>
-</tbody>
-</table>
-<p>En el <a href="#codigo">fragmento 6</a>, con tanh y pesos \( N(0;0{,}01) \), la señal mide 0,099 en la capa 1, \( 10^{-5} \) en la 5 y \( 10^{-10} \) en la 10, justo lo previsto. Con \( N(0;1) \) y tanh la señal no explota (tanh no pasa de ±1) pero el <strong>78 %</strong> de las neuronas queda pegado a ±1, donde la derivada es casi 0: el gradiente se desvanece por otra vía.</p>
-</div>
-<h3>Xavier y He</h3>
-<p>Dos reglas que dan la \( \mathrm{Var}(w) \) adecuada:</p>
-<ul>
-<li><strong>Xavier / Glorot</strong> (para tanh y sigmoide): \( \mathrm{Var}(w)=\dfrac{2}{n_{\text{ent}}+n_{\text{sal}}} \). Promedia las entradas y las salidas porque busca mantener la señal en el forward y el gradiente en el backward. En versión uniforme, los pesos salen de \( U(-a,a) \) con \( a=\sqrt{6/(n_{\text{ent}}+n_{\text{sal}})} \) (la varianza de \( U(-a,a) \) es \( a^2/3 \)).</li>
-<li><strong>He / Kaiming</strong> (para ReLU y variantes): \( \mathrm{Var}(w)=\dfrac{2}{n_{\text{ent}}} \). La ReLU pone a cero la mitad de las salidas, y por eso hace falta un 2 extra para compensar.</li>
-</ul>
-<div class="callout ejemplo">
-<span class="lbl">Ejemplo numérico</span>
-<p>Una capa <code>nn.Linear(100, 50)</code> (\( n_{\text{ent}}=100 \) notas de películas, \( n_{\text{sal}}=50 \) neuronas):</p>
-<table>
-<thead><tr><th>Regla</th><th>Cuenta</th><th>Desviación</th><th>Máximo del peso</th></tr></thead>
-<tbody>
-<tr><td>Xavier uniforme</td><td>\( a=\sqrt{6/150} \)</td><td class="res">\( \sqrt{2/150}=0{,}1155 \)</td><td>0,2</td></tr>
-<tr><td>He normal</td><td>\( \sqrt{2/100} \)</td><td class="res">0,1414</td><td>sin tope</td></tr>
-<tr><td>Por defecto de <code>nn.Linear</code></td><td>\( U(\pm1/\sqrt{100}) \)</td><td class="res">\( 1/\sqrt{300}=0{,}0577 \)</td><td>0,1</td></tr>
-</tbody>
-</table>
-<p>El fragmento 5 comprueba cada una con 5000 pesos reales: 0,1146, 0,1413 y 0,0574 medidos.</p>
-</div>
-<p>Con el valor por defecto de <code>nn.Linear</code>, la señal se multiplica por \( \sqrt{100/300}=0{,}58 \) en cada capa: se encoge poco a poco (en el fragmento 6, tanh por defecto da 0,46 → 0,048 → 0,0032). Con ReLU encoge más, porque ReLU quita otra mitad. Con <strong>He + ReLU</strong> el tamaño casi se mantiene (0,83 → 0,65 → 0,60).</p>
-<h3>Cómo se escribe en PyTorch: <code>nn.init</code></h3>
-<ul>
-<li><code>nn.init.xavier_uniform_(w)</code> y <code>xavier_normal_(w)</code>; <code>nn.init.kaiming_uniform_(w, nonlinearity="relu")</code> y <code>kaiming_normal_(w, nonlinearity="relu")</code>. También <code>uniform_</code>, <code>normal_</code>, <code>zeros_</code>, <code>ones_</code>, <code>constant_</code>.</li>
-<li>El guion bajo final significa que <strong>modifican el tensor en el sitio</strong> y no devuelven uno nuevo.</li>
-<li><code>nn.init.calculate_gain("tanh")</code> da la ganancia recomendada de cada activación (1 para lineal y sigmoide, 5/3 para tanh, √2 para ReLU); se pasa como <code>gain=</code> a Xavier.</li>
-<li>Para toda una red: <code>modelo.apply(funcion)</code>, que llama a <code>funcion</code> con cada submódulo (fragmento 5).</li>
-<li><code>kaiming_*</code> usa por defecto <code>mode="fan_in"</code> (conserva la señal hacia delante); <code>mode="fan_out"</code> conserva el gradiente hacia atrás.</li>
-</ul>
-<div class="callout recuerda">
-<span class="lbl">Recuerda (Keras)</span>
-<p>El valor por defecto de <code>Dense</code> en Keras es <code>glorot_uniform</code> (Xavier) con sesgo cero. El de <code>nn.Linear</code> en PyTorch <strong>no es Xavier</strong>: es una uniforme en \( \pm1/\sqrt{n_{\text{ent}}} \) (internamente <code>kaiming_uniform_</code> con <code>a=√5</code>), más pequeña. Por eso una red PyTorch con ReLU y muchas capas puede entrenar peor «de fábrica» que la equivalente en Keras, y por eso conviene llamar a <code>kaiming_normal_</code> a propósito.</p>
-</div>
-<div class="callout regla">
-<span class="lbl">Regla fácil</span>
-<p>Activación sigmoide o tanh → <strong>Xavier</strong>. Activación ReLU (o variantes) → <strong>He</strong>. Sesgos a cero. Y si la red es muy profunda, mide la señal por capa como en el fragmento 6.</p>
-</div>
-<div class="callout ojo">
-<span class="lbl">Ojo</span>
-<p>La inicialización solo fija el punto de partida: ayuda a que el <em>primer</em> paso sea razonable. No impide que la señal se degrade más tarde si el learning rate es demasiado alto, ni sustituye a la normalización por lotes (próxima sección), que además la hace mucho menos importante.</p>
-</div>
-</section></div></details><details class="profundizar" id="codigo"><summary><span>Ver código explicado paso a paso<small>2 fragmento(s) original(es), con cada línea comentada y salida esperada.</small></span></summary><div class="prof-body"><article class="snippet" data-lang="python">
-<header>
-<h3>5 · <code>nn.init</code>: pesos con la varianza adecuada (y <code>.apply</code>)</h3>
-<p class="para-que"><strong>Para qué sirve</strong> Comprobar con números que las funciones de <code>nn.init</code> producen la desviación típica que predice la teoría, ver la «ganancia» de cada activación e inicializar toda una red de golpe con <code>.apply</code>.</p>
+<header class="hero leccion">
+  <div class="hero-grid">
+    <div>
+      <p class="eyebrow">Curso 5 · Módulo 2 · Lección 5 de 8</p>
+      <h1>Dropout: rodar cada día con medio reparto para no memorizar</h1>
+      <p class="lead">Tu recomendador acierta el 99 % con las valoraciones que ya vio y el 84 % con usuarios nuevos: memoriza. El dropout apaga neuronas al azar en cada paso para que ninguna dependa de otra concreta.</p>
+      <p class="meta-line"><span class="read-time" data-render="read-time"></span><a href="../modulo-2.html">Índice del módulo</a></p>
+    </div>
+    <div class="hero-tile" aria-hidden="true"></div>
+  </div>
 </header>
-<pre class="code"><code>import math
-import torch
+
+<details class="predice">
+  <summary>En un paso de entrenamiento apagas al azar la mitad de las neuronas de una capa. Para que la capa siguiente reciba, de media, la misma señal que sin apagar nada, ¿qué haces con las que quedan?<span class="hint"></span></summary>
+  <div>
+    <p><strong>Multiplicarlas por 2</strong>, es decir, por \( 1/(1-p) \). Cada una sobrevive la mitad de las veces, así que su valor medio es \( 0{,}5\cdot2h=h \). Por eso en evaluación, sin dropout, no hay que tocar nada.</p>
+  </div>
+</details>
+
+<section>
+<h2 id="idea">Nadie puede depender de la estrella</h2>
+<p>Imagina un rodaje en el que cada día falta al azar la mitad del reparto. Nadie puede dejar la escena en manos de una única estrella: todos aprenden a aportar algo útil por sí solos. La película sale más robusta. Las neuronas hacen lo mismo: dejan de depender de que otra concreta esté presente.</p>
+<p><code>nn.Dropout(p)</code> apaga cada activación con probabilidad \( p \) y <strong>multiplica las que sobreviven por \( 1/(1-p) \)</strong>. Cada llamada sortea una máscara nueva. No tiene parámetros que aprender.</p>
+<p>Solo actúa en <code>model.train()</code>; en <code>model.eval()</code> se apaga y la salida es siempre la misma. Dos errores clásicos: olvidar <code>model.eval()</code> antes de validar, y usar <code>F.dropout(x, p)</code> dentro de <code>forward</code>, que tiene <code>training=True</code> por defecto y no mira el modo del modelo.</p>
+</section>
+
+<figure class="demo" data-demo="curso5/c5m2-dropout-mascara" data-titulo="la máscara de dropout y el reescalado">
+  <div class="haz">Pulsa «Sortear otra máscara» varias veces. Luego «Sortear 2000 máscaras» con y sin reescalado.</div>
+  <div class="observa">Con reescalado la media de \( z \) queda en 1,62, la de la red sin dropout. Sin él baja a \( (1-p)\cdot1{,}62 \).</div>
+</figure>
+
+<section>
+<h2 id="numeros">Con números: un panel de 8 críticos</h2>
+<div class="callout ejemplo">
+  <span class="lbl">Ejemplo numérico · p = 0,5</span>
+  <p>Ocho críticos dan su entusiasmo por una película:</p>
+  <p>\( h=(0{,}8;\,0{,}5;\,0{,}9;\,0{,}3;\,0{,}6;\,0{,}2;\,0{,}7;\,0{,}4) \)</p>
+  <p>Hoy solo vienen el 3, el 7 y el 8, y hablan el doble de alto (\( 1/(1-0{,}5)=2 \)):</p>
+  <p>\( \tilde h=(0;\,0;\,1{,}8;\,0;\,0;\,0;\,1{,}4;\,0{,}8) \)</p>
+  <p>¿Funciona? Con 60 películas ruidosas y 10 semillas: sin dropout, 99,3 % en entrenamiento y 83,7 % con datos nuevos; con \( p=0{,}5 \), 90,5 % y <span class="res">85,8 %</span>. La pérdida de test baja de 0,967 a <span class="res">0,423</span>.</p>
+</div>
+</section>
+
+<details class="predice">
+  <summary>Al añadir dropout, el acierto en entrenamiento baja de 99,3 % a 90,5 %. ¿Es mala señal?<span class="hint"></span></summary>
+  <div>
+    <p><strong>No: es la señal de que funciona.</strong> La red ya no puede memorizar, así que acierta menos lo visto y más lo nuevo (83,7 → 85,8 %). Si tu red no sobreajusta, en cambio, el dropout solo añade ruido.</p>
+  </div>
+</details>
+
+<div class="resumen">
+  <h2 class="sin-num sin-toc">En tres líneas</h2>
+  <ul>
+    <li>Dropout apaga con probabilidad \( p \) y reescala por \( 1/(1-p) \) para conservar el valor medio.</li>
+    <li><code>model.train()</code> lo activa, <code>model.eval()</code> lo apaga; <code>F.dropout</code> necesita <code>training=self.training</code>.</li>
+    <li>Peor en entrenamiento y mejor con datos nuevos: así se ve que la regularización funciona.</li>
+  </ul>
+</div>
+
+<section class="quiz mini">
+<script type="application/json" class="quiz-data">
+{
+ "titulo": "¿Lo tienes?",
+ "preguntas": [
+  {
+   "q": "<code>nn.Dropout(p=0.2)</code> en modo entrenamiento: ¿por qué factor se multiplican las activaciones que sobreviven?",
+   "opciones": [
+    "\\( 1/(1-0{,}2)=1{,}25 \\)",
+    "0,8",
+    "1,2",
+    "5"
+   ],
+   "correcta": 0,
+   "porque": "Cada activación sobrevive con probabilidad 0,8; multiplicar por 1,25 hace que su valor esperado sea \\( 0{,}8\\cdot1{,}25\\,h=h \\). Así, en <code>eval()</code> (sin dropout) las capas siguientes ven la misma escala que durante el entrenamiento (<em>inverted dropout</em>)."
+  },
+  {
+   "q": "Tu <code>forward</code> contiene <code>return self.lineal(F.dropout(x, p=0.5))</code> y haces <code>model.eval()</code>. Las predicciones con la misma entrada siguen cambiando en cada llamada. ¿Por qué?",
+   "opciones": [
+    "<code>eval()</code> solo afecta a las capas de BatchNorm",
+    "El generador aleatorio no tiene semilla",
+    "<code>F.dropout</code> tiene <code>training=True</code> por defecto y no mira el modo del modelo; hay que escribir <code>training=self.training</code> (o usar <code>nn.Dropout</code>)",
+    "Hay que llamar también a <code>torch.no_grad()</code> para apagar el dropout"
+   ],
+   "correcta": 2,
+   "porque": "La versión funcional no conoce el modo del modelo. El fragmento 7 da −0,1736 y −0,1031 para la misma entrada en <code>eval()</code>. <code>nn.Dropout</code> como capa sí hereda el modo. <code>no_grad</code> desactiva el cálculo de gradientes, no el dropout."
+  },
+  {
+   "q": "Validas tu modelo sin llamar antes a <code>model.eval()</code>, y tiene <code>nn.Dropout(0.5)</code>. ¿Qué pasa con la métrica de validación?",
+   "opciones": [
+    "Nada: el dropout solo actúa en <code>backward()</code>",
+    "Se mide con neuronas apagadas al azar y cambia en cada ejecución",
+    "Sale exactamente igual que con <code>eval()</code>",
+    "PyTorch lanza un error"
+   ],
+   "correcta": 1,
+   "porque": "El modelo sigue en modo entrenamiento, así que cada predicción usa una máscara distinta. <code>torch.no_grad()</code> no lo arregla: apaga los gradientes, no el dropout."
+  }
+ ]
+}
+</script>
+</section>
+
+<details class="profundizar">
+  <summary><span>Profundizar: la explicación completa<small>La analogía del rodaje, la fórmula con la máscara de Bernoulli, la tabla de los 8 críticos, train() frente a eval(), la trampa de F.dropout y el experimento con 10 semillas.</small></span></summary>
+  <div class="prof-body">
+<h2 id="dropout">Dropout: apagar neuronas al azar para que no memoricen</h2>
+
+<p class="pregunta">Mi recomendador acierta el 99 % con las valoraciones que ya había visto y solo el 84 % con usuarios nuevos: se ha aprendido las valoraciones de memoria. ¿Cómo lo obligo a aprender gustos de verdad en vez de memorizar?</p>
+
+<div class="callout recuerda">
+  <span class="lbl">Recuerda (<a href="../../curso-3/modulo-5/leccion-6.html#regularizacion">Curso 3 · módulo 5</a>)</span>
+  <p>El sobreajuste es memorizar el ruido de los datos de entrenamiento; la regularización (L2, <code>Dropout</code>, parada temprana) lo frena. En Keras ponías <code>Dropout(0.5)</code> entre capas y el argumento <code>training</code> decidía si actuaba. En PyTorch es <code>nn.Dropout(p=0.5)</code> y lo decide <code>model.train()</code> frente a <code>model.eval()</code>.</p>
+</div>
+
+<div class="callout analogia">
+  <span class="lbl">Analogía</span>
+  <p>Un rodaje en el que cada día falta al azar la mitad del reparto. Nadie puede dejar la escena en manos de una única estrella: todos tienen que aprender a aportar algo útil por sí solos y a trabajar con compañeros distintos cada día. Una película así sale más robusta que una que se hunde si falta el protagonista. Las neuronas hacen lo mismo: dejan de depender de que otra neurona concreta esté presente (la «co-adaptación»).</p>
+</div>
+
+<h3>Cómo funciona, con 8 números</h3>
+
+<p>En cada paso de entrenamiento, <code>nn.Dropout(p)</code> apaga cada activación con probabilidad \( p \) (la pone a 0) y <strong>multiplica las que sobreviven por \( 1/(1-p) \)</strong>:</p>
+
+<div class="formula">\[ \tilde h_i=\frac{m_i}{1-p}\,h_i,\qquad m_i\sim\text{Bernoulli}(1-p)\quad(m_i=1\text{ con probabilidad }1-p,\ \text{si no }0) \]</div>
+
+<div class="callout ejemplo">
+  <span class="lbl">Ejemplo numérico</span>
+  <p>Imagina un panel de 8 críticos (8 neuronas). Cada uno da su entusiasmo por una película, \( h \), entre 0 y 1. Hoy falta cada uno con probabilidad \( p=0{,}5 \), y los que se quedan hablan el doble de alto para que el volumen total del panel sea el mismo: se multiplican por \( 1/(1-0{,}5)=2 \). Entusiasmos \( h=(0{,}8;\,0{,}5;\,0{,}9;\,0{,}3;\,0{,}6;\,0{,}2;\,0{,}7;\,0{,}4) \). Una máscara posible deja sin venir a los críticos 1, 2, 4, 5 y 6 y deja a la 3, la 7 y la 8:</p>
+  <table>
+    <thead><tr><th>Crítico</th><th>1</th><th>2</th><th>3</th><th>4</th><th>5</th><th>6</th><th>7</th><th>8</th></tr></thead>
+    <tbody>
+      <tr><td>\( h \)</td><td>0,8</td><td>0,5</td><td>0,9</td><td>0,3</td><td>0,6</td><td>0,2</td><td>0,7</td><td>0,4</td></tr>
+      <tr><td>\( \tilde h \)</td><td class="res">0</td><td class="res">0</td><td class="res">1,8</td><td class="res">0</td><td class="res">0</td><td class="res">0</td><td class="res">1,4</td><td class="res">0,8</td></tr>
+    </tbody>
+  </table>
+  <p>Esa es justo la primera salida del fragmento 7. <strong>¿Por qué multiplicar por 2?</strong> Porque cada activación sobrevive la mitad de las veces: su valor medio es \( 0{,}5\cdot 2h=h \). El reescalado mantiene el <em>valor esperado</em>, de modo que en evaluación (sin dropout) las neuronas siguientes ven la misma escala que vieron al entrenar. Esta versión se llama <abbr class="t" data-def="Inverted dropout: se reescala durante el entrenamiento (÷(1−p)), de modo que en evaluación no hay que tocar nada. Es lo que hacen nn.Dropout y Keras.">inverted dropout</abbr>.</p>
+</div>
+
+<div class="callout recuerda">
+  <span class="lbl">Experimento de arriba: «la máscara de dropout y el reescalado», con todo detalle</span>
+  <p><strong>Haz esto.</strong> Cada barra es un crítico del panel y su altura es su entusiasmo por la película. Pulsa «Sortear otra máscara» varias veces: cada vez faltan críticos distintos. Cambia \( p \). Luego pulsa «Sortear 2000 máscaras» con el reescalado activado y mira el histograma de la salida \( z \) de la neurona siguiente. Desactiva el reescalado y repite.</p>
+  <p><strong>Fíjate en.</strong> Con el reescalado, la media de \( z \) en las 2000 máscaras queda en 1,62, el valor de la red <em>sin</em> dropout (que es lo que se calcula en <code>eval</code>). Sin reescalado, la media baja a \( (1-p)\cdot1{,}62 \): en evaluación la red recibiría señales más grandes que durante el entrenamiento. Con \( p \) alto, el histograma se ensancha: el dropout mete ruido.</p>
+</div>
+
+<h3><code>model.train()</code> frente a <code>model.eval()</code></h3>
+
+<ul>
+  <li><strong>Entrenar:</strong> <code>model.train()</code> → dropout activo, una máscara distinta en cada llamada.</li>
+  <li><strong>Evaluar / predecir:</strong> <code>model.eval()</code> → dropout apagado, la salida es determinista.</li>
+  <li>Ambas funciones recorren <em>todos</em> los submódulos y cambian su atributo <code>training</code> (el fragmento 7 lo imprime). No cambian nada más: no desactivan el cálculo del gradiente. Para eso se usa <code>torch.no_grad()</code>.</li>
+  <li>El dropout no tiene parámetros que aprender; durante el backward, las neuronas apagadas dejan pasar gradiente 0.</li>
+</ul>
+
+<div class="callout ojo">
+  <span class="lbl">Ojo · la trampa de <code>F.dropout</code></span>
+  <p>La versión funcional <code>torch.nn.functional.dropout(x, p)</code> tiene <code>training=True</code> <strong>por defecto</strong> y no mira el modo del modelo. Si la usas dentro de <code>forward</code> sin escribir <code>training=self.training</code>, el dropout sigue activo en <code>eval()</code>: las predicciones salen distintas cada vez (el fragmento 7 muestra −0,1736 y −0,1031 para la misma entrada). Con <code>nn.Dropout</code> como capa no hay este problema. Y otro error clásico: <strong>olvidar llamar a <code>model.eval()</code> antes de validar</strong>, con lo que la validación se mide con neuronas apagadas.</p>
+</div>
+
+<h3>¿Funciona? Medido con 10 semillas</h3>
+
+<p>El <a href="#frag-8">fragmento 8</a> entrena la misma red grande con solo 60 puntos y mucho ruido, con \( p=0 \), \( 0{,}2 \) y \( 0{,}5 \), promediando 10 semillas. Sin dropout, la red memoriza (99,3 % en entrenamiento) y acierta el 83,7 % en datos nuevos; con \( p=0{,}5 \) baja en entrenamiento (90,5 %) pero acierta el 85,8 % en test, y la pérdida de test cae de 0,967 a 0,423. Es la señal típica de que una regularización funciona: <strong>peor en entrenamiento, mejor con datos nuevos</strong>. La ganancia en acierto es modesta; en la pérdida, grande.</p>
+
+<div class="callout regla">
+  <span class="lbl">Regla fácil</span>
+  <p>Dropout: \( p \) entre 0,1 y 0,5 en las capas ocultas, nunca en la salida. <code>train()</code> para entrenar, <code>eval()</code> para medir. Si tu red no sobreajusta, no lo uses: solo añadiría ruido.</p>
+</div>
+  </div>
+</details>
+
+
+<section>
+<h2 class="sin-num">Código</h2>
+<article class="snippet" data-lang="python" id="frag-7">
+  <header>
+    <h3>7 · Dropout: la máscara, <code>train</code> frente a <code>eval</code> y la trampa de <code>F.dropout</code></h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Ver con 8 números cómo <code>nn.Dropout</code> apaga neuronas al azar y reescala el resto, que en evaluación no hace nada, y cómo un <code>F.dropout</code> mal escrito sigue apagando neuronas cuando creías estar en evaluación.</p>
+  </header>
+  <pre class="code"><code>import torch
 import torch.nn as nn
+import torch.nn.functional as F
+
+
+def r(t):
+    return [round(v, 2) for v in t.flatten().tolist()]
+
 
 torch.manual_seed(0)
-capa = nn.Linear(100, 50)
-print("forma de weight:", tuple(capa.weight.shape), "-&gt; fan_in =", capa.weight.shape[1], ", fan_out =", capa.weight.shape[0])
+drop = nn.Dropout(p=0.5)
+h = torch.tensor([[0.8, 0.5, 0.9, 0.3, 0.6, 0.2, 0.7, 0.4]])
+print("entrada          :", r(h))
+print("train, 1ª llamada:", r(drop(h)))
+print("train, 2ª llamada:", r(drop(h)))
 
-pruebas = [
-    ("defecto de nn.Linear", None, 1 / math.sqrt(3 * 100)),
-    ("uniform_(-0.1, 0.1)", lambda w: nn.init.uniform_(w, -0.1, 0.1), 0.2 / math.sqrt(12)),
-    ("normal_(0, 0.1)", lambda w: nn.init.normal_(w, 0.0, 0.1), 0.1),
-    ("xavier_uniform_", nn.init.xavier_uniform_, math.sqrt(2 / (100 + 50))),
-    ("xavier_normal_", nn.init.xavier_normal_, math.sqrt(2 / (100 + 50))),
-    ("kaiming_uniform_ (relu)", lambda w: nn.init.kaiming_uniform_(w, nonlinearity="relu"), math.sqrt(2 / 100)),
-    ("kaiming_normal_ (relu)", lambda w: nn.init.kaiming_normal_(w, nonlinearity="relu"), math.sqrt(2 / 100)),
-]
-print(f"{'inicialización':25s} {'std medida':&gt;10s} {'std teórica':&gt;12s} {'|w| máximo':&gt;11s}")
-for nombre, f, teorica in pruebas:
-    if f is not None:
-        f(capa.weight)
-    w = capa.weight.detach()
-    print(f"{nombre:25s} {w.std().item():10.4f} {teorica:12.4f} {w.abs().max().item():11.4f}")
+drop.eval()
+print("eval             :", r(drop(h)))
 
-print("ganancias:", {k: round(nn.init.calculate_gain(k), 4) for k in ["linear", "sigmoid", "tanh", "relu"]})
+drop.train()
+muchas = torch.stack([drop(h) for _ in range(20000)])
+print("media de 20000 máscaras:", r(muchas.mean(0)))
+print("fracción de ceros      :", round((muchas == 0).float().mean().item(), 3))
 
-
-def inicializar(modulo):
-    if isinstance(modulo, nn.Linear):
-        nn.init.kaiming_normal_(modulo.weight, nonlinearity="relu")
-        nn.init.zeros_(modulo.bias)
+# El mismo modelo, dos modos
+modelo = nn.Sequential(nn.Linear(8, 16), nn.ReLU(), nn.Dropout(0.5), nn.Linear(16, 1))
+x = torch.randn(1, 8)
+modelo.train()
+print("train:", round(modelo(x).item(), 4), round(modelo(x).item(), 4), " training =", modelo.training, modelo[2].training)
+modelo.eval()
+print("eval :", round(modelo(x).item(), 4), round(modelo(x).item(), 4), " training =", modelo.training, modelo[2].training)
 
 
-modelo = nn.Sequential(nn.Linear(64, 32), nn.ReLU(), nn.Linear(32, 10))
-modelo.apply(inicializar)
-print("bias tras apply:", modelo[0].bias.abs().sum().item(), " std de la primera capa:", round(modelo[0].weight.std().item(), 4), "(teórica", round(math.sqrt(2 / 64), 4), ")")</code></pre>
-<details class="linea-a-linea" open="">
-<summary>Línea por línea</summary>
-<p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
-<table class="lineas">
-<thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
-<tbody>
-<tr data-lines="1-3"><td><code>import math …</code></td><td>Importamos <code>math</code> (para las raíces), <code>torch</code> y <code>nn</code>.</td></tr>
-<tr data-lines="5-7"><td><code>torch.manual_seed(0) …</code></td><td>Una capa <code>nn.Linear(100, 50)</code>. Su <code>weight</code> tiene forma <code>(50, 100)</code>: <code>fan_in</code> (entradas por neurona) = 100 y <code>fan_out</code> (salidas) = 50, y así se imprimen.</td></tr>
-<tr data-lines="9-17"><td><code>pruebas = [ …</code></td><td>Lista de pruebas: nombre, función que inicializa el peso (o <code>None</code> para dejar el valor por defecto) y la desviación típica <strong>teórica</strong>: \(1/\sqrt{3\cdot100}\) del defecto, \(0.2/\sqrt{12}\) de una uniforme en \([-0.1,0.1]\), \(\sqrt{2/(100+50)}\) de Xavier y \(\sqrt{2/100}\) de He.</td></tr>
-<tr data-lines="18"><td><code>print(f"{'inicialización':25s} {'std medida':&gt;10s} {'std teórica':&gt;12s} {'|w| máximo':&gt;11s}")</code></td><td>Cabecera de la tabla con anchos fijos (<code>:25s</code>, <code>:&gt;10s</code>) para que las columnas queden alineadas.</td></tr>
-<tr data-lines="19-21"><td><code>for nombre, f, teorica in pruebas: …</code></td><td>Recorre las pruebas y, si hay función, <strong>la aplica al peso en el sitio</strong> (todas las funciones de <code>nn.init</code> terminan en <code>_</code> porque modifican el tensor).</td></tr>
-<tr data-lines="22-23"><td><code>w = capa.weight.detach() …</code></td><td><code>detach()</code> saca el peso del grafo; mide su desviación típica (<code>std</code>) y su valor absoluto máximo, y lo imprime junto a la teórica.</td></tr>
-<tr data-lines="25"><td><code>print("ganancias:", {k: round(nn.init.calculate_gain(k), 4) for k in ["linear", "sigmoid", "tanh", "relu"]})</code></td><td><code>nn.init.calculate_gain</code> devuelve el factor por el que cada activación encoge o agranda la señal (1 para lineal y sigmoide, 5/3 para tanh, √2 para ReLU).</td></tr>
-<tr data-lines="28-31"><td><code>def inicializar(modulo): …</code></td><td>Función de inicialización para una red entera: si el módulo es una <code>nn.Linear</code>, pone He (<code>kaiming_normal_</code>) en el peso y ceros en el sesgo (<code>nn.init.zeros_</code>).</td></tr>
-<tr data-lines="34-35"><td><code>modelo = nn.Sequential(nn.Linear(64, 32), nn.ReLU(), nn.Linear(32, 10)) …</code></td><td>Red pequeña y <code>modelo.apply(inicializar)</code>: <code>apply</code> llama a la función con cada submódulo, recursivamente.</td></tr>
-<tr data-lines="36"><td><code>print("bias tras apply:", modelo[0].bias.abs().sum().item(), " std de la primera capa:", round(modelo[0].weight.std().item(), 4), "(teórica", round(math.sqrt(2 / 64), 4), ")")</code></td><td>Comprueba el resultado: la suma de |sesgos| es 0 y la desviación del primer peso se parece a \(\sqrt{2/64}\).</td></tr>
-</tbody>
-</table>
-</details>
-<div class="salida">
-<strong>Salida esperada</strong>
-<pre>forma de weight: (50, 100) -&gt; fan_in = 100 , fan_out = 50
-inicialización            std medida  std teórica  |w| máximo
-defecto de nn.Linear          0.0574       0.0577      0.1000
-uniform_(-0.1, 0.1)           0.0577       0.0577      0.1000
-normal_(0, 0.1)               0.1014       0.1000      0.3810
-xavier_uniform_               0.1146       0.1155      0.2000
-xavier_normal_                0.1147       0.1155      0.4348
-kaiming_uniform_ (relu)       0.1399       0.1414      0.2448
-kaiming_normal_ (relu)        0.1413       0.1414      0.5372
-ganancias: {'linear': 1, 'sigmoid': 1, 'tanh': 1.6667, 'relu': 1.4142}
-bias tras apply: 0.0  std de la primera capa: 0.1785 (teórica 0.1768 )</pre>
-<p>Las desviaciones medidas se parecen mucho a las teóricas (con 5000 pesos el azar mueve la tercera cifra). Fíjate en el máximo: Xavier uniforme nunca pasa de \(0.2=\sqrt{6/150}\); la normal puede dar valores más grandes (0.43, 0.54). El defecto de PyTorch (0.057) es más pequeño que Xavier (0.115) y He (0.141). Las ganancias: 1, 1, 1.6667 y 1.4142. Tras <code>apply</code> los sesgos suman 0.0 y la primera capa tiene std 0.1785 (teórica 0.1768).</p>
-</div>
-</article><article class="snippet" data-lang="python">
-<header>
-<h3>6 · Cómo viaja la señal por 10 capas según la inicialización</h3>
-<p class="para-que"><strong>Para qué sirve</strong> Pasar datos por 10 capas de 100 neuronas y medir qué tamaño tiene la señal en la capa 1, la 5 y la 10: si se apaga, se estabiliza o se satura.</p>
-</header>
-<pre class="code"><code>import torch
+class Trampa(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.lineal = nn.Linear(8, 1)
+
+    def forward(self, x):
+        return self.lineal(F.dropout(x, p=0.5))      # se olvida training=self.training
+
+
+trampa = Trampa().eval()
+print("F.dropout olvidado en eval:", round(trampa(x).item(), 4), round(trampa(x).item(), 4))</code></pre>
+  <details class="linea-a-linea" open>
+    <summary>Línea por línea</summary>
+    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+      <tbody>
+        <tr data-lines="1-3"><td><code>import torch …</code></td><td>Importamos <code>torch</code>, <code>nn</code> y <code>torch.nn.functional as F</code> (la versión «función» de las capas).</td></tr>
+        <tr data-lines="6-7"><td><code>def r(t): …</code></td><td>Ayudante <code>r</code> que convierte un tensor en una lista de números con dos decimales, para imprimir cómodo.</td></tr>
+        <tr data-lines="10-12"><td><code>torch.manual_seed(0) …</code></td><td>Semilla, una capa <code>nn.Dropout(p=0.5)</code> (probabilidad de <strong>apagar</strong> cada neurona) y 8 activaciones inventadas <code>h</code> en forma de fila (una muestra).</td></tr>
+        <tr data-lines="13-15"><td><code>print("entrada          :", r(h)) …</code></td><td>Imprime la entrada y dos aplicaciones seguidas en modo entrenamiento: cada llamada saca una máscara distinta. Las neuronas que sobreviven se multiplican por \(1/(1-p)=2\).</td></tr>
+        <tr data-lines="17-18"><td><code>drop.eval() …</code></td><td><code>drop.eval()</code> pasa la capa a modo evaluación: ahora devuelve la entrada sin tocarla.</td></tr>
+        <tr data-lines="20-23"><td><code>drop.train() …</code></td><td>Vuelve a modo entrenamiento, aplica el dropout 20 000 veces (<code>torch.stack</code> apila los resultados) y calcula la media por neurona y la fracción de ceros.</td></tr>
+        <tr data-lines="25-27"><td><code># El mismo modelo, dos modos …</code></td><td>Un modelo completo con <code>Linear → ReLU → Dropout → Linear</code> y una muestra de entrada <code>x</code>.</td></tr>
+        <tr data-lines="28-29"><td><code>modelo.train() …</code></td><td>En modo entrenamiento (<code>modelo.train()</code>) dos llamadas con la misma entrada dan resultados diferentes; también imprime el atributo <code>training</code> del modelo y de la capa de dropout.</td></tr>
+        <tr data-lines="30-31"><td><code>modelo.eval() …</code></td><td><code>modelo.eval()</code> cambia el modo de <strong>todas</strong> las capas hijas: las dos salidas son iguales y <code>training</code> vale <code>False</code> en ambos niveles.</td></tr>
+        <tr data-lines="34-37"><td><code>class Trampa(nn.Module): …</code></td><td>Clase con la trampa: guarda una capa lineal.</td></tr>
+        <tr data-lines="39-40"><td><code>def forward(self, x): …</code></td><td>En su <code>forward</code> usa <code>F.dropout(x, p=0.5)</code> sin pasarle <code>training=self.training</code>. Esa función funcional tiene <code>training=True</code> por defecto, así que ignora el modo del modelo.</td></tr>
+        <tr data-lines="43-44"><td><code>trampa = Trampa().eval() …</code></td><td>La ponemos en <code>eval()</code> y la llamamos dos veces con la misma entrada: debería dar el mismo resultado.</td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>entrada          : [0.8, 0.5, 0.9, 0.3, 0.6, 0.2, 0.7, 0.4]
+train, 1ª llamada: [0.0, 0.0, 1.8, 0.0, 0.0, 0.0, 1.4, 0.8]
+train, 2ª llamada: [0.0, 1.0, 1.8, 0.6, 1.2, 0.0, 1.4, 0.8]
+eval             : [0.8, 0.5, 0.9, 0.3, 0.6, 0.2, 0.7, 0.4]
+media de 20000 máscaras: [0.79, 0.5, 0.9, 0.3, 0.61, 0.2, 0.7, 0.4]
+fracción de ceros      : 0.5
+train: 0.331 0.1135  training = True True
+eval : 0.1441 0.1441  training = False False
+F.dropout olvidado en eval: -0.1736 -0.1031</pre>
+    <p>Las dos llamadas en entrenamiento dan máscaras distintas, y los supervivientes valen el doble (0.9→1.8, 0.7→1.4, 0.4→0.8). En <code>eval</code> la salida es la entrada. La media de 20 000 máscaras se parece mucho a la entrada original (0.79, 0.5, 0.9…), y la mitad de los valores son ceros: el reescalado mantiene el valor esperado. En el modelo, <code>train</code> da dos resultados distintos (0.331, 0.1135) y <code>eval</code> el mismo (0.1441). La trampa: <code>F.dropout</code> sin <code>training</code> da −0.1736 y −0.1031 incluso en <code>eval()</code>.</p>
+  </div>
+</article>
+
+<article class="snippet" data-lang="python" id="frag-8">
+  <header>
+    <h3>8 · Dropout contra el sobreajuste (60 puntos, 10 semillas)</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Entrenar la misma red con y sin dropout sobre muy pocos datos y medir si el acierto en datos nuevos mejora de verdad, promediando 10 semillas para que el resultado no sea cuestión de suerte.</p>
+  </header>
+  <pre class="code"><code>import numpy as np
+import torch
 import torch.nn as nn
+from sklearn.datasets import make_moons
+
+torch.set_num_threads(1)
+perdida = nn.CrossEntropyLoss()
 
 
-def propagar(activacion, init, capas=10, ancho=100):
-    torch.manual_seed(0)
-    h = torch.randn(1000, ancho)                  # entradas con media 0 y desviación 1
-    stds = []
-    for _ in range(capas):
-        lineal = nn.Linear(ancho, ancho)
-        if init == "N(0, 0.01)":
-            nn.init.normal_(lineal.weight, 0.0, 0.01)
-        elif init == "N(0, 1)":
-            nn.init.normal_(lineal.weight, 0.0, 1.0)
-        elif init == "Xavier":
-            nn.init.xavier_uniform_(lineal.weight)
-        elif init == "He":
-            nn.init.kaiming_normal_(lineal.weight, nonlinearity="relu")
-        nn.init.zeros_(lineal.bias)
-        h = activacion(lineal(h))
-        stds.append(h.std().item())
-    saturadas = (h.abs() &gt; 0.99).float().mean().item()      # solo tiene sentido con tanh
-    return stds, saturadas
+def experimento(p, semilla):
+    Xtr, ytr = make_moons(60, noise=0.35, random_state=semilla)           # solo 60 puntos de entrenamiento
+    Xte, yte = make_moons(2000, noise=0.35, random_state=100 + semilla)   # 2000 que la red nunca ve
+    Xtr, Xte = torch.tensor(Xtr, dtype=torch.float32), torch.tensor(Xte, dtype=torch.float32)
+    ytr, yte = torch.tensor(ytr), torch.tensor(yte)
+    torch.manual_seed(semilla)
+    modelo = nn.Sequential(nn.Linear(2, 128), nn.ReLU(), nn.Dropout(p),
+                           nn.Linear(128, 128), nn.ReLU(), nn.Dropout(p),
+                           nn.Linear(128, 2))
+    optimizador = torch.optim.Adam(modelo.parameters(), lr=1e-3)
+    for epoca in range(500):
+        modelo.train()                                   # dropout activo
+        optimizador.zero_grad()
+        perdida(modelo(Xtr), ytr).backward()
+        optimizador.step()
+    modelo.eval()                                        # dropout apagado para medir
+    with torch.no_grad():
+        return [(modelo(Xtr).argmax(1) == ytr).float().mean().item(),
+                (modelo(Xte).argmax(1) == yte).float().mean().item(),
+                perdida(modelo(Xte), yte).item()]
 
 
-print(f"{'activación':10s} {'inicialización':16s} {'capa 1':&gt;9s} {'capa 5':&gt;9s} {'capa 10':&gt;9s} {'|h|&gt;0.99':&gt;9s}")
-for nombre, act, inits in [("tanh", torch.tanh, ["N(0, 0.01)", "N(0, 1)", "defecto", "Xavier"]),
-                           ("ReLU", torch.relu, ["N(0, 0.01)", "defecto", "Xavier", "He"])]:
-    for init in inits:
-        s, sat = propagar(act, init)
-        sat_txt = f"{sat:9.2f}" if nombre == "tanh" else f"{'-':&gt;9s}"
-        print(f"{nombre:10s} {init:16s} {s[0]:9.2e} {s[4]:9.2e} {s[9]:9.2e} {sat_txt}")</code></pre>
-<details class="linea-a-linea" open="">
-<summary>Línea por línea</summary>
-<p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
-<table class="lineas">
-<thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
-<tbody>
-<tr data-lines="1-2"><td><code>import torch …</code></td><td>Importamos <code>torch</code> y <code>nn</code>.</td></tr>
-<tr data-lines="5"><td><code>def propagar(activacion, init, capas=10, ancho=100):</code></td><td><code>propagar</code> recibe una función de activación, un tipo de inicialización, el número de capas y la anchura.</td></tr>
-<tr data-lines="6-7"><td><code>torch.manual_seed(0) …</code></td><td>Semilla fija y 1000 entradas aleatorias de media 0 y desviación 1 (<code>torch.randn</code>), con 100 características cada una.</td></tr>
-<tr data-lines="8-9"><td><code>stds = [] …</code></td><td>Lista donde guardar la desviación típica de cada capa y bucle sobre las capas (el <code>_</code> indica que no usamos el contador).</td></tr>
-<tr data-lines="10"><td><code>lineal = nn.Linear(ancho, ancho)</code></td><td>Crea una capa lineal 100→100 nueva.</td></tr>
-<tr data-lines="11-14"><td><code>if init == "N(0, 0.01)": …</code></td><td>Si la inicialización es normal con desviación 0.01 o con desviación 1, sobrescribe el peso con <code>nn.init.normal_</code>.</td></tr>
-<tr data-lines="15-18"><td><code>elif init == "Xavier": …</code></td><td>Xavier uniforme o He normal para ReLU.</td></tr>
-<tr data-lines="19"><td><code>nn.init.zeros_(lineal.bias)</code></td><td>Sesgo a cero, para medir solo el efecto de los pesos.</td></tr>
-<tr data-lines="20-21"><td><code>h = activacion(lineal(h)) …</code></td><td>Aplica la capa y la activación y guarda la desviación típica de la salida: la «altura» de la señal.</td></tr>
-<tr data-lines="22"><td><code>saturadas = (h.abs() &gt; 0.99).float().mean().item()      # solo tiene sentido con tanh</code></td><td>Al final, la fracción de neuronas saturadas: las que tienen \(|h|&gt;0.99\) (cerca de ±1, donde la derivada de tanh es casi 0).</td></tr>
-<tr data-lines="23"><td><code>return stds, saturadas</code></td><td>Devuelve las desviaciones por capa y la fracción de saturadas.</td></tr>
-<tr data-lines="26"><td><code>print(f"{'activación':10s} {'inicialización':16s} {'capa 1':&gt;9s} {'capa 5':&gt;9s} {'capa 10':&gt;9s} {'|h|&gt;0.99':&gt;9s}")</code></td><td>Cabecera de la tabla.</td></tr>
-<tr data-lines="27-28"><td><code>for nombre, act, inits in [("tanh", torch.tanh, ["N(0, 0.01)", "N(0, 1)", "defecto", "Xavier"]), …</code></td><td>Dos bloques: tanh con cuatro inicializaciones y ReLU con otras cuatro.</td></tr>
-<tr data-lines="29-30"><td><code>for init in inits: …</code></td><td>Para cada inicialización, ejecuta <code>propagar</code>.</td></tr>
-<tr data-lines="31"><td><code>sat_txt = f"{sat:9.2f}" if nombre == "tanh" else f"{'-':&gt;9s}"</code></td><td>Solo con tanh tiene sentido hablar de saturación; con ReLU se imprime un guion.</td></tr>
-<tr data-lines="32"><td><code>print(f"{nombre:10s} {init:16s} {s[0]:9.2e} {s[4]:9.2e} {s[9]:9.2e} {sat_txt}")</code></td><td>Imprime la desviación en las capas 1, 5 y 10 (<code>s[0]</code>, <code>s[4]</code>, <code>s[9]</code>) y la saturación.</td></tr>
-</tbody>
-</table>
-</details>
-<div class="salida">
-<strong>Salida esperada</strong>
-<pre>activación inicialización      capa 1    capa 5   capa 10  |h|&gt;0.99
-tanh       N(0, 0.01)        9.93e-02  9.94e-06  9.63e-11      0.00
-tanh       N(0, 1)           9.60e-01  9.57e-01  9.58e-01      0.78
-tanh       defecto           4.61e-01  4.84e-02  3.18e-03      0.00
-tanh       Xavier            6.29e-01  3.22e-01  2.35e-01      0.00
-ReLU       N(0, 0.01)        5.86e-02  1.15e-06  1.86e-12         -
-ReLU       defecto           3.38e-01  9.01e-03  1.32e-04         -
-ReLU       Xavier            5.88e-01  1.68e-01  2.99e-02         -
-ReLU       He                8.28e-01  6.50e-01  5.95e-01         -</pre>
-<p>Con pesos \(N(0;0.01)\) la señal se apaga: \(0.099\to10^{-5}\to10^{-10}\) (cada capa la multiplica por \(\sqrt{100\cdot0.01^2}=0.1\)). Con \(N(0;1)\) y tanh, la señal se mantiene en 0.96 pero el 78 % de las neuronas está saturado. El defecto la encoge capa a capa (0.46 → 0.0032). Xavier con tanh y, sobre todo, He con ReLU (0.83 → 0.65 → 0.60) la conservan.</p>
+print(f"{'p':&gt;4s} {'acierto train':&gt;14s} {'acierto test':&gt;13s} {'pérdida test':&gt;13s}")
+for p in [0.0, 0.2, 0.5]:
+    r = np.array([experimento(p, s) for s in range(10)]).mean(axis=0)
+    print(f"{p:4.1f} {r[0]:14.3f} {r[1]:13.3f} {r[2]:13.3f}")</code></pre>
+  <details class="linea-a-linea" open>
+    <summary>Línea por línea</summary>
+    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+      <tbody>
+        <tr data-lines="1-4"><td><code>import numpy as np …</code></td><td>Importamos NumPy (para promediar), <code>torch</code>, <code>nn</code> y <code>make_moons</code> (dos lunas con ruido, un problema de juguete).</td></tr>
+        <tr data-lines="6-7"><td><code>torch.set_num_threads(1) …</code></td><td>Un solo hilo de CPU y la pérdida de entropía cruzada.</td></tr>
+        <tr data-lines="10-14"><td><code>def experimento(p, semilla): …</code></td><td><code>experimento(p, semilla)</code>: genera <strong>60</strong> puntos de entrenamiento y 2000 de test con otra semilla (la red no los ve nunca), con mucho ruido (0.35), y los convierte a tensores.</td></tr>
+        <tr data-lines="15-18"><td><code>torch.manual_seed(semilla) …</code></td><td>Semilla de PyTorch y un modelo grande para tan pocos datos: dos capas ocultas de 128 con ReLU y <code>Dropout(p)</code> detrás de cada una. Con <code>p = 0.0</code> el dropout no hace nada.</td></tr>
+        <tr data-lines="19"><td><code>optimizador = torch.optim.Adam(modelo.parameters(), lr=1e-3)</code></td><td>Optimizador Adam con learning rate \(10^{-3}\).</td></tr>
+        <tr data-lines="20-24"><td><code>for epoca in range(500): …</code></td><td>500 épocas; en cada una: <code>modelo.train()</code> (dropout activo), puesta a cero de gradientes, <code>backward</code> de la pérdida sobre los 60 puntos y <code>step()</code>.</td></tr>
+        <tr data-lines="25-29"><td><code>modelo.eval()                                        # dropout apagado para medir …</code></td><td>Para medir: <code>modelo.eval()</code> apaga el dropout, <code>torch.no_grad()</code> evita construir grafo y se devuelven el acierto en entrenamiento, el acierto en test (con <code>argmax(1)</code> eligiendo la clase de mayor puntuación) y la pérdida en test.</td></tr>
+        <tr data-lines="32"><td><code>print(f"{'p':&gt;4s} {'acierto train':&gt;14s} {'acierto test':&gt;13s} {'pérdida test':&gt;13s}")</code></td><td>Cabecera de la tabla.</td></tr>
+        <tr data-lines="33-35"><td><code>for p in [0.0, 0.2, 0.5]: …</code></td><td>Para cada valor de <code>p</code>, repite el experimento con 10 semillas, promedia con <code>.mean(axis=0)</code> e imprime.</td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>   p  acierto train  acierto test  pérdida test
+ 0.0          0.993         0.837         0.967
+ 0.2          0.933         0.847         0.554
+ 0.5          0.905         0.858         0.423</pre>
+    <p>Sin dropout la red memoriza: 99.3 % en entrenamiento pero 83.7 % en test, con una pérdida de test de 0.967 (muy segura de sí misma y a menudo equivocada). Con \(p=0.5\): peor en entrenamiento (90.5 %), pero mejor en test (85.8 %) y con pérdida 0.423, menos de la mitad. La ganancia en acierto es modesta (+2 puntos); la mejora en la pérdida es la más visible.</p>
+  </div>
+</article>
+</section>
+
+
 </div>
-</article></div></details></div></main></body></html>
+</main>
+</body>
+</html>

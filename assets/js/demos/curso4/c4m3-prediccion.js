@@ -27,10 +27,9 @@ Lab.register("curso4/c4m3-prediccion", function (root, api) {
     D.line(ctx, plot.x(xn), plot.y(-2), plot.x(xn), plot.y(14), C.oliva, 1.5, [4, 4]);
     D.circle(ctx, plot.x(xn), plot.y(yn), 6, C.oliva, C.paper, 1.5);
     ctx.restore();
-    var lbl = "peli nueva: x = " + xn.toFixed(1) + " → ŷ = " + yn.toFixed(2);
-    var lx = plot.x(xn) + (plot.x(xn) > pb.x + pb.w * 0.6 ? -8 : 8), al = plot.x(xn) > pb.x + pb.w * 0.6 ? "right" : "left";
-    var ly = M().clamp(plot.y(yn) - 10, pb.y + 14, pb.y + pb.h - 8);
-    D.text(ctx, lbl, lx, ly, { size: 11.5, color: C.olivaInk, weight: 600, align: al });
+    // la etiqueta de la peli nueva va como tercera línea de la leyenda: así no pisa los nombres de las películas
+    var lbl = "peli nueva (verde): x = " + xn.toFixed(1) + " → ŷ = " + yn.toFixed(2);
+    D.text(ctx, lbl, pb.x + 8, pb.y + 46, { size: 11, color: C.olivaInk, weight: 600 });
     D.text(ctx, "reales (las 3 películas)", pb.x + 8, pb.y + 16, { size: 11, color: C.terracotaInk, weight: 600 });
     D.text(ctx, "predichos ŷ (huecos)", pb.x + 8, pb.y + 31, { size: 11, color: C.cobaltoInk, weight: 600 });
   }

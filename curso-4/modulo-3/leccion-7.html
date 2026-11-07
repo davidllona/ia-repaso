@@ -1,159 +1,429 @@
-<!DOCTYPE html>
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lección 7 · El learning rate y el mejor modelo se eligen con validación · Módulo 3 · Curso 4 · Cuaderno de IA</title>
+<meta name="description" content="El límite lr &lt; 2/λ, elegir el learning rate con un conjunto de validación, quedarse con el mejor modelo (checkpoint) y guardarlo con state_dict.">
+<script>try{var t=localStorage.getItem('cuaderno-ia:tema');if(t)document.documentElement.setAttribute('data-theme',t)}catch(e){}</script>
+<link rel="stylesheet" href="../../assets/css/style.css">
+<script src="../../assets/js/curriculum.js"></script>
+<script src="../../assets/js/lab.js"></script>
+<script src="../../assets/js/app.js" defer></script>
+</head>
+<body data-root="../../" data-course="4" data-module="3" data-lesson="7">
+<main>
+<div class="page">
 
-<html lang="es"><head><meta charset="utf-8"/><meta content="width=device-width,initial-scale=1" name="viewport"/><title>Lección 7 · Batch, mini-batch y SGD con DataLoader · Curso 4 · Cuaderno de IA</title><meta content="El gradiente del coste es un promedio sobre las muestras." name="description"/><script>try{var t=localStorage.getItem('cuaderno-ia:tema');if(t)document.documentElement.setAttribute('data-theme',t)}catch(e){}</script><link href="../../assets/css/style.css" rel="stylesheet"/><script src="../../assets/js/curriculum.js"></script><script src="../../assets/js/lab.js"></script><script defer="" src="../../assets/js/app.js"></script><script defer="" src="../../assets/js/microanimations.js"></script></head><body data-course="4" data-lesson="7" data-module="3" data-root="../../"><main><div class="page" data-micro="3min"><header class="hero leccion"><div class="hero-grid"><div><p class="eyebrow">Curso 4 · Módulo 3 · Lección 7 de 11</p><h1>Batch, mini-batch y SGD con DataLoader</h1><p class="lead">El gradiente del coste es un promedio sobre las muestras.</p><p class="meta-line"><span class="read-time" data-render="read-time"></span><a href="../modulo-3.html">Índice del módulo</a></p></div><div aria-hidden="true" class="hero-tile"></div></div></header><details class="predice"><summary>Hasta ahora cada paso usaba todas las películas. Con 5 millones de visionados registrados en Netflix, ¿hay que revisarlos todos para dar un solo pasito?<span class="hint"></span></summary><div><p>El gradiente del coste es un promedio sobre las muestras.</p></div></details><section aria-label="Explicación breve" class="micro-core"><div class="micro-kicker">01 · ENTENDER <span>≈ 45 s</span></div><h2>La idea en palabras sencillas</h2><p>El gradiente del coste es un promedio sobre las muestras. Se puede calcular con cuántas quieras:</p><div class="micro-example"><span aria-hidden="true" class="micro-example-icon">💡</span><div><strong>Otro ejemplo · Gimnasio</strong><p>Una red recibe horas de sueño y actividad; combina señales antes de calcular su predicción.</p></div></div></section><div class="micro-kicker micro-checkpoint">02 · RESPONDER <span>≈ 15 s</span></div><section aria-label="Pregunta intercalada" class="quiz mini micro-check"><script class="quiz-data" type="application/json">{"titulo": "Pausa rápida · Comprueba la idea", "preguntas": [{"q": "100 ejemplos en batches de 20. ¿Cuántos batches completos?", "opciones": ["20", "100", "5"], "correcta": 2, "porque": "100/20 = 5 lotes de 20 ejemplos."}]}</script></section><section aria-label="Animación interactiva" class="micro-viz" data-index="14" data-micro-viz="neural"><div class="micro-kicker">03 · EXPERIMENTAR <span>≈ 45 s</span></div><div class="micro-viz-title"><div><h2>Señales que atraviesan una red</h2><p>Pulsa «Propagar» para seguir el recorrido de entradas a salida.</p></div><span aria-hidden="true" class="micro-viz-symbol">✦</span></div><div aria-live="polite" class="micro-viz-stage"><p>Animación interactiva: Señales que atraviesan una red</p></div></section><div class="micro-kicker micro-checkpoint">04 · APLICAR <span>≈ 15 s</span></div><section aria-label="Pregunta intercalada" class="quiz mini micro-check"><script class="quiz-data" type="application/json">{"titulo": "Pausa rápida · ¿Lo aplicarías?", "preguntas": [{"q": "¿Un epoch significa un batch?", "opciones": ["Sí, independientemente de la cantidad de datos", "No, suele ser una pasada por todo TRAIN", "Sí, son sinónimos"], "correcta": 1, "porque": "Un epoch recorre el conjunto de entrenamiento; suele incluir varios batches."}]}</script></section><div class="micro-finish"><strong>Idea que te llevas</strong><span>El gradiente del coste es un promedio sobre las muestras</span><small>¿Quieres más ejemplos, fórmulas o código? Los tienes justo debajo, sin límite de tiempo.</small></div><details class="profundizar micro-legacy"><summary><span>Explorar más: explicación y simulaciones completas<small>Todo el texto original, tablas y demos avanzadas. Opcional.</small></span></summary><div class="prof-body"><section><h2>Batch, mini-batch y SGD con DataLoader</h2>
-<p>El gradiente del coste es un <strong>promedio</strong> sobre las muestras. Se puede calcular con cuántas quieras:</p>
-<p>Ventajas e inconvenientes: con lotes pequeños cada paso cuesta <strong>poco</strong> y se dan <strong>muchos más pasos por época</strong> (el modelo aprende antes, en tiempo de reloj), y el ruido ayuda a salir de zonas malas en problemas difíciles; pero el camino zigzaguea y, con learning rate fijo, nunca se asienta del todo en el fondo. Con el lote completo el camino es suave pero cada paso lee todos los datos y hay que dar muchos. El <strong>mini-batch</strong> (por ejemplo 32, 64 o 256 muestras) es el término medio y el estándar en deep learning, además de aprovechar mejor la GPU, que calcula muchas muestras a la vez.</p>
-<p>El bucle de entrenamiento gana un <code>for</code> interior: la <strong>época</strong> recorre todos los datos y cada <strong>iteración</strong> procesa un lote:</p>
-<div class="callout ejemplo"><span class="lbl">Ejemplo tomado del módulo</span><p>· el gradiente del lote es el promedio de los gradientes de cada película Con nuestras tres películas y \( w = b = 0 \), el gradiente de una sola película \( i \) es \( \bigl(2(\hat{y}_i - y_i)\,x_i,\; 2(\hat{y}_i - y_i)\bigr) \): película…</p></div></section><figure class="demo" data-demo="curso4/c4m3-lotes" data-titulo="Batch, mini-batch y SGD: lotes, camino y coste por época">
-<div class="haz">Con batch_size = 5 pulsa «Un lote» varias veces y mira el camino. Luego pulsa «10 épocas». Repite con batch_size = 30 (batch), 1 (SGD) y 7 con y sin <em>drop_last</em>. Quita <em>shuffle</em> y mira cómo cambian los lotes.</div>
-<div class="observa">La franja de arriba muestra cómo reparte el <code>DataLoader</code> las 30 películas en lotes (un color por lote). Con batch = 30 el camino es una línea suave pero con <em>1</em> actualización por época; con SGD (batch = 1) hay 30 pasos por época y el camino zigzaguea alrededor del fondo (el amarillo) sin llegar a asentarse. Con un lr alto y lotes pequeños el SGD puede divergir: el lote pequeño tiene más curvatura «local».</div>
-</figure><div class="resumen"><h2 class="sin-num sin-toc">En pocas líneas</h2><ul><li><strong>Batch, mini-batch y SGD con DataLoader:</strong> El gradiente del coste es un promedio sobre las muestras.</li><li>Antes de continuar, intenta explicar la demo sin mirar su resultado.</li></ul></div><section class="quiz mini"><script class="quiz-data" type="application/json">{"titulo": "¿Lo tienes?", "preguntas": [{"q": "¿Qué concepto estamos trabajando en esta lección?", "opciones": ["Batch, mini-batch y SGD con DataLoader", "Evaluar con datos nuevos y guardar el modelo", "La regresión lineal, vista desde PyTorch"], "correcta": 0, "porque": "El gradiente del coste es un promedio sobre las muestras."}, {"q": "¿Cuál de estas afirmaciones recoge lo que acabas de estudiar?", "opciones": ["Lo importante es comprender la idea y comprobarla con ejemplos, no memorizar términos.", "El gradiente del coste es un promedio sobre las muestras.", "Siempre hay un único método que sirve para todos los problemas."], "correcta": 1, "porque": "La explicación central es: El gradiente del coste es un promedio sobre las muestras."}, {"q": "Si una demo o un ejemplo te desconcierta, ¿cuál es la mejor forma de aprenderlo?", "opciones": ["Memorizar el nombre sin entender la operación.", "Volver a los números, cambiar un valor y explicar qué ocurre.", "Ignorar los resultados que no coinciden con tu intuición."], "correcta": 1, "porque": "Explorar qué cambia y por qué ayuda a conectar el concepto con su resultado."}]}</script></section></div></details><details class="profundizar"><summary><span>Profundizar: explicación completa<small>Matices, fórmulas, tablas, otros ejemplos y experimentos del módulo original.</small></span></summary><div class="prof-body"><section>
-<h2 id="lotes">Batch, mini-batch y SGD con <code>DataLoader</code></h2>
-<p class="pregunta">Hasta ahora cada paso usaba <em>todas</em> las películas. Con 5 millones de visionados registrados en Netflix, ¿hay que revisarlos todos para dar un solo pasito?</p>
-<div class="callout recuerda">
-<span class="lbl">Recuerda (módulo 2 y Curso 1)</span>
-<p>Un <code>Dataset</code> sabe dar la muestra número <code>i</code> (<code>__getitem__</code>) y cuántas hay (<code>__len__</code>); un <code>DataLoader</code> lo envuelve y entrega <strong>lotes</strong> de <code>batch_size</code> muestras, barajados si <code>shuffle=True</code>. En el Curso 1 viste <a href="../../curso-1/modulo-2.html#entrenamiento">batch, SGD y mini-batch</a> con scikit-learn; aquí los programas con PyTorch.</p>
-</div>
-<div class="callout analogia">
-<span class="lbl">Analogía: la encuesta de satisfacción</span>
-<p>Netflix quiere saber si una serie gusta antes de cambiar su recomendación. Puede esperar a leer las opiniones de <em>todos</em> los espectadores y dar un único paso, muy fiable pero lentísimo (<strong>batch</strong>). Puede cambiar la recomendación tras leer <em>una sola</em> opinión, rapidísimo pero con el riesgo de que esa opinión sea un capricho (<strong>SGD</strong>). O puede leerlas de 32 en 32 y retocar cada vez (<strong>mini-batch</strong>): rápido y bastante fiable.</p>
-</div>
-<p>El gradiente del coste es un <strong>promedio</strong> sobre las muestras. Se puede calcular con cuántas quieras:</p>
+<header class="hero leccion">
+  <div class="hero-grid">
+    <div>
+      <p class="eyebrow">Curso 4 · Módulo 3 · Lección 7 de 8</p>
+      <h1>El learning rate y el mejor modelo se eligen con validación</h1>
+      <p class="lead">El <strong>learning rate</strong> lo eliges tú y no hay fórmula mágica: se prueban varios y gana el que menos falla con datos que el modelo no ha usado para entrenar. Con esos mismos datos decides qué versión del modelo te quedas y la guardas.</p>
+      <p class="meta-line"><span class="read-time" data-render="read-time"></span><a href="../modulo-3.html">Índice del módulo</a></p>
+    </div>
+    <div class="hero-tile" aria-hidden="true"></div>
+  </div>
+</header>
+
+<details class="predice">
+  <summary>Pruebas \( lr = 0{,}1 \), \( 0{,}2 \) y \( 0{,}4 \) en un problema con curvatura \( \lambda = 5{,}83 \). ¿Gana el más grande, porque da pasos más largos?<span class="hint"></span></summary>
+  <div>
+    <p><strong>No: 0,4 diverge.</strong> Su factor es \( 1 - 0{,}4\cdot 5{,}83 = -1{,}33 \): cada paso se aleja un 33 % más y el MSE de validación acaba en 12.215. El límite es \( 2/\lambda = 0{,}343 \), y el mejor es 0,2, cerca del límite pero sin pasarlo.</p>
+  </div>
+</details>
+
+<section>
+<h2 id="idea">Probar candidatos y medir con datos aparte</h2>
+<p>Con una curvatura \( \lambda \), cada paso multiplica la distancia al fondo por \( (1 - lr\cdot\lambda) \). Si su valor absoluto es menor que 1, converge; si no, <strong>diverge</strong>. Un \( lr \) pequeño avanza a paso de tortuga, el bueno llega rápido y el demasiado grande rebota cada vez más lejos, como buscar una escena con saltos de 10 minutos.</p>
+<p>Para elegir no vale el coste de entrenamiento: premia al que mejor memoriza. Los datos se parten en tres conjuntos, por ejemplo con <code>random_split(dataset, [40, 20])</code>:</p>
 <table>
-<thead><tr><th>Variante</th><th>Muestras por actualización</th><th><code>batch_size</code></th><th>Actualizaciones por época (N = 60)</th></tr></thead>
-<tbody>
-<tr><td><strong>Batch</strong> gradient descent</td><td>todas</td><td>N (60)</td><td>1</td></tr>
-<tr><td><strong>Mini-batch</strong></td><td>un grupo</td><td>p. ej. 10</td><td>6</td></tr>
-<tr><td><strong>SGD</strong> (<em>Stochastic</em> GD)</td><td>una sola, elegida al azar</td><td>1</td><td>60</td></tr>
-</tbody>
+  <thead><tr><th>Conjunto</th><th>Para qué</th></tr></thead>
+  <tbody>
+    <tr><td><strong>Entrenamiento</strong></td><td>calcular gradientes y mover \( w \) y \( b \)</td></tr>
+    <tr><td><strong>Validación</strong></td><td>comparar lr, épocas… y elegir</td></tr>
+    <tr><td><strong>Prueba</strong> (<em>test</em>)</td><td>medir el resultado final, una sola vez</td></tr>
+  </tbody>
 </table>
+<p>Lo mismo sirve para quedarte con la mejor época: si el coste de validación mejora, guardas una <strong>copia</strong> de los parámetros (un <em>checkpoint</em>) con <code>copy.deepcopy(model.state_dict())</code>, y al final la restauras. Para usarlo mañana, <code>torch.save(model.state_dict(), "modelo_lineal.pt")</code>, y para cargarlo, un modelo con la misma arquitectura y <code>load_state_dict(torch.load(...))</code>.</p>
+</section>
+
+<figure class="demo" data-demo="curso4/c4m3-lr" data-titulo="Curvas de entrenamiento y validación, y barrido del learning rate">
+  <div class="haz">Mueve el slider del learning rate y mira la curva de la izquierda. Luego cambia las épocas (10, 15, 40).</div>
+  <div class="observa">La curva de la derecha es un cuenco: a la izquierda el lr se queda corto y la zona sombreada diverge. Con más épocas el mejor lr (amarillo) se mueve a la izquierda.</div>
+</figure>
+
+<section>
+<h2 id="numeros">Con números: seis learning rates, \( \lambda = 5{,}83 \)</h2>
 <div class="callout ejemplo">
-<span class="lbl">Ejemplo numérico · el gradiente del lote es el promedio de los gradientes de cada película</span>
-<p>Con nuestras tres películas y \( w = b = 0 \), el gradiente de <em>una sola</em> película \( i \) es \( \bigl(2(\hat{y}_i - y_i)\,x_i,\; 2(\hat{y}_i - y_i)\bigr) \):</p>
-<table>
-<thead><tr><th>película</th><th>error \( \hat{y}-y \)</th><th>\( dw = 2\cdot\text{error}\cdot x \)</th><th>\( db = 2\cdot\text{error} \)</th></tr></thead>
-<tbody>
-<tr><td>Shrek (x = 1)</td><td>−2</td><td>−4</td><td>−4</td></tr>
-<tr><td>Toy Story (x = 2)</td><td>−5</td><td>−20</td><td>−10</td></tr>
-<tr><td>El Rey León (x = 3)</td><td>−8</td><td>−48</td><td>−16</td></tr>
-<tr><th scope="row">promedio de las 3 (batch)</th><td></td><td class="res">−24</td><td class="res">−10</td></tr>
-<tr><th scope="row">mini-batch de 2 (Shrek y El Rey León)</th><td></td><td>(−4−48)/2 = −26</td><td>(−4−16)/2 = −10</td></tr>
-</tbody>
-</table>
-<p>El promedio da justo el gradiente completo (−24, −10) del apartado anterior. Una sola película da una <em>estimación ruidosa</em> (−4 o −48 para \( w \), según cuál toque) que apunta en la misma dirección general pero con un tamaño muy distinto; el mini-batch de 2 se acerca más (−26). Cuanto mayor es el lote, menos ruido tiene el gradiente.</p>
+  <span class="lbl">Ejemplo numérico · MSE de validación tras 10 épocas</span>
+  <table>
+    <thead><tr><th>\( lr \)</th><th>factor \( 1 - lr\cdot\lambda \)</th><th>MSE validación</th></tr></thead>
+    <tbody>
+      <tr><td>0,001</td><td>0,994 (tortuga)</td><td>36,43</td></tr>
+      <tr><td>0,05</td><td>0,709</td><td>0,2716</td></tr>
+      <tr><td>0,1</td><td>0,417</td><td>0,0984</td></tr>
+      <tr><td>0,2</td><td>−0,166</td><td class="res">0,0951</td></tr>
+      <tr><td>0,3</td><td>−0,749 (rebota)</td><td>0,1207</td></tr>
+      <tr><td>0,4</td><td>−1,332 (diverge)</td><td>12.215</td></tr>
+    </tbody>
+  </table>
+  <p>Gana 0,2, con 0,0951: casi el nivel del ruido de los datos (\( 0{,}3^2 = 0{,}09 \)), del que no se puede bajar.</p>
 </div>
-<p>Ventajas e inconvenientes: con lotes pequeños cada paso cuesta <strong>poco</strong> y se dan <strong>muchos más pasos por época</strong> (el modelo aprende antes, en tiempo de reloj), y el ruido ayuda a salir de zonas malas en problemas difíciles; pero el camino zigzaguea y, con learning rate fijo, nunca se asienta del todo en el fondo. Con el lote completo el camino es suave pero cada paso lee todos los datos y hay que dar muchos. El <strong>mini-batch</strong> (por ejemplo 32, 64 o 256 muestras) es el término medio y el estándar en deep learning, además de aprovechar mejor la GPU, que calcula muchas muestras a la vez.</p>
-<h3>Con <code>DataLoader</code> en el bucle</h3>
-<p>El bucle de entrenamiento gana un <code>for</code> interior: la <strong>época</strong> recorre todos los datos y cada <strong>iteración</strong> procesa un lote:</p>
-<pre class="ascii">for epoch in range(epochs):
-    for x, y in loader:                 # una iteración = un lote
-        loss = criterion(model(x), y)
-        optimizer.zero_grad()
-        loss.backward()
-        optimizer.step()</pre>
-<p>El <em>cambio de «batch» a «SGD»</em> es literalmente cambiar un número: <code>DataLoader(dataset, batch_size=60)</code> es batch GD, <code>batch_size=10</code> es mini-batch y <code>batch_size=1</code> es SGD. El fragmento 10 los ejecuta con los 60 puntos de los laboratorios, mismo <code>lr = 0,01</code> y 5 épocas: hace <strong>5, 30 y 300 actualizaciones</strong> respectivamente y el MSE final es 400,6, 123,7 y 0,0098. No es que SGD sea «mejor» por naturaleza: es que con el mismo número de épocas ha dado 60 veces más pasos. Con 300 actualizaciones llega a \( w = -3{,}003 \), mientras que el batch, con 5, se ha quedado en \( w = -8{,}22 \).</p>
-<h3>Los detalles del <code>DataLoader</code></h3>
+</section>
+
+<details class="predice">
+  <summary>Guardas el mejor modelo con <code>mejor = model.state_dict()</code>, sin copiar, y sigues entrenando 100 épocas más. Al final cargas <code>mejor</code>. ¿Tienes el mejor modelo?<span class="hint"></span></summary>
+  <div>
+    <p><strong>No: tienes el de la última época.</strong> <code>state_dict()</code> no copia, apunta a los mismos tensores que el modelo, así que <code>mejor</code> cambia con él (en el fragmento 16, el sesgo «guardado» pasa de 0,515 a 1,515). Es guardar el enlace a la película en vez de descargarla: usa <code>copy.deepcopy</code>.</p>
+  </div>
+</details>
+
+<div class="resumen">
+  <h2 class="sin-num sin-toc">En tres líneas</h2>
+  <ul>
+    <li>Converge si \( |1 - lr\cdot\lambda| &lt; 1 \), o sea \( lr &lt; 2/\lambda \); el mejor suele estar cerca del límite.</li>
+    <li>Se elige con el coste de validación; el test se mira una sola vez, al final.</li>
+    <li>El mejor modelo se copia con <code>copy.deepcopy(model.state_dict())</code> y se guarda con <code>torch.save</code>.</li>
+  </ul>
+</div>
+
+<section class="quiz mini">
+<script type="application/json" class="quiz-data">
+{
+ "titulo": "¿Lo tienes?",
+ "preguntas": [
+  {
+   "q": "En una dirección del paisaje el coste es <code>5·u²</code> (curvatura λ = 10, gradiente <code>10·u</code>). Haces pasos con <code>lr = 0.3</code>: <code>u ← u − 0.3·10·u</code>. ¿Qué ocurre?",
+   "opciones": [
+    "Converge en un solo paso",
+    "<strong>Diverge</strong>: cada paso multiplica la distancia por −2",
+    "Converge, pero oscilando",
+    "Se queda quieto en el mismo punto"
+   ],
+   "correcta": 1,
+   "porque": "El paso es <code>u ← (1 − 0.3·10)·u = −2·u</code>: la distancia al mínimo se <strong>duplica</strong> en cada paso (y cambia de signo), así que diverge. Converge solo si |1 − lr·λ| &lt; 1, es decir, lr &lt; 2/λ = 0,2. Con lr = 0,1 el factor sería 0 (un solo paso) y con lr = 0,15, −0,5 (converge oscilando)."
+  },
+  {
+   "q": "Guardas el mejor modelo con <code>mejor = model.state_dict()</code> (sin copiar) y sigues entrenando. ¿Qué problema tienes?",
+   "opciones": [
+    "Ninguno: <code>state_dict()</code> siempre devuelve una copia independiente",
+    "<code>state_dict()</code> solo contiene los nombres, no los valores",
+    "Solo se puede guardar con <code>torch.save</code> al final del entrenamiento",
+    "<code>mejor</code> apunta a los <strong>mismos tensores</strong> que el modelo y seguirá cambiando; hace falta <code>copy.deepcopy(model.state_dict())</code>"
+   ],
+   "correcta": 3,
+   "porque": "<code>state_dict()</code> devuelve referencias a los tensores vivos: en el fragmento 16, sumar 1 al sesgo del modelo cambió también el «guardado» (0,515 → 1,515). Para quedarte con el mejor estado hay que copiarlo (<code>copy.deepcopy</code>) en el momento en que mejora la validación."
+  },
+  {
+   "q": "¿Con qué datos eliges el learning rate entre varios candidatos?",
+   "opciones": [
+    "Con el coste de validación: datos que no se usan para mover \\( w \\) y \\( b \\)",
+    "Con el coste de entrenamiento: el más bajo gana",
+    "Con el de test, probando todos los candidatos"
+   ],
+   "correcta": 0,
+   "porque": "El coste de entrenamiento premia memorizar. El test se usa una sola vez, al acabar: si eliges con él, deja de ser una medida honesta de cómo irá con datos nuevos. Para comparar y elegir está la validación."
+  }
+ ]
+}
+</script>
+</section>
+
+<details class="profundizar">
+  <summary><span>Profundizar: la explicación completa<small>La analogía de la barra de tiempo, la tabla completa del factor por paso, el procedimiento de validación paso a paso, la honestidad sobre este ejemplo, R², checkpoint y parada temprana, state_dict que apunta y la seguridad de torch.load.</small></span></summary>
+  <div class="prof-body">
+<h2 id="lr">Elegir el learning rate, y entrenar / validar / probar</h2>
+
+<p class="pregunta">El learning rate lo eliges tú antes de entrenar, y no hay una fórmula mágica. ¿Cómo se decide cuál es bueno sin engañarse a uno mismo?</p>
+
+<div class="callout recuerda">
+  <span class="lbl">Recuerda (Curso 1)</span>
+  <p>Un <strong>hiperparámetro</strong> es un ajuste que fijas tú antes de entrenar (el learning rate, las épocas, el tamaño del lote…), a diferencia de los <strong>parámetros</strong> (\( w \), \( b \)), que aprende el algoritmo. El learning rate pequeño avanza a paso de tortuga; el adecuado baja rápido; el demasiado grande rebota o <strong>diverge</strong>. Está explicado con una tabla en el <a href="../../curso-1/modulo-2/leccion-7.html#entrenamiento">Curso 1</a>.</p>
+</div>
+
+<div class="callout analogia">
+  <span class="lbl">Analogía: buscar una escena con la barra de tiempo</span>
+  <p>Quieres llegar a tu escena favorita arrastrando la barra del reproductor. Si avanzas a saltos de 1 segundo, llegas, pero tardas una eternidad (<strong>learning rate pequeño</strong>). Si saltas de 10 minutos en 10 minutos, te pasas, vuelves, te pasas otra vez y cada vez estás más lejos de la escena (<strong>learning rate demasiado grande</strong>: diverge). El salto bueno es el más largo que todavía no se pasa de la escena.</p>
+</div>
+
+<h3>Por qué hay un límite: el factor \( (1 - lr\cdot\lambda) \)</h3>
+<p>Con un solo parámetro y un cuenco de curvatura \( \lambda \), cada paso del descenso multiplica la distancia al fondo por \( (1 - lr\cdot\lambda) \). Para el MSE respecto a \( w \), la curvatura es \( \lambda = 2\cdot\overline{x^2} \) (el doble de la media de \( x^2 \)); en los datos del fragmento 11 es \( \lambda \approx 5{,}83 \). Mira lo que pasa con distintos \( lr \):</p>
+
+<div class="callout ejemplo">
+  <span class="lbl">Ejemplo numérico · el factor por paso con \( \lambda = 5{,}83 \)</span>
+  <table>
+    <thead><tr><th>\( lr \)</th><th>factor \( 1 - lr\cdot\lambda \)</th><th>\( \lvert\text{factor}\rvert \)</th><th>Qué pasa</th><th>MSE de validación tras 10 épocas (fragmento 11)</th></tr></thead>
+    <tbody>
+      <tr><td>0,001</td><td>0,994</td><td>0,994</td><td>converge, pero a paso de tortuga</td><td>36,43</td></tr>
+      <tr><td>0,05</td><td>0,709</td><td>0,709</td><td>baja bien, aún le falta</td><td>0,2716</td></tr>
+      <tr><td>0,1</td><td>0,417</td><td>0,417</td><td>baja deprisa</td><td>0,0984</td></tr>
+      <tr><td>0,2</td><td>−0,166</td><td>0,166</td><td>casi de un salto (se pasa un poco y vuelve)</td><td class="res">0,0951</td></tr>
+      <tr><td>0,3</td><td>−0,749</td><td>0,749</td><td>rebota de un lado a otro y se asienta despacio</td><td>0,1207</td></tr>
+      <tr><td>0,4</td><td>−1,332</td><td>1,332</td><td><strong>diverge</strong>: cada paso se aleja más</td><td>12.215</td></tr>
+    </tbody>
+  </table>
+  <p>Converge mientras el valor absoluto del factor sea menor que 1, o sea mientras \( lr &lt; 2/\lambda = 0{,}343 \) (el fragmento 11 imprime ese límite). El mejor está <em>cerca del límite</em> pero sin pasarse (aquí 0,2: factor −0,17), y por encima de él todo se rompe. En un modelo con varios parámetros manda el \( \lambda \) más grande de todos (lo vimos antes: \( 2/\lambda_{\max} \)).</p>
+</div>
+
+<h3>Elegir con validación: tres conjuntos</h3>
+<p>No puedes elegir el learning rate (ni ningún hiperparámetro) mirando el coste <em>de entrenamiento</em>: siempre premiará lo que mejor memorice. Los datos se parten en tres conjuntos, igual que viste en el <a href="../../curso-1/modulo-5.html">Curso 1</a>:</p>
+<table>
+  <thead><tr><th>Conjunto</th><th>Para qué</th><th>¿Se usa para ajustar \( w \) y \( b \)?</th></tr></thead>
+  <tbody>
+    <tr><td><strong>Entrenamiento</strong> (<em>train</em>)</td><td>calcular los gradientes y mover los parámetros</td><td>sí</td></tr>
+    <tr><td><strong>Validación</strong> (<em>validation</em>)</td><td>comparar configuraciones (lr, épocas, nº de variables) y elegir la mejor</td><td>no</td></tr>
+    <tr><td><strong>Prueba</strong> (<em>test</em>)</td><td>medir el resultado final, <strong>una sola vez</strong>, al acabar</td><td>no</td></tr>
+  </tbody>
+</table>
+<p>Imagina 60 películas con sus horas vistas: 40 sirven para entrenar, 20 se apartan para validar y, si hubiera conjunto de prueba, serían los estrenos que ni miras hasta el final. En PyTorch se parten con <code>torch.utils.data.random_split(dataset, [40, 20])</code> (o con <code>torch.randperm</code> y los índices): devuelve subconjuntos barajados con los tamaños que pidas (y puedes pasarle un <code>generator</code> con semilla para que sea reproducible). El procedimiento: para cada learning rate candidato (en potencias de 10: 0,001, 0,01, 0,1…) entrenas con <em>train</em>, mides el coste en <em>validation</em> y te quedas con el que da menor coste de validación; el <em>test</em> ni se toca. En el fragmento 11 el ganador es \( lr = 0{,}2 \) con un MSE de validación de 0,0951, que además es casi el nivel del ruido de los datos (\( 0{,}3^2 = 0{,}09 \)): no se puede bajar de ahí.</p>
+
+<div class="callout recuerda">
+  <span class="lbl">Experimento de arriba: «Curvas de entrenamiento y validación, y barrido del learning rate», con todo detalle</span>
+  <p><strong>Haz esto.</strong> Mueve el slider del <strong>learning rate</strong> de izquierda a derecha y mira la curva de la izquierda: ¿cuándo baja despacio? ¿cuándo oscila? ¿cuándo se dispara? Después cambia las <strong>épocas</strong> (10, 15, 40) y mira cómo se desplaza el mejor lr (punto amarillo) en el gráfico de la derecha.</p>
+  <p><strong>Fíjate en.</strong> En el gráfico derecho cada punto de la curva negra es un modelo entrenado con un lr distinto. Tiene forma de «cuenco»: a la izquierda, lr demasiado pequeño para el número de épocas; a la derecha, la zona sombreada (lr &gt; 1/media de x²) donde el entrenamiento <strong>diverge</strong>. Con más épocas los lr pequeños se ponen al día y el óptimo se desplaza hacia la izquierda: <em>lr y épocas se eligen juntos</em>.</p>
+</div>
+
+<div class="callout regla">
+  <span class="lbl">Regla fácil</span>
+  <p>Prueba el learning rate en <strong>potencias de 10</strong> con pocas épocas y mira la curva de coste: si <strong>sube o da NaN</strong>, baja el lr; si <strong>casi no se mueve</strong>, súbelo; si <strong>oscila</strong>, bájalo un poco. Elige por el coste de <strong>validación</strong>, no por el de entrenamiento. Con SGD suele funcionar entre 0,001 y 0,1; con las variables estandarizadas, mucho más fácil.</p>
+</div>
+
+<div class="callout ojo">
+  <span class="lbl">Ojo: una honestidad sobre este ejemplo</span>
+  <p>La regresión lineal tiene un solo mínimo y, con épocas suficientes, casi cualquier lr estable llega a él: la validación aquí solo elige «el que llega antes». Donde la validación es imprescindible es en las redes neuronales (siguientes módulos), donde el lr cambia <em>a dónde</em> llegas, no solo cuándo, y donde un modelo con muchos parámetros puede memorizar el entrenamiento mientras el coste de validación sube (<em>sobreajuste</em>). La mecánica de este apartado es la misma.</p>
+</div>
+
+<h2 id="guardar">Evaluar con datos nuevos y guardar el modelo</h2>
+
+<p class="pregunta">Has entrenado un modelo que predice bien las horas de las películas que conoce. ¿Cómo mides lo bien que lo hará con los estrenos de mañana, que nunca ha visto, cómo te quedas con la mejor versión y cómo lo guardas para usarlo mañana?</p>
+
+<h3>Train, validación y test en el mismo bucle</h3>
+<p>En cada época se ajusta con <em>train</em> y se mide en <em>validation</em> (sin mover los parámetros). Para esa medida:</p>
 <ul>
-<li><strong><code>shuffle=True</code></strong>: baraja el orden en cada época, para que los lotes no sean siempre los mismos. Casi siempre para entrenar; no hace falta para validar ni probar.</li>
-<li><strong>El último lote puede ser más pequeño</strong>: con 60 muestras y <code>batch_size=7</code> salen 9 lotes (<code>[7, 7, 7, 7, 7, 7, 7, 7, 4]</code>), el último de 4. Con <code>drop_last=True</code> se tira ese lote incompleto y quedan 8. <code>len(loader)</code> te da el número de lotes: \( \lceil 60/7 \rceil = 9 \) (o \( \lfloor 60/7 \rfloor = 8 \)).</li>
-<li><strong><code>num_workers</code></strong>: procesos que preparan los lotes en paralelo (con datos pequeños en memoria basta el valor por defecto, 0).</li>
-<li><strong>Reproducibilidad</strong>: el baraje usa el generador aleatorio global; con <code>torch.manual_seed(...)</code> antes de crear el bucle sale siempre el mismo orden.</li>
+  <li><code>model.eval()</code> pone el modelo en «modo evaluación» y <code>model.train()</code> en «modo entrenamiento». Para <code>nn.Linear</code> no cambia nada, pero capas de los próximos cursos (<em>dropout</em>, <em>batch normalization</em>) se comportan distinto en cada modo: conviene adquirir el hábito.</li>
+  <li><code>with torch.no_grad():</code> evita que PyTorch apunte el grafo de cómputo, que no hace falta porque no vamos a llamar a <code>backward()</code>: ahorra memoria y tiempo.</li>
+</ul>
+<p>Como métrica extra se usa a menudo el <strong>\( R^2 \)</strong> (coeficiente de determinación), que compara el error del modelo con el de «predecir siempre la media»:</p>
+<div class="formula">\[ R^2 = 1 - \frac{\sum_i (\hat{y}_i - y_i)^2}{\sum_i (y_i - \bar{y})^2} \]</div>
+<p>donde \( \bar{y} \) es la media de los valores reales. Con las horas reales de nuestras tres películas, \( y = (2, 5, 8) \), y \( \hat{y} = (2{,}5;\ 4{,}5;\ 6{,}5) \): el numerador es \( 0{,}25 + 0{,}25 + 2{,}25 = 2{,}75 \); la media es 5 y el denominador \( 9 + 0 + 9 = 18 \); así \( R^2 = 1 - 2{,}75/18 = 0{,}8472 \). Vale 1 si no hay error y 0 si el modelo no mejora a la media (<a href="../../curso-1/modulo-2/leccion-3.html#metricas">Curso 1</a>).</p>
+
+<h3>Quedarte con el mejor modelo (checkpoint) y parar a tiempo</h3>
+<p>Un <strong><em>checkpoint</em></strong> es una copia de los parámetros guardada en un buen momento. La receta: en cada época calcula el coste de validación; si es el mejor visto hasta ahora, guarda <strong>una copia</strong> de los parámetros. Al final, restaura esa copia, no el estado de la última época. La <strong>parada temprana</strong> (<em>early stopping</em>) añade una regla: si el coste de validación no mejora durante \( p \) épocas seguidas (la <em>paciencia</em>), se detiene el entrenamiento.</p>
+<p>En el fragmento 16, con 300 muestras (180 train, 60 validation, 60 test) y 200 épocas, el coste de validación mejora hasta la época <strong>42</strong> (0,2059) y después se queda plano: con un modelo tan simple el sobreajuste no aparece, pero la mecánica es la que usarás con redes grandes. Medido en el conjunto de <em>test</em>, el modelo guardado da un MSE de 0,1461 y un \( R^2 \) de 0,9714 (que sea menor que el de train no es raro: son subconjuntos distintos y el ruido de los datos es de 0,25 de varianza).</p>
+
+<div class="callout ojo">
+  <span class="lbl">Ojo: <code>state_dict()</code> no copia, <em>apunta</em></span>
+  <p><code>model.state_dict()</code> devuelve un diccionario cuyos tensores son <strong>los mismos objetos</strong> que los parámetros vivos del modelo. Si guardas <code>mejor = model.state_dict()</code> y sigues entrenando, <code>mejor</code> <em>cambia con el modelo</em> y acabas «restaurando» la última época, no la mejor. El fragmento 16 lo demuestra: sumamos 1 al sesgo y el «guardado» pasa de 0,515 a 1,515. Usa <code>copy.deepcopy(model.state_dict())</code> (o guarda a disco enseguida con <code>torch.save</code>). Es como guardar el <em>enlace</em> a una película en la plataforma y no la película: si el estudio cambia el montaje, tu enlace enseña la versión nueva; <code>deepcopy</code> es descargarla para verla sin conexión.</p>
+</div>
+
+<h3>Guardar y cargar con <code>state_dict</code></h3>
+<ul>
+  <li><strong>Guardar</strong>: <code>torch.save(model.state_dict(), "modelo_lineal.pt")</code> escribe a disco solo los números (nombre → tensor). Es el método recomendado.</li>
+  <li><strong>Cargar</strong>: primero se crea un modelo <em>con la misma arquitectura</em> (<code>nuevo = nn.Linear(3, 1)</code>, con pesos al azar) y después <code>nuevo.load_state_dict(torch.load("modelo_lineal.pt"))</code> le copia los pesos guardados. Si los nombres o las formas no coinciden (por ejemplo, <code>linear.weight</code> frente a <code>0.weight</code>, o <code>Linear(3,1)</code> frente a <code>Linear(2,1)</code>), da un error con la lista de claves que faltan o sobran. Después <code>nuevo.eval()</code> y a predecir.</li>
+  <li><code>torch.save(model, ...)</code> guarda el <em>objeto entero</em> con <code>pickle</code>: ata el archivo a tu estructura de carpetas y clases, y es frágil entre versiones. Se evita.</li>
 </ul>
 <div class="callout ojo">
-<span class="lbl">Ojo: el <code>loss</code> que imprimes dentro del bucle es el de un solo lote</span>
-<p>Con mini-batch, el <code>loss</code> de la última iteración de una época es el coste de <em>ese lote</em>, que es ruidoso y puede ser mayor o menor que el de la época completa. Para ver cómo va el modelo de verdad, calcula el coste de todo el conjunto (con <code>torch.no_grad()</code>) al final de cada época, o acumula los costes de los lotes ponderados por su tamaño. Y recuerda: el número de <em>actualizaciones</em> por época depende de <code>batch_size</code>, así que al cambiarlo suele hacer falta reajustar el learning rate.</p>
+  <span class="lbl">Ojo: <code>torch.load</code> y la seguridad (cambio de versión)</span>
+  <p>En PyTorch 2.6 y posteriores, <code>torch.load</code> usa <code>weights_only=True</code> por defecto: solo carga tensores y estructuras sencillas (como un <code>state_dict</code>) y rechaza objetos arbitrarios, porque cargar un archivo <code>pickle</code> desconocido puede ejecutar código. Con un <code>state_dict</code> funciona sin avisos; si guardaste el modelo entero con <code>torch.save(model, ...)</code>, en versiones recientes tendrás que pedir <code>weights_only=False</code> <em>solo</em> con archivos en los que confíes. En versiones anteriores el valor por defecto era <code>False</code>.</p>
 </div>
-</section></div></details><details class="profundizar" id="codigo"><summary><span>Ver código explicado paso a paso<small>1 fragmento(s) original(es), con cada línea comentada y salida esperada.</small></span></summary><div class="prof-body"><article class="snippet" data-lang="python" id="frag-10">
-<header>
-<h3>10 · <code>Dataset</code> + <code>DataLoader</code>: batch, mini-batch y SGD</h3>
-<p class="para-que"><strong>Para qué sirve</strong> Entrenar con el mismo número de épocas y el mismo <code>lr</code> variando <code>batch_size</code> (60, 10 y 1), contar las actualizaciones por época y ver cómo reparte los lotes <code>drop_last</code>.</p>
-</header>
-<pre class="code"><code>import torch
+  </div>
+</details>
+
+<section>
+<h2 class="sin-num">Código</h2>
+<article class="snippet" data-lang="python" id="frag-11">
+  <header>
+    <h3>11 · Elegir el learning rate con validación</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Partir los datos con <code>random_split</code>, entrenar con varios learning rates y elegir el que da menor coste de validación; ver también cuándo diverge.</p>
+  </header>
+  <pre class="code"><code>import torch
 from torch import nn
-from torch.utils.data import Dataset, DataLoader
+from torch.utils.data import random_split
 
-class Data(Dataset):
-    def __init__(self):
-        torch.manual_seed(0)
-        self.x = torch.arange(-3, 3, 0.1).view(-1, 1)
-        self.y = -3 * self.x + 0.1 * torch.randn(self.x.size())
-        self.len = self.x.shape[0]
+torch.manual_seed(0)
+X = torch.arange(-3, 3, 0.1).view(-1, 1)
+Y = -3 * X + 1 + 0.3 * torch.randn(X.size())
+train_idx, val_idx = random_split(range(len(X)), [40, 20], generator=torch.Generator().manual_seed(7))
+Xtr, Ytr = X[list(train_idx)], Y[list(train_idx)]
+Xva, Yva = X[list(val_idx)], Y[list(val_idx)]
+print("entrenamiento:", len(Xtr), " validación:", len(Xva))
 
-    def __getitem__(self, index):
-        return self.x[index], self.y[index]
-
-    def __len__(self):
-        return self.len
-
-dataset = Data()
-print("muestras:", len(dataset), " primera:", [round(v.item(), 3) for v in dataset[0]])
-
-def entrenar(batch_size, lr, epocas=5):
+def probar(lr, epocas=10):
     torch.manual_seed(1)
     model = nn.Linear(1, 1)
+    opt = torch.optim.SGD(model.parameters(), lr=lr)
+    crit = nn.MSELoss()
+    for _ in range(epocas):
+        loss = crit(model(Xtr), Ytr)
+        opt.zero_grad(); loss.backward(); opt.step()
     with torch.no_grad():
-        model.weight.fill_(-10.0); model.bias.fill_(-20.0)
-    optimizer = torch.optim.SGD(model.parameters(), lr=lr)
-    criterion = nn.MSELoss()
-    loader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
-    pasos = 0
-    for epoch in range(epocas):
-        for x, y in loader:
-            loss = criterion(model(x), y)
-            optimizer.zero_grad()
-            loss.backward()
-            optimizer.step()
-            pasos += 1
-    total = criterion(model(dataset.x), dataset.y).item()
-    return pasos, model.weight.item(), model.bias.item(), total
+        return crit(model(Xtr), Ytr).item(), crit(model(Xva), Yva).item()
 
-print("batch_size  lr     actualizaciones  w        b        MSE total")
-for bs, lr in [(60, 0.01), (10, 0.01), (1, 0.01)]:
-    pasos, w, b, mse = entrenar(bs, lr)
-    print(f"{bs:10d}  {lr:&lt;5}  {pasos:15d}  {w:7.4f}  {b:7.4f}  {mse:8.4f}")
+print("lr        MSE entrenamiento   MSE validación")
+resultados = {}
+for lr in [0.001, 0.01, 0.05, 0.1, 0.2, 0.3, 0.4]:
+    tr, va = probar(lr)
+    resultados[lr] = va
+    print(f"{lr:&lt;8}  {tr:17.4f}   {va:14.4f}")
+validos = {lr: v for lr, v in resultados.items() if v == v}     # descarta los nan
+mejor = min(validos, key=validos.get)
+print("mejor lr según validación:", mejor)
+print("límite teórico de estabilidad 2 / (2 * media(x^2)) =", round(1 / (Xtr ** 2).mean().item(), 3))</code></pre>
+  <details class="linea-a-linea">
+    <summary>Línea por línea</summary>
+    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+      <tbody>
+        <tr data-lines="1-3"><td><code>import torch …</code></td><td><code>torch</code>, <code>nn</code> y <code>random_split</code> (parte un conjunto en trozos aleatorios).</td></tr>
+        <tr data-lines="5"><td><code>torch.manual_seed(0)</code></td><td>Semilla.</td></tr>
+        <tr data-lines="6-7"><td><code>X = torch.arange(-3, 3, 0.1).view(-1, 1) …</code></td><td>60 puntos de la recta <em>y</em> = −3<em>x</em> + 1 con ruido de desviación 0,3.</td></tr>
+        <tr data-lines="8"><td><code>train_idx, val_idx = random_split(range(len(X)), [ …</code></td><td>Parte los 60 índices en 40 de entrenamiento y 20 de validación. El <code>generator</code> con semilla hace que el reparto sea siempre el mismo.</td></tr>
+        <tr data-lines="9-10"><td><code>Xtr, Ytr = X[list(train_idx)], Y[list(train_idx)] …</code></td><td>Selecciona las filas de <code>X</code> e <code>Y</code> de cada parte (<code>list(...)</code> convierte el subconjunto en una lista de índices).</td></tr>
+        <tr data-lines="11"><td><code>print("entrenamiento:", len(Xtr), " validación:",  …</code></td><td>Imprime el tamaño de cada parte.</td></tr>
+        <tr data-lines="13"><td><code>def probar(lr, epocas=10):</code></td><td>Una función que entrena con un <code>lr</code> y devuelve el coste en train y en validation.</td></tr>
+        <tr data-lines="14-15"><td><code>torch.manual_seed(1) …</code></td><td>Semilla y modelo nuevo, para que cada <code>lr</code> parta de los mismos pesos.</td></tr>
+        <tr data-lines="16-17"><td><code>opt = torch.optim.SGD(model.parameters(), lr=lr) …</code></td><td>Optimizador SGD con el <code>lr</code> a probar, y el coste.</td></tr>
+        <tr data-lines="18-20"><td><code>for _ in range(epocas): …</code></td><td>10 épocas con todos los datos de entrenamiento (batch).</td></tr>
+        <tr data-lines="21-22"><td><code>with torch.no_grad(): …</code></td><td>Con <code>no_grad()</code> (no hace falta el grafo), mide el MSE en entrenamiento y en validación.</td></tr>
+        <tr data-lines="24"><td><code>print("lr        MSE entrenamiento   MSE validació …</code></td><td>Cabecera de la tabla.</td></tr>
+        <tr data-lines="25"><td><code>resultados = {}</code></td><td>Un diccionario donde guardar el coste de validación de cada lr.</td></tr>
+        <tr data-lines="26-29"><td><code>for lr in [0.001, 0.01, 0.05, 0.1, 0.2, 0.3, 0.4]: …</code></td><td>Prueba siete learning rates (potencias y medios de 10), guarda el de validación e imprime una fila.</td></tr>
+        <tr data-lines="30"><td><code>validos = {lr: v for lr, v in resultados.items() i …</code></td><td>Se descartan los resultados que no son números (<code>v == v</code> es falso para <code>nan</code>).</td></tr>
+        <tr data-lines="31-32"><td><code>mejor = min(validos, key=validos.get) …</code></td><td>Se queda con el <code>lr</code> de menor coste de validación y lo imprime.</td></tr>
+        <tr data-lines="33"><td><code>print("límite teórico de estabilidad 2 / (2 * medi …</code></td><td>El límite teórico de estabilidad: 2/λ con λ = 2·media(<em>x</em>²), es decir, 1/media(<em>x</em>²).</td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>entrenamiento: 40  validación: 20
+lr        MSE entrenamiento   MSE validación
+0.001               34.5630          36.4261
+0.01                12.4414          12.6986
+0.05                 0.3551           0.2716
+0.1                  0.0898           0.0984
+0.2                  0.0660           0.0951
+0.3                  0.1779           0.1207
+0.4              11228.1631       12214.9326
+mejor lr según validación: 0.2
+límite teórico de estabilidad 2 / (2 * media(x^2)) = 0.343</pre>
+    <p>Con 0,001 y 0,01 el modelo no ha tenido tiempo de bajar (MSE de validación 36,43 y 12,70); 0,05 y 0,1 ya mejoran mucho (0,2716 y 0,0984); <strong>0,2</strong> es el mejor, con 0,0951, casi el nivel del ruido (0,3² = 0,09); <strong>0,3</strong> está cerca del límite y oscila (0,1207, peor); y <strong>0,4</strong> lo supera y <strong>diverge</strong> (MSE de miles). El límite teórico, <strong>0,343</strong>, cae justo entre 0,3 y 0,4. La elección se ha hecho con el coste de <em>validación</em>; el de test ni se ha tocado.</p>
+  </div>
+</article>
 
-for kw in ({}, {"drop_last": True}):
-    tamanos = [len(x) for x, _ in DataLoader(dataset, batch_size=7, **kw)]
-    print(kw or "por defecto", "-&gt;", tamanos)</code></pre>
-<details class="linea-a-linea">
-<summary>Línea por línea</summary>
-<p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
-<table class="lineas">
-<thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
-<tbody>
-<tr data-lines="1-3"><td><code>import torch …</code></td><td><code>torch</code>, <code>nn</code> y las clases <code>Dataset</code> y <code>DataLoader</code> (módulo 2).</td></tr>
-<tr data-lines="5"><td><code>class Data(Dataset):</code></td><td>Nuestro <code>Dataset</code> propio.</td></tr>
-<tr data-lines="6-10"><td><code>def __init__(self): …</code></td><td>El constructor genera los 60 puntos de los laboratorios (con la semilla 0 dentro, para que sean siempre los mismos) y guarda cuántos hay.</td></tr>
-<tr data-lines="12-13"><td><code>def __getitem__(self, index): …</code></td><td><code>__getitem__</code> devuelve la pareja (<em>x</em>, <em>y</em>) de la muestra <code>index</code>.</td></tr>
-<tr data-lines="15-16"><td><code>def __len__(self): …</code></td><td><code>__len__</code> dice cuántas muestras hay.</td></tr>
-<tr data-lines="18"><td><code>dataset = Data()</code></td><td>Crea el dataset.</td></tr>
-<tr data-lines="19"><td><code>print("muestras:", len(dataset), " primera:", [rou …</code></td><td>Imprime cuántas muestras tiene y la primera pareja (<code>dataset[0]</code> llama a <code>__getitem__(0)</code>).</td></tr>
-<tr data-lines="21"><td><code>def entrenar(batch_size, lr, epocas=5):</code></td><td>Una función que entrena y devuelve el resultado, para poder repetirla con distintos lotes.</td></tr>
-<tr data-lines="22-25"><td><code>torch.manual_seed(1) …</code></td><td>Semilla, modelo con los mismos pesos iniciales (−10 y −20) en cada ejecución.</td></tr>
-<tr data-lines="26-27"><td><code>optimizer = torch.optim.SGD(model.parameters(), lr …</code></td><td>Optimizador SGD y coste.</td></tr>
-<tr data-lines="28"><td><code>loader = DataLoader(dataset, batch_size=batch_size …</code></td><td>El <code>DataLoader</code>: <code>batch_size</code> es el tamaño del lote y <code>shuffle=True</code> baraja en cada época.</td></tr>
-<tr data-lines="29"><td><code>pasos = 0</code></td><td>Contador de actualizaciones.</td></tr>
-<tr data-lines="30"><td><code>for epoch in range(epocas):</code></td><td>Bucle de épocas.</td></tr>
-<tr data-lines="31"><td><code>for x, y in loader:</code></td><td>Bucle de lotes: cada iteración recibe un lote <code>x</code>, <code>y</code>.</td></tr>
-<tr data-lines="32-35"><td><code>loss = criterion(model(x), y) …</code></td><td>Las cinco líneas de siempre, ahora con el coste del <em>lote</em>.</td></tr>
-<tr data-lines="36"><td><code>pasos += 1</code></td><td>Cuenta una actualización.</td></tr>
-<tr data-lines="37"><td><code>total = criterion(model(dataset.x), dataset.y).ite …</code></td><td>Al acabar, el MSE de <em>todo</em> el conjunto (para comparar), no el de un lote.</td></tr>
-<tr data-lines="38"><td><code>return pasos, model.weight.item(), model.bias.item …</code></td><td>Devuelve nº de actualizaciones, parámetros finales y coste.</td></tr>
-<tr data-lines="40"><td><code>print("batch_size  lr     actualizaciones  w       …</code></td><td>Cabecera de la tabla de resultados.</td></tr>
-<tr data-lines="41-43"><td><code>for bs, lr in [(60, 0.01), (10, 0.01), (1, 0.01)]: …</code></td><td>Tres entrenamientos con el mismo lr: batch (60), mini-batch (10) y SGD (1), e imprime una fila para cada uno.</td></tr>
-<tr data-lines="45-47"><td><code>for kw in ({}, {"drop_last": True}): …</code></td><td>Muestra cómo reparte los lotes un <code>DataLoader</code> con <code>batch_size=7</code> sin y con <code>drop_last=True</code>: <code>len(x)</code> es el tamaño de cada lote.</td></tr>
-</tbody>
-</table>
-</details>
-<div class="salida">
-<strong>Salida esperada</strong>
-<pre>muestras: 60  primera: [-3.0, 8.887]
-batch_size  lr     actualizaciones  w        b        MSE total
-        60  0.01                 5  -8.2198  -18.1078  400.6223
-        10  0.01                30  -4.2239  -10.9715  123.6977
-         1  0.01               300  -3.0029  -0.0326    0.0098
-por defecto -&gt; [7, 7, 7, 7, 7, 7, 7, 7, 4]
-{'drop_last': True} -&gt; [7, 7, 7, 7, 7, 7, 7, 7]</pre>
-<p>Con 5 épocas y el mismo <code>lr = 0,01</code>: el <em>batch</em> hace <strong>5</strong> actualizaciones y se queda lejos (<em>w</em> = −8,22; MSE 400,6); el mini-batch de 10 hace <strong>30</strong> (MSE 123,7) y SGD con lotes de 1 hace <strong>300</strong> y llega a <em>w</em> = −3,003, <em>b</em> = −0,033 y MSE 0,0098. No es que SGD sea «mejor» en sí: ha dado 60 veces más pasos por el mismo número de épocas. Con <code>batch_size=7</code>, los 60 datos dan 9 lotes, el último de solo 4; con <code>drop_last=True</code> se tira y quedan 8.</p>
+<article class="snippet" data-lang="python" id="frag-16">
+  <header>
+    <h3>16 · Entrenar, validar, probar, guardar el mejor modelo y cargarlo</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Partir los datos en train/validation/test, quedarse con la mejor época (checkpoint), guardar y cargar con <code>state_dict</code>, medir MSE y R² en test y ver por qué hace falta <code>deepcopy</code>.</p>
+  </header>
+  <pre class="code"><code>import copy
+import torch
+from torch import nn
+
+torch.manual_seed(0)
+X = torch.randn(300, 3)
+Y = (0.5 + X @ torch.tensor([[1.0], [-2.0], [0.5]])) + 0.5 * torch.randn(300, 1)
+perm = torch.randperm(300)
+tr, va, te = perm[:180], perm[180:240], perm[240:]          # 60 % / 20 % / 20 %
+print("tamaños:", len(tr), len(va), len(te))
+
+torch.manual_seed(1)
+model = nn.Linear(3, 1)
+crit = nn.MSELoss()
+opt = torch.optim.SGD(model.parameters(), lr=0.05)
+mejor_val, mejor_estado, mejor_epoca = float("inf"), None, -1
+for epoch in range(1, 201):
+    model.train()
+    loss = crit(model(X[tr]), Y[tr])
+    opt.zero_grad(); loss.backward(); opt.step()
+    model.eval()
+    with torch.no_grad():
+        val = crit(model(X[va]), Y[va]).item()
+    if val &lt; mejor_val:
+        mejor_val, mejor_epoca = val, epoch
+        mejor_estado = copy.deepcopy(model.state_dict())     # copia independiente
+    if epoch in (1, 10, 50, 200):
+        print(f"época {epoch:3d}  train = {loss.item():.4f}  val = {val:.4f}")
+print("mejor época:", mejor_epoca, " val =", round(mejor_val, 4))
+
+torch.save(mejor_estado, "modelo_lineal.pt")                 # guardar solo los parámetros
+nuevo = nn.Linear(3, 1)                                      # arquitectura vacía
+nuevo.load_state_dict(torch.load("modelo_lineal.pt"))        # cargar los parámetros
+nuevo.eval()
+with torch.no_grad():
+    pred = nuevo(X[te])
+    mse = crit(pred, Y[te]).item()
+    r2 = 1 - ((pred - Y[te]) ** 2).sum() / ((Y[te] - Y[te].mean()) ** 2).sum()
+print("test: MSE =", round(mse, 4), " R² =", round(r2.item(), 4))
+print("pesos cargados:", nuevo.weight.detach().numpy().round(3), nuevo.bias.detach().numpy().round(3))
+
+ref = model.state_dict()                                     # SIN copiar: apunta a los mismos tensores
+antes = ref["bias"].item()
+with torch.no_grad():
+    model.bias += 1.0
+print("sin deepcopy el «guardado» cambia solo:", round(antes, 3), "-&gt;", round(ref["bias"].item(), 3))</code></pre>
+  <details class="linea-a-linea">
+    <summary>Línea por línea</summary>
+    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+      <tbody>
+        <tr data-lines="1-3"><td><code>import copy …</code></td><td><code>copy</code> (para copias independientes), <code>torch</code> y <code>nn</code>.</td></tr>
+        <tr data-lines="5"><td><code>torch.manual_seed(0)</code></td><td>Semilla.</td></tr>
+        <tr data-lines="6"><td><code>X = torch.randn(300, 3)</code></td><td>300 muestras con 3 variables.</td></tr>
+        <tr data-lines="7"><td><code>Y = (0.5 + X @ torch.tensor([[1.0], [-2.0], [0.5]] …</code></td><td>Objetivo: 0,5 + 1·<em>x</em>₁ − 2·<em>x</em>₂ + 0,5·<em>x</em>₃ más ruido de desviación 0,5. El <code>@</code> multiplica la matriz por el vector de pesos.</td></tr>
+        <tr data-lines="8"><td><code>perm = torch.randperm(300)</code></td><td><code>randperm</code> da los índices 0…299 en orden aleatorio.</td></tr>
+        <tr data-lines="9"><td><code>tr, va, te = perm[:180], perm[180:240], perm[240:] …</code></td><td>Reparto 60 % / 20 % / 20 %: entrenamiento, validación y prueba.</td></tr>
+        <tr data-lines="10"><td><code>print("tamaños:", len(tr), len(va), len(te))</code></td><td>Imprime los tamaños.</td></tr>
+        <tr data-lines="12-13"><td><code>torch.manual_seed(1) …</code></td><td>Semilla y modelo <code>nn.Linear(3, 1)</code>.</td></tr>
+        <tr data-lines="14-15"><td><code>crit = nn.MSELoss() …</code></td><td>Coste y optimizador.</td></tr>
+        <tr data-lines="16"><td><code>mejor_val, mejor_estado, mejor_epoca = float("inf" …</code></td><td>Variables para guardar el mejor coste de validación, el mejor estado y su época.</td></tr>
+        <tr data-lines="17"><td><code>for epoch in range(1, 201):</code></td><td>200 épocas.</td></tr>
+        <tr data-lines="18"><td><code>model.train()</code></td><td><code>model.train()</code>: modo entrenamiento.</td></tr>
+        <tr data-lines="19-20"><td><code>loss = crit(model(X[tr]), Y[tr]) …</code></td><td>Un paso de entrenamiento con los datos de <em>train</em>.</td></tr>
+        <tr data-lines="21"><td><code>model.eval()</code></td><td><code>model.eval()</code>: modo evaluación.</td></tr>
+        <tr data-lines="22-23"><td><code>with torch.no_grad(): …</code></td><td>Sin gradientes, mide el coste en <em>validation</em>.</td></tr>
+        <tr data-lines="24"><td><code>if val &lt; mejor_val:</code></td><td>Si es el mejor hasta ahora…</td></tr>
+        <tr data-lines="25"><td><code>mejor_val, mejor_epoca = val, epoch</code></td><td>…anota su valor y su época…</td></tr>
+        <tr data-lines="26"><td><code>mejor_estado = copy.deepcopy(model.state_dict())   …</code></td><td>…y guarda <strong>una copia independiente</strong> de los parámetros con <code>copy.deepcopy</code>.</td></tr>
+        <tr data-lines="27-28"><td><code>if epoch in (1, 10, 50, 200): …</code></td><td>En algunas épocas imprime el coste de train y de validación.</td></tr>
+        <tr data-lines="29"><td><code>print("mejor época:", mejor_epoca, " val =", round …</code></td><td>Imprime la mejor época y su coste.</td></tr>
+        <tr data-lines="31"><td><code>torch.save(mejor_estado, "modelo_lineal.pt")       …</code></td><td>Guarda a disco los parámetros del mejor modelo (<code>torch.save</code>).</td></tr>
+        <tr data-lines="32"><td><code>nuevo = nn.Linear(3, 1)                            …</code></td><td>Crea un modelo nuevo con la <strong>misma arquitectura</strong> (con pesos aleatorios).</td></tr>
+        <tr data-lines="33"><td><code>nuevo.load_state_dict(torch.load("modelo_lineal.pt …</code></td><td><code>load_state_dict</code> le copia los pesos guardados (<code>torch.load</code> lee el archivo).</td></tr>
+        <tr data-lines="34"><td><code>nuevo.eval()</code></td><td>Modo evaluación.</td></tr>
+        <tr data-lines="35-37"><td><code>with torch.no_grad(): …</code></td><td>Sin gradientes, predice el conjunto de <em>test</em> y calcula su MSE.</td></tr>
+        <tr data-lines="38"><td><code>r2 = 1 - ((pred - Y[te]) ** 2).sum() / ((Y[te] - Y …</code></td><td>El R²: 1 − (suma de errores²) / (suma de desviaciones² respecto a la media).</td></tr>
+        <tr data-lines="39"><td><code>print("test: MSE =", round(mse, 4), " R² =", round …</code></td><td>Imprime MSE y R² de test.</td></tr>
+        <tr data-lines="40"><td><code>print("pesos cargados:", nuevo.weight.detach().num …</code></td><td>Imprime los pesos cargados (los del mejor modelo).</td></tr>
+        <tr data-lines="42"><td><code>ref = model.state_dict()                           …</code></td><td>Guarda una «referencia» al <code>state_dict</code> del modelo <strong>sin copiarla</strong>.</td></tr>
+        <tr data-lines="43"><td><code>antes = ref["bias"].item()</code></td><td>Lee el sesgo guardado en esa referencia.</td></tr>
+        <tr data-lines="44-45"><td><code>with torch.no_grad(): …</code></td><td>Le sumamos 1 al sesgo del modelo vivo.</td></tr>
+        <tr data-lines="46"><td><code>print("sin deepcopy el «guardado» cambia solo:", r …</code></td><td>Imprime el sesgo «guardado» antes y después: cambia solo.</td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>tamaños: 180 60 60
+época   1  train = 4.0660  val = 3.7568
+época  10  train = 0.8031  val = 0.7409
+época  50  train = 0.2125  val = 0.2062
+época 200  train = 0.2123  val = 0.2070
+mejor época: 42  val = 0.2059
+test: MSE = 0.1461  R² = 0.9714
+pesos cargados: [[ 0.953 -1.947  0.548]] [0.518]
+sin deepcopy el «guardado» cambia solo: 0.515 -&gt; 1.515</pre>
+    <p>Reparto 180/60/60. El coste baja de 4,07 (train) y 3,76 (val) en la época 1 a 0,21 hacia la época 50 y se queda plano (0,2123 / 0,2070 en la 200): el mejor coste de validación (0,2059) es de la <strong>época 42</strong>. En test, el modelo guardado y vuelto a cargar da un MSE de <strong>0,1461</strong> y un R² de <strong>0,9714</strong>; los pesos cargados son los del mejor modelo, <code>[0.953, -1.947, 0.548]</code> con sesgo 0,518, cercanos a los verdaderos (1, −2, 0,5; sesgo 0,5). Y la última línea demuestra la trampa: sin <code>deepcopy</code>, sumar 1 al sesgo del modelo cambia <em>también</em> el «guardado» (0,515 → 1,515). El fragmento crea el archivo <code>modelo_lineal.pt</code> en la carpeta actual.</p>
+  </div>
+</article>
+
+</section>
+
 </div>
-</article></div></details></div></main></body></html>
+</main>
+</body>
+</html>

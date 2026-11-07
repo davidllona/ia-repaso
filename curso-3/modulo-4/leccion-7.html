@@ -1,294 +1,442 @@
-<!DOCTYPE html>
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lección 7 · GAN: un falsificador y un crítico que se entrenan por turnos · Módulo 4 · Curso 3 · Cuaderno de IA</title>
+<meta name="description" content="El juego minimax de una GAN, su equilibrio (D = 0,5, pérdidas 1,386 y 0,693), la pérdida no saturante y el entrenamiento alterno con dos optimizadores.">
+<script>try{var t=localStorage.getItem('cuaderno-ia:tema');if(t)document.documentElement.setAttribute('data-theme',t)}catch(e){}</script>
+<link rel="stylesheet" href="../../assets/css/style.css">
+<script src="../../assets/js/curriculum.js"></script>
+<script src="../../assets/js/lab.js"></script>
+<script src="../../assets/js/app.js" defer></script>
+</head>
+<body data-root="../../" data-course="3" data-module="4" data-lesson="7">
+<main>
+<div class="page">
 
-<html lang="es"><head><meta charset="utf-8"/><meta content="width=device-width,initial-scale=1" name="viewport"/><title>Lección 7 · La red que predice el ruido · Curso 3 · Cuaderno de IA</title><meta content="La idea más usada (DDPM) es sorprendentemente simple: dar a la red un dato con ruido \( x_t \) y pedirle que adivine el ruido \( \varepsilon \) que se le añadió ." name="description"/><script>try{var t=localStorage.getItem('cuaderno-ia:tema');if(t)document.documentElement.setAttribute('data-theme',t)}catch(e){}</script><link href="../../assets/css/style.css" rel="stylesheet"/><script src="../../assets/js/curriculum.js"></script><script src="../../assets/js/lab.js"></script><script defer="" src="../../assets/js/app.js"></script><script defer="" src="../../assets/js/microanimations.js"></script></head><body data-course="3" data-lesson="7" data-module="4" data-root="../../"><main><div class="page" data-micro="3min"><header class="hero leccion"><div class="hero-grid"><div><p class="eyebrow">Curso 3 · Módulo 4 · Lección 7 de 12</p><h1>La red que predice el ruido</h1><p class="lead">La idea más usada (DDPM) es sorprendentemente simple: dar a la red un dato con ruido \( x_t \) y pedirle que adivine el ruido \( \varepsilon \) que se le añadió .</p><p class="meta-line"><span class="read-time" data-render="read-time"></span><a href="../modulo-4.html">Índice del módulo</a></p></div><div aria-hidden="true" class="hero-tile"></div></div></header><details class="predice"><summary>Sabemos destruir. ¿Qué tiene que aprender exactamente la red para poder deshacerlo?<span class="hint"></span></summary><div><p>La idea más usada (DDPM) es sorprendentemente simple: dar a la red un dato con ruido \( x_t \) y pedirle que adivine el ruido \( \varepsilon \) que se le añadió .</p></div></details><section aria-label="Explicación breve" class="micro-core"><div class="micro-kicker">01 · ENTENDER <span>≈ 45 s</span></div><h2>La idea en palabras sencillas</h2><p>El algoritmo de entrenamiento es el mismo bucle de siempre con un dato y un ruido fabricados al vuelo:</p><div class="micro-example"><span aria-hidden="true" class="micro-example-icon">💡</span><div><strong>Otro ejemplo · Diseño</strong><p>Con ejemplos de diseños, un modelo puede crear variaciones nuevas sin copiar un ejemplo entero.</p></div></div></section><div class="micro-kicker micro-checkpoint">02 · RESPONDER <span>≈ 15 s</span></div><section aria-label="Pregunta intercalada" class="quiz mini micro-check"><script class="quiz-data" type="application/json">{"titulo": "Pausa rápida · Comprueba la idea", "preguntas": [{"q": "¿Qué distingue a un modelo generativo?", "opciones": ["Solo dibuja fronteras de decisión", "Necesita predecir siempre el precio", "Puede producir nuevas muestras aprendiendo patrones"], "correcta": 2, "porque": "Los modelos generativos intentan modelar datos para crear nuevas muestras."}]}</script></section><section aria-label="Animación interactiva" class="micro-viz" data-index="14" data-micro-viz="generative"><div class="micro-kicker">03 · EXPERIMENTAR <span>≈ 45 s</span></div><div class="micro-viz-title"><div><h2>Del ruido a una estructura</h2><p>Avanza la transformación y observa cómo emerge un patrón.</p></div><span aria-hidden="true" class="micro-viz-symbol">✦</span></div><div aria-live="polite" class="micro-viz-stage"><p>Animación interactiva: Del ruido a una estructura</p></div></section><div class="micro-kicker micro-checkpoint">04 · APLICAR <span>≈ 15 s</span></div><section aria-label="Pregunta intercalada" class="quiz mini micro-check"><script class="quiz-data" type="application/json">{"titulo": "Pausa rápida · ¿Lo aplicarías?", "preguntas": [{"q": "En un proceso de difusión generativa, ¿qué suele aprender la red?", "opciones": ["A convertir todas las imágenes a blanco", "A estimar y eliminar ruido progresivamente", "A clasificar exclusivamente correos"], "correcta": 1, "porque": "Los modelos de difusión suelen aprender cómo invertir un proceso de añadir ruido."}]}</script></section><div class="micro-finish"><strong>Idea que te llevas</strong><span>El algoritmo de entrenamiento es el mismo bucle de siempre con un dato y un ruido fabricados al vuelo:</span><small>¿Quieres más ejemplos, fórmulas o código? Los tienes justo debajo, sin límite de tiempo.</small></div><details class="profundizar micro-legacy"><summary><span>Explorar más: explicación y simulaciones completas<small>Todo el texto original, tablas y demos avanzadas. Opcional.</small></span></summary><div class="prof-body"><section><h2>La red que predice el ruido</h2>
-<p>La idea más usada (DDPM) es sorprendentemente simple: dar a la red un dato con ruido \( x_t \) y <strong>pedirle que adivine el ruido \( \varepsilon \) que se le añadió</strong>. Esa es la única tarea. Es como un restaurador de películas antiguas al que enseñas un fotograma lleno de nieve y le pides que adivine cuánta nieve le echaron: si lo adivina bien, basta restarla para ver el fotograma. Se llama \( \varepsilon_\theta(x_t, t) \) a la red (\( \theta \) son sus pesos) y la pérdida es el error cuadrático medio entre el ruido verdadero y el estimado:</p>
-<p>El algoritmo de entrenamiento es el mismo bucle de siempre con un dato y un ruido fabricados al vuelo:</p>
-<p>La misma red tiene que limpiar \( x_1 \) (casi sin ruido) y \( x_T \) (casi todo ruido), que son problemas muy distintos, así que necesita saber en qué \( t \) está. Se le pasa como una entrada más, normalmente transformada en un vector de senos y cosenos de varias frecuencias, igual que la <a href="../../curso-2/modulo-4.html">codificación posicional</a> de un Transformer. En nuestra mini-red: \( \big[\tau,\ \sin(\pi 2^k\tau),\ \cos(\pi 2^k\tau)\big] \) con \( \tau = t/T \) y \( k = 0, 1, 2 \): 7 números.</p>
-<div class="callout ejemplo"><span class="lbl">Ejemplo tomado del módulo</span><p>Una sola muestra, el mismo píxel del fotograma de Titanic: \( x_0 = 2 \), \( t = 3 \) (con el schedule de 3 pasos de antes, \( \bar\alpha_3 = 0{,}504 \)) y el ruido sorteado \( \varepsilon = 0{,}5 \).</p></div></section><figure class="demo" data-demo="curso3/c3m4-estimar-x0" data-titulo="Qué estima la red de un solo golpe (red real)">
-<div class="haz">Con la red entrenada en Keras (fragmento 11), mueve t de 1 a 40. Cada punto es una película colocada en un mapa de dos rasgos. Cada punto gris es un x_t; el naranja es \( \hat{x}_0 \) calculado con la fórmula del paso 4.</div>
-<div class="observa">Con t pequeño, \( \hat{x}_0 \) casi coincide con el original y el error es mínimo. Con t grande, x_t es casi ruido y la red no puede saber de qué luna venía: contesta la <em>media</em> de todas las posibilidades y los puntos naranjas se amontonan en el centro, entre las lunas. Por eso no basta una estimación «de un golpe» y el muestreo se hace en muchos pasitos.</div>
-</figure><div class="resumen"><h2 class="sin-num sin-toc">En pocas líneas</h2><ul><li><strong>La red que predice el ruido:</strong> La idea más usada (DDPM) es sorprendentemente simple: dar a la red un dato con ruido \( x_t \) y pedirle que adivine el ruido \(…</li><li>Antes de continuar, intenta explicar la demo sin mirar su resultado.</li></ul></div><section class="quiz mini"><script class="quiz-data" type="application/json">{"titulo": "¿Lo tienes?", "preguntas": [{"q": "¿Qué concepto estamos trabajando en esta lección?", "opciones": ["La red que predice el ruido", "GAN: el falsificador y el detective", "Cuándo falla una GAN"], "correcta": 0, "porque": "La idea más usada (DDPM) es sorprendentemente simple: dar a la red un dato con ruido \\( x_t \\) y pedirle que adivine el ruido \\( \\varepsilon \\) que se le añadió ."}, {"q": "¿Cuál de estas afirmaciones recoge lo que acabas de estudiar?", "opciones": ["Lo importante es comprender la idea y comprobarla con ejemplos, no memorizar términos.", "La idea más usada (DDPM) es sorprendentemente simple: dar a la red un dato con ruido \\( x_t \\) y pedirle que adivine el ruido \\( \\varepsilon \\) que se le añadió .", "Siempre hay un único método que sirve para todos los problemas."], "correcta": 1, "porque": "La explicación central es: La idea más usada (DDPM) es sorprendentemente simple: dar a la red un dato con ruido \\( x_t \\) y pedirle que adivine el ruido \\( \\varepsilon \\) que se le añadió ."}, {"q": "Si una demo o un ejemplo te desconcierta, ¿cuál es la mejor forma de aprenderlo?", "opciones": ["Memorizar el nombre sin entender la operación.", "Volver a los números, cambiar un valor y explicar qué ocurre.", "Ignorar los resultados que no coinciden con tu intuición."], "correcta": 1, "porque": "Explorar qué cambia y por qué ayuda a conectar el concepto con su resultado."}]}</script></section></div></details><details class="profundizar"><summary><span>Profundizar: explicación completa<small>Matices, fórmulas, tablas, otros ejemplos y experimentos del módulo original.</small></span></summary><div class="prof-body"><section>
-<h2 id="difusion-entrenar">La red que predice el ruido</h2>
-<p class="pregunta">Sabemos destruir. ¿Qué tiene que aprender exactamente la red para poder deshacerlo?</p>
-<p>La idea más usada (DDPM) es sorprendentemente simple: dar a la red un dato con ruido \( x_t \) y <strong>pedirle que adivine el ruido \( \varepsilon \) que se le añadió</strong>. Esa es la única tarea. Es como un restaurador de películas antiguas al que enseñas un fotograma lleno de nieve y le pides que adivine cuánta nieve le echaron: si lo adivina bien, basta restarla para ver el fotograma. Se llama \( \varepsilon_\theta(x_t, t) \) a la red (\( \theta \) son sus pesos) y la pérdida es el error cuadrático medio entre el ruido verdadero y el estimado:</p>
-<div class="formula">\[ L \;=\; \mathbb{E}_{x_0,\;t,\;\varepsilon}\Big[\,\big\|\,\varepsilon - \varepsilon_\theta(x_t,\,t)\,\big\|^2\,\Big], \qquad x_t = \sqrt{\bar\alpha_t}\,x_0 + \sqrt{1-\bar\alpha_t}\,\varepsilon \]</div>
-<p>El algoritmo de entrenamiento es el mismo bucle de siempre con un dato y un ruido fabricados al vuelo:</p>
-<ol class="pasos">
-<li>Coge un dato real \( x_0 \) del conjunto de entrenamiento.</li>
-<li>Elige un paso \( t \) <strong>al azar</strong> entre 1 y \( T \) (uno distinto para cada ejemplo del <em>batch</em>).</li>
-<li>Saca un ruido \( \varepsilon \sim \mathcal{N}(0, I) \).</li>
-<li>Fabrica \( x_t \) con la fórmula cerrada.</li>
-<li>La red recibe \( (x_t, t) \) y devuelve \( \hat\varepsilon \).</li>
-<li>Pérdida \( = (\varepsilon - \hat\varepsilon)^2 \); gradiente; actualizar pesos.</li>
-</ol>
-<div class="callout ejemplo">
-<span class="lbl">Ejemplo numérico</span>
-<p>Una sola muestra, el mismo píxel del fotograma de Titanic: \( x_0 = 2 \), \( t = 3 \) (con el schedule de 3 pasos de antes, \( \bar\alpha_3 = 0{,}504 \)) y el ruido sorteado \( \varepsilon = 0{,}5 \).</p>
-<ol class="pasos">
-<li><strong>Fabricar x_t.</strong> \( x_3 = \sqrt{0{,}504}\cdot 2 + \sqrt{0{,}496}\cdot 0{,}5 = 0{,}7099\cdot 2 + 0{,}7043\cdot 0{,}5 = 1{,}4199 + 0{,}3521 = 1{,}7720 \).</li>
-<li><strong>La red mira (1,7720; t = 3)</strong> y responde, digamos, \( \hat\varepsilon = 0{,}2 \) (aún no está entrenada).</li>
-<li><strong>Pérdida.</strong> \( (0{,}5 - 0{,}2)^2 = 0{,}09 \). El gradiente empuja los pesos para que la próxima vez responda más cerca de 0,5.</li>
-<li><strong>Qué x₀ deduciría de eso.</strong> De la fórmula cerrada se despeja \( \hat{x}_0 = \dfrac{x_t - \sqrt{1-\bar\alpha_t}\,\hat\varepsilon}{\sqrt{\bar\alpha_t}} = \dfrac{1{,}7720 - 0{,}7043\cdot 0{,}2}{0{,}7099} = 2{,}2975 \). Con el \( \varepsilon \) exacto habría salido 2,0000. El error en x₀ (0,2975) es el error en \( \varepsilon \) (0,3) multiplicado por \( \sqrt{1-\bar\alpha}/\sqrt{\bar\alpha} = 0{,}992 \): cuanto más ruido hay, más se amplifica.</li>
-</ol>
-</div>
-<h3>Por qué «predecir el ruido» y no «predecir la imagen»</h3>
-<ul>
-<li><strong>Es lo mismo, con otro disfraz.</strong> Conocer \( \varepsilon \) equivale a conocer \( x_0 \) por la fórmula de arriba, y también equivale a conocer la dirección hacia datos más probables (el <em>score</em>, \( \nabla\log p(x_t) \propto -\varepsilon/\sqrt{1-\bar\alpha_t} \)). Las tres parametrizaciones se usan; la del ruido funciona muy bien en la práctica.</li>
-<li><strong>El objetivo está bien escalado.</strong> \( \varepsilon \) siempre tiene media 0 y varianza 1 sea cual sea \( t \); si predijeras \( x_0 \), el objetivo no cambia pero la dificultad sí lo hace mucho de un paso a otro.</li>
+<header class="hero leccion">
+  <div class="hero-grid">
+    <div>
+      <p class="eyebrow">Curso 3 · Módulo 4 · Lección 7 de 8</p>
+      <h1>GAN: un falsificador y un crítico que se entrenan por turnos</h1>
+      <p class="lead">Un falsificador de pósters (el generador) y un crítico que los revisa (el discriminador). Nadie le dice al falsificador cómo es el póster de Matrix: aprende solo para engañar.</p>
+      <p class="meta-line"><span class="read-time" data-render="read-time"></span><a href="../modulo-4.html">Índice del módulo</a></p>
+    </div>
+    <div class="hero-tile" aria-hidden="true"></div>
+  </div>
+</header>
+<details class="predice">
+  <summary>Al principio el crítico pilla todos los pósters falsos: \( D(G(z)) \approx 0{,}01 \). Con la pérdida original \( \log(1 - D(G(z))) \), ¿el falsificador aprende rápido o casi nada?<span class="hint"></span></summary>
+  <div>
+    <p><strong>Casi nada.</strong> El gradiente respecto al logit es \( -p = -0{,}01 \): justo cuando peor lo hace, menos señal recibe. Por eso se usa la pérdida <strong>no saturante</strong> \( -\log D(G(z)) \), cuyo gradiente es \( -(1-p) = -0{,}99 \).</p>
+  </div>
+</details>
+
+<section>
+<h2 id="idea">Dos redes con objetivos opuestos</h2>
+<ul class="flow">
+  <li class="d">z ~ N(0, I)<small>ruido</small></li>
+  <li class="b">GENERADOR G<small>fabrica G(z)</small></li>
+  <li class="b">DISCRIMINADOR D<small>¿real o falso?</small></li>
+  <li class="c">D(x) ∈ (0, 1)<small>prob. de «real»</small></li>
 </ul>
-<h3>La red recibe también el paso t</h3>
-<p>La misma red tiene que limpiar \( x_1 \) (casi sin ruido) y \( x_T \) (casi todo ruido), que son problemas muy distintos, así que necesita saber en qué \( t \) está. Se le pasa como una entrada más, normalmente transformada en un vector de senos y cosenos de varias frecuencias, igual que la <a href="../../curso-2/modulo-4.html">codificación posicional</a> de un Transformer. En nuestra mini-red: \( \big[\tau,\ \sin(\pi 2^k\tau),\ \cos(\pi 2^k\tau)\big] \) con \( \tau = t/T \) y \( k = 0, 1, 2 \): 7 números.</p>
-<p>Para imágenes de verdad la red es una <strong>U-Net</strong>: una pila de convoluciones que reduce la resolución y luego la recupera con <a href="../modulo-2.html">convoluciones transpuestas o upsampling</a>, con <em>skip connections</em> que pasan los detalles de la bajada a la subida (como en las redes residuales del módulo 2), capas de atención en las resoluciones pequeñas y el vector del paso \( t \) inyectado en cada bloque. Aquí, con puntos 2D, basta un MLP pequeño de 9 090 parámetros.</p>
-</section></div></details><details class="profundizar" id="codigo"><summary><span>Ver código explicado paso a paso<small>3 fragmento(s) original(es), con cada línea comentada y salida esperada.</small></span></summary><div class="prof-body"><article class="snippet" data-lang="python">
-<header>
-<h3>8 · Schedules de ruido: lineal frente a coseno</h3>
-<p class="para-que"><strong>Para qué sirve</strong> Calcular a mano (con NumPy) los β<sub>t</sub> y los ᾱ<sub>t</sub> de la difusión con T = 1 000 pasos, y comparar cuánta señal sobrevive en cada t con el schedule lineal del DDPM y con el coseno.</p>
-</header>
-<pre class="code"><code>import numpy as np
+<p>D es un clasificador binario: quiere dar 1 a los pósters reales y 0 a los falsos. G quiere que D diga 1 a sus falsos. Es un juego <strong>minimax</strong> cuyo equilibrio llega cuando G imita tan bien que D acierta la mitad: \( D = 0{,}5 \) en todas partes.</p>
+<p>No hay una sola pérdida, así que se entrena <strong>por turnos</strong>: un paso de D (reales → 1, falsos → 0, solo se tocan los pesos de D) y un paso de G (sus falsos → 1, el gradiente atraviesa D pero solo se tocan los pesos de G). En Keras se sobrescribe <code>train_step</code> con <strong>dos optimizadores y dos <code>GradientTape</code></strong>, con Adam y <code>beta_1=0.5</code>.</p>
+<p>Ojo: las pérdidas de una GAN <strong>no son un termómetro</strong>. Se evalúa mirando muestras o con métricas como FID.</p>
+</section>
 
-T = 1000
-beta_lin = np.linspace(1e-4, 0.02, T)
-abar_lin = np.cumprod(1 - beta_lin)
+<figure class="demo" data-demo="curso3/c3m4-duelo-gan" data-titulo="Duelo G contra D sobre una distribución 1D (entrena en tu navegador)">
+  <div class="haz">x es la duración de una peli. Pulsa «Entrenar / pausa» con «Una campana» y «Equilibrado». Luego prueba «D abruma a G» y «G demasiado rápido».</div>
+  <div class="observa">En el equilibrado la curva naranja se acerca a la azul y D se aplana hacia 0,5. Con G demasiado rápido, el generador colapsa a casi un solo punto.</div>
+</figure>
 
-# Schedule coseno (Nichol y Dhariwal, 2021)
-s = 0.008
-tt = np.arange(T + 1) / T
-f = np.cos((tt + s) / (1 + s) * np.pi / 2) ** 2
-abar_cos = f[1:] / f[0]
+<figure class="demo" data-demo="curso3/c3m4-perdidas-gan" data-titulo="Pérdida saturante contra no saturante">
+  <div class="haz">Mueve el logit del crítico o pulsa «El crítico lo huele».</div>
+  <div class="observa">Con p cerca de 0 la línea azul (saturante) es casi plana y la naranja (no saturante) vale casi −1.</div>
+</figure>
 
-print("   t |  beta_t | abar lineal | abar coseno | raiz(abar) | raiz(1-abar)")
-for t in (1, 100, 250, 500, 750, 1000):
-    i = t - 1
-    print(f"{t:4d} | {beta_lin[i]:.5f} | {abar_lin[i]:11.5f} | {abar_cos[i]:11.5f} | "
-          f"{np.sqrt(abar_lin[i]):10.4f} | {np.sqrt(1 - abar_lin[i]):.4f}")
-
-print("primer t con abar &lt; 0.5 (lineal):", int(np.argmax(abar_lin &lt; 0.5)) + 1)
-print("primer t con abar &lt; 0.5 (coseno):", int(np.argmax(abar_cos &lt; 0.5)) + 1)</code></pre>
-<details class="linea-a-linea" open="">
-<summary>Línea por línea</summary>
-<p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
-<table class="lineas">
-<thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
-<tbody>
-<tr data-lines="1"><td><code>import numpy as np</code></td><td>NumPy para los arrays y las operaciones.</td></tr>
-<tr data-lines="3"><td><code>T = 1000</code></td><td>Número de pasos de la difusión.</td></tr>
-<tr data-lines="4"><td><code>beta_lin = np.linspace(1e-4, 0.02, T)</code></td><td>Los 1 000 valores de β<sub>t</sub> del schedule lineal: de 0,0001 a 0,02, equiespaciados. <code>1e-4</code> es notación científica de 0,0001.</td></tr>
-<tr data-lines="5"><td><code>abar_lin = np.cumprod(1 - beta_lin)</code></td><td>Primero α<sub>t</sub> = 1 − β<sub>t</sub> para todos; <code>np.cumprod</code> hace el producto acumulado, y eso es justo ᾱ<sub>t</sub> = α<sub>1</sub>·α<sub>2</sub>·…·α<sub>t</sub>.</td></tr>
-<tr data-lines="7-8"><td><code>s = 0.008</code></td><td>Comentario y el pequeño desplazamiento <em>s</em> del schedule coseno, que evita que β sea casi 0 al principio.</td></tr>
-<tr data-lines="9"><td><code>tt = np.arange(T + 1) / T</code></td><td>Los valores t/T para t = 0, 1, …, 1 000 (son 1 001 números entre 0 y 1).</td></tr>
-<tr data-lines="10"><td><code>f = np.cos((tt + s) / (1 + s) * np.pi / 2) ** 2</code></td><td>La función f(t) = cos²(((t/T + s)/(1 + s))·π/2) del artículo de Nichol y Dhariwal (2021).</td></tr>
-<tr data-lines="11"><td><code>abar_cos = f[1:] / f[0]</code></td><td>ᾱ<sub>t</sub> = f(t)/f(0). Se descarta el elemento 0 (<code>f[1:]</code>) para quedarse con t = 1…1 000.</td></tr>
-<tr data-lines="13-17"><td><code>print(...)</code> y el bucle <code>for t in (1, 100, …)</code></td><td>Escribe la cabecera y, para seis valores de t, la fila con β, los dos ᾱ y las dos raíces del schedule lineal. <code>i = t - 1</code> porque los arrays empiezan en 0 y t en 1. <code>:11.5f</code> = 11 caracteres con 5 decimales.</td></tr>
-<tr data-lines="19-20"><td><code>np.argmax(abar_lin &lt; 0.5)</code></td><td>Comparar crea un array de verdaderos/falsos; <code>argmax</code> devuelve la posición del primer <code>True</code>. Se suma 1 para pasar de índice a t. Es el instante en que se pierde la mitad de la «señal».</td></tr>
-</tbody>
-</table>
-</details>
-<div class="salida">
-<strong>Salida esperada</strong>
-<pre>   t |  beta_t | abar lineal | abar coseno | raiz(abar) | raiz(1-abar)
-   1 | 0.00010 |     0.99990 |     0.99996 |     0.9999 | 0.0100
- 100 | 0.00207 |     0.89702 |     0.97209 |     0.9471 | 0.3209
- 250 | 0.00506 |     0.52409 |     0.84701 |     0.7239 | 0.6899
- 500 | 0.01004 |     0.07859 |     0.49384 |     0.2803 | 0.9599
- 750 | 0.01502 |     0.00335 |     0.14427 |     0.0579 | 0.9983
-1000 | 0.02000 |     0.00004 |     0.00000 |     0.0064 | 1.0000
-primer t con abar &lt; 0.5 (lineal): 260
-primer t con abar &lt; 0.5 (coseno): 497</pre>
-<p>Con el schedule lineal, β crece de 0,0001 a 0,02, y ᾱ cae a 0,897 en t = 100, a 0,079 en t = 500 y a 0,00004 en t = 1 000: al final la imagen es ruido casi puro (la señal vale √ᾱ = 0,0064). Esto cumple lo que queríamos: x<sub>T</sub> ≈ N(0, 1). El coseno degrada más despacio (ᾱ = 0,972 en t = 100 frente a 0,897): el lineal pierde la mitad de la señal en t = 260 y el coseno en t = 497. En el lineal, además, los últimos cientos de pasos casi no aportan, porque ya solo queda ruido.</p>
+<section>
+<h2 id="numeros">Con números: el marcador del juego</h2>
+<div class="callout ejemplo">
+  <span class="lbl">Ejemplo numérico</span>
+  <p>El marcador es \( V = \ln D(\text{real}) + \ln(1 - D(\text{falso})) \). D quiere subirlo; G, bajarlo.</p>
+  <ol class="pasos">
+    <li>D bueno: 0,9 al póster de Matrix y 0,2 al falso: \( \ln 0{,}9 + \ln 0{,}8 = -0{,}1054 - 0{,}2231 = -0{,}3285 \).</li>
+    <li>D indeciso, 0,5 a todo: \( 2\ln 0{,}5 = \) <strong>−1,3863</strong>, el equilibrio.</li>
+    <li>Allí la pérdida de D es 1,386 y la de G, \( \ln 2 = \) 0,693.</li>
+  </ol>
+  <p>Donde hay 3 pósters oficiales por cada falso (densidades 0,3 y 0,1), el mejor D responde \( 0{,}3/0{,}4 = 0{,}75 \).</p>
 </div>
-</article><article class="snippet" data-lang="python">
-<header>
-<h3>10 · Ensuciar un dígito con ruido a distintos tiempos t</h3>
-<p class="para-que"><strong>Para qué sirve</strong> Aplicar la fórmula cerrada x<sub>t</sub> = √ᾱ·x<sub>0</sub> + √(1−ᾱ)·ε a un dígito real de 8×8 con el schedule lineal de 1 000 pasos, y ver cuánta señal queda con la correlación entre x<sub>t</sub> y x<sub>0</sub>.</p>
-</header>
-<pre class="code"><code>import numpy as np
-from sklearn.datasets import load_digits
+</section>
 
-digito = load_digits().data[45] / 16.0          # un "3" de 8x8, valores en [0, 1]
-x0 = 2 * digito - 1                              # la difusión trabaja en [-1, 1]
-
-T = 1000
-abar = np.cumprod(1 - np.linspace(1e-4, 0.02, T))
-rng = np.random.default_rng(0)
-eps = rng.normal(size=64)                        # el mismo ruido para todos los t
-
-def arte(img):
-    img = np.clip((img + 1) / 2, 0, 0.999)
-    return ["".join(" .:-=+*#%@"[int(v * 10)] * 2 for v in fila) for fila in img.reshape(8, 8)]
-
-tiempos = [0, 50, 100, 200, 500]
-imagenes = []
-for t in tiempos:
-    if t == 0:
-        xt = x0
-    else:
-        xt = np.sqrt(abar[t - 1]) * x0 + np.sqrt(1 - abar[t - 1]) * eps
-    imagenes.append(xt)
-    corr = np.corrcoef(xt, x0)[0, 1]
-    print(f"t = {t:3d} | señal {np.sqrt(abar[t - 1]) if t else 1:.3f} | ruido {np.sqrt(1 - abar[t - 1]) if t else 0:.3f} | correlación con x0 = {corr:.2f}")
-
-for filas in zip(*[arte(im) for im in imagenes]):
-    print("   ".join(filas))</code></pre>
-<details class="linea-a-linea" open="">
-<summary>Línea por línea</summary>
-<p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
-<table class="lineas">
-<thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
-<tbody>
-<tr data-lines="1-2"><td><code>import numpy as np</code> y <code>from sklearn.datasets import load_digits</code></td><td>NumPy y los dígitos 8×8 de scikit-learn.</td></tr>
-<tr data-lines="4"><td><code>digito = load_digits().data[45] / 16.0</code></td><td>Toma la imagen número 45 (un «3») y normaliza a [0, 1].</td></tr>
-<tr data-lines="5"><td><code>x0 = 2 * digito - 1</code></td><td>Reescala a [−1, 1] (0 → −1 y 1 → +1): la difusión trabaja con datos centrados en 0, como el ruido gaussiano.</td></tr>
-<tr data-lines="7-8"><td><code>T = 1000</code> y <code>abar = np.cumprod(...)</code></td><td>El mismo schedule lineal del fragmento 8, en una sola línea para <code>abar</code>.</td></tr>
-<tr data-lines="9-10"><td><code>rng = …</code> y <code>eps = rng.normal(size=64)</code></td><td>Un único vector de ruido de 64 números (uno por píxel). Se reutiliza para todos los t, así se ve que solo cambia la <em>dosis</em>.</td></tr>
-<tr data-lines="12-14"><td><code>def arte(img): …</code></td><td>Como la versión anterior, pero primero reescala de [−1, 1] a [0, 1] y recorta (<code>np.clip</code>) a 0,999 para que el índice del carácter no se salga de la escala.</td></tr>
-<tr data-lines="16-17"><td><code>tiempos = [0, 50, 100, 200, 500]</code> e <code>imagenes = []</code></td><td>Los instantes a mostrar y una lista donde guardar las imágenes.</td></tr>
-<tr data-lines="18-19"><td><code>for t in tiempos: if t == 0:</code></td><td>Recorre los instantes. En t = 0 no hay ruido.</td></tr>
-<tr data-lines="20-22"><td><code>xt = x0</code> / <code>else: xt = np.sqrt(abar[t-1]) * x0 + np.sqrt(1 - abar[t-1]) * eps</code></td><td>La fórmula cerrada. El índice es <code>t - 1</code> porque el array empieza en 0.</td></tr>
-<tr data-lines="23"><td><code>imagenes.append(xt)</code></td><td>Guarda la imagen ruidosa.</td></tr>
-<tr data-lines="24"><td><code>corr = np.corrcoef(xt, x0)[0, 1]</code></td><td>Coeficiente de correlación entre la imagen ruidosa y la original (1 = idénticas en forma, 0 = nada que ver). <code>corrcoef</code> devuelve una matriz 2×2 y <code>[0, 1]</code> elige el valor cruzado.</td></tr>
-<tr data-lines="25"><td><code>print(f"t = {t:3d} | señal … ")</code></td><td>Escribe el instante, la cantidad de señal (√ᾱ), la de ruido (√(1−ᾱ)) y la correlación, con 3, 3 y 2 decimales.</td></tr>
-<tr data-lines="27-28"><td><code>for filas in zip(*[arte(im) …]): print(…)</code></td><td>Dibuja las cinco imágenes en horizontal.</td></tr>
-</tbody>
-</table>
+<details class="predice">
+  <summary>Entrenas tu GAN y las pérdidas se quedan clavadas en 1,39 (D) y 0,69 (G). ¿El generador es bueno?<span class="hint"></span></summary>
+  <div>
+    <p><strong>No lo sabes.</strong> Esos valores salen siempre que D está indeciso, y eso puede pasar con un G excelente o con uno malo. Hay que mirar las muestras y medir aparte (FID, Inception Score o la distancia a datos reales).</p>
+  </div>
 </details>
-<div class="salida">
-<strong>Salida esperada</strong>
-<pre>t =   0 | señal 1.000 | ruido 0.000 | correlación con x0 = 1.00
-t =  50 | señal 0.985 | ruido 0.170 | correlación con x0 = 0.98
-t = 100 | señal 0.947 | ruido 0.321 | correlación con x0 = 0.90
-t = 200 | señal 0.812 | ruido 0.584 | correlación con x0 = 0.64
-t = 500 | señal 0.280 | ruido 0.960 | correlación con x0 = -0.08
-    ++@@%%--           **@@##==..         **@@##==::..   ..  ##@@++++==--   ==::%%**--**@@%%
-    ----@@@@           ----##@@           ::--**@@           ::--::%%           ..==  ++    
-      ++@@--             ++@@==             **%%++           ::%%%%##  ..     ::++@@++@@  ++
-      --%%..             ::%%::       ..    ..##::       --..    **--       ##==    --++  ::
-        ++@@..             ++@@....     ..    ==%%::::     ::....--%%==++   ::**==++::++##@@
-          **##       ....    **%%..     ::::..  **@@--     ++==--..++@@**     @@@@##====@@@@
-    ::++**@@##     ....::--**@@**     --::----**@@++     **====..**@@--::   @@@@**  ++@@  ++
-    **%%##++           ++%%##==..       ..==##**----     ::::--**++..**     ++**  ::--  @@..</pre>
-<p>La señal baja de 1 a 0,985, 0,947, 0,812 y 0,280, y el ruido sube de 0 a 0,170, 0,321, 0,584 y 0,960. La correlación con el dígito original cae de 1,00 a 0,98 (t = 50), 0,90 (t = 100), 0,64 (t = 200) y −0,08 (t = 500): en t = 500, aunque √ᾱ valga 0,28, ya no queda nada que se pueda reconocer a simple vista; con el ruido tan grande, el patrón del dígito sigue en los datos pero hundido. Fíjate en que las columnas del dibujo son versiones cada vez peores <em>del mismo</em> dígito con <em>el mismo</em> ruido.</p>
+
+<div class="resumen">
+  <h2 class="sin-num sin-toc">En tres líneas</h2>
+  <ul>
+    <li>G falsifica desde ruido; D clasifica real o falso. Equilibrio: D = 0,5, pérdidas 1,386 y 0,693.</li>
+    <li>G usa la pérdida no saturante \( -\log D(G(z)) \): gradiente −0,99 donde la original da −0,01.</li>
+    <li>Entrenamiento alterno: dos optimizadores y dos cintas, cada uno solo con los pesos de su red.</li>
+  </ul>
 </div>
-</article><article class="snippet" data-lang="python">
-<header>
-<h3>11 · Entrenar una red que predice el ruido (difusión sobre dos lunas)</h3>
-<p class="para-que"><strong>Para qué sirve</strong> La mini-implementación completa del entrenamiento DDPM: sortear un t y un ruido ε por ejemplo, ensuciar con la fórmula cerrada y enseñar a una red a adivinar ε. Usa puntos 2D (dos lunas) para que entrene en un minuto y medio en CPU; la receta es la misma que con imágenes, solo cambia la red.</p>
-</header>
-<pre class="code"><code>import numpy as np
-import tensorflow as tf
+
+<section class="quiz mini">
+<script type="application/json" class="quiz-data">
+{
+ "titulo": "¿Lo tienes?",
+ "preguntas": [
+  {
+   "q": "Si el falsificador de pósters (el generador de una GAN) fuese <strong>perfecto</strong> (p<sub>g</sub> = p<sub>data</sub>), ¿qué haría el discriminador óptimo (el crítico) y cuánto valdría la suma de sus dos entropías cruzadas?",
+   "opciones": [
+    "Diría 1 a todo y la pérdida valdría 0.",
+    "Diría 0,5 a todo y la pérdida valdría 0,693.",
+    "Diría 0 a todo y la pérdida valdría 1.",
+    "Diría 0,5 a todo y la pérdida valdría 2 ln 2 = 1,386."
+   ],
+   "correcta": 3,
+   "porque": "El discriminador óptimo es D* = p<sub>data</sub>/(p<sub>data</sub> + p<sub>g</sub>); con p<sub>g</sub> = p<sub>data</sub> da 0,5 en todas partes. Cada entropía cruzada vale −ln 0,5 = 0,693 y se suman las dos: 1,386. En el fragmento 15 la GAN se queda cerca (d_loss 1,388 y g_loss 0,696 al final). La respuesta de 0,693 es solo una mitad."
+  },
+  {
+   "q": "Cuando el crítico D tiene muy claro que un póster es falso (D(G(z)) = 0,01), ¿qué gradiente respecto al logit recibe G con la pérdida minimax y con la no saturante?",
+   "opciones": [
+    "−0,010 con la minimax (casi nada) y −0,990 con la no saturante.",
+    "−0,990 con la minimax y −0,010 con la no saturante.",
+    "−0,500 con las dos.",
+    "0 con la minimax y +0,990 con la no saturante."
+   ],
+   "correcta": 0,
+   "porque": "La derivada de ln(1 − p) respecto al logit es −p, y la de −ln p es −(1 − p). Con p = 0,01 salen −0,010 y −0,990 (fragmento 13). Con la minimax el generador casi no aprende justo cuando va peor; con la no saturante recibe la señal más fuerte. Por eso se usa la segunda."
+  },
+  {
+   "q": "En el paso de G del <code>train_step</code>, ¿qué pesos se actualizan?",
+   "opciones": [
+    "Los de G y los de D, porque el gradiente pasa por las dos.",
+    "Solo los de D.",
+    "Solo los de G, aunque el gradiente atraviese D para llegar a G.",
+    "Ninguno: el paso de G solo mide la pérdida."
+   ],
+   "correcta": 2,
+   "porque": "La cinta ve G y D, pero se piden gradientes solo de <code>generador.trainable_weights</code>. En el paso de D pasa lo contrario: los falsos se generan fuera de la cinta y solo se actualiza D."
+  }
+ ]
+}
+</script>
+</section>
+
+<details class="profundizar">
+  <summary><span>Profundizar: la explicación completa<small>El juego minimax con todas las cuentas, las tablas de pérdidas y gradientes, el train_step en detalle, el patrón antiguo frágil y DCGAN, WGAN y cGAN.</small></span></summary>
+  <div class="prof-body">
+<h2 id="gan">GAN: el falsificador y el detective</h2>
+
+<p class="pregunta">¿Se puede aprender a generar sin definir ninguna pérdida de «parecerse a los datos», solo con alguien que te diga si lo que haces cuela?</p>
+
+<div class="callout analogia">
+  <span class="lbl">Analogía</span>
+  <p>Un falsificador de pósters de cine (<strong>generador</strong>, G) y el crítico que revisa los pósters antes de publicarlos en la plataforma (<strong>discriminador</strong>, D). Al principio el falsificador hace garabatos y el crítico los distingue sin esfuerzo. El crítico, con cada póster oficial y cada falso que examina, afina el ojo. El falsificador, viendo cuáles le descubren, mejora la imitación. El ciclo se repite hasta que los falsos son tan buenos que el crítico acierta solo la mitad de las veces: está adivinando. Nadie le ha dicho al falsificador cómo es el póster de Matrix: lo ha aprendido solo para engañar.</p>
+</div>
+
+<p>Esa es la idea de las <strong><abbr class="t" data-def="Generative Adversarial Network (Goodfellow et al., 2014). Dos redes que se entrenan a la vez con objetivos opuestos: una genera datos falsos, la otra intenta distinguirlos de los reales.">GAN</abbr></strong>. Dos redes:</p>
+<ul class="flow">
+  <li class="d">z ~ N(0, I)<small>ruido</small></li>
+  <li class="b">GENERADOR G<small>fabrica x = G(z)</small></li>
+  <li class="a">dato falso<small>o dato real</small></li>
+  <li class="b">DISCRIMINADOR D<small>¿real o falso?</small></li>
+  <li class="c">D(x) ∈ (0, 1)<small>prob. de «real»</small></li>
+</ul>
+<ul>
+  <li>El <strong>generador</strong> \( G \) recibe un ruido \( z \) y produce una muestra \( G(z) \) (un póster, un dígito, un punto 2D…). Aquí \( z \) hace el papel del código latente de un VAE: es lo que se sortea al generar.</li>
+  <li>El <strong>discriminador</strong> \( D \) recibe una muestra, real o falsa, y devuelve un número entre 0 y 1: la probabilidad de que sea <em>real</em>. Es simplemente un clasificador binario.</li>
+</ul>
+
+<h3>El juego minimax</h3>
+<div class="formula">\[ \min_G\;\max_D\; V(D, G) \;=\; \mathbb{E}_{x\sim p_{\text{datos}}}\big[\log D(x)\big] \;+\; \mathbb{E}_{z\sim p_z}\big[\log\big(1 - D(G(z))\big)\big] \]</div>
+<p>\( V \) es el «marcador» del juego. D quiere <strong>maximizarlo</strong>: que \( D(x) \) sea cercano a 1 para datos reales (primer término cercano a \( \log 1 = 0 \)) y cercano a 0 para falsos (segundo término cercano a \( \log 1 = 0 \)). G quiere <strong>minimizarlo</strong>: lograr que \( D(G(z)) \) sea alto, lo que hunde el segundo término.</p>
+
+<div class="callout ejemplo">
+  <span class="lbl">Ejemplo numérico</span>
+  <table>
+    <thead><tr><th>Situación</th><th>Cuentas</th><th>V</th></tr></thead>
+    <tbody>
+      <tr><td>D bastante bueno: da 0,9 al póster oficial de Matrix y 0,2 a un póster falso</td><td>\( \ln 0{,}9 + \ln(1 - 0{,}2) = -0{,}1054 - 0{,}2231 \)</td><td>−0,3285</td></tr>
+      <tr><td>D indeciso: da 0,5 a todos los pósters</td><td>\( \ln 0{,}5 + \ln 0{,}5 = -0{,}6931 - 0{,}6931 \)</td><td class="res">−1,3863 = −2 ln 2</td></tr>
+    </tbody>
+  </table>
+  <p>El mejor D posible, dado un G, es \( D^*(x) = \dfrac{p_{\text{datos}}(x)}{p_{\text{datos}}(x) + p_G(x)} \): en una zona del «mapa de pósters» donde hay densidad real 0,3 y densidad generada 0,1 (por cada 3 pósters oficiales hay 1 falso), la mejor respuesta es \( 0{,}3/0{,}4 = 0{,}75 \). Si G logra que \( p_G = p_{\text{datos}} \) en todas partes, \( D^* \) vale 0,5 en todas partes y \( V = -2\ln 2 = -1{,}3863 \): ese es el <strong>equilibrio</strong>. Dos números que reconocerás en los experimentos: en equilibrio la pérdida (entropía cruzada) de D es 1,386 y la de G, 0,693.</p>
+</div>
+
+<h3>Las pérdidas en la práctica</h3>
+<p>Cada red tiene su pérdida y solo actualiza sus propios pesos:</p>
+<table>
+  <thead><tr><th>Red</th><th>Qué le dice la pérdida</th><th>Etiquetas con BCE</th></tr></thead>
+  <tbody>
+    <tr><td><strong>D</strong></td><td>«Da 1 a los reales y 0 a los falsos»</td><td>reales → 1, \( G(z) \) → 0</td></tr>
+    <tr><td><strong>G</strong></td><td>«Haz que D diga 1 a tus falsos»</td><td>\( G(z) \) → 1 (se engaña a D con la etiqueta «real»)</td></tr>
+  </tbody>
+</table>
+<p>Fíjate en el truco de la segunda fila: para G no se usa \( \log(1 - D(G(z))) \) tal cual, sino \( -\log D(G(z)) \), la entropía cruzada con la etiqueta «real». Se llama <strong>pérdida no saturante</strong> y existe por un problema de gradiente al principio del entrenamiento. Al principio D lo tiene muy fácil (el crítico reconoce el póster falso a la primera) y da \( D(G(z)) \approx 0 \). Derivando respecto al logit \( s \) de D (\( p = \sigma(s) \)): la pérdida original tiene gradiente \( -p \) (casi 0), así que G no recibe casi señal justo cuando más necesita aprender; la no saturante tiene gradiente \( -(1-p) \) (casi 1). El fragmento 13 lo mide:</p>
+<table>
+  <thead><tr><th>\( D(G(z)) \)</th><th>Gradiente minimax (saturante)</th><th>Gradiente no saturante</th></tr></thead>
+  <tbody>
+    <tr><td>0,01</td><td class="res">−0,010</td><td class="res">−0,990</td></tr>
+    <tr><td>0,10</td><td>−0,100</td><td>−0,900</td></tr>
+    <tr><td>0,50</td><td>−0,500</td><td>−0,500</td></tr>
+    <tr><td>0,90</td><td>−0,900</td><td>−0,100</td></tr>
+  </tbody>
+</table>
+
+<div class="callout recuerda">
+  <span class="lbl">Experimento de arriba: «Pérdida saturante contra no saturante», con todo detalle</span>
+  <p><strong>Haz esto.</strong> Imagina que el crítico D acaba de ver un póster falso del falsificador G. Mueve el logit s del crítico, o pulsa «El crítico lo huele» (D casi seguro de que es falso: el comienzo típico del entrenamiento).</p>
+  <p><strong>Fíjate en.</strong> En la gráfica de abajo, cuando p es cercano a 0, la línea azul (saturante) es casi plana: el gradiente es casi 0 (−0,018 con el logit −4 de la demo) y G aprende muy lento. La naranja (no saturante) vale casi −1 justo ahí. Se cruzan en p = 0,5. A la derecha del cruce pasa lo contrario, pero allí G ya está engañando a D y no necesita tanto empuje.</p>
+</div>
+
+<h3>El entrenamiento alterno</h3>
+<p>Como D y G tienen objetivos opuestos, no se pueden entrenar de una sola vez con una única pérdida: se <strong>alterna</strong>. En cada iteración:</p>
+<ol class="pasos">
+  <li><strong>Paso de D.</strong> Se coge un lote de datos reales y uno de falsos (\( G(z) \), sin tocar G). Pérdida de D = BCE(reales, 1) + BCE(falsos, 0). Se actualizan <em>solo</em> los pesos de D. (A veces se hacen \( k > 1 \) pasos de D por cada uno de G.)</li>
+  <li><strong>Paso de G.</strong> Se sortea ruido nuevo, se pasa por G y luego por D. Pérdida de G = BCE(\( D(G(z)) \), 1). El gradiente atraviesa D hasta llegar a G, pero se actualizan <em>solo</em> los pesos de G.</li>
+</ol>
+<p>Por eso se necesitan <strong>dos optimizadores</strong> y dos <code>GradientTape</code> en el código (lo ves en el fragmento 15): cada uno recoge los gradientes respecto a los pesos de «su» red.</p>
+
+<div class="callout recuerda">
+  <span class="lbl">Experimento de arriba: «Duelo G contra D sobre una distribución 1D (entrena en tu navegador)», con todo detalle</span>
+  <p><strong>Haz esto.</strong> Imagina que x es la duración de una película (de cortos a maratones, en una escala inventada): la campana azul son las duraciones de las pelis reales, el generador es un falsificador que inventa duraciones y D el crítico que dice si «esa duración es de peli real». Pulsa «Entrenar / pausa» con la distribución «Una campana» y el preset «Equilibrado». Después prueba «Dos campanas». Por último, «D abruma a G» y «G demasiado rápido».</p>
+  <p><strong>Fíjate en.</strong> En el equilibrado la curva naranja (generador) se acerca a la azul (real) y la curva verde de D se aplana hacia 0,5, con pérdidas cerca de 1,39 y 0,69; pero no se queda quieta: oscila alrededor, algo normal en un juego. Con «D abruma a G» (D con learning rate 0,01 y cinco pasos por cada uno de G, que aprende lento), al principio la pérdida de G sube muy por encima de 0,69 (D gana: hacia el paso 600 ronda 1,3) y solo baja poco a poco; este D es pequeño y G acaba alcanzándolo. Con «G demasiado rápido» el generador colapsa a casi un solo punto que salta de un sitio a otro persiguiendo a D (desviación ≈ 0): es un mode collapse en una dimensión.</p>
+</div>
+
+<div class="callout ojo">
+  <span class="lbl">Ojo</span>
+  <p>En una GAN <strong>las pérdidas no son un termómetro del progreso</strong>. En un modelo normal, la pérdida baja y sabes que mejoras. Aquí, si D gana, su pérdida baja y la de G sube; si G gana, al revés; y en el equilibrio ambas se quedan clavadas en 1,39 y 0,69 (el fragmento 15 acaba con 1,388 y 0,696) mientras el generador puede ser excelente <em>o</em> malo. Se evalúa mirando muestras y con métricas aparte (FID, Inception Score, o la distancia a datos reales que usamos aquí).</p>
+</div>
+
+<h2 id="gan-keras">GAN en Keras 3: DCGAN, WGAN y cGAN</h2>
+
+<p class="pregunta">¿Cómo se escribe ese entrenamiento alterno si <code>model.fit()</code> asume una sola pérdida y un solo optimizador?</p>
+
+<p>Se sobrescribe <code>train_step</code> en una subclase de <code>keras.Model</code> (<a href="../modulo-1.html">módulo 1</a>), exactamente como en el VAE, pero con <strong>dos redes, dos optimizadores y dos cintas de gradiente</strong>. <code>tf.GradientTape</code> es una «cinta» que graba las operaciones para poder derivar después; se estudia a fondo en el <a href="../modulo-5.html">módulo 5</a>. Aquí basta saber que <code>tape.gradient(perdida, pesos)</code> devuelve cuánto debe cambiar cada peso, y <code>optimizer.apply_gradients(...)</code> aplica el cambio. Detalles del código del fragmento 15:</p>
+<ul>
+  <li><strong><code>compile(d_optimizer, g_optimizer)</code></strong>: se redefine para guardar los dos optimizadores. Se usa Adam con <code>beta_1=0.5</code> (en vez del 0,9 de siempre): un momento más corto es lo habitual en GAN porque el «suelo» cambia con cada paso del rival.</li>
+  <li><strong><code>BinaryCrossentropy(from_logits=True)</code></strong>: D termina en <code>Dense(1)</code> <em>sin sigmoide</em> (devuelve un logit) y la pérdida aplica la sigmoide con más estabilidad numérica.</li>
+  <li><strong>Etiquetas</strong>: <code>ones</code> para lo que debe parecer real, <code>zeros</code> para lo falso. En el paso de G se usan <code>ones</code> sobre los falsos: es la pérdida no saturante.</li>
+  <li><strong>La clave</strong>: en el paso de D, los falsos se generan <em>fuera</em> de la cinta (<code>falsos = self.generador(z)</code> antes del <code>with</code>) y los gradientes se piden solo respecto a <code>discriminador.trainable_weights</code>; en el paso de G, la cinta ve G y D pero se piden gradientes solo de <code>generador.trainable_weights</code>.</li>
+</ul>
+<div class="callout ojo">
+  <span class="lbl">Ojo</span>
+  <p>Había un patrón antiguo: construir un modelo «combinado» <code>Model(z, D(G(z)))</code> con <code>D.trainable = False</code> y entrenarlo con <code>train_on_batch</code>. Funciona pero es frágil: el valor de <code>trainable</code> se «congela» al compilar, así que cambiarlo después de compilar no tiene efecto hasta volver a compilar, y es una fuente clásica de errores silenciosos. El patrón con <code>train_step</code> y gradientes explícitos evita todo eso.</p>
+</div>
+<div class="callout ojo">
+  <span class="lbl">Ojo</span>
+  <p>Mezclar un tensor de Keras con un array de NumPy en la misma llamada de un modelo con dos entradas da error en Keras 3 (<code>In a nested call() argument, you cannot mix tensors and non-tensors</code>). Lo encontramos al escribir la cGAN del fragmento 18: la solución es convertir todo con <code>ops.convert_to_tensor</code> o <code>keras.random.normal</code>.</p>
+</div>
+
+<h3>DCGAN: GAN convolucional</h3>
+<p>Las GAN de imágenes se hacen con convoluciones. La receta <strong>DCGAN</strong> (<em>Deep Convolutional GAN</em>, Radford et al. 2015) fijó unas reglas que siguen funcionando:</p>
+<ul>
+  <li><strong>Sin pooling</strong>: el discriminador baja resolución con <code>Conv2D(strides=2)</code> y el generador la sube con <code>Conv2DTranspose(strides=2)</code> (la convolución transpuesta del <a href="../modulo-2.html">módulo 2</a>: de 2×2 a 4×4 a 8×8).</li>
+  <li><strong>BatchNormalization</strong> en el generador (y a veces en D) para estabilizar el entrenamiento.</li>
+  <li><strong>Activaciones</strong>: LeakyReLU(0,2) en D (deja pasar un pequeño gradiente por las negativas, importante porque D es la que alimenta el gradiente de G); ReLU o LeakyReLU en G; <strong>tanh</strong> a la salida de G, con las imágenes reales escaladas a \( [-1, 1] \).</li>
+  <li><strong>Sin capas densas ocultas</strong> salvo la que convierte el ruido en el primer mapa y la final de D.</li>
+</ul>
+<p>El fragmento 17 es una mini-DCGAN para los dígitos 8×8: el generador (45 697 parámetros) y el discriminador (8 625), entrenados 150 epochs. Es un ejemplo diminuto y los dígitos que salen son burdos, pero un clasificador entrenado con dígitos reales reconoce el 83 % de las muestras con confianza ≥ 0,9, y salen clases de todos los tipos.</p>
+
+<h3>WGAN: una pérdida que no satura</h3>
+<p>La <strong>WGAN</strong> (<em>Wasserstein GAN</em>, 2017) cambia el juego: D se convierte en un <em>crítico</em> sin sigmoide ni logaritmos que da una puntuación real, y la pérdida es la diferencia de puntuaciones medias:</p>
+<div class="formula">\[ L_D = \mathbb{E}\big[D(G(z))\big] - \mathbb{E}\big[D(x)\big], \qquad L_G = -\,\mathbb{E}\big[D(G(z))\big] \]</div>
+<p>Esa diferencia estima la <strong>distancia de Wasserstein</strong> (la «cantidad de tierra que hay que mover» para convertir una distribución en otra). Su gran ventaja es que da gradiente útil aunque D acierte siempre, y que su valor <em>sí</em> baja cuando G mejora. A cambio, el crítico debe ser Lipschitz (no cambiar demasiado rápido): el artículo original <strong>recorta los pesos</strong> a un intervalo pequeño (en el experimento de mode collapse puedes probar «WGAN (recorte de pesos)», que recorta a ±0,05) y la mejora WGAN-GP añade una <em>penalización del gradiente</em> en su lugar.</p>
+
+<h3>cGAN: elegir qué generar</h3>
+<p>Una GAN normal genera «algún» dígito. Una <strong>GAN condicional</strong> (<em>cGAN</em>) recibe además una etiqueta \( y \) y genera «un 3». Se consigue concatenando la etiqueta en one-hot al ruido de entrada del generador, y la misma etiqueta a la imagen que ve el discriminador (que ahora juzga «¿es este un 3 real?»). El fragmento 18 construye los dos modelos y comprueba las formas. Misma idea que el VAE condicional: es como pedir «una comedia» en lugar de «una peli cualquiera». Sobre esta base nacen Pix2Pix (imagen → imagen), CycleGAN (traducción sin pares) y StyleGAN (control fino del estilo en caras).</p>
+  </div>
+</details>
+
+<section>
+<h2 class="sin-num">Código</h2>
+<!-- ---------- Fragmento 14 ---------- -->
+<article class="snippet" data-lang="python">
+  <header>
+    <h3>14 · Generador y discriminador de una GAN sobre las dos lunas</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Construir las dos redes de una GAN con <code>Sequential</code> y ver sus formas: G convierte 8 números de ruido en un punto 2D; D convierte un punto 2D en un <em>logit</em> (un número, sin sigmoide).</p>
+  </header>
+  <pre class="code"><code>import numpy as np
 import keras
 from keras import layers, ops
 from sklearn.datasets import make_moons
 
 keras.utils.set_random_seed(0)
-
-# Datos: dos lunas, normalizadas a media 0 y desviación 1
 X, _ = make_moons(4000, noise=0.1, random_state=0)
 X = ((X - X.mean(0)) / X.std(0)).astype("float32")
 
-# Schedule: T = 40 pasos con beta lineal
-T = 40
-betas = np.linspace(1e-3, 0.2, T).astype("float32")
-alphas = 1 - betas
-abar = np.cumprod(alphas).astype("float32")
-print("abar en t=1, 20 y 40:", abar[[0, 19, 39]].round(3))
+LATENTE = 8
 
-# El paso t entra a la red como un vector de senos y cosenos
-FREQ = np.pi * 2.0 ** np.arange(3)
-def embed_t(tau):                        # tau = t / T, entre 0 y 1
-    a = ops.expand_dims(tau, 1) * FREQ.astype("float32")
-    return ops.concatenate([ops.expand_dims(tau, 1), ops.sin(a), ops.cos(a)], axis=1)
+def crear_generador():
+    return keras.Sequential([
+        keras.Input(shape=(LATENTE,)),
+        layers.Dense(64, activation="relu"),
+        layers.Dense(64, activation="relu"),
+        layers.Dense(2),
+    ], name="generador")
 
-# Red que predice el ruido: entra (x_t, t) y sale eps_hat
-x_in = keras.Input(shape=(2,))
-t_in = keras.Input(shape=(7,))
-h = layers.Concatenate()([x_in, t_in])
-for _ in range(3):
-    h = layers.Dense(64, activation="swish")(h)
-eps_net = keras.Model([x_in, t_in], layers.Dense(2)(h), name="eps_net")
-print("parámetros de la red:", eps_net.count_params())
+def crear_discriminador():
+    return keras.Sequential([
+        keras.Input(shape=(2,)),
+        layers.Dense(64, activation="leaky_relu"),
+        layers.Dense(64, activation="leaky_relu"),
+        layers.Dense(1),                  # logit: sin sigmoide, la aplica la pérdida
+    ], name="discriminador")
+
+G, D = crear_generador(), crear_discriminador()
+print("parámetros G:", G.count_params(), "| parámetros D:", D.count_params())
+
+z = keras.random.normal((5, LATENTE), seed=1)
+falsos = G(z)
+print("ruido z:", z.shape, "-&gt; muestras falsas:", falsos.shape)
+print("D(logit) sobre reales:", np.round(ops.convert_to_numpy(D(X[:3])).ravel(), 2))
+print("D(logit) sobre falsos:", np.round(ops.convert_to_numpy(D(falsos)).ravel(), 2))</code></pre>
+  <details class="linea-a-linea" open>
+    <summary>Línea por línea</summary>
+    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+      <tbody>
+        <tr data-lines="1-4"><td><code>import numpy as np</code>, <code>keras</code>, <code>layers, ops</code>, <code>make_moons</code></td><td>Las librerías de siempre y el generador de dos lunas.</td></tr>
+        <tr data-lines="6"><td><code>keras.utils.set_random_seed(0)</code></td><td>Semilla global.</td></tr>
+        <tr data-lines="7-8"><td><code>X, _ = make_moons(…)</code> y la normalización</td><td>Los mismos 4 000 puntos y la misma normalización del fragmento 11. Son los datos <em>reales</em>.</td></tr>
+        <tr data-lines="10"><td><code>LATENTE = 8</code></td><td>La dimensión del ruido que recibe G: 8 números al azar por muestra.</td></tr>
+        <tr data-lines="12-18"><td><code>def crear_generador(): return keras.Sequential([...])</code></td><td>G: entrada de 8 números, dos capas ocultas de 64 neuronas con ReLU y una salida lineal de 2 (las coordenadas x e y del punto). Sin activación final porque los datos están normalizados y pueden ser negativos.</td></tr>
+        <tr data-lines="20-26"><td><code>def crear_discriminador(): return keras.Sequential([...])</code></td><td>D: entrada de 2 números, dos capas ocultas de 64 con <code>leaky_relu</code> (como ReLU pero deja pasar una pequeña pendiente en los negativos, para que nunca se «apague» del todo) y una neurona final <strong>sin sigmoide</strong>: el logit. La sigmoide la aplicará la pérdida (<code>from_logits=True</code>), que es más estable numéricamente.</td></tr>
+        <tr data-lines="28-29"><td><code>G, D = crear_generador(), crear_discriminador()</code> y <code>print</code></td><td>Crea las dos redes y cuenta sus parámetros: G 8·64+64 + 64·64+64 + 64·2+2 = 4 866; D 2·64+64 + 64·64+64 + 64+1 = 4 417.</td></tr>
+        <tr data-lines="31-33"><td><code>z = keras.random.normal((5, LATENTE), seed=1)</code>, <code>falsos = G(z)</code></td><td>Cinco vectores de ruido y las cinco muestras falsas que produce G (aún sin entrenar).</td></tr>
+        <tr data-lines="34-35"><td><code>print("D(logit) …", np.round(ops.convert_to_numpy(D(…)).ravel(), 2))</code></td><td>Los logits que da D a tres puntos reales y a los cinco falsos. <code>.ravel()</code> aplana el resultado a una lista y <code>np.round(…, 2)</code> redondea.</td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>parámetros G: 4866 | parámetros D: 4417
+ruido z: (5, 8) -&gt; muestras falsas: (5, 2)
+D(logit) sobre reales: [0.23 0.2  0.12]
+D(logit) sobre falsos: [0.02 0.09 0.05 0.04 0.03]</pre>
+    <p>G tiene 4 866 parámetros y D 4 417. El ruido de forma (5, 8) se convierte en cinco puntos de forma (5, 2). Antes de entrenar, D da logits muy cercanos a 0 (entre 0,02 y 0,23) tanto a lo real como a lo falso: aún no distingue nada, equivale a «50 %» (la sigmoide de 0 es 0,5).</p>
+  </div>
+</article>
+
+<!-- ---------- Fragmento 15 ---------- -->
+<article class="snippet" data-lang="python">
+  <header>
+    <h3>15 · Entrenar la GAN: dos optimizadores y dos cintas</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> El entrenamiento alternante completo. Usa <code>G</code>, <code>D</code>, <code>X</code>, <code>LATENTE</code>, <code>keras</code>, <code>ops</code> y <code>np</code> del fragmento 14.</p>
+  </header>
+  <pre class="code"><code>import tensorflow as tf
+
+bce = keras.losses.BinaryCrossentropy(from_logits=True)
 
 
-class Difusion(keras.Model):
-    def __init__(self, red, **kwargs):
+class GAN(keras.Model):
+    def __init__(self, generador, discriminador, latente, **kwargs):
         super().__init__(**kwargs)
-        self.red = red
-        self.abar = tf.constant(abar)
-        self.semilla = keras.random.SeedGenerator(7)
-        self.loss_tracker = keras.metrics.Mean(name="loss")
+        self.generador = generador
+        self.discriminador = discriminador
+        self.latente = latente
+        self.semilla = keras.random.SeedGenerator(3)
+        self.d_tracker = keras.metrics.Mean(name="d_loss")
+        self.g_tracker = keras.metrics.Mean(name="g_loss")
+
+    def compile(self, d_optimizer, g_optimizer):
+        super().compile()
+        self.d_optimizer = d_optimizer
+        self.g_optimizer = g_optimizer
 
     @property
     def metrics(self):
-        return [self.loss_tracker]
+        return [self.d_tracker, self.g_tracker]
 
-    def train_step(self, x0):
-        n = ops.shape(x0)[0]
-        t = keras.random.randint((n,), 0, T, seed=self.semilla)        # un t al azar por ejemplo
-        eps = keras.random.normal(ops.shape(x0), seed=self.semilla)    # el ruido verdadero
-        ab = ops.expand_dims(ops.take(self.abar, t), 1)
-        xt = ops.sqrt(ab) * x0 + ops.sqrt(1 - ab) * eps                # fórmula cerrada
-        emb = embed_t((ops.cast(t, "float32") + 1) / T)
+    def train_step(self, reales):
+        n = ops.shape(reales)[0]
+
+        # 1) Entrenar D: reales -&gt; 1, falsos -&gt; 0 (G no se toca)
+        z = keras.random.normal((n, self.latente), seed=self.semilla)
+        falsos = self.generador(z)
         with tf.GradientTape() as tape:
-            eps_hat = self.red([xt, emb], training=True)
-            loss = ops.mean(ops.square(eps - eps_hat))
-        grads = tape.gradient(loss, self.red.trainable_weights)
-        self.optimizer.apply_gradients(zip(grads, self.red.trainable_weights))
-        self.loss_tracker.update_state(loss)
-        return {"loss": self.loss_tracker.result()}
+            d_loss = bce(ops.ones((n, 1)), self.discriminador(reales)) + \
+                     bce(ops.zeros((n, 1)), self.discriminador(falsos))
+        grads = tape.gradient(d_loss, self.discriminador.trainable_weights)
+        self.d_optimizer.apply_gradients(zip(grads, self.discriminador.trainable_weights))
+
+        # 2) Entrenar G: que D diga "real" sobre sus falsos (D no se toca)
+        z = keras.random.normal((n, self.latente), seed=self.semilla)
+        with tf.GradientTape() as tape:
+            g_loss = bce(ops.ones((n, 1)), self.discriminador(self.generador(z)))
+        grads = tape.gradient(g_loss, self.generador.trainable_weights)
+        self.g_optimizer.apply_gradients(zip(grads, self.generador.trainable_weights))
+
+        self.d_tracker.update_state(d_loss)
+        self.g_tracker.update_state(g_loss)
+        return {"d_loss": self.d_tracker.result(), "g_loss": self.g_tracker.result()}
 
 
-modelo = Difusion(eps_net)
-modelo.compile(optimizer=keras.optimizers.Adam(keras.optimizers.schedules.CosineDecay(1e-2, 5000)))
-hist = modelo.fit(X[:3000], epochs=5000 // (3000 // 512), batch_size=512, verbose=0)
-perd = hist.history["loss"]
-print("pérdida (media del epoch) en los epochs 1, 100, 300 y último:",
-      [round(perd[i], 3) for i in (0, 99, 299, -1)])</code></pre>
-<details class="linea-a-linea" open="">
-<summary>Línea por línea</summary>
-<p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
-<table class="lineas">
-<thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
-<tbody>
-<tr data-lines="1-5"><td><code>import numpy as np</code>, <code>tensorflow</code>, <code>keras</code>, <code>layers, ops</code>, <code>make_moons</code></td><td>Las librerías de siempre más <code>make_moons</code>, que fabrica puntos en forma de dos medias lunas.</td></tr>
-<tr data-lines="7"><td><code>keras.utils.set_random_seed(0)</code></td><td>Semilla global para reproducir el resultado.</td></tr>
-<tr data-lines="9-11"><td><code>X, _ = make_moons(4000, noise=0.1, random_state=0)</code> y la normalización</td><td>4 000 puntos con un poco de ruido; <code>_</code> ignora las etiquetas. Después se resta la media y se divide entre la desviación de cada columna (<code>X.mean(0)</code>, <code>X.std(0)</code>) para que los datos tengan media 0 y desviación 1, la escala del ruido gaussiano.</td></tr>
-<tr data-lines="13-15"><td><code>T = 40</code> y <code>betas = np.linspace(1e-3, 0.2, T)</code></td><td>Una difusión de solo 40 pasos con β de 0,001 a 0,2 (mucho más rápida que la de 1 000 pasos, porque nuestros datos son de 2 números).</td></tr>
-<tr data-lines="16-17"><td><code>alphas = 1 - betas</code> y <code>abar = np.cumprod(alphas)</code></td><td>α y su producto acumulado ᾱ, como en el fragmento 8.</td></tr>
-<tr data-lines="18"><td><code>print("abar en t=1, 20 y 40:", …)</code></td><td>Escribe ᾱ en tres instantes (los índices 0, 19 y 39, por empezar en 0) para comprobar que acabamos en ruido casi puro.</td></tr>
-<tr data-lines="20-21"><td><code>FREQ = np.pi * 2.0 ** np.arange(3)</code></td><td>Tres frecuencias π, 2π y 4π para codificar el tiempo con senos y cosenos. <code>2.0 ** np.arange(3)</code> es [1, 2, 4].</td></tr>
-<tr data-lines="22-24"><td><code>def embed_t(tau): …</code></td><td>Convierte el tiempo normalizado τ = t/T (entre 0 y 1) en un vector de 7 números: τ, tres senos y tres cosenos. <code>ops.expand_dims(tau, 1)</code> pasa de forma (n,) a (n, 1) para multiplicar por las 3 frecuencias de golpe; <code>ops.concatenate</code> los junta. La red recibirá así «qué hora es» sin tener que descubrirlo.</td></tr>
-<tr data-lines="26-29"><td><code>x_in</code>, <code>t_in</code>, <code>h = layers.Concatenate()([x_in, t_in])</code></td><td>La red tiene dos entradas: el punto ruidoso (2 números) y el embedding del tiempo (7). Se pegan en un vector de 9.</td></tr>
-<tr data-lines="30-31"><td><code>for _ in range(3): h = layers.Dense(64, activation="swish")(h)</code></td><td>Tres capas ocultas de 64 neuronas con la activación swish (parecida a ReLU pero suave). El <code>_</code> es una variable que no se usa.</td></tr>
-<tr data-lines="32"><td><code>eps_net = keras.Model([x_in, t_in], layers.Dense(2)(h), name="eps_net")</code></td><td>La capa final lineal produce 2 números: el ruido estimado ε̂ (uno por coordenada).</td></tr>
-<tr data-lines="33"><td><code>print("parámetros de la red:", …)</code></td><td>9·64 + 64 = 640; 2 × (64·64 + 64) = 8 320; 64·2 + 2 = 130; en total 9 090.</td></tr>
-<tr data-lines="36-39"><td><code>class Difusion(keras.Model): def __init__(self, red, **kwargs)</code></td><td>Un modelo propio que envuelve a la red. Guarda <code>red</code> y los ᾱ como constante de TensorFlow.</td></tr>
-<tr data-lines="40-41"><td><code>self.abar = tf.constant(abar)</code> y <code>self.semilla = keras.random.SeedGenerator(7)</code></td><td>La tabla de ᾱ dentro del modelo y un generador de semillas para sortear t y ε de forma reproducible.</td></tr>
-<tr data-lines="42"><td><code>self.loss_tracker = keras.metrics.Mean(name="loss")</code></td><td>El promediador de la pérdida del epoch.</td></tr>
-<tr data-lines="44-46"><td><code>@property def metrics(self)</code></td><td>Registra el promediador para que Keras lo reinicie en cada epoch.</td></tr>
-<tr data-lines="48"><td><code>def train_step(self, x0):</code></td><td>Cada lote son puntos limpios x<sub>0</sub> (no hay etiquetas).</td></tr>
-<tr data-lines="49"><td><code>n = ops.shape(x0)[0]</code></td><td>Cuántos ejemplos hay en el lote.</td></tr>
-<tr data-lines="50"><td><code>t = keras.random.randint((n,), 0, T, seed=self.semilla)</code></td><td>Un instante t al azar (0 a 39) <strong>por ejemplo</strong>: así la red aprende todos los niveles de ruido a la vez.</td></tr>
-<tr data-lines="51"><td><code>eps = keras.random.normal(ops.shape(x0), seed=self.semilla)</code></td><td>El ruido verdadero ε ~ N(0, 1) de la misma forma que el lote. Es el <em>objetivo</em> que la red debe adivinar.</td></tr>
-<tr data-lines="52"><td><code>ab = ops.expand_dims(ops.take(self.abar, t), 1)</code></td><td>Busca el ᾱ<sub>t</sub> de cada ejemplo (<code>ops.take</code> indexa con el vector <code>t</code>) y lo deja en forma (n, 1) para poder multiplicarlo por los puntos.</td></tr>
-<tr data-lines="53"><td><code>xt = ops.sqrt(ab) * x0 + ops.sqrt(1 - ab) * eps</code></td><td>La fórmula cerrada: el punto ensuciado hasta el instante t.</td></tr>
-<tr data-lines="54"><td><code>emb = embed_t((ops.cast(t, "float32") + 1) / T)</code></td><td>El tiempo como número real entre 0 y 1 (el +1 convierte el índice 0–39 en el t verdadero 1–40) y su codificación de 7 números.</td></tr>
-<tr data-lines="55"><td><code>with tf.GradientTape() as tape:</code></td><td>Graba para derivar.</td></tr>
-<tr data-lines="56"><td><code>eps_hat = self.red([xt, emb], training=True)</code></td><td>La red recibe el punto ruidoso y el tiempo, y devuelve su apuesta sobre el ruido.</td></tr>
-<tr data-lines="57"><td><code>loss = ops.mean(ops.square(eps - eps_hat))</code></td><td>El error cuadrático medio entre el ruido real y el estimado: la pérdida de la difusión, \( \| \varepsilon - \hat\varepsilon \|^2 \).</td></tr>
-<tr data-lines="58-59"><td><code>grads = tape.gradient(...)</code> y <code>self.optimizer.apply_gradients(...)</code></td><td>Calcula los gradientes respecto a los pesos de la red y da el paso del optimizador.</td></tr>
-<tr data-lines="60-61"><td><code>self.loss_tracker.update_state(loss)</code> y <code>return {...}</code></td><td>Acumula la pérdida del lote y devuelve la media corriente.</td></tr>
-<tr data-lines="64"><td><code>modelo = Difusion(eps_net)</code></td><td>Crea el modelo.</td></tr>
-<tr data-lines="65"><td><code>modelo.compile(optimizer=keras.optimizers.Adam(CosineDecay(1e-2, 5000)))</code></td><td>Adam con una tasa de aprendizaje que arranca en 0,01 y baja en forma de coseno hasta 0 en 5 000 pasos: aprende rápido al principio y afina al final.</td></tr>
-<tr data-lines="66"><td><code>hist = modelo.fit(X[:3000], epochs=5000 // (3000 // 512), batch_size=512, verbose=0)</code></td><td>Entrena con los primeros 3 000 puntos (los otros 1 000 se reservan para evaluar). 3 000 // 512 = 5 y 5 000 // 5 = 1 000 epochs de 6 lotes: unos 6 000 pasos (el coseno llega a 0 en el 5 000).</td></tr>
-<tr data-lines="67"><td><code>perd = hist.history["loss"]</code></td><td>La lista de pérdidas medias, una por epoch.</td></tr>
-<tr data-lines="68-69"><td><code>print("pérdida … ", [round(perd[i], 3) for i in (0, 99, 299, -1)])</code></td><td>Muestra la pérdida en los epochs 1, 100, 300 y el último (índice −1).</td></tr>
-</tbody>
-</table>
-</details>
-<div class="salida">
-<strong>Salida esperada</strong>
-<pre>abar en t=1, 20 y 40: [0.999 0.359 0.013]
-parámetros de la red: 9090
-pérdida (media del epoch) en los epochs 1, 100, 300 y último: [0.661, 0.372, 0.35, 0.365]</pre>
-<p>Con β de 0,001 a 0,2, ᾱ vale 0,999 en t = 1, 0,359 en t = 20 y 0,013 en t = 40: al final queda solo un 1,3 % de la varianza de la señal. La red tiene 9 090 parámetros. La pérdida baja de 0,661 a 0,372 y se queda cerca de 0,35–0,37; <strong>no llega a 0</strong> y eso es normal: con t pequeño casi todo lo que se ve es el dato limpio y adivinar un ruido diminuto es difícil, así que siempre queda algo de error. Esa pequeña variación entre 0,350 y 0,365 es solo el azar de los t y ε sorteados en cada lote.</p>
+gan = GAN(G, D, LATENTE)
+gan.compile(keras.optimizers.Adam(2e-3, beta_1=0.5), keras.optimizers.Adam(2e-3, beta_1=0.5))
+hist = gan.fit(X, epochs=129, batch_size=128, verbose=0)          # 129 epochs x 32 lotes = 4128 pasos
+
+print("epoch |  d_loss | g_loss")
+for e in (0, 19, 59, 128):
+    print(f"{e + 1:5d} | {hist.history['d_loss'][e]:7.3f} | {hist.history['g_loss'][e]:6.3f}")
+
+falsos = ops.convert_to_numpy(G(keras.random.normal((1000, LATENTE), seed=2)))
+d = np.sqrt(((falsos[:, None, :] - X[None, :3000, :]) ** 2).sum(-1)).min(axis=1)
+print("distancia media al dato real más cercano:", round(float(d.mean()), 3), "(la difusión del fragmento 12: 0.026)")</code></pre>
+  <details class="linea-a-linea" open>
+    <summary>Línea por línea</summary>
+    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+      <tbody>
+        <tr data-lines="1"><td><code>import tensorflow as tf</code></td><td>Para <code>GradientTape</code>.</td></tr>
+        <tr data-lines="3"><td><code>bce = keras.losses.BinaryCrossentropy(from_logits=True)</code></td><td>La entropía cruzada binaria. Con <code>from_logits=True</code> espera logits (sin sigmoide) y aplica la sigmoide internamente.</td></tr>
+        <tr data-lines="6"><td><code>class GAN(keras.Model):</code></td><td>Modelo propio, como el VAE.</td></tr>
+        <tr data-lines="7-11"><td><code>def __init__(self, generador, discriminador, latente, **kwargs)</code></td><td>Guarda las dos redes y el tamaño del ruido.</td></tr>
+        <tr data-lines="12"><td><code>self.semilla = keras.random.SeedGenerator(3)</code></td><td>Generador de semillas para el ruido de cada paso.</td></tr>
+        <tr data-lines="13-14"><td><code>self.d_tracker = …</code> y <code>self.g_tracker = …</code></td><td>Promediadores de las dos pérdidas.</td></tr>
+        <tr data-lines="16-19"><td><code>def compile(self, d_optimizer, g_optimizer):</code></td><td>Se sobrescribe <code>compile</code> para recibir <strong>dos</strong> optimizadores, uno por red. <code>super().compile()</code> sin argumentos deja que Keras haga su configuración interna.</td></tr>
+        <tr data-lines="21-23"><td><code>@property def metrics(self)</code></td><td>Registra los dos promediadores.</td></tr>
+        <tr data-lines="25-26"><td><code>def train_step(self, reales):</code> y <code>n = …</code></td><td>Cada lote son puntos reales; <code>n</code> es su tamaño.</td></tr>
+        <tr data-lines="28-30"><td><code>z = keras.random.normal(…)</code> y <code>falsos = self.generador(z)</code></td><td>Paso 1 (D): se fabrican <code>n</code> falsos. Esta llamada está <strong>fuera</strong> de la cinta, así que ninguna cuenta de G se graba: G no recibirá gradientes en este paso.</td></tr>
+        <tr data-lines="31-33"><td><code>with tf.GradientTape() as tape: d_loss = bce(ones, D(reales)) + bce(zeros, D(falsos))</code></td><td>La pérdida de D: los reales deben salir 1 (<code>ops.ones</code>) y los falsos 0 (<code>ops.zeros</code>); se suman los dos errores. La barra invertida <code>\</code> continúa la línea.</td></tr>
+        <tr data-lines="34-35"><td><code>grads = tape.gradient(d_loss, self.discriminador.trainable_weights)</code> y <code>apply_gradients</code></td><td>Los gradientes se piden <strong>solo</strong> respecto a los pesos de D y solo se actualiza D con su propio optimizador.</td></tr>
+        <tr data-lines="37-38"><td><code>z = keras.random.normal(…)</code></td><td>Paso 2 (G): ruido nuevo.</td></tr>
+        <tr data-lines="39-40"><td><code>with tf.GradientTape() as tape: g_loss = bce(ones, D(G(z)))</code></td><td>La pérdida de G (la no saturante): se evalúa a D con las muestras falsas pero <strong>etiquetadas como reales</strong> (<code>ops.ones</code>). G gana si D se equivoca. Aquí la cinta sí graba G, y el gradiente pasa por D hacia G.</td></tr>
+        <tr data-lines="41-42"><td><code>grads = tape.gradient(g_loss, self.generador.trainable_weights)</code> y <code>apply_gradients</code></td><td>Los gradientes se piden solo respecto a los pesos de G, y solo G se actualiza (D queda congelada porque su optimizador no se llama).</td></tr>
+        <tr data-lines="44-46"><td><code>self.d_tracker.update_state(d_loss)</code>, el de G y <code>return {…}</code></td><td>Apunta las dos pérdidas y las devuelve.</td></tr>
+        <tr data-lines="49-50"><td><code>gan = GAN(G, D, LATENTE)</code> y <code>gan.compile(…Adam(2e-3, beta_1=0.5), …)</code></td><td>Crea la GAN con dos Adam de learning rate 0,002. <code>beta_1=0.5</code> (en vez de 0,9) es la costumbre de DCGAN: da menos inercia al optimizador, y en un juego donde el objetivo se mueve, menos inercia ayuda.</td></tr>
+        <tr data-lines="51"><td><code>hist = gan.fit(X, epochs=129, batch_size=128, verbose=0)</code></td><td>Entrena 129 epochs: 4 000/128 son 32 lotes por epoch (31 completos y uno de 32 puntos), en total 4 128 pasos. El comentario lo resume.</td></tr>
+        <tr data-lines="53-55"><td><code>print("epoch | …")</code> + <code>for e in (0, 19, 59, 128): print(f"…")</code></td><td>Imprime las dos pérdidas en los epochs 1, 20, 60 y 129.</td></tr>
+        <tr data-lines="57"><td><code>falsos = ops.convert_to_numpy(G(keras.random.normal((1000, LATENTE), seed=2)))</code></td><td>Genera 1 000 puntos falsos con la G entrenada.</td></tr>
+        <tr data-lines="58"><td><code>d = np.sqrt(((falsos[:, None, :] - X[None, :3000, :]) ** 2).sum(-1)).min(axis=1)</code></td><td>Distancia de cada punto generado al dato real más cercano de los 3 000 primeros (broadcasting, como en fragmentos anteriores).</td></tr>
+        <tr data-lines="59"><td><code>print("distancia media …", round(float(d.mean()), 3), …)</code></td><td>La media de esas distancias, para compararla con la difusión sobre los mismos datos.</td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>epoch |  d_loss | g_loss
+    1 |   1.217 |  0.803
+   20 |   1.372 |  0.706
+   60 |   1.350 |  0.761
+  129 |   1.388 |  0.696
+distancia media al dato real más cercano: 0.023 (la difusión del fragmento 12: 0.026)</pre>
+    <p>Las dos pérdidas se quedan cerca del equilibrio teórico: <code>d_loss</code> ≈ 2 ln 2 = 1,386 (D no distingue: 0,693 por cada mitad) y <code>g_loss</code> ≈ ln 2 = 0,693. Termina en 1,388 y 0,696. Por el camino las pérdidas <em>suben y bajan</em> (1,217/0,803 al principio, 1,372/0,706, 1,350/0,761): eso es la pelea entre las dos redes, no un fallo. La distancia al dato real más cercano es 0,023, la misma que alcanzaba la difusión (0,026) y que tienen los datos reales nuevos (0,024).</p>
+  </div>
+</article>
+
+</section>
+
 </div>
-</article></div></details></div></main></body></html>
+</main>
+</body>
+</html>

@@ -1,177 +1,321 @@
-<!DOCTYPE html>
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lección 3 · La pérdida del VAE: reconstruir bien contra ordenar el mapa · Módulo 4 · Curso 3 · Cuaderno de IA</title>
+<meta name="description" content="La pérdida del VAE es reconstrucción + β·KL; el KL entre dos normales calculado a mano (0,8181) y qué pasa al mover β.">
+<script>try{var t=localStorage.getItem('cuaderno-ia:tema');if(t)document.documentElement.setAttribute('data-theme',t)}catch(e){}</script>
+<link rel="stylesheet" href="../../assets/css/style.css">
+<script src="../../assets/js/curriculum.js"></script>
+<script src="../../assets/js/lab.js"></script>
+<script src="../../assets/js/app.js" defer></script>
+</head>
+<body data-root="../../" data-course="3" data-module="4" data-lesson="3">
+<main>
+<div class="page">
 
-<html lang="es"><head><meta charset="utf-8"/><meta content="width=device-width,initial-scale=1" name="viewport"/><title>Lección 3 · El truco de reparametrización · Curso 3 · Cuaderno de IA</title><meta content="Imagina el paso de sacar \( z \) como el botón «Sorpréndeme» de Netflix: le dices más o menos dónde buscar (el centro \( \mu \) y cuánto te alejas, \( \sigma \)) y te devuelve una película al azar de esa zona." name="description"/><script>try{var t=localStorage.getItem('cuaderno-ia:tema');if(t)document.documentElement.setAttribute('data-theme',t)}catch(e){}</script><link href="../../assets/css/style.css" rel="stylesheet"/><script src="../../assets/js/curriculum.js"></script><script src="../../assets/js/lab.js"></script><script defer="" src="../../assets/js/app.js"></script><script defer="" src="../../assets/js/microanimations.js"></script></head><body data-course="3" data-lesson="3" data-module="4" data-root="../../"><main><div class="page" data-micro="3min"><header class="hero leccion"><div class="hero-grid"><div><p class="eyebrow">Curso 3 · Módulo 4 · Lección 3 de 12</p><h1>El truco de reparametrización</h1><p class="lead">Imagina el paso de sacar \( z \) como el botón «Sorpréndeme» de Netflix: le dices más o menos dónde buscar (el centro \( \mu \) y cuánto te alejas, \( \sigma \)) y te devuelve una película al azar de esa zona.</p><p class="meta-line"><span class="read-time" data-render="read-time"></span><a href="../modulo-4.html">Índice del módulo</a></p></div><div aria-hidden="true" class="hero-tile"></div></div></header><details class="predice"><summary>El entrenamiento necesita derivadas (backpropagation). ¿Cómo se deriva respecto a \( \mu \) y \( \sigma \) una operación que consiste en «sacar un número al azar»?<span class="hint"></span></summary><div><p>Haz una predicción, compruébala en la animación y lee la explicación completa si quieres saber por qué.</p></div></details><section aria-label="Explicación breve" class="micro-core"><div class="micro-kicker">01 · ENTENDER <span>≈ 45 s</span></div><h2>La idea en palabras sencillas</h2><p>En esta lección descubrirás cómo funciona «El truco de reparametrización» con un caso sencillo. Observa el cambio en la demostración antes de elegir una respuesta.</p><div class="micro-example"><span aria-hidden="true" class="micro-example-icon">💡</span><div><strong>Otro ejemplo · Texto</strong><p>Un modelo puede generar la siguiente palabra a partir de palabras anteriores, una decisión detrás de otra.</p></div></div></section><div class="micro-kicker micro-checkpoint">02 · RESPONDER <span>≈ 15 s</span></div><section aria-label="Pregunta intercalada" class="quiz mini micro-check"><script class="quiz-data" type="application/json">{"titulo": "Pausa rápida · Comprueba la idea", "preguntas": [{"q": "¿Qué distingue a un modelo generativo?", "opciones": ["Puede producir nuevas muestras aprendiendo patrones", "Solo dibuja fronteras de decisión", "Necesita predecir siempre el precio"], "correcta": 0, "porque": "Los modelos generativos intentan modelar datos para crear nuevas muestras."}]}</script></section><section aria-label="Animación interactiva" class="micro-viz" data-index="10" data-micro-viz="generative"><div class="micro-kicker">03 · EXPERIMENTAR <span>≈ 45 s</span></div><div class="micro-viz-title"><div><h2>Del ruido a una estructura</h2><p>Avanza la transformación y observa cómo emerge un patrón.</p></div><span aria-hidden="true" class="micro-viz-symbol">✦</span></div><div aria-live="polite" class="micro-viz-stage"><p>Animación interactiva: Del ruido a una estructura</p></div></section><div class="micro-kicker micro-checkpoint">04 · APLICAR <span>≈ 15 s</span></div><section aria-label="Pregunta intercalada" class="quiz mini micro-check"><script class="quiz-data" type="application/json">{"titulo": "Pausa rápida · ¿Lo aplicarías?", "preguntas": [{"q": "En un proceso de difusión generativa, ¿qué suele aprender la red?", "opciones": ["A clasificar exclusivamente correos", "A convertir todas las imágenes a blanco", "A estimar y eliminar ruido progresivamente"], "correcta": 2, "porque": "Los modelos de difusión suelen aprender cómo invertir un proceso de añadir ruido."}]}</script></section><div class="micro-finish"><strong>Idea que te llevas</strong><span>En esta lección descubrirás cómo funciona «El truco de reparametrización» con un caso sencillo</span><small>¿Quieres más ejemplos, fórmulas o código? Los tienes justo debajo, sin límite de tiempo.</small></div><details class="profundizar micro-legacy"><summary><span>Explorar más: explicación y simulaciones completas<small>Todo el texto original, tablas y demos avanzadas. Opcional.</small></span></summary><div class="prof-body"><section><h2>El truco de reparametrización</h2>
-<p>Imagina el paso de sacar \( z \) como el botón «Sorpréndeme» de Netflix: le dices más o menos dónde buscar (el centro \( \mu \) y cuánto te alejas, \( \sigma \)) y te devuelve una película al azar de esa zona. Si te preguntan «¿cuánto cambia el resultado si subo \( \mu \) un poco?», no hay respuesta: el botón es azar, no una función. Pero el <em>backpropagation</em> necesita exactamente esa respuesta, porque la pérdida del decodificador depende de \( z \), y para mejorar el encoder hay que saber cómo mover \( \mu \) y \( \sigma \) para mejorar la pérdida.</p>
-<p>El <strong>truco de reparametrización</strong> separa el azar de los parámetros. En lugar de sacar \( z \) directamente de \( \mathcal{N}(\mu, \sigma^2) \), se saca un ruido \( \varepsilon \) de una \( \mathcal{N}(0, 1) \) <em>fija</em> y se calcula:</p>
-<p>\( \mu \) es el centro de la nube que da el encoder; \( \sigma \) su anchura; \( \varepsilon \) (épsilon) un número aleatorio de la campana estándar, el mismo para todas las nubes. Con el mapa del catálogo: \( \mu \) es dónde coloca el encoder la película en un eje (por ejemplo, de «comedia» a «drama»), \( \sigma \) cuánto duda y \( \varepsilon \) el «empujón» al azar que decide en qué punto exacto de esa zona cae esta vez. El resultado \( z \) sigue siendo una muestra de \( \mathcal{N}(\mu, \sigma^2) \) (desplazar por \( \mu \) y estirar por \( \sigma \) una campana estándar da exactamente esa campana), pero ahora el azar entra <em>como un dato más</em>, igual que entra la imagen, y \( z \) es una función normal y derivable de \( \mu \) y \( \sigma \).</p>
-<div class="callout ejemplo"><span class="lbl">Ejemplo tomado del módulo</span><p>El encoder coloca a Titanic en el eje «comedia ↔ drama» con centro \( \mu = 1{,}2 \) y anchura \( \sigma = 0{,}5 \) (cifras inventadas para el ejemplo).</p></div></section><figure class="demo" data-demo="curso3/c3m4-reparametrizacion" data-titulo="z = μ + σ·ε: el azar vive en ε">
-<div class="haz">Mueve μ y σ. Después arrastra horizontalmente en la campana de arriba (zona de ε) para cambiar el ε del punto marcado, y pulsa «Otras muestras de ε».</div>
-<div class="observa">Las 36 muestras de ε (azul) se desplazan y se estiran para dar las de z (naranja): la campana de abajo siempre es \( \mathcal{N}(\mu,\sigma^2) \). Las derivadas del punto marcado, \( \partial z/\partial\mu = 1 \) y \( \partial z/\partial\sigma = \varepsilon \), son números normales: por eso el gradiente puede pasar por esa operación.</div>
-</figure><div class="resumen"><h2 class="sin-num sin-toc">En pocas líneas</h2><ul><li><strong>El truco de reparametrización:</strong> Imagina el paso de sacar \( z \) como el botón «Sorpréndeme» de Netflix: le dices más o menos dónde buscar (el centro \( \mu \) y…</li><li>Antes de continuar, intenta explicar la demo sin mirar su resultado.</li></ul></div><section class="quiz mini"><script class="quiz-data" type="application/json">{"titulo": "¿Lo tienes?", "preguntas": [{"q": "¿Qué concepto estamos trabajando en esta lección?", "opciones": ["GAN en Keras 3: DCGAN, WGAN y cGAN", "El truco de reparametrización", "Generar: el muestreo inverso"], "correcta": 1, "porque": "Imagina el paso de sacar \\( z \\) como el botón «Sorpréndeme» de Netflix: le dices más o menos dónde buscar (el centro \\( \\mu \\) y cuánto te alejas, \\( \\sigma \\)) y te devuelve una película al azar de esa zona."}, {"q": "¿Cuál de estas afirmaciones recoge lo que acabas de estudiar?", "opciones": ["Siempre hay un único método que sirve para todos los problemas.", "Lo importante es comprender la idea y comprobarla con ejemplos, no memorizar términos.", "Imagina el paso de sacar \\( z \\) como el botón «Sorpréndeme» de Netflix: le dices más o menos dónde buscar (el centro \\( \\mu \\) y cuánto te alejas, \\( \\sigma \\)) y te devuelve una película al azar de esa zona."], "correcta": 2, "porque": "La explicación central es: Imagina el paso de sacar \\( z \\) como el botón «Sorpréndeme» de Netflix: le dices más o menos dónde buscar (el centro \\( \\mu \\) y cuánto te alejas, \\( \\sigma \\)) y te devuelve una película al azar de esa zona."}, {"q": "Si una demo o un ejemplo te desconcierta, ¿cuál es la mejor forma de aprenderlo?", "opciones": ["Ignorar los resultados que no coinciden con tu intuición.", "Memorizar el nombre sin entender la operación.", "Volver a los números, cambiar un valor y explicar qué ocurre."], "correcta": 2, "porque": "Explorar qué cambia y por qué ayuda a conectar el concepto con su resultado."}]}</script></section></div></details><details class="profundizar"><summary><span>Profundizar: explicación completa<small>Matices, fórmulas, tablas, otros ejemplos y experimentos del módulo original.</small></span></summary><div class="prof-body"><section>
-<h2 id="reparametrizacion">El truco de reparametrización</h2>
-<p class="pregunta">El entrenamiento necesita derivadas (backpropagation). ¿Cómo se deriva respecto a \( \mu \) y \( \sigma \) una operación que consiste en «sacar un número al azar»?</p>
-<p>Imagina el paso de sacar \( z \) como el botón «Sorpréndeme» de Netflix: le dices más o menos dónde buscar (el centro \( \mu \) y cuánto te alejas, \( \sigma \)) y te devuelve una película al azar de esa zona. Si te preguntan «¿cuánto cambia el resultado si subo \( \mu \) un poco?», no hay respuesta: el botón es azar, no una función. Pero el <em>backpropagation</em> necesita exactamente esa respuesta, porque la pérdida del decodificador depende de \( z \), y para mejorar el encoder hay que saber cómo mover \( \mu \) y \( \sigma \) para mejorar la pérdida.</p>
-<p>El <strong>truco de reparametrización</strong> separa el azar de los parámetros. En lugar de sacar \( z \) directamente de \( \mathcal{N}(\mu, \sigma^2) \), se saca un ruido \( \varepsilon \) de una \( \mathcal{N}(0, 1) \) <em>fija</em> y se calcula:</p>
-<div class="formula">\[ z \;=\; \mu + \sigma \cdot \varepsilon, \qquad \varepsilon \sim \mathcal{N}(0, 1) \]</div>
-<p>\( \mu \) es el centro de la nube que da el encoder; \( \sigma \) su anchura; \( \varepsilon \) (épsilon) un número aleatorio de la campana estándar, el mismo para todas las nubes. Con el mapa del catálogo: \( \mu \) es dónde coloca el encoder la película en un eje (por ejemplo, de «comedia» a «drama»), \( \sigma \) cuánto duda y \( \varepsilon \) el «empujón» al azar que decide en qué punto exacto de esa zona cae esta vez. El resultado \( z \) sigue siendo una muestra de \( \mathcal{N}(\mu, \sigma^2) \) (desplazar por \( \mu \) y estirar por \( \sigma \) una campana estándar da exactamente esa campana), pero ahora el azar entra <em>como un dato más</em>, igual que entra la imagen, y \( z \) es una función normal y derivable de \( \mu \) y \( \sigma \).</p>
+<header class="hero leccion">
+  <div class="hero-grid">
+    <div>
+      <p class="eyebrow">Curso 3 · Módulo 4 · Lección 3 de 8</p>
+      <h1>La pérdida del VAE: reconstruir bien contra ordenar el mapa</h1>
+      <p class="lead">Dos deseos que chocan: que el decoder redibuje bien la carátula y que todas las nubes se parezcan a \( \mathcal{N}(0,1) \). La pérdida los suma, y \( \beta \) decide quién manda.</p>
+      <p class="meta-line"><span class="read-time" data-render="read-time"></span><a href="../modulo-4.html">Índice del módulo</a></p>
+    </div>
+    <div class="hero-tile" aria-hidden="true"></div>
+  </div>
+</header>
+<details class="predice">
+  <summary>Quitas el término KL (\( \beta = 0 \)) y dejas solo la reconstrucción. ¿Qué nubes aprende el encoder?<span class="hint"></span></summary>
+  <div>
+    <p><strong>Nubes que se encogen hasta ser un punto</strong> (\( \sigma \to 0 \)) en el sitio exacto de cada dato: así se reconstruye mejor. Vuelves al autoencoder normal, con todos sus huecos. El KL existe para impedirlo.</p>
+  </div>
+</details>
+
+<section>
+<h2 id="idea">Dos términos que tiran en sentidos opuestos</h2>
+<div class="formula">\[ L_{\text{VAE}} = \text{reconstrucción}(x, \hat{x}) + \beta \cdot D_{KL}\big(\mathcal{N}(\mu,\sigma^2)\,\|\,\mathcal{N}(0,1)\big) \]</div>
+<p>La <strong>reconstrucción</strong> mide cuánto se parece \( \hat{x} \) a \( x \) (entropía cruzada o error cuadrático, <em>sumada</em> sobre los 64 píxeles). Empuja a nubes estrechas y separadas: cada película en su sitio exacto.</p>
+<p>El <strong>KL</strong> mide cuánto se aleja cada nube del prior. Para dos normales tiene fórmula cerrada:</p>
+<div class="formula">\[ D_{KL} = \tfrac{1}{2}\left(\mu^2 + \sigma^2 - 1 - \ln\sigma^2\right) \]</div>
+<p>\( \mu^2 \) castiga alejarse del origen; \( \sigma^2 - 1 - \ln\sigma^2 \) solo vale 0 con \( \sigma = 1 \) y se dispara si la nube se encoge a un punto. Empuja a nubes anchas, centradas y solapadas: el mapa ordenado. Con \( \beta = 1 \) esto es, salvo constantes, el <em>ELBO</em>.</p>
+</section>
+
+<figure class="demo" data-demo="curso3/c3m4-kl-perdida" data-titulo="Reconstrucción contra KL, con la cuenta a la vista">
+  <div class="haz">Mueve μ y σ para bajar la pérdida total. Después pulsa «Ir al óptimo para este β», «Solo reconstrucción (β = 0)» y «β grande (6)».</div>
+  <div class="observa">Con β = 0, σ → 0: un autoencoder normal. Con β = 6 la nube casi olvida x. Con β = 1, un punto intermedio.</div>
+</figure>
+
+<section>
+<h2 id="numeros">Con números: el KL de la nube de Titanic</h2>
 <div class="callout ejemplo">
-<span class="lbl">Ejemplo numérico</span>
-<p>El encoder coloca a Titanic en el eje «comedia ↔ drama» con centro \( \mu = 1{,}2 \) y anchura \( \sigma = 0{,}5 \) (cifras inventadas para el ejemplo). Sacamos \( \varepsilon = 0{,}8 \). Supón que el decodificador dibuja bien su carátula cuando \( z \) está en 3 (el extremo «drama») y que se equivoca según una pérdida \( L = (z - 3)^2 \).</p>
-<ol class="pasos">
-<li><strong>Calcular z.</strong> \( z = 1{,}2 + 0{,}5 \cdot 0{,}8 = 1{,}6 \).</li>
-<li><strong>Pérdida.</strong> \( L = (1{,}6 - 3)^2 = 1{,}96 \).</li>
-<li><strong>Derivada respecto a z.</strong> \( \partial L/\partial z = 2(z - 3) = -2{,}8 \).</li>
-<li><strong>Regla de la cadena hacia el encoder.</strong> Como \( z = \mu + \sigma\varepsilon \): \( \partial z/\partial\mu = 1 \) y \( \partial z/\partial\sigma = \varepsilon = 0{,}8 \). Entonces \( \partial L/\partial\mu = -2{,}8 \cdot 1 = -2{,}8 \) y \( \partial L/\partial\sigma = -2{,}8 \cdot 0{,}8 = -2{,}24 \).</li>
-<li><strong>Lectura.</strong> Ambos gradientes son negativos: subir \( \mu \) (y, con este \( \varepsilon \) positivo, también \( \sigma \)) acerca \( z \) a 3 y baja la pérdida. Con otro \( \varepsilon \) negativo el efecto sobre \( \sigma \) sería el contrario; en promedio sobre muchas muestras las dos influencias se compensan.</li>
-</ol>
+  <span class="lbl">Ejemplo numérico</span>
+  <p>\( \mu = 1 \), \( \sigma = 0{,}5 \), así que \( \sigma^2 = 0{,}25 \) y \( \ln 0{,}25 = -1{,}3863 \).</p>
+  <ol class="pasos">
+    <li>Desplazamiento: \( \tfrac12\mu^2 = 0{,}5 \).</li>
+    <li>Anchura: \( \tfrac12(0{,}25 - 1 + 1{,}3863) = 0{,}3181 \).</li>
+    <li>KL \( = 0{,}5 + 0{,}3181 = \) <strong>0,8181</strong>.</li>
+  </ol>
+  <p>Con dos ejes, los KL se suman. En el VAE real de 2 dimensiones, tras 60 epochs: pérdida 25,02 = <strong>22,74</strong> de reconstrucción + <strong>2,28</strong> de KL.</p>
 </div>
+</section>
+
+<details class="predice">
+  <summary>Promedias la reconstrucción sobre los 64 píxeles (≈ 0,36) en vez de sumarla (≈ 22). El KL sigue en ≈ 2,3. ¿Qué pasa?<span class="hint"></span></summary>
+  <div>
+    <p><strong>Gana el KL</strong>, que ahora es unas 6 veces mayor que la reconstrucción. Al modelo le sale a cuenta dejar todas las nubes en el prior e ignorar la entrada: el <em>posterior collapse</em>. El equilibrio depende de las escalas, así que cuida cómo agregas.</p>
+  </div>
+</details>
+
+<div class="resumen">
+  <h2 class="sin-num sin-toc">En tres líneas</h2>
+  <ul>
+    <li>Pérdida = reconstrucción (aprender cada dato) + β·KL (ordenar el mapa).</li>
+    <li>KL \( = \tfrac12(\mu^2 + \sigma^2 - 1 - \ln\sigma^2) \): con \( \mu = 1 \), \( \sigma = 0{,}5 \) da 0,8181.</li>
+    <li>β grande ordena más y emborrona; si el KL gana del todo, posterior collapse.</li>
+  </ul>
+</div>
+
+<section class="quiz mini">
+<script type="application/json" class="quiz-data">
+{
+ "titulo": "¿Lo tienes?",
+ "preguntas": [
+  {
+   "q": "Para una dimensión del VAE, con <code>μ = 1</code> y <code>σ = 0,5</code>, ¿cuánto vale el KL contra N(0, 1) usando ½(μ² + σ² − 1 − ln σ²)?",
+   "opciones": [
+    "0,5, que es μ²/2",
+    "1,6363, porque falta dividir entre 2",
+    "0,3181, que es lo que aporta σ",
+    "0,8181"
+   ],
+   "correcta": 3,
+   "porque": "σ² = 0,25 y ln 0,25 = −1,3863; así que ½(1 + 0,25 − 1 + 1,3863) = ½·1,6363 = 0,8181. Es la suma de dos partes: 0,5 por el desplazamiento (μ²/2) y 0,3181 por la anchura (½(σ² − 1 − ln σ²)). El fragmento 2 lo comprueba también integrando numéricamente. Dar 1,6363 es olvidar la mitad."
+  },
+  {
+   "q": "Entrenas un VAE con <code>β = 10</code> en lugar de <code>β = 1</code>. ¿Qué cabe esperar?",
+   "opciones": [
+    "Reconstrucciones más nítidas, porque el KL pesa más.",
+    "Una nube más pegada al prior N(0, I) y un espacio latente más ordenado, a costa de reconstrucciones más borrosas.",
+    "Que el decoder deje de necesitar el espacio latente.",
+    "Nada, porque β solo afecta a la velocidad de entrenamiento."
+   ],
+   "correcta": 1,
+   "porque": "β multiplica el KL en la pérdida. Con β grande, el KL se vuelve lo más caro y el encoder prefiere nubes cercanas a N(0, I), aunque pierda información útil para reconstruir: más orden en el espacio, menos detalle. En la demo de la pérdida, con β = 6 el óptimo para x = 2 se acerca al prior (μ* = 0,5; σ* = 0,87), mientras con β = 1 es μ* = 1,33; σ* = 0,58. En el extremo, el encoder ignora la entrada (<em>posterior collapse</em>)."
+  },
+  {
+   "q": "Siguiendo una receta antigua, calculas el KL con <code>K.sum(1 + z_log_var - K.square(z_mean) - K.exp(z_log_var))</code> sobre los tensores de la API funcional y Keras 3 lanza <code>ValueError: A KerasTensor cannot be used as input to a TensorFlow function</code>. ¿Cuál es la solución?",
+   "opciones": [
+    "Instalar Keras 2 y no actualizar nunca.",
+    "Quitar <code>z_log_var</code> del encoder.",
+    "Hacer la cuenta con <code>keras.ops</code> dentro de una capa propia (con <code>add_loss</code>) o dentro de <code>train_step</code>, donde los tensores ya tienen valores.",
+    "Convertir los tensores a NumPy con <code>.numpy()</code> antes de la cuenta."
+   ],
+   "correcta": 2,
+   "porque": "Los tensores simbólicos de la API funcional (<code>KerasTensor</code>) son marcadores sin valores; las funciones del backend viejo (<code>K.*</code>) llaman a TensorFlow y no los admiten. <code>keras.ops</code> sí, y dentro de una capa o de <code>train_step</code> se ejecuta con tensores reales (fragmentos 4 y 5). Pasar a NumPy rompería el grafo y los gradientes dejarían de existir."
+  }
+ ]
+}
+</script>
+</section>
+
+<details class="profundizar">
+  <summary><span>Profundizar: la explicación completa<small>La derivación del KL paso a paso, la tabla de comprobación, el modelo de juguete con su óptimo, β-VAE, posterior collapse y la receta antigua que falla en Keras 3.</small></span></summary>
+  <div class="prof-body">
+<h2 id="perdida-vae">La pérdida del VAE: reconstrucción + KL</h2>
+
+<p class="pregunta">Hay dos deseos que chocan: que el decodificador reconstruya bien la imagen de entrada (la carátula, el dígito…), y que todas las nubes se parezcan a una \( \mathcal{N}(0, I) \). ¿Cómo se mide cada uno y cómo se combinan?</p>
+
+<div class="formula">\[ L_{\text{VAE}} \;=\; \underbrace{\text{reconstrucción}(x, \hat{x})}_{\text{se parece a la entrada}} \;+\; \beta\cdot\underbrace{D_{KL}\big(\,q(z\mid x)\;\|\;p(z)\,\big)}_{\text{la nube se parece al prior}} \]</div>
+
+<p>Con \( \beta = 1 \) es, salvo constantes, la <strong>cota inferior de la evidencia</strong> o <em>ELBO</em> (<em>Evidence Lower BOund</em>): como no podemos calcular directamente lo bien que el modelo explica los datos, \( \log p(x) \), se maximiza una cota inferior suya, que es exactamente «reconstrucción menos KL»; minimizar la pérdida de arriba equivale a maximizar esa cota. Aquí \( q(z \mid x) = \mathcal{N}(\mu, \sigma^2) \) es la nube que da el encoder y \( p(z) = \mathcal{N}(0, 1) \) es el prior.</p>
+
+<h3>Término 1: reconstrucción</h3>
+<p>Mide la diferencia entre la entrada y su reconstrucción. Con píxeles entre 0 y 1 se usa la <strong>entropía cruzada binaria</strong> (BCE) por píxel o el error cuadrático. Lo importante: se <strong>suma sobre los 64 píxeles</strong>, no se promedia.</p>
 <div class="callout ojo">
-<span class="lbl">Ojo</span>
-<p>El truco solo funciona si el azar se saca <em>dentro</em> del grafo con operaciones de Keras. Si haces la muestra con NumPy (<code>np.random.normal(mu, sigma)</code>), el resultado es una constante para TensorFlow y <code>tape.gradient</code> devuelve <code>None</code>: el encoder no recibiría gradiente alguno y no aprendería. Lo comprobamos en el fragmento 1. En Keras 3 se usa <code>keras.random.normal(..., seed=SeedGenerator)</code> dentro de una capa propia.</p>
+  <span class="lbl">Ojo</span>
+  <p>Suma frente a media. La entropía cruzada de un píxel vale del orden de 0,3; la de la imagen, sumando 64, ronda 22 (en nuestro entrenamiento, 22,74). El KL se suma sobre las <em>dimensiones latentes</em> (2 en nuestro caso) y vale unos 2,3. Si promedias la reconstrucción sobre los píxeles la dividirías entre 64 (≈ 0,36) y el KL pasaría a ser 6 veces mayor que ella: el modelo preferiría ignorar la entrada y dejar todas las nubes en el prior (el <em>posterior collapse</em> de más abajo). El equilibrio entre términos depende de las escalas, así que cuida cómo agregas.</p>
 </div>
-</section></div></details><details class="profundizar" id="codigo"><summary><span>Ver código explicado paso a paso<small>2 fragmento(s) original(es), con cada línea comentada y salida esperada.</small></span></summary><div class="prof-body"><article class="snippet" data-lang="python">
-<header>
-<h3>1 · El truco de reparametrización y sus gradientes</h3>
-<p class="para-que"><strong>Para qué sirve</strong> Comprobar con una cinta de gradientes por qué hay que sacar el azar dentro del grafo: con \( z = \mu + \sigma\varepsilon \) los gradientes existen (1 y ε); con una muestra de NumPy no existen.</p>
-</header>
-<pre class="code"><code>import numpy as np
-import tensorflow as tf
-import keras
 
-mu = tf.Variable([1.2])
-sigma = tf.Variable([0.5])
-eps = tf.constant([0.8])
+<h3>Término 2: el KL, derivado con números</h3>
+<p>La <strong>divergencia de Kullback-Leibler</strong> \( D_{KL}(q \,\|\, p) \) mide cuánto se parece una distribución \( q \) a otra \( p \): vale 0 si son idénticas y crece cuanto más se separan. No es una distancia simétrica, pero sirve para eso. Su definición es el <em>promedio, bajo \( q \), de la diferencia entre sus logaritmos</em>:</p>
+<div class="formula">\[ D_{KL}(q\,\|\,p) \;=\; \mathbb{E}_{z\sim q}\big[\log q(z) - \log p(z)\big] \]</div>
+<p>Para nuestras dos normales en una dimensión se puede calcular a mano. Con \( q = \mathcal{N}(\mu, \sigma^2) \) y \( p = \mathcal{N}(0, 1) \):</p>
+<ol class="pasos">
+  <li><strong>El logaritmo de \( q \).</strong> \( \log q(z) = -\tfrac{1}{2}\ln(2\pi) - \ln\sigma - \dfrac{(z-\mu)^2}{2\sigma^2} \).</li>
+  <li><strong>Su promedio bajo \( q \).</strong> Como \( \mathbb{E}[(z-\mu)^2] = \sigma^2 \), el último término promedia \( \tfrac{1}{2} \): \( \mathbb{E}_q[\log q] = -\tfrac{1}{2}\ln(2\pi) - \ln\sigma - \tfrac{1}{2} \).</li>
+  <li><strong>El logaritmo de \( p \).</strong> \( \log p(z) = -\tfrac{1}{2}\ln(2\pi) - \tfrac{z^2}{2} \). Su promedio bajo \( q \) usa \( \mathbb{E}_q[z^2] = \mu^2 + \sigma^2 \): \( \mathbb{E}_q[\log p] = -\tfrac{1}{2}\ln(2\pi) - \tfrac{1}{2}(\mu^2+\sigma^2) \).</li>
+  <li><strong>Restar.</strong> Las constantes \( -\tfrac{1}{2}\ln(2\pi) \) se cancelan y queda el resultado:</li>
+</ol>
+<div class="formula">\[ D_{KL}\big(\mathcal{N}(\mu,\sigma^2)\,\|\,\mathcal{N}(0,1)\big) \;=\; \tfrac{1}{2}\left(\mu^2 + \sigma^2 - 1 - \ln\sigma^2\right) \]</div>
 
-# Con el truco: el azar (eps) entra como un dato más
-with tf.GradientTape() as tape:
-    z = mu + sigma * eps
-d_mu, d_sigma = tape.gradient(z, [mu, sigma])
-print("z =", z.numpy())
-print("dz/dmu =", d_mu.numpy(), "| dz/dsigma =", d_sigma.numpy())
+<div class="callout ejemplo">
+  <span class="lbl">Ejemplo numérico</span>
+  <p>La nube de Titanic en un eje del mapa, con \( \mu = 1 \) y \( \sigma = 0{,}5 \) (cifras inventadas; así que \( \sigma^2 = 0{,}25 \) y \( \ln 0{,}25 = -1{,}3863 \)).</p>
+  <table>
+    <thead><tr><th>Pieza</th><th>Cuenta</th><th>Valor</th></tr></thead>
+    <tbody>
+      <tr><td>\( \mathbb{E}_q[\log q] + \tfrac{1}{2}\ln 2\pi \)</td><td>\( -\ln 0{,}5 - 0{,}5 = 0{,}6931 - 0{,}5 \)</td><td>0,1931</td></tr>
+      <tr><td>\( \mathbb{E}_q[\log p] + \tfrac{1}{2}\ln 2\pi \)</td><td>\( -\tfrac{1}{2}(1 + 0{,}25) \)</td><td>−0,6250</td></tr>
+      <tr><td>Diferencia = KL</td><td>\( 0{,}1931 - (-0{,}6250) \)</td><td class="res">0,8181</td></tr>
+      <tr><td>Con la fórmula cerrada</td><td>\( \tfrac{1}{2}(1 + 0{,}25 - 1 + 1{,}3863) = \tfrac{1}{2}\cdot 1{,}6363 \)</td><td class="res">0,8181</td></tr>
+    </tbody>
+  </table>
+  <p>El fragmento 2 comprueba el valor 0,8181 integrando numéricamente \( q\log(q/p) \) y obtiene lo mismo. Con más dimensiones latentes (más ejes del mapa, por ejemplo «comedia ↔ drama» y «ritmo lento ↔ rápido»), como las dimensiones son independientes, el KL total <strong>se suma</strong>: para \( \mu = (1{,}2;\,-0{,}4) \) y \( \sigma = (0{,}5;\,1{,}0) \) sale \( 1{,}0381 + 0{,}0800 = 1{,}1181 \).</p>
+</div>
 
-# Sin el truco: el azar se saca fuera del grafo, con NumPy
-with tf.GradientTape() as tape:
-    z_malo = tf.constant(np.random.default_rng(0).normal(mu.numpy(), sigma.numpy()))
-print("sin truco:", tape.gradient(z_malo, mu))
+<h3>Qué significa cada trozo de la fórmula</h3>
+<ul>
+  <li>\( \mu^2 \) empuja el centro de la nube hacia 0 (el centro del prior): cuanto más lejos del origen, más cuesta.</li>
+  <li>\( \sigma^2 - 1 - \ln\sigma^2 \) es 0 solo cuando \( \sigma = 1 \). Si la nube se encoge (\( \sigma \to 0 \)) el término \( -\ln\sigma^2 \) se dispara hacia infinito; si se ensancha mucho, crece \( \sigma^2 \). Es decir, <strong>penaliza que la nube sea un punto</strong>, y por eso evita el autoencoder normal disfrazado.</li>
+  <li>En el código de Keras se escribe con el log-varianza: \( -\tfrac{1}{2}\left(1 + \text{z\_log\_var} - \text{z\_mean}^2 - e^{\text{z\_log\_var}}\right) \), idéntico a la fórmula (el fragmento 2 lo confirma: 0,8181).</li>
+</ul>
 
-# Muchas muestras: z sale de N(mu, sigma^2)
-eps_muchos = keras.random.normal((100000,), seed=0)
-z_muchos = mu.numpy() + sigma.numpy() * eps_muchos.numpy()
-print("media z =", round(float(z_muchos.mean()), 2), "| desviación z =", round(float(z_muchos.std()), 2))</code></pre>
-<details class="linea-a-linea" open="">
-<summary>Línea por línea</summary>
-<p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
-<table class="lineas">
-<thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
-<tbody>
-<tr data-lines="1"><td><code>import numpy as np</code></td><td>Importa NumPy, que usaremos para el ejemplo «incorrecto» de sacar el azar fuera de TensorFlow.</td></tr>
-<tr data-lines="2"><td><code>import tensorflow as tf</code></td><td>Importa TensorFlow, que aporta <code>Variable</code> y <code>GradientTape</code>.</td></tr>
-<tr data-lines="3"><td><code>import keras</code></td><td>Importa Keras 3 (para <code>keras.random</code>).</td></tr>
-<tr data-lines="5-6"><td><code>mu = tf.Variable([1.2])</code> y <code>sigma = ...</code></td><td>Los dos números que daría el encoder, como <code>Variable</code> (algo que TensorFlow puede derivar). Son μ = 1,2 y σ = 0,5.</td></tr>
-<tr data-lines="7"><td><code>eps = tf.constant([0.8])</code></td><td>El ruido ε ya sorteado: una <strong>constante</strong>, porque no queremos derivar respecto a él.</td></tr>
-<tr data-lines="9-11"><td><code>with tf.GradientTape() as tape: z = mu + sigma * eps</code></td><td>La «cinta» graba lo que ocurra dentro del <code>with</code>. Aquí se hace el truco: z = μ + σ·ε.</td></tr>
-<tr data-lines="12"><td><code>d_mu, d_sigma = tape.gradient(z, [mu, sigma])</code></td><td>Pide a la cinta las derivadas de z respecto a μ y a σ. Devuelve una lista con dos resultados.</td></tr>
-<tr data-lines="13"><td><code>print("z =", z.numpy())</code></td><td><code>.numpy()</code> convierte el tensor en un array de NumPy para imprimirlo.</td></tr>
-<tr data-lines="14"><td><code>print("dz/dmu =", ...)</code></td><td>Imprime las dos derivadas.</td></tr>
-<tr data-lines="16-18"><td><code>z_malo = tf.constant(np.random.default_rng(0).normal(mu.numpy(), sigma.numpy()))</code></td><td>Sin el truco: se saca una muestra de N(μ, σ²) con NumPy (fuera del grafo) y se mete en una constante. TensorFlow ya no sabe de dónde salió.</td></tr>
-<tr data-lines="19"><td><code>print("sin truco:", tape.gradient(z_malo, mu))</code></td><td>Pide la derivada respecto a μ de esa muestra.</td></tr>
-<tr data-lines="21-22"><td><code>eps_muchos = keras.random.normal((100000,), seed=0)</code></td><td>Sortea 100 000 ruidos de N(0, 1) con la función de Keras (con semilla 0, así que se repite).</td></tr>
-<tr data-lines="23"><td><code>z_muchos = mu.numpy() + sigma.numpy() * eps_muchos.numpy()</code></td><td>Aplica la reparametrización a todos a la vez: 100 000 muestras de z.</td></tr>
-<tr data-lines="24"><td><code>print("media z =", ...)</code></td><td>Calcula la media y la desviación de esas muestras, redondeadas a 2 decimales, para comprobar que z sale de N(1,2; 0,5²).</td></tr>
-</tbody>
-</table>
+<h3>La pelea entre los dos términos</h3>
+<p>Para verlo con una sola neurona latente usamos un modelo de juguete: un dato \( x \) (el sitio del eje del mapa donde está de verdad una película), un encoder que da \( (\mu,\sigma) \) y un decodificador que devuelve \( \hat{x} = z \). La reconstrucción esperada es \( \mathbb{E}[(x-z)^2] = (x-\mu)^2 + \sigma^2 \). Con \( x = 2 \) y \( \beta = 1 \), el mínimo de \( (x-\mu)^2 + \sigma^2 + \beta\cdot\text{KL} \) se encuentra derivando: \( \mu^* = \tfrac{2x}{2+\beta} = 1{,}333 \) y \( \sigma^{*2} = \tfrac{\beta}{2+\beta} = \tfrac{1}{3} \), con reconstrucción 0,778, KL 1,105 y pérdida total 1,883 (en el experimento puedes comprobarlo con el botón «Ir al óptimo»).</p>
+
+<div class="callout recuerda">
+  <span class="lbl">Experimento de arriba: «Reconstrucción contra KL, con la cuenta a la vista», con todo detalle</span>
+  <p><strong>Haz esto.</strong> Mueve μ y σ a mano e intenta bajar la pérdida total. Luego pulsa «Ir al óptimo para este β», después «Solo reconstrucción (β = 0)» y «β grande (6)».</p>
+  <p><strong>Fíjate en.</strong> Con β = 0 el óptimo es μ = x y σ → 0: un autoencoder normal, con la reconstrucción perfecta y un KL altísimo. Con β grande gana el KL: μ → 0,5 y σ → 0,87, la nube casi no sabe nada de x. Con β = 1 hay un punto intermedio: μ cerca de x, nube de anchura razonable. El readout muestra el KL con todos sus sumandos.</p>
+</div>
+
+<h3>Lo que pasa en un entrenamiento real</h3>
+<p>En el fragmento 5 entrenamos un VAE de 2 dimensiones latentes con \( \beta = 1 \): tras 60 epochs la pérdida total es 25,02, de los cuales 22,74 son reconstrucción y 2,28 son KL. Ese KL pequeño es el <em>coste informativo</em> del código: el modelo ha «gastado» 2,28 nats por dígito para describir su posición en el mapa.</p>
+<div class="callout regla">
+  <span class="lbl">Regla fácil</span>
+  <p>Reconstrucción empuja a <strong>aprender cada dato</strong> (nubes estrechas, separadas). KL empuja a <strong>ordenar el mapa</strong> (nubes anchas, centradas, solapadas). El VAE es el compromiso entre ambas, y \( \beta \) es el regulador.</p>
+</div>
+<ul>
+  <li><strong>β-VAE:</strong> subir \( \beta \) por encima de 1 ordena más el espacio y tiende a que cada dimensión latente controle un factor distinto (más «desenredado», <em>disentangled</em>), a costa de imágenes más borrosas.</li>
+  <li><strong><abbr class="t" data-def="El decodificador es tan potente que ignora z; el encoder deja todas las nubes en el prior (KL ≈ 0) y el VAE no aprende nada útil.">Posterior collapse</abbr>:</strong> si el KL gana demasiado, el posterior se pega al prior y el VAE ignora la entrada. Se combate con un <em>KL annealing</em> (empezar con \( \beta \) pequeño y subirlo poco a poco), con \( \beta < 1 \) o limitando cuánto KL «cobra» por dimensión (<em>free bits</em>).</li>
+</ul>
+  </div>
 </details>
-<div class="salida">
-<strong>Salida esperada</strong>
-<pre>z = [1.6]
-dz/dmu = [1.] | dz/dsigma = [0.8]
-sin truco: None
-media z = 1.2 | desviación z = 0.5</pre>
-<p>z = 1,2 + 0,5·0,8 = 1,6, como en la cuenta a mano. Las derivadas son 1 (respecto a μ) y 0,8 = ε (respecto a σ): números normales, así que el backpropagation puede llegar al encoder. Con la muestra de NumPy, <code>tape.gradient</code> devuelve <code>None</code>: sin gradiente no hay aprendizaje. Y con 100 000 muestras, la media es 1,2 y la desviación 0,5: el truco no cambia la distribución de z.</p>
+
+<section>
+<h2 class="sin-num">Código</h2>
+<!-- ---------- Fragmento 2 ---------- -->
+<article class="snippet" data-lang="python">
+  <header>
+    <h3>2 · El KL entre dos gaussianas: fórmula, integral numérica y tabla</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Verificar que la fórmula cerrada del KL del VAE, ½(μ² + σ² − 1 − ln σ²), da lo mismo que integrar la definición, y ver qué valores toma para varias nubes.</p>
+  </header>
+  <pre class="code"><code>import numpy as np
+
+def kl_gauss(mu, sigma):
+    return 0.5 * (mu**2 + sigma**2 - 1 - np.log(sigma**2))
+
+# Comprobación numérica: integral de q(x) * log(q(x) / p(x))
+x = np.linspace(-10, 10, 200001)
+q = np.exp(-0.5 * ((x - 1.0) / 0.5) ** 2) / (0.5 * np.sqrt(2 * np.pi))
+p = np.exp(-0.5 * x**2) / np.sqrt(2 * np.pi)
+integral = np.sum(q * np.log(q / p)) * (x[1] - x[0])
+print("fórmula  :", round(kl_gauss(1.0, 0.5), 4))
+print("integral :", round(float(integral), 4))
+
+print("  mu  sigma    KL")
+for m, s in [(0, 1), (1, 1), (0, 0.5), (0, 2), (1, 0.5), (3, 0.2)]:
+    print(f"{m:4.1f} {s:5.1f} {kl_gauss(m, s):7.4f}")
+
+# La forma que usa Keras: con log-varianza
+log_var = np.log(0.5**2)
+print("con log_var:", round(float(-0.5 * (1 + log_var - 1.0**2 - np.exp(log_var))), 4))</code></pre>
+  <details class="linea-a-linea" open>
+    <summary>Línea por línea</summary>
+    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+      <tbody>
+        <tr data-lines="1"><td><code>import numpy as np</code></td><td>Importa NumPy.</td></tr>
+        <tr data-lines="3-4"><td><code>def kl_gauss(mu, sigma): return 0.5 * (...)</code></td><td>La fórmula cerrada para una dimensión: ½(μ² + σ² − 1 − ln σ²). <code>**2</code> eleva al cuadrado y <code>np.log</code> es el logaritmo natural.</td></tr>
+        <tr data-lines="6-7"><td><code>x = np.linspace(-10, 10, 200001)</code></td><td>Una rejilla de 200 001 puntos entre −10 y 10 sobre la que integraremos.</td></tr>
+        <tr data-lines="8"><td><code>q = np.exp(...) / (0.5 * np.sqrt(2 * np.pi))</code></td><td>La densidad de q = N(1, 0,5²) en cada punto de la rejilla (la fórmula de la campana de Gauss).</td></tr>
+        <tr data-lines="9"><td><code>p = np.exp(-0.5 * x**2) / np.sqrt(2 * np.pi)</code></td><td>La densidad del prior p = N(0, 1).</td></tr>
+        <tr data-lines="10"><td><code>integral = np.sum(q * np.log(q / p)) * (x[1] - x[0])</code></td><td>La definición del KL: la integral de q·log(q/p). Se aproxima con una suma de rectángulos: suma de valores × anchura de cada paso (<code>x[1] - x[0]</code>).</td></tr>
+        <tr data-lines="11-12"><td><code>print("fórmula  :", ...)</code> y <code>print("integral :", ...)</code></td><td>Imprime las dos versiones redondeadas a 4 decimales.</td></tr>
+        <tr data-lines="14"><td><code>print("  mu  sigma    KL")</code></td><td>Cabecera de la tabla.</td></tr>
+        <tr data-lines="15-16"><td><code>for m, s in [...]: print(f"...")</code></td><td>Recorre seis parejas (μ, σ) y escribe su KL. Las f-strings dan el formato: <code>:4.1f</code> = 4 caracteres con 1 decimal, <code>:7.4f</code> = 7 con 4 decimales.</td></tr>
+        <tr data-lines="18-20"><td><code>log_var = np.log(0.5**2)</code> y el <code>print</code> siguiente</td><td>La forma que usa Keras: con el logaritmo de la varianza, −½(1 + log_var − μ² − e^log_var). Para μ = 1 y σ = 0,5.</td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>fórmula  : 0.8181
+integral : 0.8181
+  mu  sigma    KL
+ 0.0   1.0  0.0000
+ 1.0   1.0  0.5000
+ 0.0   0.5  0.3181
+ 0.0   2.0  0.8069
+ 1.0   0.5  0.8181
+ 3.0   0.2  5.6294
+con log_var: 0.8181</pre>
+    <p>La fórmula y la integral numérica coinciden: 0,8181, el valor de la cuenta a mano. En la tabla: (0, 1) da 0 porque es el propio prior; (1, 1) da 0,5 = μ²/2, solo hay desplazamiento; (0; 0,5) da 0,3181 y (0, 2) da 0,8069: una nube más estrecha o más ancha que el prior cuesta; (3; 0,2) da 5,6294: estar lejos del centro y además tan estrecha es muy caro. La versión con <code>log_var</code> da otra vez 0,8181.</p>
+  </div>
+</article>
+
+<!-- ---------- Fragmento 4 ---------- -->
+<article class="snippet" data-lang="python">
+  <header>
+    <h3>4 · La receta antigua del VAE que falla en Keras 3, y su arreglo</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Reconocer el error que daría el código típico de muchos tutoriales (funciones del backend <code>K.*</code> sobre tensores simbólicos con <code>add_loss</code>) y ver la forma que funciona hoy.</p>
+  </header>
+  <pre class="code"><code>from tensorflow import keras
+from tensorflow.keras import layers, backend as K
+
+entrada = keras.Input(shape=(64,))
+z_mean = layers.Dense(2)(entrada)
+z_log_var = layers.Dense(2)(entrada)
+
+# Receta clásica: la pérdida KL como tensor simbólico + add_loss
+try:
+    kl = -0.5 * K.sum(1 + z_log_var - K.square(z_mean) - K.exp(z_log_var), axis=-1)
+except ValueError as e:
+    print("ValueError:", str(e).split(".")[0] + ".")
+
+# Lo mismo envuelto en una capa con keras.ops: sí funciona
+class CapaKL(layers.Layer):
+    def call(self, inputs):
+        z_mean, z_log_var = inputs
+        kl = -0.5 * keras.ops.sum(1 + z_log_var - keras.ops.square(z_mean) - keras.ops.exp(z_log_var), axis=-1)
+        self.add_loss(keras.ops.mean(kl))
+        return inputs
+
+_ = CapaKL()([z_mean, z_log_var])
+print("con keras.ops dentro de una capa: sin error")</code></pre>
+  <details class="linea-a-linea" open>
+    <summary>Línea por línea</summary>
+    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+      <tbody>
+        <tr data-lines="1"><td><code>from tensorflow import keras</code></td><td>Importa Keras a través de TensorFlow, como hacen los tutoriales antiguos (en Keras 3 vale igual).</td></tr>
+        <tr data-lines="2"><td><code>from tensorflow.keras import layers, backend as K</code></td><td>Importa las capas y el módulo <code>backend</code> con el alias <code>K</code>, que en Keras 2 daba funciones como <code>K.sum</code>, <code>K.square</code>, <code>K.exp</code>.</td></tr>
+        <tr data-lines="4-6"><td><code>entrada = keras.Input(...)</code>, <code>z_mean = ...</code>, <code>z_log_var = ...</code></td><td>Una entrada de 64 números y dos capas <code>Dense(2)</code>: son tensores <strong>simbólicos</strong> (marcadores de forma, sin números dentro) de la API funcional.</td></tr>
+        <tr data-lines="8-12"><td><code>try: kl = -0.5 * K.sum(1 + z_log_var - K.square(z_mean) - K.exp(z_log_var), axis=-1)</code> y <code>except</code></td><td>La receta clásica: calcular el KL directamente con funciones del backend sobre los tensores simbólicos. Aquí falla; el <code>except ValueError</code> captura el error y el <code>print</code> enseña solo su primera frase (<code>split(".")[0]</code>).</td></tr>
+        <tr data-lines="14-15"><td><code>class CapaKL(layers.Layer):</code></td><td>La solución: envolver la cuenta en una capa propia.</td></tr>
+        <tr data-lines="16-17"><td><code>def call(self, inputs): z_mean, z_log_var = inputs</code></td><td>Dentro de <code>call</code> los tensores ya tienen valores reales cuando el modelo se ejecuta.</td></tr>
+        <tr data-lines="18"><td><code>kl = -0.5 * keras.ops.sum(...)</code></td><td>El mismo KL, pero con <code>keras.ops</code> (la librería de operaciones de Keras 3, válida para tensores simbólicos y reales y para cualquier backend).</td></tr>
+        <tr data-lines="19"><td><code>self.add_loss(keras.ops.mean(kl))</code></td><td><code>add_loss</code> suma una pérdida adicional al modelo (la media del KL del lote) que <code>fit</code> sumará a la pérdida principal.</td></tr>
+        <tr data-lines="20"><td><code>return inputs</code></td><td>La capa no modifica los datos: los devuelve tal cual.</td></tr>
+        <tr data-lines="22-23"><td><code>_ = CapaKL()([z_mean, z_log_var])</code> y el <code>print</code></td><td>La aplica sobre los tensores simbólicos: esta vez sin error.</td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>ValueError: A KerasTensor cannot be used as input to a TensorFlow function.
+con keras.ops dentro de una capa: sin error</pre>
+    <p>El primer bloque falla con <code>ValueError</code>: <code>K.square</code> y compañía (en Keras 3, las del módulo <code>legacy</code>) llaman a funciones de TensorFlow que no aceptan los tensores simbólicos de Keras (<code>KerasTensor</code>). Mientras que con <code>keras.ops</code> dentro de una capa no hay problema. Regla: en Keras 3, cualquier cuenta con tensores simbólicos se hace con <code>keras.ops</code> y dentro de una capa (o, como en el fragmento siguiente, dentro de <code>train_step</code>, donde ya hay tensores reales).</p>
+  </div>
+</article>
+
+</section>
+
 </div>
-</article><article class="snippet" data-lang="python">
-<header>
-<h3>5 · Entrenar el VAE con un <code>train_step</code> propio</h3>
-<p class="para-que"><strong>Para qué sirve</strong> Unir encoder y decoder en un <code>keras.Model</code> cuya pérdida es reconstrucción + KL, y entrenarlo con el <code>fit</code> de siempre. Usa <code>encoder</code>, <code>decoder</code>, <code>keras</code>, <code>ops</code> y <code>X</code> del fragmento 3.</p>
-</header>
-<pre class="code"><code>import tensorflow as tf
-
-
-class VAE(keras.Model):
-    def __init__(self, encoder, decoder, beta=1.0, **kwargs):
-        super().__init__(**kwargs)
-        self.encoder = encoder
-        self.decoder = decoder
-        self.beta = beta
-        self.loss_tracker = keras.metrics.Mean(name="loss")
-        self.recon_tracker = keras.metrics.Mean(name="recon")
-        self.kl_tracker = keras.metrics.Mean(name="kl")
-
-    @property
-    def metrics(self):
-        return [self.loss_tracker, self.recon_tracker, self.kl_tracker]
-
-    def train_step(self, data):
-        with tf.GradientTape() as tape:
-            z_mean, z_log_var, z = self.encoder(data, training=True)
-            recon_img = self.decoder(z, training=True)
-            bce = keras.losses.binary_crossentropy(data[..., None], recon_img[..., None])
-            recon = ops.mean(ops.sum(bce, axis=1))
-            kl = ops.mean(ops.sum(-0.5 * (1 + z_log_var - ops.square(z_mean) - ops.exp(z_log_var)), axis=1))
-            total = recon + self.beta * kl
-        grads = tape.gradient(total, self.trainable_weights)
-        self.optimizer.apply_gradients(zip(grads, self.trainable_weights))
-        self.loss_tracker.update_state(total)
-        self.recon_tracker.update_state(recon)
-        self.kl_tracker.update_state(kl)
-        return {m.name: m.result() for m in self.metrics}
-
-
-vae = VAE(encoder, decoder)
-vae.compile(optimizer=keras.optimizers.Adam(1e-2))
-hist = vae.fit(X, epochs=60, batch_size=64, verbose=0)
-
-print("época |  pérdida | reconstr. |   KL")
-for e in (0, 9, 29, 59):
-    h = hist.history
-    print(f"{e + 1:5d} | {h['loss'][e]:8.2f} | {h['recon'][e]:9.2f} | {h['kl'][e]:5.2f}")</code></pre>
-<details class="linea-a-linea" open="">
-<summary>Línea por línea</summary>
-<p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
-<table class="lineas">
-<thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
-<tbody>
-<tr data-lines="1"><td><code>import tensorflow as tf</code></td><td>Se necesita para <code>tf.GradientTape</code>, la cinta que graba las operaciones y permite derivar (módulo 5).</td></tr>
-<tr data-lines="4"><td><code>class VAE(keras.Model):</code></td><td>Un modelo propio que hereda de <code>keras.Model</code> (subclassing, módulo 1).</td></tr>
-<tr data-lines="5-9"><td><code>def __init__(self, encoder, decoder, beta=1.0, **kwargs)</code> y sus cuatro líneas</td><td>Guarda el encoder, el decoder y el peso <code>beta</code> del término KL (con 1,0 es el VAE estándar).</td></tr>
-<tr data-lines="10-12"><td><code>self.loss_tracker = keras.metrics.Mean(name="loss")</code> y los otros dos</td><td>Tres «promediadores» de Keras: llevan la media, a lo largo de un epoch, de la pérdida total, de la reconstrucción y del KL.</td></tr>
-<tr data-lines="14-16"><td><code>@property def metrics(self): return [...]</code></td><td>Le dice a Keras qué métricas debe reiniciar al empezar cada epoch y mostrar en el historial.</td></tr>
-<tr data-lines="18"><td><code>def train_step(self, data):</code></td><td>Lo que <code>fit</code> ejecuta con cada lote. Al no pasar etiquetas, <code>data</code> es el lote de imágenes.</td></tr>
-<tr data-lines="19"><td><code>with tf.GradientTape() as tape:</code></td><td>Empieza a grabar para poder derivar la pérdida respecto a los pesos.</td></tr>
-<tr data-lines="20"><td><code>z_mean, z_log_var, z = self.encoder(data, training=True)</code></td><td>El encoder devuelve los tres resultados. <code>training=True</code> activa el comportamiento de entrenamiento de las capas.</td></tr>
-<tr data-lines="21"><td><code>recon_img = self.decoder(z, training=True)</code></td><td>Reconstruye desde el punto muestreado.</td></tr>
-<tr data-lines="22"><td><code>bce = keras.losses.binary_crossentropy(data[..., None], recon_img[..., None])</code></td><td>Entropía cruzada por píxel. <code>[..., None]</code> añade un último eje de tamaño 1 para que la función calcule el error de cada píxel por separado en vez de promediar la imagen. El resultado tiene forma (lote, 64).</td></tr>
-<tr data-lines="23"><td><code>recon = ops.mean(ops.sum(bce, axis=1))</code></td><td><strong>Suma</strong> sobre los 64 píxeles (<code>axis=1</code>) y luego promedia sobre las imágenes del lote.</td></tr>
-<tr data-lines="24"><td><code>kl = ops.mean(ops.sum(-0.5 * (1 + z_log_var - ops.square(z_mean) - ops.exp(z_log_var)), axis=1))</code></td><td>El KL con la fórmula del log-varianza, sumado sobre las 2 dimensiones latentes y promediado sobre el lote.</td></tr>
-<tr data-lines="25"><td><code>total = recon + self.beta * kl</code></td><td>La pérdida del VAE: reconstrucción + β·KL.</td></tr>
-<tr data-lines="26"><td><code>grads = tape.gradient(total, self.trainable_weights)</code></td><td>Calcula cuánto debe cambiar cada peso (de encoder <em>y</em> decoder) para reducir la pérdida.</td></tr>
-<tr data-lines="27"><td><code>self.optimizer.apply_gradients(zip(grads, self.trainable_weights))</code></td><td>El optimizador (Adam) aplica el cambio. <code>zip</code> empareja cada gradiente con su peso.</td></tr>
-<tr data-lines="28-30"><td><code>self.loss_tracker.update_state(total)</code> y las otras dos</td><td>Alimentan los promediadores con los valores de este lote.</td></tr>
-<tr data-lines="31"><td><code>return {m.name: m.result() for m in self.metrics}</code></td><td>Devuelve un diccionario nombre → valor medio: es lo que <code>fit</code> guarda en el historial.</td></tr>
-<tr data-lines="34"><td><code>vae = VAE(encoder, decoder)</code></td><td>Crea el VAE con las dos mitades del fragmento 3.</td></tr>
-<tr data-lines="35"><td><code>vae.compile(optimizer=keras.optimizers.Adam(1e-2))</code></td><td>Solo se indica el optimizador (learning rate 0,01); la pérdida ya está dentro de <code>train_step</code>.</td></tr>
-<tr data-lines="36"><td><code>hist = vae.fit(X, epochs=60, batch_size=64, verbose=0)</code></td><td>Entrena 60 epochs con lotes de 64 imágenes, sin etiquetas (por eso solo <code>X</code>). <code>verbose=0</code> evita imprimir cada epoch.</td></tr>
-<tr data-lines="38-41"><td><code>print(...)</code> + <code>for e in (0, 9, 29, 59): ...</code></td><td>Imprime una tabla con la pérdida total, la reconstrucción y el KL en los epochs 1, 10, 30 y 60 (los índices empiezan en 0).</td></tr>
-</tbody>
-</table>
-</details>
-<div class="salida">
-<strong>Salida esperada</strong>
-<pre>época |  pérdida | reconstr. |   KL
-    1 |    33.43 |     32.21 |  1.22
-   10 |    25.78 |     24.19 |  1.59
-   30 |    25.14 |     23.12 |  2.02
-   60 |    25.02 |     22.74 |  2.28</pre>
-<p>La pérdida total baja de 33,43 a 25,02 y, en cada fila, es la suma de las otras dos columnas (22,74 + 2,28 = 25,02). La reconstrucción baja mucho; el KL <em>sube</em> de 1,22 a 2,28: el encoder va usando más «información» para colocar cada dígito. Un KL de 2,28 nats por dígito es pequeño: con 2 dimensiones latentes el modelo no puede describir mucho más, y por eso las imágenes generadas son borrosas.</p>
-</div>
-</article></div></details></div></main></body></html>
+</main>
+</body>
+</html>

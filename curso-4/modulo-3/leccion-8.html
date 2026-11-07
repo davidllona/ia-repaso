@@ -1,241 +1,650 @@
-<!DOCTYPE html>
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lección 8 · Con varias variables cambia una línea… y hay que estandarizar · Módulo 3 · Curso 4 · Cuaderno de IA</title>
+<meta name="description" content="Regresión múltiple y con varias salidas en PyTorch con nn.Linear(k, m), por qué hay que estandarizar las variables, cómo deshacer el escalado y los errores típicos.">
+<script>try{var t=localStorage.getItem('cuaderno-ia:tema');if(t)document.documentElement.setAttribute('data-theme',t)}catch(e){}</script>
+<link rel="stylesheet" href="../../assets/css/style.css">
+<script src="../../assets/js/curriculum.js"></script>
+<script src="../../assets/js/lab.js"></script>
+<script src="../../assets/js/app.js" defer></script>
+</head>
+<body data-root="../../" data-course="4" data-module="3" data-lesson="8">
+<main>
+<div class="page">
 
-<html lang="es"><head><meta charset="utf-8"/><meta content="width=device-width,initial-scale=1" name="viewport"/><title>Lección 8 · Elegir el learning rate, y entrenar / validar / probar · Curso 4 · Cuaderno de IA</title><meta content="Con un solo parámetro y un cuenco de curvatura \( \lambda \), cada paso del descenso multiplica la distancia al fondo por \( (1 - lr\cdot\lambda) \)." name="description"/><script>try{var t=localStorage.getItem('cuaderno-ia:tema');if(t)document.documentElement.setAttribute('data-theme',t)}catch(e){}</script><link href="../../assets/css/style.css" rel="stylesheet"/><script src="../../assets/js/curriculum.js"></script><script src="../../assets/js/lab.js"></script><script defer="" src="../../assets/js/app.js"></script><script defer="" src="../../assets/js/microanimations.js"></script></head><body data-course="4" data-lesson="8" data-module="3" data-root="../../"><main><div class="page" data-micro="3min"><header class="hero leccion"><div class="hero-grid"><div><p class="eyebrow">Curso 4 · Módulo 3 · Lección 8 de 11</p><h1>Elegir el learning rate, y entrenar / validar / probar</h1><p class="lead">Con un solo parámetro y un cuenco de curvatura \( \lambda \), cada paso del descenso multiplica la distancia al fondo por \( (1 - lr\cdot\lambda) \).</p><p class="meta-line"><span class="read-time" data-render="read-time"></span><a href="../modulo-3.html">Índice del módulo</a></p></div><div aria-hidden="true" class="hero-tile"></div></div></header><details class="predice"><summary>El learning rate lo eliges tú antes de entrenar, y no hay una fórmula mágica. ¿Cómo se decide cuál es bueno sin engañarse a uno mismo?<span class="hint"></span></summary><div><p>Con un solo parámetro y un cuenco de curvatura \( \lambda \), cada paso del descenso multiplica la distancia al fondo por \( (1 - lr\cdot\lambda) \).</p></div></details><section aria-label="Explicación breve" class="micro-core"><div class="micro-kicker">01 · ENTENDER <span>≈ 45 s</span></div><h2>La idea en palabras sencillas</h2><p>No puedes elegir el learning rate (ni ningún hiperparámetro) mirando el coste de entrenamiento: siempre premiará lo que mejor memorice. Los datos se parten en tres conjuntos, igual que viste en el Curso 1:</p><div class="micro-example"><span aria-hidden="true" class="micro-example-icon">💡</span><div><strong>Otro ejemplo · Termostato</strong><p>Ajustas la temperatura varias veces: mides cuánto te alejas de 21 °C y corriges hacia ese objetivo.</p></div></div></section><div class="micro-kicker micro-checkpoint">02 · RESPONDER <span>≈ 15 s</span></div><section aria-label="Pregunta intercalada" class="quiz mini micro-check"><script class="quiz-data" type="application/json">{"titulo": "Pausa rápida · Comprueba la idea", "preguntas": [{"q": "Si el learning rate es demasiado grande, ¿qué puede pasar?", "opciones": ["Siempre aprende mejor", "La función loss desaparece", "Los saltos impiden converger"], "correcta": 2, "porque": "Pasos grandes pueden provocar oscilaciones."}]}</script></section><section aria-label="Animación interactiva" class="micro-viz" data-index="15" data-micro-viz="gradient"><div class="micro-kicker">03 · EXPERIMENTAR <span>≈ 45 s</span></div><div class="micro-viz-title"><div><h2>Bajar el error, paso a paso</h2><p>Da pasos y mira cómo el punto se acerca al mínimo de la curva.</p></div><span aria-hidden="true" class="micro-viz-symbol">✦</span></div><div aria-live="polite" class="micro-viz-stage"><p>Animación interactiva: Bajar el error, paso a paso</p></div></section><div class="micro-kicker micro-checkpoint">04 · APLICAR <span>≈ 15 s</span></div><section aria-label="Pregunta intercalada" class="quiz mini micro-check"><script class="quiz-data" type="application/json">{"titulo": "Pausa rápida · ¿Lo aplicarías?", "preguntas": [{"q": "¿Qué suelen indicar los gradientes?", "opciones": ["El idioma del modelo", "Cómo cambia la pérdida cuando cambian parámetros", "Cuántas filas faltan de la tabla"], "correcta": 1, "porque": "Orientan la actualización de los parámetros."}]}</script></section><div class="micro-finish"><strong>Idea que te llevas</strong><span>No puedes elegir el learning rate (ni ningún hiperparámetro) mirando el coste de entrenamiento: siempre premiará lo que mejor memorice</span><small>¿Quieres más ejemplos, fórmulas o código? Los tienes justo debajo, sin límite de tiempo.</small></div><details class="profundizar micro-legacy"><summary><span>Explorar más: explicación y simulaciones completas<small>Todo el texto original, tablas y demos avanzadas. Opcional.</small></span></summary><div class="prof-body"><section><h2>Elegir el learning rate, y entrenar / validar / probar</h2>
-<p>Con un solo parámetro y un cuenco de curvatura \( \lambda \), cada paso del descenso multiplica la distancia al fondo por \( (1 - lr\cdot\lambda) \). Para el MSE respecto a \( w \), la curvatura es \( \lambda = 2\cdot\overline{x^2} \) (el doble de la media de \( x^2 \)); en los datos del fragmento 11 es \( \lambda \approx 5{,}83 \). Mira lo que pasa con distintos \( lr \):</p>
-<p>No puedes elegir el learning rate (ni ningún hiperparámetro) mirando el coste <em>de entrenamiento</em>: siempre premiará lo que mejor memorice. Los datos se parten en tres conjuntos, igual que viste en el <a href="../../curso-1/modulo-5.html">Curso 1</a>:</p>
-<p>Imagina 60 películas con sus horas vistas: 40 sirven para entrenar, 20 se apartan para validar y, si hubiera conjunto de prueba, serían los estrenos que ni miras hasta el final. En PyTorch se parten con torch.utils.data.random_split(dataset, [40, 20]) (o con torch.randperm y los índices): devuelve subconjuntos barajados con los tamaños que pidas (y puedes pasarle un generator con semilla para que sea reproducible).</p>
-<div class="callout ejemplo"><span class="lbl">Ejemplo tomado del módulo</span><p>· el factor por paso con \( \lambda = 5{,}83 \) \( lr \) factor \( 1 - lr\cdot\lambda \) \( \lvert\text{factor}\rvert \) Qué pasa MSE de validación tras 10 épocas (fragmento 11) 0,001 0,994 0,994 converge, pero a paso de tortuga 36,43 0,05…</p></div></section><figure class="demo" data-demo="curso4/c4m3-lr" data-titulo="Curvas de entrenamiento y validación, y barrido del learning rate">
-<div class="haz">Mueve el slider del <strong>learning rate</strong> de izquierda a derecha y mira la curva de la izquierda: ¿cuándo baja despacio? ¿cuándo oscila? ¿cuándo se dispara? Después cambia las <strong>épocas</strong> (10, 15, 40) y mira cómo se desplaza el mejor lr (punto amarillo) en el gráfico de la derecha.</div>
-<div class="observa">En el gráfico derecho cada punto de la curva negra es un modelo entrenado con un lr distinto. Tiene forma de «cuenco»: a la izquierda, lr demasiado pequeño para el número de épocas; a la derecha, la zona sombreada (lr &gt; 1/media de x²) donde el entrenamiento <strong>diverge</strong>. Con más épocas los lr pequeños se ponen al día y el óptimo se desplaza hacia la izquierda: <em>lr y épocas se eligen juntos</em>.</div>
-</figure><div class="resumen"><h2 class="sin-num sin-toc">En pocas líneas</h2><ul><li><strong>Elegir el learning rate, y entrenar / validar / probar:</strong> Con un solo parámetro y un cuenco de curvatura \( \lambda \), cada paso del descenso multiplica la distancia al fondo por \( (1 -…</li><li>Antes de continuar, intenta explicar la demo sin mirar su resultado.</li></ul></div><section class="quiz mini"><script class="quiz-data" type="application/json">{"titulo": "¿Lo tienes?", "preguntas": [{"q": "¿Qué concepto estamos trabajando en esta lección?", "opciones": ["Predecir con tensores: de w * x + b a nn.Linear", "La pendiente del paisaje: gradientes a mano y con autograd", "Elegir el learning rate, y entrenar / validar / probar"], "correcta": 2, "porque": "Con un solo parámetro y un cuenco de curvatura \\( \\lambda \\), cada paso del descenso multiplica la distancia al fondo por \\( (1 - lr\\cdot\\lambda) \\)."}, {"q": "¿Cuál de estas afirmaciones recoge lo que acabas de estudiar?", "opciones": ["Con un solo parámetro y un cuenco de curvatura \\( \\lambda \\), cada paso del descenso multiplica la distancia al fondo por \\( (1 - lr\\cdot\\lambda) \\).", "Siempre hay un único método que sirve para todos los problemas.", "Lo importante es comprender la idea y comprobarla con ejemplos, no memorizar términos."], "correcta": 0, "porque": "La explicación central es: Con un solo parámetro y un cuenco de curvatura \\( \\lambda \\), cada paso del descenso multiplica la distancia al fondo por \\( (1 - lr\\cdot\\lambda) \\)."}, {"q": "Si una demo o un ejemplo te desconcierta, ¿cuál es la mejor forma de aprenderlo?", "opciones": ["Volver a los números, cambiar un valor y explicar qué ocurre.", "Ignorar los resultados que no coinciden con tu intuición.", "Memorizar el nombre sin entender la operación."], "correcta": 0, "porque": "Explorar qué cambia y por qué ayuda a conectar el concepto con su resultado."}]}</script></section></div></details><details class="profundizar"><summary><span>Profundizar: explicación completa<small>Matices, fórmulas, tablas, otros ejemplos y experimentos del módulo original.</small></span></summary><div class="prof-body"><section>
-<h2 id="lr">Elegir el learning rate, y entrenar / validar / probar</h2>
-<p class="pregunta">El learning rate lo eliges tú antes de entrenar, y no hay una fórmula mágica. ¿Cómo se decide cuál es bueno sin engañarse a uno mismo?</p>
-<div class="callout recuerda">
-<span class="lbl">Recuerda (Curso 1)</span>
-<p>Un <strong>hiperparámetro</strong> es un ajuste que fijas tú antes de entrenar (el learning rate, las épocas, el tamaño del lote…), a diferencia de los <strong>parámetros</strong> (\( w \), \( b \)), que aprende el algoritmo. El learning rate pequeño avanza a paso de tortuga; el adecuado baja rápido; el demasiado grande rebota o <strong>diverge</strong>. Está explicado con una tabla en el <a href="../../curso-1/modulo-2.html#entrenamiento">Curso 1</a>.</p>
-</div>
-<div class="callout analogia">
-<span class="lbl">Analogía: buscar una escena con la barra de tiempo</span>
-<p>Quieres llegar a tu escena favorita arrastrando la barra del reproductor. Si avanzas a saltos de 1 segundo, llegas, pero tardas una eternidad (<strong>learning rate pequeño</strong>). Si saltas de 10 minutos en 10 minutos, te pasas, vuelves, te pasas otra vez y cada vez estás más lejos de la escena (<strong>learning rate demasiado grande</strong>: diverge). El salto bueno es el más largo que todavía no se pasa de la escena.</p>
-</div>
-<h3>Por qué hay un límite: el factor \( (1 - lr\cdot\lambda) \)</h3>
-<p>Con un solo parámetro y un cuenco de curvatura \( \lambda \), cada paso del descenso multiplica la distancia al fondo por \( (1 - lr\cdot\lambda) \). Para el MSE respecto a \( w \), la curvatura es \( \lambda = 2\cdot\overline{x^2} \) (el doble de la media de \( x^2 \)); en los datos del fragmento 11 es \( \lambda \approx 5{,}83 \). Mira lo que pasa con distintos \( lr \):</p>
-<div class="callout ejemplo">
-<span class="lbl">Ejemplo numérico · el factor por paso con \( \lambda = 5{,}83 \)</span>
-<table>
-<thead><tr><th>\( lr \)</th><th>factor \( 1 - lr\cdot\lambda \)</th><th>\( \lvert\text{factor}\rvert \)</th><th>Qué pasa</th><th>MSE de validación tras 10 épocas (fragmento 11)</th></tr></thead>
-<tbody>
-<tr><td>0,001</td><td>0,994</td><td>0,994</td><td>converge, pero a paso de tortuga</td><td>36,43</td></tr>
-<tr><td>0,05</td><td>0,709</td><td>0,709</td><td>baja bien, aún le falta</td><td>0,2716</td></tr>
-<tr><td>0,1</td><td>0,417</td><td>0,417</td><td>baja deprisa</td><td>0,0984</td></tr>
-<tr><td>0,2</td><td>−0,166</td><td>0,166</td><td>casi de un salto (se pasa un poco y vuelve)</td><td class="res">0,0951</td></tr>
-<tr><td>0,3</td><td>−0,749</td><td>0,749</td><td>rebota de un lado a otro y se asienta despacio</td><td>0,1207</td></tr>
-<tr><td>0,4</td><td>−1,332</td><td>1,332</td><td><strong>diverge</strong>: cada paso se aleja más</td><td>12.215</td></tr>
-</tbody>
-</table>
-<p>Converge mientras el valor absoluto del factor sea menor que 1, o sea mientras \( lr &lt; 2/\lambda = 0{,}343 \) (el fragmento 11 imprime ese límite). El mejor está <em>cerca del límite</em> pero sin pasarse (aquí 0,2: factor −0,17), y por encima de él todo se rompe. En un modelo con varios parámetros manda el \( \lambda \) más grande de todos (lo vimos antes: \( 2/\lambda_{\max} \)).</p>
-</div>
-<h3>Elegir con validación: tres conjuntos</h3>
-<p>No puedes elegir el learning rate (ni ningún hiperparámetro) mirando el coste <em>de entrenamiento</em>: siempre premiará lo que mejor memorice. Los datos se parten en tres conjuntos, igual que viste en el <a href="../../curso-1/modulo-5.html">Curso 1</a>:</p>
-<table>
-<thead><tr><th>Conjunto</th><th>Para qué</th><th>¿Se usa para ajustar \( w \) y \( b \)?</th></tr></thead>
-<tbody>
-<tr><td><strong>Entrenamiento</strong> (<em>train</em>)</td><td>calcular los gradientes y mover los parámetros</td><td>sí</td></tr>
-<tr><td><strong>Validación</strong> (<em>validation</em>)</td><td>comparar configuraciones (lr, épocas, nº de variables) y elegir la mejor</td><td>no</td></tr>
-<tr><td><strong>Prueba</strong> (<em>test</em>)</td><td>medir el resultado final, <strong>una sola vez</strong>, al acabar</td><td>no</td></tr>
-</tbody>
-</table>
-<p>Imagina 60 películas con sus horas vistas: 40 sirven para entrenar, 20 se apartan para validar y, si hubiera conjunto de prueba, serían los estrenos que ni miras hasta el final. En PyTorch se parten con <code>torch.utils.data.random_split(dataset, [40, 20])</code> (o con <code>torch.randperm</code> y los índices): devuelve subconjuntos barajados con los tamaños que pidas (y puedes pasarle un <code>generator</code> con semilla para que sea reproducible). El procedimiento: para cada learning rate candidato (en potencias de 10: 0,001, 0,01, 0,1…) entrenas con <em>train</em>, mides el coste en <em>validation</em> y te quedas con el que da menor coste de validación; el <em>test</em> ni se toca. En el fragmento 11 el ganador es \( lr = 0{,}2 \) con un MSE de validación de 0,0951, que además es casi el nivel del ruido de los datos (\( 0{,}3^2 = 0{,}09 \)): no se puede bajar de ahí.</p>
-<div class="callout regla">
-<span class="lbl">Regla fácil</span>
-<p>Prueba el learning rate en <strong>potencias de 10</strong> con pocas épocas y mira la curva de coste: si <strong>sube o da NaN</strong>, baja el lr; si <strong>casi no se mueve</strong>, súbelo; si <strong>oscila</strong>, bájalo un poco. Elige por el coste de <strong>validación</strong>, no por el de entrenamiento. Con SGD suele funcionar entre 0,001 y 0,1; con las variables estandarizadas, mucho más fácil.</p>
-</div>
-<div class="callout ojo">
-<span class="lbl">Ojo: una honestidad sobre este ejemplo</span>
-<p>La regresión lineal tiene un solo mínimo y, con épocas suficientes, casi cualquier lr estable llega a él: la validación aquí solo elige «el que llega antes». Donde la validación es imprescindible es en las redes neuronales (siguientes módulos), donde el lr cambia <em>a dónde</em> llegas, no solo cuándo, y donde un modelo con muchos parámetros puede memorizar el entrenamiento mientras el coste de validación sube (<em>sobreajuste</em>). La mecánica de este apartado es la misma.</p>
-</div>
-</section></div></details><details class="profundizar" id="codigo"><summary><span>Ver código explicado paso a paso<small>2 fragmento(s) original(es), con cada línea comentada y salida esperada.</small></span></summary><div class="prof-body"><article class="snippet" data-lang="python" id="frag-11">
-<header>
-<h3>11 · Elegir el learning rate con validación</h3>
-<p class="para-que"><strong>Para qué sirve</strong> Partir los datos con <code>random_split</code>, entrenar con varios learning rates y elegir el que da menor coste de validación; ver también cuándo diverge.</p>
+<header class="hero leccion">
+  <div class="hero-grid">
+    <div>
+      <p class="eyebrow">Curso 4 · Módulo 3 · Lección 8 de 8</p>
+      <h1>Con varias variables cambia una línea… y hay que estandarizar</h1>
+      <p class="lead">Las horas vistas no dependen solo del presupuesto. Con \( k \) variables el modelo es <code>nn.Linear(k, 1)</code> y el resto del código no cambia, pero si las variables tienen escalas muy distintas, el entrenamiento explota o se atasca.</p>
+      <p class="meta-line"><span class="read-time" data-render="read-time"></span><a href="../modulo-3.html">Índice del módulo</a></p>
+    </div>
+    <div class="hero-tile" aria-hidden="true"></div>
+  </div>
 </header>
-<pre class="code"><code>import torch
+
+<details class="predice">
+  <summary>Una variable es el presupuesto en cientos de millones (de 0 a 1) y otra la duración en minutos (de 0 a 100). Entrenas con \( lr = 0{,}001 \). ¿Qué pasa?<span class="hint"></span></summary>
+  <div>
+    <p><strong>Explota:</strong> el coste pasa de 534 a 5,4·10¹⁶ en la época 10 y a <code>nan</code> en la 100. La duración, con números tan grandes, tiene una curvatura de ≈ 6.700 y su \( lr \) máximo es ≈ 0,0003. Si bajas a 0,0001 es estable, pero entonces el presupuesto casi no se mueve.</p>
+  </div>
+</details>
+
+<section>
+<h2 id="idea">El mismo código, con números en la misma escala</h2>
+<p>La <strong>regresión múltiple</strong> suma una contribución por variable: \( \hat{y} = w_1 x_1 + w_2 x_2 + \dots + w_k x_k + b \). Cada \( w_j \) dice cuánto cambia la predicción al subir \( x_j \) una unidad, con las demás quietas. En PyTorch solo cambia una línea: <code>nn.Linear(k, 1)</code>, con <code>weight</code> de forma <code>(1, k)</code> y datos <code>X</code> de forma <code>(N, k)</code>. Coste, optimizador y bucle no cambian.</p>
+<p>Si una variable va de 0 a 1 y otra de 0 a 100, el cuenco es un valle extremo: la de números grandes limita el \( lr \) y la pequeña casi no avanza. La solución es <strong>estandarizar</strong> cada columna, \( z = (x - \mu)/\sigma \), para que todas tengan media 0 y desviación 1: <code>Xs = (X - X.mean(dim=0)) / X.std(dim=0)</code>. Con eso, <code>lr = 0.1</code> llega a un coste de 0,0117 en 100 épocas. \( \mu \) y \( \sigma \) se calculan <strong>solo con los datos de entrenamiento</strong>.</p>
+<p>Para predecir <strong>varias cosas a la vez</strong> (horas vistas y nota media), <code>nn.Linear(k, m)</code>: <code>weight</code> <code>(m, k)</code>, una fila por salida, y cada salida es una regresión independiente que comparte las entradas.</p>
+</section>
+
+<figure class="demo" data-demo="curso4/c4m3-multiple" data-titulo="Regresión múltiple en vivo: la escala de las variables importa">
+  <div class="haz">Con «x₁, x₂ misma escala» y lr = 0,1 pulsa «Entrenar». Cambia a «x₂ ×10 sin escalar» y después a «x₂ ×10 estandarizadas».</div>
+  <div class="observa">Sin escalar, el límite del lr cae a ≈ 0,0096 y lr = 0,1 diverge; con las variables estandarizadas converge en 29 pasos.</div>
+</figure>
+
+<section>
+<h2 id="numeros">Con números: predecir con dos variables y volver a minutos</h2>
+<div class="callout ejemplo">
+  <span class="lbl">Ejemplo numérico</span>
+  <ol class="pasos">
+    <li><strong>Dos variables.</strong> \( x_1 \) = presupuesto y \( x_2 \) = estrenos rivales esa semana, ya centradas. Con \( w = (2, -3) \) y \( b = 1 \), una película con \( (1, -1) \): \( 2\cdot 1 + (-3)(-1) + 1 = \) <span class="res">6</span>. El modelo entrenado del fragmento 13 da 5,992.</li>
+    <li><strong>Deshacer el escalado.</strong> La duración tiene \( \mu = 50 \) y \( \sigma = 20 \) minutos, y el modelo aprendió \( w = 1 \) sobre \( z \). Su contribución es \( 1\cdot\frac{x - 50}{20} = 0{,}05\,x - 2{,}5 \): el peso real es \( w/\sigma = \) <span class="res">0,05 por minuto</span> y el sesgo se mueve \( -2{,}5 \).</li>
+  </ol>
+</div>
+</section>
+
+<details class="predice">
+  <summary>Llega un estreno nuevo y lo quieres predecir con el modelo estandarizado. ¿Lo estandarizas con su propia media y desviación, o con las del entrenamiento?<span class="hint"></span></summary>
+  <div>
+    <p><strong>Con las del entrenamiento.</strong> El modelo aprendió con números en esa escala; si usaras la media del propio estreno, cualquier película quedaría en 0 y el modelo recibiría números en otra escala. Lo mismo para validación y test: se reutilizan \( \mu \) y \( \sigma \) del entrenamiento.</p>
+  </div>
+</details>
+
+<div class="resumen">
+  <h2 class="sin-num sin-toc">En tres líneas</h2>
+  <ul>
+    <li>Varias variables: <code>nn.Linear(k, 1)</code>; varias salidas: <code>nn.Linear(k, m)</code>, una fila de <code>weight</code> por salida.</li>
+    <li>Variables en escalas distintas hacen explotar o atascar el descenso: estandariza con \( \mu \) y \( \sigma \) del entrenamiento.</li>
+    <li>Para leer los pesos en unidades originales: \( w/\sigma \), y el sesgo menos \( \sum w\,\mu/\sigma \).</li>
+  </ul>
+</div>
+
+<section class="quiz mini">
+<script type="application/json" class="quiz-data">
+{
+ "titulo": "¿Lo tienes?",
+ "preguntas": [
+  {
+   "q": "Entrenas con la duración de las películas (en minutos) estandarizada, <code>z = (x − 50) / 20</code>, y obtienes el peso <code>w = 1</code> para <code>z</code>. ¿Qué peso corresponde a <code>x</code> en las unidades originales?",
+   "opciones": [
+    "0,05",
+    "20",
+    "1",
+    "50"
+   ],
+   "correcta": 0,
+   "porque": "Como <code>z = (x − 50)/20</code>, el término <code>w·z = (w/20)·x − w·50/20</code>: el peso original es <strong>w / σ = 1 / 20 = 0,05</strong> por minuto (y el sesgo se corrige restando <code>w·μ/σ</code>). Multiplicar por 20 o dejarlo en 1 serían errores de escala; 50 es la media, que solo interviene en el sesgo."
+  },
+  {
+   "q": "Pasas de 1 variable a 4 (presupuesto, duración, críticas y estrenos rivales). ¿Qué cambia en el código?",
+   "opciones": [
+    "Hay que reescribir el bucle y el coste",
+    "<code>nn.Linear(4, 1)</code>: <code>weight</code> pasa a <code>(1, 4)</code> y <code>X</code> a <code>(N, 4)</code>; el resto igual",
+    "Hay que entrenar cuatro <code>nn.Linear(1, 1)</code>",
+    "Hay que cambiar <code>nn.MSELoss</code> por otra pérdida"
+   ],
+   "correcta": 1,
+   "porque": "El coste, el optimizador y el bucle no cambian ni una línea; los gradientes siguen la misma fórmula, una por variable. Solo cambia el número de entradas de la capa (y conviene estandarizar las cuatro columnas)."
+  },
+  {
+   "q": "Quieres predecir a la vez las horas vistas y la nota media a partir del presupuesto y la duración. ¿Qué capa y cuántos parámetros?",
+   "opciones": [
+    "<code>nn.Linear(2, 1)</code>, 3 parámetros",
+    "<code>nn.Linear(1, 2)</code>, 4 parámetros",
+    "<code>nn.Linear(2, 2)</code>, 6 parámetros"
+   ],
+   "correcta": 2,
+   "porque": "2 entradas y 2 salidas: <code>weight</code> <code>(2, 2)</code> = 4 números más <code>bias</code> <code>(2,)</code> = 2, en total 6. Cada fila de <code>weight</code> con su sesgo es una regresión para una salida."
+  },
+  {
+   "q": "Al llamar a <code>model(x)</code> sale <code>RuntimeError: mat1 and mat2 must have the same dtype, but got Long and Float</code>. ¿Qué ha pasado?",
+   "opciones": [
+    "La entrada tiene forma <code>(3,)</code> en vez de <code>(3, 1)</code>",
+    "Falta <code>optimizer.zero_grad()</code>",
+    "Falta <code>super().__init__()</code>",
+    "Los datos son enteros (<code>int64</code>) y el modelo es <code>float32</code>"
+   ],
+   "correcta": 3,
+   "porque": "<code>torch.tensor([[1], [2]])</code> crea enteros (Long). <code>nn.Linear</code> trabaja en <code>float32</code>: escribe los datos con decimales (<code>1.0</code>) o usa <code>.float()</code>. Un problema de forma da otro mensaje (<code>shapes cannot be multiplied</code>)."
+  }
+ ]
+}
+</script>
+</section>
+
+<details class="profundizar">
+  <summary><span>Profundizar: la explicación completa<small>Regresión múltiple con el Dataset del módulo 2 y el resultado del fragmento 13, las dos formas de fallar sin escalar, la fórmula para deshacer el escalado, varias salidas con nn.Linear(2, 2), la tabla de errores típicos con su mensaje real y el resumen de todo el módulo.</small></span></summary>
+  <div class="prof-body">
+<h2 id="multiple">Regresión múltiple y varias salidas</h2>
+
+<p class="pregunta">Las horas vistas de una película no dependen solo del presupuesto: también de la duración, de las críticas, de cuántos estrenos compiten esa misma semana… ¿Cómo cambia el modelo y el código cuando hay más de una variable de entrada?</p>
+
+<h3>Varias variables, el mismo código</h3>
+<p>La <strong>regresión lineal múltiple</strong> suma una contribución por variable:</p>
+<div class="formula">\[ \hat{y} = w_1 x_1 + w_2 x_2 + \dots + w_k x_k + b \]</div>
+<p>Cada \( w_j \) dice cuánto cambia \( \hat{y} \) al subir \( x_j \) una unidad <em>manteniendo las demás variables constantes</em> (lo explica el <a href="../../curso-1/modulo-2/leccion-4.html#multiple">Curso 1</a>). En PyTorch cambia una sola cosa: <code>nn.Linear(k, 1)</code> en lugar de <code>nn.Linear(1, 1)</code>. Su <code>weight</code> pasa a tener forma <code>(1, k)</code> y los datos <code>X</code> forma <code>(N, k)</code>. El resto del código (coste, optimizador, bucle) <strong>no cambia ni una línea</strong>, y los gradientes siguen la misma fórmula, una por variable: \( \partial \mathrm{MSE}/\partial w_j = \tfrac{2}{n}\sum_i(\hat{y}_i - y_i)\,x_{ij} \).</p>
+
+<div class="callout ejemplo">
+  <span class="lbl">Ejemplo numérico · una predicción con dos variables</span>
+  <p>Imagina que \( x_1 \) es el presupuesto y \( x_2 \) cuántos estrenos rivales hay esa semana (a más competencia, menos horas), los dos ya centrados en su media. Con \( w = (2,\,-3) \) y \( b = 1 \), una película con \( (x_1, x_2) = (1, -1) \) (presupuesto por encima de la media y poca competencia) da \( \hat{y} = 2\cdot 1 + (-3)\cdot(-1) + 1 = 2 + 3 + 1 = 6 \). Son justo los coeficientes con los que generamos los datos del fragmento 13 (\( y = 1 + 2x_1 - 3x_2 \) más ruido), así que el modelo, si aprende bien, debe acercarse a 6 en esta muestra.</p>
+</div>
+
+<p>El <code>Dataset</code> del módulo 2 se adapta cambiando la forma de <code>x</code>: <code>self.x = torch.randn(n, 2)</code> y <code>__getitem__</code> devuelve <code>self.x[i]</code> (de forma <code>(2,)</code>) y <code>self.y[i]</code> (de forma <code>(1,)</code>); el <code>DataLoader</code> apila 20 muestras en un lote <code>x</code> de forma <code>(20, 2)</code> e <code>y</code> de forma <code>(20, 1)</code>. Con 100 muestras y <code>batch_size=20</code> hay 5 actualizaciones por época. El resultado tras 30 épocas (fragmento 13): \( w \approx (2{,}007;\,-2{,}987) \), \( b \approx 0{,}998 \), predicción para \( (1,-1) \) de 5,992 y scikit-learn, que usa la fórmula exacta, da \( (2{,}008;\,-2{,}987) \) y 1,002: casi iguales (la pequeña diferencia viene del ruido del mini-batch y de parar tras 30 épocas).</p>
+
+<h3>Variables en escalas distintas: estandarizar</h3>
+<p>Ya vimos que el descenso va tan lento como la dirección más «plana» y que el lr lo limita la más «empinada». Con varias variables eso se agrava si una tiene valores enormes y otra pequeños. Imagina que en el fragmento 14 \( x_1 \) es el presupuesto (en cientos de millones de euros) y \( x_2 \) la duración en minutos: dos variables en unidades muy distintas, como mezclar euros y minutos en la misma cuenta. Aquí \( x_1 \) va de 0 a 1 y \( x_2 \) de 0 a 100 (y \( y = 1 + 2x_1 + 0{,}05\,x_2 \) más ruido): la curvatura en la dirección de \( x_2 \) es \( \approx 2\cdot\overline{x_2^2} \approx 6.700 \) (lr máximo \( \approx 0{,}0003 \)), y en la de \( x_1 \) solo \( \approx 0{,}67 \):</p>
+<ul>
+  <li><code>lr = 0.001</code>: supera el límite de \( x_2 \) y <strong>explota</strong>: el coste pasa de 534 (época 1) a 5,4·10¹⁶ (época 10) y a <code>nan</code> (época 100).</li>
+  <li><code>lr = 0.0001</code>: es estable, pero la dirección de \( x_1 \) avanza con un factor \( 1 - 0{,}0001\cdot 0{,}67 \approx 0{,}99993 \): <strong>casi no se mueve</strong>; tras 100 épocas el coste sigue en 1,09.</li>
+</ul>
+<p>La solución estándar es <strong>estandarizar</strong> cada columna: restarle su media y dividirla por su desviación típica, \( z = (x - \mu)/\sigma \), de modo que todas tengan media 0 y desviación 1. Con las variables estandarizadas, el mismo código con <code>lr = 0.1</code> llega a un coste de 0,0117 en 100 épocas. En PyTorch: <code>media, desv = X.mean(dim=0), X.std(dim=0)</code> y <code>Xs = (X - media) / desv</code> (<code>dim=0</code> = «a lo largo de las muestras», una media por columna). La media y la desviación se calculan <strong>solo con los datos de entrenamiento</strong> y se reutilizan para validación, prueba y para cualquier dato nuevo (si no, el modelo recibiría números en otra escala que los de su entrenamiento).</p>
+
+<div class="callout ejemplo">
+  <span class="lbl">Ejemplo numérico · deshacer el escalado para leer los pesos en unidades originales</span>
+  <p>Un peso entrenado con variables estandarizadas se refiere a \( z \), no a \( x \). Supón que \( x_2 \) es la duración en minutos, con media \( \mu = 50 \) y desviación \( \sigma = 20 \), y que el modelo aprendió \( w = 1 \) sobre \( z_2 \). Entonces su contribución es \( 1\cdot\dfrac{x_2 - 50}{20} = 0{,}05\,x_2 - 2{,}5 \): el peso <strong>en la escala original</strong> es \( w/\sigma = 1/20 = 0{,}05 \) (0,05 por cada minuto, en lugar de «1 por cada 20 minutos») y el sesgo se desplaza en \( -w\,\mu/\sigma = -2{,}5 \). En general:</p>
+  <div class="formula">\[ w_j^{\text{orig}} = \frac{w_j}{\sigma_j} \qquad\quad b^{\text{orig}} = b - \sum_j \frac{w_j\,\mu_j}{\sigma_j} \]</div>
+  <p>En el fragmento 14 eso devuelve \( (1{,}9972;\ 0{,}0502) \) y \( b = 0{,}999 \), frente a los valores verdaderos \( (2;\ 0{,}05) \) y 1.</p>
+</div>
+
+<div class="callout recuerda">
+  <span class="lbl">Experimento de arriba: «Regresión múltiple en vivo: la escala de las variables importa», con todo detalle</span>
+  <p><strong>Haz esto.</strong> Piensa en x₁ como el presupuesto y en x₂ como los estrenos rivales de esa semana. Con «x₁, x₂ misma escala» y lr = 0,1, pulsa «Entrenar»: los tres parámetros (barras azules) suben hacia las rayas amarillas. Cambia a «x₂ ×10 sin escalar» y vuelve a entrenar (verás la divergencia). Baja el lr hasta que sea estable (por debajo del límite que indica el cuadro) y mira la lentitud. Por último, elige «x₂ ×10 estandarizadas» con lr = 0,1.</p>
+  <p><strong>Fíjate en.</strong> El cuadro de lectura te da el <strong>límite del learning rate</strong> (2/λ) calculado a partir de los datos: sin escalar es ≈ 0,0096 (por eso lr = 0,1 diverge), con la misma escala ≈ 0,69 y con las variables estandarizadas 1,0. Con lr = 0,1 las dos últimas convergen en 26 y 29 pasos. La dirección «lenta» del valle es la que pone el techo a la velocidad: el coste se atasca arriba de la línea verde hasta que los pesos pequeños terminan de ajustarse.</p>
+</div>
+
+<h3>Varias salidas: <code>nn.Linear(k, m)</code></h3>
+<p>A veces hay que predecir <strong>varios números a la vez</strong> (por ejemplo, las horas vistas <em>y</em> la nota media de una película, a partir de su presupuesto y su duración). El objetivo \( y \) pasa a ser una matriz <code>(N, m)</code> y el modelo <code>nn.Linear(k, m)</code>. Su <code>weight</code> tiene forma <code>(m, k)</code>: <strong>una fila por salida</strong>, y su <code>bias</code> forma <code>(m,)</code>. Cada salida es una regresión lineal independiente que comparte las entradas: la fila \( j \) de \( W \) y \( b_j \) solo influyen en la salida \( j \). El coste, <code>nn.MSELoss</code>, promedia el error cuadrático sobre <em>todos</em> los \( N \cdot m \) números, así que es la media de los MSE de cada salida.</p>
+<p>En el fragmento 15 (piensa en \( y_1 \) como las horas vistas y en \( y_2 \) como la nota media; las fórmulas están inventadas), con \( y_1 = 1 + 2x_1 - 3x_2 \) e \( y_2 = -1 + 0{,}5x_1 + 4x_2 \) (más ruido), el modelo <code>nn.Linear(2, 2)</code> (6 parámetros) aprende <code>weight</code> \( \approx \begin{pmatrix}1{,}99 & -2{,}99\\ 0{,}49 & 3{,}99\end{pmatrix} \) y <code>bias</code> \( \approx (1{,}00;\,-1{,}01) \): las dos regresiones a la vez. Y <strong>predecir con varias salidas</strong> es llamar al modelo con un lote: <code>model(nuevos)</code> con <code>nuevos</code> de forma <code>(2, 2)</code> devuelve una matriz <code>(2, 2)</code> con una fila por muestra y una columna por salida (la muestra \( (1,-1) \) da \( (5{,}98;\,-4{,}51) \); la verdad sin ruido es \( 6 \) y \( -4{,}5 \)).</p>
+
+<h2 id="errores">Errores típicos, con su mensaje real</h2>
+
+<p class="pregunta">Cuando el entrenamiento «no funciona», ¿qué es lo primero que miras?</p>
+
+<p>Casi todos los problemas de este módulo caen en seis familias. El fragmento 17 provoca cada uno con el mensaje real de PyTorch 2.14:</p>
+<table>
+  <thead><tr><th>Síntoma</th><th>Causa</th><th>Qué hacer</th></tr></thead>
+  <tbody>
+    <tr><td><code>RuntimeError: mat1 and mat2 must have the same dtype, but got Double and Float</code> (o «Long»)</td><td>La entrada es <code>float64</code> o entera y el modelo es <code>float32</code></td><td>Escribe los datos con decimales o usa <code>.float()</code></td></tr>
+    <tr><td><code>mat1 and mat2 shapes cannot be multiplied (1x3 and 1x1)</code></td><td>La entrada tiene forma <code>(3,)</code> en vez de <code>(3, 1)</code>: PyTorch la toma como <em>una</em> muestra con 3 variables</td><td><code>x.view(-1, 1)</code></td></tr>
+    <tr><td><code>element 0 of tensors does not require grad and does not have a grad_fn</code></td><td>El coste no depende de ningún parámetro con <code>requires_grad=True</code> (o se calculó dentro de <code>no_grad</code>, o con <code>.detach()</code>)</td><td>Revisa <code>requires_grad=True</code> en <code>w</code> y <code>b</code> y que no desconectes el grafo</td></tr>
+    <tr><td><code>a leaf Variable that requires grad is being used in an in-place operation</code></td><td>Editar un parámetro en el sitio (<code>w -= …</code>) fuera de <code>torch.no_grad()</code></td><td><code>with torch.no_grad(): w -= lr * w.grad</code></td></tr>
+    <tr><td><code>AttributeError: cannot assign module before Module.__init__() call</code></td><td>Falta <code>super().__init__()</code> al principio de <code>__init__</code></td><td>Añádelo como primera línea</td></tr>
+    <tr><td>El entrenamiento «no se mueve» y <code>w.grad</code> es <code>None</code></td><td><code>w = w - lr * w.grad</code> crea un tensor nuevo que ya no es el parámetro (<code>is_leaf</code> es <code>False</code>)</td><td>Actualiza en el sitio con <code>-=</code> dentro de <code>no_grad</code>, o usa un optimizador</td></tr>
+    <tr><td>La pérdida baja… a un valor raro; el modelo predice la media</td><td><code>y</code> de forma <code>(N,)</code> y <code>yhat</code> de forma <code>(N, 1)</code></td><td><code>y.view(-1, 1)</code> y comprueba las formas</td></tr>
+    <tr><td>La pérdida sube, da <code>inf</code> o <code>nan</code></td><td>Learning rate demasiado grande para la curvatura de los datos (o variables sin escalar)</td><td>Baja el lr un factor 10 y/o estandariza las variables</td></tr>
+    <tr><td>La pérdida oscila o crece sin parar aunque el lr sea razonable</td><td>Falta <code>optimizer.zero_grad()</code>: los gradientes se acumulan</td><td>Vacía los gradientes en cada vuelta</td></tr>
+  </tbody>
+</table>
+
+<div class="callout regla">
+  <span class="lbl">Checklist antes de entrenar</span>
+  <ol class="pasos">
+    <li>Imprime <code>x.shape</code>, <code>y.shape</code> y <code>model(x).shape</code>: ¿<code>yhat</code> e <code>y</code> tienen la <strong>misma forma</strong>?</li>
+    <li>¿Los datos son <code>float32</code>? (<code>x.dtype</code>)</li>
+    <li>¿Las variables están <strong>estandarizadas</strong>?</li>
+    <li>¿El bucle tiene <code>zero_grad</code>, <code>backward</code> y <code>step</code>, en este orden?</li>
+    <li>Prueba con un lr pequeño y mira que el coste <strong>baje</strong> en las primeras épocas; si baja, sube el lr.</li>
+    <li>Fija una semilla (<code>torch.manual_seed</code>) para poder repetir el experimento.</li>
+  </ol>
+</div>
+
+<section class="resumen">
+<h2 class="sin-num sin-toc">Resumen del módulo</h2>
+<ul>
+  <li><strong>Predicción.</strong> La regresión lineal es \( \hat{y} = w\,x + b \); con varias variables, \( \hat{y} = X\,W^{T} + b \). <code>nn.Linear(in, out)</code> guarda <code>weight</code> de forma <code>(out, in)</code> y <code>bias</code> de forma <code>(out,)</code>; <code>model(x)</code> llama a <code>forward</code>. Los datos son <code>float32</code> y de forma <code>(N, in)</code>: una fila por muestra. Una clase propia hereda de <code>nn.Module</code>, llama a <code>super().__init__()</code> y define <code>forward</code>.</li>
+  <li><strong>Coste.</strong> MSE \( = \tfrac{1}{N}\sum(\hat{y}-y)^2 \): con las horas vistas <code>y = [2, 5, 8]</code> de Shrek, Toy Story y El Rey León y <code>ŷ = [2.5, 4.5, 6.5]</code> vale 0,9167, igual a mano que con <code>nn.MSELoss</code>. Trampa: <code>yhat</code> <code>(N, 1)</code> con <code>y</code> <code>(N,)</code> no da error, da otro número (8,9167) y el modelo aprende la media. Con un parámetro el coste es una parábola; con dos, un cuenco.</li>
+  <li><strong>Gradientes.</strong> \( \partial \text{MSE}/\partial w = 2\,\overline{e\,x} \) y \( \partial \text{MSE}/\partial b = 2\,\overline{e} \); <code>loss.backward()</code> da lo mismo (−24 y −10 en el ejemplo) y <code>w -= lr * w.grad</code> dentro de <code>torch.no_grad()</code> es un paso (w = 1,2; b = 0,5; MSE 31 → 6,57).</li>
+  <li><strong>El bucle.</strong> Forward, coste, <code>optimizer.zero_grad()</code>, <code>loss.backward()</code>, <code>optimizer.step()</code>. <code>backward()</code> <em>acumula</em>, por eso hay que vaciar; en PyTorch 2.x <code>zero_grad()</code> deja <code>None</code>. <code>nn.Linear + nn.MSELoss + optim.SGD</code> da exactamente lo mismo que el bucle a mano.</li>
+  <li><strong>Momentum.</strong> \( v \leftarrow \mu v + g,\; p \leftarrow p - lr\,v \): con \( \mu = 0{,}9 \) acelera en los valles largos (<code>p</code> pasa de 1,0 a 2,7 en el ejemplo) pero puede pasarse de largo al principio.</li>
+  <li><strong>Batch, mini-batch y SGD.</strong> Con <code>DataLoader(batch_size=…, shuffle=True, drop_last=…)</code>: el número de actualizaciones por época es \( \lceil N/\text{batch} \rceil \) (60 muestras, 5 épocas: 5, 30 o 300). Más actualizaciones por época, más progreso por época, pero cada una más ruidosa.</li>
+  <li><strong>Learning rate.</strong> Demasiado pequeño, lento; demasiado grande, diverge: en una dirección con curvatura \( \lambda \) hay que cumplir \( lr < 2/\lambda \). Se elige con el coste de <strong>validación</strong> (en el ejemplo, 0,2 con un límite teórico de 0,343) y se mira el de <strong>test</strong> una sola vez al final.</li>
+  <li><strong>Regresión múltiple y varias salidas.</strong> <code>nn.Linear(n, 1)</code> para \( n \) variables (<code>weight</code> <code>(1, n)</code>); <code>nn.Linear(n, k)</code> para \( k \) salidas (<code>weight</code> <code>(k, n)</code>, una fila por salida). Si las variables tienen escalas distintas, el entrenamiento explota o se atasca: <strong>estandariza</strong> (\( z=(x-\mu)/\sigma \)) y, para leer los pesos en las unidades originales, <code>w/σ</code> y <code>b − Σ w·μ/σ</code>.</li>
+  <li><strong>Guardar y errores típicos.</strong> <code>torch.save(model.state_dict(), ruta)</code> y <code>model.load_state_dict(torch.load(ruta))</code> en un modelo con la <em>misma arquitectura</em>; copia el estado con <code>copy.deepcopy</code> si quieres quedarte con el mejor. Errores: tipos (<code>float64</code> frente a <code>float32</code>), formas <code>(3,)</code> en lugar de <code>(3, 1)</code>, <code>backward()</code> sin <code>requires_grad</code>, modificar en el sitio fuera de <code>no_grad()</code>, olvidar <code>super().__init__()</code> y <code>w = w - lr * w.grad</code>.</li>
+</ul>
+<p>Siguiente paso: en el <a href="../modulo-4.html">módulo 4</a> pasamos de predecir un número a <strong>clasificar en dos clases</strong>: la función sigmoide, la entropía cruzada (BCE) y el mismo bucle de entrenamiento que has aprendido aquí. Todo lo de este módulo (<code>nn.Module</code>, <code>optim</code>, <code>DataLoader</code>) se reutiliza tal cual.</p>
+</section>
+  </div>
+</details>
+
+<section>
+<h2 class="sin-num">Código</h2>
+<article class="snippet" data-lang="python" id="frag-13">
+  <header>
+    <h3>13 · Regresión múltiple: <code>Dataset</code> de dos variables y <code>nn.Linear(2, 1)</code></h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Entrenar una regresión con dos variables de entrada usando <code>Dataset</code>, <code>DataLoader</code> y mini-batch, comparar el resultado con scikit-learn y predecir una muestra nueva.</p>
+  </header>
+  <pre class="code"><code>import torch
 from torch import nn
-from torch.utils.data import random_split
+from torch.utils.data import Dataset, DataLoader
+from sklearn.linear_model import LinearRegression
+
+class Data2D(Dataset):
+    def __init__(self, n=100):
+        torch.manual_seed(0)
+        self.x = torch.randn(n, 2)                                     # dos variables
+        self.y = (1 + 2 * self.x[:, 0] - 3 * self.x[:, 1]).view(-1, 1)  # y = 1 + 2·x1 - 3·x2
+        self.y = self.y + 0.1 * torch.randn(n, 1)                      # más ruido
+    def __getitem__(self, i):
+        return self.x[i], self.y[i]
+    def __len__(self):
+        return len(self.x)
+
+data = Data2D()
+x0, y0 = data[0]
+print("una muestra: x =", x0.shape, " y =", y0.shape)
+loader = DataLoader(data, batch_size=20, shuffle=True)
+xb, yb = next(iter(loader))
+print("un lote: x =", tuple(xb.shape), " y =", tuple(yb.shape))
+
+torch.manual_seed(1)
+model = nn.Linear(2, 1)
+print("weight:", tuple(model.weight.shape), " bias:", tuple(model.bias.shape))
+criterion = nn.MSELoss()
+optimizer = torch.optim.SGD(model.parameters(), lr=0.1)
+for epoch in range(30):
+    for x, y in loader:
+        loss = criterion(model(x), y)
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
+    if epoch in (0, 4, 14, 29):
+        print(f"época {epoch + 1:2d}  w = {model.weight.detach().flatten().numpy().round(3)}  b = {model.bias.item():.3f}  loss último lote = {loss.item():.4f}")
+
+nuevo = torch.tensor([[1.0, -1.0]])
+print("predicción para (1, -1):", round(model(nuevo).item(), 3), " (verdad sin ruido: 1 + 2 + 3 = 6)")
+sk = LinearRegression().fit(data.x.numpy(), data.y.numpy())
+print("scikit-learn: coef =", sk.coef_.flatten().round(3), " intercept =", sk.intercept_.round(3))</code></pre>
+  <details class="linea-a-linea">
+    <summary>Línea por línea</summary>
+    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+      <tbody>
+        <tr data-lines="1-4"><td><code>import torch …</code></td><td><code>torch</code>, <code>nn</code>, <code>Dataset</code>/<code>DataLoader</code> y <code>LinearRegression</code> de scikit-learn (solo para comparar).</td></tr>
+        <tr data-lines="6"><td><code>class Data2D(Dataset):</code></td><td>Un <code>Dataset</code> con dos variables.</td></tr>
+        <tr data-lines="7-8"><td><code>def __init__(self, n=100): …</code></td><td>Constructor, con semilla; <code>n</code> es el número de muestras (100).</td></tr>
+        <tr data-lines="9"><td><code>self.x = torch.randn(n, 2)                         …</code></td><td>Dos variables por muestra: <code>randn(n, 2)</code> da una matriz <code>(100, 2)</code> de números normales.</td></tr>
+        <tr data-lines="10"><td><code>self.y = (1 + 2 * self.x[:, 0] - 3 * self.x[:, 1]) …</code></td><td>El objetivo: <em>y</em> = 1 + 2·<em>x</em>₁ − 3·<em>x</em>₂ (<code>[:, 0]</code> es la primera columna, <code>[:, 1]</code> la segunda); <code>view(-1, 1)</code> lo deja como columna <code>(100, 1)</code>.</td></tr>
+        <tr data-lines="11"><td><code>self.y = self.y + 0.1 * torch.randn(n, 1)          …</code></td><td>Le añadimos ruido.</td></tr>
+        <tr data-lines="12-13"><td><code>def __getitem__(self, i): …</code></td><td><code>__getitem__</code>: devuelve una fila de <code>x</code> (forma <code>(2,)</code>) y su <code>y</code> (forma <code>(1,)</code>).</td></tr>
+        <tr data-lines="14-15"><td><code>def __len__(self): …</code></td><td><code>__len__</code>.</td></tr>
+        <tr data-lines="17"><td><code>data = Data2D()</code></td><td>Crea el dataset.</td></tr>
+        <tr data-lines="18-19"><td><code>x0, y0 = data[0] …</code></td><td>Mira una muestra: <code>x</code> es <code>(2,)</code> e <code>y</code> es <code>(1,)</code>.</td></tr>
+        <tr data-lines="20"><td><code>loader = DataLoader(data, batch_size=20, shuffle=T …</code></td><td><code>DataLoader</code> con lotes de 20 muestras, barajados.</td></tr>
+        <tr data-lines="21-22"><td><code>xb, yb = next(iter(loader)) …</code></td><td><code>next(iter(loader))</code> pide el primer lote: <code>x</code> de forma <code>(20, 2)</code> e <code>y</code> de forma <code>(20, 1)</code>.</td></tr>
+        <tr data-lines="24-25"><td><code>torch.manual_seed(1) …</code></td><td>El modelo: <code>nn.Linear(2, 1)</code> (2 variables, 1 salida).</td></tr>
+        <tr data-lines="26"><td><code>print("weight:", tuple(model.weight.shape), " bias …</code></td><td>Formas de los parámetros: <code>weight</code> <code>(1, 2)</code> y <code>bias</code> <code>(1,)</code>.</td></tr>
+        <tr data-lines="27-28"><td><code>criterion = nn.MSELoss() …</code></td><td>Coste y optimizador (lr 0,1).</td></tr>
+        <tr data-lines="29"><td><code>for epoch in range(30):</code></td><td>30 épocas.</td></tr>
+        <tr data-lines="30"><td><code>for x, y in loader:</code></td><td>Un lote por iteración (5 por época).</td></tr>
+        <tr data-lines="31-34"><td><code>loss = criterion(model(x), y) …</code></td><td>Las cuatro líneas del bucle: coste, <code>zero_grad</code>, <code>backward</code>, <code>step</code>.</td></tr>
+        <tr data-lines="35-36"><td><code>if epoch in (0, 4, 14, 29): …</code></td><td>En las épocas 1, 5, 15 y 30 imprime los pesos (<code>detach().flatten().numpy().round(3)</code> los pasa a NumPy), el sesgo y el coste del último lote.</td></tr>
+        <tr data-lines="38-39"><td><code>nuevo = torch.tensor([[1.0, -1.0]]) …</code></td><td>Una muestra nueva (1, −1) y la predicción del modelo; sin ruido el valor verdadero es 1 + 2 + 3 = 6.</td></tr>
+        <tr data-lines="40-41"><td><code>sk = LinearRegression().fit(data.x.numpy(), data.y …</code></td><td>La misma regresión con scikit-learn (solución exacta) para comparar coeficientes y término independiente.</td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>una muestra: x = torch.Size([2])  y = torch.Size([1])
+un lote: x = (20, 2)  y = (20, 1)
+weight: (1, 2)  bias: (1,)
+época  1  w = [ 1.111 -2.074]  b = 0.627  loss último lote = 1.7179
+época  5  w = [ 1.959 -2.963]  b = 0.999  loss último lote = 0.0130
+época 15  w = [ 2.007 -2.986]  b = 1.001  loss último lote = 0.0151
+época 30  w = [ 2.007 -2.987]  b = 0.998  loss último lote = 0.0119
+predicción para (1, -1): 5.992  (verdad sin ruido: 1 + 2 + 3 = 6)
+scikit-learn: coef = [ 2.008 -2.987]  intercept = [1.002]</pre>
+    <p>Cada muestra es <code>(2,)</code>/<code>(1,)</code> y cada lote <code>(20, 2)</code>/<code>(20, 1)</code>; <code>weight</code> es <code>(1, 2)</code>. En una sola época los pesos ya han pasado de valores aleatorios a (1,11; −2,07) (con <em>b</em> = 0,627), tras 5 épocas son (1,96; −2,96) y a partir de la 15 se estabilizan en torno a <strong>(2,007; −2,987)</strong> con <em>b</em> ≈ 0,998; el coste del último lote (≈ 0,012) es de nivel del ruido (0,1² = 0,01). La predicción para (1, −1) es <strong>5,992</strong> (cercana a 6) y scikit-learn da prácticamente lo mismo: <code>[2.008, -2.987]</code> e intercepto 1.002. La diferencia con scikit-learn es de milésimas: viene del ruido del mini-batch y de haber parado a las 30 épocas.</p>
+  </div>
+</article>
+
+<article class="snippet" data-lang="python" id="frag-14">
+  <header>
+    <h3>14 · Escalar las variables: sin escalar explota o se atasca; estandarizadas, converge</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Ver con dos variables de escalas muy distintas (0–1 y 0–100) cómo falla el entrenamiento sin escalar, estandarizar con <code>mean</code> y <code>std</code> y deshacer el escalado para leer los pesos en las unidades originales.</p>
+  </header>
+  <pre class="code"><code>import torch
+from torch import nn
 
 torch.manual_seed(0)
-X = torch.arange(-3, 3, 0.1).view(-1, 1)
-Y = -3 * X + 1 + 0.3 * torch.randn(X.size())
-train_idx, val_idx = random_split(range(len(X)), [40, 20], generator=torch.Generator().manual_seed(7))
-Xtr, Ytr = X[list(train_idx)], Y[list(train_idx)]
-Xva, Yva = X[list(val_idx)], Y[list(val_idx)]
-print("entrenamiento:", len(Xtr), " validación:", len(Xva))
+n = 200
+x1 = torch.rand(n, 1)                         # entre 0 y 1
+x2 = torch.rand(n, 1) * 100                   # entre 0 y 100: otra escala
+X = torch.cat([x1, x2], dim=1)
+Y = 1 + 2 * x1 + 0.05 * x2 + 0.1 * torch.randn(n, 1)
 
-def probar(lr, epocas=10):
+def entrenar(X, Y, lr, epocas=100):
     torch.manual_seed(1)
-    model = nn.Linear(1, 1)
+    model = nn.Linear(2, 1)
     opt = torch.optim.SGD(model.parameters(), lr=lr)
     crit = nn.MSELoss()
+    perdidas = []
     for _ in range(epocas):
-        loss = crit(model(Xtr), Ytr)
+        loss = crit(model(X), Y)
         opt.zero_grad(); loss.backward(); opt.step()
-    with torch.no_grad():
-        return crit(model(Xtr), Ytr).item(), crit(model(Xva), Yva).item()
+        perdidas.append(loss.item())
+    return model, perdidas
 
-print("lr        MSE entrenamiento   MSE validación")
-resultados = {}
-for lr in [0.001, 0.01, 0.05, 0.1, 0.2, 0.3, 0.4]:
-    tr, va = probar(lr)
-    resultados[lr] = va
-    print(f"{lr:&lt;8}  {tr:17.4f}   {va:14.4f}")
-validos = {lr: v for lr, v in resultados.items() if v == v}     # descarta los nan
-mejor = min(validos, key=validos.get)
-print("mejor lr según validación:", mejor)
-print("límite teórico de estabilidad 2 / (2 * media(x^2)) =", round(1 / (Xtr ** 2).mean().item(), 3))</code></pre>
-<details class="linea-a-linea">
-<summary>Línea por línea</summary>
-<p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
-<table class="lineas">
-<thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
-<tbody>
-<tr data-lines="1-3"><td><code>import torch …</code></td><td><code>torch</code>, <code>nn</code> y <code>random_split</code> (parte un conjunto en trozos aleatorios).</td></tr>
-<tr data-lines="5"><td><code>torch.manual_seed(0)</code></td><td>Semilla.</td></tr>
-<tr data-lines="6-7"><td><code>X = torch.arange(-3, 3, 0.1).view(-1, 1) …</code></td><td>60 puntos de la recta <em>y</em> = −3<em>x</em> + 1 con ruido de desviación 0,3.</td></tr>
-<tr data-lines="8"><td><code>train_idx, val_idx = random_split(range(len(X)), [ …</code></td><td>Parte los 60 índices en 40 de entrenamiento y 20 de validación. El <code>generator</code> con semilla hace que el reparto sea siempre el mismo.</td></tr>
-<tr data-lines="9-10"><td><code>Xtr, Ytr = X[list(train_idx)], Y[list(train_idx)] …</code></td><td>Selecciona las filas de <code>X</code> e <code>Y</code> de cada parte (<code>list(...)</code> convierte el subconjunto en una lista de índices).</td></tr>
-<tr data-lines="11"><td><code>print("entrenamiento:", len(Xtr), " validación:",  …</code></td><td>Imprime el tamaño de cada parte.</td></tr>
-<tr data-lines="13"><td><code>def probar(lr, epocas=10):</code></td><td>Una función que entrena con un <code>lr</code> y devuelve el coste en train y en validation.</td></tr>
-<tr data-lines="14-15"><td><code>torch.manual_seed(1) …</code></td><td>Semilla y modelo nuevo, para que cada <code>lr</code> parta de los mismos pesos.</td></tr>
-<tr data-lines="16-17"><td><code>opt = torch.optim.SGD(model.parameters(), lr=lr) …</code></td><td>Optimizador SGD con el <code>lr</code> a probar, y el coste.</td></tr>
-<tr data-lines="18-20"><td><code>for _ in range(epocas): …</code></td><td>10 épocas con todos los datos de entrenamiento (batch).</td></tr>
-<tr data-lines="21-22"><td><code>with torch.no_grad(): …</code></td><td>Con <code>no_grad()</code> (no hace falta el grafo), mide el MSE en entrenamiento y en validación.</td></tr>
-<tr data-lines="24"><td><code>print("lr        MSE entrenamiento   MSE validació …</code></td><td>Cabecera de la tabla.</td></tr>
-<tr data-lines="25"><td><code>resultados = {}</code></td><td>Un diccionario donde guardar el coste de validación de cada lr.</td></tr>
-<tr data-lines="26-29"><td><code>for lr in [0.001, 0.01, 0.05, 0.1, 0.2, 0.3, 0.4]: …</code></td><td>Prueba siete learning rates (potencias y medios de 10), guarda el de validación e imprime una fila.</td></tr>
-<tr data-lines="30"><td><code>validos = {lr: v for lr, v in resultados.items() i …</code></td><td>Se descartan los resultados que no son números (<code>v == v</code> es falso para <code>nan</code>).</td></tr>
-<tr data-lines="31-32"><td><code>mejor = min(validos, key=validos.get) …</code></td><td>Se queda con el <code>lr</code> de menor coste de validación y lo imprime.</td></tr>
-<tr data-lines="33"><td><code>print("límite teórico de estabilidad 2 / (2 * medi …</code></td><td>El límite teórico de estabilidad: 2/λ con λ = 2·media(<em>x</em>²), es decir, 1/media(<em>x</em>²).</td></tr>
-</tbody>
-</table>
-</details>
-<div class="salida">
-<strong>Salida esperada</strong>
-<pre>entrenamiento: 40  validación: 20
-lr        MSE entrenamiento   MSE validación
-0.001               34.5630          36.4261
-0.01                12.4414          12.6986
-0.05                 0.3551           0.2716
-0.1                  0.0898           0.0984
-0.2                  0.0660           0.0951
-0.3                  0.1779           0.1207
-0.4              11228.1631       12214.9326
-mejor lr según validación: 0.2
-límite teórico de estabilidad 2 / (2 * media(x^2)) = 0.343</pre>
-<p>Con 0,001 y 0,01 el modelo no ha tenido tiempo de bajar (MSE de validación 36,43 y 12,70); 0,05 y 0,1 ya mejoran mucho (0,2716 y 0,0984); <strong>0,2</strong> es el mejor, con 0,0951, casi el nivel del ruido (0,3² = 0,09); <strong>0,3</strong> está cerca del límite y oscila (0,1207, peor); y <strong>0,4</strong> lo supera y <strong>diverge</strong> (MSE de miles). El límite teórico, <strong>0,343</strong>, cae justo entre 0,3 y 0,4. La elección se ha hecho con el coste de <em>validación</em>; el de test ni se ha tocado.</p>
-</div>
-</article><article class="snippet" data-lang="python" id="frag-16">
-<header>
-<h3>16 · Entrenar, validar, probar, guardar el mejor modelo y cargarlo</h3>
-<p class="para-que"><strong>Para qué sirve</strong> Partir los datos en train/validation/test, quedarse con la mejor época (checkpoint), guardar y cargar con <code>state_dict</code>, medir MSE y R² en test y ver por qué hace falta <code>deepcopy</code>.</p>
-</header>
-<pre class="code"><code>import copy
+for lr in (0.001, 0.0001):
+    _, p = entrenar(X, Y, lr)
+    print(f"sin escalar, lr = {lr}: loss en épocas 1, 10, 100 = {p[0]:.3g}, {p[9]:.3g}, {p[99]:.3g}")
+
+media, desv = X.mean(dim=0), X.std(dim=0)     # media y desviación de cada columna
+Xs = (X - media) / desv                       # estandarizar
+print("medias tras escalar:", Xs.mean(dim=0).numpy().round(3), " desviaciones:", Xs.std(dim=0).numpy().round(3))
+model, p = entrenar(Xs, Y, lr=0.1)
+print(f"estandarizado, lr = 0.1: loss en épocas 1, 10, 100 = {p[0]:.3g}, {p[9]:.3g}, {p[99]:.3g}")
+
+w = model.weight.detach().flatten()
+b = model.bias.detach()
+w_orig = w / desv                             # deshacer el escalado
+b_orig = b - (w * media / desv).sum()
+print("pesos en la escala original:", w_orig.numpy().round(4), " sesgo:", b_orig.numpy().round(3))
+print("verdad:                      [2.     0.05]   sesgo: 1")</code></pre>
+  <details class="linea-a-linea">
+    <summary>Línea por línea</summary>
+    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+      <tbody>
+        <tr data-lines="1-2"><td><code>import torch …</code></td><td><code>torch</code> y <code>nn</code>.</td></tr>
+        <tr data-lines="4"><td><code>torch.manual_seed(0)</code></td><td>Semilla.</td></tr>
+        <tr data-lines="5"><td><code>n = 200</code></td><td>200 muestras.</td></tr>
+        <tr data-lines="6"><td><code>x1 = torch.rand(n, 1)                         # en …</code></td><td>Primera variable: <code>rand</code> da números uniformes entre 0 y 1.</td></tr>
+        <tr data-lines="7"><td><code>x2 = torch.rand(n, 1) * 100                   # en …</code></td><td>Segunda variable: entre 0 y 100.</td></tr>
+        <tr data-lines="8"><td><code>X = torch.cat([x1, x2], dim=1)</code></td><td>Las junta en una matriz <code>(200, 2)</code> (<code>cat</code> con <code>dim=1</code> pega columnas).</td></tr>
+        <tr data-lines="9"><td><code>Y = 1 + 2 * x1 + 0.05 * x2 + 0.1 * torch.randn(n, 1)</code></td><td>El objetivo: 1 + 2·<em>x</em>₁ + 0,05·<em>x</em>₂ más ruido.</td></tr>
+        <tr data-lines="11"><td><code>def entrenar(X, Y, lr, epocas=100):</code></td><td>Una función que entrena <code>nn.Linear(2, 1)</code> con los datos y el <code>lr</code> que le des y devuelve el modelo y la lista de costes.</td></tr>
+        <tr data-lines="12-13"><td><code>torch.manual_seed(1) …</code></td><td>Semilla (mismos pesos iniciales) y modelo.</td></tr>
+        <tr data-lines="14-15"><td><code>opt = torch.optim.SGD(model.parameters(), lr=lr) …</code></td><td>Optimizador SGD y coste MSE.</td></tr>
+        <tr data-lines="16"><td><code>perdidas = []</code></td><td>Lista para anotar el coste de cada época.</td></tr>
+        <tr data-lines="17-20"><td><code>for _ in range(epocas): …</code></td><td>El bucle de siempre con todos los datos (batch) y anota el coste.</td></tr>
+        <tr data-lines="21"><td><code>return model, perdidas</code></td><td>Devuelve el modelo y los costes.</td></tr>
+        <tr data-lines="23-25"><td><code>for lr in (0.001, 0.0001): …</code></td><td>Prueba dos learning rates <strong>sin escalar</strong> e imprime el coste en las épocas 1, 10 y 100 (<code>.3g</code> = 3 cifras significativas).</td></tr>
+        <tr data-lines="27"><td><code>media, desv = X.mean(dim=0), X.std(dim=0)     # me …</code></td><td>La media y la desviación típica de <strong>cada columna</strong> (<code>dim=0</code>: a lo largo de las muestras).</td></tr>
+        <tr data-lines="28"><td><code>Xs = (X - media) / desv                       # es …</code></td><td>Estandariza: resta la media y divide por la desviación, columna a columna (por broadcasting).</td></tr>
+        <tr data-lines="29"><td><code>print("medias tras escalar:", Xs.mean(dim=0).numpy …</code></td><td>Comprueba que ahora cada columna tiene media 0 y desviación 1.</td></tr>
+        <tr data-lines="30-31"><td><code>model, p = entrenar(Xs, Y, lr=0.1) …</code></td><td>Entrena con las variables estandarizadas y <code>lr=0.1</code> e imprime los costes.</td></tr>
+        <tr data-lines="33-34"><td><code>w = model.weight.detach().flatten() …</code></td><td>Los pesos y el sesgo aprendidos (en unidades «estandarizadas»).</td></tr>
+        <tr data-lines="35"><td><code>w_orig = w / desv                             # de …</code></td><td>Deshace el escalado en los pesos: <em>w</em>/σ.</td></tr>
+        <tr data-lines="36"><td><code>b_orig = b - (w * media / desv).sum()</code></td><td>Y en el sesgo: <em>b</em> − Σ <em>w</em>·μ/σ.</td></tr>
+        <tr data-lines="37-38"><td><code>print("pesos en la escala original:", w_orig.numpy …</code></td><td>Imprime los pesos y el sesgo en las unidades originales y los valores verdaderos con los que se generaron los datos.</td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>sin escalar, lr = 0.001: loss en épocas 1, 10, 100 = 534, 5.38e+16, nan
+sin escalar, lr = 0.0001: loss en épocas 1, 10, 100 = 534, 1.1, 1.09
+medias tras escalar: [ 0. -0.]  desviaciones: [1. 1.]
+estandarizado, lr = 0.1: loss en épocas 1, 10, 100 = 25, 0.464, 0.0117
+pesos en la escala original: [1.9972 0.0502]  sesgo: [0.999]
+verdad:                      [2.     0.05]   sesgo: 1</pre>
+    <p>Sin escalar y con <code>lr = 0.001</code> el coste <strong>explota</strong>: 534 en la época 1, 5,38·10¹⁶ en la 10 y <code>nan</code> en la 100. Con <code>lr = 0.0001</code> es estable: baja deprisa al principio (534 → 1,1 en 10 épocas) pero luego se <strong>atasca</strong> en 1,09 tras 100 épocas, muy lejos del ruido (0,01). Tras estandarizar (medias 0 y desviaciones 1), con <code>lr = 0.1</code> el coste baja de 25 a 0,464 y a 0,0117. Al deshacer el escalado recuperamos <code>[1.9972, 0.0502]</code> y sesgo 0,999, casi exactamente los valores verdaderos <code>[2, 0.05]</code> y 1.</p>
+  </div>
+</article>
+
+</section>
+
+<section>
+<h2 class="sin-num" id="resto">Código: el resto del módulo</h2>
+<p>Tres fragmentos más del módulo: el 3 escribe la recta como una clase propia de <code>nn.Module</code> (<a href="leccion-1.html">lección 1</a>), el 15 entrena un modelo con dos salidas a la vez y el 17 provoca, uno a uno, los errores típicos de la tabla de «Profundizar» con su mensaje real.</p>
+
+<article class="snippet" data-lang="python" id="frag-3">
+  <header>
+    <h3>3 · Una clase propia de <code>nn.Module</code> (y su gemela con <code>nn.Sequential</code>)</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Escribir un modelo como clase con <code>__init__</code> y <code>forward</code>, ver sus parámetros con nombre y comprobar que <code>model(x)</code> es lo mismo que llamar a <code>forward</code>.</p>
+  </header>
+  <pre class="code"><code>import torch
+from torch import nn
+
+class LR(nn.Module):
+    def __init__(self, in_size, out_size):
+        super().__init__()
+        self.linear = nn.Linear(in_size, out_size)
+
+    def forward(self, x):
+        return self.linear(x)
+
+torch.manual_seed(1)
+model = LR(1, 1)
+print(model)
+for name, p in model.named_parameters():
+    print(name, tuple(p.shape), p.requires_grad)
+
+x = torch.tensor([[1.0], [2.0]])
+print(torch.equal(model(x), model.forward(x)))   # model(x) llama a forward
+
+seq = nn.Sequential(nn.Linear(1, 1))               # la misma idea sin escribir la clase
+print(list(model.state_dict().keys()), list(seq.state_dict().keys()))</code></pre>
+  <details class="linea-a-linea">
+    <summary>Línea por línea</summary>
+    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+      <tbody>
+        <tr data-lines="1-2"><td><code>import torch …</code></td><td>Importa <code>torch</code> y <code>nn</code>.</td></tr>
+        <tr data-lines="4"><td><code>class LR(nn.Module):</code></td><td>Nuestra clase <code>LR</code> <strong>hereda</strong> de <code>nn.Module</code>: así obtiene <code>parameters()</code>, <code>state_dict()</code>, <code>train()</code>/<code>eval()</code>, etc.</td></tr>
+        <tr data-lines="5"><td><code>def __init__(self, in_size, out_size):</code></td><td>El constructor recibe cuántas variables entran y cuántas salen.</td></tr>
+        <tr data-lines="6"><td><code>super().__init__()</code></td><td><code>super().__init__()</code> inicializa la parte interna de <code>nn.Module</code> (el registro de capas y parámetros). Tiene que ser la primera línea.</td></tr>
+        <tr data-lines="7"><td><code>self.linear = nn.Linear(in_size, out_size)</code></td><td>Declara la capa como atributo. <code>nn.Module</code> detecta que es una capa y registra sus parámetros con el nombre <code>linear.weight</code> y <code>linear.bias</code>.</td></tr>
+        <tr data-lines="9-10"><td><code>def forward(self, x): …</code></td><td><code>forward</code> dice cómo se calcula la salida a partir de la entrada: aquí, pasarla por la capa.</td></tr>
+        <tr data-lines="12"><td><code>torch.manual_seed(1)</code></td><td>Semilla para que los pesos iniciales sean siempre los mismos.</td></tr>
+        <tr data-lines="13"><td><code>model = LR(1, 1)</code></td><td>Crea el modelo: una entrada y una salida.</td></tr>
+        <tr data-lines="14"><td><code>print(model)</code></td><td>Imprimir un modelo muestra su estructura como un árbol de capas.</td></tr>
+        <tr data-lines="15-16"><td><code>for name, p in model.named_parameters(): …</code></td><td>Recorre los parámetros con su nombre: imprime nombre, forma y si se derivan (<code>requires_grad</code>).</td></tr>
+        <tr data-lines="18"><td><code>x = torch.tensor([[1.0], [2.0]])</code></td><td>Una entrada de ejemplo, forma <code>(2, 1)</code>.</td></tr>
+        <tr data-lines="19"><td><code>print(torch.equal(model(x), model.forward(x)))   # …</code></td><td><code>torch.equal</code> compara dos tensores. <code>model(x)</code> y <code>model.forward(x)</code> dan lo mismo, pero se usa siempre <code>model(x)</code>, que además ejecuta los «ganchos» internos de PyTorch.</td></tr>
+        <tr data-lines="21"><td><code>seq = nn.Sequential(nn.Linear(1, 1))               …</code></td><td>La misma idea sin escribir la clase: <code>nn.Sequential</code> encadena capas en orden.</td></tr>
+        <tr data-lines="22"><td><code>print(list(model.state_dict().keys()), list(seq.st …</code></td><td>Compara los nombres de los parámetros de las dos versiones: <code>linear.weight</code> frente a <code>0.weight</code>.</td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>LR(
+  (linear): Linear(in_features=1, out_features=1, bias=True)
+)
+linear.weight (1, 1) True
+linear.bias (1,) True
+True
+['linear.weight', 'linear.bias'] ['0.weight', '0.bias']</pre>
+    <p><code>print(model)</code> muestra <code>LR( (linear): Linear(in_features=1, out_features=1, bias=True) )</code>. Los dos parámetros se llaman <code>linear.weight</code> (forma <code>(1, 1)</code>) y <code>linear.bias</code> (forma <code>(1,)</code>) y ambos tienen <code>requires_grad=True</code>. <code>model(x)</code> y <code>model.forward(x)</code> son iguales (<code>True</code>). Y la versión con <code>nn.Sequential</code> hace lo mismo pero llama a los parámetros <code>0.weight</code> y <code>0.bias</code>: si guardas un modelo con unos nombres, tienes que cargarlo en un modelo con <em>los mismos nombres</em>.</p>
+  </div>
+</article>
+
+<article class="snippet" data-lang="python" id="frag-15">
+  <header>
+    <h3>15 · Varias salidas: <code>nn.Linear(2, 2)</code> con un <code>Y</code> de dos columnas</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Entrenar un único modelo que predice dos números a la vez, leer su matriz <code>weight</code> (una fila por salida) y predecir un lote.</p>
+  </header>
+  <pre class="code"><code>import torch
+from torch import nn
+
+torch.manual_seed(0)
+n = 100
+X = torch.randn(n, 2)
+Y1 = 1 + 2 * X[:, 0] - 3 * X[:, 1]
+Y2 = -1 + 0.5 * X[:, 0] + 4 * X[:, 1]
+Y = torch.stack([Y1, Y2], dim=1) + 0.1 * torch.randn(n, 2)    # 2 salidas por muestra
+print("X:", tuple(X.shape), " Y:", tuple(Y.shape))
+
+torch.manual_seed(1)
+model = nn.Linear(2, 2)                        # 2 entradas -&gt; 2 salidas
+print("weight:", tuple(model.weight.shape), " bias:", tuple(model.bias.shape),
+      " parámetros:", sum(p.numel() for p in model.parameters()))
+crit = nn.MSELoss()
+opt = torch.optim.SGD(model.parameters(), lr=0.1)
+for epoch in range(100):
+    loss = crit(model(X), Y)
+    opt.zero_grad(); loss.backward(); opt.step()
+print("loss final:", round(loss.item(), 4))
+print("weight aprendido (fila = una salida):")
+print(model.weight.detach().numpy().round(3))
+print("bias aprendido:", model.bias.detach().numpy().round(3))
+print("verdad: [[2, -3], [0.5, 4]] y [1, -1]")
+
+nuevos = torch.tensor([[1.0, -1.0], [0.0, 2.0]])
+print("predicciones (una fila por muestra, una columna por salida):")
+print(model(nuevos).detach().numpy().round(2))</code></pre>
+  <details class="linea-a-linea">
+    <summary>Línea por línea</summary>
+    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+      <tbody>
+        <tr data-lines="1-2"><td><code>import torch …</code></td><td><code>torch</code> y <code>nn</code>.</td></tr>
+        <tr data-lines="4-6"><td><code>torch.manual_seed(0) …</code></td><td>Semilla, 100 muestras y dos variables de entrada <code>(100, 2)</code>.</td></tr>
+        <tr data-lines="7"><td><code>Y1 = 1 + 2 * X[:, 0] - 3 * X[:, 1]</code></td><td>Primera salida verdadera: 1 + 2·<em>x</em>₁ − 3·<em>x</em>₂.</td></tr>
+        <tr data-lines="8"><td><code>Y2 = -1 + 0.5 * X[:, 0] + 4 * X[:, 1]</code></td><td>Segunda salida verdadera: −1 + 0,5·<em>x</em>₁ + 4·<em>x</em>₂.</td></tr>
+        <tr data-lines="9"><td><code>Y = torch.stack([Y1, Y2], dim=1) + 0.1 * torch.ran …</code></td><td><code>stack(..., dim=1)</code> pone las dos salidas como columnas, <code>(100, 2)</code>, y se les añade ruido.</td></tr>
+        <tr data-lines="10"><td><code>print("X:", tuple(X.shape), " Y:", tuple(Y.shape))</code></td><td>Imprime las formas de <code>X</code> y de <code>Y</code>.</td></tr>
+        <tr data-lines="12-13"><td><code>torch.manual_seed(1) …</code></td><td>Semilla y modelo con 2 entradas y 2 salidas.</td></tr>
+        <tr data-lines="14-15"><td><code>print("weight:", tuple(model.weight.shape), " bias …</code></td><td>Formas de <code>weight</code> y <code>bias</code> y número total de parámetros.</td></tr>
+        <tr data-lines="16-17"><td><code>crit = nn.MSELoss() …</code></td><td>Coste MSE y optimizador SGD (lr 0,1).</td></tr>
+        <tr data-lines="18-20"><td><code>for epoch in range(100): …</code></td><td>100 épocas con todos los datos; <code>MSELoss</code> promedia sobre las 100 × 2 = 200 componentes.</td></tr>
+        <tr data-lines="21"><td><code>print("loss final:", round(loss.item(), 4))</code></td><td>Coste final.</td></tr>
+        <tr data-lines="22-23"><td><code>print("weight aprendido (fila = una salida):") …</code></td><td>La matriz <code>weight</code> aprendida: cada fila es una de las dos regresiones.</td></tr>
+        <tr data-lines="24"><td><code>print("bias aprendido:", model.bias.detach().numpy …</code></td><td>El vector <code>bias</code>.</td></tr>
+        <tr data-lines="25"><td><code>print("verdad: [[2, -3], [0.5, 4]] y [1, -1]")</code></td><td>Los valores verdaderos, para comparar.</td></tr>
+        <tr data-lines="27"><td><code>nuevos = torch.tensor([[1.0, -1.0], [0.0, 2.0]])</code></td><td>Dos muestras nuevas, forma <code>(2, 2)</code>.</td></tr>
+        <tr data-lines="28-29"><td><code>print("predicciones (una fila por muestra, una col …</code></td><td>Predice las dos de golpe: una fila por muestra y una columna por salida, redondeado a 2 decimales.</td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>X: (100, 2)  Y: (100, 2)
+weight: (2, 2)  bias: (2,)  parámetros: 6
+loss final: 0.0111
+weight aprendido (fila = una salida):
+[[ 1.99  -2.988]
+ [ 0.488  3.992]]
+bias aprendido: [ 1.001 -1.01 ]
+verdad: [[2, -3], [0.5, 4]] y [1, -1]
+predicciones (una fila por muestra, una columna por salida):
+[[ 5.98 -4.51]
+ [-4.97  6.97]]</pre>
+    <p><code>X</code> es <code>(100, 2)</code> e <code>Y</code> también <code>(100, 2)</code>. El modelo tiene <code>weight</code> <code>(2, 2)</code>, <code>bias</code> <code>(2,)</code> y <strong>6 parámetros</strong>. Tras 100 épocas el coste es 0,0111 (cercano al ruido, 0,01) y la matriz aprendida, <code>[[1.99, -2.988], [0.488, 3.992]]</code> con sesgos <code>[1.001, -1.01]</code>, está casi igual que la verdadera <code>[[2, -3], [0.5, 4]]</code> y <code>[1, -1]</code>. Las predicciones de las dos muestras nuevas son <code>[[5.98, -4.51], [-4.97, 6.97]]</code>; las verdaderas, sin ruido, serían (6; −4,5) y (−5; 7).</p>
+  </div>
+</article>
+
+<article class="snippet" data-lang="python" id="frag-17">
+  <header>
+    <h3>17 · Los errores típicos, con su mensaje real de PyTorch 2.14</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Provocar a propósito siete errores típicos de la regresión con PyTorch y leer el mensaje que da cada uno (o, en el último, el síntoma silencioso).</p>
+  </header>
+  <pre class="code"><code>import warnings
 import torch
 from torch import nn
 
-torch.manual_seed(0)
-X = torch.randn(300, 3)
-Y = (0.5 + X @ torch.tensor([[1.0], [-2.0], [0.5]])) + 0.5 * torch.randn(300, 1)
-perm = torch.randperm(300)
-tr, va, te = perm[:180], perm[180:240], perm[240:]          # 60 % / 20 % / 20 %
-print("tamaños:", len(tr), len(va), len(te))
+def intentar(titulo, f):
+    try:
+        f()
+    except Exception as e:
+        print(f"{titulo}\n   {type(e).__name__}: {str(e).splitlines()[0]}")
 
+lineal = nn.Linear(1, 1)
+
+intentar("1. entrada float64 en un modelo float32",
+         lambda: lineal(torch.tensor([[1.0], [2.0]], dtype=torch.float64)))
+intentar("2. entrada con forma (3,) en lugar de (3, 1)",
+         lambda: lineal(torch.tensor([1.0, 2.0, 3.0])))
+intentar("3. backward() sin requires_grad",
+         lambda: (torch.tensor(2.0) * 3).backward())
+
+w = torch.tensor(1.0, requires_grad=True)
+def en_sitio():
+    w.sub_(0.1)                                        # w -= 0.1 en sitio
+intentar("4. actualizar un parámetro en sitio sin torch.no_grad()", en_sitio)
+
+class Mala(nn.Module):
+    def __init__(self):
+        self.linear = nn.Linear(1, 1)                  # se nos olvidó super().__init__()
+intentar("5. clase nn.Module sin super().__init__()", Mala)
+
+w = torch.tensor(1.0, requires_grad=True)
+loss = (w * 2 - 5) ** 2
+loss.backward()
+w = w - 0.1 * w.grad                                   # crea un tensor NUEVO, no actualiza el parámetro
+print("6. w = w - lr * w.grad  -&gt;  w.is_leaf =", w.is_leaf, " requires_grad =", w.requires_grad, " w.grad =", end=" ")
+with warnings.catch_warnings():
+    warnings.simplefilter("ignore")
+    print(w.grad)
+
+x = torch.tensor([[1.0], [2.0], [3.0]])
+y = torch.tensor([2.0, 5.0, 8.0])                      # forma (3,) en lugar de (3, 1)
 torch.manual_seed(1)
-model = nn.Linear(3, 1)
+modelo = nn.Linear(1, 1)
+opt = torch.optim.SGD(modelo.parameters(), lr=0.05)
 crit = nn.MSELoss()
-opt = torch.optim.SGD(model.parameters(), lr=0.05)
-mejor_val, mejor_estado, mejor_epoca = float("inf"), None, -1
-for epoch in range(1, 201):
-    model.train()
-    loss = crit(model(X[tr]), Y[tr])
-    opt.zero_grad(); loss.backward(); opt.step()
-    model.eval()
-    with torch.no_grad():
-        val = crit(model(X[va]), Y[va]).item()
-    if val &lt; mejor_val:
-        mejor_val, mejor_epoca = val, epoch
-        mejor_estado = copy.deepcopy(model.state_dict())     # copia independiente
-    if epoch in (1, 10, 50, 200):
-        print(f"época {epoch:3d}  train = {loss.item():.4f}  val = {val:.4f}")
-print("mejor época:", mejor_epoca, " val =", round(mejor_val, 4))
+with warnings.catch_warnings():
+    warnings.simplefilter("ignore")
+    for _ in range(500):
+        loss = crit(modelo(x), y)
+        opt.zero_grad(); loss.backward(); opt.step()
+print("7. y de forma (3,) frente a yhat de forma (3, 1): w =", round(modelo.weight.item(), 3),
+      " b =", round(modelo.bias.item(), 3), " loss =", round(loss.item(), 3))</code></pre>
+  <details class="linea-a-linea">
+    <summary>Línea por línea</summary>
+    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+      <tbody>
+        <tr data-lines="1-3"><td><code>import warnings …</code></td><td>Importa <code>warnings</code>, <code>torch</code> y <code>nn</code>.</td></tr>
+        <tr data-lines="5-9"><td><code>def intentar(titulo, f): …</code></td><td>Una función auxiliar: ejecuta <code>f()</code>, y si da error imprime su título, el tipo de excepción y la primera línea del mensaje.</td></tr>
+        <tr data-lines="11"><td><code>lineal = nn.Linear(1, 1)</code></td><td>Una capa lineal 1 → 1 (en <code>float32</code>).</td></tr>
+        <tr data-lines="13-14"><td><code>intentar("1. entrada float64 en un modelo float32", …</code></td><td>Error 1: una entrada en <code>float64</code> (<code>dtype=torch.float64</code>) en una capa <code>float32</code>.</td></tr>
+        <tr data-lines="15-16"><td><code>intentar("2. entrada con forma (3,) en lugar de (3 …</code></td><td>Error 2: una entrada de forma <code>(3,)</code> en lugar de <code>(3, 1)</code>: PyTorch la toma como <em>una</em> muestra de 3 variables.</td></tr>
+        <tr data-lines="17-18"><td><code>intentar("3. backward() sin requires_grad", …</code></td><td>Error 3: <code>backward()</code> sobre un tensor que no depende de nada con <code>requires_grad</code>.</td></tr>
+        <tr data-lines="20-23"><td><code>w = torch.tensor(1.0, requires_grad=True) …</code></td><td>Error 4: modificar en el sitio (<code>sub_</code> equivale a <code>-=</code>) un parámetro con <code>requires_grad=True</code> fuera de <code>torch.no_grad()</code>.</td></tr>
+        <tr data-lines="25-28"><td><code>class Mala(nn.Module): …</code></td><td>Error 5: una clase <code>nn.Module</code> que asigna una capa sin haber llamado a <code>super().__init__()</code>.</td></tr>
+        <tr data-lines="30-32"><td><code>w = torch.tensor(1.0, requires_grad=True) …</code></td><td>Error 6, preparación: un parámetro <em>w</em>, un coste y su <code>backward()</code>.</td></tr>
+        <tr data-lines="33"><td><code>w = w - 0.1 * w.grad                               …</code></td><td><code>w = w - 0.1 * w.grad</code> crea un tensor <strong>nuevo</strong>: ya no es el parámetro original.</td></tr>
+        <tr data-lines="34-37"><td><code>print("6. w = w - lr * w.grad  -&gt;  w.is_leaf =", w …</code></td><td>Imprime si el nuevo <em>w</em> sigue siendo una «hoja» del grafo y cuánto vale su <code>.grad</code> (con los avisos silenciados).</td></tr>
+        <tr data-lines="39-40"><td><code>x = torch.tensor([[1.0], [2.0], [3.0]]) …</code></td><td>Error 7, preparación: <code>x</code> de forma <code>(3, 1)</code> pero <code>y</code> de forma <code>(3,)</code>.</td></tr>
+        <tr data-lines="41-44"><td><code>torch.manual_seed(1) …</code></td><td>Semilla, modelo, optimizador y coste.</td></tr>
+        <tr data-lines="45-49"><td><code>with warnings.catch_warnings(): …</code></td><td>Entrena 500 pasos con las formas desiguales (silenciando el aviso para no repetirlo 500 veces).</td></tr>
+        <tr data-lines="50-51"><td><code>print("7. y de forma (3,) frente a yhat de forma ( …</code></td><td>Imprime los parámetros aprendidos y el coste.</td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>1. entrada float64 en un modelo float32
+   RuntimeError: mat1 and mat2 must have the same dtype, but got Double and Float
+2. entrada con forma (3,) en lugar de (3, 1)
+   RuntimeError: mat1 and mat2 shapes cannot be multiplied (1x3 and 1x1)
+3. backward() sin requires_grad
+   RuntimeError: element 0 of tensors does not require grad and does not have a grad_fn
+4. actualizar un parámetro en sitio sin torch.no_grad()
+   RuntimeError: a leaf Variable that requires grad is being used in an in-place operation.
+5. clase nn.Module sin super().__init__()
+   AttributeError: cannot assign module before Module.__init__() call
+6. w = w - lr * w.grad  -&gt;  w.is_leaf = False  requires_grad = True  w.grad = None
+7. y de forma (3,) frente a yhat de forma (3, 1): w = 0.005  b = 4.989  loss = 6.0</pre>
+    <p>Cada error da el mensaje que verás en tu terminal: «mat1 and mat2 must have the same dtype, but got Double and Float»; «mat1 and mat2 shapes cannot be multiplied (1x3 and 1x1)»; «element 0 of tensors does not require grad and does not have a grad_fn»; «a leaf Variable that requires grad is being used in an in-place operation»; y «cannot assign module before Module.__init__() call». En el 6, <code>w</code> deja de ser una hoja (<code>is_leaf = False</code>) y su <code>.grad</code> es <code>None</code>. Y el 7 es el silencioso: no da error, pero el modelo aprende <code>w ≈ 0.005</code> y <code>b ≈ 4.989</code> con coste 6.0, es decir, <strong>predice siempre la media de y (5)</strong> porque compara cada predicción con todos los objetivos.</p>
+  </div>
+</article>
 
-torch.save(mejor_estado, "modelo_lineal.pt")                 # guardar solo los parámetros
-nuevo = nn.Linear(3, 1)                                      # arquitectura vacía
-nuevo.load_state_dict(torch.load("modelo_lineal.pt"))        # cargar los parámetros
-nuevo.eval()
-with torch.no_grad():
-    pred = nuevo(X[te])
-    mse = crit(pred, Y[te]).item()
-    r2 = 1 - ((pred - Y[te]) ** 2).sum() / ((Y[te] - Y[te].mean()) ** 2).sum()
-print("test: MSE =", round(mse, 4), " R² =", round(r2.item(), 4))
-print("pesos cargados:", nuevo.weight.detach().numpy().round(3), nuevo.bias.detach().numpy().round(3))
+</section>
 
-ref = model.state_dict()                                     # SIN copiar: apunta a los mismos tensores
-antes = ref["bias"].item()
-with torch.no_grad():
-    model.bias += 1.0
-print("sin deepcopy el «guardado» cambia solo:", round(antes, 3), "-&gt;", round(ref["bias"].item(), 3))</code></pre>
-<details class="linea-a-linea">
-<summary>Línea por línea</summary>
-<p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
-<table class="lineas">
-<thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
-<tbody>
-<tr data-lines="1-3"><td><code>import copy …</code></td><td><code>copy</code> (para copias independientes), <code>torch</code> y <code>nn</code>.</td></tr>
-<tr data-lines="5"><td><code>torch.manual_seed(0)</code></td><td>Semilla.</td></tr>
-<tr data-lines="6"><td><code>X = torch.randn(300, 3)</code></td><td>300 muestras con 3 variables.</td></tr>
-<tr data-lines="7"><td><code>Y = (0.5 + X @ torch.tensor([[1.0], [-2.0], [0.5]] …</code></td><td>Objetivo: 0,5 + 1·<em>x</em>₁ − 2·<em>x</em>₂ + 0,5·<em>x</em>₃ más ruido de desviación 0,5. El <code>@</code> multiplica la matriz por el vector de pesos.</td></tr>
-<tr data-lines="8"><td><code>perm = torch.randperm(300)</code></td><td><code>randperm</code> da los índices 0…299 en orden aleatorio.</td></tr>
-<tr data-lines="9"><td><code>tr, va, te = perm[:180], perm[180:240], perm[240:] …</code></td><td>Reparto 60 % / 20 % / 20 %: entrenamiento, validación y prueba.</td></tr>
-<tr data-lines="10"><td><code>print("tamaños:", len(tr), len(va), len(te))</code></td><td>Imprime los tamaños.</td></tr>
-<tr data-lines="12-13"><td><code>torch.manual_seed(1) …</code></td><td>Semilla y modelo <code>nn.Linear(3, 1)</code>.</td></tr>
-<tr data-lines="14-15"><td><code>crit = nn.MSELoss() …</code></td><td>Coste y optimizador.</td></tr>
-<tr data-lines="16"><td><code>mejor_val, mejor_estado, mejor_epoca = float("inf" …</code></td><td>Variables para guardar el mejor coste de validación, el mejor estado y su época.</td></tr>
-<tr data-lines="17"><td><code>for epoch in range(1, 201):</code></td><td>200 épocas.</td></tr>
-<tr data-lines="18"><td><code>model.train()</code></td><td><code>model.train()</code>: modo entrenamiento.</td></tr>
-<tr data-lines="19-20"><td><code>loss = crit(model(X[tr]), Y[tr]) …</code></td><td>Un paso de entrenamiento con los datos de <em>train</em>.</td></tr>
-<tr data-lines="21"><td><code>model.eval()</code></td><td><code>model.eval()</code>: modo evaluación.</td></tr>
-<tr data-lines="22-23"><td><code>with torch.no_grad(): …</code></td><td>Sin gradientes, mide el coste en <em>validation</em>.</td></tr>
-<tr data-lines="24"><td><code>if val &lt; mejor_val:</code></td><td>Si es el mejor hasta ahora…</td></tr>
-<tr data-lines="25"><td><code>mejor_val, mejor_epoca = val, epoch</code></td><td>…anota su valor y su época…</td></tr>
-<tr data-lines="26"><td><code>mejor_estado = copy.deepcopy(model.state_dict())   …</code></td><td>…y guarda <strong>una copia independiente</strong> de los parámetros con <code>copy.deepcopy</code>.</td></tr>
-<tr data-lines="27-28"><td><code>if epoch in (1, 10, 50, 200): …</code></td><td>En algunas épocas imprime el coste de train y de validación.</td></tr>
-<tr data-lines="29"><td><code>print("mejor época:", mejor_epoca, " val =", round …</code></td><td>Imprime la mejor época y su coste.</td></tr>
-<tr data-lines="31"><td><code>torch.save(mejor_estado, "modelo_lineal.pt")       …</code></td><td>Guarda a disco los parámetros del mejor modelo (<code>torch.save</code>).</td></tr>
-<tr data-lines="32"><td><code>nuevo = nn.Linear(3, 1)                            …</code></td><td>Crea un modelo nuevo con la <strong>misma arquitectura</strong> (con pesos aleatorios).</td></tr>
-<tr data-lines="33"><td><code>nuevo.load_state_dict(torch.load("modelo_lineal.pt …</code></td><td><code>load_state_dict</code> le copia los pesos guardados (<code>torch.load</code> lee el archivo).</td></tr>
-<tr data-lines="34"><td><code>nuevo.eval()</code></td><td>Modo evaluación.</td></tr>
-<tr data-lines="35-37"><td><code>with torch.no_grad(): …</code></td><td>Sin gradientes, predice el conjunto de <em>test</em> y calcula su MSE.</td></tr>
-<tr data-lines="38"><td><code>r2 = 1 - ((pred - Y[te]) ** 2).sum() / ((Y[te] - Y …</code></td><td>El R²: 1 − (suma de errores²) / (suma de desviaciones² respecto a la media).</td></tr>
-<tr data-lines="39"><td><code>print("test: MSE =", round(mse, 4), " R² =", round …</code></td><td>Imprime MSE y R² de test.</td></tr>
-<tr data-lines="40"><td><code>print("pesos cargados:", nuevo.weight.detach().num …</code></td><td>Imprime los pesos cargados (los del mejor modelo).</td></tr>
-<tr data-lines="42"><td><code>ref = model.state_dict()                           …</code></td><td>Guarda una «referencia» al <code>state_dict</code> del modelo <strong>sin copiarla</strong>.</td></tr>
-<tr data-lines="43"><td><code>antes = ref["bias"].item()</code></td><td>Lee el sesgo guardado en esa referencia.</td></tr>
-<tr data-lines="44-45"><td><code>with torch.no_grad(): …</code></td><td>Le sumamos 1 al sesgo del modelo vivo.</td></tr>
-<tr data-lines="46"><td><code>print("sin deepcopy el «guardado» cambia solo:", r …</code></td><td>Imprime el sesgo «guardado» antes y después: cambia solo.</td></tr>
-</tbody>
-</table>
-</details>
-<div class="salida">
-<strong>Salida esperada</strong>
-<pre>tamaños: 180 60 60
-época   1  train = 4.0660  val = 3.7568
-época  10  train = 0.8031  val = 0.7409
-época  50  train = 0.2125  val = 0.2062
-época 200  train = 0.2123  val = 0.2070
-mejor época: 42  val = 0.2059
-test: MSE = 0.1461  R² = 0.9714
-pesos cargados: [[ 0.953 -1.947  0.548]] [0.518]
-sin deepcopy el «guardado» cambia solo: 0.515 -&gt; 1.515</pre>
-<p>Reparto 180/60/60. El coste baja de 4,07 (train) y 3,76 (val) en la época 1 a 0,21 hacia la época 50 y se queda plano (0,2123 / 0,2070 en la 200): el mejor coste de validación (0,2059) es de la <strong>época 42</strong>. En test, el modelo guardado y vuelto a cargar da un MSE de <strong>0,1461</strong> y un R² de <strong>0,9714</strong>; los pesos cargados son los del mejor modelo, <code>[0.953, -1.947, 0.548]</code> con sesgo 0,518, cercanos a los verdaderos (1, −2, 0,5; sesgo 0,5). Y la última línea demuestra la trampa: sin <code>deepcopy</code>, sumar 1 al sesgo del modelo cambia <em>también</em> el «guardado» (0,515 → 1,515). El fragmento crea el archivo <code>modelo_lineal.pt</code> en la carpeta actual.</p>
 </div>
-</article></div></details></div></main></body></html>
+</main>
+</body>
+</html>

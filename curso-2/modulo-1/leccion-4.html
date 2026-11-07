@@ -1,115 +1,351 @@
-<!DOCTYPE html>
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lección 4 · Softmax reparte el 100 % y la pérdida pone la nota · Módulo 1 · Curso 2 · Cuaderno de IA</title>
+<meta name="description" content="Softmax para convertir logits en probabilidades y las funciones de pérdida: MSE, entropía cruzada binaria y categórica, y qué salida y pérdida usar en cada problema.">
+<script>try{var t=localStorage.getItem('cuaderno-ia:tema');if(t)document.documentElement.setAttribute('data-theme',t)}catch(e){}</script>
+<link rel="stylesheet" href="../../assets/css/style.css">
+<script src="../../assets/js/curriculum.js"></script>
+<script src="../../assets/js/lab.js"></script>
+<script src="../../assets/js/app.js" defer></script>
+</head>
+<body data-root="../../" data-course="2" data-module="1" data-lesson="4">
+<main>
+<div class="page">
 
-<html lang="es"><head><meta charset="utf-8"/><meta content="width=device-width,initial-scale=1" name="viewport"/><title>Lección 4 · Softmax: de números sueltos a probabilidades · Curso 2 · Cuaderno de IA</title><meta content="Esos tres números sin normalizar se llaman logits (los \( z \) de la última capa)." name="description"/><script>try{var t=localStorage.getItem('cuaderno-ia:tema');if(t)document.documentElement.setAttribute('data-theme',t)}catch(e){}</script><link href="../../assets/css/style.css" rel="stylesheet"/><script src="../../assets/js/curriculum.js"></script><script src="../../assets/js/lab.js"></script><script defer="" src="../../assets/js/app.js"></script><script defer="" src="../../assets/js/microanimations.js"></script></head><body data-course="2" data-lesson="4" data-module="1" data-root="../../"><main><div class="page" data-micro="3min"><header class="hero leccion"><div class="hero-grid"><div><p class="eyebrow">Curso 2 · Módulo 1 · Lección 4 de 15</p><h1>Softmax: de números sueltos a probabilidades</h1><p class="lead">Esos tres números sin normalizar se llaman logits (los \( z \) de la última capa).</p><p class="meta-line"><span class="read-time" data-render="read-time"></span><a href="../modulo-1.html">Índice del módulo</a></p></div><div aria-hidden="true" class="hero-tile"></div></div></header><details class="predice"><summary>Una red mira el tráiler de una película y debe decidir su género: «acción», «comedia» o «terror». Su última capa saca tres números cualesquiera, por ejemplo 2,0; 1,0 y 0,1. ¿Cómo los convertimos en tres probabilidades que sumen 1?<span class="hint"></span></summary><div><p>Esos tres números sin normalizar se llaman logits (los \( z \) de la última capa).</p></div></details><section aria-label="Explicación breve" class="micro-core"><div class="micro-kicker">01 · ENTENDER <span>≈ 45 s</span></div><h2>La idea en palabras sencillas</h2><p>Esos tres números sin normalizar se llaman logits (los \( z \) de la última capa).</p><div class="micro-example"><span aria-hidden="true" class="micro-example-icon">💡</span><div><strong>Otro ejemplo · Compras</strong><p>Un detector asigna 60 % a «ropa», 30 % a «electrónica» y 10 % a «hogar».</p></div></div></section><div class="micro-kicker micro-checkpoint">02 · RESPONDER <span>≈ 15 s</span></div><section aria-label="Pregunta intercalada" class="quiz mini micro-check"><script class="quiz-data" type="application/json">{"titulo": "Pausa rápida · Comprueba la idea", "preguntas": [{"q": "Un modelo devuelve 20 %, 30 % y 50 %. ¿Cuál es la clase elegida?", "opciones": ["La primera", "La tercera", "La segunda"], "correcta": 1, "porque": "Se elige la clase con más probabilidad: 50 %."}]}</script></section><section aria-label="Animación interactiva" class="micro-viz" data-index="7" data-micro-viz="probability"><div class="micro-kicker">03 · EXPERIMENTAR <span>≈ 45 s</span></div><div class="micro-viz-title"><div><h2>De puntuaciones a probabilidades</h2><p>Modifica una puntuación y compara las tres probabilidades.</p></div><span aria-hidden="true" class="micro-viz-symbol">✦</span></div><div aria-live="polite" class="micro-viz-stage"><p>Animación interactiva: De puntuaciones a probabilidades</p></div></section><div class="micro-kicker micro-checkpoint">04 · APLICAR <span>≈ 15 s</span></div><section aria-label="Pregunta intercalada" class="quiz mini micro-check"><script class="quiz-data" type="application/json">{"titulo": "Pausa rápida · ¿Lo aplicarías?", "preguntas": [{"q": "¿Qué debe sumar una salida softmax?", "opciones": ["1 (100 %)", "0 (0 %)", "3 (300 %)"], "correcta": 0, "porque": "Softmax normaliza todos los valores para que su suma sea 1."}]}</script></section><div class="micro-finish"><strong>Idea que te llevas</strong><span>Esos tres números sin normalizar se llaman logits (los \( z \) de la última capa)</span><small>¿Quieres más ejemplos, fórmulas o código? Los tienes justo debajo, sin límite de tiempo.</small></div><details class="profundizar micro-legacy"><summary><span>Explorar más: explicación y simulaciones completas<small>Todo el texto original, tablas y demos avanzadas. Opcional.</small></span></summary><div class="prof-body"><section><h2>Softmax: de números sueltos a probabilidades</h2>
-<p>Esos tres números sin normalizar se llaman <strong>logits</strong> (los \( z \) de la última capa). Necesitamos una función que los convierta en probabilidades: positivas y con suma 1. Primero probemos con la idea ingenua: dividir cada número entre la suma. Con \( (2, 1, 0{,}1) \) sale \( (0{,}65;\ 0{,}32;\ 0{,}03) \), pero con un logit negativo como en \( (-1, 3, 2) \) saldría una «probabilidad» de \( -0{,}25 \), y con \( (-1, 1) \) habría que dividir entre 0. La solución es pasar antes cada número por la exponencial \( e^{z} \), que siempre es positiva.</p>
-<div class="callout ejemplo"><span class="lbl">Ejemplo tomado del módulo</span><p>La red mira el tráiler de Los Vengadores (cifras inventadas).</p></div></section><figure class="demo" data-demo="curso2/c2m1-softmax" data-titulo="Softmax en vivo: ¿de qué género es la película?">
-<div class="haz">Deja los logits en 2,0 · 1,0 · 0,1 y comprueba que salen 0,66 · 0,24 · 0,10. Después sube el logit de «comedia» hasta 3 y observa a quién beneficia. Cambia la clase correcta del selector y, por último, juega con la temperatura T.</div>
-<div class="observa">Las barras de probabilidad siempre suman 1, y subir un logit <strong>le quita</strong> probabilidad a los demás. El tercer panel («gradiente p − y») es el gradiente de la entropía cruzada, p − y: para la clase correcta es negativo (empuja su logit hacia arriba) y para las demás es positivo (las empuja hacia abajo). Con T pequeño casi toda la probabilidad se va a un solo logit; con T grande se reparte casi por igual.</div>
-</figure><div class="resumen"><h2 class="sin-num sin-toc">En pocas líneas</h2><ul><li><strong>Softmax: de números sueltos a probabilidades:</strong> Esos tres números sin normalizar se llaman logits (los \( z \) de la última capa).</li><li>Antes de continuar, intenta explicar la demo sin mirar su resultado.</li></ul></div><section class="quiz mini"><script class="quiz-data" type="application/json">{"titulo": "¿Lo tienes?", "preguntas": [{"q": "¿Qué concepto estamos trabajando en esta lección?", "opciones": ["Softmax: de números sueltos a probabilidades", "Épocas, batches e iteraciones: el bucle de entrenamiento", "Gradientes que se desvanecen o explotan"], "correcta": 0, "porque": "Esos tres números sin normalizar se llaman logits (los \\( z \\) de la última capa)."}, {"q": "¿Cuál de estas afirmaciones recoge lo que acabas de estudiar?", "opciones": ["Lo importante es comprender la idea y comprobarla con ejemplos, no memorizar términos.", "Esos tres números sin normalizar se llaman logits (los \\( z \\) de la última capa).", "Siempre hay un único método que sirve para todos los problemas."], "correcta": 1, "porque": "La explicación central es: Esos tres números sin normalizar se llaman logits (los \\( z \\) de la última capa)."}, {"q": "Si una demo o un ejemplo te desconcierta, ¿cuál es la mejor forma de aprenderlo?", "opciones": ["Memorizar el nombre sin entender la operación.", "Volver a los números, cambiar un valor y explicar qué ocurre.", "Ignorar los resultados que no coinciden con tu intuición."], "correcta": 1, "porque": "Explorar qué cambia y por qué ayuda a conectar el concepto con su resultado."}]}</script></section></div></details><details class="profundizar"><summary><span>Profundizar: explicación completa<small>Matices, fórmulas, tablas, otros ejemplos y experimentos del módulo original.</small></span></summary><div class="prof-body"><section>
+<header class="hero leccion">
+  <div class="hero-grid">
+    <div>
+      <p class="eyebrow">Curso 2 · Módulo 1 · Lección 4 de 8</p>
+      <h1>Softmax reparte el 100 % y la pérdida pone la nota</h1>
+      <p class="lead">La última capa tiene que dar una respuesta con sentido (una probabilidad, un reparto entre géneros) y hace falta un número que diga cuánto se ha equivocado: la pérdida.</p>
+      <p class="meta-line"><span class="read-time" data-render="read-time"></span><a href="../modulo-1.html">Índice del módulo</a></p>
+    </div>
+    <div class="hero-tile" aria-hidden="true"></div>
+  </div>
+</header>
+
+<details class="predice">
+  <summary>Una película es de terror. La red A le da un 40 % a «terror»; la red B, un 1 %. ¿B merece un castigo 40 veces mayor que A, o menos?<span class="hint"></span></summary>
+  <div>
+    <p>Menos, pero sin techo. Con la entropía cruzada el castigo es −ln de la probabilidad dada a la respuesta correcta: A se lleva 0,92 y B 4,61, unas 5 veces más. Si B hubiera dado un 0 %, el castigo sería infinito: equivocarse con convicción sale carísimo.</p>
+  </div>
+</details>
+
+<section>
+<h2 id="softmax-rapido">Softmax: de números sueltos a probabilidades</h2>
+<p>Una red que clasifica tráilers en acción, comedia o terror saca tres números cualesquiera, los <strong>logits</strong>. La <strong>softmax</strong> los convierte en probabilidades positivas que suman 1: eleva \( e \) a cada logit y divide entre la suma de todos.</p>
+<div class="formula">\[ \mathrm{softmax}(z)_i = \frac{e^{z_i}}{\sum_{j=1}^{K} e^{z_j}} \]</div>
+<p>La exponencial exagera las diferencias: un logit un punto mayor pesa unas 2,7 veces más. Para dos clases (¿la termina o no?) basta una sigmoide.</p>
+</section>
+<figure class="demo" data-demo="curso2/c2m1-softmax" data-titulo="Softmax en vivo: ¿de qué género es la película?">
+  <p class="haz">Sube el logit de «comedia» hasta 3 y después mueve la temperatura T.</p>
+  <p class="observa">Las barras siempre suman 1: subir un logit le quita probabilidad a los demás.</p>
+</figure>
+
+<section>
+<h2 id="perdida-rapido">La pérdida: cuánto se ha equivocado</h2>
+<p>La <strong>pérdida</strong> (<em>loss</em>) es un número que vale casi 0 si la predicción es buena, crece si es mala y es derivable (en la lección 5 verás por qué). Cada problema tiene la suya:</p>
+<table>
+  <thead><tr><th>Problema</th><th>Salida</th><th>Pérdida</th></tr></thead>
+  <tbody>
+    <tr><td>Regresión (minutos que verá)</td><td>1, identidad</td><td>MSE: media de \( (\hat y - y)^2 \)</td></tr>
+    <tr><td>Binaria (¿la terminará?)</td><td>1, sigmoide</td><td>Entropía cruzada binaria</td></tr>
+    <tr><td>Multiclase (género)</td><td>K, softmax</td><td>Entropía cruzada categórica</td></tr>
+  </tbody>
+</table>
+<p>Las dos entropías cruzadas se reducen a lo mismo: \( L = -\ln p \), con \( p \) la probabilidad que la red dio a lo que de verdad pasó.</p>
+</section>
+
+<section>
+<h2 id="con-numeros">Con números</h2>
+<div class="callout ejemplo">
+  <span class="lbl">Ejemplo numérico</span>
+  <p><strong><em>Los Vengadores</em></strong>, logits 2,0 · 1,0 · 0,1:</p>
+  <ol class="pasos">
+    <li>Exponenciales: 7,389 · 2,718 · 1,105. Suma: 11,213.</li>
+    <li>Probabilidades: 0,659 · 0,242 · 0,099 (suman 1): «66 % acción».</li>
+    <li>Es de acción: L = −ln 0,659 = <span class="res">0,417</span>.</li>
+  </ol>
+  <p><strong>Nuestro usuario</strong> (lección 3) la terminó (y = 1) y la red dijo ŷ = 0,4942: L = −ln 0,4942 = <strong>0,7047</strong>, casi lo que cuesta lanzar una moneda (ln 2 = 0,693).</p>
+</div>
+</section>
+<details class="predice">
+  <summary>La red está casi segura de que un usuario abandonará (ŷ = 0,01), pero la terminó. ¿Qué empuja más fuerte para corregir: MSE o entropía cruzada?<span class="hint"></span></summary>
+  <div>
+    <p>La entropía cruzada, unas 100 veces más. Con MSE y sigmoide la señal es (ŷ − y) · ŷ · (1 − ŷ) = −0,0098: la sigmoide saturada la ahoga. Con entropía cruzada es ŷ − y = −0,99. Por eso en clasificación se usa entropía cruzada.</p>
+  </div>
+</details>
+<div class="resumen">
+  <h2 class="sin-num sin-toc">En tres líneas</h2>
+  <ul>
+    <li>Softmax: exponenciar y dividir entre la suma → probabilidades que suman 1.</li>
+    <li>Pérdida: MSE en regresión; entropía cruzada (−ln de lo que diste a la respuesta correcta) en clasificación.</li>
+    <li>La red baja la pérdida, que es derivable, no la métrica (el accuracy no lo es).</li>
+  </ul>
+</div>
+
+<section class="quiz mini">
+<script type="application/json" class="quiz-data">
+{
+ "titulo": "¿Lo tienes?",
+ "preguntas": [
+  {
+   "q": "Quieres clasificar tráilers en 4 géneros que se excluyen entre sí (acción, comedia, terror, animación). ¿Qué capa de salida y qué pérdida usas?",
+   "opciones": [
+    "1 neurona con sigmoide y <code>binary_crossentropy</code>",
+    "4 neuronas con ReLU y <code>mean_squared_error</code>",
+    "1 neurona lineal y <code>mean_squared_error</code>",
+    "4 neuronas con softmax y <code>categorical_crossentropy</code>"
+   ],
+   "correcta": 3,
+   "porque": "Con K clases excluyentes se usa una neurona por clase con softmax (las salidas son probabilidades que suman 1) y entropía cruzada categórica. Una sola sigmoide solo distingue dos clases; ReLU o una salida lineal no dan probabilidades, y el MSE aprende peor en clasificación (su gradiente se hunde cuando la salida está saturada)."
+  },
+  {
+   "q": "Un usuario terminó la serie (y = 1) y la red predijo ŷ = 0,9. ¿Cuánto vale la entropía cruzada binaria?",
+   "opciones": [
+    "0,9",
+    "0,1054",
+    "2,303",
+    "0,01"
+   ],
+   "correcta": 1,
+   "porque": "L = −ln 0,9 = 0,1054: la red dio un 90 % a lo que pasó y se lleva una pérdida pequeña. 2,303 sería −ln 0,1 (si hubiera dado un 10 %) y 0,01 es el error cuadrático (0,1²), no la entropía cruzada."
+  },
+  {
+   "q": "¿Por qué la red se entrena con la pérdida y no directamente con el accuracy?",
+   "opciones": [
+    "Porque el accuracy es más difícil de calcular",
+    "Porque la pérdida es derivable y el accuracy es un escalón sin pendiente que seguir",
+    "Porque Keras no permite medir el accuracy",
+    "Porque el accuracy siempre sube al entrenar"
+   ],
+   "correcta": 1,
+   "porque": "El accuracy cuenta aciertos: si mueves un peso un poquito, casi nunca cambia, así que no da pendiente. La pérdida sí cambia suavemente y se puede derivar. El accuracy se sigue midiendo como métrica para informar."
+  }
+ ]
+}
+</script>
+</section>
+
+<details class="profundizar">
+  <summary><span>Profundizar: la explicación completa<small>Por qué no basta dividir entre la suma, la temperatura, la tabla de castigos de −ln p, la CCE con dos películas, MSE frente a entropía cruzada y la tabla completa de pérdidas de Keras.</small></span></summary>
+  <div class="prof-body">
 <h2 id="softmax">Softmax: de números sueltos a probabilidades</h2>
+
 <p class="pregunta">Una red mira el tráiler de una película y debe decidir su género: «acción», «comedia» o «terror». Su última capa saca tres números cualesquiera, por ejemplo 2,0; 1,0 y 0,1. ¿Cómo los convertimos en tres probabilidades que sumen 1?</p>
+
 <p>Esos tres números sin normalizar se llaman <strong>logits</strong> (los \( z \) de la última capa). Necesitamos una función que los convierta en probabilidades: positivas y con suma 1. Primero probemos con la idea ingenua: dividir cada número entre la suma. Con \( (2, 1, 0{,}1) \) sale \( (0{,}65;\ 0{,}32;\ 0{,}03) \), pero con un logit negativo como en \( (-1, 3, 2) \) saldría una «probabilidad» de \( -0{,}25 \), y con \( (-1, 1) \) habría que dividir entre 0. La solución es pasar antes cada número por la exponencial \( e^{z} \), que siempre es positiva.</p>
+
 <div class="formula">\[ \mathrm{softmax}(z)_i = \frac{e^{z_i}}{\sum_{j=1}^{K} e^{z_j}} \]</div>
 <ul>
-<li>\( z_i \) es el logit de la clase \( i \), y \( K \) el número de clases.</li>
-<li>El numerador \( e^{z_i} \) hace positivo cada valor y <strong>exagera las diferencias</strong>: un logit un punto mayor tiene \( e \approx 2{,}72 \) veces más «peso».</li>
-<li>El denominador es la suma de todos los numeradores, así que al dividir todo suma exactamente 1.</li>
+  <li>\( z_i \) es el logit de la clase \( i \), y \( K \) el número de clases.</li>
+  <li>El numerador \( e^{z_i} \) hace positivo cada valor y <strong>exagera las diferencias</strong>: un logit un punto mayor tiene \( e \approx 2{,}72 \) veces más «peso».</li>
+  <li>El denominador es la suma de todos los numeradores, así que al dividir todo suma exactamente 1.</li>
 </ul>
+
 <div class="callout ejemplo">
-<span class="lbl">Ejemplo numérico</span>
-<p>La red mira el tráiler de <em>Los Vengadores</em> (cifras inventadas). Logits: acción = 2,0 · comedia = 1,0 · terror = 0,1.</p>
-<ol class="pasos">
-<li><strong>Exponenciales:</strong> \( e^{2} = 7{,}389 \) · \( e^{1} = 2{,}718 \) · \( e^{0{,}1} = 1{,}105 \).</li>
-<li><strong>Suma:</strong> 7,389 + 2,718 + 1,105 = <strong>11,213</strong>.</li>
-<li><strong>Dividir cada una entre la suma:</strong> acción = 7,389 / 11,213 = <strong>0,659</strong> · comedia = 2,718 / 11,213 = <strong>0,242</strong> · terror = 1,105 / 11,213 = <strong>0,099</strong>.</li>
-<li><strong>Comprobación:</strong> 0,659 + 0,242 + 0,099 = 1,000. La red dice «66 % acción».</li>
-</ol>
-<p>Observa que el logit mayor (2,0) se lleva el 66 % aunque solo es el doble que el segundo: el reparto no es proporcional a los logits, es proporcional a sus <em>exponenciales</em>.</p>
-<p><strong>Cómo se lee.</strong> Si la red que distingue «drama / comedia / terror» mira el tráiler de <em>Shrek</em> y devuelve \( (0{,}08;\ 0{,}87;\ 0{,}05) \), la clase predicha es la de mayor probabilidad (comedia, un 87 %) y las tres suman 1,00.</p>
+  <span class="lbl">Ejemplo numérico</span>
+  <p>La red mira el tráiler de <em>Los Vengadores</em> (cifras inventadas). Logits: acción = 2,0 · comedia = 1,0 · terror = 0,1.</p>
+  <ol class="pasos">
+    <li><strong>Exponenciales:</strong> \( e^{2} = 7{,}389 \) · \( e^{1} = 2{,}718 \) · \( e^{0{,}1} = 1{,}105 \).</li>
+    <li><strong>Suma:</strong> 7,389 + 2,718 + 1,105 = <strong>11,213</strong>.</li>
+    <li><strong>Dividir cada una entre la suma:</strong> acción = 7,389 / 11,213 = <strong>0,659</strong> · comedia = 2,718 / 11,213 = <strong>0,242</strong> · terror = 1,105 / 11,213 = <strong>0,099</strong>.</li>
+    <li><strong>Comprobación:</strong> 0,659 + 0,242 + 0,099 = 1,000. La red dice «66 % acción».</li>
+  </ol>
+  <p>Observa que el logit mayor (2,0) se lleva el 66 % aunque solo es el doble que el segundo: el reparto no es proporcional a los logits, es proporcional a sus <em>exponenciales</em>.</p>
+  <p><strong>Cómo se lee.</strong> Si la red que distingue «drama / comedia / terror» mira el tráiler de <em>Shrek</em> y devuelve \( (0{,}08;\ 0{,}87;\ 0{,}05) \), la clase predicha es la de mayor probabilidad (comedia, un 87 %) y las tres suman 1,00.</p>
 </div>
+
 <h3>Dos detalles que importan</h3>
 <ul>
-<li><strong>Sumar una constante a todos los logits no cambia nada</strong> (\( e^{z+c} = e^{c}\,e^{z} \) y \( e^{c} \) se cancela al dividir). Los programas lo aprovechan restando el logit máximo antes de exponenciar: con logits como 1000, \( e^{1000} \) desborda a infinito, pero \( e^{1000-1000} = 1 \) funciona. Lo verás en el código.</li>
-<li><strong>Temperatura.</strong> Si divides los logits entre un número \( T \) antes de la softmax, \( T &gt; 1 \) reparte más (probabilidades más parecidas) y \( T &lt; 1 \) concentra (más seguridad). Es un truco que verás en modelos de lenguaje; con \( T = 1 \) es la softmax normal.</li>
+  <li><strong>Sumar una constante a todos los logits no cambia nada</strong> (\( e^{z+c} = e^{c}\,e^{z} \) y \( e^{c} \) se cancela al dividir). Los programas lo aprovechan restando el logit máximo antes de exponenciar: con logits como 1000, \( e^{1000} \) desborda a infinito, pero \( e^{1000-1000} = 1 \) funciona. Lo verás en el código.</li>
+  <li><strong>Temperatura.</strong> Si divides los logits entre un número \( T \) antes de la softmax, \( T > 1 \) reparte más (probabilidades más parecidas) y \( T < 1 \) concentra (más seguridad). Es un truco que verás en modelos de lenguaje; con \( T = 1 \) es la softmax normal.</li>
 </ul>
-<div class="callout ojo">
-<span class="lbl">Ojo</span>
-<p><strong>(1) Softmax versus sigmoide.</strong> Softmax obliga a que las clases se repartan una probabilidad total de 1: sirve cuando cada ejemplo pertenece a <em>una sola</em> clase (acción <em>o</em> comedia <em>o</em> terror). Si una película puede tener varias etiquetas a la vez (comedia <em>y</em> romántica), se usa una sigmoide independiente por clase. <strong>(2) «Probabilidad» no es «seguridad».</strong> Una red mal entrenada puede dar un 99 % de «terror» al tráiler de una comedia: la softmax solo reparte los logits, no garantiza que la red tenga razón.</p>
+
+<div class="callout recuerda">
+  <span class="lbl">Guía completa del experimento «Softmax en vivo: ¿de qué género es la película?»</span>
+  <p>El experimento está más arriba, en la lección. Estas son sus instrucciones completas.</p>
+  <p><strong>Haz esto:</strong> Deja los logits en 2,0 · 1,0 · 0,1 y comprueba que salen 0,66 · 0,24 · 0,10. Después sube el logit de «comedia» hasta 3 y observa a quién beneficia. Cambia la clase correcta del selector y, por último, juega con la temperatura T.</p>
+  <p><strong>Fíjate en:</strong> Las barras de probabilidad siempre suman 1, y subir un logit <strong>le quita</strong> probabilidad a los demás. El tercer panel («gradiente p − y») es el gradiente de la entropía cruzada, p − y: para la clase correcta es negativo (empuja su logit hacia arriba) y para las demás es positivo (las empuja hacia abajo). Con T pequeño casi toda la probabilidad se va a un solo logit; con T grande se reparte casi por igual.</p>
 </div>
-</section></div></details><details class="profundizar" id="codigo"><summary><span>Ver código explicado paso a paso<small>1 fragmento(s) original(es), con cada línea comentada y salida esperada.</small></span></summary><div class="prof-body"><article class="snippet" data-lang="python">
-<header>
-<h3>12 · La misma red en Keras: los mismos números</h3>
-<p class="para-que"><strong>Para qué sirve</strong> Construir en Keras la red 2-2-1 del módulo, ponerle exactamente los pesos de nuestros ejemplos y dar un paso de gradient descent con η = 0,5, para comprobar que Keras produce las mismas cifras que nuestra cuenta a mano. Keras se estudia a fondo en el módulo 2; aquí sirve de contraste y verificación.</p>
-</header>
-<pre class="code"><code>import numpy as np
+
+<div class="callout ojo">
+  <span class="lbl">Ojo</span>
+  <p><strong>(1) Softmax versus sigmoide.</strong> Softmax obliga a que las clases se repartan una probabilidad total de 1: sirve cuando cada ejemplo pertenece a <em>una sola</em> clase (acción <em>o</em> comedia <em>o</em> terror). Si una película puede tener varias etiquetas a la vez (comedia <em>y</em> romántica), se usa una sigmoide independiente por clase. <strong>(2) «Probabilidad» no es «seguridad».</strong> Una red mal entrenada puede dar un 99 % de «terror» al tráiler de una comedia: la softmax solo reparte los logits, no garantiza que la red tenga razón.</p>
+</div>
+
+<h2 id="perdida">La función de pérdida: medir cuánto se equivoca</h2>
+
+<p class="pregunta">La red dijo 0,49 cuando la respuesta correcta era 1. ¿Cómo convertimos «se ha equivocado bastante» en un único número que podamos hacer más pequeño?</p>
+
+<p>Para que una red aprenda hace falta un número que diga <strong>cómo de mala es su predicción</strong>. Se llama <strong>función de pérdida</strong> (<em>loss function</em>) y se escribe \( L \). Cuando se promedia sobre muchos ejemplos suele llamarse <em>coste</em> (<em>cost</em>), aunque Keras usa «loss» para los dos. Tiene que cumplir tres cosas: valer 0 (o casi) cuando la predicción es buena, crecer cuando es mala, y ser <strong>derivable</strong>, porque el aprendizaje se apoya en su pendiente.</p>
+
+<div class="callout analogia">
+  <span class="lbl">Analogía</span>
+  <p>Es como un crítico que puntúa las recomendaciones de Netflix. No es lo mismo recomendarte una peli que casi te gusta que una que odias, y quien presume de seguridad («¡esta te va a encantar!») y se equivoca debería llevarse la peor nota. Cada tipo de problema usa un «examen» distinto.</p>
+</div>
+
+<h3>Regresión: error cuadrático medio (MSE)</h3>
+<div class="formula">\[ \mathrm{MSE} = \frac{1}{n}\sum_{i=1}^{n}\bigl(\hat y_i - y_i\bigr)^2 \]</div>
+<p>\( n \) es el número de ejemplos, \( y_i \) el valor real y \( \hat y_i \) la predicción. Cada error se eleva al cuadrado y se promedia.</p>
+<div class="callout ejemplo">
+  <span class="lbl">Ejemplo numérico</span>
+  <p>Tres películas. Las notas que un usuario les puso de verdad (sobre 10) son \( y = (3,\ 5,\ 2) \) y las que Netflix había predicho, \( \hat y = (2{,}5,\ 5{,}5,\ 4) \) (cifras inventadas).</p>
+  <ol class="pasos">
+    <li><strong>Errores</strong> \( \hat y - y \): −0,5 · +0,5 · +2.</li>
+    <li><strong>Al cuadrado:</strong> 0,25 · 0,25 · 4.</li>
+    <li><strong>Media:</strong> (0,25 + 0,25 + 4) / 3 = 4,5 / 3 = <strong>1,5</strong>.</li>
+  </ol>
+</div>
+<p><strong>¿Por qué al cuadrado?</strong> (1) Así los errores positivos y negativos no se cancelan. (2) Castiga mucho más los errores grandes: el error de 2 aporta 4, muchísimo más que el de 0,5, que aporta 0,25. (3) Es suave y fácil de derivar. Su alternativa, el error absoluto medio (<em>MAE</em>, <code>mean_absolute_error</code> en Keras), no exagera los errores grandes y es más tolerante con los <em>outliers</em>.</p>
+
+<h3>Clasificación binaria: entropía cruzada binaria (BCE)</h3>
+<p>La red devuelve una probabilidad \( \hat y \) de que el usuario termine la serie (clase 1), y la respuesta real \( y \) es 1 (la terminó) o 0 (la abandonó). Usamos:</p>
+<div class="formula">\[ L = -\Bigl[\, y\,\ln \hat y + (1 - y)\,\ln(1 - \hat y)\,\Bigr] \]</div>
+<p>Los dos términos funcionan como un interruptor: si \( y = 1 \) solo queda \( -\ln \hat y \) (la «sorpresa» de que la red diera \( \hat y \) a lo que ocurrió); si \( y = 0 \) solo queda \( -\ln(1 - \hat y) \). En ambos casos mide <strong>la probabilidad que la red asignó a la respuesta correcta</strong>, pasada por \( -\ln \).</p>
+<div class="callout ejemplo">
+  <span class="lbl">Ejemplo numérico</span>
+  <p>¿Terminará cada usuario la serie? Aquí \( y = 1 \) significa «la terminó», \( y = 0 \) «la abandonó» y \( \hat y \) es la probabilidad que la red daba de que la terminara (cifras inventadas).</p>
+  <table>
+    <thead><tr><th>Usuario</th><th>Real \( y \)</th><th>Predicción \( \hat y \)</th><th>Probabilidad dada a la respuesta correcta</th><th>Pérdida</th></tr></thead>
+    <tbody>
+      <tr><td>Usuario 1</td><td>1</td><td>0,9</td><td>0,9</td><td>−ln 0,9 = 0,1054</td></tr>
+      <tr><td>Usuario 2</td><td>0</td><td>0,2</td><td>1 − 0,2 = 0,8</td><td>−ln 0,8 = 0,2231</td></tr>
+      <tr><td>Usuario 3</td><td>1</td><td>0,6</td><td>0,6</td><td>−ln 0,6 = 0,5108</td></tr>
+      <tr><td>Usuario 4</td><td>0</td><td>0,7</td><td>1 − 0,7 = 0,3</td><td class="res">−ln 0,3 = 1,2040</td></tr>
+    </tbody>
+  </table>
+  <p>La pérdida del conjunto es la media: (0,1054 + 0,2231 + 0,5108 + 1,2040) / 4 = 2,0433 / 4 = <strong>0,5108</strong>. El usuario 4 (la red estaba bastante segura de que la terminaría, y la abandonó) aporta más que los otros tres juntos.</p>
+</div>
+
+<p><strong>¿Por qué un logaritmo?</strong> Fíjate en cómo se castiga según la probabilidad que la red dio a lo que de verdad ocurrió:</p>
+<table>
+  <thead><tr><th>Probabilidad dada a la respuesta correcta</th><th>0,99</th><th>0,9</th><th>0,5</th><th>0,1</th><th>0,01</th></tr></thead>
+  <tbody><tr><th scope="row">Pérdida \( -\ln p \)</th><td>0,010</td><td>0,105</td><td>0,693</td><td>2,303</td><td>4,605</td></tr></tbody>
+</table>
+<p>Acertar con seguridad casi no cuesta nada; dudar cuesta 0,69; y <strong>equivocarse con convicción</strong> se castiga sin techo (la pérdida tiende a infinito cuando la probabilidad tiende a 0). La red aprende rápido a no estar muy segura de lo que no sabe. Hay además una razón de fondo: minimizar esta pérdida equivale a <strong>maximizar la probabilidad que el modelo asigna a los datos observados</strong> (es la <em>log-verosimilitud negativa</em>).</p>
+
+<h3>Clasificación multiclase: entropía cruzada categórica (CCE)</h3>
+<p>Con \( K \) clases, la respuesta correcta se escribe como un vector <em>one-hot</em> (todo ceros salvo un 1 en la clase correcta) y la red devuelve un vector de probabilidades \( \hat{\mathbf{y}} \) (softmax):</p>
+<div class="formula">\[ L = -\sum_{k=1}^{K} y_k \,\ln \hat y_k \]</div>
+<p>Como \( y_k \) vale 0 salvo en la clase correcta, la suma se queda con <strong>un solo término</strong>: \( -\ln \) de la probabilidad que la red dio a la clase correcta. La BCE es el caso particular de dos clases.</p>
+<div class="callout ejemplo">
+  <span class="lbl">Ejemplo numérico</span>
+  <p>Dos películas y tres géneros (clase 1 = acción, 2 = comedia, 3 = terror). Película A: es una comedia (clase 2) y la red da \( (0{,}2;\ 0{,}7;\ 0{,}1) \) → \( L = -\ln 0{,}7 = 0{,}3567 \). Película B: es de acción (clase 1) y la red da \( (0{,}5;\ 0{,}3;\ 0{,}2) \) → \( L = -\ln 0{,}5 = 0{,}6931 \). Media: \( (0{,}3567 + 0{,}6931)/2 = \mathbf{0{,}5249} \).</p>
+</div>
+
+<h3>¿Por qué no usar MSE para clasificar?</h3>
+<p>Se podría, pero aprende peor. Supón que la salida es una sigmoide, la respuesta correcta es \( y = 1 \) y la red está <em>muy</em> equivocada: \( \hat y = 0{,}01 \) (estaba casi segura de que el usuario abandonaría la serie y, en realidad, la terminó). La pendiente de la pérdida respecto a \( z_o \) es:</p>
+<ul>
+  <li>con <strong>MSE</strong>: \( (\hat y - y)\,\hat y\,(1 - \hat y) = (0{,}01 - 1)\cdot 0{,}01\cdot 0{,}99 = -0{,}0098 \). Casi plana: la sigmoide está saturada y apenas deja pasar gradiente.</li>
+  <li>con <strong>BCE</strong>: \( \hat y - y = -0{,}99 \). Unas 100 veces mayor.</li>
+</ul>
+<p>Con la entropía cruzada, cuanto más equivocada está la red, más fuerte es la señal de corrección. Con MSE y sigmoide, es al revés justo cuando más falta hace. (Lo demostraremos en la <a href="leccion-6.html#backprop">lección 6</a>, la de backpropagation.)</p>
+
+<table>
+  <caption>Qué activación de salida y qué pérdida usar según el problema</caption>
+  <thead><tr><th>Problema</th><th>Neuronas de salida</th><th>Activación de salida</th><th>Pérdida (nombre en Keras)</th></tr></thead>
+  <tbody>
+    <tr><td>Regresión (un número, p. ej. los minutos que verá un usuario)</td><td>1</td><td>Identidad («linear»)</td><td>MSE (<code>mean_squared_error</code>) o MAE</td></tr>
+    <tr><td>Clasificación binaria (p. ej. ¿terminará la serie?)</td><td>1</td><td>Sigmoide</td><td><code>binary_crossentropy</code></td></tr>
+    <tr><td>Multiclase (una sola clase correcta, p. ej. el género de la peli), etiquetas one-hot</td><td>\( K \)</td><td>Softmax</td><td><code>categorical_crossentropy</code></td></tr>
+    <tr><td>Multiclase, etiquetas como enteros (0, 1, 2…)</td><td>\( K \)</td><td>Softmax</td><td><code>sparse_categorical_crossentropy</code></td></tr>
+    <tr><td>Multietiqueta (varias clases a la vez, p. ej. «comedia» y «romántica»)</td><td>\( K \)</td><td>\( K \) sigmoides independientes</td><td><code>binary_crossentropy</code></td></tr>
+  </tbody>
+</table>
+
+<div class="callout ojo">
+  <span class="lbl">Ojo</span>
+  <p><strong>Pérdida y métrica no son lo mismo.</strong> La <em>pérdida</em> es lo que la red intenta reducir y debe ser derivable. La <em>métrica</em> (accuracy, F1…) es lo que tú quieres informar y puede no ser derivable: el accuracy es un escalón (cuenta aciertos), sin pendiente que seguir. Pueden moverse distinto: la pérdida puede bajar un poco sin que el accuracy cambie. Y un detalle de Keras: si la última capa no lleva activación y devuelve <em>logits</em>, hay que indicarlo en la pérdida con <code>from_logits=True</code>; olvidarlo es un error clásico (lo veremos en el módulo 2).</p>
+</div>
+  </div>
+</details>
+
+<section>
+<h2 class="sin-num">Código</h2>
+
+<article class="snippet" data-lang="python">
+  <header>
+    <h3>4 · Pérdidas: MSE, BCE y CCE a mano y con Keras</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Calcular a mano las tres pérdidas del módulo con los mismos números de la <a href="#perdida">lección 4</a> y comprobar que coinciden con las que trae Keras (<code>keras.losses</code>). Keras se explica a fondo en el módulo 2; aquí solo se usa para verificar.</p>
+  </header>
+  <pre class="code"><code>import numpy as np
 from tensorflow import keras
 
-x = np.array([[1.0, 0.5]])                      # 1 ejemplo, 2 entradas
-y = np.array([[1.0]])
+# --- Regresión: error cuadrático medio (MSE) ---
+y_real = np.array([3.0, 5.0, 2.0])
+y_pred = np.array([2.5, 5.5, 4.0])
+mse = np.mean((y_pred - y_real) ** 2)
+print("MSE a mano :", mse)
+print("MSE Keras  :", float(keras.losses.MeanSquaredError()(y_real, y_pred)))
 
-modelo = keras.Sequential([
-    keras.layers.Input(shape=(2,)),
-    keras.layers.Dense(2, activation="sigmoid"),    # capa oculta: 2 neuronas
-    keras.layers.Dense(1, activation="sigmoid"),    # capa de salida: 1 neurona
-])
+# --- Clasificación binaria: entropía cruzada binaria ---
+y = np.array([1.0, 0.0, 1.0, 0.0])
+p = np.array([0.9, 0.2, 0.6, 0.7])            # probabilidad que da el modelo de ser clase 1
+por_ejemplo = -(y * np.log(p) + (1 - y) * np.log(1 - p))
+print("BCE por ejemplo:", np.round(por_ejemplo, 4))
+print("BCE a mano     :", round(por_ejemplo.mean(), 4))
+print("BCE Keras      :", round(float(keras.losses.binary_crossentropy(y, p)), 4))
 
-# Ponemos EXACTAMENTE los pesos de nuestro ejemplo (Keras guarda W con forma (entradas, neuronas))
-W1 = np.array([[0.4, -0.6], [0.7, 0.2]])
-b1 = np.array([0.1, -0.3])
-v  = np.array([0.5, -0.8])
-c  = np.array([0.2])
-modelo.set_weights([W1.T, b1, v.reshape(2, 1), c])
+# --- Clasificación multiclase: entropía cruzada categórica ---
+Y = np.array([[0, 1, 0],
+              [1, 0, 0]], dtype=float)          # one-hot: clase 1 y clase 0
+P = np.array([[0.2, 0.7, 0.1],
+              [0.5, 0.3, 0.2]])                 # salida softmax de la red
+cce = -np.sum(Y * np.log(P), axis=1)
+print("CCE por ejemplo:", np.round(cce, 4))
+print("CCE a mano     :", round(cce.mean(), 4))
+print("CCE Keras      :", round(float(keras.losses.categorical_crossentropy(Y, P).numpy().mean()), 4))</code></pre>
+  <details class="linea-a-linea" open>
+    <summary>Línea por línea</summary>
+    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+      <tbody>
+        <tr data-lines="1"><td><code>import numpy as np</code></td><td>Importa NumPy.</td></tr>
+        <tr data-lines="2"><td><code>from tensorflow import keras</code></td><td>Importa Keras (la librería de redes neuronales de TensorFlow). Aquí solo usaremos sus funciones de pérdida para comprobar nuestras fórmulas.</td></tr>
+        <tr data-lines="4"><td><code># --- Regresión ... ---</code></td><td>Comentario que abre el bloque de la pérdida de regresión.</td></tr>
+        <tr data-lines="5"><td><code>y_real = np.array([3.0, 5.0, 2.0])</code></td><td>Los valores reales: las notas que un usuario puso a tres películas.</td></tr>
+        <tr data-lines="6"><td><code>y_pred = np.array([2.5, 5.5, 4.0])</code></td><td>Las notas que Netflix había predicho.</td></tr>
+        <tr data-lines="7"><td><code>mse = np.mean((y_pred - y_real) ** 2)</code></td><td>MSE a mano: resta elemento a elemento, eleva al cuadrado (<code>** 2</code>) y promedia con <code>np.mean</code>.</td></tr>
+        <tr data-lines="8"><td><code>print("MSE a mano :", mse)</code></td><td>Muestra el valor calculado a mano.</td></tr>
+        <tr data-lines="9"><td><code>print("MSE Keras  :", ...)</code></td><td><code>keras.<wbr>losses.<wbr>MeanSquaredError(<wbr>)</code> crea un objeto «pérdida» que se usa como función: <code>(y_real, y_pred)</code>. Devuelve un tensor; <code>float()</code> lo convierte a número normal.</td></tr>
+        <tr data-lines="11"><td><code># --- Clasificación binaria ... ---</code></td><td>Comentario del bloque de la entropía cruzada binaria.</td></tr>
+        <tr data-lines="12"><td><code>y = np.array([1.0, 0.0, 1.0, 0.0])</code></td><td>Las cuatro respuestas correctas (1 = terminó la serie, 0 = la abandonó).</td></tr>
+        <tr data-lines="13"><td><code>p = np.array([0.9, 0.2, 0.6, 0.7])</code></td><td>La probabilidad de clase 1 (que la termine) que da el modelo en cada ejemplo.</td></tr>
+        <tr data-lines="14"><td><code>por_ejemplo = -(y * np.log(p) + ...)</code></td><td>La fórmula de la BCE aplicada a los cuatro ejemplos a la vez: salen cuatro pérdidas, una por ejemplo.</td></tr>
+        <tr data-lines="15"><td><code>print("BCE por ejemplo:", ...)</code></td><td>Imprime las cuatro pérdidas con 4 decimales.</td></tr>
+        <tr data-lines="16"><td><code>print("BCE a mano     :", ...)</code></td><td>Su media es la pérdida del conjunto.</td></tr>
+        <tr data-lines="17"><td><code>print("BCE Keras      :", ...)</code></td><td>La misma pérdida con <code>keras.<wbr>losses.<wbr>binary_<wbr>crossentropy</code>.</td></tr>
+        <tr data-lines="19"><td><code># --- Clasificación multiclase ... ---</code></td><td>Comentario del bloque de la entropía cruzada categórica.</td></tr>
+        <tr data-lines="20-21"><td><code>Y = np.array([[0, 1, 0], [1, 0, 0]], dtype=float)</code></td><td>Las respuestas correctas <em>one-hot</em>: un 1 en la clase correcta y ceros en el resto (la primera película es de la clase 2, comedia, y la segunda de la clase 1, acción). <code>dtype=float</code> las guarda como decimales.</td></tr>
+        <tr data-lines="22-23"><td><code>P = np.array([[0.2, 0.7, 0.1], [0.5, 0.3, 0.2]])</code></td><td>Las probabilidades que da la red (la salida de una softmax): cada fila suma 1.</td></tr>
+        <tr data-lines="24"><td><code>cce = -np.sum(Y * np.log(P), axis=1)</code></td><td><code>Y * np.log(P)</code> multiplica elemento a elemento: todos los términos valen 0 salvo el de la clase correcta. <code>np.sum(..., axis=1)</code> suma cada fila (<code>axis=1</code> = a lo largo de las columnas). Queda una pérdida por ejemplo.</td></tr>
+        <tr data-lines="25"><td><code>print("CCE por ejemplo:", ...)</code></td><td>Imprime las dos pérdidas.</td></tr>
+        <tr data-lines="26"><td><code>print("CCE a mano     :", ...)</code></td><td>Su media.</td></tr>
+        <tr data-lines="27"><td><code>print("CCE Keras      :", ...)</code></td><td><code>keras.<wbr>losses.<wbr>categorical_<wbr>crossentropy</code> devuelve una pérdida por ejemplo; <code>.numpy().mean()</code> la pasa a NumPy y promedia.</td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>MSE a mano : 1.5
+MSE Keras  : 1.5
+BCE por ejemplo: [0.1054 0.2231 0.5108 1.204 ]
+BCE a mano     : 0.5108
+BCE Keras      : 0.5108
+CCE por ejemplo: [0.3567 0.6931]
+CCE a mano     : 0.5249
+CCE Keras      : 0.5249</pre>
+    <p>En los tres bloques el valor a mano y el de Keras son idénticos (1,5 · 0,5108 · 0,5249): las fórmulas del módulo son exactamente lo que calcula Keras. En la BCE por ejemplo, el cuarto vale 1,204: la red daba 0,7 de probabilidad de que el usuario terminara la serie y la abandonó, el error «seguro y equivocado» que más se castiga. En la CCE, −ln 0,7 = 0,3567 y −ln 0,5 = 0,6931.</p>
+  </div>
+</article>
+</section>
 
-print("predicción  :", round(float(modelo.predict(x, verbose=0)[0, 0]), 4))
-print("parámetros  :", modelo.count_params())
-
-# Un único paso de gradient descent con learning rate 0.5
-modelo.compile(optimizer=keras.optimizers.SGD(learning_rate=0.5), loss="binary_crossentropy")
-modelo.fit(x, y, epochs=1, batch_size=1, verbose=0)
-
-W1n, b1n, vn, cn = modelo.get_weights()
-print("W1 nueva    :", np.round(W1n.T, 4).ravel())
-print("b1 nuevo    :", np.round(b1n, 4))
-print("v nuevo     :", np.round(vn.ravel(), 4), " c nuevo:", np.round(cn, 4))
-print("predicción después:", round(float(modelo.predict(x, verbose=0)[0, 0]), 4))</code></pre>
-<details class="linea-a-linea" open="">
-<summary>Línea por línea</summary>
-<p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
-<table class="lineas">
-<thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
-<tbody>
-<tr data-lines="1"><td><code>import numpy as np</code></td><td>Importa NumPy.</td></tr>
-<tr data-lines="2"><td><code>from tensorflow import keras</code></td><td>Importa Keras.</td></tr>
-<tr data-lines="4"><td><code>x = np.array([[1.0, 0.5]])</code></td><td>Un ejemplo (un usuario y una película) con dos entradas. Keras siempre espera un <em>lote</em> de ejemplos (forma: ejemplos × características), por eso los dobles corchetes: 1 fila, 2 columnas.</td></tr>
-<tr data-lines="5"><td><code>y = np.array([[1.0]])</code></td><td>La respuesta correcta, con la misma forma de lote.</td></tr>
-<tr data-lines="7-11"><td><code>modelo = keras.Sequential([...])</code></td><td>Crea una red como una pila de capas (<code>Sequential</code>): <code>Input(shape=(2,))</code> declara que entran 2 números, la primera <code>Dense(<wbr/>2, activation=<wbr/>"sigmoid")</code> es la capa oculta (2 neuronas, sigmoide) y la segunda <code>Dense(<wbr/>1, activation=<wbr/>"sigmoid")</code> es la salida (1 neurona, sigmoide). <code>Dense</code> = capa densa (todas conectadas con todas).</td></tr>
-<tr data-lines="13"><td><code># Ponemos EXACTAMENTE los pesos ...</code></td><td>Comentario: Keras inicializaría los pesos al azar; los fijamos para comparar con nuestra cuenta.</td></tr>
-<tr data-lines="14"><td><code>W1 = np.array([[0.4, -0.6], [0.7, 0.2]])</code></td><td>Pesos de la capa oculta, con una fila por neurona, como en el resto del módulo.</td></tr>
-<tr data-lines="15"><td><code>b1 = np.array([0.1, -0.3])</code></td><td>Biases ocultos.</td></tr>
-<tr data-lines="16"><td><code>v  = np.array([0.5, -0.8])</code></td><td>Pesos de la salida.</td></tr>
-<tr data-lines="17"><td><code>c  = np.array([0.2])</code></td><td>Bias de la salida, como vector de un elemento (así lo espera Keras).</td></tr>
-<tr data-lines="18"><td><code>modelo.set_weights([W1.T, b1, v.reshape(2, 1), c])</code></td><td>Pone los pesos en el orden que Keras guarda: núcleo y bias de cada capa. Keras guarda el núcleo con forma <em>(entradas, neuronas)</em>, la traspuesta de nuestra <code>W1</code> (<code>.T</code>); y el de la salida con forma (2, 1) (<code>reshape</code>).</td></tr>
-<tr data-lines="20"><td><code>print("predicción  :", ...)</code></td><td><code>modelo.predict(x)</code> hace el forward; <code>verbose=0</code> evita la barra de progreso; <code>[0, 0]</code> toma el primer ejemplo y su primera salida.</td></tr>
-<tr data-lines="21"><td><code>print("parámetros  :", modelo.count_params())</code></td><td>Cuenta los parámetros de la red: tiene que salir 9 (6 de la capa oculta y 3 de la salida).</td></tr>
-<tr data-lines="23"><td><code># Un único paso de gradient descent ...</code></td><td>Comentario.</td></tr>
-<tr data-lines="24"><td><code>modelo.compile(optimizer=keras.optimizers.SGD(learning_rate=0.5), loss="binary_crossentropy")</code></td><td>Configura el entrenamiento: <code>SGD</code> con learning rate 0,5 y pérdida de entropía cruzada binaria.</td></tr>
-<tr data-lines="25"><td><code>modelo.fit(x, y, epochs=1, batch_size=1, verbose=0)</code></td><td><code>fit</code> entrena. Con un ejemplo, <code>batch_size=1</code> y <code>epochs=1</code> es exactamente <strong>una</strong> iteración: un forward, un backward y una actualización.</td></tr>
-<tr data-lines="27"><td><code>W1n, b1n, vn, cn = modelo.get_weights()</code></td><td>Recupera los pesos actualizados en el mismo orden.</td></tr>
-<tr data-lines="28"><td><code>print("W1 nueva    :", ...)</code></td><td>Muestra <code>W1</code> (de nuevo con una fila por neurona, <code>.T</code>) como lista plana (<code>.ravel()</code>).</td></tr>
-<tr data-lines="29"><td><code>print("b1 nuevo    :", ...)</code></td><td>Biases ocultos nuevos.</td></tr>
-<tr data-lines="30"><td><code>print("v nuevo     :", ...)</code></td><td>Pesos y bias de salida nuevos.</td></tr>
-<tr data-lines="31"><td><code>print("predicción después:", ...)</code></td><td>Predicción tras la actualización.</td></tr>
-</tbody>
-</table>
-</details>
-<div class="salida">
-<strong>Salida esperada</strong>
-<pre>predicción  : 0.4942
-parámetros  : 9
-W1 nueva    : [ 0.4313 -0.5844  0.6525  0.1762]
-b1 nuevo    : [ 0.1313 -0.3475]
-v nuevo     : [ 0.639  -0.6426]  c nuevo: [0.4529]
-predicción después: 0.6063</pre>
-<p>Keras reproduce nuestra cuenta: antes del paso la predicción es 0,4942, tiene 9 parámetros y tras una iteración los pesos son <code>[0.<wbr/>4313 -0.<wbr/>5844 0.<wbr/>6525 0.<wbr/>1762]</code>, <code>[0.1313 -0.3475]</code>, <code>[0.639 -0.6426]</code> y <code>[0.4529]</code>, los mismos que calculamos a mano y con NumPy; la predicción pasa a 0,6063. Keras trabaja en float32, así que a más decimales verías pequeñas diferencias con NumPy; con 4 decimales coinciden.</p>
 </div>
-</article></div></details></div></main></body></html>
+</main>
+</body>
+</html>

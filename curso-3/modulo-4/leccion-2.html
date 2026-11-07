@@ -1,41 +1,353 @@
-<!DOCTYPE html>
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lección 2 · El VAE guarda una nube por película, y el azar va aparte en ε · Módulo 4 · Curso 3 · Cuaderno de IA</title>
+<meta name="description" content="El encoder del VAE devuelve una nube (μ, log σ²) en vez de un punto, y el truco de reparametrización z = μ + σ·ε permite derivar a través del sorteo.">
+<script>try{var t=localStorage.getItem('cuaderno-ia:tema');if(t)document.documentElement.setAttribute('data-theme',t)}catch(e){}</script>
+<link rel="stylesheet" href="../../assets/css/style.css">
+<script src="../../assets/js/curriculum.js"></script>
+<script src="../../assets/js/lab.js"></script>
+<script src="../../assets/js/app.js" defer></script>
+</head>
+<body data-root="../../" data-course="3" data-module="4" data-lesson="2">
+<main>
+<div class="page">
 
-<html lang="es"><head><meta charset="utf-8"/><meta content="width=device-width,initial-scale=1" name="viewport"/><title>Lección 2 · VAE: de un punto a una nube · Curso 3 · Cuaderno de IA</title><meta content="Un autoencoder variacional (VAE) cambia dos cosas del autoencoder normal." name="description"/><script>try{var t=localStorage.getItem('cuaderno-ia:tema');if(t)document.documentElement.setAttribute('data-theme',t)}catch(e){}</script><link href="../../assets/css/style.css" rel="stylesheet"/><script src="../../assets/js/curriculum.js"></script><script src="../../assets/js/lab.js"></script><script defer="" src="../../assets/js/app.js"></script><script defer="" src="../../assets/js/microanimations.js"></script></head><body data-course="3" data-lesson="2" data-module="4" data-root="../../"><main><div class="page" data-micro="3min"><header class="hero leccion"><div class="hero-grid"><div><p class="eyebrow">Curso 3 · Módulo 4 · Lección 2 de 12</p><h1>VAE: de un punto a una nube</h1><p class="lead">Un autoencoder variacional (VAE) cambia dos cosas del autoencoder normal.</p><p class="meta-line"><span class="read-time" data-render="read-time"></span><a href="../modulo-4.html">Índice del módulo</a></p></div><div aria-hidden="true" class="hero-tile"></div></div></header><details class="predice"><summary>Si el problema es que el espacio latente tiene huecos, ¿cómo se obliga a que no los haya?<span class="hint"></span></summary><div><p>Un autoencoder variacional (VAE) cambia dos cosas del autoencoder normal.</p></div></details><section aria-label="Explicación breve" class="micro-core"><div class="micro-kicker">01 · ENTENDER <span>≈ 45 s</span></div><h2>La idea en palabras sencillas</h2><p>Observa la caja del medio: entrenamos al decodificador con puntos sacados al azar de la nube, no con el centro. Esa «sacudida» es la que lo obliga a ser tolerante: si dos nubes se pisan, el decodificador recibe puntos de ambas y tiene que aprender a transicionar suavemente de una a otra. De dónde sale ese \( z \) es el siguiente problema.</p><div class="micro-example"><span aria-hidden="true" class="micro-example-icon">💡</span><div><strong>Otro ejemplo · Dibujo</strong><p>Un modelo generativo puede empezar con ruido y producir un dibujo que comparte patrones con los aprendidos.</p></div></div></section><div class="micro-kicker micro-checkpoint">02 · RESPONDER <span>≈ 15 s</span></div><section aria-label="Pregunta intercalada" class="quiz mini micro-check"><script class="quiz-data" type="application/json">{"titulo": "Pausa rápida · Comprueba la idea", "preguntas": [{"q": "En un VAE, el encoder suele producir…", "opciones": ["Parámetros de una distribución latente", "Solo una etiqueta de spam", "Una tabla de temperaturas"], "correcta": 0, "porque": "Se aprende una distribución que permite muestrear valores latentes."}]}</script></section><section aria-label="Animación interactiva" class="micro-viz" data-index="9" data-micro-viz="generative"><div class="micro-kicker">03 · EXPERIMENTAR <span>≈ 45 s</span></div><div class="micro-viz-title"><div><h2>Del ruido a una estructura</h2><p>Avanza la transformación y observa cómo emerge un patrón.</p></div><span aria-hidden="true" class="micro-viz-symbol">✦</span></div><div aria-live="polite" class="micro-viz-stage"><p>Animación interactiva: Del ruido a una estructura</p></div></section><div class="micro-kicker micro-checkpoint">04 · APLICAR <span>≈ 15 s</span></div><section aria-label="Pregunta intercalada" class="quiz mini micro-check"><script class="quiz-data" type="application/json">{"titulo": "Pausa rápida · ¿Lo aplicarías?", "preguntas": [{"q": "¿Para qué sirve ese espacio latente?", "opciones": ["Hacer siempre bagging", "Eliminar la pérdida de reconstrucción", "Generar nuevas muestras próximas a patrones aprendidos"], "correcta": 2, "porque": "El espacio latente permite interpolar y generar."}]}</script></section><div class="micro-finish"><strong>Idea que te llevas</strong><span>Observa la caja del medio: entrenamos al decodificador con puntos sacados al azar de la nube, no con el centro</span><small>¿Quieres más ejemplos, fórmulas o código? Los tienes justo debajo, sin límite de tiempo.</small></div><details class="profundizar micro-legacy"><summary><span>Explorar más: explicación y simulaciones completas<small>Todo el texto original, tablas y demos avanzadas. Opcional.</small></span></summary><div class="prof-body"><section><h2>VAE: de un punto a una nube</h2>
-<p>Un <strong><abbr class="t" data-def="Variational AutoEncoder. Autoencoder cuyo encoder no devuelve un punto sino los parámetros de una distribución, y cuya pérdida obliga a esas distribuciones a parecerse a una N(0, I).">autoencoder variacional (VAE)</abbr></strong> cambia dos cosas del autoencoder normal. Primero, el encoder deja de devolver <em>un punto</em> y devuelve <em>una nube</em>: una distribución normal con su centro \( \mu \) y su anchura \( \sigma \). Segundo, la pérdida incluye un término que obliga a todas las nubes a parecerse a una nube de referencia, la normal estándar \( \mathcal{N}(0, I) \), llamada <abbr class="t" data-def="La distribución que queremos que tenga el espacio latente: normal con media 0 y varianza 1 en cada dimensión. De ella se saca el z al generar.">prior</abbr>.</p>
-<p>Para cada dimensión latente el encoder da dos números: la media \( \mu \) y el logaritmo de la varianza \( \log \sigma^2 \) (en el código <code>z_mean</code> y <code>z_log_var</code>). Se usa el logaritmo porque una red devuelve cualquier número real y una desviación típica no puede ser negativa: con \( \sigma = e^{\frac{1}{2}\log\sigma^2} \) cualquier salida de la red es válida y, de paso, la red trabaja con números más estables.</p>
-<p>Observa la caja del medio: <strong>entrenamos al decodificador con puntos sacados al azar de la nube</strong>, no con el centro. Esa «sacudida» es la que lo obliga a ser tolerante: si dos nubes se pisan, el decodificador recibe puntos de ambas y tiene que aprender a transicionar suavemente de una a otra. De dónde sale ese \( z \) es el siguiente problema.</p>
+<header class="hero leccion">
+  <div class="hero-grid">
+    <div>
+      <p class="eyebrow">Curso 3 · Módulo 4 · Lección 2 de 8</p>
+      <h1>El VAE guarda una nube por película, y el azar va aparte en ε</h1>
+      <p class="lead">El encoder del VAE no dice «Titanic está aquí», sino «Titanic está por esta zona»: un centro \( \mu \) y una anchura \( \sigma \). Y para poder entrenarlo, el sorteo se escribe como \( z = \mu + \sigma\,\varepsilon \).</p>
+      <p class="meta-line"><span class="read-time" data-render="read-time"></span><a href="../modulo-4.html">Índice del módulo</a></p>
+    </div>
+    <div class="hero-tile" aria-hidden="true"></div>
+  </div>
+</header>
+<details class="predice">
+  <summary>Para cada eje, el encoder devuelve \( \mu \) y <code>z_log_var</code> \( = \log\sigma^2 \). Si la red da <code>z_log_var</code> = −1,386, ¿la nube es más estrecha o más ancha que la normal estándar?<span class="hint"></span></summary>
+  <div>
+    <p><strong>Más estrecha.</strong> \( \sigma^2 = e^{-1{,}386} = 0{,}25 \) y \( \sigma = 0{,}5 \): la mitad de ancha que el prior. Se usa el logaritmo porque la red puede devolver cualquier número, también negativo, y \( \sigma = e^{\frac12\log\sigma^2} \) siempre sale positiva.</p>
+  </div>
+</details>
+
+<section>
+<h2 id="idea">De un punto a una nube</h2>
+<p>Un <strong>autoencoder variacional (VAE)</strong> cambia dos cosas. Primero, el encoder devuelve <em>una nube</em>: una normal con centro \( \mu \) y anchura \( \sigma \) por cada dimensión latente. Segundo, la pérdida obliga a todas las nubes a parecerse a la normal estándar \( \mathcal{N}(0, I) \), el <strong>prior</strong> (lo verás en la lección siguiente).</p>
 <ul class="flow">
-<li class="a">x<small>dígito 8×8 = 64 números</small></li>
-<li class="b">ENCODER<small>da μ y log σ²</small></li>
-<li class="d">z = μ + σ·ε<small>punto al azar de la nube</small></li>
-<li class="b">DECODER<small>de z a 64 píxeles</small></li>
-<li class="c">x̂<small>reconstrucción</small></li>
+  <li class="a">x<small>64 píxeles</small></li>
+  <li class="b">ENCODER<small>da μ y log σ²</small></li>
+  <li class="d">z = μ + σ·ε<small>punto al azar de la nube</small></li>
+  <li class="b">DECODER<small>de z a 64 píxeles</small></li>
+  <li class="c">x̂<small>reconstrucción</small></li>
 </ul>
-<div class="callout ejemplo"><span class="lbl">Con números</span><p>Un autoencoder variacional (VAE) cambia dos cosas del autoencoder normal.</p></div></section><div class="resumen"><h2 class="sin-num sin-toc">En pocas líneas</h2><ul><li><strong>VAE: de un punto a una nube:</strong> Un autoencoder variacional (VAE) cambia dos cosas del autoencoder normal.</li><li>Antes de continuar, intenta explicar la demo sin mirar su resultado.</li></ul></div><section class="quiz mini"><script class="quiz-data" type="application/json">{"titulo": "¿Lo tienes?", "preguntas": [{"q": "¿Qué concepto estamos trabajando en esta lección?", "opciones": ["Generar e interpolar con un VAE", "La red que predice el ruido", "VAE: de un punto a una nube"], "correcta": 2, "porque": "Un autoencoder variacional (VAE) cambia dos cosas del autoencoder normal."}, {"q": "¿Cuál de estas afirmaciones recoge lo que acabas de estudiar?", "opciones": ["Un autoencoder variacional (VAE) cambia dos cosas del autoencoder normal.", "Siempre hay un único método que sirve para todos los problemas.", "Lo importante es comprender la idea y comprobarla con ejemplos, no memorizar términos."], "correcta": 0, "porque": "La explicación central es: Un autoencoder variacional (VAE) cambia dos cosas del autoencoder normal."}, {"q": "Si una demo o un ejemplo te desconcierta, ¿cuál es la mejor forma de aprenderlo?", "opciones": ["Volver a los números, cambiar un valor y explicar qué ocurre.", "Ignorar los resultados que no coinciden con tu intuición.", "Memorizar el nombre sin entender la operación."], "correcta": 0, "porque": "Explorar qué cambia y por qué ayuda a conectar el concepto con su resultado."}]}</script></section></div></details><details class="profundizar"><summary><span>Profundizar: explicación completa<small>Matices, fórmulas, tablas, otros ejemplos y experimentos del módulo original.</small></span></summary><div class="prof-body"><section>
-<h2 id="vae">VAE: de un punto a una nube</h2>
-<p class="pregunta">Si el problema es que el espacio latente tiene huecos, ¿cómo se obliga a que no los haya?</p>
-<p>Un <strong><abbr class="t" data-def="Variational AutoEncoder. Autoencoder cuyo encoder no devuelve un punto sino los parámetros de una distribución, y cuya pérdida obliga a esas distribuciones a parecerse a una N(0, I).">autoencoder variacional (VAE)</abbr></strong> cambia dos cosas del autoencoder normal. Primero, el encoder deja de devolver <em>un punto</em> y devuelve <em>una nube</em>: una distribución normal con su centro \( \mu \) y su anchura \( \sigma \). Segundo, la pérdida incluye un término que obliga a todas las nubes a parecerse a una nube de referencia, la normal estándar \( \mathcal{N}(0, I) \), llamada <abbr class="t" data-def="La distribución que queremos que tenga el espacio latente: normal con media 0 y varianza 1 en cada dimensión. De ella se saca el z al generar.">prior</abbr>.</p>
-<div class="callout analogia">
-<span class="lbl">Analogía</span>
-<p>Un autoencoder normal te dice: «Titanic está exactamente en la fila 4, asiento 7 del mapa». Un VAE te dice: «Titanic está <em>por aquí</em>, en el barrio de los dramas románticos». Como cada película ocupa una zona y no un punto, las zonas vecinas se solapan y entre ellas no queda terreno vacío. Y el decodificador aprende que <em>todo el barrio</em> debe devolver algo parecido, así que al moverte un poco por el mapa, la imagen cambia poco.</p>
+<p>El decoder se entrena con <strong>puntos sorteados</strong> de la nube, no con su centro. Si las nubes de dos películas se pisan, recibe puntos de ambas y aprende a pasar suavemente de una a otra: así desaparecen los huecos.</p>
+<p>Pero sortear es como el botón «Sorpréndeme» de Netflix: no tiene derivada. El <strong>truco de reparametrización</strong> separa el azar de los parámetros: se sortea \( \varepsilon \sim \mathcal{N}(0,1) \), siempre la misma campana, y se calcula \( z = \mu + \sigma\,\varepsilon \). Ahora \( z \) es una cuenta normal, con \( \partial z/\partial\mu = 1 \) y \( \partial z/\partial\sigma = \varepsilon \), y el gradiente llega al encoder.</p>
+</section>
+
+<figure class="demo" data-demo="curso3/c3m4-reparametrizacion" data-titulo="z = μ + σ·ε: el azar vive en ε">
+  <div class="haz">Mueve μ y σ, y pulsa «Otras muestras de ε».</div>
+  <div class="observa">Las muestras de ε (azul) solo se desplazan y se estiran para dar las de z (naranja); las derivadas del punto marcado son números normales.</div>
+</figure>
+
+<section>
+<h2 id="numeros">Con números: el gradiente atraviesa el sorteo</h2>
+<div class="callout ejemplo">
+  <span class="lbl">Ejemplo numérico</span>
+  <p>Titanic en el eje «comedia ↔ drama»: \( \mu = 1{,}2 \), \( \sigma = 0{,}5 \), sale \( \varepsilon = 0{,}8 \). El decoder acierta cuando \( z = 3 \), con pérdida \( L = (z-3)^2 \).</p>
+  <ol class="pasos">
+    <li>\( z = 1{,}2 + 0{,}5 \cdot 0{,}8 = 1{,}6 \) y \( L = (1{,}6-3)^2 = 1{,}96 \).</li>
+    <li>\( \partial L/\partial z = 2(1{,}6-3) = -2{,}8 \).</li>
+    <li>\( \partial L/\partial\mu = -2{,}8 \cdot 1 = -2{,}8 \) y \( \partial L/\partial\sigma = -2{,}8 \cdot 0{,}8 = -2{,}24 \).</li>
+  </ol>
+  <p>Los dos son negativos: subir \( \mu \) (y aquí también \( \sigma \)) acerca \( z \) a 3. El encoder ya sabe hacia dónde moverse.</p>
 </div>
+</section>
+
+<details class="predice">
+  <summary>Mismo ejemplo, pero ahora sale \( \varepsilon = -0{,}8 \). ¿Subir \( \sigma \) sigue bajando la pérdida?<span class="hint"></span></summary>
+  <div>
+    <p><strong>No, la sube.</strong> \( z = 1{,}2 - 0{,}4 = 0{,}8 \), \( \partial L/\partial z = 2(0{,}8-3) = -4{,}4 \) y \( \partial L/\partial\sigma = -4{,}4\cdot(-0{,}8) = +3{,}52 \). Con un ε negativo, ensanchar la nube aleja \( z \) de 3. Sobre muchas muestras, esos efectos se compensan.</p>
+  </div>
+</details>
+
+<div class="resumen">
+  <h2 class="sin-num sin-toc">En tres líneas</h2>
+  <ul>
+    <li>El encoder del VAE da una nube por dato: \( \mu \) y \( \log\sigma^2 \), no un punto.</li>
+    <li>El decoder aprende con puntos sorteados de la nube, y eso rellena los huecos.</li>
+    <li>\( z = \mu + \sigma\varepsilon \) saca el azar a \( \varepsilon \): \( \partial z/\partial\mu = 1 \), \( \partial z/\partial\sigma = \varepsilon \).</li>
+  </ul>
+</div>
+
+<section class="quiz mini">
+<script type="application/json" class="quiz-data">
+{
+ "titulo": "¿Lo tienes?",
+ "preguntas": [
+  {
+   "q": "En un VAE, el encoder coloca una película en un eje del mapa con μ = 1,2 y σ = 0,5, y se sortea ε = 0,8. Con la reparametrización z = μ + σ·ε, ¿cuánto valen <strong>z</strong> y la derivada <strong>∂z/∂σ</strong>?",
+   "opciones": [
+    "z = 1,6 y ∂z/∂σ = 0,8",
+    "z = 1,6 y ∂z/∂σ = 1",
+    "z = 1,6 y ∂z/∂σ = 0,5",
+    "z = 1,4 y ∂z/∂σ = 0,8"
+   ],
+   "correcta": 0,
+   "porque": "z = 1,2 + 0,5·0,8 = 1,6. Al derivar respecto a σ, solo queda lo que multiplica a σ, que es ε = 0,8; respecto a μ la derivada es 1. Si ε se sortea con NumPy fuera del grafo, <code>tape.gradient</code> devuelve <code>None</code> (fragmento 1). La opción z = 1,4 no sale de ninguna cuenta correcta."
+  },
+  {
+   "q": "¿Por qué el encoder devuelve \\( \\log\\sigma^2 \\) (<code>z_log_var</code>) en vez de \\( \\sigma \\) directamente?",
+   "opciones": [
+    "Porque así la nube siempre tiene anchura 1.",
+    "Porque una red puede devolver cualquier número real y \\( \\sigma = e^{\\frac12\\log\\sigma^2} \\) siempre es positiva.",
+    "Porque el logaritmo hace que el KL valga 0.",
+    "Porque Keras no admite desviaciones típicas."
+   ],
+   "correcta": 1,
+   "porque": "Una desviación típica no puede ser negativa, pero la salida de una capa Dense sí. Con la exponencial cualquier salida es válida, y además la red trabaja con números más estables."
+  },
+  {
+   "q": "Sorteas \\( z \\) con <code>np.random.normal(mu, sigma)</code> dentro del modelo. ¿Qué devuelve <code>tape.gradient(perdida, mu)</code>?",
+   "opciones": [
+    "1, como siempre.",
+    "ε.",
+    "<code>None</code>: para TensorFlow el resultado de NumPy es una constante y el encoder no recibe gradiente.",
+    "Un error de formas."
+   ],
+   "correcta": 2,
+   "porque": "El azar tiene que sortearse dentro del grafo, con <code>keras.random.normal</code> en una capa propia. Con NumPy el gradiente desaparece y el encoder no aprende (fragmento 1)."
+  }
+ ]
+}
+</script>
+</section>
+
+<details class="profundizar">
+  <summary><span>Profundizar: la explicación completa<small>La tabla de z_log_var frente a la anchura de la nube, la analogía del botón «Sorpréndeme» y el ejemplo completo con la lectura de los gradientes.</small></span></summary>
+  <div class="prof-body">
+<h2 id="vae">VAE: de un punto a una nube</h2>
+
+<p class="pregunta">Si el problema es que el espacio latente tiene huecos, ¿cómo se obliga a que no los haya?</p>
+
+<p>Un <strong><abbr class="t" data-def="Variational AutoEncoder. Autoencoder cuyo encoder no devuelve un punto sino los parámetros de una distribución, y cuya pérdida obliga a esas distribuciones a parecerse a una N(0, I).">autoencoder variacional (VAE)</abbr></strong> cambia dos cosas del autoencoder normal. Primero, el encoder deja de devolver <em>un punto</em> y devuelve <em>una nube</em>: una distribución normal con su centro \( \mu \) y su anchura \( \sigma \). Segundo, la pérdida incluye un término que obliga a todas las nubes a parecerse a una nube de referencia, la normal estándar \( \mathcal{N}(0, I) \), llamada <abbr class="t" data-def="La distribución que queremos que tenga el espacio latente: normal con media 0 y varianza 1 en cada dimensión. De ella se saca el z al generar.">prior</abbr>.</p>
+
+<div class="callout analogia">
+  <span class="lbl">Analogía</span>
+  <p>Un autoencoder normal te dice: «Titanic está exactamente en la fila 4, asiento 7 del mapa». Un VAE te dice: «Titanic está <em>por aquí</em>, en el barrio de los dramas románticos». Como cada película ocupa una zona y no un punto, las zonas vecinas se solapan y entre ellas no queda terreno vacío. Y el decodificador aprende que <em>todo el barrio</em> debe devolver algo parecido, así que al moverte un poco por el mapa, la imagen cambia poco.</p>
+</div>
+
 <h3>Qué devuelve exactamente el encoder</h3>
 <p>Para cada dimensión latente el encoder da dos números: la media \( \mu \) y el logaritmo de la varianza \( \log \sigma^2 \) (en el código <code>z_mean</code> y <code>z_log_var</code>). Se usa el logaritmo porque una red devuelve cualquier número real y una desviación típica no puede ser negativa: con \( \sigma = e^{\frac{1}{2}\log\sigma^2} \) cualquier salida de la red es válida y, de paso, la red trabaja con números más estables.</p>
 <table>
-<caption>Relación entre la salida de la red y la anchura de la nube</caption>
-<thead><tr><th>z_log_var = \( \log\sigma^2 \)</th><th>\( \sigma^2 \)</th><th>\( \sigma = e^{0{,}5\cdot\text{z_log_var}} \)</th><th>Nube</th></tr></thead>
-<tbody>
-<tr><td>−1,386</td><td>0,25</td><td class="res">0,5</td><td>estrecha: el encoder está seguro de dónde va la película</td></tr>
-<tr><td>0</td><td>1</td><td>1</td><td>igual de ancha que el prior</td></tr>
-<tr><td>+1,386</td><td>4</td><td>2</td><td>ancha: el encoder duda mucho de dónde colocarla</td></tr>
-</tbody>
+  <caption>Relación entre la salida de la red y la anchura de la nube</caption>
+  <thead><tr><th>z_log_var = \( \log\sigma^2 \)</th><th>\( \sigma^2 \)</th><th>\( \sigma = e^{0{,}5\cdot\text{z_log_var}} \)</th><th>Nube</th></tr></thead>
+  <tbody>
+    <tr><td>−1,386</td><td>0,25</td><td class="res">0,5</td><td>estrecha: el encoder está seguro de dónde va la película</td></tr>
+    <tr><td>0</td><td>1</td><td>1</td><td>igual de ancha que el prior</td></tr>
+    <tr><td>+1,386</td><td>4</td><td>2</td><td>ancha: el encoder duda mucho de dónde colocarla</td></tr>
+  </tbody>
 </table>
+
 <ul class="flow">
-<li class="a">x<small>dígito 8×8 = 64 números</small></li>
-<li class="b">ENCODER<small>da μ y log σ²</small></li>
-<li class="d">z = μ + σ·ε<small>punto al azar de la nube</small></li>
-<li class="b">DECODER<small>de z a 64 píxeles</small></li>
-<li class="c">x̂<small>reconstrucción</small></li>
+  <li class="a">x<small>dígito 8×8 = 64 números</small></li>
+  <li class="b">ENCODER<small>da μ y log σ²</small></li>
+  <li class="d">z = μ + σ·ε<small>punto al azar de la nube</small></li>
+  <li class="b">DECODER<small>de z a 64 píxeles</small></li>
+  <li class="c">x̂<small>reconstrucción</small></li>
 </ul>
 <p>Observa la caja del medio: <strong>entrenamos al decodificador con puntos sacados al azar de la nube</strong>, no con el centro. Esa «sacudida» es la que lo obliga a ser tolerante: si dos nubes se pisan, el decodificador recibe puntos de ambas y tiene que aprender a transicionar suavemente de una a otra. De dónde sale ese \( z \) es el siguiente problema.</p>
-</section></div></details><details class="profundizar" id="codigo"><summary><span>Ver código explicado paso a paso<small>0 fragmento(s) original(es), con cada línea comentada y salida esperada.</small></span></summary><div class="prof-body"><p>Esta lección se centra en la idea y la demo; no requiere código adicional.</p></div></details></div></main></body></html>
+
+<h2 id="reparametrizacion">El truco de reparametrización</h2>
+
+<p class="pregunta">El entrenamiento necesita derivadas (backpropagation). ¿Cómo se deriva respecto a \( \mu \) y \( \sigma \) una operación que consiste en «sacar un número al azar»?</p>
+
+<p>Imagina el paso de sacar \( z \) como el botón «Sorpréndeme» de Netflix: le dices más o menos dónde buscar (el centro \( \mu \) y cuánto te alejas, \( \sigma \)) y te devuelve una película al azar de esa zona. Si te preguntan «¿cuánto cambia el resultado si subo \( \mu \) un poco?», no hay respuesta: el botón es azar, no una función. Pero el <em>backpropagation</em> necesita exactamente esa respuesta, porque la pérdida del decodificador depende de \( z \), y para mejorar el encoder hay que saber cómo mover \( \mu \) y \( \sigma \) para mejorar la pérdida.</p>
+<p>El <strong>truco de reparametrización</strong> separa el azar de los parámetros. En lugar de sacar \( z \) directamente de \( \mathcal{N}(\mu, \sigma^2) \), se saca un ruido \( \varepsilon \) de una \( \mathcal{N}(0, 1) \) <em>fija</em> y se calcula:</p>
+<div class="formula">\[ z \;=\; \mu + \sigma \cdot \varepsilon, \qquad \varepsilon \sim \mathcal{N}(0, 1) \]</div>
+<p>\( \mu \) es el centro de la nube que da el encoder; \( \sigma \) su anchura; \( \varepsilon \) (épsilon) un número aleatorio de la campana estándar, el mismo para todas las nubes. Con el mapa del catálogo: \( \mu \) es dónde coloca el encoder la película en un eje (por ejemplo, de «comedia» a «drama»), \( \sigma \) cuánto duda y \( \varepsilon \) el «empujón» al azar que decide en qué punto exacto de esa zona cae esta vez. El resultado \( z \) sigue siendo una muestra de \( \mathcal{N}(\mu, \sigma^2) \) (desplazar por \( \mu \) y estirar por \( \sigma \) una campana estándar da exactamente esa campana), pero ahora el azar entra <em>como un dato más</em>, igual que entra la imagen, y \( z \) es una función normal y derivable de \( \mu \) y \( \sigma \).</p>
+
+<div class="callout ejemplo">
+  <span class="lbl">Ejemplo numérico</span>
+  <p>El encoder coloca a Titanic en el eje «comedia ↔ drama» con centro \( \mu = 1{,}2 \) y anchura \( \sigma = 0{,}5 \) (cifras inventadas para el ejemplo). Sacamos \( \varepsilon = 0{,}8 \). Supón que el decodificador dibuja bien su carátula cuando \( z \) está en 3 (el extremo «drama») y que se equivoca según una pérdida \( L = (z - 3)^2 \).</p>
+  <ol class="pasos">
+    <li><strong>Calcular z.</strong> \( z = 1{,}2 + 0{,}5 \cdot 0{,}8 = 1{,}6 \).</li>
+    <li><strong>Pérdida.</strong> \( L = (1{,}6 - 3)^2 = 1{,}96 \).</li>
+    <li><strong>Derivada respecto a z.</strong> \( \partial L/\partial z = 2(z - 3) = -2{,}8 \).</li>
+    <li><strong>Regla de la cadena hacia el encoder.</strong> Como \( z = \mu + \sigma\varepsilon \): \( \partial z/\partial\mu = 1 \) y \( \partial z/\partial\sigma = \varepsilon = 0{,}8 \). Entonces \( \partial L/\partial\mu = -2{,}8 \cdot 1 = -2{,}8 \) y \( \partial L/\partial\sigma = -2{,}8 \cdot 0{,}8 = -2{,}24 \).</li>
+    <li><strong>Lectura.</strong> Ambos gradientes son negativos: subir \( \mu \) (y, con este \( \varepsilon \) positivo, también \( \sigma \)) acerca \( z \) a 3 y baja la pérdida. Con otro \( \varepsilon \) negativo el efecto sobre \( \sigma \) sería el contrario; en promedio sobre muchas muestras las dos influencias se compensan.</li>
+  </ol>
+</div>
+
+<div class="callout recuerda">
+  <span class="lbl">Experimento de arriba: «z = μ + σ·ε: el azar vive en ε», con todo detalle</span>
+  <p><strong>Haz esto.</strong> Mueve μ y σ. Después arrastra horizontalmente en la campana de arriba (zona de ε) para cambiar el ε del punto marcado, y pulsa «Otras muestras de ε».</p>
+  <p><strong>Fíjate en.</strong> Las 36 muestras de ε (azul) se desplazan y se estiran para dar las de z (naranja): la campana de abajo siempre es \( \mathcal{N}(\mu,\sigma^2) \). Las derivadas del punto marcado, \( \partial z/\partial\mu = 1 \) y \( \partial z/\partial\sigma = \varepsilon \), son números normales: por eso el gradiente puede pasar por esa operación.</p>
+</div>
+
+<div class="callout ojo">
+  <span class="lbl">Ojo</span>
+  <p>El truco solo funciona si el azar se saca <em>dentro</em> del grafo con operaciones de Keras. Si haces la muestra con NumPy (<code>np.random.normal(mu, sigma)</code>), el resultado es una constante para TensorFlow y <code>tape.gradient</code> devuelve <code>None</code>: el encoder no recibiría gradiente alguno y no aprendería. Lo comprobamos en el fragmento 1. En Keras 3 se usa <code>keras.random.normal(..., seed=SeedGenerator)</code> dentro de una capa propia.</p>
+</div>
+  </div>
+</details>
+
+<section>
+<h2 class="sin-num">Código</h2>
+<!-- ---------- Fragmento 1 ---------- -->
+<article class="snippet" data-lang="python">
+  <header>
+    <h3>1 · El truco de reparametrización y sus gradientes</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Comprobar con una cinta de gradientes por qué hay que sacar el azar dentro del grafo: con \( z = \mu + \sigma\varepsilon \) los gradientes existen (1 y ε); con una muestra de NumPy no existen.</p>
+  </header>
+  <pre class="code"><code>import numpy as np
+import tensorflow as tf
+import keras
+
+mu = tf.Variable([1.2])
+sigma = tf.Variable([0.5])
+eps = tf.constant([0.8])
+
+# Con el truco: el azar (eps) entra como un dato más
+with tf.GradientTape() as tape:
+    z = mu + sigma * eps
+d_mu, d_sigma = tape.gradient(z, [mu, sigma])
+print("z =", z.numpy())
+print("dz/dmu =", d_mu.numpy(), "| dz/dsigma =", d_sigma.numpy())
+
+# Sin el truco: el azar se saca fuera del grafo, con NumPy
+with tf.GradientTape() as tape:
+    z_malo = tf.constant(np.random.default_rng(0).normal(mu.numpy(), sigma.numpy()))
+print("sin truco:", tape.gradient(z_malo, mu))
+
+# Muchas muestras: z sale de N(mu, sigma^2)
+eps_muchos = keras.random.normal((100000,), seed=0)
+z_muchos = mu.numpy() + sigma.numpy() * eps_muchos.numpy()
+print("media z =", round(float(z_muchos.mean()), 2), "| desviación z =", round(float(z_muchos.std()), 2))</code></pre>
+  <details class="linea-a-linea" open>
+    <summary>Línea por línea</summary>
+    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+      <tbody>
+        <tr data-lines="1"><td><code>import numpy as np</code></td><td>Importa NumPy, que usaremos para el ejemplo «incorrecto» de sacar el azar fuera de TensorFlow.</td></tr>
+        <tr data-lines="2"><td><code>import tensorflow as tf</code></td><td>Importa TensorFlow, que aporta <code>Variable</code> y <code>GradientTape</code>.</td></tr>
+        <tr data-lines="3"><td><code>import keras</code></td><td>Importa Keras 3 (para <code>keras.random</code>).</td></tr>
+        <tr data-lines="5-6"><td><code>mu = tf.Variable([1.2])</code> y <code>sigma = ...</code></td><td>Los dos números que daría el encoder, como <code>Variable</code> (algo que TensorFlow puede derivar). Son μ = 1,2 y σ = 0,5.</td></tr>
+        <tr data-lines="7"><td><code>eps = tf.constant([0.8])</code></td><td>El ruido ε ya sorteado: una <strong>constante</strong>, porque no queremos derivar respecto a él.</td></tr>
+        <tr data-lines="9-11"><td><code>with tf.GradientTape() as tape: z = mu + sigma * eps</code></td><td>La «cinta» graba lo que ocurra dentro del <code>with</code>. Aquí se hace el truco: z = μ + σ·ε.</td></tr>
+        <tr data-lines="12"><td><code>d_mu, d_sigma = tape.gradient(z, [mu, sigma])</code></td><td>Pide a la cinta las derivadas de z respecto a μ y a σ. Devuelve una lista con dos resultados.</td></tr>
+        <tr data-lines="13"><td><code>print("z =", z.numpy())</code></td><td><code>.numpy()</code> convierte el tensor en un array de NumPy para imprimirlo.</td></tr>
+        <tr data-lines="14"><td><code>print("dz/dmu =", ...)</code></td><td>Imprime las dos derivadas.</td></tr>
+        <tr data-lines="16-18"><td><code>z_malo = tf.constant(np.random.default_rng(0).normal(mu.numpy(), sigma.numpy()))</code></td><td>Sin el truco: se saca una muestra de N(μ, σ²) con NumPy (fuera del grafo) y se mete en una constante. TensorFlow ya no sabe de dónde salió.</td></tr>
+        <tr data-lines="19"><td><code>print("sin truco:", tape.gradient(z_malo, mu))</code></td><td>Pide la derivada respecto a μ de esa muestra.</td></tr>
+        <tr data-lines="21-22"><td><code>eps_muchos = keras.random.normal((100000,), seed=0)</code></td><td>Sortea 100 000 ruidos de N(0, 1) con la función de Keras (con semilla 0, así que se repite).</td></tr>
+        <tr data-lines="23"><td><code>z_muchos = mu.numpy() + sigma.numpy() * eps_muchos.numpy()</code></td><td>Aplica la reparametrización a todos a la vez: 100 000 muestras de z.</td></tr>
+        <tr data-lines="24"><td><code>print("media z =", ...)</code></td><td>Calcula la media y la desviación de esas muestras, redondeadas a 2 decimales, para comprobar que z sale de N(1,2; 0,5²).</td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>z = [1.6]
+dz/dmu = [1.] | dz/dsigma = [0.8]
+sin truco: None
+media z = 1.2 | desviación z = 0.5</pre>
+    <p>z = 1,2 + 0,5·0,8 = 1,6, como en la cuenta a mano. Las derivadas son 1 (respecto a μ) y 0,8 = ε (respecto a σ): números normales, así que el backpropagation puede llegar al encoder. Con la muestra de NumPy, <code>tape.gradient</code> devuelve <code>None</code>: sin gradiente no hay aprendizaje. Y con 100 000 muestras, la media es 1,2 y la desviación 0,5: el truco no cambia la distribución de z.</p>
+  </div>
+</article>
+
+<!-- ---------- Fragmento 3 ---------- -->
+<article class="snippet" data-lang="python">
+  <header>
+    <h3>3 · Encoder con capa de muestreo y decoder (API funcional)</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Construir las dos mitades del VAE con la API funcional del módulo 1: el encoder devuelve <code>z_mean</code>, <code>z_log_var</code> y el punto muestreado <code>z</code>; el decoder reconstruye 64 píxeles desde 2 números.</p>
+  </header>
+  <pre class="code"><code>import numpy as np
+import keras
+from keras import layers, ops
+from sklearn.datasets import load_digits
+
+keras.utils.set_random_seed(0)
+X = (load_digits().data / 16.0).astype("float32")
+y = load_digits().target
+
+
+class Sampling(layers.Layer):
+    """z = mu + sigma * eps, con eps ~ N(0, 1)."""
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.seed_generator = keras.random.SeedGenerator(1337)
+
+    def call(self, inputs):
+        z_mean, z_log_var = inputs
+        eps = keras.random.normal(shape=ops.shape(z_mean), seed=self.seed_generator)
+        return z_mean + ops.exp(0.5 * z_log_var) * eps
+
+
+entrada = keras.Input(shape=(64,))
+h = layers.Dense(32, activation="relu")(entrada)
+z_mean = layers.Dense(2, name="z_mean")(h)
+z_log_var = layers.Dense(2, name="z_log_var")(h)
+z = Sampling(name="z")([z_mean, z_log_var])
+encoder = keras.Model(entrada, [z_mean, z_log_var, z], name="encoder")
+
+entrada_z = keras.Input(shape=(2,))
+h = layers.Dense(32, activation="relu")(entrada_z)
+salida = layers.Dense(64, activation="sigmoid")(h)
+decoder = keras.Model(entrada_z, salida, name="decoder")
+
+print("parámetros:", encoder.count_params(), "(encoder) y", decoder.count_params(), "(decoder)")
+m1, lv1, z1 = encoder(X[:1])
+m2, lv2, z2 = encoder(X[:1])
+print("z_mean  :", m1.numpy().round(3), m2.numpy().round(3))
+print("z       :", z1.numpy().round(3), z2.numpy().round(3))
+print("forma de la reconstrucción:", decoder(z1).shape)</code></pre>
+  <details class="linea-a-linea" open>
+    <summary>Línea por línea</summary>
+    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+      <tbody>
+        <tr data-lines="1-3"><td><code>import numpy as np</code>, <code>import keras</code>, <code>from keras import layers, ops</code></td><td>NumPy; Keras 3; y sus capas (<code>layers</code>) y operaciones matemáticas independientes del backend (<code>ops</code>).</td></tr>
+        <tr data-lines="4"><td><code>from sklearn.datasets import load_digits</code></td><td>Los dígitos 8×8 incluidos en scikit-learn: no necesitan internet.</td></tr>
+        <tr data-lines="6"><td><code>keras.utils.set_random_seed(0)</code></td><td>Fija las semillas de Python, NumPy y TensorFlow: así los pesos iniciales y el entrenamiento son reproducibles.</td></tr>
+        <tr data-lines="7"><td><code>X = (load_digits().data / 16.0).astype("float32")</code></td><td>Las imágenes vienen con 64 valores de 0 a 16; se dividen entre 16 para dejarlas en [0, 1] (los píxeles son «intensidad de tinta»).</td></tr>
+        <tr data-lines="8"><td><code>y = load_digits().target</code></td><td>Las etiquetas (0–9). No se usarán para entrenar el VAE: solo para comprobar cosas.</td></tr>
+        <tr data-lines="11-12"><td><code>class Sampling(layers.Layer):</code> y su docstring</td><td>Una capa propia (subclassing del módulo 1) que hará el truco de reparametrización. La cadena entre triples comillas es la documentación.</td></tr>
+        <tr data-lines="13-15"><td><code>def __init__(...)</code></td><td>El constructor: llama al de la clase madre y crea un <code>SeedGenerator</code> (semilla 1337), el objeto de Keras 3 que gestiona el azar dentro de las capas de forma reproducible.</td></tr>
+        <tr data-lines="17-18"><td><code>def call(self, inputs): z_mean, z_log_var = inputs</code></td><td><code>call</code> es lo que hace la capa al recibir datos. Le llega una lista con la media y el log-varianza.</td></tr>
+        <tr data-lines="19"><td><code>eps = keras.random.normal(shape=ops.shape(z_mean), seed=self.seed_generator)</code></td><td>Sortea ε de N(0, 1) con la misma forma que <code>z_mean</code> (un ruido por ejemplo y por dimensión latente).</td></tr>
+        <tr data-lines="20"><td><code>return z_mean + ops.exp(0.5 * z_log_var) * eps</code></td><td>El truco: μ + σ·ε, con σ = exp(½·log σ²).</td></tr>
+        <tr data-lines="23-24"><td><code>entrada = keras.Input(shape=(64,))</code> y la <code>Dense(32)</code></td><td>Entrada de 64 números y una capa oculta de 32 neuronas con ReLU.</td></tr>
+        <tr data-lines="25-26"><td><code>z_mean = layers.Dense(2, ...)(h)</code> y <code>z_log_var = ...</code></td><td>Dos «cabezas» paralelas que salen de la misma capa oculta: cada una produce 2 números (el espacio latente es de 2 dimensiones).</td></tr>
+        <tr data-lines="27"><td><code>z = Sampling(name="z")([z_mean, z_log_var])</code></td><td>Aplica la capa de muestreo a las dos cabezas.</td></tr>
+        <tr data-lines="28"><td><code>encoder = keras.Model(entrada, [z_mean, z_log_var, z], name="encoder")</code></td><td>Cierra el modelo: una entrada y <strong>tres</strong> salidas.</td></tr>
+        <tr data-lines="30-31"><td><code>entrada_z = keras.Input(shape=(2,))</code> y la <code>Dense(32)</code></td><td>El decoder recibe 2 números y tiene una capa oculta de 32 neuronas.</td></tr>
+        <tr data-lines="32"><td><code>salida = layers.Dense(64, activation="sigmoid")(h)</code></td><td>64 salidas con sigmoide: cada píxel reconstruido queda entre 0 y 1.</td></tr>
+        <tr data-lines="33"><td><code>decoder = keras.Model(entrada_z, salida, name="decoder")</code></td><td>Cierra el decoder.</td></tr>
+        <tr data-lines="35"><td><code>print("parámetros:", ...)</code></td><td><code>count_params()</code> cuenta los pesos de cada modelo.</td></tr>
+        <tr data-lines="36-37"><td><code>m1, lv1, z1 = encoder(X[:1])</code> (dos veces)</td><td>Pasa el primer dígito dos veces por el encoder. <code>X[:1]</code> es un lote de 1 imagen (forma 1 × 64).</td></tr>
+        <tr data-lines="38-39"><td><code>print("z_mean  :", ...)</code> y <code>print("z       :", ...)</code></td><td>Imprime media y muestra de las dos pasadas, redondeadas a 3 decimales.</td></tr>
+        <tr data-lines="40"><td><code>print("forma de la reconstrucción:", decoder(z1).shape)</code></td><td>Comprueba que el decoder devuelve una imagen de 64 valores por ejemplo.</td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>parámetros: 2212 (encoder) y 2208 (decoder)
+z_mean  : [[-0.376 -0.115]] [[-0.376 -0.115]]
+z       : [[ 0.482 -1.172]] [[ 0.784 -0.006]]
+forma de la reconstrucción: (1, 64)</pre>
+    <p>El encoder tiene 2 212 parámetros (64·32 + 32 = 2 080 de la capa oculta, más 2·(32·2 + 2) = 132 de las dos cabezas) y el decoder 2 208 (2·32 + 32 = 96, más 32·64 + 64 = 2 112). Las dos pasadas dan <strong>la misma</strong> <code>z_mean</code> (el centro de la nube no cambia) pero <strong>distinta</strong> <code>z</code> (0,482 frente a 0,784 en la primera coordenada): cada vez se saca un punto distinto de la misma nube. Eso es el truco funcionando. Los valores concretos de <code>z_mean</code> no significan nada todavía: el encoder aún no está entrenado.</p>
+  </div>
+</article>
+
+</section>
+
+</div>
+</main>
+</body>
+</html>

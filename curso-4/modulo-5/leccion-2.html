@@ -1,139 +1,333 @@
-<!DOCTYPE html>
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lección 2 · La softmax exponencia y reparte: solo importan las diferencias · Módulo 5 · Curso 4 · Cuaderno de IA</title>
+<meta name="description" content="La softmax a mano con los logits (3, 1, −1): exponenciales, suma y división; por qué sumar una constante no cambia nada, el argmax se conserva y en un lote va con dim=1.">
+<script>try{var t=localStorage.getItem('cuaderno-ia:tema');if(t)document.documentElement.setAttribute('data-theme',t)}catch(e){}</script>
+<link rel="stylesheet" href="../../assets/css/style.css">
+<script src="../../assets/js/curriculum.js"></script>
+<script src="../../assets/js/lab.js"></script>
+<script src="../../assets/js/app.js" defer></script>
+</head>
+<body data-root="../../" data-course="4" data-module="5" data-lesson="2">
+<main>
+<div class="page">
 
-<html lang="es"><head><meta charset="utf-8"/><meta content="width=device-width,initial-scale=1" name="viewport"/><title>Lección 2 · La softmax, paso a paso · Curso 4 · Cuaderno de IA</title><meta content="Primero lo ingenuo: dividir cada número entre la suma." name="description"/><script>try{var t=localStorage.getItem('cuaderno-ia:tema');if(t)document.documentElement.setAttribute('data-theme',t)}catch(e){}</script><link href="../../assets/css/style.css" rel="stylesheet"/><script src="../../assets/js/curriculum.js"></script><script src="../../assets/js/lab.js"></script><script defer="" src="../../assets/js/app.js"></script><script defer="" src="../../assets/js/microanimations.js"></script></head><body data-course="4" data-lesson="2" data-module="5" data-root="../../"><main><div class="page" data-micro="3min"><header class="hero leccion"><div class="hero-grid"><div><p class="eyebrow">Curso 4 · Módulo 5 · Lección 2 de 13</p><h1>La softmax, paso a paso</h1><p class="lead">Primero lo ingenuo: dividir cada número entre la suma.</p><p class="meta-line"><span class="read-time" data-render="read-time"></span><a href="../modulo-5.html">Índice del módulo</a></p></div><div aria-hidden="true" class="hero-tile"></div></div></header><details class="predice"><summary>Antes de mirar el ejemplo: ¿qué crees que va a cambiar al mover los controles?</summary><div><p>Primero lo ingenuo: dividir cada número entre la suma.</p></div></details><section aria-label="Explicación breve" class="micro-core"><div class="micro-kicker">01 · ENTENDER <span>≈ 45 s</span></div><h2>La idea en palabras sencillas</h2><p>En esta lección descubrirás cómo funciona «La softmax, paso a paso» con un caso sencillo. Observa el cambio en la demostración antes de elegir una respuesta.</p><div class="micro-example"><span aria-hidden="true" class="micro-example-icon">🌱</span><div><strong>Otro ejemplo · Plantas</strong><p>Una foto recibe 10 % rosal, 70 % margarita y 20 % tulipán. La clase más probable es margarita.</p></div></div></section><div class="micro-kicker micro-checkpoint">02 · RESPONDER <span>≈ 15 s</span></div><section aria-label="Pregunta intercalada" class="quiz mini micro-check"><script class="quiz-data" type="application/json">{"titulo": "Pausa rápida · Comprueba la idea", "preguntas": [{"q": "Un modelo devuelve 20 %, 30 % y 50 %. ¿Cuál es la clase elegida?", "opciones": ["La segunda", "La primera", "La tercera"], "correcta": 2, "porque": "Se elige la clase con más probabilidad: 50 %."}]}</script></section><section aria-label="Animación interactiva" class="micro-viz" data-index="11" data-micro-viz="probability"><div class="micro-kicker">03 · EXPERIMENTAR <span>≈ 45 s</span></div><div class="micro-viz-title"><div><h2>De puntuaciones a probabilidades</h2><p>Modifica una puntuación y compara las tres probabilidades.</p></div><span aria-hidden="true" class="micro-viz-symbol">✦</span></div><div aria-live="polite" class="micro-viz-stage"><p>Animación interactiva: De puntuaciones a probabilidades</p></div></section><div class="micro-kicker micro-checkpoint">04 · APLICAR <span>≈ 15 s</span></div><section aria-label="Pregunta intercalada" class="quiz mini micro-check"><script class="quiz-data" type="application/json">{"titulo": "Pausa rápida · ¿Lo aplicarías?", "preguntas": [{"q": "¿Qué debe sumar una salida softmax?", "opciones": ["3 (300 %)", "1 (100 %)", "0 (0 %)"], "correcta": 1, "porque": "Softmax normaliza todos los valores para que su suma sea 1."}]}</script></section><div class="micro-finish"><strong>Idea que te llevas</strong><span>En esta lección descubrirás cómo funciona «La softmax, paso a paso» con un caso sencillo</span><small>¿Quieres más ejemplos, fórmulas o código? Los tienes justo debajo, sin límite de tiempo.</small></div><details class="profundizar micro-legacy"><summary><span>Explorar más: explicación y simulaciones completas<small>Todo el texto original, tablas y demos avanzadas. Opcional.</small></span></summary><div class="prof-body"><section><h2>La softmax, paso a paso</h2>
-<p>Primero lo ingenuo: dividir cada número entre la suma. Con \( (3, 1, -1) \) la suma es 3 y saldría \( (1;\ 0{,}33;\ -0{,}33) \): una «probabilidad» negativa, y la primera vale 1. Con \( (1, -1) \) habría que dividir entre 0. El problema son los <strong>negativos</strong>. Necesitamos antes una función que convierta cualquier número en uno <strong>positivo</strong> sin alterar el orden: la <strong>exponencial</strong> \( e^{z} \) (con \( e \approx 2{,}718 \)). Es positiva siempre, crece cuando \( z \) crece y se puede derivar. Primero exponenciar, luego dividir entre la suma:</p>
-<p>Fíjate en el cociente entre dos probabilidades: \( p_0/p_1 = e^{z_0}/e^{z_1} = e^{z_0 - z_1} \). Con los números: \( e^{3-1} = e^{2} = 7{,}389 \), y en efecto \( 0{,}8668/0{,}1173 = 7{,}39 \). <strong>El cociente entre las probabilidades de dos clases depende solo de la <em>diferencia</em> entre sus logits</strong>, no de su valor. Cada punto de diferencia multiplica la probabilidad relativa por \( e \approx 2{,}72 \). De aquí salen tres propiedades que conviene tener grabadas:</p>
-<p>Si divides los logits entre un número \( T &gt; 0 \) (la <em>temperatura</em>) antes de la softmax, cambias lo «decidida» que es. Con \( \mathbf{z} = (3,1,-1) \):</p>
-<div class="callout ejemplo"><span class="lbl">Ejemplo tomado del módulo</span><p>· los logits (3, 1, −1) Género (clase) logit \( z \) \( e^{z} \) \( p = e^{z} / 23{,}1717 \) acción (0) 3 20,0855 0,8668 comedia (1) 1 2,7183 0,1173 terror (2) −1 0,3679 0,0159 Suma 23,1717 1,0000 (0,8668 + 0,1173 + 0,0159 = 1) La red…</p></div></section><figure class="demo" data-demo="curso4/c4m5-softmax-vivo" data-titulo="Softmax en vivo: la cadena z, e^z, p">
-<div class="haz">Las cuatro clases son acción, comedia, terror y animación. Deja los logits en (3, 1, −1, 0) y comprueba la fila de p: 0,8310 · 0,1125 · 0,0152 · 0,0414. Sube z1 (comedia) hasta 3 y mira a quién perjudica. Luego mueve la constante c (que se suma a <strong>todos</strong>) y observa la columna de p. Prueba los botones «Todos iguales» y «Uno domina».</div>
-<div class="observa">Subir un logit <strong>le quita</strong> probabilidad a los demás, porque todo suma 1. Mover c hace que cambien z + c y e^(z+c) pero <strong>no p</strong>: la constante se cancela al dividir (la línea de abajo muestra que el cambio máximo es del orden de 1e-16, puro redondeo). Con logits iguales el reparto es uniforme (1/K); con una diferencia grande, la ganadora se lleva casi todo.</div>
-</figure><div class="resumen"><h2 class="sin-num sin-toc">En pocas líneas</h2><ul><li><strong>La softmax, paso a paso:</strong> Primero lo ingenuo: dividir cada número entre la suma.</li><li>Antes de continuar, intenta explicar la demo sin mirar su resultado.</li></ul></div><section class="quiz mini"><script class="quiz-data" type="application/json">{"titulo": "¿Lo tienes?", "preguntas": [{"q": "¿Qué concepto estamos trabajando en esta lección?", "opciones": ["nn.CrossEntropyLoss : qué espera, qué hace y sus opciones", "Los datos: dígitos escritos a mano (y la verdad sobre MNIST)", "La softmax, paso a paso"], "correcta": 2, "porque": "Primero lo ingenuo: dividir cada número entre la suma."}, {"q": "¿Cuál de estas afirmaciones recoge lo que acabas de estudiar?", "opciones": ["Primero lo ingenuo: dividir cada número entre la suma.", "Siempre hay un único método que sirve para todos los problemas.", "Lo importante es comprender la idea y comprobarla con ejemplos, no memorizar términos."], "correcta": 0, "porque": "La explicación central es: Primero lo ingenuo: dividir cada número entre la suma."}, {"q": "Si una demo o un ejemplo te desconcierta, ¿cuál es la mejor forma de aprenderlo?", "opciones": ["Volver a los números, cambiar un valor y explicar qué ocurre.", "Ignorar los resultados que no coinciden con tu intuición.", "Memorizar el nombre sin entender la operación."], "correcta": 0, "porque": "Explorar qué cambia y por qué ayuda a conectar el concepto con su resultado."}]}</script></section></div></details><details class="profundizar"><summary><span>Profundizar: explicación completa<small>Matices, fórmulas, tablas, otros ejemplos y experimentos del módulo original.</small></span></summary><div class="prof-body"><section>
+<header class="hero leccion">
+  <div class="hero-grid">
+    <div>
+      <p class="eyebrow">Curso 4 · Módulo 5 · Lección 2 de 8</p>
+      <h1>La softmax exponencia y reparte: solo importan las diferencias</h1>
+      <p class="lead">La softmax convierte las puntuaciones de los críticos en un reparto que suma 1 <strong>sin cambiar quién gana</strong>: exponencia cada logit y divide entre la suma.</p>
+      <p class="meta-line"><span class="read-time" data-render="read-time"></span><a href="../modulo-5.html">Índice del módulo</a></p>
+    </div>
+    <div class="hero-tile" aria-hidden="true"></div>
+  </div>
+</header>
+
+<details class="predice">
+  <summary>Los logits de un tráiler son acción 3, comedia 1 y terror −1. Si divides cada uno entre la suma (3), ¿obtienes probabilidades válidas?<span class="hint"></span></summary>
+  <div>
+    <p><strong>No:</strong> sale \( (1;\ 0{,}33;\ -0{,}33) \), con una «probabilidad» negativa. Y con \( (1, -1) \) dividirías entre 0. Antes hay que volver positivos los números sin cambiar su orden, y eso lo hace la exponencial \( e^{z} \).</p>
+  </div>
+</details>
+
+<section>
+<h2 id="idea">Exponenciar y dividir entre la suma</h2>
+<div class="formula">\[ p_k = \frac{e^{z_k}}{\sum_{j=1}^{K} e^{z_j}} \]</div>
+<p>La exponencial (\( e \approx 2{,}718 \)) es siempre positiva, crece cuando \( z \) crece y <strong>exagera las diferencias</strong>. Al dividir entre la suma, el total es exactamente 1.</p>
+<p>La clave: el cociente entre dos probabilidades es \( p_0/p_1 = e^{z_0 - z_1} \). <strong>Solo importan las diferencias entre logits.</strong> Cada punto de diferencia multiplica la probabilidad relativa por 2,72. De ahí salen tres propiedades:</p>
+<ul>
+  <li><strong>Sumar la misma constante a todos no cambia nada</strong>: si los tres críticos suben su nota 10 puntos, nadie ha cambiado de opinión.</li>
+  <li><strong>El orden se conserva</strong>: el <code>argmax</code> de los logits y el de las probabilidades es el mismo; para decidir la clase no hace falta la softmax.</li>
+  <li><strong>Es un máximo «suave»</strong>: en vez de \( (1, 0, 0) \) da \( (0{,}87;\ 0{,}12;\ 0{,}02) \), un reparto que sí se puede derivar. Eso permite entrenar.</li>
+</ul>
+<p>En PyTorch: <code>torch.softmax(z, dim=1)</code>. Con logits de forma <code>(N, K)</code>, cada fila es un tráiler, así que el 1 se reparte a lo largo de las columnas: <code>dim=1</code>. Escribe siempre el <code>dim</code>.</p>
+</section>
+
+<figure class="demo" data-demo="curso4/c4m5-softmax-vivo" data-titulo="Softmax en vivo: la cadena z, e^z, p">
+  <div class="haz">Sube z1 (comedia) hasta 3 y mira a quién perjudica. Luego mueve la constante c.</div>
+  <div class="observa">Subir un logit quita probabilidad a los demás; sumar c a todos cambia z y e^z, pero no p.</div>
+</figure>
+
+<section>
+<h2 id="numeros">Con números: los logits (3, 1, −1)</h2>
+<div class="callout ejemplo">
+  <span class="lbl">Ejemplo numérico</span>
+  <table>
+    <thead><tr><th>Género</th><th>\( z \)</th><th>\( e^{z} \)</th><th>\( p \)</th></tr></thead>
+    <tbody>
+      <tr><td>acción</td><td>3</td><td>20,0855</td><td class="res">0,8668</td></tr>
+      <tr><td>comedia</td><td>1</td><td>2,7183</td><td class="res">0,1173</td></tr>
+      <tr><td>terror</td><td>−1</td><td>0,3679</td><td class="res">0,0159</td></tr>
+      <tr><td><strong>Suma</strong></td><td></td><td>23,1717</td><td>1</td></tr>
+    </tbody>
+  </table>
+  <p>Cada \( p \) es \( e^{z} \) entre 23,1717. Comprueba la regla de las diferencias: \( 0{,}8668/0{,}1173 = 7{,}39 = e^{3-1} \). Con \( (13, 11, 9) \), que es lo mismo más 10, sale otra vez \( (0{,}8668;\ 0{,}1173;\ 0{,}0159) \).</p>
+</div>
+</section>
+
+<details class="predice">
+  <summary>Tienes los logits de 3 tráilers y 4 géneros, forma <code>(3, 4)</code>, y escribes <code>torch.softmax(Z, dim=0)</code>. ¿Te avisa PyTorch del error?<span class="hint"></span></summary>
+  <div>
+    <p><strong>No.</strong> Reparte el 1 entre los <em>tráilers</em> de cada género: las columnas suman 1 y las filas suman 1,2285, 0,7588 y 2,0127. Parecen probabilidades y no lo son. Si las probabilidades de una muestra no suman 1, revisa el <code>dim</code>.</p>
+  </div>
+</details>
+
+<div class="resumen">
+  <h2 class="sin-num sin-toc">En tres líneas</h2>
+  <ul>
+    <li>Softmax = exponenciar y dividir entre la suma: probabilidades positivas que suman 1.</li>
+    <li>Solo importan las diferencias: sumar una constante no cambia nada y el <code>argmax</code> se conserva.</li>
+    <li>En un lote <code>(N, K)</code> va con <code>dim=1</code>; con <code>dim=0</code> no hay error, pero está mal.</li>
+  </ul>
+</div>
+
+<section class="quiz mini">
+<script type="application/json" class="quiz-data">
+{
+ "titulo": "¿Lo tienes?",
+ "preguntas": [
+  {
+   "q": "Tienes logits <code>Z</code> de forma <code>(N, K)</code>, una fila por muestra. ¿Qué llamada da una distribución de probabilidad por muestra?",
+   "opciones": [
+    "<code>torch.softmax(Z, dim=1)</code>: cada fila suma 1.",
+    "<code>torch.softmax(Z, dim=0)</code>: así se normaliza cada muestra.",
+    "Da igual el <code>dim</code>: PyTorch lo adivina por la forma.",
+    "<code>torch.softmax(Z, dim=-2)</code>."
+   ],
+   "correcta": 0,
+   "porque": "Cada fila es una muestra y las probabilidades de una muestra se reparten entre las clases, que están en el eje 1. Con <code>dim=0</code> se normaliza a lo largo de las muestras: las columnas suman 1, las filas no, y no hay ningún error que te lo diga (fragmento 3). <code>dim=-2</code> es lo mismo que <code>dim=0</code> en una matriz de dos ejes."
+  },
+  {
+   "q": "Los logits \\( (2, 0) \\) dan \\( p = (0{,}88;\\ 0{,}12) \\). ¿Qué da la softmax de \\( (12, 10) \\)?",
+   "opciones": [
+    "\\( (0{,}88;\\ 0{,}12) \\), lo mismo",
+    "\\( (0{,}99;\\ 0{,}01) \\), más seguro",
+    "\\( (0{,}55;\\ 0{,}45) \\), más repartido"
+   ],
+   "correcta": 0,
+   "porque": "\\( (12, 10) \\) es \\( (2, 0) + 10 \\): la diferencia sigue siendo 2 y el factor \\( e^{10} \\) se cancela al dividir. La softmax solo mira diferencias."
+  },
+  {
+   "q": "¿Puede la clase predicha cambiar si calculas <code>argmax</code> sobre las probabilidades en vez de sobre los logits?",
+   "opciones": [
+    "Sí, cuando hay logits negativos",
+    "No: la softmax conserva el orden",
+    "Solo si la temperatura es 1"
+   ],
+   "correcta": 1,
+   "porque": "La exponencial es creciente y todos se dividen entre la misma suma, así que el logit mayor da siempre la probabilidad mayor. Para decidir la clase basta <code>logits.argmax(dim=1)</code>."
+  }
+ ]
+}
+</script>
+</section>
+
+<details class="profundizar">
+  <summary><span>Profundizar: la explicación completa<small>La fórmula explicada término a término, las tres propiedades con todo detalle, la tabla de la temperatura, las tres formas de llamarla en PyTorch y el ejemplo de dim=1 frente a dim=0.</small></span></summary>
+  <div class="prof-body">
 <h2 id="softmax">La softmax, paso a paso</h2>
+
 <p class="pregunta">La capa lineal te da tres puntuaciones para el tráiler de una película: acción 3, comedia 1 y terror −1, es decir \( (3,\ 1,\ -1) \). No son probabilidades: no suman 1 y una es negativa. ¿Cómo las conviertes en tres probabilidades que sumen 1 <strong>sin cambiar quién va ganando</strong>?</p>
+
 <p>Primero lo ingenuo: dividir cada número entre la suma. Con \( (3, 1, -1) \) la suma es 3 y saldría \( (1;\ 0{,}33;\ -0{,}33) \): una «probabilidad» negativa, y la primera vale 1. Con \( (1, -1) \) habría que dividir entre 0. El problema son los <strong>negativos</strong>. Necesitamos antes una función que convierta cualquier número en uno <strong>positivo</strong> sin alterar el orden: la <strong>exponencial</strong> \( e^{z} \) (con \( e \approx 2{,}718 \)). Es positiva siempre, crece cuando \( z \) crece y se puede derivar. Primero exponenciar, luego dividir entre la suma:</p>
+
 <div class="formula">\[ p_k = \mathrm{softmax}(\mathbf{z})_k = \frac{e^{z_k}}{\sum_{j=1}^{K} e^{z_j}} \]</div>
 <ul>
-<li>\( z_k \) es el logit de la clase \( k \) y \( K \) el número de clases.</li>
-<li>El numerador \( e^{z_k} \) vuelve positiva la puntuación y <strong>exagera las diferencias</strong>.</li>
-<li>El denominador es la suma de todos los numeradores: al dividir, el total es exactamente 1.</li>
+  <li>\( z_k \) es el logit de la clase \( k \) y \( K \) el número de clases.</li>
+  <li>El numerador \( e^{z_k} \) vuelve positiva la puntuación y <strong>exagera las diferencias</strong>.</li>
+  <li>El denominador es la suma de todos los numeradores: al dividir, el total es exactamente 1.</li>
 </ul>
+
 <div class="callout ejemplo">
-<span class="lbl">Ejemplo numérico · los logits (3, 1, −1)</span>
-<table>
-<thead><tr><th>Género (clase)</th><th>logit \( z \)</th><th>\( e^{z} \)</th><th>\( p = e^{z} / 23{,}1717 \)</th></tr></thead>
-<tbody>
-<tr><td>acción (0)</td><td>3</td><td>20,0855</td><td class="res">0,8668</td></tr>
-<tr><td>comedia (1)</td><td>1</td><td>2,7183</td><td class="res">0,1173</td></tr>
-<tr><td>terror (2)</td><td>−1</td><td>0,3679</td><td class="res">0,0159</td></tr>
-<tr><td><strong>Suma</strong></td><td></td><td>23,1717</td><td>1,0000 (0,8668 + 0,1173 + 0,0159 = 1)</td></tr>
-</tbody>
-</table>
-<p>La red diría: «86,7 % de que el tráiler es de acción, 11,7 % de que es de comedia y 1,6 % de que es de terror». El <a href="leccion-11.html#frag-2">fragmento 2</a> hace exactamente esta cuenta con <code>torch.exp</code> y la compara con <code>torch.softmax</code>.</p>
+  <span class="lbl">Ejemplo numérico · los logits (3, 1, −1)</span>
+  <table>
+    <thead><tr><th>Género (clase)</th><th>logit \( z \)</th><th>\( e^{z} \)</th><th>\( p = e^{z} / 23{,}1717 \)</th></tr></thead>
+    <tbody>
+      <tr><td>acción (0)</td><td>3</td><td>20,0855</td><td class="res">0,8668</td></tr>
+      <tr><td>comedia (1)</td><td>1</td><td>2,7183</td><td class="res">0,1173</td></tr>
+      <tr><td>terror (2)</td><td>−1</td><td>0,3679</td><td class="res">0,0159</td></tr>
+      <tr><td><strong>Suma</strong></td><td></td><td>23,1717</td><td>1,0000 (0,8668 + 0,1173 + 0,0159 = 1)</td></tr>
+    </tbody>
+  </table>
+  <p>La red diría: «86,7 % de que el tráiler es de acción, 11,7 % de que es de comedia y 1,6 % de que es de terror». El <a href="#frag-2">fragmento 2</a> hace exactamente esta cuenta con <code>torch.exp</code> y la compara con <code>torch.softmax</code>.</p>
 </div>
+
 <h3>Lo que de verdad hace la softmax: mira diferencias</h3>
 <p>Fíjate en el cociente entre dos probabilidades: \( p_0/p_1 = e^{z_0}/e^{z_1} = e^{z_0 - z_1} \). Con los números: \( e^{3-1} = e^{2} = 7{,}389 \), y en efecto \( 0{,}8668/0{,}1173 = 7{,}39 \). <strong>El cociente entre las probabilidades de dos clases depende solo de la <em>diferencia</em> entre sus logits</strong>, no de su valor. Cada punto de diferencia multiplica la probabilidad relativa por \( e \approx 2{,}72 \). De aquí salen tres propiedades que conviene tener grabadas:</p>
 <ol>
-<li><strong>Sumar la misma constante \( c \) a todos los logits no cambia nada</strong>: \( e^{z+c} = e^{c}\,e^{z} \) y el factor \( e^{c} \) se cancela al dividir. Con \( (13, 11, 9) = (3,1,-1) + 10 \) sale otra vez \( (0{,}8668;\ 0{,}1173;\ 0{,}0159) \): es como si los tres críticos subieran su nota 10 puntos a la vez, nadie ha cambiado de opinión sobre qué género es el más probable. La softmax es <em>invariante a traslaciones</em>. (La siguiente sección lo aprovecha para evitar un problema numérico.)</li>
-<li><strong>El orden se conserva</strong>: el logit mayor da la probabilidad mayor. Por eso <code>argmax(logits)</code> y <code>argmax(softmax(logits))</code> dan siempre la misma clase y, para <em>decidir</em> la clase, no hace falta calcular la softmax.</li>
-<li><strong>Es un «máximo suave»</strong> (de ahí el nombre, <em>soft-max</em>). El <code>argmax</code> «duro» daría \( (1, 0, 0) \): todo o nada, y no se puede derivar (cambia a saltos). La softmax da \( (0{,}87;\ 0{,}12;\ 0{,}02) \): casi todo a la ganadora pero con un reparto suave que sí se puede derivar. Eso es lo que permite entrenar.</li>
+  <li><strong>Sumar la misma constante \( c \) a todos los logits no cambia nada</strong>: \( e^{z+c} = e^{c}\,e^{z} \) y el factor \( e^{c} \) se cancela al dividir. Con \( (13, 11, 9) = (3,1,-1) + 10 \) sale otra vez \( (0{,}8668;\ 0{,}1173;\ 0{,}0159) \): es como si los tres críticos subieran su nota 10 puntos a la vez, nadie ha cambiado de opinión sobre qué género es el más probable. La softmax es <em>invariante a traslaciones</em>. (La siguiente sección lo aprovecha para evitar un problema numérico.)</li>
+  <li><strong>El orden se conserva</strong>: el logit mayor da la probabilidad mayor. Por eso <code>argmax(logits)</code> y <code>argmax(softmax(logits))</code> dan siempre la misma clase y, para <em>decidir</em> la clase, no hace falta calcular la softmax.</li>
+  <li><strong>Es un «máximo suave»</strong> (de ahí el nombre, <em>soft-max</em>). El <code>argmax</code> «duro» daría \( (1, 0, 0) \): todo o nada, y no se puede derivar (cambia a saltos). La softmax da \( (0{,}87;\ 0{,}12;\ 0{,}02) \): casi todo a la ganadora pero con un reparto suave que sí se puede derivar. Eso es lo que permite entrenar.</li>
 </ol>
+
 <div class="callout regla">
-<span class="lbl">Regla fácil</span>
-<p>Softmax = «exponencia, divide entre la suma». Solo importan las <strong>diferencias</strong> entre logits: una diferencia de 1 multiplica por 2,72 la probabilidad relativa; una de 2 por 7,39; una de 5 por 148.</p>
+  <span class="lbl">Regla fácil</span>
+  <p>Softmax = «exponencia, divide entre la suma». Solo importan las <strong>diferencias</strong> entre logits: una diferencia de 1 multiplica por 2,72 la probabilidad relativa; una de 2 por 7,39; una de 5 por 148.</p>
 </div>
+
 <h3>Temperatura: cuánto se atreve la softmax</h3>
-<p>Si divides los logits entre un número \( T &gt; 0 \) (la <em>temperatura</em>) antes de la softmax, cambias lo «decidida» que es. Con \( \mathbf{z} = (3,1,-1) \):</p>
+<p>Si divides los logits entre un número \( T > 0 \) (la <em>temperatura</em>) antes de la softmax, cambias lo «decidida» que es. Con \( \mathbf{z} = (3,1,-1) \):</p>
 <table>
-<thead><tr><th>Temperatura \( T \)</th><th>logits \( z/T \)</th><th>probabilidades</th><th>efecto</th></tr></thead>
-<tbody>
-<tr><td>0,5</td><td>(6, 2, −2)</td><td>(0,9817; 0,0180; 0,0003)</td><td>más seguro: casi un argmax</td></tr>
-<tr><td>1 (normal)</td><td>(3, 1, −1)</td><td>(0,8668; 0,1173; 0,0159)</td><td>la softmax de siempre</td></tr>
-<tr><td>2</td><td>(1,5; 0,5; −0,5)</td><td>(0,6652; 0,2447; 0,0900)</td><td>más repartido, más «duda»</td></tr>
-</tbody>
+  <thead><tr><th>Temperatura \( T \)</th><th>logits \( z/T \)</th><th>probabilidades</th><th>efecto</th></tr></thead>
+  <tbody>
+    <tr><td>0,5</td><td>(6, 2, −2)</td><td>(0,9817; 0,0180; 0,0003)</td><td>más seguro: casi un argmax</td></tr>
+    <tr><td>1 (normal)</td><td>(3, 1, −1)</td><td>(0,8668; 0,1173; 0,0159)</td><td>la softmax de siempre</td></tr>
+    <tr><td>2</td><td>(1,5; 0,5; −0,5)</td><td>(0,6652; 0,2447; 0,0900)</td><td>más repartido, más «duda»</td></tr>
+  </tbody>
 </table>
 <p>No la usarás para clasificar dígitos, pero la verás mucho en los modelos de lenguaje, donde \( T \) controla lo «creativo» que es al elegir la siguiente palabra. En el experimento de las tres zonas de la sección anterior, la «escala s» que multiplica los pesos hace el papel de \( 1/T \).</p>
+
 <h3>La softmax en PyTorch y el parámetro <code>dim</code></h3>
 <p>Hay tres formas equivalentes: <code>torch.softmax(z, dim=…)</code>, <code>torch.nn.functional.softmax(z, dim=…)</code> y la capa <code>nn.Softmax(dim=…)</code>. Todas piden <code>dim</code>: <strong>la dimensión a lo largo de la cual se reparte el 1</strong>. Con logits de forma <code>(N, K)</code> (filas = muestras, columnas = clases) las probabilidades de <em>una muestra</em> están en su fila, así que hay que normalizar <strong>a lo largo de las columnas: <code>dim=1</code></strong>. Con <code>dim=0</code> repartirías el 1 entre las <em>muestras</em> de cada clase, que no significa nada.</p>
+
 <div class="callout ejemplo">
-<span class="lbl">Ejemplo numérico · <code>dim=1</code> frente a <code>dim=0</code> (<a href="leccion-11.html#frag-3">fragmento 3</a>)</span>
-<p>Logits de 3 tráilers (3 filas) y 4 géneros (4 columnas: acción, comedia, terror, animación; cifras inventadas). Con <code>dim=1</code> la primera fila, \( (3, 1, -1, 0) \), pasa a \( (0{,}8310;\ 0{,}1125;\ 0{,}0152;\ 0{,}0414) \) y cada <strong>fila</strong> suma 1. La segunda fila, un tráiler que no da ninguna pista (cuatro logits iguales \( (0{,}5) \)), da \( (0{,}25;\ 0{,}25;\ 0{,}25;\ 0{,}25) \): reparto uniforme. Con <code>dim=0</code> son las <strong>columnas</strong> las que suman 1 y las filas suman \( 1{,}2285 \), \( 0{,}7588 \) y \( 2{,}0127 \): probabilidades sin sentido, pero <strong>sin ningún error</strong>.</p>
+  <span class="lbl">Ejemplo numérico · <code>dim=1</code> frente a <code>dim=0</code> (<a href="#frag-3">fragmento 3</a>)</span>
+  <p>Logits de 3 tráilers (3 filas) y 4 géneros (4 columnas: acción, comedia, terror, animación; cifras inventadas). Con <code>dim=1</code> la primera fila, \( (3, 1, -1, 0) \), pasa a \( (0{,}8310;\ 0{,}1125;\ 0{,}0152;\ 0{,}0414) \) y cada <strong>fila</strong> suma 1. La segunda fila, un tráiler que no da ninguna pista (cuatro logits iguales \( (0{,}5) \)), da \( (0{,}25;\ 0{,}25;\ 0{,}25;\ 0{,}25) \): reparto uniforme. Con <code>dim=0</code> son las <strong>columnas</strong> las que suman 1 y las filas suman \( 1{,}2285 \), \( 0{,}7588 \) y \( 2{,}0127 \): probabilidades sin sentido, pero <strong>sin ningún error</strong>.</p>
 </div>
+
 <div class="callout ojo">
-<span class="lbl">Ojo</span>
-<p><strong>(1)</strong> <code>dim=0</code> en un lote no da error: da números que parecen probabilidades y no lo son. Si tus probabilidades por muestra no suman 1, mira el <code>dim</code>. <strong>(2)</strong> En esta versión de PyTorch, <code>torch.softmax(z)</code> sin <code>dim</code> falla con <code>TypeError: softmax() missing 1 required positional arguments: "dim"</code>, mientras que <code>F.softmax(z)</code> y <code>nn.Softmax()</code> sin <code>dim</code> funcionan pero avisan con <code>UserWarning: Implicit dimension choice for softmax has been deprecated</code> (eligen un <code>dim</code> por su cuenta). Escribe siempre el <code>dim</code>. <strong>(3)</strong> «Probabilidad» no es «certeza»: una red mal entrenada puede dar un 99 % a una clase equivocada. La softmax solo reparte los logits; no sabe si tiene razón.</p>
+  <span class="lbl">Ojo</span>
+  <p><strong>(1)</strong> <code>dim=0</code> en un lote no da error: da números que parecen probabilidades y no lo son. Si tus probabilidades por muestra no suman 1, mira el <code>dim</code>. <strong>(2)</strong> En esta versión de PyTorch, <code>torch.softmax(z)</code> sin <code>dim</code> falla con <code>TypeError: softmax() missing 1 required positional arguments: "dim"</code>, mientras que <code>F.softmax(z)</code> y <code>nn.Softmax()</code> sin <code>dim</code> funcionan pero avisan con <code>UserWarning: Implicit dimension choice for softmax has been deprecated</code> (eligen un <code>dim</code> por su cuenta). Escribe siempre el <code>dim</code>. <strong>(3)</strong> «Probabilidad» no es «certeza»: una red mal entrenada puede dar un 99 % a una clase equivocada. La softmax solo reparte los logits; no sabe si tiene razón.</p>
 </div>
-</section></div></details><details class="profundizar" id="codigo"><summary><span>Ver código explicado paso a paso<small>1 fragmento(s) original(es), con cada línea comentada y salida esperada.</small></span></summary><div class="prof-body"><article class="snippet" data-lang="python" id="frag-13">
-<header>
-<h3>13 · Un paso del descenso del gradiente con números pequeños</h3>
-<p class="para-que"><strong>Para qué sirve</strong> Repite a mano, con un solo tráiler de dos rasgos y tres clases (acción, comedia, terror), todo lo que ocurre en un paso: logits, probabilidades, pérdida, gradiente \( (p-y)^T x \), actualización y comprobación con autograd.</p>
-</header>
-<pre class="code"><code>import torch
-import torch.nn.functional as F
 
-x = torch.tensor([[1.0, 2.0]])
-y = torch.tensor([0])
-W = torch.tensor([[ 0.5, -0.5],
-                  [ 0.0,  0.5],
-                  [-0.5,  0.0]], requires_grad=True)
-b = torch.zeros(3, requires_grad=True)
-
-z = x @ W.T + b
-p = torch.softmax(z, dim=1)
-perdida = F.cross_entropy(z, y)
-print("logits z        :", z.detach())
-print("probabilidades p:", p.detach())
-print("pérdida         :", round(perdida.item(), 4))
-
-perdida.backward()
-dz = (p - F.one_hot(y, 3)).detach()
-print("dz = p - y      :", dz)
-print("dW a mano       :", dz.T @ x)
-print("dW de autograd  :", W.grad)
-print("¿coinciden?     :", torch.allclose(dz.T @ x, W.grad))
-print("db de autograd  :", b.grad)
-
-lr = 0.5
-with torch.no_grad():
-    W -= lr * W.grad
-    b -= lr * b.grad
-z2 = x @ W.T + b
-print("tras un paso -&gt; p:", torch.softmax(z2, dim=1).detach())
-print("tras un paso -&gt; pérdida:", round(F.cross_entropy(z2, y).item(), 4))</code></pre>
-<details class="linea-a-linea" open="">
-<summary>Línea por línea</summary>
-<p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
-<table class="lineas">
-<thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
-<tbody>
-<tr data-lines="1-2"><td><code>import torch …</code></td><td>Importamos PyTorch y el módulo funcional.</td></tr>
-<tr data-lines="4-5"><td><code>x = torch.tensor([[1.0, 2.0]]) …</code></td><td>Un tráiler con 2 rasgos (1 escena de acción y 2 chistes), \( x = (1, 2) \), cuyo género real es acción: la clase 0. (Al código le da igual qué mida cada número; podrían ser 2 píxeles.)</td></tr>
-<tr data-lines="6-9"><td><code>W = torch.tensor([[ 0.5, -0.5], …</code></td><td>Una matriz de pesos de 3 clases × 2 entradas, elegida a mano, con <code>requires_grad=True</code>, y un sesgo de ceros.</td></tr>
-<tr data-lines="11-13"><td><code>z = x @ W.T + b …</code></td><td>Logits \( z = xW^T + b \), probabilidades por softmax y la pérdida (<code>cross_entropy</code> parte de los logits, no de <code>p</code>).</td></tr>
-<tr data-lines="14-16"><td><code>print("logits z        :", z.detach()) …</code></td><td>Imprime \( z = (-0{,}5;\ 1;\ -0{,}5) \), las probabilidades \( (0{,}1543;\ 0{,}6914;\ 0{,}1543) \) y la pérdida \( -\ln 0{,}1543 = 1{,}869 \).</td></tr>
-<tr data-lines="18"><td><code>perdida.backward()</code></td><td><code>backward()</code> calcula los gradientes de <code>W</code> y <code>b</code>.</td></tr>
-<tr data-lines="19-21"><td><code>dz = (p - F.one_hot(y, 3)).detach() …</code></td><td>A mano: \( dz = p - y \) y \( dW = dz^T x \): cada fila de \( dW \) es el error de esa clase multiplicado por los rasgos de la entrada. <code>.detach()</code> saca <code>dz</code> del grafo de autograd.</td></tr>
-<tr data-lines="22-24"><td><code>print("dW de autograd  :", W.grad) …</code></td><td>El gradiente de autograd coincide con el de la cuenta a mano, y \( db = dz \).</td></tr>
-<tr data-lines="26-29"><td><code>lr = 0.5 …</code></td><td>Un paso de descenso con \( \eta = 0{,}5 \): <code>W -= lr * W.grad</code>, dentro de <code>no_grad()</code> porque estamos modificando parámetros y no queremos que eso quede registrado como una operación derivable.</td></tr>
-<tr data-lines="30-32"><td><code>z2 = x @ W.T + b …</code></td><td>Recalcula con los pesos nuevos: la probabilidad de la clase 0 sube de 0,1543 a 0,9138 y la pérdida baja de 1,869 a 0,0901.</td></tr>
-</tbody>
-</table>
+<div class="callout recuerda">
+  <span class="lbl">Experimento de arriba: «Softmax en vivo: la cadena z, e^z, p», con todo detalle</span>
+  <p><strong>Haz esto.</strong> Las cuatro clases son acción, comedia, terror y animación. Deja los logits en (3, 1, −1, 0) y comprueba la fila de p: 0,8310 · 0,1125 · 0,0152 · 0,0414. Sube z1 (comedia) hasta 3 y mira a quién perjudica. Luego mueve la constante c (que se suma a <strong>todos</strong>) y observa la columna de p. Prueba los botones «Todos iguales» y «Uno domina».</p>
+  <p><strong>Fíjate en.</strong> Subir un logit <strong>le quita</strong> probabilidad a los demás, porque todo suma 1. Mover c hace que cambien z + c y e^(z+c) pero <strong>no p</strong>: la constante se cancela al dividir (la línea de abajo muestra que el cambio máximo es del orden de 1e-16, puro redondeo). Con logits iguales el reparto es uniforme (1/K); con una diferencia grande, la ganadora se lleva casi todo.</p>
+</div>
+  </div>
 </details>
-<div class="salida">
-<strong>Salida esperada</strong>
-<pre>logits z        : tensor([[-0.5000,  1.0000, -0.5000]])
-probabilidades p: tensor([[0.1543, 0.6914, 0.1543]])
-pérdida         : 1.869
-dz = p - y      : tensor([[-0.8457,  0.6914,  0.1543]])
-dW a mano       : tensor([[-0.8457, -1.6914],
-        [ 0.6914,  1.3829],
-        [ 0.1543,  0.3086]])
-dW de autograd  : tensor([[-0.8457, -1.6914],
-        [ 0.6914,  1.3829],
-        [ 0.1543,  0.3086]])
-¿coinciden?     : True
-db de autograd  : tensor([-0.8457,  0.6914,  0.1543])
-tras un paso -&gt; p: tensor([[0.9138, 0.0407, 0.0455]])
-tras un paso -&gt; pérdida: 0.0901</pre>
-<p>El gradiente a mano y el de autograd son idénticos, y un solo paso con tasa 0,5 baja la pérdida de 1,869 a 0,0901 (la clase 0 pasa de 15 % a 91 %). Con una tasa tan grande y una sola muestra es un salto enorme; en el bucle real cada paso promedia un lote de 32 imágenes que tiran en direcciones distintas, y la pérdida baja poco a poco.</p>
+
+<section>
+<h2 class="sin-num">Código</h2>
+<article class="snippet" id="frag-2" data-lang="python">
+  <header>
+    <h3>2 · Softmax a mano frente a torch.softmax</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Calcula la softmax paso a paso (exponencial, suma, división) y comprueba que coincide con <code>torch.softmax</code> y con la capa <code>nn.Softmax</code>. Muestra también que el <code>argmax</code> no cambia.</p>
+  </header>
+  <pre class="code"><code>import torch
+from torch import nn
+
+z = torch.tensor([3.0, 1.0, -1.0])
+
+e = torch.exp(z)
+suma = e.sum()
+p_mano = e / suma
+print(&quot;e^z       :&quot;, e)
+print(&quot;suma      :&quot;, suma)
+print(&quot;p a mano  :&quot;, p_mano)
+
+p_torch = torch.softmax(z, dim=0)
+print(&quot;p torch   :&quot;, p_torch)
+print(&quot;¿iguales? :&quot;, torch.allclose(p_mano, p_torch))
+print(&quot;suman     :&quot;, p_torch.sum())
+
+capa = nn.Softmax(dim=0)
+print(&quot;nn.Softmax:&quot;, capa(z))
+
+print(&quot;clase predicha (argmax de p)     :&quot;, torch.argmax(p_torch).item())
+print(&quot;clase predicha (argmax de logits):&quot;, torch.argmax(z).item())</code></pre>
+  <details class="linea-a-linea" open>
+    <summary>Línea por línea</summary>
+    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+      <tbody>
+        <tr data-lines="1-2"><td><code>import torch …</code></td><td>Importamos PyTorch y su módulo de redes <code>nn</code>.</td></tr>
+        <tr data-lines="4"><td><code>z = torch.tensor([3.0, 1.0, -1.0])</code></td><td>Los logits de una muestra con tres clases: \( \mathbf{z} = (3;\ 1;\ -1) \). Son puntuaciones sueltas, pueden ser negativas y no suman nada en particular.</td></tr>
+        <tr data-lines="6-8"><td><code>e = torch.exp(z) …</code></td><td>Paso 1: <code>torch.exp(z)</code> eleva \( e \) a cada logit (todos pasan a ser positivos). Paso 2: <code>e.sum()</code> los suma. Paso 3: dividir cada uno entre la suma da las probabilidades.</td></tr>
+        <tr data-lines="9-11"><td><code>print(&quot;e^z       :&quot;, e) …</code></td><td>Muestra los tres pasos: \( e^z = (20{,}0855;\ 2{,}7183;\ 0{,}3679) \), suma 23,1717 y probabilidades \( (0{,}8668;\ 0{,}1173;\ 0{,}0159) \).</td></tr>
+        <tr data-lines="13-14"><td><code>p_torch = torch.softmax(z, dim=0) …</code></td><td>La función de PyTorch hace lo mismo en una sola llamada. <code>dim=0</code> indica sobre qué eje se normaliza; con un vector de una dimensión solo hay un eje.</td></tr>
+        <tr data-lines="15-16"><td><code>print(&quot;¿iguales? :&quot;, torch.allclose(p_mano, p_torch)) …</code></td><td><code>torch.allclose</code> compara tensores permitiendo diferencias minúsculas de redondeo (con <code>==</code> exacto, dos cálculos distintos de decimales podrían salir distintos en la última cifra). Y la suma de las probabilidades es 1.</td></tr>
+        <tr data-lines="18-19"><td><code>capa = nn.Softmax(dim=0) …</code></td><td><code>nn.Softmax(dim=0)</code> es la misma operación empaquetada como capa, para meterla dentro de un <code>nn.Sequential</code>. Se crea y luego se llama como una función.</td></tr>
+        <tr data-lines="21-22"><td><code>print(&quot;clase predicha (argmax de p)     :&quot;, torch.argmax(p …</code></td><td><code>argmax</code> devuelve la posición del mayor valor. Da lo mismo sobre las probabilidades que sobre los logits, porque la softmax conserva el orden. <code>.item()</code> convierte el tensor de un solo número en un número de Python.</td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>e^z       : tensor([20.0855,  2.7183,  0.3679])
+suma      : tensor(23.1717)
+p a mano  : tensor([0.8668, 0.1173, 0.0159])
+p torch   : tensor([0.8668, 0.1173, 0.0159])
+¿iguales? : True
+suman     : tensor(1.0000)
+nn.Softmax: tensor([0.8668, 0.1173, 0.0159])
+clase predicha (argmax de p)     : 0
+clase predicha (argmax de logits): 0</pre>
+    <p>Las tres formas de calcularla dan \( (0{,}8668;\ 0{,}1173;\ 0{,}0159) \), con suma 1, y la clase elegida es la 0 tanto con logits como con probabilidades: por eso, al <em>predecir</em>, no hace falta calcular la softmax si solo quieres la clase.</p>
+  </div>
+</article>
+
+<article class="snippet" id="frag-3" data-lang="python">
+  <header>
+    <h3>3 · Softmax con un lote: dim=1 frente a dim=0</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Con una matriz de logits <code>(muestras, clases)</code> enseña por qué la softmax va sobre <code>dim=1</code>: con <code>dim=0</code> no da ningún error, pero normaliza lo que no toca.</p>
+  </header>
+  <pre class="code"><code>import torch
+
+Z = torch.tensor([[ 3.0,  1.0, -1.0,  0.0],
+                  [ 0.5,  0.5,  0.5,  0.5],
+                  [-2.0,  4.0,  1.0,  1.0]])
+print(&quot;forma de Z:&quot;, tuple(Z.shape), &quot;= (muestras, clases)&quot;)
+
+P1 = torch.softmax(Z, dim=1)
+P0 = torch.softmax(Z, dim=0)
+
+print(&quot;softmax con dim=1:&quot;)
+print(P1)
+print(&quot;suma de cada fila   :&quot;, P1.sum(dim=1))
+print(&quot;softmax con dim=0 (mal):&quot;)
+print(P0)
+print(&quot;suma de cada fila   :&quot;, P0.sum(dim=1))
+print(&quot;suma de cada columna:&quot;, P0.sum(dim=0))
+
+confianza, clase = torch.max(P1, dim=1)
+print(&quot;clase predicha de cada muestra:&quot;, clase)
+print(&quot;confianza de cada muestra     :&quot;, confianza)</code></pre>
+  <details class="linea-a-linea" open>
+    <summary>Línea por línea</summary>
+    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+      <tbody>
+        <tr data-lines="1"><td><code>import torch</code></td><td>Importa PyTorch.</td></tr>
+        <tr data-lines="3-5"><td><code>Z = torch.tensor([[ 3.0,  1.0, -1.0,  0.0], …</code></td><td>Tres muestras (filas) y cuatro clases (columnas). La segunda muestra tiene los cuatro logits iguales; la tercera tiene un logit muy alto en la clase 1.</td></tr>
+        <tr data-lines="6"><td><code>print(&quot;forma de Z:&quot;, tuple(Z.shape), &quot;= (muestras, clases) …</code></td><td>Comprueba la forma: <code>(3, 4)</code>, donde el eje 0 recorre las muestras y el eje 1 recorre las clases.</td></tr>
+        <tr data-lines="8-9"><td><code>P1 = torch.softmax(Z, dim=1) …</code></td><td><code>dim=1</code> normaliza a lo largo de cada fila (correcto). <code>dim=0</code> lo hace a lo largo de cada columna: compara <em>muestras entre sí</em> (incorrecto).</td></tr>
+        <tr data-lines="11-13"><td><code>print(&quot;softmax con dim=1:&quot;) …</code></td><td>Con <code>dim=1</code> cada fila suma 1 y la fila de logits iguales da 0,25 en las cuatro clases.</td></tr>
+        <tr data-lines="14-17"><td><code>print(&quot;softmax con dim=0 (mal):&quot;) …</code></td><td>Con <code>dim=0</code> son las <em>columnas</em> las que suman 1, mientras que las filas suman 1,2285, 0,7588 y 2,0127: no son distribuciones de probabilidad. Y PyTorch no avisa.</td></tr>
+        <tr data-lines="19-21"><td><code>confianza, clase = torch.max(P1, dim=1) …</code></td><td><code>torch.max(P1, dim=1)</code> devuelve dos cosas: el valor máximo de cada fila (la confianza) y su posición (la clase predicha).</td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>forma de Z: (3, 4) = (muestras, clases)
+softmax con dim=1:
+tensor([[0.8310, 0.1125, 0.0152, 0.0414],
+        [0.2500, 0.2500, 0.2500, 0.2500],
+        [0.0022, 0.9074, 0.0452, 0.0452]])
+suma de cada fila   : tensor([1.0000, 1.0000, 1.0000])
+softmax con dim=0 (mal):
+tensor([[0.9184, 0.0461, 0.0777, 0.1863],
+        [0.0754, 0.0280, 0.3482, 0.3072],
+        [0.0062, 0.9259, 0.5741, 0.5065]])
+suma de cada fila   : tensor([1.2285, 0.7588, 2.0127])
+suma de cada columna: tensor([1.0000, 1.0000, 1.0000, 1.0000])
+clase predicha de cada muestra: tensor([0, 0, 1])
+confianza de cada muestra     : tensor([0.8310, 0.2500, 0.9074])</pre>
+    <p>Con <code>dim=1</code>, las filas suman 1: la muestra 1 elige la clase 0 (0,83), la muestra 2 está indecisa (0,25 para todas) y la 3 elige la clase 1 (0,91). Con <code>dim=0</code> el código funciona igual de bien pero los resultados no significan nada: las filas suman 1,23, 0,76 y 2,01. Es un fallo <strong>silencioso</strong>, de los peores.</p>
+  </div>
+</article>
+
+</section>
+
 </div>
-</article></div></details></div></main></body></html>
+</main>
+</body>
+</html>

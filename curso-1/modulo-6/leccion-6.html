@@ -1,312 +1,523 @@
-<!DOCTYPE html>
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lección 6 · Una media esconde dónde falla el modelo · Módulo 6 · Curso 1 · Cuaderno de IA</title>
+<meta name="description" content="Leer los errores: métricas de regresión a mano, errores por segmento y por tramo, e importancia de variables sin confundirla con causa.">
+<script>try{var t=localStorage.getItem('cuaderno-ia:tema');if(t)document.documentElement.setAttribute('data-theme',t)}catch(e){}</script>
+<link rel="stylesheet" href="../../assets/css/style.css">
+<script src="../../assets/js/curriculum.js"></script>
+<script src="../../assets/js/lab.js"></script>
+<script src="../../assets/js/app.js" defer></script>
+</head>
+<body data-root="../../" data-course="1" data-module="6" data-lesson="6">
+<main>
+<div class="page">
 
-<html lang="es"><head><meta charset="utf-8"/><meta content="width=device-width,initial-scale=1" name="viewport"/><title>Lección 6 · Pipeline, GridSearch y resultados del modelo de lluvia · Curso 1 · Cuaderno de IA</title><meta content="Los modelos de scikit-learn solo aceptan números." name="description"/><script>try{var t=localStorage.getItem('cuaderno-ia:tema');if(t)document.documentElement.setAttribute('data-theme',t)}catch(e){}</script><link href="../../assets/css/style.css" rel="stylesheet"/><script src="../../assets/js/curriculum.js"></script><script src="../../assets/js/lab.js"></script><script defer="" src="../../assets/js/app.js"></script><script defer="" src="../../assets/js/microanimations.js"></script></head><body data-course="1" data-lesson="6" data-module="6" data-root="../../"><main><div class="page" data-micro="3min"><header class="hero leccion"><div class="hero-grid"><div><p class="eyebrow">Curso 1 · Módulo 6 · Lección 6 de 23</p><h1>Pipeline, GridSearch y resultados del modelo de lluvia</h1><p class="lead">Los modelos de scikit-learn solo aceptan números.</p><p class="meta-line"><span class="read-time" data-render="read-time"></span><a href="../modulo-6.html">Índice del módulo</a></p></div><div aria-hidden="true" class="hero-tile"></div></div></header><details class="predice"><summary>Antes de leer: ¿cómo explicarías con tus palabras «Pipeline, GridSearch y resultados del modelo de lluvia» y qué comprobarías para saber que funciona?<span class="hint"></span></summary><div><p>Los modelos de scikit-learn solo aceptan números.</p></div></details><section aria-label="Explicación breve" class="micro-core"><div class="micro-kicker">01 · ENTENDER <span>≈ 45 s</span></div><h2>La idea en palabras sencillas</h2><p>Los modelos de scikit-learn solo aceptan números. En las 22 columnas de entrada hay 16 numéricas (temperaturas, presión, humedad…) y 6 de texto ( Location, las tres direcciones del viento, RainYesterday y Season ). El fragmento 6 las separa con select_dtypes y construye un ColumnTransformer con dos ramas:</p><div class="micro-example"><span aria-hidden="true" class="micro-example-icon">🛍️</span><div><strong>Otro ejemplo · Tienda</strong><p>Un sistema pasa de pedidos históricos a una previsión, la evalúa y después la integra en la web.</p></div></div></section><div class="micro-kicker micro-checkpoint">02 · RESPONDER <span>≈ 15 s</span></div><section aria-label="Pregunta intercalada" class="quiz mini micro-check"><script class="quiz-data" type="application/json">{"titulo": "Pausa rápida · Comprueba la idea", "preguntas": [{"q": "¿Cuál es una ventaja de una Pipeline de scikit-learn?", "opciones": ["Evitar usar TRAIN", "Convertir automáticamente cualquier tarea en regresión", "Encadenar el preprocesamiento y el modelo"], "correcta": 2, "porque": "Una pipeline une pasos en un flujo repetible."}]}</script></section><section aria-label="Animación interactiva" class="micro-viz" data-index="13" data-micro-viz="pipeline"><div class="micro-kicker">03 · EXPERIMENTAR <span>≈ 45 s</span></div><div class="micro-viz-title"><div><h2>De los datos a una decisión útil</h2><p>Avanza por las etapas; ninguna se puede saltar sin comprobarla.</p></div><span aria-hidden="true" class="micro-viz-symbol">✦</span></div><div aria-live="polite" class="micro-viz-stage"><p>Animación interactiva: De los datos a una decisión útil</p></div></section><div class="micro-kicker micro-checkpoint">04 · APLICAR <span>≈ 15 s</span></div><section aria-label="Pregunta intercalada" class="quiz mini micro-check"><script class="quiz-data" type="application/json">{"titulo": "Pausa rápida · ¿Lo aplicarías?", "preguntas": [{"q": "¿Por qué ayuda contra data leakage?", "opciones": ["Porque siempre usa el test para aprender", "Porque ajusta los transformadores de forma controlada dentro del flujo de entrenamiento", "Porque elimina las etiquetas"], "correcta": 1, "porque": "Las transformaciones deben ajustarse solo con datos de entrenamiento."}]}</script></section><div class="micro-finish"><strong>Idea que te llevas</strong><span>Los modelos de scikit-learn solo aceptan números</span><small>¿Quieres más ejemplos, fórmulas o código? Los tienes justo debajo, sin límite de tiempo.</small></div><details class="profundizar micro-legacy"><summary><span>Explorar más: explicación y simulaciones completas<small>Todo el texto original, tablas y demos avanzadas. Opcional.</small></span></summary><div class="prof-body"><section><h2>Pipeline, GridSearch y resultados del modelo de lluvia</h2>
-<p>Los modelos de scikit-learn solo aceptan números. En las 22 columnas de entrada hay 16 numéricas (temperaturas, presión, humedad…) y 6 de texto (<code>Location</code>, las tres direcciones del viento, <code>RainYesterday</code> y <code>Season</code>). El fragmento 6 las separa con <code>select_dtypes</code> y construye un <strong><abbr class="t" data-def="ColumnTransformer: aplica un transformador distinto a cada grupo de columnas (por ejemplo, escalar las numéricas y hacer One-Hot a las de texto) y junta el resultado.">ColumnTransformer</abbr></strong> con dos ramas:</p>
-<p>El preprocesador y el modelo se encadenan en un <code>Pipeline</code>. No es un capricho de estilo: <strong>dentro de la validación cruzada, el escalado se vuelve a ajustar en cada pliegue usando solo sus datos de entrenamiento</strong>. Si escalaras todo antes, la media del pliegue de validación habría influido en el entrenamiento: una fuga sutil. Con el Pipeline, esa fuga es imposible por construcción. En la sección de StreamFlix verás cada paso con una fila real.</p>
-<p>Un Random Forest tiene perillas (los <em>hiperparámetros</em>) que no se aprenden de los datos y hay que fijar: cuántos árboles (<code>n_estimators</code>), hasta qué profundidad (<code>max_depth</code>) y cuántas muestras hacen falta para dividir una rama (<code>min_samples_split</code>). <code>GridSearchCV</code> las prueba <strong>todas las combinaciones</strong> de una rejilla y mide cada una con validación cruzada:</p>
-<div class="callout ejemplo"><span class="lbl">Ejemplo tomado del módulo</span><p>: cuántos entrenamientos hace el GridSearch Es como probar todas las formas de ver una peli: 2 salas × 3 horarios × 2 tipos de entrada = 12 planes distintos.</p></div></section><div class="resumen"><h2 class="sin-num sin-toc">En pocas líneas</h2><ul><li><strong>Pipeline, GridSearch y resultados del modelo de lluvia:</strong> Los modelos de scikit-learn solo aceptan números.</li><li>Antes de continuar, intenta explicar la demo sin mirar su resultado.</li></ul></div><section class="quiz mini"><script class="quiz-data" type="application/json">{"titulo": "¿Lo tienes?", "preguntas": [{"q": "¿Qué concepto estamos trabajando en esta lección?", "opciones": ["DBSCAN y las cuentas anómalas", "Pipeline, GridSearch y resultados del modelo de lluvia", "Regresión: ¿cuántas horas verá el mes que viene?"], "correcta": 1, "porque": "Los modelos de scikit-learn solo aceptan números."}, {"q": "¿Cuál de estas afirmaciones recoge lo que acabas de estudiar?", "opciones": ["Siempre hay un único método que sirve para todos los problemas.", "Lo importante es comprender la idea y comprobarla con ejemplos, no memorizar términos.", "Los modelos de scikit-learn solo aceptan números."], "correcta": 2, "porque": "La explicación central es: Los modelos de scikit-learn solo aceptan números."}, {"q": "Si una demo o un ejemplo te desconcierta, ¿cuál es la mejor forma de aprenderlo?", "opciones": ["Ignorar los resultados que no coinciden con tu intuición.", "Memorizar el nombre sin entender la operación.", "Volver a los números, cambiar un valor y explicar qué ocurre."], "correcta": 2, "porque": "Explorar qué cambia y por qué ayuda a conectar el concepto con su resultado."}]}</script></section></div></details><details class="profundizar"><summary><span>Profundizar: explicación completa<small>Matices, fórmulas, tablas, otros ejemplos y experimentos del módulo original.</small></span></summary><div class="prof-body"><section>
-<h2 id="lluvia-modelo">Pipeline, GridSearch y resultados del modelo de lluvia</h2>
-<h3>El preprocesado, dentro de un Pipeline</h3>
-<p>Los modelos de scikit-learn solo aceptan números. En las 22 columnas de entrada hay 16 numéricas (temperaturas, presión, humedad…) y 6 de texto (<code>Location</code>, las tres direcciones del viento, <code>RainYesterday</code> y <code>Season</code>). El fragmento 6 las separa con <code>select_dtypes</code> y construye un <strong><abbr class="t" data-def="ColumnTransformer: aplica un transformador distinto a cada grupo de columnas (por ejemplo, escalar las numéricas y hacer One-Hot a las de texto) y junta el resultado.">ColumnTransformer</abbr></strong> con dos ramas:</p>
-<ul>
-<li><strong>Numéricas → <code>StandardScaler</code></strong>: resta la media y divide por la desviación para que todas tengan una escala comparable. (Un Random Forest no lo necesita; lo dejo porque el mismo preprocesador alimentará después a la regresión logística, que sí lo agradece.)</li>
-<li><strong>Texto → <code>OneHotEncoder</code></strong>: convierte cada categoría en columnas 0/1. Con <code>handle_unknown="ignore"</code>, una categoría que no se vio al entrenar no rompe el modelo.</li>
-</ul>
-<p>El preprocesador y el modelo se encadenan en un <code>Pipeline</code>. No es un capricho de estilo: <strong>dentro de la validación cruzada, el escalado se vuelve a ajustar en cada pliegue usando solo sus datos de entrenamiento</strong>. Si escalaras todo antes, la media del pliegue de validación habría influido en el entrenamiento: una fuga sutil. Con el Pipeline, esa fuga es imposible por construcción. En la sección de StreamFlix verás cada paso con una fila real.</p>
-<h3>La búsqueda de hiperparámetros: 60 entrenamientos</h3>
-<p>Un Random Forest tiene perillas (los <em>hiperparámetros</em>) que no se aprenden de los datos y hay que fijar: cuántos árboles (<code>n_estimators</code>), hasta qué profundidad (<code>max_depth</code>) y cuántas muestras hacen falta para dividir una rama (<code>min_samples_split</code>). <code>GridSearchCV</code> las prueba <strong>todas las combinaciones</strong> de una rejilla y mide cada una con validación cruzada:</p>
-<div class="callout ejemplo">
-<span class="lbl">Ejemplo numérico: cuántos entrenamientos hace el GridSearch</span>
-<p>Es como probar todas las formas de ver una peli: 2 salas × 3 horarios × 2 tipos de entrada = 12 planes distintos. Aquí las «salas» son los valores de cada perilla del bosque.</p>
-<ol class="pasos">
-<li><strong>Combinaciones:</strong> 2 valores de <code>n_estimators</code> × 3 de <code>max_depth</code> × 2 de <code>min_samples_split</code> = 2 × 3 × 2 = <strong>12</strong>.</li>
-<li><strong>Validación cruzada de 5 pliegues:</strong> cada combinación se entrena 5 veces (cada vez con 4/5 del train y evaluando en el 1/5 restante).</li>
-<li><strong>Entrenamientos totales:</strong> 12 × 5 = <strong>60</strong> (más uno final con la mejor combinación sobre todo el train).</li>
-</ol>
-</div>
-<p>El resultado del fragmento 6: la mejor combinación es <code>n_estimators=100</code>, <code>max_depth=10</code>, <code>min_samples_split=5</code>, con un accuracy medio en validación cruzada de <strong>0,826</strong>. Fíjate en que la mejor profundidad (10) no es ni la menor ni la mayor de la rejilla: ni demasiado simple (infraajuste) ni sin límite (sobreajuste). Esa tensión es la del <a href="../modulo-3.html">módulo 3</a>.</p>
-<h3>Evaluar en el test, una sola vez</h3>
-<p>Con el mejor modelo <strong>se mira el test una vez</strong> (fragmento 7). Resultados reales de este modelo sobre 1.422 días:</p>
-<div class="callout ejemplo">
-<span class="lbl">Ejemplo numérico: las métricas del modelo de lluvia</span>
-<table>
-<thead><tr><th></th><th>Predice «no llueve»</th><th>Predice «llueve»</th></tr></thead>
-<tbody>
-<tr><th scope="row">No llovió</th><td>TN = 978</td><td>FP = 101</td></tr>
-<tr><th scope="row">Llovió</th><td>FN = 189</td><td>TP = 154</td></tr>
-</tbody>
-</table>
-<ol class="pasos">
-<li><strong>Accuracy</strong> = (978 + 154) / 1.422 = 1.132 / 1.422 = <span class="res">0,796</span>. Baseline: 1.079 días secos / 1.422 = <span class="res">0,759</span>. Mejora: <strong>3,7 puntos</strong>.</li>
-<li><strong>Precision</strong> = 154 / (154 + 101) = 154 / 255 = <span class="res">0,604</span>.</li>
-<li><strong>Recall</strong> = 154 / (154 + 189) = 154 / 343 = <span class="res">0,449</span>.</li>
-<li><strong>F1</strong> = 2 × 0,604 × 0,449 / (0,604 + 0,449) = <span class="res">0,515</span>.</li>
-</ol>
-</div>
-<p>La misma historia que la matriz de IBM: accuracy aceptable, baseline cerca, recall por debajo del 50 %. Es normal: <strong>«mañana lloverá» es un problema con mucho ruido</strong> (aunque conozcas perfectamente el tiempo de hoy, mañana tiene su parte de azar). Un modelo honesto lo refleja; uno «increíble» probablemente tenga una fuga.</p>
-<h3>Un test único es una medida con ruido</h3>
-<p>Una duda razonable: la validación cruzada decía 0,826 y el test da 0,796. ¿Es un fallo? El fragmento 8 lo comprueba repitiendo el reparto con tres semillas distintas y el mismo modelo: el accuracy de test sale <strong>0,825, 0,822 y 0,817</strong>, es decir, casi igual que la validación cruzada. El reparto con <code>random_state=42</code> simplemente nos dio un test algo más difícil. Con 1.422 días, el error típico de una exactitud es de aproximadamente ±1 punto, así que una diferencia de 3 puntos en un solo reparto no es una alarma, pero sí una buena razón para <strong>no fiarte de un único número</strong> (es la razón de ser de la validación cruzada del módulo 5).</p>
-<h3>Importancia de variables: qué mira el modelo</h3>
-<p>El Random Forest puede decir cuánto ha usado cada columna (<code>feature_importances_</code>). Aquí hay un detalle que se pasa por alto, y lo verás en el fragmento 9: tras el One-Hot, <code>RainYesterday</code> deja de ser una columna y se convierte en dos (<code>RainYesterday_No</code> y <code>RainYesterday_Yes</code>), cada una con su importancia (0,108 y 0,066). Para saber cuánto pesa <em>la variable original</em> hay que <strong>sumarlas</strong>: 0,108 + 0,066 = <strong>0,174</strong>, que la convierte en la más importante de todas, por delante de <code>Pressure9am</code> (0,106) y <code>Humidity3pm</code> (0,084). Si miras solo la lista sin agrupar, la presión parece lo más importante: la agrupación cambia la conclusión.</p>
-<div class="callout ojo">
-<span class="lbl">Ojo: mis importancias no son las de tus apuntes</span>
-<p>En el análisis de tus apuntes con el conjunto real, las variables que más importan son <code>Humidity3pm</code>, <code>Pressure</code> (9am y 3pm), <code>Sunshine</code> y el viento (<code>Wind</code>): son físicamente razonables (aire húmedo, presión baja, poco sol y viento fuerte anuncian lluvia). En mi versión sintética, la lista es otra (<code>RainYesterday</code>, <code>Pressure9am</code>, <code>Humidity3pm</code>, <code>Rainfall</code>, <code>Pressure3pm</code>, con <code>Sunshine</code> y el viento más abajo) porque mi generador no reproduce todas las relaciones del clima real. La conclusión de método no cambia: se mira la lista <em>agrupada por variable original</em>, se comprueba que tenga sentido físico y se recuerda que es una medida de qué usa el modelo, no de qué causa la lluvia.</p>
-</div>
-<p>Dos advertencias sobre estos números:</p>
-<ul>
-<li>Son importancias <em>basadas en impureza</em> del bosque: tienden a favorecer las variables continuas con muchos valores. En StreamFlix usaremos una medida más fiable, la <em>importancia por permutación</em>.</li>
-<li><strong>Importancia no es causalidad.</strong> Que la presión sea importante para <em>predecir</em> la lluvia no significa que cambiar la presión <em>cause</em> lluvia. Lo desarrollo en la sección de errores e importancias.</li>
-</ul>
-<p>Para terminar, el fragmento 9 reentrena lo mismo con una <strong>regresión logística</strong> (módulo 2) dentro del mismo Pipeline y compara: Random Forest accuracy 0,796, recall 0,449; regresión logística accuracy 0,796, recall 0,443. <strong>Empate técnico</strong> entre un modelo sencillo (una combinación lineal de las columnas) y otro de cien árboles. Cuando un modelo simple iguala al complejo, quédate con el simple: se entiende mejor, se entrena en milisegundos y es más fácil de mantener.</p>
-<div class="callout ojo">
-<span class="lbl">Ojo: el modelo complejo no gana por serlo</span>
-<p>Es tentador pensar que un Random Forest «debería» ser mejor que una regresión logística. Aquí no lo es, y en StreamFlix verás lo mismo: la logística gana por validación cruzada. Mandan los datos, no el prestigio del algoritmo. La única forma de saberlo es <strong>medirlo con una validación honesta</strong>, no suponerlo.</p>
-</div>
-</section></div></details><details class="profundizar" id="codigo"><summary><span>Ver código explicado paso a paso<small>3 fragmento(s) original(es), con cada línea comentada y salida esperada.</small></span></summary><div class="prof-body"><article class="snippet" data-lang="python">
-<header>
-<h3>1 · Un generador de datos de lluvia con semilla fija</h3>
-<p class="para-que"><strong>Para qué sirve</strong> Crea la tabla de partida del proyecto 1: tres estaciones de Melbourne con las mismas columnas que el conjunto WeatherAUS. Sustituye al CSV real, que no se puede descargar desde aquí.</p>
+<header class="hero leccion">
+  <div class="hero-grid">
+    <div>
+      <p class="eyebrow">Curso 1 · Módulo 6 · Lección 6 de 8</p>
+      <h1>Una media esconde dónde falla el modelo</h1>
+      <p class="lead">MAE, RMSE y R² frente a un baseline, y partir los errores por grupos para ver lo que la media esconde.</p>
+      <p class="meta-line"><span class="read-time" data-render="read-time"></span><a href="../modulo-6.html">Índice del módulo</a></p>
+    </div>
+    <div class="hero-tile" aria-hidden="true"></div>
+  </div>
 </header>
-<pre class="code"><code>import numpy as np
-import pandas as pd
 
-def crear_weather(n_dias=3000, seed=42):
-    rng = np.random.default_rng(seed)
-    fechas = pd.date_range("2008-12-01", periods=n_dias, freq="D")
-    estacional = np.cos(2 * np.pi * (fechas.dayofyear.to_numpy() - 20) / 365)
-    dirs = ["N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE",
-            "S", "SSW", "SW", "WSW", "W", "WNW", "NW", "NNW"]
-    tablas = []
-    for sitio, ajuste in [("Melbourne", 0.0), ("MelbourneAirport", -0.8), ("Watsonia", 0.5)]:
-        w = np.zeros(n_dias)
-        for t in range(1, n_dias):
-            w[t] = 0.95 * w[t - 1] + np.sqrt(1 - 0.95 ** 2) * rng.normal()
-        w = w + rng.normal(0, 0.35, n_dias)
-        llueve = rng.random(n_dias) &lt; 1 / (1 + np.exp(-(-2.2 + 3.5 * w - 0.25 * estacional)))
-        lluvia = np.maximum(1.0, rng.gamma(0.9, 4.0, n_dias))
-        llovizna = rng.uniform(0, 0.8, n_dias) * (rng.random(n_dias) &lt; 0.35)
-        max_t = 19.5 + 6.5 * estacional + ajuste + rng.normal(0, 3.5, n_dias) - 1.5 * w
-        min_t = max_t - 8.5 + rng.normal(0, 2.0, n_dias)
-        h9 = 68 - 4 * estacional + 8 * w + rng.normal(0, 9, n_dias)
-        h3 = 50 - 3 * estacional + 11 * w + rng.normal(0, 10, n_dias)
-        p9 = 1017.5 - 3.8 * w + rng.normal(0, 3.0, n_dias)
-        rafaga = 42 + 4.5 * w + rng.normal(0, 10, n_dias)
-        t = pd.DataFrame({
-            "Date": fechas, "Location": sitio,
-            "MinTemp": min_t.round(1), "MaxTemp": max_t.round(1),
-            "Rainfall": np.where(llueve, lluvia, llovizna).round(1),
-            "Evaporation": np.clip(4.6 + 3.2 * estacional - 0.8 * w + rng.normal(0, 1.8, n_dias), 0.2, 20).round(1),
-            "Sunshine": np.clip(7.8 + 3.0 * estacional - 1.8 * w + rng.normal(0, 2.2, n_dias), 0, 13.5).round(1),
-            "WindGustDir": rng.choice(dirs, n_dias),
-            "WindGustSpeed": np.clip(rafaga, 17, 100).round(),
-            "WindDir9am": rng.choice(dirs, n_dias), "WindDir3pm": rng.choice(dirs, n_dias),
-            "WindSpeed9am": np.clip(rafaga * 0.38 + rng.normal(0, 4, n_dias), 0, 60).round(),
-            "WindSpeed3pm": np.clip(rafaga * 0.50 + rng.normal(0, 4, n_dias), 0, 60).round(),
-            "Humidity9am": np.clip(h9, 15, 100).round(), "Humidity3pm": np.clip(h3, 8, 100).round(),
-            "Pressure9am": p9.round(1), "Pressure3pm": (p9 - 1.0 + rng.normal(0, 1.4, n_dias)).round(1),
-            "Cloud9am": np.clip(np.round(4.0 + 1.3 * w + rng.normal(0, 1.8, n_dias)), 0, 8),
-            "Cloud3pm": np.clip(np.round(4.2 + 1.5 * w + rng.normal(0, 1.8, n_dias)), 0, 8),
-            "Temp9am": (min_t + 0.45 * (max_t - min_t) + rng.normal(0, 1.5, n_dias)).round(1),
-            "Temp3pm": (max_t - rng.uniform(0.3, 2.0, n_dias)).round(1),
-        })
-        t["RainToday"] = np.where(t["Rainfall"] &gt;= 1.0, "Yes", "No")
-        t["RainTomorrow"] = t["RainToday"].shift(-1)
-        tablas.append(t.iloc[:-1])
-    return pd.concat(tablas, ignore_index=True)
-
-df = crear_weather()
-print(df.shape)
-print(df.iloc[0])</code></pre>
-<details class="linea-a-linea" open="">
-<summary>Línea por línea</summary>
-<p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
-<table class="lineas">
-<thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
-<tbody>
-<tr data-lines="1"><td><code>import numpy as np</code></td><td>Importa NumPy, la librería de arrays y números aleatorios. Por costumbre se abrevia <code>np</code>.</td></tr>
-<tr data-lines="2"><td><code>import pandas as pd</code></td><td>Importa pandas, la librería de tablas (<code>DataFrame</code>), abreviada <code>pd</code>.</td></tr>
-<tr data-lines="4"><td><code>def crear_weather(n_dias=3000, seed=42):</code></td><td>Define la función generadora: <code>n_dias</code> días por estación y <code>seed</code>, la semilla del azar (misma semilla, mismos datos en cualquier ordenador).</td></tr>
-<tr data-lines="5"><td><code>rng = np.random.default_rng(seed)</code></td><td>Crea el generador aleatorio moderno de NumPy. Todas las tiradas de la función salen de él, y por eso el resultado es reproducible.</td></tr>
-<tr data-lines="6"><td><code>fechas = pd.date_range("2008-12-01", periods=n_dias, freq="D")</code></td><td><code>pd.date_range</code> fabrica 3.000 fechas diarias seguidas a partir del 1 de diciembre de 2008.</td></tr>
-<tr data-lines="7"><td><code>estacional = np.cos(2 * np.pi * (fechas.dayofyear.to_numpy()…</code></td><td>Una onda de coseno con periodo de un año: vale +1 hacia el 20 de enero (pleno verano en Australia) y −1 seis meses después. Sirve para que temperatura, sol o evaporación cambien con la estación. <code>.to_numpy()</code> la convierte de pandas a un array de NumPy.</td></tr>
-<tr data-lines="8-9"><td><code>dirs = ["N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE", …</code></td><td>Los 16 rumbos del viento (N, NNE, NE…). Se usan más abajo para las columnas de dirección.</td></tr>
-<tr data-lines="10"><td><code>tablas = []</code></td><td>Lista vacía donde se irá guardando la tabla de cada estación.</td></tr>
-<tr data-lines="11"><td><code>for sitio, ajuste in [("Melbourne", 0.0), ("MelbourneAirport…</code></td><td>Recorre las tres estaciones. <code>ajuste</code> es un pequeño desplazamiento de temperatura: el aeropuerto es algo más frío y Watsonia algo más cálida.</td></tr>
-<tr data-lines="12"><td><code>w = np.zeros(n_dias)</code></td><td><code>w</code> es la «humedad del ambiente» oculta: un vector de ceros que se rellenará día a día.</td></tr>
-<tr data-lines="13-14"><td><code>for t in range(1, n_dias): …</code></td><td>Bucle que da <strong>memoria</strong> al tiempo: cada día hereda el 95 % del anterior y le suma un poco de ruido normal. El factor <code>√(1−0,95²)</code> mantiene la desviación de <code>w</code> en 1. Resultado: rachas de días húmedos y de días secos, como el clima real.</td></tr>
-<tr data-lines="15"><td><code>w = w + rng.normal(0, 0.35, n_dias)</code></td><td>Añade ruido diario sin memoria (desviación 0,35) para que ningún día sea una función exacta del anterior.</td></tr>
-<tr data-lines="16"><td><code>llueve = rng.random(n_dias) &lt; 1 / (1 + np.exp(-(-2.2 + 3.5 *…</code></td><td>Decide qué días llueve: la probabilidad es una sigmoide (módulo 2) que sube con <code>w</code> y baja un poco en verano. <code>rng.random(n) &lt; p</code> da <code>True</code> con probabilidad <code>p</code> en cada día.</td></tr>
-<tr data-lines="17"><td><code>lluvia = np.maximum(1.0, rng.gamma(0.9, 4.0, n_dias))</code></td><td>Cuánta lluvia cae en los días que llueve: una distribución gamma (muchos días de poca lluvia, pocos de mucha), con un mínimo de 1 mm.</td></tr>
-<tr data-lines="18"><td><code>llovizna = rng.uniform(0, 0.8, n_dias) * (rng.random(n_dias)…</code></td><td>Los días «secos» a veces tienen llovizna, siempre menor de 0,8 mm (el 35 % de las veces). Como es menos de 1 mm, seguirán contando como «no llueve».</td></tr>
-<tr data-lines="19"><td><code>max_t = 19.5 + 6.5 * estacional + ajuste + rng.normal(0, 3.5…</code></td><td>Temperatura máxima: 19,5 °C de base, ±6,5 según la estación, el ajuste de la estación, ruido, y algo menos de calor cuando <code>w</code> es alto (días nublados).</td></tr>
-<tr data-lines="20"><td><code>min_t = max_t - 8.5 + rng.normal(0, 2.0, n_dias)</code></td><td>La mínima es unos 8,5 °C menor que la máxima, con ruido.</td></tr>
-<tr data-lines="21-22"><td><code>h9 = 68 - 4 * estacional + 8 * w + rng.normal(0, 9, n_dias) …</code></td><td>Humedad a las 9:00 y a las 15:00: suben cuando <code>w</code> es alto y bajan algo en verano.</td></tr>
-<tr data-lines="23"><td><code>p9 = 1017.5 - 3.8 * w + rng.normal(0, 3.0, n_dias)</code></td><td>Presión a las 9:00 (hPa): baja cuando <code>w</code> es alto, como con las borrascas.</td></tr>
-<tr data-lines="24"><td><code>rafaga = 42 + 4.5 * w + rng.normal(0, 10, n_dias)</code></td><td>Ráfaga de viento base, que sube un poco con <code>w</code>.</td></tr>
-<tr data-lines="25-26"><td><code>t = pd.DataFrame({ …</code></td><td>Empieza a construir la tabla de la estación, con las columnas <code>Date</code> y <code>Location</code> (el nombre del sitio, repetido en todas las filas).</td></tr>
-<tr data-lines="27"><td><code>"MinTemp": min_t.round(1), "MaxTemp": max_t.round(1),</code></td><td>Temperaturas mínima y máxima redondeadas a un decimal.</td></tr>
-<tr data-lines="28"><td><code>"Rainfall": np.where(llueve, lluvia, llovizna).round(1),</code></td><td><code>Rainfall</code>: los milímetros de lluvia si ese día llueve, y la llovizna si no. <code>np.where(condición, A, B)</code> elige A o B fila a fila.</td></tr>
-<tr data-lines="29-30"><td><code>"Evaporation": np.clip(4.6 + 3.2 * estacional - 0.8 * w + rn…</code></td><td>Evaporación y horas de sol, dependientes de la estación y de <code>w</code>. <code>np.clip(x, mín, máx)</code> recorta los valores a un rango físicamente posible.</td></tr>
-<tr data-lines="31"><td><code>"WindGustDir": rng.choice(dirs, n_dias),</code></td><td>Dirección de la ráfaga, elegida <strong>al azar</strong> entre los 16 rumbos. En este generador no aporta información (como pasa con muchas columnas reales: están, pero no ayudan).</td></tr>
-<tr data-lines="32"><td><code>"WindGustSpeed": np.clip(rafaga, 17, 100).round(),</code></td><td>Velocidad de la ráfaga, recortada entre 17 y 100 km/h y redondeada.</td></tr>
-<tr data-lines="33"><td><code>"WindDir9am": rng.choice(dirs, n_dias), "WindDir3pm": rng.ch…</code></td><td>Direcciones del viento a las 9:00 y a las 15:00, también al azar.</td></tr>
-<tr data-lines="34-35"><td><code>"WindSpeed9am": np.clip(rafaga * 0.38 + rng.normal(0, 4, n_d…</code></td><td>Velocidades del viento a las 9:00 y a las 15:00: una fracción de la ráfaga, con ruido, entre 0 y 60.</td></tr>
-<tr data-lines="36"><td><code>"Humidity9am": np.clip(h9, 15, 100).round(), "Humidity3pm": …</code></td><td>Humedades recortadas a su rango posible (15–100 % y 8–100 %) y redondeadas.</td></tr>
-<tr data-lines="37"><td><code>"Pressure9am": p9.round(1), "Pressure3pm": (p9 - 1.0 + rng.n…</code></td><td>Presión a las 9:00 y a las 15:00 (esta última, algo menor y con ruido propio).</td></tr>
-<tr data-lines="38-39"><td><code>"Cloud9am": np.clip(np.round(4.0 + 1.3 * w + rng.normal(0, 1…</code></td><td>Nubosidad en octavos de cielo cubierto (0 a 8): se redondea a un entero y se recorta.</td></tr>
-<tr data-lines="40-41"><td><code>"Temp9am": (min_t + 0.45 * (max_t - min_t) + rng.normal(0, 1…</code></td><td>Temperaturas a las 9:00 (entre mínima y máxima) y a las 15:00 (muy cerca de la máxima).</td></tr>
-<tr data-lines="42"><td><code>})</code></td><td>Cierra el diccionario y la llamada a <code>pd.DataFrame</code>: la tabla de la estación está lista.</td></tr>
-<tr data-lines="43"><td><code>t["RainToday"] = np.where(t["Rainfall"] &gt;= 1.0, "Yes", "No")</code></td><td><code>RainToday</code> vale «Yes» si ese día llovió 1 mm o más y «No» si no. Es la misma regla que usa el conjunto real.</td></tr>
-<tr data-lines="44"><td><code>t["RainTomorrow"] = t["RainToday"].shift(-1)</code></td><td><code>RainTomorrow</code>: desplaza <code>RainToday</code> una fila hacia arriba con <code>shift(-1)</code>, de modo que cada día recibe la respuesta del día <strong>siguiente</strong>. El último día queda sin valor (NaN).</td></tr>
-<tr data-lines="45"><td><code>tablas.append(t.iloc[:-1])</code></td><td>Guarda la tabla sin su última fila (<code>iloc[:-1]</code>), la que no tiene «mañana».</td></tr>
-<tr data-lines="46"><td><code>return pd.concat(tablas, ignore_index=True)</code></td><td>Junta las tres tablas una debajo de otra y renumera las filas de 0 a n−1.</td></tr>
-<tr data-lines="48"><td><code>df = crear_weather()</code></td><td>Llama a la función: <code>df</code> es la tabla completa.</td></tr>
-<tr data-lines="49"><td><code>print(df.shape)</code></td><td>Imprime su forma: (filas, columnas).</td></tr>
-<tr data-lines="50"><td><code>print(df.iloc[0])</code></td><td>Imprime la primera fila, una columna por línea.</td></tr>
-</tbody>
-</table>
+<details class="predice">
+  <summary>Dos modelos de «horas que verá el mes que viene» se equivocan, de media, 15,5 horas cada uno. ¿Son igual de buenos?<span class="hint"></span></summary>
+  <div>
+    <p>No necesariamente. Uno puede fallar 15 y 16 horas; el otro, 1 y 30. El error medio (MAE) es el mismo, pero el segundo esconde un error enorme. El RMSE lo delata: 15,5 frente a 21,2.</p>
+  </div>
 </details>
-<div class="salida">
-<strong>Salida esperada</strong>
-<pre>(8997, 23)
-Date             2008-12-01 00:00:00
-Location                   Melbourne
-MinTemp                         11.0
-MaxTemp                         23.4
-Rainfall                         0.8
-Evaporation                      6.4
-Sunshine                         8.4
-WindGustDir                      SSW
-WindGustSpeed                   35.0
-WindDir9am                       NNW
-WindDir3pm                        SW
-WindSpeed9am                    16.0
-WindSpeed3pm                    12.0
-Humidity9am                     60.0
-Humidity3pm                     60.0
-Pressure9am                   1013.7
-Pressure3pm                   1013.6
-Cloud9am                         5.0
-Cloud3pm                         2.0
-Temp9am                         17.6
-Temp3pm                         22.4
-RainToday                         No
-RainTomorrow                      No
-Name: 0, dtype: object</pre>
-<p><strong>8.997 filas × 23 columnas</strong>: tres estaciones × 2.999 días (a cada estación se le quita el último día). La primera fila es el 1 de diciembre de 2008 en Melbourne: 0,8 mm de lluvia (menos de 1, por eso <code>RainToday</code> es «No»), 60 % de humedad a las 15:00 y <code>RainTomorrow</code> «No». Ya tienes datos con la estructura de los reales: columnas numéricas, de texto y una fecha.</p>
+
+<section>
+<h2 id="idea">Una media esconde dónde falla el modelo</h2>
+<p>Un número global (MAE, accuracy, euros) dice cuánto falla el modelo, no <strong>dónde</strong>. Para predecir horas de StreamFlix se usan tres métricas, siempre frente a un baseline (predecir la media):</p>
+<ul>
+  <li><strong>MAE:</strong> «me equivoco X horas de media». La que se cuenta a negocio.</li>
+  <li><strong>RMSE:</strong> eleva los errores al cuadrado antes de promediar, así que se asusta de los errores grandes. Cuanto más se separa del MAE, más errores gordos hay.</li>
+  <li><strong>R²:</strong> qué fracción de la variación explicas (1 = todo; 0 = como predecir la media).</li>
+</ul>
+<p>Después se parte el error en trozos. En la clasificación de bajas, los clientes que se escapan sin aviso (FN) entran cada 2,8 días y ven 35 horas: se parecen a los que se quedan, y ningún modelo los cazará con estas columnas. Y por plan, el recall va de 0,93 en Basic a 0,69 en Standard. En las horas, el error ronda las 4 h salvo en los usuarios de más de 60 h, donde sube a 6,15.</p>
+<p>Por último, qué mira el modelo: al barajar <code>DiasSinEntrar</code> el ROC-AUC cae 0,106, la mayor caída. Sirve para <em>predecir</em>, pero no es la causa: obligar a entrar no quita el desinterés.</p>
+</section>
+
+<figure class="demo" data-demo="curso1/c1m6-regresion-errores" data-titulo="Real frente a predicho, con MAE, RMSE y R² en vivo">
+  <div class="haz">Cambia de modelo y mira la nube alrededor de la diagonal. Luego sube el error extra de un solo usuario.</div>
+  <div class="observa">Un único error enorme apenas mueve el MAE y dispara el RMSE.</div>
+</figure>
+
+<section>
+<h2 id="numeros">Con números: cuatro usuarios</h2>
+<div class="callout ejemplo">
+  <span class="lbl">Ejemplo numérico: MAE, RMSE y R² a mano</span>
+  <p>Horas reales 10, 20, 30, 40; predichas 12, 18, 33, 36. Errores: 2, 2, 3, 4.</p>
+  <ol class="pasos">
+    <li><strong>MAE</strong> = (2 + 2 + 3 + 4) / 4 = <span class="res">2,75 h</span>.</li>
+    <li><strong>RMSE</strong> = √((4 + 4 + 9 + 16) / 4) = √8,25 = <span class="res">2,87 h</span>.</li>
+    <li><strong>R²</strong> = 1 − 33 / 500 = <span class="res">0,934</span> (500 = suma de desviaciones² respecto a la media, 25).</li>
+    <li><strong>Un error grande:</strong> si al de 40 h le predices 60, el MAE sube a 6,75 (×2,5) y el RMSE a 10,2 (×3,6).</li>
+  </ol>
 </div>
-</article><article class="snippet" data-lang="python">
-<header>
-<h3>6 · Pipeline con ColumnTransformer y GridSearchCV</h3>
-<p class="para-que"><strong>Para qué sirve</strong> Construye el modelo completo de la lluvia (preprocesado + Random Forest) y busca sus mejores hiperparámetros con validación cruzada.</p>
-</header>
-<pre class="code"><code>from sklearn.compose import ColumnTransformer
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.model_selection import GridSearchCV, StratifiedKFold
-from sklearn.pipeline import Pipeline
-from sklearn.preprocessing import OneHotEncoder, StandardScaler
+<p>En el StreamFlix ampliado, el baseline de la media falla 18 h; el Random Forest, 3,78 h (R² 0,94). Pero frente al baseline más duro, «verá lo mismo que este mes» (7,21 h), la mejora real es del 42 %, no de 18 a 4.</p>
+</section>
 
-categoricas = X_train.select_dtypes(include=["object", "string"]).columns.tolist()
-numericas = X_train.select_dtypes(exclude=["object", "string"]).columns.tolist()
-print(len(numericas), "numéricas |", categoricas)
+<details class="predice">
+  <summary>En el StreamFlix de tus apuntes las horas se fabricaron como una suma con pesos más ruido. ¿Ganará la regresión lineal o el Random Forest?<span class="hint"></span></summary>
+  <div>
+    <p>La lineal (RMSE 5,06 frente a 5,42): la relación es justo una recta más ruido, y el bosque, que aproxima con escalones, se despista algo más. Con relaciones curvas ganaría el bosque. Por eso se prueban los dos y se mide.</p>
+  </div>
+</details>
 
-preprocesador = ColumnTransformer([
-    ("num", StandardScaler(), numericas),
-    ("cat", OneHotEncoder(handle_unknown="ignore"), categoricas),
-])
-pipeline = Pipeline([
-    ("prep", preprocesador),
-    ("modelo", RandomForestClassifier(random_state=42)),
-])
+<div class="resumen">
+  <h2 class="sin-num sin-toc">En tres líneas</h2>
+  <ul>
+    <li>MAE para contar, RMSE si los errores grandes duelen, R² frente a la media; todo contra el baseline más duro razonable.</li>
+    <li>Parte los errores: FN y FP, segmentos, tramos. Ahí se ve lo que la media esconde.</li>
+    <li>Importancia dice qué usa el modelo para predecir, no qué causa el resultado.</li>
+  </ul>
+</div>
 
-param_grid = {
-    "modelo__n_estimators": [50, 100],
-    "modelo__max_depth": [None, 10, 20],
-    "modelo__min_samples_split": [2, 5],
+<section class="quiz mini">
+<script type="application/json" class="quiz-data">
+{
+ "titulo": "¿Lo tienes?",
+ "preguntas": [
+  {
+   "q": "Un modelo de horas tiene dos errores: 1 hora y 30 horas. ¿Cuánto vale su <strong>RMSE</strong>?",
+   "opciones": [
+    "15,5",
+    "30",
+    "10,5",
+    "21,2"
+   ],
+   "correcta": 3,
+   "porque": "RMSE = √((1² + 30²) / 2) = √(901 / 2) = √450,5 = 21,2. El MAE sería (1 + 30) / 2 = 15,5. El RMSE es mayor porque eleva los errores al cuadrado y el error de 30 domina: cuanto más se separa del MAE, más errores grandes hay."
+  },
+  {
+   "q": "En el StreamFlix de tus apuntes, la regresión lineal (RMSE 5,06) gana al Random Forest Regressor (RMSE 5,42). ¿Por qué?",
+   "opciones": [
+    "Porque el Random Forest siempre es peor que la regresión lineal",
+    "Porque el target se fabricó como una suma lineal más ruido, justo la forma que ajusta un modelo lineal",
+    "Porque la regresión lineal usa más datos",
+    "Porque el RMSE favorece a los modelos lineales"
+   ],
+   "correcta": 1,
+   "porque": "El modelo que gana depende de los datos: aquí la relación es lineal más un ruido de desviación 5, y un RMSE de 5,06 está casi en el mínimo posible. El bosque, que aproxima con escalones, se despista algo más con el ruido. En otros datos (relaciones curvas o con interacciones) ganaría el bosque; por eso se prueban los dos y se mide."
+  },
+  {
+   "q": "<code>Pressure9am</code> sale como una de las variables más importantes del Random Forest de lluvia. ¿Qué puedes afirmar?",
+   "opciones": [
+    "Que subir la presión provoca lluvia",
+    "Que la presión es la causa de la lluvia",
+    "Que si se elimina la columna el modelo dejará de funcionar",
+    "Que el modelo la usa mucho para predecir, pero eso no demuestra que sea la causa"
+   ],
+   "correcta": 3,
+   "porque": "La importancia mide cuánto usa el modelo una columna para predecir, no qué causa el resultado. La presión baja <em>acompaña</em> a las borrascas, pero otras columnas correlacionadas (humedad, nubes) pueden sustituirla si se quita. Para preguntas causales hacen falta experimentos (A/B), no importancias."
+  },
+  {
+   "q": "Los FN del modelo de bajas entran cada 2,8 días y ven 35 h al mes. ¿Qué los arreglaría?",
+   "opciones": [
+    "Un modelo más complejo con las mismas columnas",
+    "Datos nuevos que contengan la señal (fallos de pago, quejas…)",
+    "Bajar el umbral a 0"
+   ],
+   "correcta": 1,
+   "porque": "Se parecen a los que se quedan: la información no está en estas columnas. Ningún modelo encuentra lo que no hay."
+  }
+ ]
 }
-cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
-grid = GridSearchCV(pipeline, param_grid, cv=cv, scoring="accuracy", n_jobs=2)
-grid.fit(X_train, y_train)
+</script>
+</section>
 
-print("combinaciones:", len(grid.cv_results_["params"]), "x 5 folds =", len(grid.cv_results_["params"]) * 5, "entrenamientos")
-print("mejores parámetros:", grid.best_params_)
-print("accuracy media en validación cruzada:", round(grid.best_score_, 3))</code></pre>
-<details class="linea-a-linea">
-<summary>Línea por línea</summary>
-<p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
-<table class="lineas">
-<thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
-<tbody>
-<tr data-lines="1"><td><code>from sklearn.compose import ColumnTransformer</code></td><td><code>ColumnTransformer</code>: aplica un tratamiento distinto a cada grupo de columnas.</td></tr>
-<tr data-lines="2"><td><code>from sklearn.ensemble import RandomForestClassifier</code></td><td>El clasificador Random Forest (módulo 3).</td></tr>
-<tr data-lines="3"><td><code>from sklearn.model_selection import GridSearchCV, Stratified…</code></td><td><code>GridSearchCV</code> prueba todas las combinaciones de una rejilla; <code>StratifiedKFold</code> reparte los pliegues de la validación cruzada manteniendo la proporción de clases.</td></tr>
-<tr data-lines="4"><td><code>from sklearn.pipeline import Pipeline</code></td><td><code>Pipeline</code> encadena pasos en uno solo.</td></tr>
-<tr data-lines="5"><td><code>from sklearn.preprocessing import OneHotEncoder, StandardSca…</code></td><td><code>OneHotEncoder</code> convierte categorías en columnas 0/1 y <code>StandardScaler</code> estandariza los números.</td></tr>
-<tr data-lines="7"><td><code>categoricas = X_train.select_dtypes(include=["object", "stri…</code></td><td>Columnas de texto: <code>select_dtypes(include=["object", "string"])</code> funciona en pandas 2 (<code>object</code>) y en pandas 3 (<code>str</code>). <code>.columns.tolist()</code> deja los nombres en una lista.</td></tr>
-<tr data-lines="8"><td><code>numericas = X_train.select_dtypes(exclude=["object", "string…</code></td><td>Columnas numéricas: <code>exclude</code> las de texto.</td></tr>
-<tr data-lines="9"><td><code>print(len(numericas), "numéricas |", categoricas)</code></td><td>Imprime cuántas hay de cada tipo: 16 numéricas y 6 de texto.</td></tr>
-<tr data-lines="11-14"><td><code>preprocesador = ColumnTransformer([ …</code></td><td>El <code>ColumnTransformer</code>: una lista de tuplas (nombre, transformador, columnas). Las numéricas se estandarizan; las de texto pasan por One-Hot, con <code>handle_unknown="ignore"</code> para que una categoría que no se vio al entrenar no rompa el modelo.</td></tr>
-<tr data-lines="15-18"><td><code>pipeline = Pipeline([ …</code></td><td>El <code>Pipeline</code>: primero el preprocesado (<code>"prep"</code>) y después el Random Forest (<code>"modelo"</code>). <code>random_state=42</code> fija el azar de los árboles. Los nombres son importantes: sirven para dirigirse a cada paso.</td></tr>
-<tr data-lines="20-24"><td><code>param_grid = { …</code></td><td>La rejilla de hiperparámetros. La clave <code>"modelo__n_estimators"</code> usa el nombre del paso, <strong>dos guiones bajos</strong> y el hiperparámetro. 2 × 3 × 2 = 12 combinaciones. <code>None</code> en <code>max_depth</code> significa «sin límite».</td></tr>
-<tr data-lines="25"><td><code>cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=…</code></td><td>Validación cruzada de 5 pliegues, mezclando las filas (<code>shuffle=True</code>) con semilla fija.</td></tr>
-<tr data-lines="26"><td><code>grid = GridSearchCV(pipeline, param_grid, cv=cv, scoring="ac…</code></td><td>El buscador: el Pipeline, la rejilla, la validación cruzada, la métrica de puntuación (<code>accuracy</code>) y <code>n_jobs=2</code> (dos núcleos en paralelo).</td></tr>
-<tr data-lines="27"><td><code>grid.fit(X_train, y_train)</code></td><td><code>fit</code> lanza la búsqueda: entrena 12 × 5 = 60 modelos <strong>solo con el train</strong> y, al terminar, reentrena el mejor con todo el train.</td></tr>
-<tr data-lines="29"><td><code>print("combinaciones:", len(grid.cv_results_["params"]), "x …</code></td><td>Cuenta las combinaciones probadas (<code>cv_results_</code> guarda un registro de cada una) y los entrenamientos totales.</td></tr>
-<tr data-lines="30"><td><code>print("mejores parámetros:", grid.best_params_)</code></td><td><code>best_params_</code>: la mejor combinación encontrada.</td></tr>
-<tr data-lines="31"><td><code>print("accuracy media en validación cruzada:", round(grid.be…</code></td><td><code>best_score_</code>: la accuracy media de la mejor combinación en los 5 pliegues de validación.</td></tr>
-</tbody>
+<details class="profundizar">
+  <summary><span>Profundizar: la explicación completa<small>La regresión de tus apuntes (la lineal gana), el perfil de FN y FP, el recall por plan, coeficientes e importancia por permutación, y la regresión del StreamFlix ampliado.</small></span></summary>
+  <div class="prof-body">
+<h2 id="david-regresion">StreamFlix de tus apuntes: predecir las horas del mes siguiente</h2>
+
+<p class="pregunta">Ahora el target es un número. ¿Cuántas horas verá cada usuario el mes que viene, y cuánto se equivoca el modelo?</p>
+
+<h3>Lo primero, el baseline (fragmento 17)</h3>
+<p>Un modelo que predijera siempre la media de las horas de entrenamiento tendría un <strong>MAE de 8,50 h y un RMSE de 10,73 h</strong>. Ese es el listón: cualquier modelo útil tiene que bajar de ahí.</p>
+
+<h3>Regresión lineal</h3>
+<p>El mismo Pipeline (mediana, escalado, One-Hot) con <code>LinearRegression()</code> da en el test:</p>
+<table>
+  <thead><tr><th>MAE</th><th>MSE</th><th>RMSE</th><th>R²</th></tr></thead>
+  <tbody><tr><td class="res">3,997 h</td><td>25,56 h²</td><td class="res">5,056 h</td><td class="res">0,778</td></tr></tbody>
 </table>
-</details>
-<div class="salida">
-<strong>Salida esperada</strong>
-<pre>16 numéricas | ['Location', 'WindGustDir', 'WindDir9am', 'WindDir3pm', 'RainYesterday', 'Season']
-combinaciones: 12 x 5 folds = 60 entrenamientos
-mejores parámetros: {'modelo__max_depth': 10, 'modelo__min_samples_split': 5, 'modelo__n_estimators': 100}
-accuracy media en validación cruzada: 0.826</pre>
-<p>La búsqueda hace 60 entrenamientos y elige <code>n_estimators=100</code>, <code>max_depth=10</code> y <code>min_samples_split=5</code>, con una <strong>accuracy media en validación cruzada de 0,826</strong>. La mejor profundidad (10) está en medio de la rejilla, ni demasiado simple ni sin límite.</p>
+<p>La f-string del código lo traduce a una frase para el negocio: <em>«El modelo Linear Regression se equivoca aproximadamente 4,00 horas de media. RMSE es 5,06 horas. R² es 0,778.»</em> El R² de 0,778 significa que el modelo explica el 77,8 % de la variación de las horas; también se puede comprobar con el baseline: \( 1 - (5{,}056/10{,}730)^2 = 1 - 0{,}222 = 0{,}778 \).</p>
+
+<h4>¿Por qué el RMSE es mayor que el MAE?</h4>
+<p>Porque el RMSE eleva los errores al cuadrado antes de promediar, y el cuadrado agranda mucho los errores grandes. Tus apuntes lo ilustran con dos usuarios: el A tiene 30 horas reales y el modelo dice 29 (error de 1); el B tiene 50 y el modelo dice 20 (error de 30).</p>
+
+<div class="callout ejemplo">
+  <span class="lbl">Ejemplo numérico: mismo MAE, distinto RMSE</span>
+  <ol class="pasos">
+    <li><strong>Errores 1 y 30.</strong> MAE = (1 + 30) / 2 = <span class="res">15,5</span>. RMSE = √((1² + 30²) / 2) = √(901 / 2) = √450,5 = <span class="res">21,2</span>.</li>
+    <li><strong>Errores 15 y 16.</strong> MAE = (15 + 16) / 2 = <span class="res">15,5</span>. RMSE = √((225 + 256) / 2) = <span class="res">15,5</span>.</li>
+  </ol>
+  <p>Los dos casos tienen el mismo error medio, pero el primero esconde un error enorme y el RMSE lo delata (21,2 frente a 15,5). <strong>Cuanto más se separa el RMSE del MAE, más errores grandes hay.</strong></p>
 </div>
-</article><article class="snippet" data-lang="python">
-<header>
-<h3>7 · Evaluar el modelo de lluvia en el test</h3>
-<p class="para-que"><strong>Para qué sirve</strong> Mide, una sola vez y con el test, el mejor modelo de la búsqueda: accuracy, precision, recall, F1 y la matriz de confusión desglosada.</p>
-</header>
-<pre class="code"><code>from sklearn.metrics import accuracy_score, confusion_matrix, f1_score, precision_score, recall_score
 
-mejor = grid.best_estimator_
-pred = mejor.predict(X_test)
+<p>En nuestros datos el cociente RMSE / MAE es 5,056 / 3,997 = 1,26. Hay un dato curioso: cuando los errores tienen forma de campana (normal), ese cociente vale siempre \( \sqrt{\pi/2} \approx 1{,}25 \). Un 1,26 indica que los errores del modelo son casi puramente «normales», sin errores gigantes escondidos.</p>
 
-print("accuracy :", round(accuracy_score(y_test, pred), 3))
-print("precision:", round(precision_score(y_test, pred), 3))
-print("recall   :", round(recall_score(y_test, pred), 3))
-print("F1       :", round(f1_score(y_test, pred), 3))
-
-tn, fp, fn, tp = confusion_matrix(y_test, pred).ravel()
-print("TN =", tn, "| FP =", fp, "| FN =", fn, "| TP =", tp)
-print("días de lluvia reales:", fn + tp, "| detectados:", tp, "| perdidos:", fn)</code></pre>
-<details class="linea-a-linea">
-<summary>Línea por línea</summary>
-<p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
-<table class="lineas">
-<thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
-<tbody>
-<tr data-lines="1"><td><code>from sklearn.metrics import accuracy_score, confusion_matrix…</code></td><td>Importa las métricas que vamos a usar.</td></tr>
-<tr data-lines="3"><td><code>mejor = grid.best_estimator_</code></td><td><code>best_estimator_</code>: el Pipeline ganador, ya reentrenado con todo el train.</td></tr>
-<tr data-lines="4"><td><code>pred = mejor.predict(X_test)</code></td><td>Predice las clases del test (0 o 1). Recibe las filas <strong>crudas</strong>: el Pipeline se encarga de preparar las columnas.</td></tr>
-<tr data-lines="6-9"><td><code>print("accuracy :", round(accuracy_score(y_test, pred), 3)) …</code></td><td>Calcula e imprime cada métrica comparando el target real (<code>y_test</code>) con la predicción (<code>pred</code>). <code>round(..., 3)</code> la deja con tres decimales.</td></tr>
-<tr data-lines="11"><td><code>tn, fp, fn, tp = confusion_matrix(y_test, pred).ravel()</code></td><td><code>confusion_matrix</code> devuelve una tabla 2×2; <code>.ravel()</code> la aplana en cuatro números, siempre en el orden TN, FP, FN, TP.</td></tr>
-<tr data-lines="12"><td><code>print("TN =", tn, "| FP =", fp, "| FN =", fn, "| TP =", tp)</code></td><td>Imprime los cuatro valores con su nombre.</td></tr>
-<tr data-lines="13"><td><code>print("días de lluvia reales:", fn + tp, "| detectados:", tp…</code></td><td>Traduce la matriz a lenguaje de lluvia: días de lluvia reales (FN + TP), los que detectó (TP) y los que se le escaparon (FN).</td></tr>
-</tbody>
+<h4>El modelo también redescubre la receta</h4>
+<p>El fragmento 17 imprime los pesos de la regresión en horas por unidad original. Frente a la receta de <code>HorasProximoMes</code>:</p>
+<table>
+  <thead><tr><th>Columna</th><th>Receta</th><th>Aprendido</th></tr></thead>
+  <tbody>
+    <tr><td><code>HorasMes</code></td><td>+0,65</td><td class="res">+0,638</td></tr>
+    <tr><td><code>DiasDesdeUltimoUso</code></td><td>−0,20</td><td class="res">−0,199</td></tr>
+    <tr><td><code>ProblemasPago</code></td><td>−2,5</td><td class="res">−2,293</td></tr>
+    <tr><td><code>Dispositivos</code></td><td>+1,2</td><td class="res">+1,113</td></tr>
+    <tr><td><code>ErroresApp</code>, <code>Edad</code>, <code>PeliculasVistas</code>, <code>SeriesVistas</code></td><td>0</td><td class="res">+0,104 / +0,003 / −0,005 / −0,004</td></tr>
+  </tbody>
 </table>
-</details>
-<div class="salida">
-<strong>Salida esperada</strong>
-<pre>accuracy : 0.796
-precision: 0.604
-recall   : 0.449
-F1       : 0.515
-TN = 978 | FP = 101 | FN = 189 | TP = 154
-días de lluvia reales: 343 | detectados: 154 | perdidos: 189</pre>
-<p><strong>Accuracy 0,796, precision 0,604, recall 0,449, F1 0,515.</strong> La matriz: TN = 978, FP = 101, FN = 189, TP = 154. De 343 días de lluvia detecta 154 y se le escapan 189. El baseline «siempre No» acertaría 0,759: la mejora es de unos 3,7 puntos, y el recall no llega a la mitad.</p>
+<p>Los pesos se quedan algo por debajo de los verdaderos porque el <code>clip(lower=0)</code> aplasta los valores negativos y el modelo lineal no sabe de ese suelo. Aun así, es una réplica notable.</p>
+
+<h3>Random Forest Regressor (fragmento 18)</h3>
+<table>
+  <thead><tr><th>Modelo</th><th>MAE</th><th>RMSE</th><th>R²</th></tr></thead>
+  <tbody>
+    <tr><td>Baseline (la media)</td><td>8,50</td><td>10,73</td><td>0,00</td></tr>
+    <tr><td>Linear Regression</td><td class="res">3,997</td><td class="res">5,056</td><td class="res">0,778</td></tr>
+    <tr><td>Random Forest Regressor</td><td>4,267</td><td>5,418</td><td>0,745</td></tr>
+  </tbody>
+</table>
+<p>Aquí gana la <strong>regresión lineal</strong>, no el bosque. No hay ningún fallo: el target se fabricó como una suma con pesos más un ruido, que es exactamente lo que ajusta un modelo lineal. El bosque, que aproxima con escalones, necesita muchos para imitar una recta y se deja engañar algo más por el ruido. Y hay un suelo: el ruido sorteado tiene desviación 5 horas y <em>ningún modelo puede predecirlo</em>, así que un RMSE de 5,06 está prácticamente en el mínimo posible. Moraleja de tus apuntes, con otro resultado: <strong>prueba un modelo sencillo y uno complejo y mide</strong>; que gane uno u otro depende de los datos.</p>
+
+<p>Las 20 primeras predicciones del bosque (fragmento 18) enseñan errores de todos los tamaños: el usuario 17 (real 44,3 h, predicho 44,8) casi acierta; el 13 (real 8,0, predicho 18,8) falla por unas 10,8 horas; el 18 (real 32,9, predicho 24,3) por 8,6. El gráfico real-contra-predicho que no ves sería una nube de puntos alrededor de la diagonal «real = predicho», con una dispersión vertical del orden del RMSE.</p>
+
+<div class="callout ojo">
+  <span class="lbl">Ojo: el preprocesador compartido se reajusta en silencio</span>
+  <p>En el código de tus apuntes, los cuatro Pipelines (logística, KNN, regresión lineal y bosque de regresión) reciben <em>el mismo objeto</em> <code>preprocessor</code>. Un <code>Pipeline</code> no lo copia al hacer <code>fit</code>: lo reajusta. Así, al entrenar la regresión (con otro reparto de filas, porque no se estratifica) el preprocesador de la logística ha cambiado de medias y desviaciones sin que lo hayas pedido. El fragmento 17 lo comprueba: el ROC-AUC de la logística era 0,79169 y, tras entrenar la regresión, pasa a 0,79155. Aquí la diferencia es mínima, pero en otro proyecto podría romper un modelo ya entrenado sin ningún aviso. El remedio es darle a cada Pipeline su propia copia con <code>from sklearn.base import clone</code> y <code>clone(preprocessor)</code>, o escribir una pequeña función que construya un preprocesador nuevo cada vez.</p>
 </div>
-</article></div></details></div></main></body></html>
+
+<h2 id="errores">Leer los errores y la importancia de las variables</h2>
+
+<p class="pregunta">Tienes un modelo que ahorra 10.185 € frente a no hacer nada. ¿Quién se te escapa, a quién molestas sin necesidad y qué mira el modelo para decidir?</p>
+
+<p>Un número global (accuracy, AUC, euros) esconde <strong>dónde</strong> falla el modelo. El análisis de errores consiste en separar a los usuarios del test en cuatro grupos según lo que ocurrió y compararlos. El fragmento 31 lo hace con el umbral 0,20 que elegimos:</p>
+
+<ul>
+  <li><strong>TP</strong> (225): cancelaban y el modelo avisó. Aciertos que valen dinero.</li>
+  <li><strong>FN</strong> (53): cancelaron y el modelo no avisó. Los costosos (60 € cada uno).</li>
+  <li><strong>FP</strong> (221): el modelo avisó pero se quedaron. Los molestos (15 € cada uno).</li>
+  <li><strong>TN</strong> (501): se quedaron y no se avisó. Lo normal.</li>
+</ul>
+
+<p>Perfil medio de cada grupo:</p>
+<table>
+  <thead><tr><th>Grupo</th><th>Días sin entrar</th><th>Horas/mes</th><th>Tickets</th><th>Antigüedad (meses)</th></tr></thead>
+  <tbody>
+    <tr><td>TP acertados (225)</td><td>19,9</td><td>12,6</td><td>1,1</td><td>11,8</td></tr>
+    <tr><td>FN no vistos (53)</td><td>2,8</td><td>35,4</td><td>0,4</td><td>21,4</td></tr>
+    <tr><td>FP falsas alarmas (221)</td><td>8,2</td><td>18,9</td><td>0,6</td><td>12,2</td></tr>
+    <tr><td>TN tranquilos (501)</td><td>2,5</td><td>48,6</td><td>0,3</td><td>26,7</td></tr>
+  </tbody>
+</table>
+
+<p>Qué se desprende de esa tabla, y es lo que se cuenta a negocio:</p>
+<ul>
+  <li><strong>Los FN son clientes que «se parecen a los que se quedan».</strong> Entran cada 2,8 días de media, ven 35 horas al mes y llevan casi dos años: no tienen ninguna señal de alarma. Se fueron <em>sin avisar</em>. Esos errores <strong>no se arreglan con un modelo mejor</strong> sobre estas columnas: la información simplemente no está. Se arreglan con datos nuevos (un fallo de pago, una queja, una oferta de la competencia…).</li>
+  <li><strong>Los FP tienen señales intermedias</strong> (8,2 días sin entrar, 19 horas): son usuarios en riesgo que, por suerte, no se fueron. Son el precio de haber puesto el umbral bajo: avisar a casi 450 usuarios para atrapar a 225.</li>
+</ul>
+
+<h3>¿Falla igual con todo el mundo?</h3>
+<p>Otro corte útil es por segmento. De las cancelaciones reales de cada plan, ¿a qué fracción avisó el modelo (es decir, el <strong>recall por plan</strong>)? Según el fragmento 31: <strong>Basic 0,93</strong> (126 cancelaciones), <strong>Premium 0,75</strong> (53) y <strong>Standard 0,69</strong> (96). El modelo cubre casi todas las cancelaciones de Basic y bastante menos las de Standard. Es esperable: Basic tiene una tasa de cancelación base mucho más alta, y el modelo le suma un empujón extra, así que sus usuarios cruzan antes el umbral. La lección: <strong>un recall global del 0,81 puede esconder segmentos donde es del 0,69</strong>, y si algún segmento te importa especialmente (o puede tener implicaciones de equidad), hay que mirarlo por separado.</p>
+
+<div class="callout ojo">
+  <span class="lbl">Ojo: no sobreajustes tu análisis de errores</span>
+  <p>Cuando ves un patrón en los errores del test, la tentación es corregirlo y volver a medir en el mismo test. Pero entonces el test ya te ha «enseñado» algo. Si decides cambiar el modelo a partir de lo que ves, vuelve a hacer la validación cruzada sobre el train o reserva otro conjunto nuevo para la medida final.</p>
+</div>
+
+<h3>Qué mira el modelo: coeficientes e importancia por permutación</h3>
+<p>Para una regresión logística los <strong>coeficientes</strong> se pueden leer directamente, porque las variables están escaladas (misma unidad: «desviaciones típicas»). Los seis mayores en valor absoluto (fragmento 31):</p>
+<table>
+  <thead><tr><th>Variable</th><th>Coeficiente</th><th>Lectura</th></tr></thead>
+  <tbody>
+    <tr><td><code>DiasSinEntrar</code></td><td>+0,86</td><td>Cada desviación típica más (unos 10 días) multiplica por e<sup>0,86</sup> = 2,36 las <em>odds</em> (lo mucho más probable que es cancelar que quedarse)</td></tr>
+    <tr><td><code>HorasMes</code></td><td>−0,47</td><td>Más horas vistas, menos riesgo</td></tr>
+    <tr><td><code>AntiguedadMeses</code></td><td>−0,35</td><td>Los clientes veteranos cancelan menos</td></tr>
+    <tr><td><code>TicketsSoporte</code></td><td>+0,30</td><td>Más incidencias, más riesgo</td></tr>
+    <tr><td><code>Plan_Basic</code> / <code>Plan_Standard</code></td><td>+0,10 / −0,10</td><td>Efecto pequeño: la regularización fuerte (<code>C</code> = 0,01) encoge los pesos de las columnas débiles. Estas dos no están escaladas, son columnas 0/1</td></tr>
+  </tbody>
+</table>
+
+<p>Para saber cuánto <em>importa</em> cada variable al modelo, sirve para cualquier modelo (no solo la logística) la <strong>importancia por permutación</strong>: barajas al azar los valores de <em>una</em> columna del test, de modo que pierda su relación con la respuesta, y mides cuánto <em>cae</em> el AUC. Si cae mucho, el modelo dependía de esa columna; si no cae, la ignoraba. Resultado (fragmento 31, 5 repeticiones):</p>
+
+<table>
+  <thead><tr><th>Variable</th><th>Caída de ROC-AUC al barajarla</th></tr></thead>
+  <tbody>
+    <tr><td><code>DiasSinEntrar</code></td><td class="res">0,106</td></tr>
+    <tr><td><code>HorasMes</code></td><td>0,047</td></tr>
+    <tr><td><code>TicketsSoporte</code></td><td>0,019</td></tr>
+    <tr><td><code>AntiguedadMeses</code></td><td>0,014</td></tr>
+    <tr><td><code>Dispositivo</code></td><td>0,001</td></tr>
+    <tr><td><code>PctDrama</code>, <code>PctInfantil</code>, <code>Edad</code>, <code>Plan</code>, <code>PctAccion</code>, <code>PctDocumental</code>, <code>PctComedia</code></td><td>entre −0,001 y 0,000 (ruido)</td></tr>
+  </tbody>
+</table>
+
+<p>Las dos medidas coinciden en las cuatro variables que importan, con los días sin entrar y las horas en cabeza (el orden entre tickets y antigüedad se invierte, pero están muy cerca). Los valores negativos («−0,001») son ruido: al barajar una columna inútil el AUC sube o baja una milésima por azar. <code>Plan</code> sale con importancia cero porque su coeficiente es pequeño (la regularización lo ha encogido) y porque parte de lo que cuenta el plan ya viaja, probablemente, en las horas y en los días sin entrar: las variables correlacionadas comparten información.</p>
+
+<div class="callout ojo">
+  <span class="lbl">Ojo: importancia no es causalidad</span>
+  <p>Que <code>DiasSinEntrar</code> sea la variable más importante significa que <strong>sirve para predecir</strong> quién cancelará. No significa que <em>obligar a un usuario a entrar</em> evite que se dé de baja. Los días sin entrar son un <em>síntoma</em> de desinterés, no la causa: lo que hay debajo (el desinterés, el precio, la falta de contenido) es lo que provoca las dos cosas a la vez. Si mandas notificaciones para que la gente entre y se reducen los días sin entrar, la columna cambia pero la causa sigue ahí. Para responder «¿qué pasa si hago X?» no basta un modelo predictivo: hace falta un <strong>experimento</strong> (un test A/B) o un análisis causal. Y dos variables muy correlacionadas se reparten la importancia: ver un valor bajo en una no prueba que no importe.</p>
+</div>
+
+<h2 id="regresion">Regresión: ¿cuántas horas verá el mes que viene?</h2>
+
+<p class="pregunta">Los servidores y las negociaciones de contenidos se planifican en horas, no en «cancela o no». ¿Cómo se predice un número y cómo se sabe si la predicción es buena?</p>
+
+<p>Es el segundo target: <code>HorasProximoMes</code>. El flujo es el mismo (mismas filas de train y de test, mismo preprocesador dentro del Pipeline), pero cambian tres cosas: los modelos (<code>LinearRegression</code> y <code>RandomForestRegressor</code>), el baseline (<code>DummyRegressor(strategy="mean")</code> predice siempre la media de las horas del train) y las métricas.</p>
+
+<h3>Las métricas, calculadas a mano con cuatro usuarios</h3>
+<p>El <a href="../modulo-2.html">módulo 2</a> las definió; aquí las usamos para tomar decisiones, así que conviene tenerlas frescas con un ejemplo muy pequeño:</p>
+
+<div class="callout ejemplo">
+  <span class="lbl">Ejemplo numérico: MAE, MSE, RMSE y R² con cuatro usuarios</span>
+  <table>
+    <thead><tr><th>Usuario</th><th>Horas reales</th><th>Predicción</th><th>Error (real − pred.)</th><th>|Error|</th><th>Error²</th></tr></thead>
+    <tbody>
+      <tr><td>A</td><td>10</td><td>12</td><td>−2</td><td>2</td><td>4</td></tr>
+      <tr><td>B</td><td>20</td><td>18</td><td>+2</td><td>2</td><td>4</td></tr>
+      <tr><td>C</td><td>30</td><td>33</td><td>−3</td><td>3</td><td>9</td></tr>
+      <tr><td>D</td><td>40</td><td>36</td><td>+4</td><td>4</td><td>16</td></tr>
+    </tbody>
+  </table>
+  <ol class="pasos">
+    <li><strong>MAE</strong> (error absoluto medio) = (2 + 2 + 3 + 4) / 4 = <span class="res">2,75 h</span>: «me equivoco 2,75 horas de media».</li>
+    <li><strong>MSE</strong> (error cuadrático medio) = (4 + 4 + 9 + 16) / 4 = <span class="res">8,25</span> (en horas², poco intuitivo).</li>
+    <li><strong>RMSE</strong> = √8,25 = <span class="res">2,87 h</span>: vuelve a las horas y castiga más los errores grandes.</li>
+    <li><strong>R²</strong> = 1 − (suma de errores²) / (suma de desviaciones² respecto a la media). La media real es 25, así que las desviaciones² son 225 + 25 + 25 + 225 = 500; los errores² suman 33. R² = 1 − 33 / 500 = <span class="res">0,934</span>.</li>
+    <li><strong>Baseline de la media</strong> (predecir 25 para todos): MAE = (15 + 5 + 5 + 15) / 4 = 10; MSE = 125; R² = <span class="res">0</span> por definición.</li>
+    <li><strong>Un solo error grande</strong>: si D se predijera como 60 en vez de 36 (error de −20), el MAE sube a 6,75 (de 2,75, ×2,5) pero el MSE salta a 104,25 y el RMSE a 10,2 (de 2,87, ×3,6), y el R² cae a 0,166. El RMSE «se asusta» de los errores grandes mucho más que el MAE.</li>
+  </ol>
+</div>
+
+<p>Así se leen en la práctica: <strong>MAE</strong> para comunicar («me equivoco X horas de media»), <strong>RMSE</strong> cuando los errores grandes son especialmente malos, y <strong>R²</strong> como «qué fracción de la variación he explicado» (1 = todo, 0 = lo mismo que predecir la media, negativo = peor que la media).</p>
+
+<h3>Resultados reales (fragmento 32)</h3>
+<table>
+  <thead><tr><th>Modelo</th><th>MAE</th><th>MSE</th><th>RMSE</th><th>R²</th></tr></thead>
+  <tbody>
+    <tr><td>Baseline (la media)</td><td>18,06</td><td>455,83</td><td>21,35</td><td>−0,00</td></tr>
+    <tr><td>Regresión lineal</td><td>4,21</td><td>33,28</td><td>5,77</td><td>0,93</td></tr>
+    <tr><td>Random Forest</td><td class="res">3,78</td><td>27,08</td><td class="res">5,20</td><td class="res">0,94</td></tr>
+  </tbody>
+</table>
+<p>Las horas del mes siguiente tienen media 27,0 y desviación 21,4: el RMSE del baseline (21,35) es prácticamente esa desviación, como debe ser, porque predecir la media equivale a medir cuánto varían los datos. Los dos modelos reducen el error de 18 horas a 4: una mejora enorme. (El «−0,00» de R² del baseline es un cero ligeramente negativo: la media del train no coincide exactamente con la del test, así que predecirla es un pelín peor que predecir la media del propio test.)</p>
+
+<div class="callout ojo">
+  <span class="lbl">Ojo: un R² de 0,93 no dice nada hasta compararlo con el baseline correcto</span>
+  <p>«Predecir la media» es un baseline muy débil, porque ignora que el que ve mucho este mes verá mucho el siguiente. El baseline que usaría un profesional es el <em>ingenuo</em>: «el mes que viene verá lo mismo que este» (<code>HorasMes</code>). Ese baseline tan simple saca MAE 7,21 y R² 0,82 (también en el fragmento 32). Frente a él, la regresión lineal pasa de 7,21 a 4,21 horas de error: una mejora real del 42 %, pero muy distinta de «de 18 a 4». Un resultado se mide siempre contra el <em>baseline más duro razonable</em>, no contra el más fácil de superar.</p>
+</div>
+
+<div class="callout ojo">
+  <span class="lbl">Ojo: <code>squared=False</code> ya no existe</span>
+  <p>En el código de muchos cursos viejos el RMSE se obtiene con <code>mean_squared_error(y, pred, squared=False)</code>. Ese parámetro se eliminó en scikit-learn 1.6 y en las versiones actuales da error. La forma actual es una función propia: <code>root_mean_squared_error(y, pred)</code> (la importo en el fragmento 32). Si necesitas compatibilidad con versiones antiguas, calcula <code>np.sqrt(mean_squared_error(y, pred))</code>.</p>
+</div>
+
+<h3>Real frente a predicho (lo que dibujaba el gráfico original)</h3>
+<p>El gráfico clásico de la regresión es una nube de puntos con «horas reales» en el eje horizontal y «horas predichas» en el vertical: si el modelo fuera perfecto, todos los puntos caerían sobre la diagonal. Como aquí no hay imágenes, el fragmento 32 imprime lo mismo en números: las cinco primeras filas del test. Por ejemplo, un usuario que de verdad vio 12,2 horas recibe una predicción de 14,5 (regresión lineal) y 15,4 (bosque); otro con 25,2 horas reales recibe 33,8 y 34,7; y uno con 40,5 recibe 39,8 y 38,3. Las predicciones se acercan a la realidad pero con desviaciones de pocas horas, que es lo que verás como una nube alrededor de la diagonal en el experimento de abajo. Y como el error no tiene por qué ser igual en todos los rangos, lo mide por tramos de horas reales:</p>
+<table>
+  <thead><tr><th>Horas reales</th><th>Usuarios</th><th>Error absoluto medio</th></tr></thead>
+  <tbody>
+    <tr><td>0 a 10 h</td><td>273</td><td>4,22</td></tr>
+    <tr><td>10 a 30 h</td><td>302</td><td>3,84</td></tr>
+    <tr><td>30 a 60 h</td><td>338</td><td>4,03</td></tr>
+    <tr><td>más de 60 h</td><td>87</td><td class="res">6,15</td></tr>
+  </tbody>
+</table>
+<p>El error es bastante uniforme (≈ 4 h) salvo en los usuarios más intensivos (más de 60 horas), donde sube a 6,15: hay menos usuarios así y la relación se vuelve más ruidosa. Si planificas la capacidad de los servidores para esos usuarios, ese error es el que debes presupuestar, no el promedio global.</p>
+
+
+  </div>
+</details>
+
+<section>
+<h2 class="sin-num">Código</h2>
+<p class="codigo-intro">Cuaderno C (StreamFlix ampliado): los dos usan el reparto del 26 y la función <code>construir</code> del 27; el 31 también las probabilidades del 29 y los costes del 30.</p>
+<article class="snippet" data-lang="python">
+  <header>
+    <h3>31 · Análisis de errores e importancia de variables</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Separa a los usuarios del test en TP, FN, FP y TN con el umbral elegido, compara sus perfiles, mide el recall por plan y calcula qué variables usa el modelo (coeficientes e importancia por permutación).</p>
+  </header>
+  <pre class="code"><code>UMBRAL = COSTE_FP / (COSTE_FP + COSTE_FN)
+pred_u = (prob &gt;= UMBRAL).astype(int)
+test = X_test.copy()
+test["real"], test["avisado"] = y_test.to_numpy(), pred_u
+test["grupo"] = np.select(
+    [(test["real"] == 1) &amp; (test["avisado"] == 1), (test["real"] == 1) &amp; (test["avisado"] == 0),
+     (test["real"] == 0) &amp; (test["avisado"] == 1)],
+    ["TP acertados", "FN no vistos", "FP falsas alarmas"], default="TN tranquilos")
+print(test.groupby("grupo")[["DiasSinEntrar", "HorasMes", "TicketsSoporte", "AntiguedadMeses"]].mean().round(1))
+print(test.groupby("grupo").size().to_dict())
+print(test[test["real"] == 1].groupby("Plan")["avisado"].agg(["count", "mean"]).round(2))
+
+from sklearn.inspection import permutation_importance
+
+coef = pd.Series(modelo_final.named_steps["modelo"].coef_[0], index=modelo_final.named_steps["prep"].get_feature_names_out())
+print(coef.sort_values(key=abs, ascending=False).head(6).round(2))
+
+imp = permutation_importance(modelo_final, X_test, y_test, scoring="roc_auc", n_repeats=5, random_state=42)
+ranking = pd.Series(imp.importances_mean, index=X_test.columns).sort_values(ascending=False)
+print(ranking.round(3).to_string())</code></pre>
+  <details class="linea-a-linea">
+    <summary>Línea por línea</summary>
+    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+      <tbody>
+        <tr data-lines="1"><td><code>UMBRAL = COSTE_FP / (COSTE_FP + COSTE_FN)</code></td><td>El umbral de decisión: la fórmula de costes (0,20).</td></tr>
+        <tr data-lines="2"><td><code>pred_u = (prob &gt;= UMBRAL).astype(int)</code></td><td>Decisión con ese umbral.</td></tr>
+        <tr data-lines="3"><td><code>test = X_test.copy()</code></td><td>Copia del test para añadirle columnas sin tocar el original.</td></tr>
+        <tr data-lines="4"><td><code>test["real"], test["avisado"] = y_test.to_numpy(), pred_u</code></td><td>Añade dos columnas: la realidad (<code>real</code>) y si se avisó (<code>avisado</code>). Se asignan las dos a la vez con <code>.to_numpy()</code> para quitar el índice.</td></tr>
+        <tr data-lines="5-8"><td><code>test["grupo"] = np.select( …</code></td><td><code>np.select</code> asigna a cada usuario su grupo: una lista de condiciones, una lista de nombres y un valor por defecto («TN tranquilos») si ninguna se cumple.</td></tr>
+        <tr data-lines="9"><td><code>print(test.groupby("grupo")[["DiasSinEntrar", "HorasMes", "T…</code></td><td>Media de cuatro columnas en cada grupo: el perfil de cada tipo de acierto y de error.</td></tr>
+        <tr data-lines="10"><td><code>print(test.groupby("grupo").size().to_dict())</code></td><td>Tamaño de cada grupo.</td></tr>
+        <tr data-lines="11"><td><code>print(test[test["real"] == 1].groupby("Plan")["avisado"].agg…</code></td><td>Entre las cancelaciones reales (<code>test["real"] == 1</code>), recuento y fracción avisada por plan: el recall por segmento (la media de <code>avisado</code> entre los que canceló es el recall).</td></tr>
+        <tr data-lines="13"><td><code>from sklearn.inspection import permutation_importance</code></td><td>Importa <code>permutation_importance</code>.</td></tr>
+        <tr data-lines="15"><td><code>coef = pd.Series(modelo_final.named_steps["modelo"].coef_[0]…</code></td><td>Los coeficientes de la regresión logística (<code>coef_[0]</code>), etiquetados con el nombre de cada columna ya preparada (<code>get_feature_names_out()</code>) en una <code>Series</code>.</td></tr>
+        <tr data-lines="16"><td><code>print(coef.sort_values(key=abs, ascending=False).head(6).rou…</code></td><td>Los ordena por valor absoluto (<code>key=abs</code>) y muestra los 6 mayores con dos decimales. Como las numéricas están estandarizadas, son comparables entre sí.</td></tr>
+        <tr data-lines="18"><td><code>imp = permutation_importance(modelo_final, X_test, y_test, s…</code></td><td><strong>Importancia por permutación</strong>: baraja cada columna del test 5 veces y mide cuánto cae el ROC-AUC. Funciona con cualquier modelo y se calcula con el Pipeline entero, así que las columnas son las originales (no las del One-Hot).</td></tr>
+        <tr data-lines="19"><td><code>ranking = pd.Series(imp.importances_mean, index=X_test.colum…</code></td><td>Ordena la media de las caídas de mayor a menor, con el nombre de cada columna original.</td></tr>
+        <tr data-lines="20"><td><code>print(ranking.round(3).to_string())</code></td><td>La imprime con tres decimales (<code>to_string()</code> evita que pandas abrevie la lista).</td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>                   DiasSinEntrar  HorasMes  TicketsSoporte  AntiguedadMeses
+grupo                                                                      
+FN no vistos                 2.8      35.4             0.4             21.4
+FP falsas alarmas            8.2      18.9             0.6             12.2
+TN tranquilos                2.5      48.6             0.3             26.7
+TP acertados                19.9      12.6             1.1             11.8
+{'FN no vistos': 53, 'FP falsas alarmas': 221, 'TN tranquilos': 501, 'TP acertados': 225}
+          count  mean
+Plan                 
+Basic       126  0.93
+Premium      53  0.75
+Standard     96  0.69
+
+num__DiasSinEntrar      0.86
+num__HorasMes          -0.47
+num__AntiguedadMeses   -0.35
+num__TicketsSoporte     0.30
+cat__Plan_Basic         0.10
+cat__Plan_Standard     -0.10
+dtype: float64
+DiasSinEntrar      0.106
+HorasMes           0.047
+TicketsSoporte     0.019
+AntiguedadMeses    0.014
+Dispositivo        0.001
+PctDrama           0.000
+PctInfantil       -0.000
+Edad              -0.000
+Plan              -0.000
+PctAccion         -0.000
+PctDocumental     -0.001
+PctComedia        -0.001</pre>
+    <p>Grupos (umbral 0,20): 225 TP, 53 FN, 221 FP y 501 TN. Los <strong>FN</strong> entran cada 2,8 días y ven 35,4 horas: son clientes sin señal de alarma. Los TP llevan 19,9 días sin entrar. Recall por plan: <strong>Basic 0,93, Premium 0,75, Standard 0,69</strong>. Coeficientes: <code>DiasSinEntrar</code> +0,86, <code>HorasMes</code> −0,47, <code>AntiguedadMeses</code> −0,35, <code>TicketsSoporte</code> +0,30. Permutación: <code>DiasSinEntrar</code> 0,106, <code>HorasMes</code> 0,047, <code>TicketsSoporte</code> 0,019, <code>AntiguedadMeses</code> 0,014; el resto, entre −0,001 y 0,001 (ruido).</p>
+  </div>
+</article>
+<article class="snippet" data-lang="python">
+  <header>
+    <h3>32 · Regresión: baseline, regresión lineal y Random Forest</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Predice las horas del mes siguiente con tres modelos (la media, regresión lineal y Random Forest), calcula MAE, MSE, RMSE y R², compara con un baseline más duro y mide el error por tramos.</p>
+  </header>
+  <pre class="code"><code>from sklearn.dummy import DummyRegressor
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.linear_model import LinearRegression
+from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score, root_mean_squared_error
+
+modelos_reg = {
+    "Baseline (la media)": DummyRegressor(strategy="mean"),
+    "Regresión lineal": LinearRegression(),
+    "Random Forest": RandomForestRegressor(n_estimators=100, random_state=42),
+}
+filas, predicciones = [], {}
+for nombre, modelo in modelos_reg.items():
+    pipe = construir(modelo).fit(X_train, h_train)
+    p = pipe.predict(X_test)
+    predicciones[nombre] = p
+    filas.append({"modelo": nombre, "MAE": mean_absolute_error(h_test, p), "MSE": mean_squared_error(h_test, p),
+                  "RMSE": root_mean_squared_error(h_test, p), "R2": r2_score(h_test, p)})
+print(pd.DataFrame(filas).set_index("modelo").round(2))
+print("las horas del mes siguiente tienen media", round(h_test.mean(), 1), "y desviación", round(h_test.std(), 1))
+ingenuo = X_test["HorasMes"].fillna(X_train["HorasMes"].median())          # baseline más duro: «el mes que viene verá lo mismo que este»
+print("baseline ingenuo (repetir las horas de este mes): MAE", round(mean_absolute_error(h_test, ingenuo), 2), "| R2", round(r2_score(h_test, ingenuo), 2))
+
+comparacion = pd.DataFrame({"real": h_test.to_numpy(), "lineal": predicciones["Regresión lineal"], "forest": predicciones["Random Forest"]})
+print(comparacion.head(5).round(1))
+
+error = np.abs(h_test - predicciones["Regresión lineal"])
+tramos = pd.cut(h_test, [-0.1, 10, 30, 60, 100], labels=["0-10 h", "10-30 h", "30-60 h", "60+ h"])
+print(error.groupby(tramos, observed=True).agg(["count", "mean"]).round(2))</code></pre>
+  <details class="linea-a-linea">
+    <summary>Línea por línea</summary>
+    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+      <tbody>
+        <tr data-lines="1"><td><code>from sklearn.dummy import DummyRegressor</code></td><td><code>DummyRegressor</code>: el baseline que predice siempre lo mismo.</td></tr>
+        <tr data-lines="2"><td><code>from sklearn.ensemble import RandomForestRegressor</code></td><td><code>RandomForestRegressor</code>: el bosque de árboles para predecir números.</td></tr>
+        <tr data-lines="3"><td><code>from sklearn.linear_model import LinearRegression</code></td><td><code>LinearRegression</code>: la regresión lineal del módulo 2.</td></tr>
+        <tr data-lines="4"><td><code>from sklearn.metrics import mean_absolute_error, mean_square…</code></td><td>Las métricas de regresión. <code>root_mean_squared_error</code> es la forma actual de obtener el RMSE (el parámetro <code>squared=False</code> se eliminó en scikit-learn 1.6).</td></tr>
+        <tr data-lines="6-10"><td><code>modelos_reg = { …</code></td><td>Los tres candidatos. <code>strategy="mean"</code> hace que el baseline prediga siempre la media de las horas del train. (El bosque no lleva <code>n_jobs</code>, para que las predicciones salgan idénticas en cada ejecución.)</td></tr>
+        <tr data-lines="11"><td><code>filas, predicciones = [], {}</code></td><td>Dos contenedores vacíos: una lista para las filas de resultados y un diccionario para guardar las predicciones de cada modelo.</td></tr>
+        <tr data-lines="12"><td><code>for nombre, modelo in modelos_reg.items():</code></td><td>Recorre los candidatos.</td></tr>
+        <tr data-lines="13"><td><code>pipe = construir(modelo).fit(X_train, h_train)</code></td><td>Construye el Pipeline (copia limpia del preprocesador + modelo) y lo entrena con las <strong>horas futuras del train</strong> (<code>h_train</code>) como respuesta.</td></tr>
+        <tr data-lines="14"><td><code>p = pipe.predict(X_test)</code></td><td>Predice las horas del test.</td></tr>
+        <tr data-lines="15"><td><code>predicciones[nombre] = p</code></td><td>Guarda esas predicciones con el nombre del modelo.</td></tr>
+        <tr data-lines="16-17"><td><code>filas.append({"modelo": nombre, "MAE": mean_absolute_error(h…</code></td><td>Calcula las cuatro métricas contra las horas reales del test (<code>h_test</code>) y guarda una fila.</td></tr>
+        <tr data-lines="18"><td><code>print(pd.DataFrame(filas).set_index("modelo").round(2))</code></td><td>Tabla de resultados con el nombre como índice y dos decimales.</td></tr>
+        <tr data-lines="19"><td><code>print("las horas del mes siguiente tienen media", round(h_te…</code></td><td>Media y desviación de las horas reales del test, para tener una referencia.</td></tr>
+        <tr data-lines="20"><td><code>ingenuo = X_test["HorasMes"].fillna(X_train["HorasMes"].medi…</code></td><td>El baseline <strong>ingenuo</strong>: «el mes que viene verá lo mismo que este». Usa <code>HorasMes</code> y rellena sus huecos con la mediana del train (<code>fillna</code>).</td></tr>
+        <tr data-lines="21"><td><code>print("baseline ingenuo (repetir las horas de este mes): MAE…</code></td><td>MAE y R² de ese baseline más duro.</td></tr>
+        <tr data-lines="23"><td><code>comparacion = pd.DataFrame({"real": h_test.to_numpy(), "line…</code></td><td>Pone lado a lado las horas reales y las predicciones de los dos modelos: lo que dibujaría el gráfico «real frente a predicho».</td></tr>
+        <tr data-lines="24"><td><code>print(comparacion.head(5).round(1))</code></td><td>Muestra las cinco primeras filas, con un decimal.</td></tr>
+        <tr data-lines="26"><td><code>error = np.abs(h_test - predicciones["Regresión lineal"])</code></td><td>Error absoluto de la regresión lineal en cada usuario (<code>np.abs</code> de real menos predicho).</td></tr>
+        <tr data-lines="27"><td><code>tramos = pd.cut(h_test, [-0.1, 10, 30, 60, 100], labels=["0-…</code></td><td><code>pd.cut</code> clasifica cada usuario en un tramo de horas reales: (−0,1–10], (10–30], (30–60], (60–100].</td></tr>
+        <tr data-lines="28"><td><code>print(error.groupby(tramos, observed=True).agg(["count", "me…</code></td><td>Agrupa los errores por tramo y calcula cuántos usuarios hay y su error medio. <code>observed=True</code> evita un aviso al agrupar por categorías.</td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>                       MAE     MSE   RMSE    R2
+modelo                                         
+Baseline (la media)  18.06  455.83  21.35 -0.00
+Regresión lineal      4.21   33.28   5.77  0.93
+Random Forest         3.78   27.08   5.20  0.94
+las horas del mes siguiente tienen media 27.0 y desviación 21.4
+baseline ingenuo (repetir las horas de este mes): MAE 7.21 | R2 0.82
+   real  lineal  forest
+0  12.2    14.5    15.4
+1  25.2    33.8    34.7
+2   7.9    11.3     9.2
+3   8.5    11.2    10.6
+4  40.5    39.8    38.3
+                 count  mean
+HorasProximoMes             
+0-10 h             273  4.22
+10-30 h            302  3.84
+30-60 h            338  4.03
+60+ h               87  6.15</pre>
+    <p><strong>Baseline (la media): MAE 18,06 y R² −0,00. Regresión lineal: MAE 4,21, RMSE 5,77, R² 0,93. Random Forest: MAE 3,78, RMSE 5,20, R² 0,94.</strong> Contra el baseline ingenuo (MAE 7,21, R² 0,82) la mejora de la lineal es del 42 %. En las cinco primeras filas el usuario con 12,2 horas reales se predice con 14,5 y 15,4, y el de 40,5 con 39,8 y 38,3. El error es de unas 4 horas en casi todos los tramos y sube a 6,15 en los de más de 60 horas.</p>
+  </div>
+</article>
+</section>
+
+</div>
+</main>
+</body>
+</html>

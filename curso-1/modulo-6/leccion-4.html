@@ -1,137 +1,474 @@
-<!DOCTYPE html>
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lección 4 · Primero se reparte, después se prepara: el Pipeline lo garantiza · Módulo 6 · Curso 1 · Cuaderno de IA</title>
+<meta name="description" content="Preparar datos sin fugas: ColumnTransformer, Pipeline y el viaje de una fila de StreamFlix con todos los números.">
+<script>try{var t=localStorage.getItem('cuaderno-ia:tema');if(t)document.documentElement.setAttribute('data-theme',t)}catch(e){}</script>
+<link rel="stylesheet" href="../../assets/css/style.css">
+<script src="../../assets/js/curriculum.js"></script>
+<script src="../../assets/js/lab.js"></script>
+<script src="../../assets/js/app.js" defer></script>
+</head>
+<body data-root="../../" data-course="1" data-module="6" data-lesson="4">
+<main>
+<div class="page">
 
-<html lang="es"><head><meta charset="utf-8"/><meta content="width=device-width,initial-scale=1" name="viewport"/><title>Lección 4 · La fuga temporal: qué sabes «el día de predecir» · Curso 1 · Cuaderno de IA</title><meta content="Una fuga de datos ( data leakage ) ocurre cuando alguna columna de entrada contiene, directa o indirectamente, información del futuro o de la propia respuesta ." name="description"/><script>try{var t=localStorage.getItem('cuaderno-ia:tema');if(t)document.documentElement.setAttribute('data-theme',t)}catch(e){}</script><link href="../../assets/css/style.css" rel="stylesheet"/><script src="../../assets/js/curriculum.js"></script><script src="../../assets/js/lab.js"></script><script defer="" src="../../assets/js/app.js"></script><script defer="" src="../../assets/js/microanimations.js"></script></head><body data-course="1" data-lesson="4" data-module="6" data-root="../../"><main><div class="page" data-micro="3min"><header class="hero leccion"><div class="hero-grid"><div><p class="eyebrow">Curso 1 · Módulo 6 · Lección 4 de 23</p><h1>La fuga temporal: qué sabes «el día de predecir»</h1><p class="lead">Una fuga de datos ( data leakage ) ocurre cuando alguna columna de entrada contiene, directa o indirectamente, información del futuro o de la propia respuesta .</p><p class="meta-line"><span class="read-time" data-render="read-time"></span><a href="../modulo-6.html">Índice del módulo</a></p></div><div aria-hidden="true" class="hero-tile"></div></div></header><details class="predice"><summary>Tienes la columna RainTomorrow y quieres predecirla. ¿Cuáles de las otras 22 columnas puedes usar como entrada sin hacerte trampas?<span class="hint"></span></summary><div><p>Una fuga de datos ( data leakage ) ocurre cuando alguna columna de entrada contiene, directa o indirectamente, información del futuro o de la propia respuesta .</p></div></details><section aria-label="Explicación breve" class="micro-core"><div class="micro-kicker">01 · ENTENDER <span>≈ 45 s</span></div><h2>La idea en palabras sencillas</h2><p>Una fuga de datos ( data leakage ) ocurre cuando alguna columna de entrada contiene, directa o indirectamente, información del futuro o de la propia respuesta.</p><div class="micro-example"><span aria-hidden="true" class="micro-example-icon">🛍️</span><div><strong>Otro ejemplo · Tienda</strong><p>Una caja contiene 6 productos. Para 4 cajas estimarías 24 productos. Esta es una relación numérica sencilla.</p></div></div></section><div class="micro-kicker micro-checkpoint">02 · RESPONDER <span>≈ 15 s</span></div><section aria-label="Pregunta intercalada" class="quiz mini micro-check"><script class="quiz-data" type="application/json">{"titulo": "Pausa rápida · Comprueba la idea", "preguntas": [{"q": "Para predecir lluvia mañana usas «lluvia de mañana» como entrada. ¿Qué problema hay?", "opciones": ["One-Hot Encoding", "Batch Normalization", "Data leakage"], "correcta": 2, "porque": "El modelo tiene información futura que no estaría disponible en producción."}]}</script></section><section aria-label="Animación interactiva" class="micro-viz" data-index="11" data-micro-viz="regression"><div class="micro-kicker">03 · EXPERIMENTAR <span>≈ 45 s</span></div><div class="micro-viz-title"><div><h2>De una entrada a una predicción</h2><p>Mueve los pedidos: observa cómo cambia el tiempo de preparación.</p></div><span aria-hidden="true" class="micro-viz-symbol">✦</span></div><div aria-live="polite" class="micro-viz-stage"><p>Animación interactiva: De una entrada a una predicción</p></div></section><div class="micro-kicker micro-checkpoint">04 · APLICAR <span>≈ 15 s</span></div><section aria-label="Pregunta intercalada" class="quiz mini micro-check"><script class="quiz-data" type="application/json">{"titulo": "Pausa rápida · ¿Lo aplicarías?", "preguntas": [{"q": "¿Qué conviene comprobar con cada feature?", "opciones": ["Que incluya la respuesta final", "Que existirá en el momento de predecir", "Que tenga siempre miles de valores"], "correcta": 1, "porque": "Las variables de entrada deben estar disponibles en el instante de inferencia."}]}</script></section><div class="micro-finish"><strong>Idea que te llevas</strong><span>Una fuga de datos ( data leakage ) ocurre cuando alguna columna de entrada contiene, directa o indirectamente, información del futuro o de la propia r</span><small>¿Quieres más ejemplos, fórmulas o código? Los tienes justo debajo, sin límite de tiempo.</small></div><details class="profundizar micro-legacy"><summary><span>Explorar más: explicación y simulaciones completas<small>Todo el texto original, tablas y demos avanzadas. Opcional.</small></span></summary><div class="prof-body"><section><h2>La fuga temporal: qué sabes «el día de predecir»</h2>
-<p>Una <abbr class="t" data-def="Data leakage: cuando el modelo recibe como entrada información que en la vida real no tendría en el momento de predecir. Da métricas buenísimas en el laboratorio y falla en producción.">fuga de datos</abbr> (<em>data leakage</em>) ocurre cuando alguna columna de entrada contiene, directa o indirectamente, <strong>información del futuro o de la propia respuesta</strong>. En el <a href="../modulo-5.html">módulo 5</a> viste la idea general; aquí la vas a ver paso a paso en un caso concreto, porque la fuga temporal es el error más tentador de los datos meteorológicos y de cualquier dato con fechas.</p>
-<p>Piensa en capítulos de una serie: cuando decides si ver el siguiente, ya conoces los anteriores, pero el que viene todavía no lo has visto. Aquí igual. Cada fila de la tabla describe un <strong>día D (hoy)</strong>: sus medidas de las 9:00 y de las 15:00, la lluvia total del día (<code>Rainfall</code>) y dos respuestas: <code>RainToday</code> («¿llovió ≥ 1 mm hoy?», que se calcula a partir de <code>Rainfall</code>) y <code>RainTomorrow</code> («¿llovió el día D+1, es decir, mañana?»). Si decides a última hora de hoy, <strong>todo lo del día D ya existe y nada del día D+1 (mañana) existe todavía</strong>.</p>
-<p>El laboratorio cambia los nombres: <code>RainToday</code> pasa a llamarse <code>RainYesterday</code> y <code>RainTomorrow</code> pasa a llamarse <code>RainToday</code>. No cambia ni un dato: cambia el <em>punto de vista</em>. Ahora la fila dice «esto es lo que pasó <em>ayer</em> (las medidas y la lluvia de ayer) y lo que quiero saber es si llueve <em>hoy</em>». Es como mirar un capítulo y preguntarte «¿qué ha pasado hasta aquí?» (las features) frente a «¿qué pasará en el siguiente?» (el target).</p>
-<div class="callout ejemplo"><span class="lbl">Con números</span><p>Tienes la columna RainTomorrow y quieres predecirla.</p></div></section><figure class="demo" data-demo="curso1/c1m6-fuga-temporal" data-titulo="El día de predecir: ¿existe ya esa columna?">
-<div class="haz">Elige una «columna extra» y mira dónde cae su punto en la línea de tiempo respecto a la raya «ahora». Después cambia el <em>momento en que necesitas la predicción</em> (07:00, 12:00 o 17:00 de mañana, el día D+1) y observa cómo la misma columna pasa de fuga a legítima. Es como un spoiler: antes de ver el capítulo es un destripe; después, ya es parte de lo que has visto.</div>
-<div class="observa">Una columna no es «buena» o «mala» por sí misma: depende de <strong>cuándo</strong> tomas la decisión. <code>Humidity9am</code> de mañana es una fuga a las 7:00 y un dato legítimo a las 12:00. Las exactitudes que ves salen de la ejecución real del fragmento 4.</div>
-</figure><div class="resumen"><h2 class="sin-num sin-toc">En pocas líneas</h2><ul><li><strong>La fuga temporal: qué sabes «el día de predecir»:</strong> Una fuga de datos ( data leakage ) ocurre cuando alguna columna de entrada contiene, directa o indirectamente, información del futuro…</li><li>Antes de continuar, intenta explicar la demo sin mirar su resultado.</li></ul></div><section class="quiz mini"><script class="quiz-data" type="application/json">{"titulo": "¿Lo tienes?", "preguntas": [{"q": "¿Qué concepto estamos trabajando en esta lección?", "opciones": ["La fuga temporal: qué sabes «el día de predecir»", "StreamFlix ampliado: los datos y su exploración", "Clasificar: baseline, tres modelos, validación cruzada y ROC-AUC"], "correcta": 0, "porque": "Una fuga de datos ( data leakage ) ocurre cuando alguna columna de entrada contiene, directa o indirectamente, información del futuro o de la propia respuesta ."}, {"q": "¿Cuál de estas afirmaciones recoge lo que acabas de estudiar?", "opciones": ["Lo importante es comprender la idea y comprobarla con ejemplos, no memorizar términos.", "Una fuga de datos ( data leakage ) ocurre cuando alguna columna de entrada contiene, directa o indirectamente, información del futuro o de la propia respuesta .", "Siempre hay un único método que sirve para todos los problemas."], "correcta": 1, "porque": "La explicación central es: Una fuga de datos ( data leakage ) ocurre cuando alguna columna de entrada contiene, directa o indirectamente, información del futuro o de la propia respuesta ."}, {"q": "Si una demo o un ejemplo te desconcierta, ¿cuál es la mejor forma de aprenderlo?", "opciones": ["Memorizar el nombre sin entender la operación.", "Volver a los números, cambiar un valor y explicar qué ocurre.", "Ignorar los resultados que no coinciden con tu intuición."], "correcta": 1, "porque": "Explorar qué cambia y por qué ayuda a conectar el concepto con su resultado."}]}</script></section></div></details><details class="profundizar"><summary><span>Profundizar: explicación completa<small>Matices, fórmulas, tablas, otros ejemplos y experimentos del módulo original.</small></span></summary><div class="prof-body"><section>
-<h2 id="lluvia-fuga">La fuga temporal: qué sabes «el día de predecir»</h2>
-<p class="pregunta">Tienes la columna <code>RainTomorrow</code> y quieres predecirla. ¿Cuáles de las otras 22 columnas puedes usar como entrada sin hacerte trampas?</p>
-<p>Una <abbr class="t" data-def="Data leakage: cuando el modelo recibe como entrada información que en la vida real no tendría en el momento de predecir. Da métricas buenísimas en el laboratorio y falla en producción.">fuga de datos</abbr> (<em>data leakage</em>) ocurre cuando alguna columna de entrada contiene, directa o indirectamente, <strong>información del futuro o de la propia respuesta</strong>. En el <a href="../modulo-5.html">módulo 5</a> viste la idea general; aquí la vas a ver paso a paso en un caso concreto, porque la fuga temporal es el error más tentador de los datos meteorológicos y de cualquier dato con fechas.</p>
-<div class="callout analogia">
-<span class="lbl">Analogía</span>
-<p>Es como un <strong>spoiler</strong>. Si ya has visto el final de la serie, «adivinar» cómo termina es facilísimo: aciertas siempre, pero no porque entiendas la trama, sino porque has visto la respuesta. Y la próxima serie, sin spoiler, ya no aciertas. Una columna filtrada es un spoiler para tu modelo: en el laboratorio saca un 10 y, en la vida real, donde ese dato no existe todavía, vuelve a fallar.</p>
-</div>
-<h3>Paso 1: pon el tiempo en una línea</h3>
-<p>Piensa en capítulos de una serie: cuando decides si ver el siguiente, ya conoces los anteriores, pero el que viene todavía no lo has visto. Aquí igual. Cada fila de la tabla describe un <strong>día D (hoy)</strong>: sus medidas de las 9:00 y de las 15:00, la lluvia total del día (<code>Rainfall</code>) y dos respuestas: <code>RainToday</code> («¿llovió ≥ 1 mm hoy?», que se calcula a partir de <code>Rainfall</code>) y <code>RainTomorrow</code> («¿llovió el día D+1, es decir, mañana?»). Si decides a última hora de hoy, <strong>todo lo del día D ya existe y nada del día D+1 (mañana) existe todavía</strong>.</p>
-<h3>Paso 2: el truco de renombrar</h3>
-<p>El laboratorio cambia los nombres: <code>RainToday</code> pasa a llamarse <code>RainYesterday</code> y <code>RainTomorrow</code> pasa a llamarse <code>RainToday</code>. No cambia ni un dato: cambia el <em>punto de vista</em>. Ahora la fila dice «esto es lo que pasó <em>ayer</em> (las medidas y la lluvia de ayer) y lo que quiero saber es si llueve <em>hoy</em>». Es como mirar un capítulo y preguntarte «¿qué ha pasado hasta aquí?» (las features) frente a «¿qué pasará en el siguiente?» (el target).</p>
-<p>Puedes comprobarlo con los datos reales del fragmento 3. Mira las filas 3 y 4 de su salida (son dos días consecutivos de la misma estación):</p>
-<table>
-<thead><tr><th>Fila</th><th><code>Rainfall</code> (ese día)</th><th><code>RainYesterday</code></th><th><code>RainToday</code> (el target)</th></tr></thead>
-<tbody>
-<tr><td>3</td><td>1,4 mm</td><td>Yes (1,4 ≥ 1 mm)</td><td>No</td></tr>
-<tr><td>4</td><td>0,6 mm</td><td>No (0,6 &lt; 1 mm)</td><td>No</td></tr>
-</tbody>
-</table>
-<p>El target de la fila 3 es «No» porque <em>el día siguiente</em> (la fila 4) llovió solo 0,6 mm, menos de 1 mm. La fila 3 mira al futuro de la fila 3, que es la fila 4: ese es el desplazamiento de un día que hace el generador con <code>shift(-1)</code>. Todas las <em>features</em> de una fila son del día D y el target es del día D+1: <strong>no hay fuga</strong>.</p>
-<h3>Paso 3: pregunta, columna a columna, «¿existe ya este dato?»</h3>
-<p>Esta es la técnica que debes aplicar siempre. Escribe, para cada columna, <em>en qué momento se conoce su valor</em>, y compáralo con el momento en que necesitas la predicción:</p>
-<table>
-<thead><tr><th>Columna</th><th>Se conoce…</th><th>¿Sirve si decides al final del día D?</th></tr></thead>
-<tbody>
-<tr><td><code>Humidity9am</code>, <code>Pressure3pm</code>… del día D</td><td>el día D</td><td class="res">Sí</td></tr>
-<tr><td><code>Rainfall</code> del día D (y <code>RainYesterday</code>)</td><td>cuando termina el día D</td><td class="res">Sí</td></tr>
-<tr><td><code>Humidity9am</code> de mañana (D+1)</td><td>a las 9:00 de mañana</td><td>No: es futuro (un spoiler)</td></tr>
-<tr><td><code>Humidity3pm</code> de mañana (D+1)</td><td>a las 15:00 de mañana</td><td>No: es futuro (un spoiler)</td></tr>
-<tr><td><code>Rainfall</code> de mañana (D+1)</td><td>cuando termina mañana</td><td>No: <strong>es la respuesta</strong> (el final de la serie)</td></tr>
-</tbody>
-</table>
-<h3>Paso 4: demuéstralo con una ejecución</h3>
-<p>En el fragmento 4 entreno el mismo Random Forest cinco veces: una solo con columnas de hoy, el día D (el escenario honesto), y cuatro añadiendo, una a una, una columna que en realidad pertenece a mañana, el día D+1. Resultado real:</p>
-<table>
-<thead><tr><th>Entrada</th><th>Accuracy</th><th>Recall</th></tr></thead>
-<tbody>
-<tr><td>Solo datos de hoy, día D (honesto)</td><td class="res">0,820</td><td>0,500</td></tr>
-<tr><td>+ <code>Humidity9am</code> de mañana (D+1)</td><td>0,817</td><td>0,509</td></tr>
-<tr><td>+ <code>Pressure9am</code> de mañana (D+1)</td><td>0,840</td><td>0,553</td></tr>
-<tr><td>+ <code>Humidity3pm</code> de mañana (D+1)</td><td>0,838</td><td>0,534</td></tr>
-<tr><td>+ <code>Rainfall</code> de mañana (D+1)</td><td>1,000</td><td>1,000</td></tr>
-</tbody>
-</table>
-<p>Tres lecciones salen de esa tabla:</p>
-<ul>
-<li><strong>La fuga total es evidente</strong>: un 100 % (accuracy y recall) es casi siempre un error, no una proeza. <code>Rainfall</code> de D+1 <em>es</em> la respuesta con otro nombre, porque <code>RainToday = Rainfall ≥ 1</code>.</li>
-<li><strong>Las fugas parciales son las peligrosas</strong>: la presión a las 9:00 de mañana mejora la exactitud en dos puntos (0,820 → 0,840) y el recall en más de cinco (0,500 → 0,553), justo lo que parecería «un buen trabajo de feature engineering». Pero en producción ese dato no existirá y el modelo volverá a 0,820.</li>
-<li><strong>No toda fuga mueve la métrica</strong>: <code>Humidity9am</code> de D+1 apenas cambia nada (incluso la exactitud baja tres milésimas). Que una variable no mejore el resultado <em>no</em> la hace legítima: lo que la descalifica es cuándo existe, no cuánto ayuda.</li>
-</ul>
-<div class="callout ojo">
-<span class="lbl">Ojo: estos números no se comparan con los del modelo final</span>
-<p>El fragmento 4 es un experimento aparte: usa los datos <em>sin huecos</em> del generador, solo las columnas numéricas y un Random Forest fijo, sin Pipeline ni búsqueda de hiperparámetros. Por eso su 0,820 honesto no coincide con el 0,796 del modelo completo de la sección «Pipeline y resultados». Lo que importa es comparar las <strong>filas entre sí</strong>, dentro de la misma tabla.</p>
-</div>
-<div class="callout regla">
-<span class="lbl">Regla fácil</span>
-<p>Para cada columna, pregúntate: <strong>«si hoy fuera el día de predecir, ¿tendría ya este dato?»</strong>. Si la respuesta es «no», o «solo a veces», fuera. Y desconfía de cualquier métrica demasiado buena: es el síntoma más fiable.</p>
-</div>
-<h3>Otras formas de fuga que ya conoces</h3>
-<p>La temporal no es la única. Todas se resuelven con la misma disciplina de «qué sabía yo en ese momento»:</p>
-<ul>
-<li><strong>Un derivado del target.</strong> Predecir <code>RainToday</code> dejando <code>Rainfall</code> en las features (con los nombres originales): la respuesta se calcula a partir de esa columna.</li>
-<li><strong>Preprocesar antes de repartir.</strong> Calcular la media del escalado con todos los datos, test incluido: el test «ya ha influido» en el entrenamiento. Se evita con un <strong>Pipeline</strong> (lo verás en la sección de StreamFlix).</li>
-<li><strong>Filas repetidas o casi iguales en train y test</strong>, o dividir al azar series temporales cuando lo que importa es predecir lo que viene después.</li>
-</ul>
-</section></div></details><details class="profundizar" id="codigo"><summary><span>Ver código explicado paso a paso<small>1 fragmento(s) original(es), con cada línea comentada y salida esperada.</small></span></summary><div class="prof-body"><article class="snippet" data-lang="python">
-<header>
-<h3>4 · La fuga, demostrada: cinco escenarios</h3>
-<p class="para-que"><strong>Para qué sirve</strong> Entrena el mismo Random Forest cinco veces, una con datos honestos del día D y cuatro añadiendo una columna del día D+1, para ver cuánto «ayuda» cada fuga y por qué nunca hay que usarlas.</p>
+<header class="hero leccion">
+  <div class="hero-grid">
+    <div>
+      <p class="eyebrow">Curso 1 · Módulo 6 · Lección 4 de 8</p>
+      <h1>Primero se reparte, después se prepara: el Pipeline lo garantiza</h1>
+      <p class="lead">Imputar, escalar y One-Hot aprenden de los datos: que lo aprendan solo del train, dentro de un Pipeline.</p>
+      <p class="meta-line"><span class="read-time" data-render="read-time"></span><a href="../modulo-6.html">Índice del módulo</a></p>
+    </div>
+    <div class="hero-tile" aria-hidden="true"></div>
+  </div>
 </header>
-<pre class="code"><code>from sklearn.ensemble import RandomForestClassifier
-from sklearn.metrics import accuracy_score, recall_score
-from sklearn.model_selection import train_test_split
 
-crudo = crear_weather()                                   # sin huecos: cada fila es un día de un sitio
-manana = (crudo["RainTomorrow"] == "Yes").astype(int)     # ¿llueve el día siguiente?
-
-dia_d = crudo.select_dtypes(include="number").copy()      # lo que ya se ha medido el día D, cuando decides
-dia_d["RainYesterday"] = (crudo["RainToday"] == "Yes").astype(int)
-dia_d1 = (crudo.groupby("Location")[["Humidity9am", "Pressure9am", "Humidity3pm", "Rainfall"]]
-          .shift(-1).add_suffix("_diaD1"))                # lo que se medirá el día D+1, el que quieres predecir
-
-escenarios = [("honesto: solo datos del día D", []),
-              ("+ Humidity9am del día D+1", ["Humidity9am_diaD1"]),
-              ("+ Pressure9am del día D+1", ["Pressure9am_diaD1"]),
-              ("+ Humidity3pm del día D+1", ["Humidity3pm_diaD1"]),
-              ("+ Rainfall del día D+1", ["Rainfall_diaD1"])]
-for nombre, extra in escenarios:
-    Xe = pd.concat([dia_d, dia_d1[extra]], axis=1)
-    bien = Xe.notna().all(axis=1)
-    X_tr, X_te, y_tr, y_te = train_test_split(Xe[bien], manana[bien], test_size=0.2, stratify=manana[bien], random_state=42)
-    rf = RandomForestClassifier(n_estimators=100, max_depth=10, min_samples_split=5, random_state=42, n_jobs=2).fit(X_tr, y_tr)
-    p = rf.predict(X_te)
-    print(f"{nombre:32s} accuracy = {accuracy_score(y_te, p):.3f} | recall = {recall_score(y_te, p):.3f}")</code></pre>
-<details class="linea-a-linea">
-<summary>Línea por línea</summary>
-<p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
-<table class="lineas">
-<thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
-<tbody>
-<tr data-lines="1-3"><td><code>from sklearn.ensemble import RandomForestClassifier …</code></td><td>Importa lo necesario para este experimento: el Random Forest, las métricas accuracy y recall, y el reparto train/test. (Este fragmento es autónomo y se puede ejecutar justo después de generar los datos.)</td></tr>
-<tr data-lines="5"><td><code>crudo = crear_weather()                                   # …</code></td><td><code>crear_weather()</code> sin huecos: cada fila es un día de una estación, y el orden de los días se conserva.</td></tr>
-<tr data-lines="6"><td><code>manana = (crudo["RainTomorrow"] == "Yes").astype(int)     # …</code></td><td>El target: 1 si el día siguiente llueve (<code>RainTomorrow == "Yes"</code>), 0 si no. <code>.astype(int)</code> convierte los booleanos en 0/1.</td></tr>
-<tr data-lines="8"><td><code>dia_d = crudo.select_dtypes(include="number").copy()      # …</code></td><td><code>dia_d</code> reúne todas las columnas numéricas (<code>select_dtypes(include="number")</code>): lo ya medido el día D, cuando tienes que decidir. <code>.copy()</code> evita modificar la tabla original.</td></tr>
-<tr data-lines="9"><td><code>dia_d["RainYesterday"] = (crudo["RainToday"] == "Yes").astyp…</code></td><td>Añade <code>RainYesterday</code>: 1 si el día D llovió. Es información del día D, legítima.</td></tr>
-<tr data-lines="10-11"><td><code>dia_d1 = (crudo.groupby("Location")[["Humidity9am", "Pressur…</code></td><td>Lo que <strong>no</strong> existe todavía: cuatro columnas del día D+1. <code>groupby("Location")</code> trabaja estación por estación (para no mezclar el último día de una con el primero de otra) y <code>shift(-1)</code> sube cada valor a la fila del día anterior; <code>add_suffix</code> les pone el sufijo <code>_diaD1</code>.</td></tr>
-<tr data-lines="13-17"><td><code>escenarios = [("honesto: solo datos del día D", []), …</code></td><td>Los cinco escenarios: el honesto (sin columnas extra) y cuatro con una columna del día D+1 cada uno. Cada elemento es una pareja (nombre, lista de columnas extra).</td></tr>
-<tr data-lines="18"><td><code>for nombre, extra in escenarios:</code></td><td>Bucle por escenarios.</td></tr>
-<tr data-lines="19"><td><code>Xe = pd.concat([dia_d, dia_d1[extra]], axis=1)</code></td><td>Pega las columnas del día D con las extra de ese escenario (<code>axis=1</code> = lado a lado).</td></tr>
-<tr data-lines="20"><td><code>bien = Xe.notna().all(axis=1)</code></td><td>Se queda solo con las filas sin ningún hueco (los días D+1 inexistentes, como el último de cada estación, dejan NaN).</td></tr>
-<tr data-lines="21"><td><code>X_tr, X_te, y_tr, y_te = train_test_split(Xe[bien], manana[b…</code></td><td>Reparto 80/20 estratificado, con la misma semilla en todos los escenarios, para que sean comparables.</td></tr>
-<tr data-lines="22"><td><code>rf = RandomForestClassifier(n_estimators=100, max_depth=10, …</code></td><td>Entrena el Random Forest con los hiperparámetros del modelo final de la lluvia. <code>n_jobs=2</code> usa dos núcleos del procesador.</td></tr>
-<tr data-lines="23"><td><code>p = rf.predict(X_te)</code></td><td>Predice en el test.</td></tr>
-<tr data-lines="24"><td><code>print(f"{nombre:32s} accuracy = {accuracy_score(y_te, p):.3f…</code></td><td>Imprime el escenario con su accuracy y su recall. <code>{nombre:32s}</code> rellena el texto hasta 32 caracteres para alinear las columnas y <code>:.3f</code> pone tres decimales.</td></tr>
-</tbody>
-</table>
+<details class="predice">
+  <summary>Antes de repartir en train y test, rellenas los huecos de <code>HorasMes</code> con la mediana de los 5.000 usuarios. ¿Pasa algo?<span class="hint"></span></summary>
+  <div>
+    <p>Sí, una fuga pequeña: esa mediana ya «ha visto» a los usuarios del test, así que el examen ha influido en el estudio y la nota sale optimista. Todo lo que se aprende de los datos debe aprenderse <strong>solo del train</strong>.</p>
+  </div>
 </details>
-<div class="salida">
-<strong>Salida esperada</strong>
-<pre>honesto: solo datos del día D    accuracy = 0.820 | recall = 0.500
-+ Humidity9am del día D+1        accuracy = 0.817 | recall = 0.509
-+ Pressure9am del día D+1        accuracy = 0.840 | recall = 0.553
-+ Humidity3pm del día D+1        accuracy = 0.838 | recall = 0.534
-+ Rainfall del día D+1           accuracy = 1.000 | recall = 1.000</pre>
-<p>El modelo honesto saca <strong>accuracy 0,820 y recall 0,500</strong>. Con la presión de las 9:00 de mañana sube a 0,840 / 0,553; con la humedad de las 15:00 de mañana, a 0,838 / 0,534; con la humedad de las 9:00, casi no cambia (0,817 / 0,509); y con la lluvia de mañana, <strong>1,000 / 1,000</strong>: es la respuesta. Las fugas parciales mejoran un poco y parecen un éxito; la total es evidente. Estos números no son comparables con los del modelo completo (fragmento 7): aquí no hay huecos, solo columnas numéricas ni búsqueda de hiperparámetros.</p>
+
+<section>
+<h2 id="idea">Primero se reparte, después se prepara</h2>
+<p>Los datos de StreamFlix llegan con huecos, escalas muy distintas (edad ≈ 36, horas ≈ 33, tickets ≈ 0,6) y dos columnas de texto (<code>Plan</code> y <code>Dispositivo</code>). Un modelo de scikit-learn solo acepta números, sin huecos. Prepararlos es cosa de cuatro piezas, en dos ramas:</p>
+<ul class="flow">
+  <li class="a">Numéricas (10)<small>mediana → StandardScaler</small></li>
+  <li class="b">Texto (2)<small>más frecuente → One-Hot</small></li>
+  <li class="c">ColumnTransformer<small>junta las dos ramas</small></li>
+  <li class="d">Pipeline<small>preparar + modelo</small></li>
+</ul>
+<p>Cada pieza <strong>aprende algo</strong> de los datos: una mediana para rellenar, una media y una desviación para escalar, la lista de categorías para el One-Hot. Por eso el orden importa: se reparte primero (4.000 train, 1.000 test) y el preprocesador se ajusta (<code>fit</code>) con el train y solo se aplica (<code>transform</code>) al test.</p>
+<p>El <strong>Pipeline</strong> encadena preprocesador y modelo, y lo hace por ti: <code>fit</code> aprende con el train, <code>predict</code> aplica lo aprendido. Además, dentro de la validación cruzada se vuelve a ajustar en cada pliegue, así que la fuga es imposible por construcción. Y cada modelo lleva su propia copia limpia del preprocesador (<code>clone</code>).</p>
+</section>
+
+<figure class="demo" data-demo="curso1/c1m6-pipeline-fila" data-titulo="El viaje de una fila por el Pipeline">
+  <div class="haz">Pulsa «Etapa siguiente» hasta la 5. Después baja los días sin entrar con el slider.</div>
+  <div class="observa">Cada hueco se rellena con lo aprendido en el train, y los días sin entrar son lo que más mueve la probabilidad.</div>
+</figure>
+
+<section>
+<h2 id="numeros">Con números: el usuario 2078</h2>
+<div class="callout ejemplo">
+  <span class="lbl">Ejemplo numérico: de la fila cruda a la probabilidad</span>
+  <p>Plan Basic en móvil, <strong>sin dato de <code>HorasMes</code></strong>, 25 días sin entrar y 1 ticket.</p>
+  <ol class="pasos">
+    <li><strong>Imputar:</strong> <code>HorasMes</code> = mediana del train = 27,8.</li>
+    <li><strong>Escalar:</strong> horas (27,8 − 32,56) / 22,11 = −0,215; días (25 − 8,02) / 9,82 = <span class="res">+1,729</span>.</li>
+    <li><strong>One-Hot:</strong> Basic → [1, 0, 0]; Móvil → [1, 0, 0, 0].</li>
+    <li><strong>Sumar peso × valor:</strong> los días aportan 0,8586 × 1,729 = +1,485; con el resto y el intercepto (−1,2355), el logit es +0,741.</li>
+    <li><strong>Probabilidad</strong> = 1 / (1 + e<sup>−0,741</sup>) = <span class="res">0,677</span>. (Y canceló.)</li>
+  </ol>
 </div>
-</article></div></details></div></main></body></html>
+<p>Un dato que faltaba no ha impedido predecir, y lo que más empuja es lo esperable: los 25 días sin entrar.</p>
+</section>
+
+<details class="predice">
+  <summary>Si a ese mismo usuario le bajas los días sin entrar de 25 a 2, ¿su probabilidad de cancelar baja un poco o mucho?<span class="hint"></span></summary>
+  <div>
+    <p>Mucho: del 68 % a cerca del 22 %. <code>DiasSinEntrar</code> tiene el mayor peso del modelo (+0,86 por cada desviación, unos 10 días), así que moverla 23 días cambia el logit en casi 2 unidades.</p>
+  </div>
+</details>
+
+<div class="resumen">
+  <h2 class="sin-num sin-toc">En tres líneas</h2>
+  <ul>
+    <li>Imputar, escalar y One-Hot aprenden algo de los datos: que lo aprendan solo del train.</li>
+    <li>ColumnTransformer da a cada tipo de columna su rama; el Pipeline encadena preparación y modelo.</li>
+    <li><code>fit</code> aprende, <code>transform</code> aplica; dentro del Pipeline y de la validación cruzada ocurre solo.</li>
+  </ul>
+</div>
+
+<section class="quiz mini">
+<script type="application/json" class="quiz-data">
+{
+ "titulo": "¿Lo tienes?",
+ "preguntas": [
+  {
+   "q": "¿Por qué el imputer y el scaler van <em>dentro</em> de un Pipeline y se ajustan después del reparto train/test?",
+   "opciones": [
+    "Para que el código sea más corto",
+    "Para que la mediana, la media y las categorías se aprendan solo del train; si se calculan con todos los datos, el test ya ha influido y la medida es optimista",
+    "Porque scikit-learn no permite escalar fuera de un Pipeline",
+    "Para que el test tenga más filas"
+   ],
+   "correcta": 1,
+   "porque": "Todo lo que «aprende» de los datos (una mediana, una desviación, las categorías de un One-Hot) debe aprenderlo solo del train; el test simula datos nuevos. Si lo calculas con todos, parte de la información del test se cuela en el entrenamiento (fuga). El Pipeline lo garantiza y, además, lo repite correctamente en cada trozo de la validación cruzada."
+  },
+  {
+   "q": "En el Pipeline, ¿qué hace <code>pipe.predict(X_test)</code> con los huecos del test?",
+   "opciones": [
+    "Los rellena con la mediana calculada en el test",
+    "Los rellena con la mediana aprendida en el train",
+    "Borra esas filas"
+   ],
+   "correcta": 1,
+   "porque": "El preprocesador se ajusta una vez, con el train, y después solo se aplica. El test se trata como datos nuevos."
+  },
+  {
+   "q": "<code>Plan</code> tiene 3 categorías y <code>Dispositivo</code> 4. Con 10 columnas numéricas, ¿cuántas columnas salen del ColumnTransformer?",
+   "opciones": [
+    "12",
+    "14",
+    "17"
+   ],
+   "correcta": 2,
+   "porque": "10 numéricas + 3 de plan + 4 de dispositivo = 17 columnas, sin ningún NaN."
+  }
+ ]
+}
+</script>
+</section>
+
+<details class="profundizar">
+  <summary><span>Profundizar: la explicación completa<small>Cómo se fabrican los datos del StreamFlix de tus apuntes (la receta y el usuario 0), su exploración, el StreamFlix ampliado con su estructura oculta y todo el detalle del preprocesador.</small></span></summary>
+  <div class="prof-body">
+<h2 id="streamflix-david">Proyecto 2 · StreamFlix de tus apuntes: los datos</h2>
+
+<p class="pregunta">Tus apuntes cierran el curso con un proyecto de punta a punta sobre una plataforma de streaming. Si ejecutas ese código tal cual, ¿qué sale de verdad?</p>
+
+<p>Este es <strong>tu proyecto</strong>: el código de StreamFlix de tus apuntes, con sus nombres de variables, sus parámetros y su semilla (42). Lo he ejecutado entero, línea por línea, con scikit-learn 1.9.1, pandas 3 y NumPy 2: son los <strong>fragmentos 10 a 23</strong> de la sección de código. A diferencia de la lluvia, aquí <em>no hay nada que descargar</em>: el propio código fabrica los datos con una semilla, así que lo que ves en esta página es exactamente lo que obtendrás tú. Los gráficos no se pueden pegar en una página de texto; en su lugar he añadido en cada fragmento unas pocas líneas (marcadas como «añadida por mí») que imprimen con números lo que el gráfico dibujaría.</p>
+
+<div class="callout ojo">
+  <span class="lbl">Ojo: tus números y los de la ejecución no coinciden, y es normal</span>
+  <p>En tus apuntes aparecen cifras como MAE 3,4 h, RMSE 5,8 h, R² 0,78, Silhouette 0,62 o DBI de 1,2 / 0,7 / 1,0. Son cifras <strong>ilustrativas</strong>: sirven para aprender a leer cada métrica, pero no son la salida de este código. Las que salen al ejecutarlo son otras, y las tienes todas juntas, frente a las de tus apuntes, en <a href="leccion-8.html#david-resumen">la tabla del final de esta parte</a>. Lo importante no es que coincidan, sino que sepas leer cada una. Y verás que algunas diferencias enseñan más que las coincidencias.</p>
+</div>
+
+<h3>Cómo se fabrican los datos (fragmento 10)</h3>
+<p>Los datos son ficticios: cada columna se <strong>sortea</strong> con una distribución distinta. Conviene entender cuál, porque más adelante sabrás qué debería encontrar cada modelo.</p>
+
+<table>
+  <thead><tr><th>Columna</th><th>Cómo se sortea</th><th>Papel</th></tr></thead>
+  <tbody>
+    <tr><td><code>Edad</code></td><td>Entero entre 18 y 74, todos igual de probables</td><td>feature</td></tr>
+    <tr><td><code>Plan</code></td><td>Basic 30 %, Standard 45 %, Premium 25 %</td><td>feature (texto)</td></tr>
+    <tr><td><code>HorasMes</code></td><td>Distribución gamma (shape 3, scale 8): media 24 y cola larga a la derecha</td><td>feature; 100 huecos</td></tr>
+    <tr><td><code>DiasDesdeUltimoUso</code></td><td>Entero entre 0 y 60, todos igual de probables</td><td>feature</td></tr>
+    <tr><td><code>PeliculasVistas</code>, <code>SeriesVistas</code></td><td>Poisson de media 12 y 7 (recuentos enteros)</td><td>features</td></tr>
+    <tr><td><code>ProblemasPago</code>, <code>ErroresApp</code></td><td>Poisson de media 0,3 y 1,5</td><td>features</td></tr>
+    <tr><td><code>Dispositivos</code></td><td>Entero entre 1 y 5</td><td>feature</td></tr>
+    <tr><td><code>GeneroFavorito</code></td><td>Uno de cinco géneros, todos igual de probables</td><td>feature (texto); 100 huecos</td></tr>
+    <tr><td><code>Cancelado</code></td><td>Se sortea con una probabilidad que sale de una fórmula (abajo)</td><td><strong>target 1</strong> (clasificación)</td></tr>
+    <tr><td><code>HorasProximoMes</code></td><td>Otra fórmula más ruido, sin valores negativos</td><td><strong>target 2</strong> (regresión)</td></tr>
+  </tbody>
+</table>
+
+<p>Los dos targets se fabrican con una <strong>receta</strong>. Para la cancelación, primero se calcula un «score» con pesos:</p>
+
+<div class="formula">\[ \text{score} = -0{,}05\cdot\text{HorasMes} + 0{,}065\cdot\text{DiasDesdeUltimoUso} + 0{,}90\cdot\text{ProblemasPago} + 0{,}12\cdot\text{ErroresApp} - 1{,}7 \]</div>
+
+<p>Léelo como una persona: cada hora vista <em>resta</em> 0,05 al riesgo; cada día sin entrar <em>suma</em> 0,065; cada problema de pago suma 0,90 (¡tanto como casi 14 días sin entrar, porque 0,90 / 0,065 ≈ 13,8!); cada error de la app suma 0,12; y −1,7 es el punto de partida de alguien que no hace nada de esto. Después la sigmoide convierte el score en probabilidad, \( p = 1/(1+e^{-\text{score}}) \), y un sorteo decide el 0/1 final.</p>
+
+<div class="callout ejemplo">
+  <span class="lbl">Ejemplo numérico: el usuario 0, paso a paso</span>
+  <p>El primer usuario de la tabla tiene <code>HorasMes</code> = 4,70, <code>DiasDesdeUltimoUso</code> = 36, <code>ProblemasPago</code> = 0, <code>ErroresApp</code> = 0 y <code>Dispositivos</code> = 2.</p>
+  <ol class="pasos">
+    <li><strong>Score de cancelación.</strong> −0,05 × 4,70 + 0,065 × 36 + 0,90 × 0 + 0,12 × 0 − 1,7 = −0,235 + 2,340 + 0 + 0 − 1,7 = <span class="res">+0,405</span>.</li>
+    <li><strong>Probabilidad.</strong> \( p = 1/(1+e^{-0{,}405}) = 1/(1+0{,}667) = \) <span class="res">0,600</span>. El código sortea un número entre 0 y 1; si sale menor que 0,600, el usuario cancela. En este caso <code>Cancelado</code> vale 1.</li>
+    <li><strong>Horas del mes siguiente.</strong> 5 + 0,65 × 4,70 − 0,20 × 36 − 2,5 × 0 + 1,2 × 2 = 5 + 3,06 − 7,20 + 0 + 2,40 = <span class="res">+3,26</span>, más un ruido normal de desviación 5. En la tabla aparece <code>HorasProximoMes</code> = 0,0: el ruido sorteado fue más negativo que −3,26, la suma salió negativa y <code>clip(lower=0)</code> la subió a 0.</li>
+  </ol>
+</div>
+
+<div class="callout recuerda">
+  <span class="lbl">Recuerda</span>
+  <p>Una probabilidad de 0,600 <em>no</em> significa «cancela seguro»: de cada 10 usuarios como este, unos 6 cancelan y 4 no. Por eso, aunque conozcas la receta perfecta, ningún modelo podrá acertar siempre: <strong>hay un suelo de error que viene del azar</strong>. Es una de las razones de que el accuracy de más abajo se quede en 0,74.</p>
+</div>
+
+<h3>La clave que lo explica casi todo: las columnas son independientes</h3>
+<p>Fíjate en un detalle de la tabla: <em>cada columna se sortea por separado</em>. La edad, el plan o el género favorito no influyen en la cancelación (no aparecen en la receta) ni dependen de las horas ni de los días sin entrar. Solo los <strong>dos targets</strong> dependen de las columnas; las columnas no dependen entre sí. Esto tiene dos consecuencias que irás viendo con números:</p>
+<ul>
+  <li><strong>Para predecir (clasificación y regresión) es perfecto</strong>: hay una señal real (la receta) y los modelos pueden encontrarla.</li>
+  <li><strong>Para encontrar grupos (clusters) es malísimo</strong>: si ninguna columna se parece a otra, los usuarios forman una nube uniforme sin «costuras» naturales, y K-Means o DBSCAN no tienen nada que descubrir. Los tipos de usuario de tus apuntes (ocasionales, fans de películas, fans de series, intensivos) no existen en estos datos. Lo comprobaremos.</li>
+</ul>
+
+<h3>Qué sale al explorar (fragmentos 10 y 11)</h3>
+<ul>
+  <li><strong>Forma y tipos.</strong> 5.000 filas y 12 columnas: 8 numéricas de entrada, 2 de texto (<code>Plan</code> y <code>GeneroFavorito</code>, que pandas 3 llama <code>str</code> y no <code>object</code>) y los dos targets.</li>
+  <li><strong>Huecos.</strong> <code>HorasMes</code> y <code>GeneroFavorito</code> tienen 4.900 valores no nulos: faltan 100 en cada una (el 2 %), justo los que fabricó el código.</li>
+  <li><strong>Target.</strong> No cancelan 2.952 usuarios (59,04 %) y cancelan 2.048 (40,96 %). El <code>countplot</code> que no ves serían dos barras con esas alturas. Es un desequilibrio suave, mucho menor que el de la lluvia, y fija el <strong>baseline</strong>: un modelo que dijera siempre «nadie cancela» acertaría el 59 % de las veces.</li>
+  <li><strong>Quién cancela más.</strong> Por plan: Basic 41,0 %, Standard 39,6 %, Premium 43,5 %, es decir, casi igual (el plan no está en la receta). Por problemas de pago: con 0 problemas cancela el <strong>36,5 %</strong>, con 1 el <strong>52,0 %</strong>, con 2 el <strong>64,1 %</strong> y con 3 el 81,8 % (solo 11 usuarios). Eso sí es señal.</li>
+  <li><strong>Correlaciones con <code>Cancelado</code>.</strong> <code>DiasDesdeUltimoUso</code> +0,45, <code>HorasMes</code> −0,21, <code>ProblemasPago</code> +0,16, <code>ErroresApp</code> +0,07; todas las demás entre −0,01 y +0,02. Justo las cuatro columnas de la receta, ordenadas por lo que pesan. Y <code>HorasProximoMes</code> tiene −0,34: quien va a ver pocas horas el mes que viene cancela más. Es precisamente la fuga temporal de la lluvia: por eso el fragmento 12 quita <strong>las dos</strong> columnas objetivo de <code>X</code>.</li>
+</ul>
+
+<h3>Preparar los datos (fragmento 12)</h3>
+<p>El reparto y el preprocesado hacen lo que viste en el módulo 1 y en la lluvia, con esta forma:</p>
+<ul class="flow">
+  <li class="a">REPARTO<small>4.000 train · 1.000 test, estratificado</small></li>
+  <li class="b">NUMÉRICAS (8)<small>mediana → StandardScaler</small></li>
+  <li class="c">TEXTO (2)<small>más frecuente → One-Hot</small></li>
+  <li class="d">TABLA FINAL<small>4.000 × 16</small></li>
+</ul>
+<p>Las 10 columnas de entrada se convierten en <strong>16</strong>: 8 numéricas escaladas, 3 columnas de plan y 5 de género favorito. Los 100 huecos de <code>HorasMes</code> se rellenan con la mediana y los 100 de <code>GeneroFavorito</code> con el género más frecuente. Cómo viaja una fila concreta por este proceso, con todos los números, lo verás en <a href="#preparacion">la sección de preparación del proyecto 3</a>.</p>
+
+<div class="callout ojo">
+  <span class="lbl">Ojo: <code>select_dtypes</code> y el nuevo tipo <code>str</code> de pandas 3</span>
+  <p>Hasta pandas 2, una columna de texto tenía dtype <code>object</code>. En pandas 3 es <code>str</code>. Si escribes <code>select_dtypes(include=['object'])</code> a secas, pandas 3 todavía incluye las columnas <code>str</code> «por compatibilidad», pero <strong>avisa</strong> (<code>Pandas4Warning</code>) de que dejará de hacerlo. El día que se retire, <code>categorical_features</code> quedaría vacía sin ningún error y el modelo nunca vería <code>Plan</code> ni <code>GeneroFavorito</code>. Por eso la línea del fragmento 12 pide <code>['object', 'string', 'category']</code>, que funciona igual en pandas 2 y 3. Comprobar siempre que las dos listas (<code>numeric_features</code> y <code>categorical_features</code>) tienen las columnas que esperas es una de las mejores costumbres que puedes tener.</p>
+</div>
+
+<h2 id="streamflix-datos">Proyecto 3 · StreamFlix ampliado: los datos y su exploración</h2>
+
+<p class="pregunta">Antes de entrenar nada: ¿qué cuentan los datos? ¿Qué columnas parecen importar, cuántas faltan y qué clase es la mayoritaria?</p>
+
+<div class="callout analogia">
+  <span class="lbl">Por qué un tercer proyecto</span>
+  <p>El StreamFlix de tus apuntes (proyecto 2) enseña la mecánica, pero sus columnas son independientes: no tiene tipos de usuario que descubrir, ni cuentas raras, ni costes, ni un momento «de producción». Es como aprender a conducir en un aparcamiento vacío. Aquí construyo <strong>el mismo StreamFlix con más vida</strong>: misma plataforma, mismos dos targets y la misma tubería, pero con datos que esconden estructura, para que puedas comprobar si cada técnica encuentra lo que de verdad hay, y para llegar hasta la decisión en euros y la vigilancia en producción. Son los fragmentos 24 a 40.</p>
+</div>
+
+<p>Esta versión de StreamFlix tiene <strong>5.000 usuarios</strong>. El fragmento 24 genera la tabla (con semilla fija, para que siempre salga igual) con <strong>14 columnas</strong>:</p>
+
+<table>
+  <thead><tr><th>Columna</th><th>Qué es</th><th>Papel</th></tr></thead>
+  <tbody>
+    <tr><td><code>Edad</code>, <code>Plan</code> (Basic/Standard/Premium), <code>Dispositivo</code> (Móvil/TV/PC/Tablet), <code>AntiguedadMeses</code></td><td>Quién es el usuario y desde cuándo está</td><td>feature</td></tr>
+    <tr><td><code>HorasMes</code>, <code>DiasSinEntrar</code>, <code>TicketsSoporte</code></td><td>Cuánto ve este mes, cuántos días lleva sin entrar, cuántas incidencias abrió</td><td>feature</td></tr>
+    <tr><td><code>PctAccion</code>, <code>PctComedia</code>, <code>PctDrama</code>, <code>PctInfantil</code>, <code>PctDocumental</code></td><td>Cómo reparte sus horas entre géneros (cada fila suma 100 %)</td><td>feature</td></tr>
+    <tr><td><code>Cancelado</code></td><td>1 si se da de baja el mes siguiente</td><td><strong>target 1</strong> (clasificación)</td></tr>
+    <tr><td><code>HorasProximoMes</code></td><td>Horas que verá el mes siguiente</td><td><strong>target 2</strong> (regresión)</td></tr>
+  </tbody>
+</table>
+
+<h3>Qué hay escondido en los datos (y por qué te lo cuento)</h3>
+<p>Como los datos los genero yo, sé qué estructura tienen, y eso me permite algo que casi nunca tendrás en la vida real: <strong>comprobar si cada técnica encuentra lo que de verdad hay</strong>. Esto es lo que he escondido, y el modelo no lo verá directamente:</p>
+<ul>
+  <li><strong>Cuatro tipos de usuario</strong> (25 % «maratoniano», 35 % «ocasional», 25 % «familiar», 15 % «dormido») que determinan sus horas, sus días sin entrar, su edad, su plan y sus géneros. El modelo nunca recibe «tipo»: solo ve las columnas resultantes.</li>
+  <li><strong>40 «cuentas contradictorias»</strong> (el 1 %): muchas horas <em>y a la vez</em> muchísimos días sin entrar (por ejemplo, una cuenta compartida mal registrada). Más adelante veremos si DBSCAN las caza.</li>
+  <li><strong>Una regla de cancelación con un «precipicio»</strong>: la probabilidad de cancelar sube con los días sin entrar y da un salto al pasar de 20 días; baja con las horas vistas y con la antigüedad; sube con los tickets de soporte y con el plan Basic. La regla es probabilística: hay azar, como en la vida real.</li>
+  <li><strong>Huecos</strong> en <code>Edad</code>, <code>HorasMes</code>, <code>Plan</code> y <code>AntiguedadMeses</code>, añadidos al azar.</li>
+</ul>
+
+<div class="callout ojo">
+  <span class="lbl">Ojo: dos targets, y ninguno puede ser feature</span>
+  <p><code>Cancelado</code> y <code>HorasProximoMes</code> describen el <strong>mes que viene</strong>; las demás columnas, el mes que termina. Si dejaras <code>HorasProximoMes</code> como entrada para predecir <code>Cancelado</code> (alguien que verá 0 horas casi seguro cancela) cometerías una fuga temporal exactamente igual que la de la lluvia. Por eso, en cuanto el fragmento 26 construye <code>X</code>, quita <strong>las dos</strong>.</p>
+</div>
+
+<h3>Mirar antes de modelar (fragmento 25)</h3>
+<p>Una exploración de cinco líneas cuenta mucho. Esto es lo que sale:</p>
+<ul>
+  <li><strong>Tipos.</strong> 9 columnas decimales, 3 enteras y 2 de texto (<code>Plan</code> y <code>Dispositivo</code>): como ya viste, pandas 3 las llama <code>str</code>.</li>
+  <li><strong>Huecos.</strong> <code>Edad</code> 164, <code>HorasMes</code> 148, <code>AntiguedadMeses</code> 89 y <code>Plan</code> 86. Pocos (entre el 1,7 % y el 3,3 % de cada columna) pero reales: habrá que imputar. (Los porcentajes del código son probabilidades de sorteo; la cuenta real varía alrededor de ellos.)</li>
+  <li><strong>Target.</strong> Cancela el <strong>27,8 %</strong>; se queda el 72,2 %. Hay desequilibrio, aunque menos que en la lluvia. Un baseline «nadie cancela» acertaría un 72,2 %.</li>
+  <li><strong>Forma de las variables.</strong> <code>DiasSinEntrar</code> tiene media 8,0 pero mediana 4,0 y máximo 59: <em>cuando la media supera claramente a la mediana, la distribución tiene una cola larga</em> (muchos usuarios entran casi cada día y unos pocos llevan semanas sin entrar). Lo mismo pasa con <code>TicketsSoporte</code> (media 0,6, mediana 0): la mayoría no abre ninguno.</li>
+  <li><strong>Cancelación por plan.</strong> Basic: 37,5 % (1.738 usuarios); Standard: 25,4 % (1.765); Premium: 19,1 % (1.411).</li>
+  <li><strong>Correlación con <code>Cancelado</code>.</strong> La más fuerte es <code>DiasSinEntrar</code> (+0,57), después <code>HorasMes</code> (−0,42), <code>TicketsSoporte</code> (+0,29) y <code>AntiguedadMeses</code> (−0,23). Los porcentajes de género están por debajo de 0,16 en valor absoluto.</li>
+</ul>
+
+<div class="callout recuerda">
+  <span class="lbl">Recuerda</span>
+  <p>El <strong>coeficiente de correlación</strong> va de −1 a +1 y mide cuánto se parecen dos columnas <em>en línea recta</em>: +1, suben juntas; −1, una sube cuando la otra baja; 0, ninguna relación lineal. Es solo un primer vistazo: no ve relaciones curvas ni «precipicios», y por eso el +0,57 de <code>DiasSinEntrar</code> infravalora lo que esa columna importa de verdad (tiene un salto en 20 días que un coeficiente lineal no describe).</p>
+</div>
+
+<p>Conclusión de la exploración: las señales principales serán los días sin entrar y las horas del mes; el plan Basic cancela más; los géneros, por sí solos, dicen poco sobre quién cancela (aunque sí sobre <em>qué tipo de usuario</em> es, y los usaremos para agrupar y para recomendar).</p>
+
+<h2 id="preparacion">Preparación: reparto, ColumnTransformer y el viaje de una fila</h2>
+
+<p class="pregunta">Las columnas tienen huecos, escalas muy distintas (edad ≈ 36, horas ≈ 33, tickets ≈ 0,6) y dos son texto. ¿Cómo se las das a un modelo sin hacer trampas?</p>
+
+<h3>Primero se reparte, después se prepara</h3>
+<p>El fragmento 26 empieza separando <code>X</code> (las 12 columnas que el modelo verá) de los dos targets y reparte las filas con <code>train_test_split</code> en <strong>4.000 de entrenamiento y 1.000 de test</strong>, con <code>stratify=y</code> (la tasa de cancelación queda en 0,278 en ambos). Fíjate en que le pasamos <em>tres</em> series a la vez (<code>y</code> y <code>horas_futuras</code>): devuelve seis objetos y los reparte con <strong>las mismas filas</strong>, de modo que los usuarios del test son los mismos para la clasificación y la regresión.</p>
+
+<div class="callout regla">
+  <span class="lbl">Regla fácil</span>
+  <p><strong>Primero reparte, después prepara.</strong> Cualquier cosa que «aprenda» de los datos (una mediana, una media, las categorías de un One-Hot) debe aprenderla <em>solo del train</em>. Si la calculas con todos los datos, el test ya ha influido en el entrenamiento y tu medida es optimista.</p>
+</div>
+
+<h3>Dos ramas, un ColumnTransformer</h3>
+<p>Cada tipo de columna necesita su propio tratamiento. Por eso se construyen dos mini-Pipelines y se juntan en un <code>ColumnTransformer</code>:</p>
+<ul class="flow">
+  <li class="a">Numéricas (10)<small>Imputer mediana → StandardScaler</small></li>
+  <li class="b">Texto (2)<small>Imputer más frecuente → OneHot</small></li>
+  <li class="c">ColumnTransformer<small>junta las dos ramas</small></li>
+</ul>
+
+<ul>
+  <li><strong><code>SimpleImputer(strategy="median")</code></strong> rellena cada hueco numérico con la <strong>mediana</strong> de esa columna en el train. Se prefiere la mediana a la media porque no se deja arrastrar por valores extremos (recuerda la cola de <code>DiasSinEntrar</code>).</li>
+  <li><strong><code>StandardScaler</code></strong> transforma cada valor en un «z-score»: \( z = (x - \mu) / \sigma \). Tras el escalado todas las columnas tienen media 0 y desviación 1, y la regresión logística o K-Means ya no creen que «horas» pesa más que «tickets» solo por tener números más grandes (módulo 1).</li>
+  <li><strong><code>SimpleImputer(strategy="most_frequent")</code></strong> rellena los huecos de texto con la categoría más habitual (<code>Basic</code> en el plan, <code>Móvil</code> en el dispositivo).</li>
+  <li><strong><code>OneHotEncoder(handle_unknown="ignore")</code></strong> convierte cada categoría en una columna 0/1: <code>Plan</code> (3 categorías) pasa a 3 columnas y <code>Dispositivo</code> (4) a 4. Si en producción aparece un plan nuevo, la fila sale con todo ceros en vez de romper el modelo.</li>
+</ul>
+
+<p>El resultado (fragmento 26): <strong>4.000 filas × 17 columnas</strong> (10 numéricas + 3 de plan + 4 de dispositivo), sin ningún NaN. Los nombres de las columnas finales llevan el prefijo de su rama (<code>num__HorasMes</code>, <code>cat__Plan_Basic</code>…), que nos servirá para interpretar el modelo.</p>
+
+<div class="callout ojo">
+  <span class="lbl">Ojo: <code>fit</code> aprende, <code>transform</code> aplica</span>
+  <p>El preprocesador se <strong>ajusta una vez, con el train</strong> (<code>fit_transform(X_train)</code>) y después solo se <strong>aplica</strong> al test (<code>transform</code>), usando lo aprendido. Dentro de un <code>Pipeline</code> esto ocurre solo: <code>pipe.fit(X_train, y_train)</code> ajusta y <code>pipe.predict(X_test)</code> aplica. En el fragmento 26 hago el <code>fit_transform</code> sueltos únicamente para que mires el resultado; en los modelos reales cada Pipeline lleva su propia <em>copia limpia</em> del preprocesador (<code>clone</code>).</p>
+</div>
+
+<h3>Lo que el preprocesador aprendió</h3>
+<p>La última línea del fragmento 26 abre el preprocesador ya ajustado y muestra lo que aprendió de <code>HorasMes</code>: una <strong>mediana de 27,8 horas</strong> (para rellenar sus huecos), y una <strong>media de 32,56</strong> y una <strong>desviación de 22,11</strong> (para escalar; la media se calcula ya con los huecos rellenos). Esos tres números son todo lo que necesita para tratar a un usuario nuevo.</p>
+
+<h3>El viaje de una fila, con números</h3>
+<p>Vamos a seguir al usuario nº 2078 del train. Tiene 36 años, plan Basic en móvil, 17 meses de antigüedad, <strong>no tiene dato de <code>HorasMes</code></strong> (NaN), lleva <strong>25 días sin entrar</strong> y ha abierto 1 ticket. Su reparto de géneros es 18,2 % acción, 18,6 % comedia, 39,1 % drama, 3,6 % infantil y 20,5 % documental. Estos son los pasos, con los parámetros <em>reales</em> del modelo ajustado (regresión logística con <code>C = 0,01</code>, que elegirá la validación cruzada más abajo):</p>
+
+<div class="callout ejemplo">
+  <span class="lbl">Ejemplo numérico: de la fila cruda a la probabilidad</span>
+  <ol class="pasos">
+    <li><strong>Imputar.</strong> <code>HorasMes</code> es NaN: se rellena con la mediana del train, <strong>27,8</strong>.</li>
+    <li><strong>Escalar</strong> (media y desviación del train): <code>HorasMes</code> → (27,8 − 32,56) / 22,11 = <span class="res">−0,215</span>; <code>DiasSinEntrar</code> → (25 − 8,02) / 9,82 = <span class="res">+1,729</span>; <code>TicketsSoporte</code> → (1 − 0,61) / 0,83 = <span class="res">+0,474</span>. Lo mismo con las otras siete numéricas.</li>
+    <li><strong>One-Hot.</strong> <code>Plan = Basic</code> → [1, 0, 0] sobre (Basic, Premium, Standard); <code>Dispositivo = Móvil</code> → [1, 0, 0, 0].</li>
+    <li><strong>Pesos del modelo</strong> (lo que aprendió la regresión logística): <code>DiasSinEntrar</code> +0,8586, <code>HorasMes</code> −0,4683, <code>TicketsSoporte</code> +0,2996, <code>Plan_Basic</code> +0,102, <code>Dispositivo_Móvil</code> +0,0743… y un intercepto de −1,2355.</li>
+    <li><strong>Aportes</strong> (peso × valor): <code>DiasSinEntrar</code> 0,8586 × 1,729 = <span class="res">+1,485</span>; <code>TicketsSoporte</code> 0,2996 × 0,474 = +0,142; <code>HorasMes</code> −0,4683 × (−0,215) = +0,101; <code>Plan_Basic</code> +0,102; <code>Dispositivo_Móvil</code> +0,074; el resto de columnas suman +0,072 entre todas.</li>
+    <li><strong>Logit</strong> = intercepto + suma de aportes = −1,2355 + 1,485 + 0,142 + 0,101 + 0,102 + 0,074 + 0,072 ≈ <span class="res">+0,741</span>.</li>
+    <li><strong>Probabilidad</strong> = 1 / (1 + e<sup>−0,741</sup>) = 1 / (1 + 0,477) = <span class="res">0,677</span>. El modelo dice: <em>67,7 % de probabilidad de cancelar</em>. (Y en la vida real este usuario canceló.)</li>
+  </ol>
+</div>
+
+<p>Nota lo que ha ocurrido: <strong>un dato que faltaba no ha impedido tener una predicción</strong>, y lo que más empuja la predicción es lo que esperabas, los 25 días sin entrar (+1,485 de un total de +1,98 antes del intercepto). Tócalo tú:</p>
+
+
+  </div>
+</details>
+
+<section>
+<h2 class="sin-num">Código</h2>
+<p class="codigo-intro">El fragmento 12 es del cuaderno B (tus apuntes) y el 26 del cuaderno C (StreamFlix ampliado); cada uno usa la tabla creada por el 10 y el 24, respectivamente.</p>
+<article class="snippet" data-lang="python">
+  <header>
+    <h3>12 · Reparto train/test y preprocesador (ColumnTransformer)</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Separa features y target, reserva el 20 % de los usuarios para el test (con la misma proporción de cancelaciones), detecta qué columnas son numéricas y cuáles de texto, y monta el preprocesador que imputa, escala y codifica cada grupo.</p>
+  </header>
+  <pre class="code"><code>X_class = df.drop(columns=['Cancelado', 'HorasProximoMes'])
+y_class = df['Cancelado']
+X_train_class, X_test_class, y_train_class, y_test_class = train_test_split(
+    X_class, y_class, test_size=0.20, stratify=y_class, random_state=42)
+
+numeric_features = X_train_class.select_dtypes(include=['number']).columns.tolist()
+categorical_features = X_train_class.select_dtypes(include=['object', 'string', 'category']).columns.tolist()
+print('Numéricas:', numeric_features)
+print('Categóricas:', categorical_features)
+
+numeric_transformer = Pipeline(steps=[
+    ('imputer', SimpleImputer(strategy='median')),
+    ('scaler', StandardScaler())])
+categorical_transformer = Pipeline(steps=[
+    ('imputer', SimpleImputer(strategy='most_frequent')),
+    ('onehot', OneHotEncoder(handle_unknown='ignore'))])
+preprocessor = ColumnTransformer(transformers=[
+    ('num', numeric_transformer, numeric_features),
+    ('cat', categorical_transformer, categorical_features)])
+
+Z = preprocessor.fit_transform(X_train_class)
+print(X_train_class.shape, '-&gt;', Z.shape)
+print(preprocessor.get_feature_names_out())</code></pre>
+  <details class="linea-a-linea">
+    <summary>Línea por línea</summary>
+    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+      <tbody>
+        <tr data-lines="1"><td><code>X_class = df.drop(columns=['Cancelado', 'HorasProximoMes'])</code></td><td><code>X_class</code> es la tabla <strong>sin los dos targets</strong>: <code>drop(columns=[...])</code> quita <code>Cancelado</code> (lo que queremos predecir) y <code>HorasProximoMes</code> (sería una fuga del futuro: describe el mes que aún no ha pasado). Quedan 10 columnas.</td></tr>
+        <tr data-lines="2"><td><code>y_class = df['Cancelado']</code></td><td><code>y_class</code> es el target: la columna <code>Cancelado</code>.</td></tr>
+        <tr data-lines="3-4"><td><code>X_train_class, X_test_class, y_train_class, y_test_class = t…</code></td><td><code>train_test_split</code> devuelve cuatro objetos: <code>X_train</code>, <code>X_test</code>, <code>y_train</code>, <code>y_test</code> (en ese orden). <code>test_size=0.20</code> reserva el 20 % para el test; <code>stratify=y_class</code> hace que train y test tengan la misma proporción de cancelaciones; <code>random_state=42</code> fija el sorteo para que sea reproducible.</td></tr>
+        <tr data-lines="6"><td><code>numeric_features = X_train_class.select_dtypes(include=['num…</code></td><td><code>select_dtypes(include=['number'])</code> se queda con las columnas numéricas, <code>.columns</code> toma sus nombres y <code>.tolist()</code> los pasa a una lista de Python. Se hace sobre el train.</td></tr>
+        <tr data-lines="7"><td><code>categorical_features = X_train_class.select_dtypes(include=[…</code></td><td>Lo mismo para las de texto. Fíjate en que la lista incluye <code>'string'</code> además de <code>'object'</code> y <code>'category'</code>: en pandas 3 el texto es de tipo <code>str</code>; con solo <code>'object'</code> todavía se detecta, pero pandas avisa de que dejará de hacerlo, y entonces <code>Plan</code> y <code>GeneroFavorito</code> desaparecerían del modelo sin ningún error.</td></tr>
+        <tr data-lines="8-9"><td><code>print('Numéricas:', numeric_features) …</code></td><td>Imprimen las dos listas para comprobar el reparto.</td></tr>
+        <tr data-lines="11-13"><td><code>numeric_transformer = Pipeline(steps=[ …</code></td><td><code>numeric_transformer</code>: un mini-Pipeline para columnas numéricas con dos pasos con nombre: primero <code>SimpleImputer(strategy='median')</code> rellena los huecos con la mediana de la columna; después <code>StandardScaler()</code> resta la media y divide por la desviación.</td></tr>
+        <tr data-lines="14-16"><td><code>categorical_transformer = Pipeline(steps=[ …</code></td><td><code>categorical_transformer</code>, el equivalente para texto: <code>SimpleImputer(strategy='most_frequent')</code> rellena con la categoría más habitual y <code>OneHotEncoder(handle_unknown='ignore')</code> crea una columna 0/1 por categoría (y, si en producción aparece una categoría nueva, la ignora en vez de dar error).</td></tr>
+        <tr data-lines="17-19"><td><code>preprocessor = ColumnTransformer(transformers=[ …</code></td><td><code>ColumnTransformer</code> junta ambos: <code>('num', numeric_transformer, numeric_features)</code> significa «a las columnas de la lista <code>numeric_features</code> aplícales el transformador numérico, y llama a esa rama <code>num</code>»; igual para <code>cat</code>.</td></tr>
+        <tr data-lines="21"><td><code>Z = preprocessor.fit_transform(X_train_class)</code></td><td><strong>Línea añadida por mí:</strong> <code>fit_transform</code> ajusta el preprocesador con el train (aprende medianas, medias, desviaciones y categorías) y devuelve la tabla ya transformada. Solo se hace aquí para poder mirar el resultado; los modelos de abajo lo ajustan solos dentro de su Pipeline.</td></tr>
+        <tr data-lines="22"><td><code>print(X_train_class.shape, '-&gt;', Z.shape)</code></td><td>Forma antes y después: (filas, columnas) de la tabla original y de la transformada.</td></tr>
+        <tr data-lines="23"><td><code>print(preprocessor.get_feature_names_out())</code></td><td>Los nombres de las columnas resultantes: llevan el prefijo de su rama (<code>num__</code> o <code>cat__</code>) y, en las categóricas, el valor (<code>cat__Plan_Basic</code>).</td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>Numéricas: ['Edad', 'HorasMes', 'DiasDesdeUltimoUso', 'PeliculasVistas', 'SeriesVistas', 'ProblemasPago', 'ErroresApp', 'Dispositivos']
+Categóricas: ['Plan', 'GeneroFavorito']
+(4000, 10) -&gt; (4000, 16)
+['num__Edad' 'num__HorasMes' 'num__DiasDesdeUltimoUso'
+ 'num__PeliculasVistas' 'num__SeriesVistas' 'num__ProblemasPago'
+ 'num__ErroresApp' 'num__Dispositivos' 'cat__Plan_Basic'
+ 'cat__Plan_Premium' 'cat__Plan_Standard' 'cat__GeneroFavorito_Accion'
+ 'cat__GeneroFavorito_Ciencia Ficcion' 'cat__GeneroFavorito_Comedia'
+ 'cat__GeneroFavorito_Drama' 'cat__GeneroFavorito_Terror']</pre>
+    <p>Hay <strong>8 columnas numéricas</strong> y <strong>2 de texto</strong> (<code>Plan</code> y <code>GeneroFavorito</code>). El train tiene 4.000 usuarios y el preprocesador convierte sus <strong>10 columnas en 16</strong>: 8 numéricas escaladas + 3 de plan (Basic, Premium, Standard) + 5 de género favorito (Accion, Ciencia Ficcion, Comedia, Drama, Terror). No queda ningún NaN: las 100 horas que faltaban se rellenaron con la mediana y los 100 géneros con el más frecuente.</p>
+  </div>
+</article>
+<article class="snippet" data-lang="python">
+  <header>
+    <h3>26 · Repartir los datos y construir el preprocesador</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Separa features y targets, reparte train y test (para clasificación y regresión a la vez) y monta el ColumnTransformer que imputa, escala y codifica. Después lo ajusta una vez para inspeccionar lo que aprende.</p>
+  </header>
+  <pre class="code"><code>from sklearn.compose import ColumnTransformer
+from sklearn.impute import SimpleImputer
+from sklearn.model_selection import train_test_split
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import OneHotEncoder, StandardScaler
+
+X = df.drop(columns=["Cancelado", "HorasProximoMes"])
+y = df["Cancelado"]
+horas_futuras = df["HorasProximoMes"]
+
+X_train, X_test, y_train, y_test, h_train, h_test = train_test_split(
+    X, y, horas_futuras, test_size=0.2, stratify=y, random_state=42
+)
+print(X_train.shape, X_test.shape)
+print("cancelan en train:", round(y_train.mean(), 3), "| en test:", round(y_test.mean(), 3))
+
+numericas = X.select_dtypes(exclude=["object", "string"]).columns.tolist()
+categoricas = X.select_dtypes(include=["object", "string"]).columns.tolist()
+print(numericas)
+print(categoricas)
+
+pre_num = Pipeline([("imputar", SimpleImputer(strategy="median")), ("escalar", StandardScaler())])
+pre_cat = Pipeline([("imputar", SimpleImputer(strategy="most_frequent")),
+                    ("onehot", OneHotEncoder(handle_unknown="ignore"))])
+preprocesador = ColumnTransformer([("num", pre_num, numericas), ("cat", pre_cat, categoricas)])
+
+X_train_listo = preprocesador.fit_transform(X_train)
+print(X_train_listo.shape, "| NaN que quedan:", int(np.isnan(X_train_listo).sum()))
+print(preprocesador.get_feature_names_out()[:4], "...", preprocesador.get_feature_names_out()[-4:])
+
+num = preprocesador.named_transformers_["num"]                           # lo que el preprocesador aprendió del train
+i = numericas.index("HorasMes")
+print("HorasMes -&gt; mediana para imputar:", num["imputar"].statistics_[i], "| media y desviación para escalar:", round(num["escalar"].mean_[i], 2), round(num["escalar"].scale_[i], 2))</code></pre>
+  <details class="linea-a-linea">
+    <summary>Línea por línea</summary>
+    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+      <tbody>
+        <tr data-lines="1-5"><td><code>from sklearn.compose import ColumnTransformer …</code></td><td>Las herramientas: <code>ColumnTransformer</code>, <code>SimpleImputer</code> (rellena huecos), <code>train_test_split</code>, <code>Pipeline</code>, y <code>OneHotEncoder</code> y <code>StandardScaler</code>.</td></tr>
+        <tr data-lines="7"><td><code>X = df.drop(columns=["Cancelado", "HorasProximoMes"])</code></td><td><code>X</code>: la tabla sin <strong>ninguno de los dos targets</strong> (si dejaras <code>HorasProximoMes</code> sería una fuga del futuro). Quedan 12 columnas.</td></tr>
+        <tr data-lines="8"><td><code>y = df["Cancelado"]</code></td><td><code>y</code>: el target de clasificación.</td></tr>
+        <tr data-lines="9"><td><code>horas_futuras = df["HorasProximoMes"]</code></td><td><code>horas_futuras</code>: el target de regresión, que se reparte a la vez.</td></tr>
+        <tr data-lines="11-13"><td><code>X_train, X_test, y_train, y_test, h_train, h_test = train_te…</code></td><td><code>train_test_split</code> con tres series (<code>X</code>, <code>y</code>, <code>horas_futuras</code>) devuelve seis objetos con <strong>las mismas filas</strong> en cada uno: <code>X_train, X_test, y_train, y_test, h_train, h_test</code>. 20 % para test, estratificado por <code>y</code>, semilla 42.</td></tr>
+        <tr data-lines="14"><td><code>print(X_train.shape, X_test.shape)</code></td><td>Formas: 4.000 filas de entrenamiento y 1.000 de test.</td></tr>
+        <tr data-lines="15"><td><code>print("cancelan en train:", round(y_train.mean(), 3), "| en …</code></td><td>Comprueba la estratificación: la tasa de cancelación es igual en train y en test.</td></tr>
+        <tr data-lines="17-18"><td><code>numericas = X.select_dtypes(exclude=["object", "string"]).co…</code></td><td>Separa las columnas numéricas de las de texto (<code>["object", "string"]</code> funciona con pandas 2 y 3).</td></tr>
+        <tr data-lines="19-20"><td><code>print(numericas) …</code></td><td>Las enseña para comprobar que son las esperadas: 10 numéricas y 2 de texto.</td></tr>
+        <tr data-lines="22"><td><code>pre_num = Pipeline([("imputar", SimpleImputer(strategy="medi…</code></td><td>Rama numérica: un mini-Pipeline que primero rellena los huecos con la <strong>mediana</strong> y luego estandariza.</td></tr>
+        <tr data-lines="23-24"><td><code>pre_cat = Pipeline([("imputar", SimpleImputer(strategy="most…</code></td><td>Rama de texto: rellena con la categoría más frecuente y luego hace One-Hot, ignorando categorías desconocidas.</td></tr>
+        <tr data-lines="25"><td><code>preprocesador = ColumnTransformer([("num", pre_num, numerica…</code></td><td>El <code>ColumnTransformer</code> aplica cada rama a sus columnas y junta el resultado.</td></tr>
+        <tr data-lines="27"><td><code>X_train_listo = preprocesador.fit_transform(X_train)</code></td><td><code>fit_transform(X_train)</code>: <strong>aprende</strong> medianas, medias, desviaciones y categorías del train y devuelve la matriz ya preparada.</td></tr>
+        <tr data-lines="28"><td><code>print(X_train_listo.shape, "| NaN que quedan:", int(np.isnan…</code></td><td>Comprueba el resultado: forma de la matriz y cuántos NaN quedan (<code>np.isnan(...).sum()</code>).</td></tr>
+        <tr data-lines="29"><td><code>print(preprocesador.get_feature_names_out()[:4], "...", prep…</code></td><td>Los nombres de las 4 primeras y 4 últimas columnas resultantes (<code>get_feature_names_out</code>).</td></tr>
+        <tr data-lines="31-32"><td><code>num = preprocesador.named_transformers_["num"]              …</code></td><td>Abre el preprocesador ya ajustado: <code>named_transformers_["num"]</code> devuelve la rama numérica y <code>numericas.index("HorasMes")</code> localiza la posición de esa columna.</td></tr>
+        <tr data-lines="33"><td><code>print("HorasMes -&gt; mediana para imputar:", num["imputar"].st…</code></td><td>Lo que aprendió de <code>HorasMes</code>: <code>statistics_</code> (la mediana usada para imputar) y <code>mean_</code> / <code>scale_</code> (media y desviación del escalado). Los atributos que terminan en <code>_</code> existen solo después de <code>fit</code>.</td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>(4000, 12) (1000, 12)
+cancelan en train: 0.278 | en test: 0.278
+['Edad', 'AntiguedadMeses', 'HorasMes', 'DiasSinEntrar', 'TicketsSoporte', 'PctAccion', 'PctComedia', 'PctDrama', 'PctInfantil', 'PctDocumental']
+['Plan', 'Dispositivo']
+(4000, 17) | NaN que quedan: 0
+['num__Edad' 'num__AntiguedadMeses' 'num__HorasMes' 'num__DiasSinEntrar'] ... ['cat__Dispositivo_Móvil' 'cat__Dispositivo_PC' 'cat__Dispositivo_TV'
+ 'cat__Dispositivo_Tablet']
+HorasMes -&gt; mediana para imputar: 27.8 | media y desviación para escalar: 32.56 22.11</pre>
+    <p><strong>4.000 filas de entrenamiento y 1.000 de test</strong>, con la misma tasa de cancelación (0,278) en ambos. Hay 10 columnas numéricas y 2 de texto. La matriz preparada tiene <strong>4.000 × 17</strong> (10 numéricas + 3 de plan + 4 de dispositivo) y ningún NaN. Los nombres llevan prefijo (<code>num__Edad</code>…, <code>cat__Dispositivo_Tablet</code>). Para <code>HorasMes</code> el preprocesador aprendió: mediana 27,8 (imputar), media 32,56 y desviación 22,11 (escalar).</p>
+  </div>
+</article>
+</section>
+
+</div>
+</main>
+</body>
+</html>

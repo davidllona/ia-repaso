@@ -1,0 +1,225 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lección 6 · Keras y PyTorch hacen lo mismo con los datos; cambian dónde va el canal y quién divide entre 255 · Módulo 1 · Curso 6 · Cuaderno de IA</title>
+<meta name="description" content="Comparación Keras vs PyTorch para cargar y aumentar imágenes: tabla lado a lado, (B, H, W, C) frente a (B, C, H, W), escala de los píxeles y errores típicos.">
+<script>try{var t=localStorage.getItem('cuaderno-ia:tema');if(t)document.documentElement.setAttribute('data-theme',t)}catch(e){}</script>
+<link rel="stylesheet" href="../../assets/css/style.css">
+<script src="../../assets/js/curriculum.js"></script>
+<script src="../../assets/js/lab.js"></script>
+<script src="../../assets/js/app.js" defer></script>
+</head>
+<body data-root="../../" data-course="6" data-module="1" data-lesson="6">
+<main>
+<div class="page">
+
+<header class="hero leccion">
+  <div class="hero-grid">
+    <div>
+      <p class="eyebrow">Curso 6 · Módulo 1 · Lección 6 de 6</p>
+      <h1>Keras y PyTorch hacen lo mismo con los datos; cambian dónde va el canal y quién divide entre 255</h1>
+      <p class="lead">Las dos tuberías leen los mismos píxeles. La diferencia está en el orden de los ejes, la escala y quién hace cada paso.</p>
+      <p class="meta-line"><span class="read-time" data-render="read-time"></span><a href="../modulo-1.html">Índice del módulo</a></p>
+    </div>
+    <div class="hero-tile" aria-hidden="true"></div>
+  </div>
+</header>
+
+<details class="predice">
+  <summary>El mismo póster sale por la tubería de Keras y por la de PyTorch. ¿Tienen los mismos números?<span class="hint"></span></summary>
+  <div>
+    <p><strong>Los mismos píxeles, en otro orden y otra escala.</strong> Keras da <code>(32, 32, 3)</code> en 0–255; PyTorch, <code>(3, 32, 32)</code> en 0–1. Si transpones los ejes y divides entre 255, la diferencia es exactamente 0 (lo comprueba el fragmento de abajo).</p>
+  </div>
+</details>
+
+<section>
+<h2 id="idea">La misma tubería, lado a lado</h2>
+<p>Los dos frameworks hacen los mismos pasos con las mismas carpetas. Cambian los nombres, dónde va el canal y quién divide entre 255:</p>
+<table>
+  <thead><tr><th>Paso</th><th>Keras</th><th>PyTorch</th></tr></thead>
+  <tbody>
+    <tr><th scope="row">Leer carpetas</th><td><code>image_dataset_from_directory</code></td><td><code>datasets.ImageFolder</code></td></tr>
+    <tr><th scope="row">Clases</th><td><code>class_names</code>, alfabético</td><td><code>class_to_idx</code>, alfabético</td></tr>
+    <tr><th scope="row">Validación</th><td><code>validation_split</code> + <code>subset</code> + <code>seed</code></td><td><code>random_split</code> + <code>generator</code></td></tr>
+    <tr><th scope="row">Tamaño</th><td><code>image_size=(32, 32)</code></td><td><code>transforms.Resize</code></td></tr>
+    <tr><th scope="row">Escala</th><td>0–255; <code>Rescaling(1./255)</code> en el modelo</td><td><code>ToTensor</code> → 0–1; <code>Normalize</code></td></tr>
+    <tr><th scope="row">Aumento</th><td>capas <code>Random*</code>, activas con <code>training=True</code></td><td><code>transforms.Random*</code> en la receta</td></tr>
+    <tr><th scope="row">Giro</th><td>fracción de vuelta: 0,1 = 36°</td><td>grados: 36</td></tr>
+    <tr><th scope="row">Lotes</th><td><code>batch_size</code> en la misma función</td><td><code>DataLoader(batch_size, shuffle)</code></td></tr>
+    <tr><th scope="row">Forma del lote</th><td class="res">(B, alto, ancho, C)</td><td class="res">(B, C, alto, ancho)</td></tr>
+  </tbody>
+</table>
+<p>Keras te da más hecho con menos líneas; PyTorch te obliga a escribir cada pieza, y a cambio ves y controlas cada paso. Ninguno es «mejor» para los datos: en el <a href="../modulo-2.html">módulo 2</a> compararás los modelos con números reales.</p>
+</section>
+
+<figure class="demo" data-demo="curso6/c6m1-formas" data-titulo="La misma imagen por las dos tuberías">
+  <div class="haz">Avanza los cuatro pasos y mueve el valor del píxel.</div>
+  <div class="observa">El canal cambia de sitio en el paso 2 y la escala en los pasos 2 y 4; el lote siempre va delante.</div>
+</figure>
+
+<section>
+<h2 id="numeros">Con números: un píxel de 200 por los dos caminos</h2>
+<div class="callout ejemplo">
+  <span class="lbl">Ejemplo numérico</span>
+  <table>
+    <thead><tr><th></th><th>Keras</th><th>PyTorch</th></tr></thead>
+    <tbody>
+      <tr><td>Leído</td><td>200,0</td><td>200 / 255 = 0,784</td></tr>
+      <tr><td>Listo para la red</td><td>200 / 255 = <span class="res">0,784</span></td><td>(0,784 − 0,5) / 0,5 = <span class="res">0,569</span></td></tr>
+      <tr><td>Lote de 8</td><td>(8, 32, 32, 3)</td><td>(8, 3, 32, 32)</td></tr>
+    </tbody>
+  </table>
+  <p>Para pasar de uno a otro: <code>np.transpose(x, (0, 3, 1, 2)) / 255</code>. El eje 0 (lote) se queda; el 3 (canal) pasa a la posición 1.</p>
+</div>
+</section>
+
+<details class="predice">
+  <summary>Le das a una <code>Conv2d(3, 16, 3)</code> de PyTorch un lote sacado de Keras sin transponer, <code>(8, 32, 32, 3)</code>. ¿Qué pasa?<span class="hint"></span></summary>
+  <div>
+    <p><strong>Error:</strong> <code>expected input[8, 32, 32, 3] to have 3 channels, but got 32 channels instead</code>. PyTorch lee el eje 1 como canales y encuentra 32. Peor es olvidar la escala: eso no da ningún error, la red solo aprende peor.</p>
+  </div>
+</details>
+
+<div class="resumen">
+  <h2 class="sin-num sin-toc">En tres líneas</h2>
+  <ul>
+    <li>Mismos pasos en los dos frameworks; las clases se numeran igual (orden alfabético).</li>
+    <li>Keras: <code>(B, alto, ancho, C)</code> en 0–255; PyTorch: <code>(B, C, alto, ancho)</code> en 0–1 tras <code>ToTensor</code>.</li>
+    <li>Equivocarse de ejes da error; equivocarse de escala no lo da, así que compruébalo tú.</li>
+  </ul>
+</div>
+
+<section class="quiz mini">
+<script type="application/json" class="quiz-data">
+{
+ "titulo": "¿Lo tienes?",
+ "preguntas": [
+  {
+   "q": "¿Qué forma tiene en PyTorch un lote de 16 imágenes RGB de 64 × 64 después de <code>ToTensor</code> y el <code>DataLoader</code>?",
+   "opciones": [
+    "(16, 64, 64, 3)",
+    "(16, 3, 64, 64)",
+    "(3, 16, 64, 64)",
+    "(64, 64, 3, 16)"
+   ],
+   "correcta": 1,
+   "porque": "El lote va siempre primero y, en PyTorch, el canal justo después: (B, C, alto, ancho). (16, 64, 64, 3) sería el formato de Keras."
+  },
+  {
+   "q": "Quieres en PyTorch el mismo giro que <code>layers.RandomRotation(0.25)</code> de Keras. ¿Qué escribes?",
+   "opciones": [
+    "<code>transforms.RandomRotation(0.25)</code>",
+    "<code>transforms.RandomRotation(25)</code>",
+    "<code>transforms.RandomRotation(90)</code>"
+   ],
+   "correcta": 2,
+   "porque": "0,25 vueltas = 0,25 · 360° = 90°, y torchvision pide grados."
+  },
+  {
+   "q": "¿Cuál de estos fallos <strong>no</strong> produce ningún mensaje de error?",
+   "opciones": [
+    "Pasar un lote (B, H, W, C) a una Conv2d de PyTorch",
+    "Olvidar dividir entre 255 en Keras",
+    "Poner Normalize antes de ToTensor en torchvision"
+   ],
+   "correcta": 1,
+   "porque": "Los píxeles en 0–255 son números válidos: la red entrena igual, pero peor. Los otros dos fallan en cuanto se ejecutan (canales que no cuadran; Normalize recibe una imagen PIL en vez de un tensor)."
+  }
+ ]
+}
+</script>
+</section>
+
+<details class="profundizar">
+  <summary><span>Profundizar: la explicación completa<small>Por qué el canal va en sitios distintos, tf.data frente a num_workers, reproducibilidad, Keras 3 con un DataLoader y el choque al importar los dos.</small></span></summary>
+  <div class="prof-body">
+<h3>Por qué el canal va en sitios distintos</h3>
+<p>Es una convención histórica. TensorFlow eligió <strong>channels_last</strong> (B, H, W, C), que es como se guardan las imágenes en disco, en PIL y en NumPy. PyTorch heredó de Torch <strong>channels_first</strong> (B, C, H, W), el formato con el que empezaron las librerías de convolución en GPU. Hoy los dos aceptan ambas: Keras con <code>data_format="channels_first"</code> en las capas y PyTorch con <code>memory_format=torch.channels_last</code>, que a veces acelera en GPUs modernas. Para el proyecto basta con saber qué espera cada uno.</p>
+
+<h3>Paralelismo: tf.data frente a num_workers</h3>
+<p>En Keras, la tubería es un grafo de <code>tf.data</code>: <code>map(..., num_parallel_calls=AUTOTUNE)</code> y <code>prefetch(AUTOTUNE)</code> reparten el trabajo en hilos y TensorFlow decide cuántos. En PyTorch eliges tú <code>num_workers</code>: cada worker es un proceso de Python que ejecuta <code>__getitem__</code> y la receta. Si en el laboratorio el entrenamiento en PyTorch va lento con la GPU casi parada, el cuello de botella suele estar aquí: sube <code>num_workers</code>.</p>
+
+<h3>Reproducibilidad en cada uno</h3>
+<ul>
+  <li>Keras: <code>keras.utils.set_random_seed(0)</code> y la misma <code>seed</code> en las dos llamadas de <code>image_dataset_from_directory</code>.</li>
+  <li>PyTorch: <code>torch.manual_seed(0)</code> para el aumento y un <code>generator</code> con semilla para <code>random_split</code> y el <code>DataLoader</code>. Con <code>num_workers &gt; 0</code>, cada worker tiene su semilla derivada de la principal.</li>
+</ul>
+<p>Aun así, el reparto de validación no será el mismo en los dos frameworks (cada uno baraja a su manera). Si quieres comparar los modelos del módulo 2 con justicia, lo más limpio es separar <code>train/</code>, <code>val/</code> y <code>test/</code> en carpetas, y que los dos lean exactamente los mismos archivos.</p>
+
+<h3>Keras 3 puede comerse un DataLoader</h3>
+<p>Keras 3 funciona encima de TensorFlow, JAX o PyTorch, y su <code>fit</code> acepta un <code>tf.data.Dataset</code>, arrays de NumPy, generadores de Python y también un <code>DataLoader</code> de PyTorch. En ese caso, eso sí, la forma de las imágenes debe ser la que esperan las capas de Keras (canal al final, salvo que cambies <code>data_format</code>).</p>
+
+<div class="callout ojo">
+  <span class="lbl">Ojo · importar los dos a la vez</span>
+  <p>En el fragmento se importa <code>torch</code> antes que <code>keras</code>. En este entorno, al revés, el proceso se cae al importar: TensorFlow y PyTorch traen librerías nativas que a veces chocan. En Coursera cada framework va en su propio cuaderno y no lo notarás; si mezclas los dos, prueba a cambiar el orden de los imports.</p>
+</div>
+
+<p>Para el cuestionario graduado: forma del lote en cada framework, rango de los píxeles a la salida de cada función, que el giro de Keras es una fracción de vuelta y el de torchvision son grados, y que el aumento solo se aplica al entrenamiento.</p>
+  </div>
+</details>
+
+<section>
+<h2 class="sin-num">Código</h2>
+
+<article class="snippet" data-lang="python" id="frag-c6-lado-a-lado">
+  <header>
+    <h3>7 · El mismo lote por las dos tuberías</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Cargar los mismos 8 pósters con Keras y con PyTorch, comparar forma, tipo y rango, y demostrar que tras transponer y dividir entre 255 son idénticos. Usa la carpeta del <a href="leccion-1.html#frag-c6-crear">fragmento 1</a>.</p>
+  </header>
+  <pre class="code"><code>import numpy as np
+import torch                                   # torch primero (ver tabla)
+from torch.utils.data import DataLoader
+from torchvision import datasets, transforms
+import keras
+
+ds_k = keras.utils.image_dataset_from_directory(
+    "posters", image_size=(32, 32), batch_size=8, shuffle=False, verbose=False)
+ds_t = datasets.ImageFolder("posters", transform=transforms.ToTensor())
+dl_t = DataLoader(ds_t, batch_size=8, shuffle=False)
+
+xk, yk = next(iter(ds_k))
+xt, yt = next(iter(dl_t))
+print("Keras  :", tuple(xk.shape), xk.dtype.name, f"rango {float(xk.numpy().min()):.0f}–{float(xk.numpy().max()):.0f}", "y", yk.numpy().tolist())
+print("PyTorch:", tuple(xt.shape), xt.dtype, f"rango {xt.min():.2f}–{xt.max():.2f}", "y", yt.tolist())
+
+xk_como_t = np.transpose(xk.numpy(), (0, 3, 1, 2)) / 255.0   # (B,H,W,C) -&gt; (B,C,H,W) y 0–1
+print("forma tras transponer:", xk_como_t.shape)
+print("diferencia máxima entre los dos:", float(np.abs(xk_como_t - xt.numpy()).max()))
+print("misma ficha 0:", ds_k.file_paths[0], "&lt;-&gt;", ds_t.samples[0][0])</code></pre>
+  <details class="linea-a-linea" open>
+    <summary>Línea por línea</summary>
+    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+      <tbody>
+        <tr data-lines="1"><td><code>import numpy as np</code></td><td>NumPy para transponer y comparar.</td></tr>
+        <tr data-lines="2-4"><td><code>import torch … from torchvision import datasets, transforms</code></td><td>PyTorch y torchvision. Van antes que Keras: en este entorno, al revés, el proceso falla (ver «Profundizar»).</td></tr>
+        <tr data-lines="5"><td><code>import keras</code></td><td>Keras 3.</td></tr>
+        <tr data-lines="7-8"><td><code>ds_k = keras.utils.image_dataset_from_directory(…, shuffle=False, …)</code></td><td>Tubería de Keras, sin barajar para que el orden sea el de los archivos, en lotes de 8.</td></tr>
+        <tr data-lines="9-10"><td><code>ds_t = datasets.ImageFolder(…) dl_t = DataLoader(…)</code></td><td>Tubería de PyTorch con solo <code>ToTensor</code>, también sin barajar y en lotes de 8.</td></tr>
+        <tr data-lines="12-13"><td><code>xk, yk = next(iter(ds_k)) xt, yt = next(iter(dl_t))</code></td><td>El primer lote de cada una.</td></tr>
+        <tr data-lines="14-15"><td><code>print("Keras  :", …) print("PyTorch:", …)</code></td><td>Forma, tipo, rango y etiquetas de cada lote.</td></tr>
+        <tr data-lines="17"><td><code>xk_como_t = np.transpose(xk.numpy(), (0, 3, 1, 2)) / 255.0</code></td><td>Convierte el lote de Keras al formato de PyTorch: el canal (eje 3) pasa a la posición 1 y se divide entre 255.</td></tr>
+        <tr data-lines="18-19"><td><code>print("forma tras transponer:", …) print("diferencia máxima …", …)</code></td><td>La forma nueva y la mayor diferencia, píxel a píxel, entre los dos lotes.</td></tr>
+        <tr data-lines="20"><td><code>print("misma ficha 0:", …)</code></td><td>Confirma que los dos empiezan por el mismo archivo.</td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>Keras  : (8, 32, 32, 3) float32 rango 0–231 y [0, 0, 0, 0, 0, 0, 0, 0]
+PyTorch: (8, 3, 32, 32) torch.float32 rango 0.00–0.91 y [0, 0, 0, 0, 0, 0, 0, 0]
+forma tras transponer: (8, 3, 32, 32)
+diferencia máxima entre los dos: 0.0
+misma ficha 0: posters/accion/000.png &lt;-&gt; posters/accion/000.png</pre>
+    <p>Keras entrega <code>(8, 32, 32, 3)</code> con píxeles de 0 a 231 (sin escalar); PyTorch, <code>(8, 3, 32, 32)</code> de 0,00 a 0,91, que es 231 / 255. Las etiquetas coinciden: los 8 primeros archivos son de <code>accion</code> (clase 0) en los dos. Tras transponer y dividir, la <strong>diferencia máxima es 0,0</strong>: son exactamente los mismos números. Los dos frameworks leen igual; solo los guardan distinto.</p>
+  </div>
+</article>
+</section>
+
+</div>
+</main>
+</body>
+</html>

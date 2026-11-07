@@ -1,157 +1,271 @@
-<!DOCTYPE html>
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lección 3 · Cada filtro busca un patrón; la red lo aprende y ReLU filtra · Módulo 3 · Curso 2 · Cuaderno de IA</title>
+<meta name="description" content="Qué detecta un filtro según sus pesos (desenfoque, nitidez, Sobel), por qué los aprende la red y por qué se aplica ReLU después de la convolución.">
+<script>try{var t=localStorage.getItem('cuaderno-ia:tema');if(t)document.documentElement.setAttribute('data-theme',t)}catch(e){}</script>
+<link rel="stylesheet" href="../../assets/css/style.css">
+<script src="../../assets/js/curriculum.js"></script>
+<script src="../../assets/js/lab.js"></script>
+<script src="../../assets/js/app.js" defer></script>
+</head>
+<body data-root="../../" data-course="2" data-module="3" data-lesson="3">
+<main>
+<div class="page">
 
-<html lang="es"><head><meta charset="utf-8"/><meta content="width=device-width,initial-scale=1" name="viewport"/><title>Lección 3 · La convolución, a mano · Curso 2 · Cuaderno de IA</title><meta content="Necesitamos dos cosas: la imagen (una matriz de números) y el filtro o kernel (otra matriz, mucho más pequeña, por ejemplo de 3×3)." name="description"/><script>try{var t=localStorage.getItem('cuaderno-ia:tema');if(t)document.documentElement.setAttribute('data-theme',t)}catch(e){}</script><link href="../../assets/css/style.css" rel="stylesheet"/><script src="../../assets/js/curriculum.js"></script><script src="../../assets/js/lab.js"></script><script defer="" src="../../assets/js/app.js"></script><script defer="" src="../../assets/js/microanimations.js"></script></head><body data-course="2" data-lesson="3" data-module="3" data-root="../../"><main><div class="page" data-micro="3min"><header class="hero leccion"><div class="hero-grid"><div><p class="eyebrow">Curso 2 · Módulo 3 · Lección 3 de 17</p><h1>La convolución, a mano</h1><p class="lead">Necesitamos dos cosas: la imagen (una matriz de números) y el filtro o kernel (otra matriz, mucho más pequeña, por ejemplo de 3×3).</p><p class="meta-line"><span class="read-time" data-render="read-time"></span><a href="../modulo-3.html">Índice del módulo</a></p></div><div aria-hidden="true" class="hero-tile"></div></div></header><details class="predice"><summary>«Un detector pequeño que se desliza por el fotograma»: ¿cómo se hace eso con números, exactamente?<span class="hint"></span></summary><div><p>Necesitamos dos cosas: la imagen (una matriz de números) y el filtro o kernel (otra matriz, mucho más pequeña, por ejemplo de 3×3).</p></div></details><section aria-label="Explicación breve" class="micro-core"><div class="micro-kicker">01 · ENTENDER <span>≈ 45 s</span></div><h2>La idea en palabras sencillas</h2><p>Necesitamos dos cosas: la imagen (una matriz de números) y el filtro o kernel (otra matriz, mucho más pequeña, por ejemplo de 3×3).</p><div class="micro-example"><span aria-hidden="true" class="micro-example-icon">🐾</span><div><strong>Otro ejemplo · Mascotas</strong><p>Para detectar orejas en una foto, un filtro busca formas locales aunque aparezcan en posiciones distintas.</p></div></div></section><div class="micro-kicker micro-checkpoint">02 · RESPONDER <span>≈ 15 s</span></div><section aria-label="Pregunta intercalada" class="quiz mini micro-check"><script class="quiz-data" type="application/json">{"titulo": "Pausa rápida · Comprueba la idea", "preguntas": [{"q": "Un kernel 3×3 se coloca sobre una foto. ¿Qué analiza primero?", "opciones": ["Solo la etiqueta final", "Nueve posiciones próximas de la imagen", "Todas las fotografías del dataset a la vez"], "correcta": 1, "porque": "El filtro procesa una región local y luego se desplaza."}]}</script></section><section aria-label="Animación interactiva" class="micro-viz" data-index="8" data-micro-viz="convolution"><div class="micro-kicker">03 · EXPERIMENTAR <span>≈ 45 s</span></div><div class="micro-viz-title"><div><h2>Una ventana recorre la imagen</h2><p>Avanza el filtro 3×3; fíjate en qué píxeles observa cada vez.</p></div><span aria-hidden="true" class="micro-viz-symbol">✦</span></div><div aria-live="polite" class="micro-viz-stage"><p>Animación interactiva: Una ventana recorre la imagen</p></div></section><div class="micro-kicker micro-checkpoint">04 · APLICAR <span>≈ 15 s</span></div><section aria-label="Pregunta intercalada" class="quiz mini micro-check"><script class="quiz-data" type="application/json">{"titulo": "Pausa rápida · ¿Lo aplicarías?", "preguntas": [{"q": "¿Por qué compartir un filtro en distintas posiciones es útil?", "opciones": ["Porque permite buscar el mismo patrón en varias zonas", "Porque hace innecesarias las imágenes", "Porque siempre produce una sola clase"], "correcta": 0, "porque": "La convolución reutiliza los pesos del filtro en diferentes zonas."}]}</script></section><div class="micro-finish"><strong>Idea que te llevas</strong><span>Necesitamos dos cosas: la imagen (una matriz de números) y el filtro o kernel (otra matriz, mucho más pequeña, por ejemplo de 3×3)</span><small>¿Quieres más ejemplos, fórmulas o código? Los tienes justo debajo, sin límite de tiempo.</small></div><details class="profundizar micro-legacy"><summary><span>Explorar más: explicación y simulaciones completas<small>Todo el texto original, tablas y demos avanzadas. Opcional.</small></span></summary><div class="prof-body"><section><h2>La convolución, a mano</h2>
-<p>Necesitamos dos cosas: la <strong>imagen</strong> (una matriz de números) y el <strong>filtro</strong> o <em>kernel</em> (otra matriz, mucho más pequeña, por ejemplo de 3×3). El procedimiento tiene cinco pasos:</p>
-<p>Donde <code>I</code> es la imagen de entrada (el fotograma), <code>K</code> el filtro (de lado <code>f</code>), <code>S[i,j]</code> el valor del mapa de salida en la fila <code>i</code>, columna <code>j</code>, y <code>b</code> el <em>bias</em> (un número que se suma al final; en el ejemplo anterior valía 0). Los dos sumatorios recorren las filas <code>a</code> y las columnas <code>c</code> del filtro, es decir, las \( f\cdot f \) multiplicaciones. La esquina superior izquierda de la ventana es \( (i, j) \).</p>
-<p>Con una imagen de lado \( n \) y un filtro de lado \( f \), la ventana cabe en \( n - f + 1 \) posiciones por cada dirección. En el ejemplo: \( 5 - 3 + 1 = 3 \), de ahí el mapa 3×3.</p>
-<div class="callout ejemplo"><span class="lbl">Ejemplo tomado del módulo</span><p>: fotograma 5×5, filtro 3×3 Es la miniatura (5×5 píxeles, en gris) de un fotograma tomado en una sala de cine: la parte izquierda es la sala a oscuras (valores 1–2) y la derecha la pantalla encendida (8–9).</p></div></section><figure class="demo" data-demo="curso2/c2m3-convolucion-paso" data-titulo="Convolución paso a paso: ventana, productos, suma">
-<div class="haz">Pulsa <em>Siguiente</em> y mira cómo la ventana naranja recorre la imagen, cómo se multiplican los 9 pares (panel central) y cómo se rellena el mapa de salida. Luego elige «Borde vertical (claro → oscuro)», prueba «Borde horizontal», cambia algún peso a mano o toca píxeles para modificarlos. Activa ReLU y sube el bias.</div>
-<div class="observa">Con el filtro del ejemplo, las ventanas que cruzan el borde dan 21–22 y las demás 0. Con el filtro «claro → oscuro» las respuestas son negativas: el filtro detecta <em>ese</em> patrón concreto y el contrario le da con signo opuesto. ReLU deja a 0 los negativos. Si tocas un píxel dentro de una ventana, cambia el resultado de <em>todas</em> las ventanas que lo contienen.</div>
-</figure><div class="resumen"><h2 class="sin-num sin-toc">En pocas líneas</h2><ul><li><strong>La convolución, a mano:</strong> Necesitamos dos cosas: la imagen (una matriz de números) y el filtro o kernel (otra matriz, mucho más pequeña, por ejemplo de 3×3).</li><li>Antes de continuar, intenta explicar la demo sin mirar su resultado.</li></ul></div><section class="quiz mini"><script class="quiz-data" type="application/json">{"titulo": "¿Lo tienes?", "preguntas": [{"q": "¿Qué concepto estamos trabajando en esta lección?", "opciones": ["Flatten y la clasificación final", "La convolución, a mano", "Mapas de características y campo receptivo"], "correcta": 1, "porque": "Necesitamos dos cosas: la imagen (una matriz de números) y el filtro o kernel (otra matriz, mucho más pequeña, por ejemplo de 3×3)."}, {"q": "¿Cuál de estas afirmaciones recoge lo que acabas de estudiar?", "opciones": ["Siempre hay un único método que sirve para todos los problemas.", "Lo importante es comprender la idea y comprobarla con ejemplos, no memorizar términos.", "Necesitamos dos cosas: la imagen (una matriz de números) y el filtro o kernel (otra matriz, mucho más pequeña, por ejemplo de 3×3)."], "correcta": 2, "porque": "La explicación central es: Necesitamos dos cosas: la imagen (una matriz de números) y el filtro o kernel (otra matriz, mucho más pequeña, por ejemplo de 3×3)."}, {"q": "Si una demo o un ejemplo te desconcierta, ¿cuál es la mejor forma de aprenderlo?", "opciones": ["Ignorar los resultados que no coinciden con tu intuición.", "Memorizar el nombre sin entender la operación.", "Volver a los números, cambiar un valor y explicar qué ocurre."], "correcta": 2, "porque": "Explorar qué cambia y por qué ayuda a conectar el concepto con su resultado."}]}</script></section></div></details><details class="profundizar"><summary><span>Profundizar: explicación completa<small>Matices, fórmulas, tablas, otros ejemplos y experimentos del módulo original.</small></span></summary><div class="prof-body"><section>
-<h2 id="convolucion">La convolución, a mano</h2>
-<p class="pregunta">«Un detector pequeño que se desliza por el fotograma»: ¿cómo se hace eso con números, exactamente?</p>
-<p>Necesitamos dos cosas: la <strong>imagen</strong> (una matriz de números) y el <strong>filtro</strong> o <em>kernel</em> (otra matriz, mucho más pequeña, por ejemplo de 3×3). El procedimiento tiene cinco pasos:</p>
-<ol class="pasos">
-<li><strong>Colocar</strong> el filtro sobre la esquina superior izquierda de la imagen. Los 9 píxeles que quedan debajo forman la <em>ventana</em>.</li>
-<li><strong>Multiplicar</strong> cada píxel de la ventana por el peso del filtro que tiene encima (elemento a elemento: 9 multiplicaciones).</li>
-<li><strong>Sumar</strong> los 9 productos. Sale <em>un solo número</em>.</li>
-<li><strong>Guardar</strong> ese número en el mapa de salida, en la posición correspondiente.</li>
-<li><strong>Desplazar</strong> la ventana un píxel (ese paso se llama <em>stride</em>, ya lo veremos) y repetir hasta recorrer toda la imagen.</li>
-</ol>
-<div class="callout ejemplo">
-<span class="lbl">Ejemplo numérico: fotograma 5×5, filtro 3×3</span>
-<p>Es la miniatura (5×5 píxeles, en gris) de un fotograma tomado en una sala de cine: la parte izquierda es la sala a oscuras (valores 1–2) y la derecha la pantalla encendida (8–9). Hay un <strong>borde vertical</strong> entre la columna 2 y la 3: el borde de la pantalla. El filtro compara «lo de la derecha» con «lo de la izquierda»: pesos −1 a la izquierda, 0 en el centro, +1 a la derecha.</p>
-<table>
-<caption>Fotograma (5×5)</caption>
-<tbody>
-<tr><td>1</td><td>1</td><td>2</td><td>8</td><td>9</td></tr>
-<tr><td>1</td><td>2</td><td>1</td><td>9</td><td>8</td></tr>
-<tr><td>2</td><td>1</td><td>1</td><td>8</td><td>9</td></tr>
-<tr><td>1</td><td>1</td><td>2</td><td>9</td><td>9</td></tr>
-<tr><td>1</td><td>2</td><td>1</td><td>8</td><td>8</td></tr>
-</tbody>
-</table>
-<table>
-<caption>Filtro (3×3)</caption>
-<tbody>
-<tr><td>−1</td><td>0</td><td>1</td></tr>
-<tr><td>−1</td><td>0</td><td>1</td></tr>
-<tr><td>−1</td><td>0</td><td>1</td></tr>
-</tbody>
-</table>
-<p><strong>Ventana 1</strong> (esquina en la fila 0, columna 0): filas <code>[1,1,2]</code>, <code>[1,2,1]</code>, <code>[2,1,1]</code>. Multiplicamos por los pesos:</p>
-<ol class="pasos">
-<li>Fila 1: 1·(−1) + 1·0 + 2·1 = −1 + 0 + 2 = 1</li>
-<li>Fila 2: 1·(−1) + 2·0 + 1·1 = −1 + 0 + 1 = 0</li>
-<li>Fila 3: 2·(−1) + 1·0 + 1·1 = −2 + 0 + 1 = −1</li>
-<li>Suma: 1 + 0 + (−1) = <span class="res">0</span>. No hay ningún borde: la zona es lisa, y la respuesta es 0.</li>
-</ol>
-<p><strong>Ventana 2</strong> (desplazada una columna a la derecha: fila 0, columna 1): filas <code>[1,2,8]</code>, <code>[2,1,9]</code>, <code>[1,1,8]</code>.</p>
-<ol class="pasos">
-<li>Fila 1: 1·(−1) + 2·0 + 8·1 = 7</li>
-<li>Fila 2: 2·(−1) + 1·0 + 9·1 = 7</li>
-<li>Fila 3: 1·(−1) + 1·0 + 8·1 = 7</li>
-<li>Suma: 7 + 7 + 7 = <span class="res">21</span>. ¡Aquí está el borde! Pasa de la sala oscura (1–2) a la pantalla (8–9) y el filtro responde fuerte.</li>
-</ol>
-<p>Repitiendo en las 9 posiciones posibles se obtiene el <strong>mapa de salida 3×3</strong>:</p>
-<table>
-<caption>Mapa de salida</caption>
-<tbody>
-<tr><td>0</td><td class="res">21</td><td class="res">22</td></tr>
-<tr><td>0</td><td class="res">22</td><td class="res">22</td></tr>
-<tr><td>0</td><td class="res">21</td><td class="res">22</td></tr>
-</tbody>
-</table>
-<p>La columna de ceros corresponde a la zona oscura sin cambios y las dos columnas de valores grandes a las ventanas que incluyen el salto de oscuro a claro. Un solo filtro de 9 números ha «encontrado» el borde de la pantalla.</p>
-</div>
-<h3>La fórmula</h3>
-<div class="formula">\[ S[i,j] \;=\; b \;+\; \sum_{a=0}^{f-1}\;\sum_{c=0}^{f-1} I[i+a,\; j+c]\;\cdot\; K[a,c] \]</div>
-<p>Donde <code>I</code> es la imagen de entrada (el fotograma), <code>K</code> el filtro (de lado <code>f</code>), <code>S[i,j]</code> el valor del mapa de salida en la fila <code>i</code>, columna <code>j</code>, y <code>b</code> el <em>bias</em> (un número que se suma al final; en el ejemplo anterior valía 0). Los dos sumatorios recorren las filas <code>a</code> y las columnas <code>c</code> del filtro, es decir, las \( f\cdot f \) multiplicaciones. La esquina superior izquierda de la ventana es \( (i, j) \).</p>
-<p>Con una imagen de lado \( n \) y un filtro de lado \( f \), la ventana cabe en \( n - f + 1 \) posiciones por cada dirección. En el ejemplo: \( 5 - 3 + 1 = 3 \), de ahí el mapa 3×3.</p>
-<div class="callout ojo">
-<span class="lbl">Ojo: lo que Deep Learning llama «convolución» es en realidad correlación cruzada</span>
-<p>En matemáticas, convolucionar obliga a <strong>girar el filtro 180°</strong> antes de deslizarlo. Las librerías de Deep Learning (<code>Conv2D</code> de Keras incluida) <strong>no lo giran</strong>: hacen exactamente la multiplicación y suma que acabas de ver, que técnicamente es <em>correlación cruzada</em>. No importa para aprender: como los pesos del filtro los descubre la red, si el filtro «correcto» fuera el girado, aprendería el girado. En el fragmento 2 lo comprobamos con <code>scipy.signal</code>: <code>convolve2d</code> (girando) y <code>correlate2d</code> (sin girar) dan resultados de signo opuesto con nuestro filtro, y <code>keras.ops.conv</code> coincide con <code>correlate2d</code>. Nosotros seguiremos diciendo «convolución», como todo el mundo.</p>
-</div>
-<div class="callout regla">
-<span class="lbl">Regla fácil</span>
-<p>Convolución = <strong>multiplicar la ventana por el filtro, sumar</strong>, guardar el número y deslizar. La salida es grande donde la imagen «se parece» al filtro.</p>
-</div>
-</section></div></details><details class="profundizar" id="codigo"><summary><span>Ver código explicado paso a paso<small>1 fragmento(s) original(es), con cada línea comentada y salida esperada.</small></span></summary><div class="prof-body"><article class="snippet" data-lang="python">
-<header>
-<h3>1 · La convolución a mano, con dos bucles de NumPy</h3>
-<p class="para-que"><strong>Para qué sirve</strong> Calcular exactamente la misma convolución que hicimos en papel (imagen 5×5, filtro de borde vertical 3×3) con dos bucles <code>for</code>, y comprobar que el número de una posición concreta (21) sale de multiplicar y sumar nueve productos.</p>
+<header class="hero leccion">
+  <div class="hero-grid">
+    <div>
+      <p class="eyebrow">Curso 2 · Módulo 3 · Lección 3 de 8</p>
+      <h1>Cada filtro busca un patrón, la red lo aprende y ReLU se queda con lo que encaja</h1>
+      <p class="lead">Con 9 números puedes desenfocar, dar nitidez o encontrar bordes. En una CNN nadie escribe esos números: los aprende la red, y ReLU se queda solo con la evidencia a favor.</p>
+      <p class="meta-line"><span class="read-time" data-render="read-time"></span><a href="../modulo-3.html">Índice del módulo</a></p>
+    </div>
+    <div class="hero-tile" aria-hidden="true"></div>
+  </div>
 </header>
-<pre class="code"><code>import numpy as np
-
-imagen = np.array([
-    [1, 1, 2, 8, 9],
-    [1, 2, 1, 9, 8],
-    [2, 1, 1, 8, 9],
-    [1, 1, 2, 9, 9],
-    [1, 2, 1, 8, 8],
-])
-filtro = np.array([
-    [-1, 0, 1],
-    [-1, 0, 1],
-    [-1, 0, 1],
-])
-
-alto, ancho = imagen.shape
-f = filtro.shape[0]
-salida = np.zeros((alto - f + 1, ancho - f + 1), dtype=int)
-
-for i in range(salida.shape[0]):
-    for j in range(salida.shape[1]):
-        ventana = imagen[i:i + f, j:j + f]
-        salida[i, j] = np.sum(ventana * filtro)
-
-print("Salida:")
-print(salida)
-
-ventana = imagen[0:3, 1:4]
-print("Ventana (fila 0, columna 1):")
-print(ventana)
-print("Productos elemento a elemento:")
-print(ventana * filtro)
-print("Suma:", np.sum(ventana * filtro))</code></pre>
-<details class="linea-a-linea" open="">
-<summary>Línea por línea</summary>
-<p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
-<table class="lineas">
-<thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
-<tbody>
-<tr data-lines="1"><td><code>import numpy as np</code></td><td>Importa NumPy, la librería de arrays (tablas de números) con la que representamos imágenes y filtros. <code>as np</code> es el apodo habitual.</td></tr>
-<tr data-lines="3-9"><td><code>imagen = np.array([ … ])</code></td><td>Crea la imagen como una matriz de 5 filas × 5 columnas. Es la misma del ejemplo a mano: a la izquierda números pequeños (zona oscura) y a la derecha números grandes (zona clara), así que hay un <strong>borde vertical</strong> entre la columna 2 y la 3. Las líneas 3 y 9 abren y cierran la lista de listas; las líneas 4-8 son las 5 filas.</td></tr>
-<tr data-lines="10-14"><td><code>filtro = np.array([ … ])</code></td><td>El filtro 3×3 de borde vertical: cada fila es <code>[-1, 0, 1]</code>. Resta lo que hay a la izquierda y suma lo que hay a la derecha. Las líneas 10 y 14 abren y cierran; 11-13 son sus tres filas.</td></tr>
-<tr data-lines="16"><td><code>alto, ancho = imagen.shape</code></td><td><code>.shape</code> devuelve la forma <code>(5, 5)</code>; la separamos en dos variables.</td></tr>
-<tr data-lines="17"><td><code>f = filtro.shape[0]</code></td><td>Tamaño del filtro: el primer número de su forma, 3. Lo llamamos <code>f</code> como en la fórmula.</td></tr>
-<tr data-lines="18"><td><code>salida = np.zeros((alto - f + 1, ancho - f + 1), dtype=int)</code></td><td>Prepara la matriz de salida, llena de ceros. Su tamaño es \(5 - 3 + 1 = 3\) filas y 3 columnas: la fórmula del tamaño con stride 1 y sin padding. <code>dtype=int</code> la deja con enteros para que se imprima limpia.</td></tr>
-<tr data-lines="20-21"><td><code>for i … / for j …</code></td><td>Dos bucles anidados que recorren todas las posiciones de la ventana: <code>i</code> es la fila y <code>j</code> la columna de la <em>esquina superior izquierda</em> de la ventana. <code>salida.shape[0]</code> y <code>salida.shape[1]</code> (3 y 3) son las filas y columnas de la salida, así que se visitan 9 posiciones.</td></tr>
-<tr data-lines="22"><td><code>ventana = imagen[i:i + f, j:j + f]</code></td><td>Recorta de la imagen el cuadrado 3×3 que empieza en <code>(i, j)</code>. En NumPy <code>a:b</code> incluye <code>a</code> y excluye <code>b</code>, por eso <code>i:i+3</code> son exactamente 3 filas.</td></tr>
-<tr data-lines="23"><td><code>salida[i, j] = np.sum(ventana * filtro)</code></td><td><strong>El corazón de la convolución.</strong> <code>ventana * filtro</code> multiplica elemento a elemento (nueve productos) y <code>np.sum</code> los suma en un solo número, que se guarda en la casilla <code>(i, j)</code> de la salida. Nada más.</td></tr>
-<tr data-lines="25-26"><td><code>print("Salida:") / print(salida)</code></td><td>Muestra el resultado completo: un mapa de 3×3.</td></tr>
-<tr data-lines="28"><td><code>ventana = imagen[0:3, 1:4]</code></td><td>Ahora miramos una posición concreta: filas 0-2 y columnas 1-3 (la ventana de la fila 0, columna 1).</td></tr>
-<tr data-lines="29-30"><td><code>print("Ventana …") / print(ventana)</code></td><td>Imprime esa ventana para verla.</td></tr>
-<tr data-lines="31-32"><td><code>print("Productos …") / print(ventana * filtro)</code></td><td>Imprime los nueve productos <em>antes</em> de sumarlos: es la tabla que escribimos a mano.</td></tr>
-<tr data-lines="33"><td><code>print("Suma:", np.sum(ventana * filtro))</code></td><td>Suma de los nueve productos: el valor que acabó en la casilla <code>(0, 1)</code> de la salida.</td></tr>
-</tbody>
-</table>
+<details class="predice">
+  <summary>Pasas un filtro de bordes, cuyos pesos suman 0, por una pared lisa del fotograma donde todos los píxeles valen 3. ¿Qué sale?<span class="hint"></span></summary>
+  <div>
+    <p><strong>0.</strong> Si todos los píxeles valen 3, el resultado es 3 · (suma de los pesos) = 3 · 0 = 0. Los filtros que suman 0 solo reaccionan a <em>cambios</em>: bordes, esquinas, texturas. En una zona lisa se quedan callados.</p>
+  </div>
 </details>
-<div class="salida">
-<strong>Salida esperada</strong>
-<pre>Salida:
-[[ 0 21 22]
- [ 0 22 22]
- [ 0 21 22]]
-Ventana (fila 0, columna 1):
-[[1 2 8]
- [2 1 9]
- [1 1 8]]
-Productos elemento a elemento:
-[[-1  0  8]
- [-2  0  9]
- [-1  0  8]]
-Suma: 21</pre>
-<p>La salida es 3×3 (\(5-3+1=3\)). La <strong>primera columna es 0</strong>: la ventana de la izquierda está en una zona casi plana (su columna izquierda suma 4 y la derecha también), así que «derecha menos izquierda» da 0. La segunda y la tercera valen 21-22: ahí la ventana cruza el salto de números pequeños a grandes, y el filtro grita «¡borde!». Los productos de la ventana (0, 1) son \(-1+0+8,\ -2+0+9,\ -1+0+8\), que suman \(7+7+7=21\), igual que la cuenta a mano de la sección «La convolución, a mano».</p>
+
+<section>
+<h2 id="idea">Nueve números deciden qué se busca</h2>
+<p>Cambiando los pesos cambia lo que el filtro «busca». Estos son clásicos del retoque de fotos y vídeo:</p>
+<table>
+  <thead><tr><th>Filtro</th><th>Pesos (fila a fila)</th><th>Suma</th></tr></thead>
+  <tbody>
+    <tr><td>Desenfoque</td><td>1/9 en las 9 casillas</td><td>1</td></tr>
+    <tr><td>Nitidez</td><td><code>[0,-1,0] [-1,5,-1] [0,-1,0]</code></td><td>1</td></tr>
+    <tr><td>Borde vertical (Sobel)</td><td><code>[-1,0,1] [-2,0,2] [-1,0,1]</code></td><td>0</td></tr>
+    <tr><td>Todos los bordes</td><td><code>[0,1,0] [1,-4,1] [0,1,0]</code></td><td>0</td></tr>
+  </tbody>
+</table>
+<p>Los que suman 1 conservan el brillo y tocan detalles; los que suman 0 solo ven cambios. Pero en una CNN <strong>nadie escribe los filtros</strong>: sus números son parámetros, empiezan aleatorios y la retropropagación los ajusta para que baje la pérdida. En redes grandes, los filtros de la primera capa acaban pareciéndose a detectores de bordes, descubiertos solos.</p>
+<p>Después de cada convolución va <strong>ReLU</strong>, \( \max(0, x) \), por dos razones. Una: la convolución es lineal, y dos operaciones lineales seguidas equivalen a una sola; sin ReLU, apilar capas no aporta nada. Dos: un valor positivo dice «aquí está el patrón», uno negativo «aquí está el contrario»; ReLU conserva la evidencia a favor y deja mapas con muchos ceros. El orden es <strong>convolución → bias → ReLU</strong>.</p>
+</section>
+
+<figure class="demo" data-demo="curso2/c2m3-galeria-filtros" data-titulo="Galería de filtros sobre un póster en miniatura">
+  <div class="haz">Elige «Borde vertical (Sobel)» y luego «Borde horizontal». Después prueba «Nitidez» subiendo el ruido.</div>
+  <div class="observa">Cada filtro enciende sus bordes y apaga los otros; la nitidez realza los bordes, pero también el ruido.</div>
+</figure>
+
+<section>
+<h2 id="numeros">Con números: una estrella en el cielo</h2>
+<div class="callout ejemplo">
+  <span class="lbl">Ejemplo numérico</span>
+  <p>Una ventana 3×3 de un fotograma nocturno: una estrella de valor 5 rodeada de cielo de valor 1.</p>
+  <ol class="pasos">
+    <li><strong>Desenfoque:</strong> (8 · 1 + 5) / 9 = 13/9 = <span class="res">1,44</span>. La estrella se diluye.</li>
+    <li><strong>Nitidez:</strong> 5 · 5 − 4 · 1 = 25 − 4 = <span class="res">21</span>. La estrella destaca mucho más.</li>
+    <li><strong>ReLU</strong> sobre la fila <code>[0, 21, 22]</code> del borde de la pantalla: <span class="res">[0, 21, 22]</span>. Sobre <code>[0, −21, −22]</code> (filtro al revés): <span class="res">[0, 0, 0]</span>.</li>
+  </ol>
 </div>
-</article></div></details></div></main></body></html>
+</section>
+
+<details class="predice">
+  <summary>Apilas dos convoluciones sin ReLU entre ellas. ¿La red puede aprender patrones más complejos que con una sola?<span class="hint"></span></summary>
+  <div>
+    <p><strong>No.</strong> Convolucionar con <code>[1, 1]</code> y luego otra vez con <code>[1, 1]</code> es lo mismo que hacerlo una vez con <code>[1, 2, 1]</code>. Dos capas lineales valen lo que una. ReLU entre ellas rompe la linealidad y deja que cada capa aporte algo nuevo.</p>
+  </div>
+</details>
+
+<div class="resumen">
+  <h2 class="sin-num sin-toc">En tres líneas</h2>
+  <ul>
+    <li>Los pesos del filtro deciden qué detecta: suman 1 → retoca; suman 0 → solo ve cambios.</li>
+    <li>En una CNN los filtros no se diseñan: son parámetros que aprende la retropropagación.</li>
+    <li>Convolución → bias → ReLU: sin ReLU, apilar capas no sirve de nada.</li>
+  </ul>
+</div>
+<section class="quiz mini">
+<script type="application/json" class="quiz-data">
+{
+ "titulo": "¿Lo tienes?",
+ "preguntas": [
+  {
+   "q": "¿Por qué se pone una activación como <strong>ReLU</strong> después de cada convolución?",
+   "opciones": [
+    "Para reducir el tamaño de los mapas de características.",
+    "Para que el modelo tenga parámetros que entrenar.",
+    "Sin ella, dos convoluciones seguidas equivaldrían a una sola operación lineal y la red no podría aprender patrones complejos.",
+    "Para llevar los píxeles al rango 0-255."
+   ],
+   "correcta": 2,
+   "porque": "Una convolución es una operación lineal, y una combinación lineal de operaciones lineales sigue siendo lineal (dos convoluciones apiladas se pueden reescribir como una sola). La no linealidad de ReLU (poner a 0 los negativos) es lo que permite que más capas aprendan cosas más ricas. Reducir el tamaño es trabajo del pooling o del stride; los parámetros están en los filtros; y ReLU no tiene nada que ver con el rango 0-255."
+  },
+  {
+   "q": "Un filtro cuyos pesos suman 1 pasa por una zona lisa del fotograma donde todos los píxeles valen 7. ¿Qué sale?",
+   "opciones": [
+    "0",
+    "7",
+    "63",
+    "1"
+   ],
+   "correcta": 1,
+   "porque": "En una zona lisa el resultado es 7 · (suma de pesos) = 7 · 1 = 7: el brillo se conserva. Saldría 0 con un filtro que suma 0 (de bordes); 63 = 7 · 9 sería sumar los píxeles sin pesos."
+  },
+  {
+   "q": "En una CNN, ¿quién decide los 9 números de cada filtro?",
+   "opciones": [
+    "El programador, copiando filtros clásicos como Sobel",
+    "Keras, que trae una lista fija de filtros",
+    "La propia red: empiezan aleatorios y la retropropagación los ajusta"
+   ],
+   "correcta": 2,
+   "porque": "Los pesos de los filtros son parámetros como los de una Dense. Si detectar cierto borde ayuda a bajar la pérdida, el entrenamiento empuja algún filtro hacia ese detector."
+  }
+ ]
+}
+</script>
+</section>
+<details class="profundizar">
+  <summary><span>Profundizar: la explicación completa<small>La tabla de siete filtros clásicos, la estrella y la pared lisa calculadas a mano, cómo aprende la red los pesos y las dos razones de ReLU, con el ejemplo de [1,1] * [1,1] = [1,2,1].</small></span></summary>
+  <div class="prof-body">
+<h2 id="filtros">Filtros: detectores de patrones que la red aprende sola</h2>
+
+<p class="pregunta">Con solo 9 números, ¿qué se puede detectar? Y la pregunta importante: ¿quién decide cuáles son esos 9 números?</p>
+
+<p>Cambiando los pesos del filtro cambia lo que «busca». Estos son los filtros clásicos del procesamiento de imágenes (los diseñaron personas, mucho antes de las redes neuronales). Son los mismos efectos que ves en cualquier editor de fotos o de vídeo, aplicados a un fotograma:</p>
+
+<table>
+  <thead><tr><th>Filtro</th><th>Pesos (fila a fila)</th><th>Qué hace</th><th>Suma de pesos</th></tr></thead>
+  <tbody>
+    <tr><td>Identidad</td><td><code>[0,0,0] [0,1,0] [0,0,0]</code></td><td>Copia la imagen sin cambios.</td><td>1</td></tr>
+    <tr><td>Desenfoque (media)</td><td>un <code>1/9</code> en las 9 casillas</td><td>Cada píxel pasa a ser la media de su vecindario: suaviza y reduce el ruido.</td><td>1</td></tr>
+    <tr><td>Nitidez (<em>sharpen</em>)</td><td><code>[0,-1,0] [-1,5,-1] [0,-1,0]</code></td><td>Realza el píxel central frente a sus vecinos.</td><td>1</td></tr>
+    <tr><td>Borde vertical (Sobel)</td><td><code>[-1,0,1] [-2,0,2] [-1,0,1]</code></td><td>Responde a cambios de izquierda a derecha.</td><td>0</td></tr>
+    <tr><td>Borde horizontal (Sobel)</td><td><code>[-1,-2,-1] [0,0,0] [1,2,1]</code></td><td>Responde a cambios de arriba abajo.</td><td>0</td></tr>
+    <tr><td>Todos los bordes (Laplaciano)</td><td><code>[0,1,0] [1,-4,1] [0,1,0]</code></td><td>Responde a cambios en cualquier dirección.</td><td>0</td></tr>
+    <tr><td>Relieve (<em>emboss</em>)</td><td><code>[-2,-1,0] [-1,1,1] [0,1,2]</code></td><td>Da sensación de relieve iluminado desde una esquina.</td><td>1</td></tr>
+  </tbody>
+</table>
+
+<h3>Por qué funcionan: dos ejemplos a mano</h3>
+<div class="callout ejemplo">
+  <span class="lbl">Ejemplo numérico: una estrella en el cielo de un fotograma</span>
+  <p>Una ventana de 3×3 de un fotograma nocturno con una estrella brillante (5) rodeada de cielo oscuro (píxeles de valor 1), y otra ventana de una pared lisa con todo valor 3:</p>
+  <ol class="pasos">
+    <li><strong>Desenfoque</strong> sobre la estrella: (1+1+1+1+5+1+1+1+1) / 9 = 13/9 = <span class="res">1,44</span>. La estrella de 5 se ha «diluido» en sus vecinos.</li>
+    <li><strong>Nitidez</strong> sobre la estrella: 5·5 + (−1)·1 + (−1)·1 + (−1)·1 + (−1)·1 = 25 − 4 = <span class="res">21</span>. La estrella destaca mucho más: se ha exagerado la diferencia con los vecinos.</li>
+    <li><strong>Nitidez</strong> sobre la pared lisa de 3: 5·3 − 4·3 = 15 − 12 = <span class="res">3</span>. Una zona lisa no cambia (por eso los pesos suman 1).</li>
+    <li><strong>Sobel o Laplaciano</strong> sobre la pared lisa de 3: como todos los píxeles valen lo mismo, el resultado es 3·(suma de pesos) = 3·0 = <span class="res">0</span>.</li>
+  </ol>
+</div>
+<p>Esa última cuenta explica una regla: <strong>los filtros cuyos pesos suman 0 solo reaccionan a cambios</strong> (bordes, esquinas, texturas). Dan 0 en las zonas lisas. Los que suman 1 conservan el brillo medio y solo modifican detalles.</p>
+
+<div class="callout recuerda">
+  <span class="lbl">Experimento de arriba: «Galería de filtros sobre un póster en miniatura», con todo detalle</span>
+  <p><strong>Haz esto.</strong> El póster (32×32 píxeles) es de mentira: un cuadrado, una circunferencia, una línea diagonal y una cruz sobre fondo oscuro. Elige «Borde vertical (Sobel)» y luego «Borde horizontal». Prueba «Desenfoque» subiendo el ruido (el grano de la película), y «Nitidez» con ruido: ¿qué pasa? Después elige «Personalizado» y escribe tus propios pesos (por ejemplo, un 1 en una esquina y ceros en el resto).</p>
+  <p><strong>Fíjate en.</strong> El filtro vertical enciende los lados verticales del cuadrado y la circunferencia, y apaga los horizontales; con el horizontal ocurre lo contrario. La línea diagonal responde a los dos. El desenfoque borra el ruido pero también emborrona los bordes; la nitidez los refuerza pero también <em>amplifica</em> el ruido. Con ReLU solo queda la mitad «positiva» de los bordes (por ejemplo, los lados izquierdos de las figuras).</p>
+</div>
+
+<h3>¿Quién decide los pesos? La red, aprendiendo</h3>
+<p>En una red convolucional <strong>nadie escribe los filtros</strong>. Los 9 (o 25, o 27…) números de cada filtro son <strong>parámetros</strong> como los pesos de una neurona: se inicializan con valores aleatorios pequeños y la retropropagación (módulo 1) los va ajustando para que la pérdida baje. Si detectar cierto borde ayuda a distinguir un primer plano de una cara de un paisaje, el entrenamiento empuja los pesos de algún filtro hacia un detector de ese borde. En redes grandes entrenadas con millones de fotos y fotogramas, los filtros de la primera capa acaban pareciéndose a detectores de bordes orientados y de manchas de color: justo lo que diseñaban a mano los ingenieros, pero descubierto automáticamente y en cientos de variantes.</p>
+
+<div class="callout ojo">
+  <span class="lbl">Ojo</span>
+  <p>No confundas el filtro con su <strong>resultado</strong>. El filtro son los pesos (9 números, siempre los mismos al recorrer la imagen). El resultado es el <em>mapa de características</em>: una matriz del tamaño de la imagen (aprox.) con la respuesta del filtro en cada posición. Una capa con 16 filtros tiene 16 grupos de pesos y produce 16 mapas.</p>
+</div>
+
+<h2 id="relu">ReLU después de la convolución</h2>
+
+<p class="pregunta">En una <code>Conv2D</code> de Keras casi siempre aparece <code>activation="relu"</code>. ¿Por qué?</p>
+
+<div class="callout recuerda">
+  <span class="lbl">Recuerda (módulo 1)</span>
+  <p><strong>ReLU</strong> es la función \( \text{ReLU}(x) = \max(0, x) \): deja pasar los positivos y pone a 0 los negativos. Se aplica a cada valor del mapa por separado.</p>
+</div>
+
+<h3>Razón 1: sin una no linealidad, apilar convoluciones no sirve de nada</h3>
+<p>Una convolución es una operación <strong>lineal</strong> (multiplicar y sumar). Y encadenar dos operaciones lineales da otra operación lineal. Con números: convolucionar una fila con el filtro \( [1, 1] \) y luego con otro \( [1, 1] \) equivale a hacerlo <em>una sola vez</em> con el filtro \( [1, 2, 1] \) (los dos filtros combinados: \( [1,1] * [1,1] = [1,2,1] \)). Dos capas lineales serían tan expresivas como una. Poner ReLU entre ellas rompe la linealidad y permite que cada capa aporte algo nuevo (es el mismo argumento que viste para las capas densas en el módulo 1).</p>
+
+<h3>Razón 2: es una forma natural de leer la respuesta del filtro</h3>
+<p>La salida del filtro dice «cuánto se parece este parche al patrón del filtro». Un valor grande y positivo significa «sí, aquí está»; uno negativo, «aquí aparece el patrón contrario»; 0, «nada». ReLU conserva la evidencia a favor y borra el resto, y deja <strong>mapas dispersos</strong> (muchos ceros), que son baratos y más fáciles de interpretar.</p>
+
+<div class="callout ejemplo">
+  <span class="lbl">Ejemplo numérico</span>
+  <p>Una fila del mapa del fotograma de la sala y la pantalla (ejemplo de la convolución): <code>[0, 21, 22]</code> con el filtro «oscuro → claro». Con el filtro invertido («claro → oscuro») la misma fila sale con los signos cambiados: <code>[0, −21, −22]</code>.</p>
+  <ol class="pasos">
+    <li>ReLU de <code>[0, 21, 22]</code> = <code>[max(0,0), max(0,21), max(0,22)]</code> = <span class="res">[0, 21, 22]</span> → el borde de la pantalla está ahí.</li>
+    <li>ReLU de <code>[0, −21, −22]</code> = <span class="res">[0, 0, 0]</span> → este filtro no ve nada (el borde está al revés).</li>
+  </ol>
+</div>
+<p>Por eso una capa convolucional completa hace tres cosas, en este orden: <strong>convolución → sumar el bias → ReLU</strong>. En Keras: <code>Conv2D(16, (5,5), activation="relu")</code>.</p>
+<p>¿Por qué ReLU y no sigmoide o tanh? Por lo que viste con el <em>vanishing gradient</em>: las sigmoides se saturan y el gradiente se apaga en redes profundas; ReLU tiene pendiente 1 para los positivos, es barata de calcular y entrena mucho más rápido. Es la opción por defecto en capas ocultas de CNN.</p>
+  </div>
+</details>
+
+<section>
+<h2 class="sin-num">Código</h2>
+<!-- ---------- Fragmento 3 ---------- -->
+<article class="snippet" data-lang="python">
+  <header>
+    <h3>3 · Filtros clásicos sobre una imagen de prueba</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Aplicar cuatro filtros famosos (Sobel vertical, Sobel horizontal, desenfoque por media y nitidez) a un cuadrado brillante y ver qué hace cada uno con los números. Es lo que descubre la primera capa de una CNN, pero aquí los filtros los fijamos nosotros.</p>
+  </header>
+  <pre class="code"><code>import numpy as np
+from scipy.signal import correlate2d
+
+imagen = np.zeros((8, 8))
+imagen[2:6, 2:6] = 8          # un cuadrado brillante de 4x4 sobre fondo negro
+
+filtros = {
+    "borde vertical (Sobel)": np.array([[-1, 0, 1], [-2, 0, 2], [-1, 0, 1]]),
+    "borde horizontal (Sobel)": np.array([[-1, -2, -1], [0, 0, 0], [1, 2, 1]]),
+    "desenfoque (media)": np.ones((3, 3)) / 9,
+    "nitidez": np.array([[0, -1, 0], [-1, 5, -1], [0, -1, 0]]),
+}
+
+for nombre, k in filtros.items():
+    salida = correlate2d(imagen, k, mode="valid")
+    print(f"{nombre:26s} suma del filtro={k.sum():4.1f}  min={salida.min():6.1f}  max={salida.max():6.1f}")
+
+sobel_x = correlate2d(imagen, filtros["borde vertical (Sobel)"], mode="valid")
+print("Salida del Sobel vertical:")
+print(sobel_x.astype(int))</code></pre>
+  <details class="linea-a-linea" open>
+    <summary>Línea por línea</summary>
+    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+      <tbody>
+        <tr data-lines="1"><td><code>import numpy as np</code></td><td>NumPy para crear imagen y filtros.</td></tr>
+        <tr data-lines="2"><td><code>from scipy.signal import correlate2d</code></td><td>La función que desliza un filtro por una imagen (la «convolución» que usan las CNN).</td></tr>
+        <tr data-lines="4"><td><code>imagen = np.zeros((8, 8))</code></td><td>Una imagen 8×8 completamente negra (todo ceros).</td></tr>
+        <tr data-lines="5"><td><code>imagen[2:6, 2:6] = 8</code></td><td>Pone un cuadrado de 4×4 de valor 8 (brillante) en el centro: filas 2 a 5 y columnas 2 a 5. El comentario de la línea lo recuerda.</td></tr>
+        <tr data-lines="7-12"><td><code>filtros = { … }</code></td><td>Un <em>diccionario</em> de Python (pares nombre → valor) con los cuatro filtros. Línea 8: Sobel vertical, detecta cambios de izquierda a derecha. Línea 9: Sobel horizontal, detecta cambios de arriba abajo. Línea 10: media, nueve unos divididos entre 9 (promedia el vecindario). Línea 11: nitidez, un 5 en el centro y \(-1\) en los cuatro vecinos de cruz. Las líneas 7 y 12 abren y cierran el diccionario.</td></tr>
+        <tr data-lines="14-16"><td><code>for nombre, k in filtros.items(): …</code></td><td>Recorre el diccionario. Para cada filtro: calcula la salida con <code>correlate2d</code> sin padding (línea 15) y escribe en una línea el nombre, la <strong>suma de los pesos del filtro</strong> y el mínimo y máximo de lo que sale (línea 16). <code>{nombre:26s}</code> y <code>{…:6.1f}</code> son formatos para alinear las columnas.</td></tr>
+        <tr data-lines="18"><td><code>sobel_x = correlate2d(imagen, filtros["borde vertical (Sobel)"], mode="valid")</code></td><td>Repite el Sobel vertical y guarda la matriz completa para poder mostrarla.</td></tr>
+        <tr data-lines="19"><td><code>print("Salida del Sobel vertical:")</code></td><td>Un título para la matriz.</td></tr>
+        <tr data-lines="20"><td><code>print(sobel_x.astype(int))</code></td><td>Imprime la matriz 6×6 (\(8-3+1=6\)) convertida a enteros para que se lea mejor.</td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>borde vertical (Sobel)     suma del filtro= 0.0  min= -32.0  max=  32.0
+borde horizontal (Sobel)   suma del filtro= 0.0  min= -32.0  max=  32.0
+desenfoque (media)         suma del filtro= 1.0  min=   0.9  max=   8.0
+nitidez                    suma del filtro= 1.0  min=  -8.0  max=  24.0
+Salida del Sobel vertical:
+[[  8   8   0   0  -8  -8]
+ [ 24  24   0   0 -24 -24]
+ [ 32  32   0   0 -32 -32]
+ [ 32  32   0   0 -32 -32]
+ [ 24  24   0   0 -24 -24]
+ [  8   8   0   0  -8  -8]]</pre>
+    <p>Mira la columna «suma del filtro»: los dos Sobel suman 0 (en una zona plana dan 0 y solo reaccionan a cambios), mientras que la media y la nitidez suman 1 (conservan el brillo medio). El Sobel vertical da <strong>+32</strong> en el borde izquierdo del cuadrado (de oscuro a claro) y <strong>−32</strong> en el derecho (de claro a oscuro); en el interior y en el fondo da 0. Por eso la matriz 6×6 tiene dos bandas, una positiva y una negativa, con ceros en medio. El desenfoque nunca baja de 0,9 (el cuadrado «mancha» los alrededores: \(8/9\approx 0{,}9\)) y nunca pasa de 8; la nitidez exagera el contraste: el interior del cuadrado se queda en 8, pero las esquinas suben hasta <strong>24</strong> y justo fuera de los bordes baja a <strong>−8</strong>. Una CNN no usa estos filtros fijos: aprende sus propios números, pero empieza a menudo con detectores de bordes parecidos.</p>
+  </div>
+</article>
+
+</section>
+
+</div>
+</main>
+</body>
+</html>

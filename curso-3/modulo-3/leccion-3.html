@@ -1,91 +1,244 @@
-<!DOCTYPE html>
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lección 3 · Dos retoques al softmax: dividir entre √d_k y tapar el futuro con −∞ · Módulo 3 · Curso 3 · Cuaderno de IA</title>
+<meta name="description" content="Por qué la atención divide entre la raíz de d_k (saturación del softmax y gradientes diminutos) y cómo la máscara causal impide que un token mire al futuro.">
+<script>try{var t=localStorage.getItem('cuaderno-ia:tema');if(t)document.documentElement.setAttribute('data-theme',t)}catch(e){}</script>
+<link rel="stylesheet" href="../../assets/css/style.css">
+<script src="../../assets/js/curriculum.js"></script>
+<script src="../../assets/js/lab.js"></script>
+<script src="../../assets/js/app.js" defer></script>
+</head>
+<body data-root="../../" data-course="3" data-module="3" data-lesson="3">
+<main>
+<div class="page">
 
-<html lang="es"><head><meta charset="utf-8"/><meta content="width=device-width,initial-scale=1" name="viewport"/><title>Lección 3 · La atención escalada, pieza a pieza · Curso 3 · Cuaderno de IA</title><meta content="Los tokens llegan como una matriz \(X\) de forma \((n, d_{model})\): una fila por token (\(n\) tokens, cada uno con \(d_{model}\) números)." name="description"/><script>try{var t=localStorage.getItem('cuaderno-ia:tema');if(t)document.documentElement.setAttribute('data-theme',t)}catch(e){}</script><link href="../../assets/css/style.css" rel="stylesheet"/><script src="../../assets/js/curriculum.js"></script><script src="../../assets/js/lab.js"></script><script defer="" src="../../assets/js/app.js"></script><script defer="" src="../../assets/js/microanimations.js"></script></head><body data-course="3" data-lesson="3" data-module="3" data-root="../../"><main><div class="page" data-micro="3min"><header class="hero leccion"><div class="hero-grid"><div><p class="eyebrow">Curso 3 · Módulo 3 · Lección 3 de 8</p><h1>La atención escalada, pieza a pieza</h1><p class="lead">Los tokens llegan como una matriz \(X\) de forma \((n, d_{model})\): una fila por token (\(n\) tokens, cada uno con \(d_{model}\) números).</p><p class="meta-line"><span class="read-time" data-render="read-time"></span><a href="../modulo-3.html">Índice del módulo</a></p></div><div aria-hidden="true" class="hero-tile"></div></div></header><details class="predice"><summary>Antes de mirar el ejemplo: ¿qué crees que va a cambiar al mover los controles?</summary><div><p>Los tokens llegan como una matriz \(X\) de forma \((n, d_{model})\): una fila por token (\(n\) tokens, cada uno con \(d_{model}\) números).</p></div></details><section aria-label="Explicación breve" class="micro-core"><div class="micro-kicker">01 · ENTENDER <span>≈ 45 s</span></div><h2>La idea en palabras sencillas</h2><p>Parece un detalle, pero sin él los Transformers grandes no entrenan. El razonamiento tiene dos mitades.</p><div class="micro-example"><span aria-hidden="true" class="micro-example-icon">💡</span><div><strong>Otro ejemplo · Idioma</strong><p>En «Ana dejó su mochila porque estaba cansada», el contexto ayuda a decidir a quién describe «cansada».</p></div></div></section><div class="micro-kicker micro-checkpoint">02 · RESPONDER <span>≈ 15 s</span></div><section aria-label="Pregunta intercalada" class="quiz mini micro-check"><script class="quiz-data" type="application/json">{"titulo": "Pausa rápida · Comprueba la idea", "preguntas": [{"q": "En «Fui al banco a retirar dinero», ¿qué ayuda a interpretar «banco»?", "opciones": ["El contexto «retirar dinero»", "Solo la longitud de la palabra", "Únicamente su primera letra"], "correcta": 0, "porque": "La atención permite relacionar términos y su contexto."}]}</script></section><section aria-label="Animación interactiva" class="micro-viz" data-index="9" data-micro-viz="attention"><div class="micro-kicker">03 · EXPERIMENTAR <span>≈ 45 s</span></div><div class="micro-viz-title"><div><h2>Qué parte del contexto importa</h2><p>Selecciona otra palabra y observa qué conexiones destacan.</p></div><span aria-hidden="true" class="micro-viz-symbol">✦</span></div><div aria-live="polite" class="micro-viz-stage"><p>Animación interactiva: Qué parte del contexto importa</p></div></section><div class="micro-kicker micro-checkpoint">04 · APLICAR <span>≈ 15 s</span></div><section aria-label="Pregunta intercalada" class="quiz mini micro-check"><script class="quiz-data" type="application/json">{"titulo": "Pausa rápida · ¿Lo aplicarías?", "preguntas": [{"q": "¿Qué busca un mecanismo de atención?", "opciones": ["Borrar toda la información anterior", "Convertir siempre imágenes en texto", "Ponderar qué elementos de la entrada son relevantes"], "correcta": 2, "porque": "La atención asigna importancia relativa a diferentes elementos del contexto."}]}</script></section><div class="micro-finish"><strong>Idea que te llevas</strong><span>Parece un detalle, pero sin él los Transformers grandes no entrenan</span><small>¿Quieres más ejemplos, fórmulas o código? Los tienes justo debajo, sin límite de tiempo.</small></div><details class="profundizar micro-legacy"><summary><span>Explorar más: explicación y simulaciones completas<small>Todo el texto original, tablas y demos avanzadas. Opcional.</small></span></summary><div class="prof-body"><section><h2>La atención escalada, pieza a pieza</h2>
-<p>Los tokens llegan como una matriz \(X\) de forma \((n, d_{model})\): una fila por token (\(n\) tokens, cada uno con \(d_{model}\) números). Se multiplica \(X\) por tres matrices de pesos que se <strong>aprenden</strong> durante el entrenamiento:</p>
-<p>Cada fila de \(Q\) es la «pregunta» de un token, cada fila de \(K\) es la «etiqueta» con la que se ofrece y cada fila de \(V\) es el «contenido» que aportará si alguien lo elige. Que sean matrices <em>aprendidas</em> es la clave: la red decide por sí misma qué significa «preguntar» y «ofrecerse». En Keras son capas <code>Dense</code> sin activación (el fragmento 8 las abre).</p>
-<p>Parece un detalle, pero sin él los Transformers grandes no entrenan. El razonamiento tiene dos mitades.</p>
-<div class="callout ejemplo"><span class="lbl">Ejemplo tomado del módulo</span><p>Tres tokens y \(d_k = d_v = 2\).</p></div></section><figure class="demo" data-demo="curso3/c3m3-atencion-manual" data-titulo="Atención con tus propios números">
-<div class="haz">Los tres títulos son Toy Story, Titanic y Shrek; el eje horizontal es «cuánta animación» y el vertical «cuánto romance». Arrastra la punta de la flecha naranja (lo que busca el título elegido) hacia una flecha azul (la etiqueta de otro título) y mira cómo cambia la fila del mapa de calor. Después escribe tú números en las casillas de V y comprueba la salida. Por último pulsa «Números al azar» y desactiva «Dividir entre √d_k».</div>
-<div class="observa">El peso es alto cuando la consulta apunta en la misma dirección que la clave <em>y</em> es larga (el producto escalar mide las dos cosas). Los pesos de cada fila suman siempre 1 y la salida es una mezcla de las filas de V (lo que aporta cada título). Cambiar V no cambia los pesos; cambiar Q o K, sí.</div>
-</figure><div class="resumen"><h2 class="sin-num sin-toc">En pocas líneas</h2><ul><li><strong>La atención escalada, pieza a pieza:</strong> Los tokens llegan como una matriz \(X\) de forma \((n, d_{model})\): una fila por token (\(n\) tokens, cada uno con \(d_{model}\)…</li><li>Antes de continuar, intenta explicar la demo sin mirar su resultado.</li></ul></div><section class="quiz mini"><script class="quiz-data" type="application/json">{"titulo": "¿Lo tienes?", "preguntas": [{"q": "¿Qué concepto estamos trabajando en esta lección?", "opciones": ["Un Transformer para series temporales", "La atención escalada, pieza a pieza", "Por qué las RNN y las LSTM se quedan cortas"], "correcta": 1, "porque": "Los tokens llegan como una matriz \\(X\\) de forma \\((n, d_{model})\\): una fila por token (\\(n\\) tokens, cada uno con \\(d_{model}\\) números)."}, {"q": "¿Cuál de estas afirmaciones recoge lo que acabas de estudiar?", "opciones": ["Siempre hay un único método que sirve para todos los problemas.", "Lo importante es comprender la idea y comprobarla con ejemplos, no memorizar términos.", "Los tokens llegan como una matriz \\(X\\) de forma \\((n, d_{model})\\): una fila por token (\\(n\\) tokens, cada uno con \\(d_{model}\\) números)."], "correcta": 2, "porque": "La explicación central es: Los tokens llegan como una matriz \\(X\\) de forma \\((n, d_{model})\\): una fila por token (\\(n\\) tokens, cada uno con \\(d_{model}\\) números)."}, {"q": "Si una demo o un ejemplo te desconcierta, ¿cuál es la mejor forma de aprenderlo?", "opciones": ["Ignorar los resultados que no coinciden con tu intuición.", "Memorizar el nombre sin entender la operación.", "Volver a los números, cambiar un valor y explicar qué ocurre."], "correcta": 2, "porque": "Explorar qué cambia y por qué ayuda a conectar el concepto con su resultado."}]}</script></section></div></details><details class="profundizar"><summary><span>Profundizar: explicación completa<small>Matices, fórmulas, tablas, otros ejemplos y experimentos del módulo original.</small></span></summary><div class="prof-body"><section>
-<h2 id="atencion">La atención escalada, pieza a pieza</h2>
-<p class="pregunta">Cuando Netflix te propone qué ver, cada título de tu historial «opina» sobre cuánto se parece a los demás. Con tokens es igual: cada token tiene que decidir a cuáles de los demás mira y cuánto. ¿Qué cuentas hace falta escribir para que eso ocurra, y por qué precisamente esas?</p>
-<h3>Q, K y V son tres proyecciones aprendidas</h3>
-<p>Los tokens llegan como una matriz \(X\) de forma \((n, d_{model})\): una fila por token (\(n\) tokens, cada uno con \(d_{model}\) números). Se multiplica \(X\) por tres matrices de pesos que se <strong>aprenden</strong> durante el entrenamiento:</p>
-<div class="formula">\[ Q = X\,W_Q, \qquad K = X\,W_K, \qquad V = X\,W_V \qquad (W_Q, W_K \in \mathbb{R}^{d_{model}\times d_k},\; W_V \in \mathbb{R}^{d_{model}\times d_v}) \]</div>
-<p>Cada fila de \(Q\) es la «pregunta» de un token, cada fila de \(K\) es la «etiqueta» con la que se ofrece y cada fila de \(V\) es el «contenido» que aportará si alguien lo elige. Que sean matrices <em>aprendidas</em> es la clave: la red decide por sí misma qué significa «preguntar» y «ofrecerse». En Keras son capas <code>Dense</code> sin activación (el fragmento 8 las abre).</p>
-<div class="callout analogia">
-<span class="lbl">Analogía</span>
-<p>Tu historial de Netflix. <strong>Q</strong> (la pregunta) es lo que busca el título que te toca decidir: «quiero algo de animación». <strong>K</strong> (la etiqueta) es cómo se presenta cada título de tu historial: «yo soy muy de animación». <strong>V</strong> (el contenido) es lo que aporta si lo eliges: lo que has aprendido de ese título. La atención compara pregunta con etiqueta, reparte porcentajes y mezcla los contenidos según esos porcentajes.</p>
-</div>
-<h3>La fórmula, con sus formas</h3>
-<div class="formula">\[ \operatorname{Attention}(Q,K,V) = \operatorname{softmax}\!\left(\frac{Q\,K^{\top}}{\sqrt{d_k}}\right) V \]</div>
-<ol class="pasos">
-<li>\(Q K^{\top}\) tiene forma \((n, d_k)\cdot(d_k, n) = (n, n)\): la entrada \((i, j)\) es el producto escalar de la pregunta del token \(i\) con la etiqueta del token \(j\). <strong>Cuanto más se parecen, más grande.</strong></li>
-<li>Se divide entre \(\sqrt{d_k}\) (en un momento verás por qué).</li>
-<li>El <abbr class="t" data-def="Convierte una lista de números cualesquiera en una lista de probabilidades: todas positivas y que suman 1. softmax(z)ᵢ = e^zᵢ / Σ e^zⱼ.">softmax</abbr> se aplica a <strong>cada fila</strong>: cada token obtiene un reparto de atención que suma 1. Es la matriz de pesos \(A\), de forma \((n, n)\).</li>
-<li>\(A\,V\) tiene forma \((n, n)\cdot(n, d_v) = (n, d_v)\): cada token recibe la <strong>media ponderada</strong> de los valores de todos, con los pesos de su fila.</li>
-</ol>
+<header class="hero leccion">
+  <div class="hero-grid">
+    <div>
+      <p class="eyebrow">Curso 3 · Módulo 3 · Lección 3 de 8</p>
+      <h1>Dos retoques al softmax: dividir entre √d_k y tapar el futuro con −∞</h1>
+      <p class="lead">Sin la división entre √d_k, un solo título se lleva toda la atención y la red deja de aprender. Sin máscara causal, cada token lee el spoiler que tiene a su derecha.</p>
+      <p class="meta-line"><span class="read-time" data-render="read-time"></span><a href="../modulo-3.html">Índice del módulo</a></p>
+    </div>
+    <div class="hero-tile" aria-hidden="true"></div>
+  </div>
+</header>
+
+<details class="predice">
+  <summary>Sin dividir, con \(d_k = 512\) y números de media 0 y varianza 1, ¿las puntuaciones \(q\cdot k\) oscilarán en torno a ±1, ±23 o ±512?<span class="hint"></span></summary>
+  <div>
+    <p>En torno a <strong>±23</strong>: la desviación de una suma de 512 términos de varianza 1 es \(\sqrt{512} \approx 22{,}6\). Con diferencias así, \(e^{23}\) aplasta al resto y la softmax pone casi todo el peso en un solo título.</p>
+  </div>
+</details>
+
+<section>
+<h2 id="idea">Puntuaciones a escala y permisos para mirar</h2>
+<p><strong>La división.</strong> El producto \(q\cdot k\) suma \(d_k\) términos de varianza 1, así que su desviación es \(\sqrt{d_k}\). Con cabezas grandes las puntuaciones se disparan y la softmax se <strong>satura</strong>: un peso ≈ 1 y el resto ≈ 0. En ese estado su derivada, \(p(1-p)\), vale \(0{,}999 \cdot 0{,}001 \approx 0{,}001\): la red casi no puede cambiar de opinión. Dividiendo entre \(\sqrt{d_k}\) la desviación vuelve a ser 1 con cualquier tamaño.</p>
+<div class="formula">\[ \sigma(q\cdot k) = \sqrt{d_k}\quad\Rightarrow\quad \sigma\!\left(\frac{q\cdot k}{\sqrt{d_k}}\right) = 1 \]</div>
+<p><strong>La máscara.</strong> Si un token no debe mirar a otro, se suma \(-\infty\) a esa puntuación: \(e^{-\infty} = 0\) y su peso es exactamente 0. La <strong>máscara causal</strong> deja que el token \(i\) mire solo a \(j \le i\): al decidir sobre el capítulo 3 solo cuentan el 1 y el 2. La usan los decoders (GPT) y la predicción de series. La <strong>máscara de relleno</strong> tapa los ceros añadidos para igualar longitudes en un lote.</p>
+<p>En Keras la causal se pide al <em>llamar</em> a la capa: <code>mha(x, x, use_causal_mask=True)</code>. Sin ella, un decoder «aprende» de maravilla copiando la respuesta y luego no sabe generar.</p>
+</section>
+
+<figure class="demo" data-demo="curso3/c3m3-raiz-d" data-titulo="Qué le pasa al softmax si no dividimos">
+  <div class="haz">Con «Dividir entre √d_k» apagado, sube el tamaño de 2^1 a 2^10. Después actívalo y repite.</div>
+  <div class="observa">Sin dividir, la atención acaba en una sola barra; dividiendo, el reparto no cambia de carácter.</div>
+</figure>
+
+<figure class="demo" data-demo="curso3/c3m3-mascara-causal" data-titulo="Tocar el futuro: con y sin máscara causal">
+  <div class="haz">Toca «Titanic», súmale +5 y mira qué barras se mueven. Apaga la máscara y repite.</div>
+  <div class="observa">Con máscara solo cambian Titanic y lo que viene después; sin ella, también el pasado.</div>
+</figure>
+
+<section>
+<h2 id="numeros">Con números: tu historial en orden</h2>
 <div class="callout ejemplo">
-<span class="lbl">Ejemplo numérico</span>
-<p>Tres tokens y \(d_k = d_v = 2\). Imagina que son tres títulos de tu historial: el token 1 es <strong>Toy Story</strong>, el 2 es <strong>Titanic</strong> y el 3 es <strong>Shrek</strong>, y cada uno se describe con dos números inventados: (animación, romance). Para centrarnos en la fórmula damos \(Q\), \(K\) y \(V\) ya calculadas (cada fila es un título):</p>
-<div class="formula">\[ Q = \begin{bmatrix} 1 &amp; 0 \\ 0 &amp; 1 \\ 1 &amp; 1 \end{bmatrix},\quad
-  K = \begin{bmatrix} 2 &amp; 0 \\ 0 &amp; 2 \\ 1 &amp; 1 \end{bmatrix},\quad
-  V = \begin{bmatrix} 1 &amp; 0 \\ 0 &amp; 1 \\ 1 &amp; 1 \end{bmatrix} \]</div>
-<ol class="pasos">
-<li><strong>Puntuaciones.</strong> Entrada \((i,j)\) = fila \(i\) de \(Q\) por fila \(j\) de \(K\). Por ejemplo, \(q_1\cdot k_1 = 1\cdot 2 + 0\cdot 0 = 2\) y \(q_1 \cdot k_3 = 1\cdot 1 + 0 \cdot 1 = 1\):
-      <div class="formula">\[ Q K^{\top} = \begin{bmatrix} 2 &amp; 0 &amp; 1 \\ 0 &amp; 2 &amp; 1 \\ 2 &amp; 2 &amp; 2 \end{bmatrix} \]</div></li>
-<li><strong>Escalar.</strong> \(\sqrt{d_k} = \sqrt{2} = 1{,}4142\): dividimos todo entre 1,4142:
-      <div class="formula">\[ \frac{Q K^{\top}}{\sqrt 2} = \begin{bmatrix} 1{,}414 &amp; 0 &amp; 0{,}707 \\ 0 &amp; 1{,}414 &amp; 0{,}707 \\ 1{,}414 &amp; 1{,}414 &amp; 1{,}414 \end{bmatrix} \]</div></li>
-<li><strong>Softmax por filas.</strong> Fila 1: \(e^{1{,}414} = 4{,}113\), \(e^{0} = 1\), \(e^{0{,}707} = 2{,}028\). Suma \(= 7{,}141\). Pesos: \(4{,}113/7{,}141 = 0{,}576\); \(1/7{,}141 = 0{,}140\); \(2{,}028/7{,}141 = 0{,}284\). La fila 2 es la simétrica y la fila 3, con tres puntuaciones iguales, reparte por igual:
-      <div class="formula">\[ A = \begin{bmatrix} 0{,}576 &amp; 0{,}140 &amp; 0{,}284 \\ 0{,}140 &amp; 0{,}576 &amp; 0{,}284 \\ 0{,}333 &amp; 0{,}333 &amp; 0{,}333 \end{bmatrix} \]</div></li>
-<li><strong>Mezcla de valores.</strong> Fila 1: \(0{,}576\,(1,0) + 0{,}140\,(0,1) + 0{,}284\,(1,1) = (0{,}576 + 0{,}284;\ 0{,}140 + 0{,}284) = (0{,}860;\ 0{,}424)\):
-      <div class="formula">\[ A\,V = \begin{bmatrix} 0{,}860 &amp; 0{,}424 \\ 0{,}424 &amp; 0{,}860 \\ 0{,}667 &amp; 0{,}667 \end{bmatrix} \]</div></li>
-</ol>
-<p>Lectura: Toy Story (token 1) preguntó «algo parecido a (1, 0)», es decir, animación pura; la etiqueta que mejor le encaja es la suya (la clave 1) y por eso su salida se parece sobre todo al valor 1. Shrek (token 3) busca un poco de animación y un poco de romance a partes iguales: le encajan igual los tres títulos y obtiene la media de los tres. Los fragmentos 4 y 6 repiten estas cuentas con NumPy.</p>
+  <span class="lbl">Ejemplo numérico</span>
+  <p>Viste Toy Story, luego Titanic y por último Shrek. Las puntuaciones ya escaladas de Titanic eran \((0;\ 1{,}414;\ 0{,}707)\). Con máscara causal, Shrek (su futuro) se tapa:</p>
+  <ol class="pasos">
+    <li>Fila de Titanic: \((0;\ 1{,}414;\ -\infty)\) → \(e^0 = 1\), \(e^{1{,}414} = 4{,}113\), \(e^{-\infty} = 0\); suma 5,113.</li>
+    <li>Pesos: \((0{,}196;\ 0{,}804;\ 0)\). Sin máscara eran \((0{,}140;\ 0{,}576;\ 0{,}284)\).</li>
+    <li>Salida: \(0{,}196\,(1,0) + 0{,}804\,(0,1) = (0{,}196;\ 0{,}804)\), frente a \((0{,}424;\ 0{,}860)\) sin máscara.</li>
+  </ol>
+  <p>Titanic ya no recibe nada de Shrek, que todavía no habías visto.</p>
 </div>
+</section>
+
+<details class="predice">
+  <summary>Un subtítulo de 4 tokens con máscara causal. De las 16 puntuaciones de la matriz, ¿cuántas se tapan con −∞?<span class="hint"></span></summary>
+  <div>
+    <p><strong>6</strong>: todo lo que hay por encima de la diagonal, \(3 + 2 + 1\). La diagonal se queda (cada token puede mirarse a sí mismo) y la matriz de permisos es triangular inferior.</p>
+  </div>
+</details>
+
+<div class="resumen">
+  <h2 class="sin-num sin-toc">En tres líneas</h2>
+  <ul>
+    <li>Sin dividir, la desviación de las puntuaciones es \(\sqrt{d_k}\) y la softmax se satura (gradiente ≈ 0).</li>
+    <li>Una máscara suma \(-\infty\): ese peso vale exactamente 0 y los demás se reparten el 100 %.</li>
+    <li>Causal = solo hacia atrás (<code>use_causal_mask=True</code>); relleno = ignorar los ceros añadidos.</li>
+  </ul>
+</div>
+
+<section class="quiz mini">
+<script type="application/json" class="quiz-data">
+{
+ "titulo": "¿Lo tienes?",
+ "preguntas": [
+  {
+   "q": "Los componentes de <code>q</code> y <code>k</code> son independientes, con media 0 y varianza 1, y <code>d_k = 16</code>. ¿Qué desviación típica tiene el producto escalar <code>q·k</code> antes y después de dividir entre √d_k?",
+   "opciones": [
+    "1 antes y 1/4 después",
+    "16 antes y 4 después",
+    "8 antes y 2 después",
+    "4 antes y 1 después"
+   ],
+   "correcta": 3,
+   "porque": "La varianza de q·k es la suma de d_k términos de varianza 1, es decir, d_k = 16; su desviación es √16 = 4. Al dividir entre √d_k = 4 queda 1. Sin esa división, con d_k grande la softmax se satura (un peso ≈ 1) y el gradiente casi desaparece."
+  },
+  {
+   "q": "En una frase de 5 tokens con máscara causal, ¿cuántas de las 25 puntuaciones se sustituyen por −∞?",
+   "opciones": [
+    "5",
+    "20",
+    "10",
+    "25"
+   ],
+   "correcta": 2,
+   "porque": "Se enmascara todo lo que queda por encima de la diagonal: 4 + 3 + 2 + 1 = 10 puntuaciones (n(n−1)/2). La diagonal sí se queda: un token puede mirarse a sí mismo. Después de la softmax, esas 10 posiciones valen exactamente 0."
+  },
+  {
+   "q": "Con máscara causal, en una frase de 6 tokens cambias el valor del token 4. ¿Qué salidas pueden cambiar?",
+   "opciones": [
+    "Solo la del token 4",
+    "Las de los tokens 4, 5 y 6",
+    "Las de los tokens 1 a 4",
+    "Las seis"
+   ],
+   "correcta": 1,
+   "porque": "Cada token solo mira a sí mismo y a los anteriores. El token 4 lo ven él mismo y los que vienen después (5 y 6); los tokens 1 a 3 no pueden enterarse de algo que está en su futuro."
+  }
+ ]
+}
+</script>
+</section>
+
+<details class="profundizar">
+  <summary><span>Profundizar: la explicación completa<small>Las dos mitades del razonamiento de √d_k (varianza y saturación), las dos máscaras, el ejemplo causal completo, el aviso de Keras, self- y cross-attention y el coste en memoria, con el detalle de los dos experimentos.</small></span></summary>
+  <div class="prof-body">
 <h3>Por qué se divide entre \(\sqrt{d_k}\)</h3>
 <p>Parece un detalle, pero sin él los Transformers grandes no entrenan. El razonamiento tiene dos mitades.</p>
 <p><strong>1. El tamaño de las puntuaciones crece con \(d_k\).</strong> Supón que cada número de \(q\) y de \(k\) es aleatorio con media 0 y varianza 1 (aproximadamente lo que ocurre al inicializar). El producto escalar es una suma de \(d_k\) términos \(q_i k_i\), cada uno con varianza \(1\cdot 1 = 1\) e independientes, así que la varianza de la suma es \(d_k\) y su desviación es \(\sqrt{d_k}\):</p>
 <div class="formula">\[ \operatorname{Var}(q\cdot k) = \sum_{i=1}^{d_k} \operatorname{Var}(q_i k_i) = d_k \quad\Rightarrow\quad \sigma(q\cdot k) = \sqrt{d_k}\quad\Rightarrow\quad \sigma\!\left(\frac{q\cdot k}{\sqrt{d_k}}\right) = 1 \]</div>
 <p>Con \(d_k = 4\) las puntuaciones oscilan unos ±2; con \(d_k = 512\), unos ±23. Dividir entre \(\sqrt{d_k}\) las deja siempre en torno a ±1, sea cual sea el tamaño de la cabeza (el fragmento 5 lo mide).</p>
 <p><strong>2. Puntuaciones grandes saturan el softmax.</strong> Con diferencias de 20 o 30 entre puntuaciones, \(e^{30}\) aplasta a todo lo demás: un peso vale casi 1 y el resto casi 0. Y en ese estado el softmax apenas reacciona a cambios pequeños. Su derivada es \(\partial p_i/\partial z_j = p_i(\delta_{ij} - p_j)\); si \(p_1 = 0{,}999\), la derivada de \(p_1\) respecto de su propia puntuación vale \(0{,}999\cdot 0{,}001 \approx 0{,}001\). Gradientes diminutos significan que la red casi no puede aprender a cambiar de opinión. Es como un recomendador que, ante puntuaciones enormes, mira solo <em>un</em> título de tu historial, se olvida del resto y ya no rectifica.</p>
-<figure class="demo" data-demo="curso3/c3m3-raiz-d" data-titulo="Qué le pasa al softmax si no dividimos">
-<div class="haz">Las 8 barras son cuánto mira una consulta a 8 títulos de un historial. Con «Dividir entre √d_k» apagado, sube el tamaño de 2^1 a 2^10 y mira las barras de arriba. Después activa la división y repite. Pulsa «Otra consulta» varias veces.</div>
-<div class="observa">Sin dividir, a partir de d_k = 64 casi toda la atención cae en una sola clave (peso máximo medio ≈ 0,9) y el gradiente medio se desploma. Dividiendo, el peso máximo medio se queda quieto en torno a 0,36 con cualquier d_k: el reparto tiene siempre el mismo «carácter». Por eso la división es parte de la fórmula, no una opción.</div>
-</figure>
+
+<div class="callout recuerda">
+  <span class="lbl">Experimento de arriba: «Qué le pasa al softmax si no dividimos», con todo detalle</span>
+  <p><strong>Haz esto.</strong> Las 8 barras son cuánto mira una consulta a 8 títulos de un historial. Con «Dividir entre √d_k» apagado, sube el tamaño de 2^1 a 2^10 y mira las barras de arriba. Después activa la división y repite. Pulsa «Otra consulta» varias veces.</p>
+  <p><strong>Fíjate en.</strong> Sin dividir, a partir de d_k = 64 casi toda la atención cae en una sola clave (peso máximo medio ≈ 0,9) y el gradiente medio se desploma. Dividiendo, el peso máximo medio se queda quieto en torno a 0,36 con cualquier d_k: el reparto tiene siempre el mismo «carácter». Por eso la división es parte de la fórmula, no una opción.</p>
+</div>
+
 <h3>Máscaras: qué posiciones pueden mirarse</h3>
 <p>A veces un token <strong>no debe</strong> poder mirar a otro. La solución es sumar \(-\infty\) a esa puntuación antes del softmax: \(e^{-\infty} = 0\), así que el peso es exactamente 0 y los demás pesos se reparten el 100 %. Dos máscaras te encontrarás siempre:</p>
 <ul>
-<li><strong>Máscara causal</strong> (<em>causal mask</em>): el token \(i\) solo puede mirar a los tokens \(j \le i\): como no destripar una serie, al decidir sobre el capítulo 3 solo puedes usar los capítulos 1 y 2, nunca el 4. Se usa en los <em>decoders</em> (GPT) y al predecir series para que, mientras entrenas con la frase entera, ningún token lea la respuesta que está a su derecha. La matriz de permisos es triangular inferior.</li>
-<li><strong>Máscara de relleno</strong> (<em>padding mask</em>): al juntar frases de distinta longitud en un lote se rellena con ceros; esas posiciones vacías no deben recibir atención.</li>
+  <li><strong>Máscara causal</strong> (<em>causal mask</em>): el token \(i\) solo puede mirar a los tokens \(j \le i\): como no destripar una serie, al decidir sobre el capítulo 3 solo puedes usar los capítulos 1 y 2, nunca el 4. Se usa en los <em>decoders</em> (GPT) y al predecir series para que, mientras entrenas con la frase entera, ningún token lea la respuesta que está a su derecha. La matriz de permisos es triangular inferior.</li>
+  <li><strong>Máscara de relleno</strong> (<em>padding mask</em>): al juntar frases de distinta longitud en un lote se rellena con ceros; esas posiciones vacías no deben recibir atención.</li>
 </ul>
 <div class="callout ejemplo">
-<span class="lbl">Ejemplo numérico</span>
-<p>Con las puntuaciones escaladas del ejemplo anterior y máscara causal. Ahora el orden importa: has visto primero Toy Story, luego Titanic y por último Shrek, y cada título solo puede mirar a los que ya vio:</p>
-<ol class="pasos">
-<li>Fila 1 (Toy Story, solo se ve a sí mismo): \((1{,}414;\,-\infty;\,-\infty)\) → pesos \((1; 0; 0)\).</li>
-<li>Fila 2 (Titanic, ve a Toy Story y a sí mismo): \((0;\ 1{,}414;\,-\infty)\) → \(e^0 = 1\) y \(e^{1{,}414} = 4{,}113\), suma \(5{,}113\) → pesos \((0{,}196;\ 0{,}804;\ 0)\).</li>
-<li>Fila 3 (Shrek, ve a los tres): no cambia, \((0{,}333;\ 0{,}333;\ 0{,}333)\).</li>
-<li>Salidas: fila 2 \(= 0{,}196\,(1,0) + 0{,}804\,(0,1) = (0{,}196;\ 0{,}804)\). Antes, sin máscara, la fila 2 daba \((0{,}424;\ 0{,}860)\): Titanic ya no recibe nada de Shrek, que está en su futuro (aún no lo has visto).</li>
-</ol>
+  <span class="lbl">Ejemplo numérico</span>
+  <p>Con las puntuaciones escaladas del ejemplo anterior y máscara causal. Ahora el orden importa: has visto primero Toy Story, luego Titanic y por último Shrek, y cada título solo puede mirar a los que ya vio:</p>
+  <ol class="pasos">
+    <li>Fila 1 (Toy Story, solo se ve a sí mismo): \((1{,}414;\,-\infty;\,-\infty)\) → pesos \((1; 0; 0)\).</li>
+    <li>Fila 2 (Titanic, ve a Toy Story y a sí mismo): \((0;\ 1{,}414;\,-\infty)\) → \(e^0 = 1\) y \(e^{1{,}414} = 4{,}113\), suma \(5{,}113\) → pesos \((0{,}196;\ 0{,}804;\ 0)\).</li>
+    <li>Fila 3 (Shrek, ve a los tres): no cambia, \((0{,}333;\ 0{,}333;\ 0{,}333)\).</li>
+    <li>Salidas: fila 2 \(= 0{,}196\,(1,0) + 0{,}804\,(0,1) = (0{,}196;\ 0{,}804)\). Antes, sin máscara, la fila 2 daba \((0{,}424;\ 0{,}860)\): Titanic ya no recibe nada de Shrek, que está en su futuro (aún no lo has visto).</li>
+  </ol>
 </div>
-<figure class="demo" data-demo="curso3/c3m3-mascara-causal" data-titulo="Tocar el futuro: con y sin máscara causal">
-<div class="haz">Las seis casillas son las palabras de un subtítulo: «el niño ve Titanic hoy .». Elige «Titanic» como token que se toca y sube «Cuánto sumas» a +5. Mira qué barras de la derecha se mueven. Apaga la máscara y repite.</div>
-<div class="observa">Con máscara, el cambio solo llega al token tocado y a los que vienen después: el pasado no puede enterarse del futuro. Sin máscara, cambian las salidas de todos, incluso las de los tokens anteriores. Esa «fuga hacia atrás» es exactamente la trampa que la máscara impide.</div>
-</figure>
+<div class="callout recuerda">
+  <span class="lbl">Experimento de arriba: «Tocar el futuro: con y sin máscara causal», con todo detalle</span>
+  <p><strong>Haz esto.</strong> Las seis casillas son las palabras de un subtítulo: «el niño ve Titanic hoy .». Elige «Titanic» como token que se toca y sube «Cuánto sumas» a +5. Mira qué barras de la derecha se mueven. Apaga la máscara y repite.</p>
+  <p><strong>Fíjate en.</strong> Con máscara, el cambio solo llega al token tocado y a los que vienen después: el pasado no puede enterarse del futuro. Sin máscara, cambian las salidas de todos, incluso las de los tokens anteriores. Esa «fuga hacia atrás» es exactamente la trampa que la máscara impide.</p>
+</div>
 <div class="callout ojo">
-<span class="lbl">Ojo</span>
-<p>En Keras la máscara causal se pide con <code>use_causal_mask=True</code> al <em>llamar</em> a <code>MultiHeadAttention</code>; no es un argumento del constructor. Y recuerda: sin máscara, un decoder entrena «de maravilla» (la pérdida cae a casi cero porque copia la respuesta) y luego, al generar, no sabe hacer nada.</p>
+  <span class="lbl">Ojo</span>
+  <p>En Keras la máscara causal se pide con <code>use_causal_mask=True</code> al <em>llamar</em> a <code>MultiHeadAttention</code>; no es un argumento del constructor. Y recuerda: sin máscara, un decoder entrena «de maravilla» (la pérdida cae a casi cero porque copia la respuesta) y luego, al generar, no sabe hacer nada.</p>
 </div>
+
 <h3>Self-attention y cross-attention; el precio</h3>
 <p>Si \(Q\), \(K\) y \(V\) salen de la <em>misma</em> secuencia hablamos de <strong>self-attention</strong>. Si \(Q\) viene de una secuencia y \(K, V\) de otra (el decoder consultando al encoder al traducir los subtítulos de una peli: el encoder lee el original y el decoder escribe la traducción), es <strong>cross-attention</strong>; la fórmula no cambia. En ambos casos la matriz de pesos es \(n \times m\), con lo que el coste crece con el producto de las dos longitudes: con 4.096 tokens y 12 cabezas, solo las puntuaciones de una capa ocupan unos 800 MB en <code>float32</code> por ejemplo del lote.</p>
-</section></div></details><details class="profundizar" id="codigo"><summary><span>Ver código explicado paso a paso<small>1 fragmento(s) original(es), con cada línea comentada y salida esperada.</small></span></summary><div class="prof-body"><article class="snippet" data-lang="python">
-<header>
-<h3>6 · La máscara causal, y comprobar que el pasado no ve el futuro</h3>
-<p class="para-que"><strong>Para qué sirve</strong> Construir la matriz triangular de permisos, ver cómo cambia el reparto de atención y demostrar con un experimento que, con máscara, cambiar un token solo afecta a ese token y a los siguientes. Usa <code>atencion</code> del fragmento 4.</p>
-</header>
-<pre class="code"><code>n = 4
+  </div>
+</details>
+
+<section>
+<h2 class="sin-num">Código</h2>
+<p class="codigo-intro">Los fragmentos 5 y 6 usan <code>softmax</code> y <code>atencion</code> del fragmento 4 (<a href="leccion-2.html">lección 2</a>): ejecútalo antes en el mismo cuaderno.</p>
+<!-- ---------- Fragmento 5 ---------- -->
+<article class="snippet" data-lang="python">
+  <header>
+    <h3>5 · Medir por qué se divide entre √d</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Comprobar con números que la desviación de \(q\cdot k\) es \(\sqrt{d_k}\) y que sin dividir el softmax se satura. Usa <code>softmax</code> del fragmento 4.</p>
+  </header>
+  <pre class="code"><code>rng = np.random.default_rng(0)
+
+for dk in (4, 64, 512):
+    q = rng.normal(size=(5000, dk))
+    k = rng.normal(size=(5000, dk))
+    puntos = (q * k).sum(axis=1)
+    print(f"d_k={dk:3d}  desv. de q·k = {puntos.std():6.2f}   (raiz de d_k = {np.sqrt(dk):5.2f})   tras dividir: {(puntos / np.sqrt(dk)).std():.2f}")
+
+print()
+for dk in (4, 64, 512):
+    q = rng.normal(size=(2000, 1, dk))
+    k = rng.normal(size=(2000, 8, dk))
+    puntos = (q * k).sum(axis=-1)
+    sin = softmax(puntos).max(axis=1).mean()
+    con = softmax(puntos / np.sqrt(dk)).max(axis=1).mean()
+    print(f"d_k={dk:3d}  peso máximo medio entre 8 claves:  sin escalar {sin:.2f}   escalado {con:.2f}")</code></pre>
+  <details class="linea-a-linea" open>
+    <summary>Línea por línea</summary>
+    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+      <tbody>
+        <tr data-lines="1"><td><code>rng = np.random.default_rng(0)</code></td><td>Generador de números aleatorios con semilla 0.</td></tr>
+        <tr data-lines="3"><td><code>for dk in (4, 64, 512):</code></td><td>Repite el experimento con tres tamaños de cabeza.</td></tr>
+        <tr data-lines="4-5"><td><code>q = rng.normal(size=(5000, dk)); k = ...</code></td><td>5.000 vectores \(q\) y 5.000 vectores \(k\) con números normales de media 0 y varianza 1 (aproximadamente cómo empiezan en una red).</td></tr>
+        <tr data-lines="6"><td><code>puntos = (q * k).sum(axis=1)</code></td><td>El producto escalar de cada pareja: multiplica componente a componente y suma a lo largo de las \(d_k\) componentes. Quedan 5.000 puntuaciones.</td></tr>
+        <tr data-lines="7"><td><code>print(f"d_k={dk:3d} ...")</code></td><td>Una f-string (los <code>{}</code> insertan valores; <code>:3d</code> un entero en 3 espacios; <code>:6.2f</code> un decimal con 2 cifras). Compara la desviación de las puntuaciones con \(\sqrt{d_k}\) y con la de las puntuaciones divididas entre \(\sqrt{d_k}\).</td></tr>
+        <tr data-lines="9"><td><code>print()</code></td><td>Una línea en blanco para separar las dos tablas.</td></tr>
+        <tr data-lines="10"><td><code>for dk in (4, 64, 512):</code></td><td>Segundo experimento, con los mismos tamaños.</td></tr>
+        <tr data-lines="11"><td><code>q = rng.normal(size=(2000, 1, dk))</code></td><td>2.000 consultas, cada una con un solo vector \(q\) (la dimensión de tamaño 1 permite comparar con muchas claves a la vez).</td></tr>
+        <tr data-lines="12"><td><code>k = rng.normal(size=(2000, 8, dk))</code></td><td>Para cada consulta, 8 claves candidatas.</td></tr>
+        <tr data-lines="13"><td><code>puntos = (q * k).sum(axis=-1)</code></td><td>Puntuaciones <code>(2000, 8)</code>: cada consulta contra sus 8 claves (NumPy «difunde» el vector \(q\) sobre las 8 filas).</td></tr>
+        <tr data-lines="14"><td><code>sin = softmax(puntos).max(axis=1).mean()</code></td><td>Softmax sobre las 8 claves, se toma el peso mayor de cada consulta (<code>max(axis=1)</code>) y se promedia. Si fuera 1/8 = 0,125, el reparto sería uniforme; si es 1, es «el ganador se lo lleva todo».</td></tr>
+        <tr data-lines="15"><td><code>con = softmax(puntos / np.sqrt(dk)).max(axis=1).mean()</code></td><td>Lo mismo, pero con las puntuaciones divididas entre \(\sqrt{d_k}\).</td></tr>
+        <tr data-lines="16"><td><code>print(f"d_k={dk:3d} peso máximo medio ...")</code></td><td>Imprime los dos pesos máximos medios.</td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>d_k=  4  desv. de q·k =   2.00   (raiz de d_k =  2.00)   tras dividir: 1.00
+d_k= 64  desv. de q·k =   8.03   (raiz de d_k =  8.00)   tras dividir: 1.00
+d_k=512  desv. de q·k =  22.98   (raiz de d_k = 22.63)   tras dividir: 1.02
+
+d_k=  4  peso máximo medio entre 8 claves:  sin escalar 0.53   escalado 0.35
+d_k= 64  peso máximo medio entre 8 claves:  sin escalar 0.87   escalado 0.36
+d_k=512  peso máximo medio entre 8 claves:  sin escalar 0.96   escalado 0.36</pre>
+    <p>Primera tabla: la desviación de \(q\cdot k\) es casi exactamente \(\sqrt{d_k}\) (2,00 · 8,03 · 22,98 frente a 2 · 8 · 22,63) y al dividir queda en 1, sea cual sea \(d_k\). Segunda tabla: sin escalar, el peso máximo medio entre 8 claves pasa de 0,53 (\(d_k=4\)) a 0,87 (64) y 0,96 (512): el softmax se vuelve un «ganador único» y su gradiente casi desaparece. Con la división se queda en 0,35–0,36 siempre.</p>
+  </div>
+</article>
+
+<!-- ---------- Fragmento 6 ---------- -->
+<article class="snippet" data-lang="python">
+  <header>
+    <h3>6 · La máscara causal, y comprobar que el pasado no ve el futuro</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Construir la matriz triangular de permisos, ver cómo cambia el reparto de atención y demostrar con un experimento que, con máscara, cambiar un token solo afecta a ese token y a los siguientes. Usa <code>atencion</code> del fragmento 4.</p>
+  </header>
+  <pre class="code"><code>n = 4
 mascara = np.tril(np.ones((n, n), dtype=bool))
 print("máscara (True = se puede mirar):\n", mascara.astype(int))
 
@@ -101,29 +254,29 @@ V2[3] += 10.0
 for nombre, m in (("sin máscara", None), ("con máscara", mascara)):
     cambio = np.abs(atencion(Q, K, V2, m)[0] - atencion(Q, K, V, m)[0]).max(axis=1)
     print(f"{nombre}: cuánto cambia la salida de cada token al tocar el token 4 -&gt;", cambio.round(2))</code></pre>
-<details class="linea-a-linea" open="">
-<summary>Línea por línea</summary>
-<p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
-<table class="lineas">
-<thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
-<tbody>
-<tr data-lines="1"><td><code>n = 4</code></td><td>Cuatro tokens.</td></tr>
-<tr data-lines="2"><td><code>mascara = np.tril(np.ones((n, n), dtype=bool))</code></td><td><code>np.ones</code> crea una matriz 4×4 de unos (<code>dtype=bool</code> = verdadero/falso) y <code>np.tril</code> conserva solo el triángulo <strong>inferior</strong> (la diagonal y lo de debajo). <code>True</code> significa «puede mirar».</td></tr>
-<tr data-lines="3"><td><code>print("máscara ...", mascara.astype(int))</code></td><td>La imprime como 1 y 0: la fila \(i\) tiene unos hasta la columna \(i\).</td></tr>
-<tr data-lines="5"><td><code>rng = np.random.default_rng(1)</code></td><td>Semilla para los datos de prueba.</td></tr>
-<tr data-lines="6"><td><code>Q, K, V = (rng.normal(size=(n, 3)) for _ in range(3))</code></td><td>Tres matrices aleatorias de 4 tokens × 3 números, creadas de una vez con un generador.</td></tr>
-<tr data-lines="7-8"><td><code>_, sin_mascara = atencion(...); _, con_mascara = atencion(..., mascara)</code></td><td>Calcula los pesos sin y con máscara (solo nos interesan los pesos, que es el segundo valor devuelto).</td></tr>
-<tr data-lines="9-10"><td><code>print("pesos sin máscara:\n", ...)</code></td><td>Imprime los dos mapas de atención, redondeados a 2 decimales.</td></tr>
-<tr data-lines="12-13"><td><code>V2 = V.copy(); V2[3] += 10.0</code></td><td>Copia V y le suma 10 al <strong>valor del cuarto token</strong> (el índice 3). Es el «tocar el futuro» del experimento.</td></tr>
-<tr data-lines="14"><td><code>for nombre, m in (("sin máscara", None), ("con máscara", mascara)):</code></td><td>Hace la prueba dos veces: sin máscara y con ella.</td></tr>
-<tr data-lines="15"><td><code>cambio = np.abs(atencion(Q, K, V2, m)[0] - atencion(Q, K, V, m)[0]).max(axis=1)</code></td><td>Calcula la salida con el V original y con el V tocado, resta, toma el valor absoluto y el máximo por fila: cuánto cambia la salida de cada token.</td></tr>
-<tr data-lines="16"><td><code>print(f"{nombre}: cuánto cambia ...", cambio.round(2))</code></td><td>Muestra el cambio de cada uno de los 4 tokens.</td></tr>
-</tbody>
-</table>
-</details>
-<div class="salida">
-<strong>Salida esperada</strong>
-<pre>máscara (True = se puede mirar):
+  <details class="linea-a-linea" open>
+    <summary>Línea por línea</summary>
+    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+      <tbody>
+        <tr data-lines="1"><td><code>n = 4</code></td><td>Cuatro tokens.</td></tr>
+        <tr data-lines="2"><td><code>mascara = np.tril(np.ones((n, n), dtype=bool))</code></td><td><code>np.ones</code> crea una matriz 4×4 de unos (<code>dtype=bool</code> = verdadero/falso) y <code>np.tril</code> conserva solo el triángulo <strong>inferior</strong> (la diagonal y lo de debajo). <code>True</code> significa «puede mirar».</td></tr>
+        <tr data-lines="3"><td><code>print("máscara ...", mascara.astype(int))</code></td><td>La imprime como 1 y 0: la fila \(i\) tiene unos hasta la columna \(i\).</td></tr>
+        <tr data-lines="5"><td><code>rng = np.random.default_rng(1)</code></td><td>Semilla para los datos de prueba.</td></tr>
+        <tr data-lines="6"><td><code>Q, K, V = (rng.normal(size=(n, 3)) for _ in range(3))</code></td><td>Tres matrices aleatorias de 4 tokens × 3 números, creadas de una vez con un generador.</td></tr>
+        <tr data-lines="7-8"><td><code>_, sin_mascara = atencion(...); _, con_mascara = atencion(..., mascara)</code></td><td>Calcula los pesos sin y con máscara (solo nos interesan los pesos, que es el segundo valor devuelto).</td></tr>
+        <tr data-lines="9-10"><td><code>print("pesos sin máscara:\n", ...)</code></td><td>Imprime los dos mapas de atención, redondeados a 2 decimales.</td></tr>
+        <tr data-lines="12-13"><td><code>V2 = V.copy(); V2[3] += 10.0</code></td><td>Copia V y le suma 10 al <strong>valor del cuarto token</strong> (el índice 3). Es el «tocar el futuro» del experimento.</td></tr>
+        <tr data-lines="14"><td><code>for nombre, m in (("sin máscara", None), ("con máscara", mascara)):</code></td><td>Hace la prueba dos veces: sin máscara y con ella.</td></tr>
+        <tr data-lines="15"><td><code>cambio = np.abs(atencion(Q, K, V2, m)[0] - atencion(Q, K, V, m)[0]).max(axis=1)</code></td><td>Calcula la salida con el V original y con el V tocado, resta, toma el valor absoluto y el máximo por fila: cuánto cambia la salida de cada token.</td></tr>
+        <tr data-lines="16"><td><code>print(f"{nombre}: cuánto cambia ...", cambio.round(2))</code></td><td>Muestra el cambio de cada uno de los 4 tokens.</td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>máscara (True = se puede mirar):
  [[1 0 0 0]
  [1 1 0 0]
  [1 1 1 0]
@@ -140,6 +293,12 @@ pesos con máscara:
  [0.19 0.25 0.22 0.34]]
 sin máscara: cuánto cambia la salida de cada token al tocar el token 4 -&gt; [4.52 4.66 4.06 3.37]
 con máscara: cuánto cambia la salida de cada token al tocar el token 4 -&gt; [0.   0.   0.   3.37]</pre>
-<p>La máscara es triangular. Sin máscara, el token 1 reparte atención entre los cuatro (0,16 · 0,23 · 0,16 · 0,45); con ella, todo su peso (1,0) va a sí mismo, y el token 2 reparte 0,70 y 0,30 entre los dos primeros. En el experimento, sumar 10 al valor del token 4 cambia las salidas de <strong>todos</strong> los tokens sin máscara (4,52 · 4,66 · 4,06 · 3,37), pero con máscara las salidas de los tokens 1, 2 y 3 no se mueven (0) y solo cambia la del propio token 4.</p>
+    <p>La máscara es triangular. Sin máscara, el token 1 reparte atención entre los cuatro (0,16 · 0,23 · 0,16 · 0,45); con ella, todo su peso (1,0) va a sí mismo, y el token 2 reparte 0,70 y 0,30 entre los dos primeros. En el experimento, sumar 10 al valor del token 4 cambia las salidas de <strong>todos</strong> los tokens sin máscara (4,52 · 4,66 · 4,06 · 3,37), pero con máscara las salidas de los tokens 1, 2 y 3 no se mueven (0) y solo cambia la del propio token 4.</p>
+  </div>
+</article>
+</section>
+
 </div>
-</article></div></details></div></main></body></html>
+</main>
+</body>
+</html>

@@ -1,72 +1,206 @@
-<!DOCTYPE html>
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lección 5 · Mejor logits y BCEWithLogitsLoss: la misma cuenta, sin romperse · Módulo 4 · Curso 4 · Cuaderno de IA</title>
+<meta name="description" content="Qué es un logit, por qué sigmoide + BCELoss se rompe en float32 y por qué la opción recomendada es nn.Linear + BCEWithLogitsLoss (con pos_weight).">
+<script>try{var t=localStorage.getItem('cuaderno-ia:tema');if(t)document.documentElement.setAttribute('data-theme',t)}catch(e){}</script>
+<link rel="stylesheet" href="../../assets/css/style.css">
+<script src="../../assets/js/curriculum.js"></script>
+<script src="../../assets/js/lab.js"></script>
+<script src="../../assets/js/app.js" defer></script>
+</head>
+<body data-root="../../" data-course="4" data-module="4" data-lesson="5">
+<main>
+<div class="page">
 
-<html lang="es"><head><meta charset="utf-8"/><meta content="width=device-width,initial-scale=1" name="viewport"/><title>Lección 5 · BCELoss o BCEWithLogitsLoss: logits y estabilidad numérica · Curso 4 · Cuaderno de IA</title><meta content="Se llama logit a la puntuación \( z = wx + b \) antes de aplicarle la sigmoide." name="description"/><script>try{var t=localStorage.getItem('cuaderno-ia:tema');if(t)document.documentElement.setAttribute('data-theme',t)}catch(e){}</script><link href="../../assets/css/style.css" rel="stylesheet"/><script src="../../assets/js/curriculum.js"></script><script src="../../assets/js/lab.js"></script><script defer="" src="../../assets/js/app.js"></script><script defer="" src="../../assets/js/microanimations.js"></script></head><body data-course="4" data-lesson="5" data-module="4" data-root="../../"><main><div class="page" data-micro="3min"><header class="hero leccion"><div class="hero-grid"><div><p class="eyebrow">Curso 4 · Módulo 4 · Lección 5 de 11</p><h1>BCELoss o BCEWithLogitsLoss: logits y estabilidad numérica</h1><p class="lead">Se llama logit a la puntuación \( z = wx + b \) antes de aplicarle la sigmoide.</p><p class="meta-line"><span class="read-time" data-render="read-time"></span><a href="../modulo-4.html">Índice del módulo</a></p></div><div aria-hidden="true" class="hero-tile"></div></div></header><details class="predice"><summary>Si la sigmoide y el logaritmo se calculan por separado, ¿puede el ordenador equivocarse sin avisar? ¿Y qué es un logit ?<span class="hint"></span></summary><div><p>Se llama logit a la puntuación \( z = wx + b \) antes de aplicarle la sigmoide.</p></div></details><section aria-label="Explicación breve" class="micro-core"><div class="micro-kicker">01 · ENTENDER <span>≈ 45 s</span></div><h2>La idea en palabras sencillas</h2><p>Se llama logit a la puntuación \( z = wx + b \) antes de aplicarle la sigmoide.</p><div class="micro-example"><span aria-hidden="true" class="micro-example-icon">💡</span><div><strong>Otro ejemplo · Compras</strong><p>Un detector asigna 60 % a «ropa», 30 % a «electrónica» y 10 % a «hogar».</p></div></div></section><div class="micro-kicker micro-checkpoint">02 · RESPONDER <span>≈ 15 s</span></div><section aria-label="Pregunta intercalada" class="quiz mini micro-check"><script class="quiz-data" type="application/json">{"titulo": "Pausa rápida · Comprueba la idea", "preguntas": [{"q": "El modelo asigna gato 70 %, perro 20 % y conejo 10 %. ¿Qué clase elegiría?", "opciones": ["Gato", "Perro", "Conejo"], "correcta": 0, "porque": "La clase con mayor probabilidad es gato."}]}</script></section><section aria-label="Animación interactiva" class="micro-viz" data-index="13" data-micro-viz="probability"><div class="micro-kicker">03 · EXPERIMENTAR <span>≈ 45 s</span></div><div class="micro-viz-title"><div><h2>De puntuaciones a probabilidades</h2><p>Modifica una puntuación y compara las tres probabilidades.</p></div><span aria-hidden="true" class="micro-viz-symbol">✦</span></div><div aria-live="polite" class="micro-viz-stage"><p>Animación interactiva: De puntuaciones a probabilidades</p></div></section><div class="micro-kicker micro-checkpoint">04 · APLICAR <span>≈ 15 s</span></div><section aria-label="Pregunta intercalada" class="quiz mini micro-check"><script class="quiz-data" type="application/json">{"titulo": "Pausa rápida · ¿Lo aplicarías?", "preguntas": [{"q": "En una softmax estándar, ¿cuánto suman las probabilidades de las clases?", "opciones": ["50 %", "Puede ser cualquier número", "100 %"], "correcta": 2, "porque": "Softmax normaliza las puntuaciones para que sumen 1 (100 %)."}]}</script></section><div class="micro-finish"><strong>Idea que te llevas</strong><span>Se llama logit a la puntuación \( z = wx + b \) antes de aplicarle la sigmoide</span><small>¿Quieres más ejemplos, fórmulas o código? Los tienes justo debajo, sin límite de tiempo.</small></div><details class="profundizar micro-legacy"><summary><span>Explorar más: explicación y simulaciones completas<small>Todo el texto original, tablas y demos avanzadas. Opcional.</small></span></summary><div class="prof-body"><section><h2>BCELoss o BCEWithLogitsLoss: logits y estabilidad numérica</h2>
-<p>Se llama <strong><abbr class="t" data-def="La puntuación z = w·x + b antes de aplicarle la sigmoide. Es el logaritmo de los odds: z = ln(p/(1-p)). Va de −∞ a +∞.">logit</abbr></strong> a la puntuación \( z = wx + b \) <em>antes</em> de aplicarle la sigmoide. Se llama así porque \( z = \ln\!\bigl(p/(1-p)\bigr) \) es el logaritmo de los odds. Un logit va de \( -\infty \) a \( +\infty \): 0 significa «50 %», positivo significa «más probable que sí», negativo «más probable que no». Todo el módulo 3 trabajaba con logits sin llamarlos así: la salida de <code>nn.Linear</code> <em>es</em> un logit.</p>
-<p>La sigmoide, en <code>float32</code>, se satura: cuando \( z \) es muy negativo (por debajo de −88 aprox.) devuelve exactamente <code>0.0</code> y cuando \( z \) es algo alto (desde \( z=17 \)) devuelve exactamente <code>1.0</code>: en 32 bits no caben más cifras (el fragmento 1 mostraba \( \sigma(10)=0.99995 \), todavía distinto de 1). A partir de ahí, la fórmula de la BCE necesita \( \ln(0) \), que es \( -\infty \). Para que no explote, <code>BCELoss</code> recorta cada logaritmo a −100, así que <strong>la pérdida de una muestra nunca pasa de 100</strong>, aunque la realidad sea muchísimo peor. <code>BCEWithLogitsLoss</code> evita el problema con una forma algebraicamente equivalente que nunca calcula \( \ln 0 \):</p>
-<p>Compruébalo con dos casos. <strong>(a)</strong> \( y = 1,\ z = 3 \): \( \max(3,0) - 3\cdot1 + \ln(1+e^{-3}) = 0 + \ln(1.0498) = 0.0486 \), igual que \( -\ln\sigma(3) = -\ln 0.9526 = 0.0486 \). <strong>(b)</strong> \( y = 1,\ z = -120 \): \( 0 + 120 + \ln(1 + e^{-120}) = 120.000 \). La sigmoide ingenua daría \( \sigma(-120) = 0 \) y la pérdida topada en 100. Fíjate en el truco: el exponente es siempre \( -|z| \le 0 \), así que \( e^{-|z|} \) está entre 0 y 1 y <strong>nunca se desborda</strong>.</p>
-<div class="callout ejemplo"><span class="lbl">Ejemplo tomado del módulo</span><p>Las dos combinaciones correctas Opción A (la del apartado anterior) Opción B (la recomendada) Modelo nn.Sequential(nn.Linear(n,1), nn.Sigmoid()) nn.Linear(n,1) a secas El modelo devuelve probabilidades \( p \) logits \( z \) Pérdida…</p></div></section><figure class="demo" data-demo="curso4/c4m4-estabilidad" data-titulo="Pérdida ingenua frente a pérdida estable en float32">
-<div class="haz">Mueve z desde 0 hasta −130 con «y = 1». Mira cuándo la versión ingenua (sigmoide + BCELoss) se separa de la estable. Cambia a «y = 0» y sube z hasta 130: ¿por qué se separan en sitios tan distintos?</div>
-<div class="observa">Con \( y=1 \) las dos curvas coinciden hasta \( z\approx-88 \) y con \( y=0 \) hasta \( z\approx 15 \) (la asimetría viene de que cerca de 1 los números de 32 bits están mucho más separados que cerca de 0). Pasado ese punto la versión ingenua se queda plana en 100 (el tope del logaritmo) mientras la estable sigue la recta \( |z| \). La demo emula la aritmética de <code>float32</code> con <code>Math.fround</code>, igual que lo haría PyTorch (comprobado contra PyTorch para todos los z enteros de −130 a 130 y las dos respuestas: diferencia máxima 5·10⁻⁷).</div>
-</figure><div class="resumen"><h2 class="sin-num sin-toc">En pocas líneas</h2><ul><li><strong>BCELoss o BCEWithLogitsLoss: logits y estabilidad numérica:</strong> Se llama logit a la puntuación \( z = wx + b \) antes de aplicarle la sigmoide.</li><li>Antes de continuar, intenta explicar la demo sin mirar su resultado.</li></ul></div><section class="quiz mini"><script class="quiz-data" type="application/json">{"titulo": "¿Lo tienes?", "preguntas": [{"q": "¿Qué concepto estamos trabajando en esta lección?", "opciones": ["¿Por qué no usar MSE? El gradiente que se aplana", "El bucle de entrenamiento, un paso a mano y el learning rate", "BCELoss o BCEWithLogitsLoss: logits y estabilidad numérica"], "correcta": 2, "porque": "Se llama logit a la puntuación \\( z = wx + b \\) antes de aplicarle la sigmoide."}, {"q": "¿Cuál de estas afirmaciones recoge lo que acabas de estudiar?", "opciones": ["Se llama logit a la puntuación \\( z = wx + b \\) antes de aplicarle la sigmoide.", "Siempre hay un único método que sirve para todos los problemas.", "Lo importante es comprender la idea y comprobarla con ejemplos, no memorizar términos."], "correcta": 0, "porque": "La explicación central es: Se llama logit a la puntuación \\( z = wx + b \\) antes de aplicarle la sigmoide."}, {"q": "Si una demo o un ejemplo te desconcierta, ¿cuál es la mejor forma de aprenderlo?", "opciones": ["Volver a los números, cambiar un valor y explicar qué ocurre.", "Ignorar los resultados que no coinciden con tu intuición.", "Memorizar el nombre sin entender la operación."], "correcta": 0, "porque": "Explorar qué cambia y por qué ayuda a conectar el concepto con su resultado."}]}</script></section></div></details><details class="profundizar"><summary><span>Profundizar: explicación completa<small>Matices, fórmulas, tablas, otros ejemplos y experimentos del módulo original.</small></span></summary><div class="prof-body"><section>
-<h2 id="logits">BCELoss o BCEWithLogitsLoss: logits y estabilidad numérica</h2>
-<p class="pregunta">Si la sigmoide y el logaritmo se calculan por separado, ¿puede el ordenador equivocarse sin avisar? ¿Y qué es un <em>logit</em>?</p>
-<div class="callout analogia">
-<span class="lbl">Analogía</span>
-<p>Imagina que calculas una receta pasando por una calculadora que solo guarda 7 cifras. Si primero redondeas un resultado intermedio muy pequeño a «cero» y después tienes que dividir por él, el resto de la receta se estropea. Lo inteligente es juntar los dos pasos en una sola fórmula que no pase por el cero intermedio. Eso es lo que hace <code>BCEWithLogitsLoss</code>: <strong>fusiona la sigmoide y el logaritmo en una sola fórmula</strong> que no se rompe.</p>
+<header class="hero leccion">
+  <div class="hero-grid">
+    <div>
+      <p class="eyebrow">Curso 4 · Módulo 4 · Lección 5 de 8</p>
+      <h1>Mejor logits y BCEWithLogitsLoss: la misma cuenta, sin romperse</h1>
+      <p class="lead">Hay dos formas correctas de montar lo mismo: un modelo que devuelve probabilidades con <code>BCELoss</code>, o uno que devuelve <strong>logits</strong> con <code>BCEWithLogitsLoss</code>. Dan el mismo resultado, pero solo la segunda aguanta los casos extremos.</p>
+      <p class="meta-line"><span class="read-time" data-render="read-time"></span><a href="../modulo-4.html">Índice del módulo</a></p>
+    </div>
+    <div class="hero-tile" aria-hidden="true"></div>
+  </div>
+</header>
+
+<details class="predice">
+  <summary>Un usuario canceló (\( y = 1 \)) y el modelo le da un logit \( z = -120 \). La pérdida real es 120. ¿Qué devuelve sigmoide + <code>BCELoss</code> en <code>float32</code>?<span class="hint"></span></summary>
+  <div>
+    <p><strong>100.</strong> En 32 bits, \( \sigma(-120) \) es exactamente 0, el logaritmo se recorta a −100 y la pérdida se topa en 100. Peor aún: su gradiente es <strong>0</strong>. <code>BCEWithLogitsLoss</code> da 120 y gradiente −1.</p>
+  </div>
+</details>
+
+<section>
+<h2 id="idea">Juntar la sigmoide y el logaritmo</h2>
+<p>Un <strong>logit</strong> es la puntuación \( z = wx + b \) <em>antes</em> de la sigmoide (es el logaritmo de los odds). Va de \( -\infty \) a \( +\infty \): 0 es «50 %», positivo «más bien sí», negativo «más bien no». La salida de <code>nn.Linear</code> <em>es</em> un logit.</p>
+<p>Calcular la sigmoide y luego el logaritmo por separado falla en las colas: en <code>float32</code>, \( \sigma(z) \) da exactamente 0 por debajo de \( z \approx -88 \) y exactamente 1 desde \( z = 17 \), y \( \ln 0 \) no existe. <code>BCEWithLogitsLoss</code> usa una fórmula equivalente que nunca pasa por ese cero:</p>
+<div class="formula">\[ L(z, y) = \max(z, 0) - z\,y + \ln\bigl(1 + e^{-|z|}\bigr) \]</div>
+<p>El exponente siempre es \( -|z| \le 0 \), así que nunca se desborda. Por eso la opción por defecto es: <strong>el modelo termina en <code>nn.Linear</code> y la pérdida es <code>BCEWithLogitsLoss</code></strong>. La probabilidad, solo para mirarla, con <code>torch.sigmoid(logits)</code>; la clase, con <code>logits &gt; 0</code>. Y nunca dos sigmoides: una en el modelo con <code>BCELoss</code>, o ninguna con <code>BCEWithLogitsLoss</code>.</p>
+</section>
+
+<figure class="demo" data-demo="curso4/c4m4-estabilidad" data-titulo="Pérdida ingenua frente a pérdida estable en float32">
+  <div class="haz">Con «y = 1», lleva z desde 0 hasta −130.</div>
+  <div class="observa">Hasta z ≈ −88 coinciden; después la versión ingenua se queda plana en 100 y la estable sigue subiendo.</div>
+</figure>
+
+<section>
+<h2 id="numeros">Con números: la fórmula estable a mano</h2>
+<div class="callout ejemplo">
+  <span class="lbl">Ejemplo numérico</span>
+  <ol class="pasos">
+    <li>\( y = 1,\ z = 3 \): \( \max(3, 0) - 3 + \ln(1 + e^{-3}) = \ln 1.0498 = \) <strong>0.0486</strong>, igual que \( -\ln\sigma(3) \).</li>
+    <li>\( y = 1,\ z = -120 \): \( 0 + 120 + \ln(1 + e^{-120}) = \) <strong>120</strong>. La versión ingenua da 100.</li>
+    <li>Con <code>pos_weight=3</code> y \( y = 1,\ z = -1 \): \( 3 \times 1.3133 = \) <strong>3.9398</strong>. Dejar escapar a un usuario que cancela cuesta el triple.</li>
+  </ol>
 </div>
+</section>
+
+<details class="predice">
+  <summary>Con <code>BCEWithLogitsLoss</code>, el modelo devuelve \( z = 0.28 \) para un usuario. ¿Lo clasificas como «cancela» con umbral 0.5?<span class="hint"></span></summary>
+  <div>
+    <p><strong>Sí</strong>, porque \( z &gt; 0 \) equivale a \( p \ge 0.5 \). Su probabilidad es \( \sigma(0.28) = 0.57 \). Ojo: un logit de 0.28 no significa «28 %».</p>
+  </div>
+</details>
+
+<div class="resumen">
+  <h2 class="sin-num sin-toc">En tres líneas</h2>
+  <ul>
+    <li>Logit = puntuación antes de la sigmoide; la salida de <code>nn.Linear</code> es un logit.</li>
+    <li>Por defecto: <code>nn.Linear</code> + <code>BCEWithLogitsLoss</code>; la sigmoide, solo para mirar probabilidades.</li>
+    <li>Una sigmoide con <code>BCELoss</code> o ninguna con <code>BCEWithLogitsLoss</code>, nunca dos.</li>
+  </ul>
+</div>
+
+<section class="quiz mini">
+<script type="application/json" class="quiz-data">
+{
+ "titulo": "¿Lo tienes?",
+ "preguntas": [
+  {
+   "q": "Tu modelo es solo <code>nn.Linear(3, 1)</code> (sin sigmoide al final). ¿Qué pérdida usas y cómo obtienes la clase?",
+   "opciones": [
+    "<code>nn.BCELoss()</code>; clase = salida \\( \\ge 0.5 \\).",
+    "<code>nn.MSELoss()</code>; clase = salida \\( \\ge 0.5 \\).",
+    "<code>nn.BCEWithLogitsLoss()</code>; clase = salida \\( > 0 \\) (equivale a la sigmoide \\( \\ge 0.5 \\)).",
+    "<code>nn.CrossEntropyLoss()</code>; clase = salida \\( > 0 \\)."
+   ],
+   "correcta": 2,
+   "porque": "La salida de <code>nn.Linear</code> es un logit \\( z \\), no una probabilidad: <code>BCELoss</code> lanzaría «all elements of input should be between 0 and 1». <code>BCEWithLogitsLoss</code> aplica la sigmoide por dentro con una fórmula estable, y como \\( \\sigma(0)=0.5 \\), decidir con \\( z>0 \\) es lo mismo que \\( p\\ge0.5 \\). <code>CrossEntropyLoss</code> es para varias clases (módulo 5) y el MSE no es la pérdida adecuada para clasificar."
+  },
+  {
+   "q": "Tu modelo termina en <code>nn.Sigmoid()</code> y usas <code>nn.BCEWithLogitsLoss()</code> como pérdida. ¿Qué ocurre?",
+   "opciones": [
+    "Lanza un error en la primera época.",
+    "Funciona igual que con <code>BCELoss</code>, porque son equivalentes.",
+    "Se detecta la sigmoide y se ignora la de la pérdida.",
+    "No da ningún error, pero la sigmoide se aplica dos veces: el modelo aprende algo peor (pérdida 0.5932 en vez de 0.3598 en el fragmento 19)."
+   ],
+   "correcta": 3,
+   "porque": "<code>BCEWithLogitsLoss</code> espera logits y aplica su propia sigmoide, así que recibe \\( \\sigma(z) \\) (valores entre 0 y 1) y vuelve a aplicarle \\( \\sigma \\): \\( \\sigma(\\sigma(z)) \\) vive entre 0.5 y 0.731. El código corre sin quejas y el modelo entrena, pero no puede dar probabilidades fuera de ese intervalo. Regla: una sigmoide con <code>BCELoss</code>, o ninguna con <code>BCEWithLogitsLoss</code>."
+  },
+  {
+   "q": "Solo 50 de 1000 usuarios cancelan. ¿Qué <code>pos_weight</code> sugiere la regla habitual para <code>BCEWithLogitsLoss</code>?",
+   "opciones": [
+    "<code>torch.tensor([0.05])</code>",
+    "<code>torch.tensor([19.0])</code>",
+    "<code>torch.tensor([50.0])</code>"
+   ],
+   "correcta": 1,
+   "porque": "La regla es <code>n_negativos / n_positivos</code> = 950 / 50 = 19: equivocarse con un usuario que cancela pesa 19 veces más, y así el modelo no se limita a decir siempre «se queda»."
+  }
+ ]
+}
+</script>
+</section>
+
+<details class="profundizar">
+  <summary><span>Profundizar: la explicación completa<small>Las dos combinaciones correctas, la estabilidad en float32 con la tabla del fragmento 7, el gradiente que se apaga, pos_weight y la doble sigmoide.</small></span></summary>
+  <div class="prof-body">
+<h2 id="logits">BCELoss o BCEWithLogitsLoss: logits y estabilidad numérica</h2>
+
+<p class="pregunta">Si la sigmoide y el logaritmo se calculan por separado, ¿puede el ordenador equivocarse sin avisar? ¿Y qué es un <em>logit</em>?</p>
+
+<div class="callout analogia">
+  <span class="lbl">Analogía</span>
+  <p>Imagina que calculas una receta pasando por una calculadora que solo guarda 7 cifras. Si primero redondeas un resultado intermedio muy pequeño a «cero» y después tienes que dividir por él, el resto de la receta se estropea. Lo inteligente es juntar los dos pasos en una sola fórmula que no pase por el cero intermedio. Eso es lo que hace <code>BCEWithLogitsLoss</code>: <strong>fusiona la sigmoide y el logaritmo en una sola fórmula</strong> que no se rompe.</p>
+</div>
+
 <h3>Qué es un logit</h3>
 <p>Se llama <strong><abbr class="t" data-def="La puntuación z = w·x + b antes de aplicarle la sigmoide. Es el logaritmo de los odds: z = ln(p/(1-p)). Va de −∞ a +∞.">logit</abbr></strong> a la puntuación \( z = wx + b \) <em>antes</em> de aplicarle la sigmoide. Se llama así porque \( z = \ln\!\bigl(p/(1-p)\bigr) \) es el logaritmo de los odds. Un logit va de \( -\infty \) a \( +\infty \): 0 significa «50 %», positivo significa «más probable que sí», negativo «más probable que no». Todo el módulo 3 trabajaba con logits sin llamarlos así: la salida de <code>nn.Linear</code> <em>es</em> un logit.</p>
+
 <h3>Dos formas de montar lo mismo</h3>
 <div class="callout ejemplo">
-<span class="lbl">Las dos combinaciones correctas</span>
-<table>
-<thead><tr><th></th><th>Opción A (la del apartado anterior)</th><th>Opción B (la recomendada)</th></tr></thead>
-<tbody>
-<tr><td>Modelo</td><td><code>nn.Sequential(nn.Linear(n,1), nn.Sigmoid())</code></td><td><code>nn.Linear(n,1)</code> a secas</td></tr>
-<tr><td>El modelo devuelve</td><td>probabilidades \( p \)</td><td>logits \( z \)</td></tr>
-<tr><td>Pérdida</td><td><code>nn.BCELoss()</code></td><td><code>nn.BCEWithLogitsLoss()</code></td></tr>
-<tr><td>Para obtener la probabilidad</td><td>la propia salida</td><td><code>torch.sigmoid(salida)</code></td></tr>
-<tr><td>Para obtener la clase</td><td><code>p &gt;= 0.5</code></td><td><code>z &gt; 0</code> (equivale a \( p \ge 0.5 \), porque \( \sigma(0)=0.5 \))</td></tr>
-</tbody>
-</table>
-<p>Matemáticamente son <em>idénticos</em>: el fragmento 10 entrena los dos y obtiene exactamente \( w = 1.2057,\ b = -4.5390 \). La opción B solo es más segura.</p>
+  <span class="lbl">Las dos combinaciones correctas</span>
+  <table>
+    <thead><tr><th></th><th>Opción A (la del apartado anterior)</th><th>Opción B (la recomendada)</th></tr></thead>
+    <tbody>
+      <tr><td>Modelo</td><td><code>nn.Sequential(nn.Linear(n,1), nn.Sigmoid())</code></td><td><code>nn.Linear(n,1)</code> a secas</td></tr>
+      <tr><td>El modelo devuelve</td><td>probabilidades \( p \)</td><td>logits \( z \)</td></tr>
+      <tr><td>Pérdida</td><td><code>nn.BCELoss()</code></td><td><code>nn.BCEWithLogitsLoss()</code></td></tr>
+      <tr><td>Para obtener la probabilidad</td><td>la propia salida</td><td><code>torch.sigmoid(salida)</code></td></tr>
+      <tr><td>Para obtener la clase</td><td><code>p &gt;= 0.5</code></td><td><code>z &gt; 0</code> (equivale a \( p \ge 0.5 \), porque \( \sigma(0)=0.5 \))</td></tr>
+    </tbody>
+  </table>
+  <p>Matemáticamente son <em>idénticos</em>: el fragmento 10 entrena los dos y obtiene exactamente \( w = 1.2057,\ b = -4.5390 \). La opción B solo es más segura.</p>
 </div>
+
 <h3>Por qué la opción B es más estable</h3>
 <p>La sigmoide, en <code>float32</code>, se satura: cuando \( z \) es muy negativo (por debajo de −88 aprox.) devuelve exactamente <code>0.0</code> y cuando \( z \) es algo alto (desde \( z=17 \)) devuelve exactamente <code>1.0</code>: en 32 bits no caben más cifras (el fragmento 1 mostraba \( \sigma(10)=0.99995 \), todavía distinto de 1). A partir de ahí, la fórmula de la BCE necesita \( \ln(0) \), que es \( -\infty \). Para que no explote, <code>BCELoss</code> recorta cada logaritmo a −100, así que <strong>la pérdida de una muestra nunca pasa de 100</strong>, aunque la realidad sea muchísimo peor. <code>BCEWithLogitsLoss</code> evita el problema con una forma algebraicamente equivalente que nunca calcula \( \ln 0 \):</p>
 <div class="formula">\[ L(z, y) = \max(z, 0) \;-\; z\,y \;+\; \ln\!\bigl(1 + e^{-|z|}\bigr) \]</div>
 <p>Compruébalo con dos casos. <strong>(a)</strong> \( y = 1,\ z = 3 \): \( \max(3,0) - 3\cdot1 + \ln(1+e^{-3}) = 0 + \ln(1.0498) = 0.0486 \), igual que \( -\ln\sigma(3) = -\ln 0.9526 = 0.0486 \). <strong>(b)</strong> \( y = 1,\ z = -120 \): \( 0 + 120 + \ln(1 + e^{-120}) = 120.000 \). La sigmoide ingenua daría \( \sigma(-120) = 0 \) y la pérdida topada en 100. Fíjate en el truco: el exponente es siempre \( -|z| \le 0 \), así que \( e^{-|z|} \) está entre 0 y 1 y <strong>nunca se desborda</strong>.</p>
+
 <div class="callout ejemplo">
-<span class="lbl">Ejemplo numérico · la tabla del fragmento 7</span>
-<table>
-<thead><tr><th>Caso</th><th>\( z \)</th><th>Con sigmoide + BCELoss</th><th>Con BCEWithLogitsLoss</th><th>Lo correcto</th></tr></thead>
-<tbody>
-<tr><td>\( y=1 \)</td><td>−120</td><td>100 (topado)</td><td class="res">120</td><td>120</td></tr>
-<tr><td>\( y=1 \)</td><td>−3</td><td>3.049</td><td>3.049</td><td>3.049</td></tr>
-<tr><td>\( y=0 \)</td><td>3</td><td>3.049</td><td>3.049</td><td>3.049</td></tr>
-<tr><td>\( y=0 \)</td><td>20</td><td>100 (topado)</td><td class="res">20</td><td>20</td></tr>
-</tbody>
-</table>
-<p>Con valores moderados (|z| ≤ 3) no hay ninguna diferencia. La diferencia aparece en las colas, que son justo los casos «seguro y muy equivocado» donde más importa tener una señal clara.</p>
+  <span class="lbl">Ejemplo numérico · la tabla del fragmento 7</span>
+  <table>
+    <thead><tr><th>Caso</th><th>\( z \)</th><th>Con sigmoide + BCELoss</th><th>Con BCEWithLogitsLoss</th><th>Lo correcto</th></tr></thead>
+    <tbody>
+      <tr><td>\( y=1 \)</td><td>−120</td><td>100 (topado)</td><td class="res">120</td><td>120</td></tr>
+      <tr><td>\( y=1 \)</td><td>−3</td><td>3.049</td><td>3.049</td><td>3.049</td></tr>
+      <tr><td>\( y=0 \)</td><td>3</td><td>3.049</td><td>3.049</td><td>3.049</td></tr>
+      <tr><td>\( y=0 \)</td><td>20</td><td>100 (topado)</td><td class="res">20</td><td>20</td></tr>
+    </tbody>
+  </table>
+  <p>Con valores moderados (|z| ≤ 3) no hay ninguna diferencia. La diferencia aparece en las colas, que son justo los casos «seguro y muy equivocado» donde más importa tener una señal clara.</p>
 </div>
+
 <p>Y lo peor no es el valor de la pérdida, sino su <strong>gradiente</strong>. Lo que dice el fragmento 7: con \( y = 1 \), la versión con logits siempre da \( p - y \approx -1 \) (en las tres pruebas, \( z=-10,-30,-120 \): \( -1.0000 \)). La versión ingenua da \( -1.0000 \) en \( z=-10 \), solo \( -0.0936 \) en \( z=-30 \) y <strong>0 en \( z=-120 \)</strong>: justo cuando el modelo está más equivocado, la señal se apaga. Es el mismo fenómeno de la sección anterior, ahora provocado por la aritmética del ordenador en vez de por la fórmula.</p>
+
+<div class="callout recuerda">
+  <span class="lbl">Experimento de arriba: «Pérdida ingenua frente a pérdida estable en float32», con todo detalle</span>
+  <p><strong>Haz esto.</strong> Mueve z desde 0 hasta −130 con «y = 1». Mira cuándo la versión ingenua (sigmoide + BCELoss) se separa de la estable. Cambia a «y = 0» y sube z hasta 130: ¿por qué se separan en sitios tan distintos?</p>
+  <p><strong>Fíjate en.</strong> Con \( y=1 \) las dos curvas coinciden hasta \( z\approx-88 \) y con \( y=0 \) hasta \( z\approx 15 \) (la asimetría viene de que cerca de 1 los números de 32 bits están mucho más separados que cerca de 0). Pasado ese punto la versión ingenua se queda plana en 100 (el tope del logaritmo) mientras la estable sigue la recta \( |z| \). La demo emula la aritmética de <code>float32</code> con <code>Math.fround</code>, igual que lo haría PyTorch (comprobado contra PyTorch para todos los z enteros de −130 a 130 y las dos respuestas: diferencia máxima 5·10⁻⁷).</p>
+</div>
+
 <h3>pos_weight: cuando una clase es rara</h3>
 <p>Si solo el 5 % de los usuarios cancela, un modelo que diga siempre «se queda» acierta el 95 % y no aprende nada. <code>BCEWithLogitsLoss</code> admite el argumento <code>pos_weight</code> para dar más peso a los <em>positivos</em> (\( y = 1 \), aquí los que cancelan):</p>
 <div class="formula">\[ L = -\bigl[\, \text{pos\_weight}\cdot y\,\ln\sigma(z) + (1-y)\ln\bigl(1-\sigma(z)\bigr) \bigr] \]</div>
 <p>Con \( y = 1,\ z = -1 \): sin peso, \( L = \ln(1+e^{1}) = 1.3133 \); con <code>pos_weight=3</code>, \( L = 3\times 1.3133 = 3.9398 \) (fragmento 7). Es como decir «equivocarme con un positivo (dejar escapar a un usuario que cancela) cuesta el triple». Regla habitual: <code>pos_weight = n_negativos / n_positivos</code>. Es un tensor con un elemento por salida: <code>torch.tensor([3.0])</code>. Aquí la clase rara (cancelar) es justo la 1, la que pondera; si la rara fuera la 0, se invierte el significado de las etiquetas o se pondera aparte. (<code>BCELoss</code> y <code>BCEWithLogitsLoss</code> también admiten <code>weight</code>, un peso por muestra o por clase.)</p>
+
 <div class="callout ojo">
-<span class="lbl">Ojo · el error más típico: la doble sigmoide</span>
-<p>Si tu modelo ya termina en <code>nn.Sigmoid()</code> y le pasas la salida a <code>BCEWithLogitsLoss</code>, <strong>no da error</strong>: PyTorch aplica la sigmoide <em>otra vez</em>. El modelo entrena, pero está aprendiendo algo distinto: \( \sigma(\sigma(z)) \) no sale nunca del intervalo (0.5, 0.731), así que no puede dar una probabilidad por encima de 0.731 ni por debajo de 0.5. El fragmento 19 (caso 8) lo muestra: pérdida 0.5932 en lugar de 0.3598, y \( w = 1.377,\ b = -6.070 \) en lugar de \( 1.206,\ -4.539 \). <strong>Regla: una sigmoide en la salida (y <code>BCELoss</code>) o ninguna (y <code>BCEWithLogitsLoss</code>), nunca las dos.</strong> Y al revés: si usas <code>BCELoss</code> con la salida de un <code>nn.Linear</code> sin sigmoide, PyTorch sí te avisa (<code>all elements of input should be between 0 and 1</code>).</p>
+  <span class="lbl">Ojo · el error más típico: la doble sigmoide</span>
+  <p>Si tu modelo ya termina en <code>nn.Sigmoid()</code> y le pasas la salida a <code>BCEWithLogitsLoss</code>, <strong>no da error</strong>: PyTorch aplica la sigmoide <em>otra vez</em>. El modelo entrena, pero está aprendiendo algo distinto: \( \sigma(\sigma(z)) \) no sale nunca del intervalo (0.5, 0.731), así que no puede dar una probabilidad por encima de 0.731 ni por debajo de 0.5. El fragmento 19 (caso 8) lo muestra: pérdida 0.5932 en lugar de 0.3598, y \( w = 1.377,\ b = -6.070 \) en lugar de \( 1.206,\ -4.539 \). <strong>Regla: una sigmoide en la salida (y <code>BCELoss</code>) o ninguna (y <code>BCEWithLogitsLoss</code>), nunca las dos.</strong> Y al revés: si usas <code>BCELoss</code> con la salida de un <code>nn.Linear</code> sin sigmoide, PyTorch sí te avisa (<code>all elements of input should be between 0 and 1</code>).</p>
 </div>
+
 <div class="callout regla">
-<span class="lbl">Regla fácil</span>
-<p>Por defecto: <strong>el modelo termina en <code>nn.Linear</code> y la pérdida es <code>BCEWithLogitsLoss</code></strong>. La sigmoide solo se aplica fuera del entrenamiento (<code>torch.sigmoid(logits)</code>) cuando quieres ver la probabilidad. Usa <code>Sigmoid + BCELoss</code> cuando quieras que el modelo, tal cual, devuelva probabilidades (porque lo vas a exportar o a enseñar), sabiendo que pierdes algo de estabilidad.</p>
+  <span class="lbl">Regla fácil</span>
+  <p>Por defecto: <strong>el modelo termina en <code>nn.Linear</code> y la pérdida es <code>BCEWithLogitsLoss</code></strong>. La sigmoide solo se aplica fuera del entrenamiento (<code>torch.sigmoid(logits)</code>) cuando quieres ver la probabilidad. Usa <code>Sigmoid + BCELoss</code> cuando quieras que el modelo, tal cual, devuelva probabilidades (porque lo vas a exportar o a enseñar), sabiendo que pierdes algo de estabilidad.</p>
 </div>
-</section></div></details><details class="profundizar" id="codigo"><summary><span>Ver código explicado paso a paso<small>2 fragmento(s) original(es), con cada línea comentada y salida esperada.</small></span></summary><div class="prof-body"><article class="snippet" data-lang="python" id="frag-7">
-<header>
-<h3>7 · BCELoss frente a BCEWithLogitsLoss: estabilidad numérica y pos_weight</h3>
-<p class="para-que"><strong>Para qué sirve</strong> Ver con números cuándo la versión «ingenua» (sigmoide + <code>BCELoss</code>) da un resultado equivocado y la versión con logits no, y usar <code>pos_weight</code> para dar más peso a la clase positiva.</p>
-</header>
-<pre class="code"><code>import torch.nn.functional as F
+  </div>
+</details>
+
+<section>
+<h2 class="sin-num">Código</h2>
+<!-- ---------- Fragmento 7 ---------- -->
+<article class="snippet" data-lang="python" id="frag-7">
+  <header>
+    <h3>7 · BCELoss frente a BCEWithLogitsLoss: estabilidad numérica y pos_weight</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Ver con números cuándo la versión «ingenua» (sigmoide + <code>BCELoss</code>) da un resultado equivocado y la versión con logits no, y usar <code>pos_weight</code> para dar más peso a la clase positiva.</p>
+  </header>
+  <pre class="code"><code>import torch.nn.functional as F
 
 z = torch.tensor([-120., -3., 0., 3., 20.])
 for yv in (1.0, 0.0):
@@ -87,36 +221,36 @@ for zv in (-10.0, -30.0, -120.0):
     z2 = torch.tensor([zv], requires_grad=True)
     nn.BCEWithLogitsLoss()(z2, torch.tensor([1.0])).backward()
     print(f"y=1, z={zv:6.1f}: gradiente BCELoss {z.grad.item():+.4f}   BCEWithLogitsLoss {z2.grad.item():+.4f}")</code></pre>
-<details class="linea-a-linea" open="">
-<summary>Línea por línea</summary>
-<p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
-<table class="lineas">
-<thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
-<tbody>
-<tr data-lines="1"><td><code>import torch.nn.functional as F</code></td><td>Importa el módulo funcional de PyTorch, que contiene las mismas pérdidas como funciones.</td></tr>
-<tr data-lines="3"><td><code>z = torch.tensor([-120., -3., 0., 3., 20.])</code></td><td>Cinco puntuaciones, de muy negativa (−120) a bastante positiva (20).</td></tr>
-<tr data-lines="4"><td><code>for yv in (1.0, 0.0):</code></td><td>Se repite todo para respuesta correcta \(y=1\) y para \(y=0\).</td></tr>
-<tr data-lines="5"><td><code>    y = torch.full_like(z, yv)</code></td><td><code>torch.full_like(z, yv)</code> crea un tensor con la misma forma que <code>z</code> relleno de <code>yv</code>.</td></tr>
-<tr data-lines="6"><td><code>    ingenua = nn.BCELoss(reduction="none")(torch.sigmoid(z), y)</code></td><td>Forma <em>ingenua</em>: primero <code>torch.sigmoid(z)</code> y luego <code>BCELoss</code>. <code>reduction="none"</code> para ver la pérdida de cada puntuación.</td></tr>
-<tr data-lines="7"><td><code>    estable = nn.BCEWithLogitsLoss(reduction="none")(z, y)</code></td><td>Forma <em>estable</em>: <code>BCEWithLogitsLoss</code> recibe directamente las puntuaciones \(z\) (los logits) y hace la sigmoide y el logaritmo juntos con una fórmula que no se desborda.</td></tr>
-<tr data-lines="8"><td><code>    print(f"y={yv:.0f}  z                  :", z.tolist())</code></td><td>Imprime las puntuaciones de esta pasada.</td></tr>
-<tr data-lines="9-10"><td><code>    print("      BCELoss(sigmoid(z))  :", [round(v, 3) for v in ingenua.tolist()])
+  <details class="linea-a-linea" open>
+    <summary>Línea por línea</summary>
+    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+      <tbody>
+        <tr data-lines="1"><td><code>import torch.nn.functional as F</code></td><td>Importa el módulo funcional de PyTorch, que contiene las mismas pérdidas como funciones.</td></tr>
+        <tr data-lines="3"><td><code>z = torch.tensor([-120., -3., 0., 3., 20.])</code></td><td>Cinco puntuaciones, de muy negativa (−120) a bastante positiva (20).</td></tr>
+        <tr data-lines="4"><td><code>for yv in (1.0, 0.0):</code></td><td>Se repite todo para respuesta correcta \(y=1\) y para \(y=0\).</td></tr>
+        <tr data-lines="5"><td><code>    y = torch.full_like(z, yv)</code></td><td><code>torch.full_like(z, yv)</code> crea un tensor con la misma forma que <code>z</code> relleno de <code>yv</code>.</td></tr>
+        <tr data-lines="6"><td><code>    ingenua = nn.BCELoss(reduction="none")(torch.sigmoid(z), y)</code></td><td>Forma <em>ingenua</em>: primero <code>torch.sigmoid(z)</code> y luego <code>BCELoss</code>. <code>reduction="none"</code> para ver la pérdida de cada puntuación.</td></tr>
+        <tr data-lines="7"><td><code>    estable = nn.BCEWithLogitsLoss(reduction="none")(z, y)</code></td><td>Forma <em>estable</em>: <code>BCEWithLogitsLoss</code> recibe directamente las puntuaciones \(z\) (los logits) y hace la sigmoide y el logaritmo juntos con una fórmula que no se desborda.</td></tr>
+        <tr data-lines="8"><td><code>    print(f"y={yv:.0f}  z                  :", z.tolist())</code></td><td>Imprime las puntuaciones de esta pasada.</td></tr>
+        <tr data-lines="9-10"><td><code>    print("      BCELoss(sigmoid(z))  :", [round(v, 3) for v in ingenua.tolist()])
     print("      BCEWithLogitsLoss(z) :", [round(v, 3) for v in estable.tolist()])</code></td><td>Imprime las pérdidas de cada versión redondeadas a 3 decimales (<code>-0.0</code> es un cero con signo).</td></tr>
-<tr data-lines="12"><td><code>z1, y1 = torch.tensor([-1.0]), torch.tensor([1.0])</code></td><td>Una puntuación −1 para un usuario que sí canceló.</td></tr>
-<tr data-lines="13"><td><code>print("versión funcional:", round(F.binary_cross_entropy_with_logits(z1, y1).item(), 4))</code></td><td>Versión funcional: <code>F.binary_cross_entropy_with_logits</code> es lo mismo que la clase, sin crear el objeto.</td></tr>
-<tr data-lines="14"><td><code>print("pos_weight=3     :", round(nn.BCEWithLogitsLoss(pos_weight=torch.tensor([3.0]))(z1, y1).item(), 4))</code></td><td><code>pos_weight=3</code> multiplica por 3 la pérdida de los ejemplos positivos.</td></tr>
-<tr data-lines="16"><td><code>for zv in (-10.0, -30.0, -120.0):</code></td><td>Tres puntuaciones muy negativas para un usuario que sí canceló (\(y=1\)): el modelo está seguro y equivocado.</td></tr>
-<tr data-lines="17-18"><td><code>    z = torch.tensor([zv], requires_grad=True)
+        <tr data-lines="12"><td><code>z1, y1 = torch.tensor([-1.0]), torch.tensor([1.0])</code></td><td>Una puntuación −1 para un usuario que sí canceló.</td></tr>
+        <tr data-lines="13"><td><code>print("versión funcional:", round(F.binary_cross_entropy_with_logits(z1, y1).item(), 4))</code></td><td>Versión funcional: <code>F.binary_cross_entropy_with_logits</code> es lo mismo que la clase, sin crear el objeto.</td></tr>
+        <tr data-lines="14"><td><code>print("pos_weight=3     :", round(nn.BCEWithLogitsLoss(pos_weight=torch.tensor([3.0]))(z1, y1).item(), 4))</code></td><td><code>pos_weight=3</code> multiplica por 3 la pérdida de los ejemplos positivos.</td></tr>
+        <tr data-lines="16"><td><code>for zv in (-10.0, -30.0, -120.0):</code></td><td>Tres puntuaciones muy negativas para un usuario que sí canceló (\(y=1\)): el modelo está seguro y equivocado.</td></tr>
+        <tr data-lines="17-18"><td><code>    z = torch.tensor([zv], requires_grad=True)
     nn.BCELoss()(torch.sigmoid(z), torch.tensor([1.0])).backward()</code></td><td>Con <code>requires_grad=True</code> PyTorch recordará cómo depende la pérdida de <code>z</code>. Se calcula la pérdida de la forma ingenua (sigmoide + <code>BCELoss</code>) y <code>.backward()</code> rellena <code>z.grad</code>, el gradiente respecto a la puntuación.</td></tr>
-<tr data-lines="19-20"><td><code>    z2 = torch.tensor([zv], requires_grad=True)
+        <tr data-lines="19-20"><td><code>    z2 = torch.tensor([zv], requires_grad=True)
     nn.BCEWithLogitsLoss()(z2, torch.tensor([1.0])).backward()</code></td><td>Lo mismo con un tensor nuevo <code>z2</code> y <code>BCEWithLogitsLoss</code> (puntuación directa).</td></tr>
-<tr data-lines="21"><td><code>    print(f"y=1, z={zv:6.1f}: gradiente BCELoss {z.grad.item():+.4f}   BCEWithLogitsLoss {z2.grad.item():+.4f}")</code></td><td>Imprime los dos gradientes. <code>{zv:6.1f}</code> reserva 6 huecos con 1 decimal y <code>{...:+.4f}</code> muestra el signo.</td></tr>
-</tbody>
-</table>
-</details>
-<div class="salida">
-<strong>Salida esperada</strong>
-<pre>y=1  z                  : [-120.0, -3.0, 0.0, 3.0, 20.0]
+        <tr data-lines="21"><td><code>    print(f"y=1, z={zv:6.1f}: gradiente BCELoss {z.grad.item():+.4f}   BCEWithLogitsLoss {z2.grad.item():+.4f}")</code></td><td>Imprime los dos gradientes. <code>{zv:6.1f}</code> reserva 6 huecos con 1 decimal y <code>{...:+.4f}</code> muestra el signo.</td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>y=1  z                  : [-120.0, -3.0, 0.0, 3.0, 20.0]
       BCELoss(sigmoid(z))  : [100.0, 3.049, 0.693, 0.049, -0.0]
       BCEWithLogitsLoss(z) : [120.0, 3.049, 0.693, 0.049, 0.0]
 y=0  z                  : [-120.0, -3.0, 0.0, 3.0, 20.0]
@@ -127,14 +261,17 @@ pos_weight=3     : 3.9398
 y=1, z= -10.0: gradiente BCELoss -1.0000   BCEWithLogitsLoss -1.0000
 y=1, z= -30.0: gradiente BCELoss -0.0936   BCEWithLogitsLoss -1.0000
 y=1, z=-120.0: gradiente BCELoss -0.0000   BCEWithLogitsLoss -1.0000</pre>
-<p>Para valores moderados (−3, 0, 3) las dos versiones dan lo mismo (3.049 · 0.693 · 0.049). Pero con \(y=1\) y \(z=-120\) la versión ingenua devuelve <strong>100</strong> y la estable <strong>120</strong> (lo correcto: \(-z\)); y con \(y=0\) y \(z=20\) la ingenua da <strong>100</strong> y la estable <strong>20</strong>. Cuando la sigmoide se satura a 0 o a 1 exactos, la versión ingenua pierde información. Los gradientes cuentan lo peor: con \(z=-10\) las dos versiones dan \(-1.0000\) (que es \(p-y\) con \(p\approx 0\)), pero con \(z=-30\) la ingenua da solo \(-0.0936\) y con \(z=-120\) da <strong>0</strong>: el modelo está seguro y equivocado y la pérdida ya <em>no le avisa</em> con la fuerza debida, mientras que la versión con logits sigue dando \(-1.0000\). La versión funcional da 1.3133 para \(z=-1,\ y=1\) y con <code>pos_weight=3</code> la pérdida se triplica (3.9398, que es 3 × 1.3133 redondeado).</p>
-</div>
-</article><article class="snippet" data-lang="python" id="frag-10">
-<header>
-<h3>10 · Lo mismo con BCEWithLogitsLoss: el modelo devuelve logits</h3>
-<p class="para-que"><strong>Para qué sirve</strong> Entrenar el mismo modelo sin la capa sigmoide y con <code>BCEWithLogitsLoss</code>, comprobar que aprende lo mismo y ver cómo se obtienen probabilidades y clases después.</p>
-</header>
-<pre class="code"><code>torch.manual_seed(0)
+    <p>Para valores moderados (−3, 0, 3) las dos versiones dan lo mismo (3.049 · 0.693 · 0.049). Pero con \(y=1\) y \(z=-120\) la versión ingenua devuelve <strong>100</strong> y la estable <strong>120</strong> (lo correcto: \(-z\)); y con \(y=0\) y \(z=20\) la ingenua da <strong>100</strong> y la estable <strong>20</strong>. Cuando la sigmoide se satura a 0 o a 1 exactos, la versión ingenua pierde información. Los gradientes cuentan lo peor: con \(z=-10\) las dos versiones dan \(-1.0000\) (que es \(p-y\) con \(p\approx 0\)), pero con \(z=-30\) la ingenua da solo \(-0.0936\) y con \(z=-120\) da <strong>0</strong>: el modelo está seguro y equivocado y la pérdida ya <em>no le avisa</em> con la fuerza debida, mientras que la versión con logits sigue dando \(-1.0000\). La versión funcional da 1.3133 para \(z=-1,\ y=1\) y con <code>pos_weight=3</code> la pérdida se triplica (3.9398, que es 3 × 1.3133 redondeado).</p>
+  </div>
+</article>
+
+<!-- ---------- Fragmento 10 ---------- -->
+<article class="snippet" data-lang="python" id="frag-10">
+  <header>
+    <h3>10 · Lo mismo con BCEWithLogitsLoss: el modelo devuelve logits</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Entrenar el mismo modelo sin la capa sigmoide y con <code>BCEWithLogitsLoss</code>, comprobar que aprende lo mismo y ver cómo se obtienen probabilidades y clases después.</p>
+  </header>
+  <pre class="code"><code>torch.manual_seed(0)
 logit_model = nn.Linear(1, 1)
 criterio = nn.BCEWithLogitsLoss()
 opt = torch.optim.SGD(logit_model.parameters(), lr=0.5)
@@ -168,48 +305,48 @@ for lr in (0.05, 0.5, 3.0, 10.0):
         if e in (9, 99, 999):
             hist.append(round(l.item(), 3))
     print(f"lr = {lr:&lt;5}: pérdida en las épocas 10, 100 y 1000 -&gt; {hist}")</code></pre>
-<details class="linea-a-linea" open="">
-<summary>Línea por línea</summary>
-<p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
-<table class="lineas">
-<thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
-<tbody>
-<tr data-lines="1"><td><code>torch.manual_seed(0)</code></td><td>Misma semilla que antes: los pesos iniciales serán idénticos a los del fragmento 9.</td></tr>
-<tr data-lines="2"><td><code>logit_model = nn.Linear(1, 1)</code></td><td>El modelo es <em>solo</em> la capa lineal: su salida son logits \(z\), no probabilidades.</td></tr>
-<tr data-lines="3"><td><code>criterio = nn.BCEWithLogitsLoss()</code></td><td><code>BCEWithLogitsLoss</code> aplica la sigmoide por dentro, con una fórmula estable.</td></tr>
-<tr data-lines="4"><td><code>opt = torch.optim.SGD(logit_model.parameters(), lr=0.5)</code></td><td>El mismo optimizador (SGD, <code>lr=0.5</code>).</td></tr>
-<tr data-lines="6"><td><code>for epoca in range(1001):</code></td><td>Mismo número de épocas (1001).</td></tr>
-<tr data-lines="7"><td><code>    logits = logit_model(dias)</code></td><td><em>Forward</em>: <code>logits</code> son las puntuaciones.</td></tr>
-<tr data-lines="8"><td><code>    loss = criterio(logits, cancela)</code></td><td>La pérdida recibe logits (no probabilidades) y la respuesta.</td></tr>
-<tr data-lines="9-11"><td><code>    opt.zero_grad()
+  <details class="linea-a-linea" open>
+    <summary>Línea por línea</summary>
+    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+      <tbody>
+        <tr data-lines="1"><td><code>torch.manual_seed(0)</code></td><td>Misma semilla que antes: los pesos iniciales serán idénticos a los del fragmento 9.</td></tr>
+        <tr data-lines="2"><td><code>logit_model = nn.Linear(1, 1)</code></td><td>El modelo es <em>solo</em> la capa lineal: su salida son logits \(z\), no probabilidades.</td></tr>
+        <tr data-lines="3"><td><code>criterio = nn.BCEWithLogitsLoss()</code></td><td><code>BCEWithLogitsLoss</code> aplica la sigmoide por dentro, con una fórmula estable.</td></tr>
+        <tr data-lines="4"><td><code>opt = torch.optim.SGD(logit_model.parameters(), lr=0.5)</code></td><td>El mismo optimizador (SGD, <code>lr=0.5</code>).</td></tr>
+        <tr data-lines="6"><td><code>for epoca in range(1001):</code></td><td>Mismo número de épocas (1001).</td></tr>
+        <tr data-lines="7"><td><code>    logits = logit_model(dias)</code></td><td><em>Forward</em>: <code>logits</code> son las puntuaciones.</td></tr>
+        <tr data-lines="8"><td><code>    loss = criterio(logits, cancela)</code></td><td>La pérdida recibe logits (no probabilidades) y la respuesta.</td></tr>
+        <tr data-lines="9-11"><td><code>    opt.zero_grad()
     loss.backward()
     opt.step()</code></td><td>Las tres líneas de siempre: <code>zero_grad()</code>, <code>backward()</code>, <code>step()</code>.</td></tr>
-<tr data-lines="13"><td><code>print(f"con BCEWithLogitsLoss: w = {logit_model.weight.item():.4f}  b = {logit_model.bias.item():.4f}  pérdida = {loss.item():.4f}")</code></td><td>Parámetros y pérdida finales de esta versión.</td></tr>
-<tr data-lines="14"><td><code>print(f"con Sigmoid + BCELoss: w = {modelo[0].weight.item():.4f}  b = {modelo[0].bias.item():.4f}")</code></td><td>Parámetros finales de la versión del fragmento 9 (<code>modelo</code>): deben coincidir.</td></tr>
-<tr data-lines="16"><td><code>with torch.no_grad():</code></td><td>Para usar el modelo ya entrenado: sin gradientes.</td></tr>
-<tr data-lines="17"><td><code>    nuevos = torch.tensor([[2.], [4.], [6.]])</code></td><td>Tres usuarios nuevos de 2, 4 y 6 días sin abrir la app.</td></tr>
-<tr data-lines="18"><td><code>    logits = logit_model(nuevos)</code></td><td>El modelo devuelve logits.</td></tr>
-<tr data-lines="19"><td><code>    print("logits       :", logits.flatten().numpy().round(3))</code></td><td>Los logits redondeados.</td></tr>
-<tr data-lines="20"><td><code>    print("probabilidad :", torch.sigmoid(logits).flatten().numpy().round(3))</code></td><td>Probabilidades: aquí sí hay que aplicar <code>torch.sigmoid</code> a mano.</td></tr>
-<tr data-lines="21"><td><code>    print("clase (z &gt; 0):", (logits &gt; 0).int().flatten().tolist())</code></td><td>Clase predicha: \(p&gt;0.5\) equivale a \(z&gt;0\), así que ni siquiera hace falta la sigmoide para decidir.</td></tr>
-<tr data-lines="23"><td><code>for lr in (0.05, 0.5, 3.0, 10.0):</code></td><td>Compara cuatro <em>learning rates</em>, de muy pequeño (0.05) a absurdamente grande (10).</td></tr>
-<tr data-lines="24-26"><td><code>    m_lr = nn.Linear(1, 1)
+        <tr data-lines="13"><td><code>print(f"con BCEWithLogitsLoss: w = {logit_model.weight.item():.4f}  b = {logit_model.bias.item():.4f}  pérdida = {loss.item():.4f}")</code></td><td>Parámetros y pérdida finales de esta versión.</td></tr>
+        <tr data-lines="14"><td><code>print(f"con Sigmoid + BCELoss: w = {modelo[0].weight.item():.4f}  b = {modelo[0].bias.item():.4f}")</code></td><td>Parámetros finales de la versión del fragmento 9 (<code>modelo</code>): deben coincidir.</td></tr>
+        <tr data-lines="16"><td><code>with torch.no_grad():</code></td><td>Para usar el modelo ya entrenado: sin gradientes.</td></tr>
+        <tr data-lines="17"><td><code>    nuevos = torch.tensor([[2.], [4.], [6.]])</code></td><td>Tres usuarios nuevos de 2, 4 y 6 días sin abrir la app.</td></tr>
+        <tr data-lines="18"><td><code>    logits = logit_model(nuevos)</code></td><td>El modelo devuelve logits.</td></tr>
+        <tr data-lines="19"><td><code>    print("logits       :", logits.flatten().numpy().round(3))</code></td><td>Los logits redondeados.</td></tr>
+        <tr data-lines="20"><td><code>    print("probabilidad :", torch.sigmoid(logits).flatten().numpy().round(3))</code></td><td>Probabilidades: aquí sí hay que aplicar <code>torch.sigmoid</code> a mano.</td></tr>
+        <tr data-lines="21"><td><code>    print("clase (z &gt; 0):", (logits &gt; 0).int().flatten().tolist())</code></td><td>Clase predicha: \(p&gt;0.5\) equivale a \(z&gt;0\), así que ni siquiera hace falta la sigmoide para decidir.</td></tr>
+        <tr data-lines="23"><td><code>for lr in (0.05, 0.5, 3.0, 10.0):</code></td><td>Compara cuatro <em>learning rates</em>, de muy pequeño (0.05) a absurdamente grande (10).</td></tr>
+        <tr data-lines="24-26"><td><code>    m_lr = nn.Linear(1, 1)
     with torch.no_grad():
         m_lr.weight.zero_(); m_lr.bias.zero_()</code></td><td>Un modelo nuevo para cada lr, con \(w=b=0\) (<code>zero_()</code> rellena de ceros) para que todos partan del mismo sitio.</td></tr>
-<tr data-lines="27"><td><code>    opt_lr = torch.optim.SGD(m_lr.parameters(), lr=lr)</code></td><td>Un optimizador SGD nuevo con ese <code>lr</code>.</td></tr>
-<tr data-lines="28"><td><code>    hist = []</code></td><td><code>hist</code> guardará la pérdida en tres momentos.</td></tr>
-<tr data-lines="29"><td><code>    for e in range(1000):</code></td><td>1000 épocas (con los 14 usuarios a la vez, cada época es una actualización).</td></tr>
-<tr data-lines="30-31"><td><code>        l = criterio(m_lr(dias), cancela)
+        <tr data-lines="27"><td><code>    opt_lr = torch.optim.SGD(m_lr.parameters(), lr=lr)</code></td><td>Un optimizador SGD nuevo con ese <code>lr</code>.</td></tr>
+        <tr data-lines="28"><td><code>    hist = []</code></td><td><code>hist</code> guardará la pérdida en tres momentos.</td></tr>
+        <tr data-lines="29"><td><code>    for e in range(1000):</code></td><td>1000 épocas (con los 14 usuarios a la vez, cada época es una actualización).</td></tr>
+        <tr data-lines="30-31"><td><code>        l = criterio(m_lr(dias), cancela)
         opt_lr.zero_grad(); l.backward(); opt_lr.step()</code></td><td>Pérdida y las tres líneas de siempre (<code>zero_grad</code>, <code>backward</code>, <code>step</code>) con un nombre corto <code>l</code>.</td></tr>
-<tr data-lines="32-33"><td><code>        if e in (9, 99, 999):
+        <tr data-lines="32-33"><td><code>        if e in (9, 99, 999):
             hist.append(round(l.item(), 3))</code></td><td>En los índices 9, 99 y 999 (las épocas 10, 100 y 1000 contando desde 1) se guarda la pérdida redondeada.</td></tr>
-<tr data-lines="34"><td><code>    print(f"lr = {lr:&lt;5}: pérdida en las épocas 10, 100 y 1000 -&gt; {hist}")</code></td><td>Imprime la lista para cada lr. <code>{lr:&lt;5}</code> alinea el número a la izquierda en 5 huecos.</td></tr>
-</tbody>
-</table>
-</details>
-<div class="salida">
-<strong>Salida esperada</strong>
-<pre>con BCEWithLogitsLoss: w = 1.2057  b = -4.5390  pérdida = 0.3598
+        <tr data-lines="34"><td><code>    print(f"lr = {lr:&lt;5}: pérdida en las épocas 10, 100 y 1000 -&gt; {hist}")</code></td><td>Imprime la lista para cada lr. <code>{lr:&lt;5}</code> alinea el número a la izquierda en 5 huecos.</td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>con BCEWithLogitsLoss: w = 1.2057  b = -4.5390  pérdida = 0.3598
 con Sigmoid + BCELoss: w = 1.2057  b = -4.5390
 logits       : [-2.128  0.284  2.695]
 probabilidad : [0.106 0.57  0.937]
@@ -218,6 +355,13 @@ lr = 0.05 : pérdida en las épocas 10, 100 y 1000 -&gt; [0.623, 0.541, 0.378]
 lr = 0.5  : pérdida en las épocas 10, 100 y 1000 -&gt; [0.55, 0.378, 0.36]
 lr = 3.0  : pérdida en las épocas 10, 100 y 1000 -&gt; [7.56, 0.831, 0.61]
 lr = 10.0 : pérdida en las épocas 10, 100 y 1000 -&gt; [9.503, 8.175, 1.433]</pre>
-<p>Los parámetros finales coinciden con los de la versión sigmoide + <code>BCELoss</code> (\(w=1.2057\), \(b=-4.5390\), pérdida 0.3598): son dos formas de escribir lo mismo. Los logits para 2, 4 y 6 días son −2.128 · 0.284 · 2.695; con la sigmoide son 0.106 · 0.570 · 0.937 y las clases, 0 · 1 · 1. Fíjate en que la clase se decide con \(z&gt;0\), sin calcular nada más. La última tabla es el <em>learning rate</em> en acción (todas parten de \(w=b=0\)): con 0.05 el descenso es lento (0.623 → 0.541 → 0.378: a las 1000 épocas aún no ha llegado); con 0.5 baja rápido hasta 0.360 (el mínimo); con 3.0 <strong>se pasa de largo</strong> (pérdida 7.56 en la época 10, peor que al empezar) y tarda en recuperarse; con 10 salta de forma caótica (9.503, 8.175…) y a las 1000 épocas sigue en 1.433.</p>
+    <p>Los parámetros finales coinciden con los de la versión sigmoide + <code>BCELoss</code> (\(w=1.2057\), \(b=-4.5390\), pérdida 0.3598): son dos formas de escribir lo mismo. Los logits para 2, 4 y 6 días son −2.128 · 0.284 · 2.695; con la sigmoide son 0.106 · 0.570 · 0.937 y las clases, 0 · 1 · 1. Fíjate en que la clase se decide con \(z&gt;0\), sin calcular nada más. La última tabla es el <em>learning rate</em> en acción (todas parten de \(w=b=0\)): con 0.05 el descenso es lento (0.623 → 0.541 → 0.378: a las 1000 épocas aún no ha llegado); con 0.5 baja rápido hasta 0.360 (el mínimo); con 3.0 <strong>se pasa de largo</strong> (pérdida 7.56 en la época 10, peor que al empezar) y tarda en recuperarse; con 10 salta de forma caótica (9.503, 8.175…) y a las 1000 épocas sigue en 1.433.</p>
+  </div>
+</article>
+
+</section>
+
 </div>
-</article></div></details></div></main></body></html>
+</main>
+</body>
+</html>

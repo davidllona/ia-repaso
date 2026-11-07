@@ -1,191 +1,212 @@
-<!DOCTYPE html>
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lección 3 · Un error de 9,5 no dice nada sin un baseline · Módulo 7 · Curso 3 · Cuaderno de IA</title>
+<meta name="description" content="MAE, RMSE y R² calculados a mano y por qué una métrica solo significa algo comparada con un baseline: la media, una regresión lineal y un random forest.">
+<script>try{var t=localStorage.getItem('cuaderno-ia:tema');if(t)document.documentElement.setAttribute('data-theme',t)}catch(e){}</script>
+<link rel="stylesheet" href="../../assets/css/style.css">
+<script src="../../assets/js/curriculum.js"></script>
+<script src="../../assets/js/lab.js"></script>
+<script src="../../assets/js/app.js" defer></script>
+</head>
+<body data-root="../../" data-course="3" data-module="7" data-lesson="3">
+<main>
+<div class="page">
 
-<html lang="es"><head><meta charset="utf-8"/><meta content="width=device-width,initial-scale=1" name="viewport"/><title>Lección 3 · Preprocesado sin fugas · Curso 3 · Cuaderno de IA</title><meta content="Una fuga de datos ( data leakage ) ocurre cuando información del test (o del futuro) se cuela, aunque sea de refilón, en el entrenamiento." name="description"/><script>try{var t=localStorage.getItem('cuaderno-ia:tema');if(t)document.documentElement.setAttribute('data-theme',t)}catch(e){}</script><link href="../../assets/css/style.css" rel="stylesheet"/><script src="../../assets/js/curriculum.js"></script><script src="../../assets/js/lab.js"></script><script defer="" src="../../assets/js/app.js"></script><script defer="" src="../../assets/js/microanimations.js"></script></head><body data-course="3" data-lesson="3" data-module="7" data-root="../../"><main><div class="page" data-micro="3min"><header class="hero leccion"><div class="hero-grid"><div><p class="eyebrow">Curso 3 · Módulo 7 · Lección 3 de 18</p><h1>Preprocesado sin fugas</h1><p class="lead">Una fuga de datos ( data leakage ) ocurre cuando información del test (o del futuro) se cuela, aunque sea de refilón, en el entrenamiento.</p><p class="meta-line"><span class="read-time" data-render="read-time"></span><a href="../modulo-7.html">Índice del módulo</a></p></div><div aria-hidden="true" class="hero-tile"></div></div></header><details class="predice"><summary>Antes de mirar el ejemplo: ¿qué crees que va a cambiar al mover los controles?</summary><div><p>Una fuga de datos ( data leakage ) ocurre cuando información del test (o del futuro) se cuela, aunque sea de refilón, en el entrenamiento.</p></div></details><section aria-label="Explicación breve" class="micro-core"><div class="micro-kicker">01 · ENTENDER <span>≈ 45 s</span></div><h2>La idea en palabras sencillas</h2><p>Una fuga de datos ( data leakage ) ocurre cuando información del test (o del futuro) se cuela, aunque sea de refilón, en el entrenamiento.</p><div class="micro-example"><span aria-hidden="true" class="micro-example-icon">💡</span><div><strong>Otro ejemplo · Spam</strong><p>Un correo legítimo marcado como spam es un falso positivo si «spam» es la clase positiva.</p></div></div></section><div class="micro-kicker micro-checkpoint">02 · RESPONDER <span>≈ 15 s</span></div><section aria-label="Pregunta intercalada" class="quiz mini micro-check"><script class="quiz-data" type="application/json">{"titulo": "Pausa rápida · Comprueba la idea", "preguntas": [{"q": "Un detector dice «hay humo», pero no hay. ¿Qué error es?", "opciones": ["Falso positivo", "Falso negativo", "Verdadero positivo"], "correcta": 0, "porque": "Positivo predicho sin positivo real es un falso positivo."}]}</script></section><section aria-label="Animación interactiva" class="micro-viz" data-index="13" data-micro-viz="evaluation"><div class="micro-kicker">03 · EXPERIMENTAR <span>≈ 45 s</span></div><div class="micro-viz-title"><div><h2>Los aciertos y los errores tienen nombre</h2><p>Cambia el caso y comprueba qué celda de la matriz se ilumina.</p></div><span aria-hidden="true" class="micro-viz-symbol">✦</span></div><div aria-live="polite" class="micro-viz-stage"><p>Animación interactiva: Los aciertos y los errores tienen nombre</p></div></section><div class="micro-kicker micro-checkpoint">04 · APLICAR <span>≈ 15 s</span></div><section aria-label="Pregunta intercalada" class="quiz mini micro-check"><script class="quiz-data" type="application/json">{"titulo": "Pausa rápida · ¿Lo aplicarías?", "preguntas": [{"q": "Con muchas clases negativas, ¿por qué puede engañar la accuracy?", "opciones": ["Porque no existe en clasificación", "Porque siempre es igual al recall", "Porque acertar solo la clase mayoritaria puede inflarla"], "correcta": 2, "porque": "El porcentaje global puede ocultar un bajo recall de la clase importante."}]}</script></section><div class="micro-finish"><strong>Idea que te llevas</strong><span>Una fuga de datos ( data leakage ) ocurre cuando información del test (o del futuro) se cuela, aunque sea de refilón, en el entrenamiento</span><small>¿Quieres más ejemplos, fórmulas o código? Los tienes justo debajo, sin límite de tiempo.</small></div><details class="profundizar micro-legacy"><summary><span>Explorar más: explicación y simulaciones completas<small>Todo el texto original, tablas y demos avanzadas. Opcional.</small></span></summary><div class="prof-body"><section><h2>Preprocesado sin fugas</h2>
-<p>Una <strong>fuga de datos</strong> (<em>data leakage</em>) ocurre cuando información del test (o del futuro) se cuela, aunque sea de refilón, en el entrenamiento. El modelo parece mejor de lo que es y el error lo descubres cuando ya está en producción. La clave para entenderlo es esta: <strong>todo lo que se «aprende» de los datos forma parte del modelo</strong>. La media y la desviación de un escalador, la mediana de un imputador, las categorías de un one-hot o las columnas que elige un selector son <em>parámetros aprendidos</em>, igual que los pesos de una red. Y los parámetros se aprenden <strong>solo con el train</strong>.</p>
-<p>Estandarizar una columna es restarle su media y dividir por su desviación: \( z = (x - \mu)/\sigma \). Es una forma de decir «cuánto se aleja de lo normal»: si la película típica de Netflix dura 100 min con una desviación de 20, una de 140 min está a \( (140-100)/20 = 2 \) desviaciones por encima. Con la superficie de nuestros pisos, el escalador ajustado <strong>solo con el train</strong> aprende \( \mu = 84{,}73 \) y \( \sigma = 26{,}91 \); ajustado con <strong>todo el conjunto</strong> (train + val + test) aprende \( \mu = 85{,}54 \) y \( \sigma = 27{,}47 \) (cifras del <a href="#frag-2">fragmento 2</a>). Para un piso de 120 m²:</p>
-<p>La diferencia parece minúscula, y en este caso lo es: con una media y una desviación no hay mucho que filtrar. Por eso el escalado es una <em>fuga pequeña</em>. Pero el principio es el mismo que en las fugas grandes, y con otros pasos del preprocesado el daño puede ser enorme. Mira el siguiente experimento.</p>
-<div class="callout ejemplo"><span class="lbl">Ejemplo tomado del módulo</span><p>· el viaje de un piso por el preprocesado El escalador aprendió, con el train, estas medias y desviaciones ( fragmento 3 ): superficie 84,73 y 26,91; habitaciones 3,05 y 1,17; antigüedad 30,96 y 17,10; distancia 4,30 y 3,27; planta 4,52 y…</p></div></section><figure class="demo" data-demo="curso3/c3m7-fuga" data-titulo="Elegir variables antes de repartir: el éxito imposible">
-<div class="haz">Cada fila es una película y la etiqueta es si le gustó o no a un usuario. Deja los valores por defecto (60 películas, 300 columnas de <strong>ruido puro</strong>, 10 elegidas). Compara las dos barras. Después sube las películas a 200: la fuga se reduce. Y baja a 30 películas con 500 columnas: se dispara. Pulsa «Otro sorteo de datos» para ver que no depende de la suerte.</div>
-<div class="observa">Las columnas no contienen <strong>ninguna información</strong> sobre si la película gustó: son números al azar (algo así como la letra inicial del título o la hora del estreno convertidas en número), y el acierto honesto es el 50 %. Pero si eliges las 10 «más correlacionadas con la etiqueta» usando <em>todas</em> las películas (también las del test), esas 10 columnas se parecen a la etiqueta del test por pura casualidad… y el modelo acierta mucho más del 50 %. Cuantas más columnas y menos películas, más casualidades hay entre las que elegir y mayor es la trampa.</div>
-</figure><div class="resumen"><h2 class="sin-num sin-toc">En pocas líneas</h2><ul><li><strong>Preprocesado sin fugas:</strong> Una fuga de datos ( data leakage ) ocurre cuando información del test (o del futuro) se cuela, aunque sea de refilón, en el…</li><li>Antes de continuar, intenta explicar la demo sin mirar su resultado.</li></ul></div><section class="quiz mini"><script class="quiz-data" type="application/json">{"titulo": "¿Lo tienes?", "preguntas": [{"q": "¿Qué concepto estamos trabajando en esta lección?", "opciones": ["Aumento de datos: ver 75 imágenes como si fueran miles", "Preprocesado sin fugas", "El veredicto: ¿gana la red a la regresión lineal y al random forest?"], "correcta": 1, "porque": "Una fuga de datos ( data leakage ) ocurre cuando información del test (o del futuro) se cuela, aunque sea de refilón, en el entrenamiento."}, {"q": "¿Cuál de estas afirmaciones recoge lo que acabas de estudiar?", "opciones": ["Siempre hay un único método que sirve para todos los problemas.", "Lo importante es comprender la idea y comprobarla con ejemplos, no memorizar términos.", "Una fuga de datos ( data leakage ) ocurre cuando información del test (o del futuro) se cuela, aunque sea de refilón, en el entrenamiento."], "correcta": 2, "porque": "La explicación central es: Una fuga de datos ( data leakage ) ocurre cuando información del test (o del futuro) se cuela, aunque sea de refilón, en el entrenamiento."}, {"q": "Si una demo o un ejemplo te desconcierta, ¿cuál es la mejor forma de aprenderlo?", "opciones": ["Ignorar los resultados que no coinciden con tu intuición.", "Memorizar el nombre sin entender la operación.", "Volver a los números, cambiar un valor y explicar qué ocurre."], "correcta": 2, "porque": "Explorar qué cambia y por qué ayuda a conectar el concepto con su resultado."}]}</script></section></div></details><details class="profundizar"><summary><span>Profundizar: explicación completa<small>Matices, fórmulas, tablas, otros ejemplos y experimentos del módulo original.</small></span></summary><div class="prof-body"><section>
-<h2 id="fuga">Preprocesado sin fugas</h2>
-<p class="pregunta">Las columnas están en escalas distintas (en Netflix serían minutos de duración frente a notas de 1 a 5; en nuestros pisos, metros cuadrados, kilómetros, 0/1) y hay huecos. Lo cómodo es escalar y rellenar todo el conjunto de una vez, antes de partirlo. ¿Qué tiene de malo, si «solo» estás ajustando números?</p>
-<p>Una <strong>fuga de datos</strong> (<em>data leakage</em>) ocurre cuando información del test (o del futuro) se cuela, aunque sea de refilón, en el entrenamiento. El modelo parece mejor de lo que es y el error lo descubres cuando ya está en producción. La clave para entenderlo es esta: <strong>todo lo que se «aprende» de los datos forma parte del modelo</strong>. La media y la desviación de un escalador, la mediana de un imputador, las categorías de un one-hot o las columnas que elige un selector son <em>parámetros aprendidos</em>, igual que los pesos de una red. Y los parámetros se aprenden <strong>solo con el train</strong>.</p>
-<div class="callout analogia">
-<span class="lbl">Analogía</span>
-<p>Te piden predecir cómo acaba una serie y alguien te deja ojear el último capítulo «solo para ver el tono». No copias el final, pero tu predicción ya sale sesgada por ese spoiler. Después, que aciertes no mide si sabes predecir series, sino lo mucho que te ayudó el spoiler.</p>
-</div>
-<h3>Un ejemplo a mano: estandarizar</h3>
-<p>Estandarizar una columna es restarle su media y dividir por su desviación: \( z = (x - \mu)/\sigma \). Es una forma de decir «cuánto se aleja de lo normal»: si la película típica de Netflix dura 100 min con una desviación de 20, una de 140 min está a \( (140-100)/20 = 2 \) desviaciones por encima. Con la superficie de nuestros pisos, el escalador ajustado <strong>solo con el train</strong> aprende \( \mu = 84{,}73 \) y \( \sigma = 26{,}91 \); ajustado con <strong>todo el conjunto</strong> (train + val + test) aprende \( \mu = 85{,}54 \) y \( \sigma = 27{,}47 \) (cifras del <a href="#frag-2">fragmento 2</a>). Para un piso de 120 m²:</p>
-<ul>
-<li>Bien (solo train): \( z = (120 - 84{,}73)/26{,}91 = 35{,}27/26{,}91 \approx 1{,}31 \).</li>
-<li>Mal (todo el conjunto): \( z = (120 - 85{,}54)/27{,}47 = 34{,}46/27{,}47 \approx 1{,}25 \).</li>
-</ul>
-<p>La diferencia parece minúscula, y en este caso lo es: con una media y una desviación no hay mucho que filtrar. Por eso el escalado es una <em>fuga pequeña</em>. Pero el principio es el mismo que en las fugas grandes, y con otros pasos del preprocesado el daño puede ser enorme. Mira el siguiente experimento.</p>
-<p>El <a href="#frag-2">fragmento 2</a> lo reproduce con scikit-learn: 60 filas y 300 columnas de ruido, y <code>SelectKBest</code> para elegir las 10 mejores. Eligiendo con todos los datos antes de validar, la exactitud sale 0,83; metiendo la selección <em>dentro</em> de un <code>Pipeline</code> (de modo que se rehace en cada partición de la validación cruzada, solo con sus filas de entrenamiento) sale 0,57. Esa última cifra tampoco es exactamente 0,50: con 60 filas el azar mueve el resultado varios puntos arriba o abajo, que es otra razón para desconfiar de conjuntos pequeños.</p>
-<div class="callout regla">
-<span class="lbl">Regla fácil</span>
-<p><strong>Primero se reparte, después se ajusta.</strong> Cualquier objeto con <code>fit</code> (escalador, imputador, codificador, selector de variables, PCA) se ajusta con <code>fit</code> o <code>fit_transform</code> <em>solo sobre el train</em>. Con validación y test solo se usa <code>transform</code>. Y si haces validación cruzada, el preprocesado va <em>dentro</em> del <code>Pipeline</code>.</p>
-</div>
-<h3>El flujo de preprocesado de los pisos: <code>ColumnTransformer</code></h3>
-<p>Nuestras columnas necesitan tratamientos distintos, y un <code>ColumnTransformer</code> los reúne en un único objeto que se ajusta una vez:</p>
-<ul>
-<li><strong>Las seis numéricas</strong> pasan por un <code>SimpleImputer(strategy="median")</code> (rellena los huecos con la mediana de la columna) y después por un <code>StandardScaler</code>. El orden importa: primero se rellena, luego se escala.</li>
-<li><strong>La categórica <code>zona</code></strong> pasa por <code>OneHotEncoder</code>: cada categoría se convierte en una columna de 0 y 1. Un piso de la Playa se codifica <code>[0, 0, 0, 1]</code> (las columnas salen en orden alfabético: Centro, Ensanche, Periferia, Playa). Con <code>handle_unknown="ignore"</code>, una zona que no estaba en el train da ceros en vez de un error.</li>
-</ul>
+<header class="hero leccion">
+  <div class="hero-grid">
+    <div>
+      <p class="eyebrow">Curso 3 · Módulo 7 · Lección 3 de 8</p>
+      <h1>Un error de 9,5 no dice nada sin un baseline</h1>
+      <p class="lead">MAE, RMSE y R² resumen todos los errores en una cifra, pero esa cifra solo significa algo comparada con un modelo tonto: predecir la media, una recta o un random forest.</p>
+      <p class="meta-line"><span class="read-time" data-render="read-time"></span><a href="../modulo-7.html">Índice del módulo</a></p>
+    </div>
+    <div class="hero-tile" aria-hidden="true"></div>
+  </div>
+</header>
+
+<details class="predice">
+  <summary>Tu modelo, que predice lo que verá cada usuario de una película, saca un R² = 0. ¿Es inútil o casi perfecto?<span class="hint"></span></summary>
+  <div>
+    <p>Inútil: R² = 0 significa que lo hace igual de bien que predecir siempre la media, sin mirar nada de la película. R² = 1 es no equivocarse nunca, y puede ser <strong>negativo</strong> si lo haces peor que la media.</p>
+  </div>
+</details>
+
+<section>
+<h2 id="idea">Tres métricas y un listón</h2>
+<p>El <strong>MAE</strong> (error absoluto medio) dice «de media me equivoco en tanto», en las unidades del problema. El <strong>RMSE</strong> también, pero eleva los errores al cuadrado antes de promediar: castiga los grandes, así que si es bastante mayor que el MAE hay algún error enorme escondido. El <strong>R²</strong> = 1 − SSE/SST compara tu suma de errores al cuadrado (SSE) con la de predecir siempre la media (SST).</p>
+<p>Un <strong>baseline</strong> es el modelo de referencia, simple y barato: el recomendador más tonto de Netflix, «recomendar a todos la película más vista». Si lo sofisticado no lo mejora, no merece el trabajo. En los pisos hay tres, de menos a más: predecir la media (MAE 72,4 en validación), una regresión lineal (22,1) y un random forest (12,0). <strong>Ese es el listón</strong>: una red que no baje de 12 no compensa.</p>
+</section>
+
+<figure class="demo" data-demo="curso3/c3m7-metricas" data-titulo="MAE, RMSE y R² con ocho películas">
+  <div class="haz">Sube σ a 80 y mira el R². Luego activa «un estreno inesperado» y compara RMSE y MAE.</div>
+  <div class="observa">R² compara las líneas rojas (errores del modelo) con las grises (predecir la media). Un solo error enorme sube el RMSE mucho más que el MAE.</div>
+</figure>
+
+<section>
+<h2 id="numeros">Con números: cuatro películas a mano</h2>
 <div class="callout ejemplo">
-<span class="lbl">Ejemplo numérico · el viaje de un piso por el preprocesado</span>
-<p>El escalador aprendió, con el train, estas medias y desviaciones (<a href="#frag-3">fragmento 3</a>): superficie 84,73 y 26,91; habitaciones 3,05 y 1,17; antigüedad 30,96 y 17,10; distancia 4,30 y 3,27; planta 4,52 y 2,88; ascensor 0,80 y 0,40. El piso del ejemplo (100 m², 4 habitaciones, 10 años, 1 km, planta 5, con ascensor, en el Centro) se transforma así:</p>
+  <span class="lbl">Ejemplo numérico</span>
+<p>Audiencia real en la primera semana (miles de espectadores) y lo que predijo el recomendador:</p>
+  <table>
+    <thead><tr><th>Película</th><th>Real</th><th>Pred.</th><th>Error \( e \)</th></tr></thead>
+    <tbody>
+      <tr><td>Toy Story</td><td>100</td><td>110</td><td>+10</td></tr>
+      <tr><td>Shrek</td><td>200</td><td>190</td><td>−10</td></tr>
+      <tr><td>Titanic</td><td>150</td><td>170</td><td>+20</td></tr>
+      <tr><td>Matrix</td><td>250</td><td>230</td><td>−20</td></tr>
+    </tbody>
+  </table>
+  <ol class="pasos">
+    <li><strong>MAE</strong> = (10 + 10 + 20 + 20) / 4 = <strong>15</strong>.</li>
+    <li>Suma de errores al cuadrado: SSE = 100 + 100 + 400 + 400 = 1.000. <strong>RMSE</strong> = \( \sqrt{1000/4} \) ≈ <strong>15,81</strong>: algo mayor, porque los errores de 20 pesan más.</li>
+    <li>Media real 175, así que SST = 5.625 + 625 + 625 + 5.625 = 12.500.</li>
+    <li><strong>R²</strong> = 1 − 1.000 / 12.500 = <strong>0,92</strong>. El baseline de la media tiene R² = 0 por construcción.</li>
+  </ol>
+</div>
+</section>
+
+<details class="predice">
+  <summary>Al recomendador de arriba le añades un sesgo: predice siempre 60 de más, aunque sigue la forma de los datos. ¿El R² baja un poco o se hunde?<span class="hint"></span></summary>
+  <div>
+    <p>Se hunde. Los errores pasan a ser 70, 50, 80 y 40: SSE = 4.900 + 2.500 + 6.400 + 1.600 = 15.400, mayor que SST = 12.500, y R² = 1 − 15.400 / 12.500 ≈ <strong>−0,23</strong>. R² mira el tamaño de los errores, no la forma: ahora predecir la media lo hace mejor.</p>
+  </div>
+</details>
+
+<div class="resumen">
+  <h2 class="sin-num sin-toc">En tres líneas</h2>
+  <ul>
+    <li>MAE en unidades del problema; RMSE castiga los errores grandes; R² compara con predecir la media.</li>
+    <li>R² = 0 es empatar con la media y negativo, hacerlo peor.</li>
+    <li>Pisos en validación: media 72,4, lineal 22,1 y random forest 12,0 de MAE. Ese es el listón.</li>
+  </ul>
+</div>
+
+<section class="quiz mini">
+<script type="application/json" class="quiz-data">
+{
+ "titulo": "¿Lo tienes?",
+ "preguntas": [
+  {
+   "q": "Tres usuarios han visto de una película 10, 20 y 30 minutos (cifras inventadas) y el modelo había predicho 12, 18 y 33. ¿Cuánto vale R²?",
+   "opciones": [
+    "0,085",
+    "0,970",
+    "0,833",
+    "0,915"
+   ],
+   "correcta": 3,
+   "porque": "Errores: +2, −2, +3, así que SSE = 4 + 4 + 9 = 17. La media real es 20 y SST = 100 + 0 + 100 = 200. R² = 1 − SSE/SST = 1 − 17/200 = 0,915. El 0,085 es el cociente SSE/SST, es decir, la parte que NO se explica: es lo que sale si se olvida restarlo de 1."
+  },
+  {
+   "q": "Calculas el R² de tu red en el test y sale −0,4. ¿Qué significa?",
+   "opciones": [
+    "Que el modelo predice peor que decir siempre la media del train",
+    "Que el modelo explica el 40 % de la variación, pero con signo contrario",
+    "Que hay un error de cálculo: R² nunca puede ser negativo",
+    "Que el modelo está sobreajustado, pero acierta en la dirección"
+   ],
+   "correcta": 0,
+   "porque": "R² = 1 − SSE/SST. Si SSE es mayor que SST, es decir, si el error cuadrático del modelo supera al de una predicción constante igual a la media, el cociente pasa de 1 y R² queda negativo. Con un R² así, el baseline más simple (la media) ya lo hace mejor. En el test no hay nada que obligue a R² a ser positivo."
+  },
+  {
+   "q": "Un modelo tiene MAE 15 y RMSE 40. ¿Qué te dice esa diferencia?",
+   "opciones": [
+    "Que el modelo es casi perfecto",
+    "Que el RMSE está mal calculado",
+    "Que el R² tiene que ser negativo",
+    "Que hay algún error muy grande escondido en la media"
+   ],
+   "correcta": 3,
+   "porque": "El RMSE eleva cada error al cuadrado antes de promediar, así que un error enorme lo dispara mientras el MAE apenas se mueve. RMSE ≥ MAE siempre; cuando es <em>mucho</em> mayor, busca los errores grandes."
+  }
+ ]
+}
+</script>
+</section>
+
+
+<details class="profundizar">
+  <summary><span>Profundizar: la explicación completa<small>Las fórmulas de MAE, RMSE y R² con todas sus letras, la tabla completa de las cuatro películas con SST, los tres baselines y la tabla de validación de los pisos (72,390; 22,104; 11,998).</small></span></summary>
+  <div class="prof-body">
+<h2 id="baselines">Métricas y baselines: ¿contra quién compites?</h2>
+
+<p class="pregunta">Tu red tiene un error medio de 9,5 (miles de euros en los pisos; en Netflix serían, por ejemplo, 9,5 minutos de error al predecir lo que verá un usuario). ¿Es bueno? ¿Es mucho? Una cifra suelta no significa nada si no sabes <em>con qué compararla</em>.</p>
+
+<h3>Tres métricas para un número</h3>
+<p>Un modelo de regresión se equivoca por una cantidad en cada fila: el <strong>error</strong> \( e_i = \hat y_i - y_i \) (lo que predijo menos lo real). Hay tres formas habituales de resumir esos errores en una cifra:</p>
+
+<div class="formula">\[ \text{MAE} = \frac{1}{n}\sum_{i=1}^{n}|e_i| \qquad \text{RMSE} = \sqrt{\frac{1}{n}\sum_{i=1}^{n}e_i^2} \qquad R^2 = 1-\frac{\text{SSE}}{\text{SST}} = 1-\frac{\sum_i (y_i-\hat y_i)^2}{\sum_i (y_i-\bar y)^2} \]</div>
+<p>\( n \) es el número de filas; \( \hat y_i \) la predicción; \( y_i \) el valor real; \( \bar y \) la media de los valores reales. <strong>SSE</strong> (<em>sum of squared errors</em>) es la suma de los errores al cuadrado del modelo y <strong>SST</strong> (<em>total sum of squares</em>) la suma de los errores al cuadrado de un «modelo» que predijera siempre la media.</p>
+
+<ul>
+  <li><strong>MAE</strong> (error absoluto medio): «de media me equivoco en tanto». Está en las unidades del problema y se lee directamente: un MAE de 15 son 15.000 € de error medio.</li>
+  <li><strong>RMSE</strong> (raíz del error cuadrático medio): también en las unidades del problema, pero <strong>castiga más los errores grandes</strong> porque los eleva al cuadrado antes de promediar. Siempre es mayor o igual que el MAE; cuando es <em>bastante</em> mayor, hay algún error muy grande escondido en el promedio.</li>
+  <li><strong>R²</strong> (coeficiente de determinación): compara tu modelo con el baseline de la media. Vale 1 si no te equivocas nunca; vale 0 si lo haces tan mal como predecir siempre la media; y puede ser <strong>negativo</strong> si lo haces peor que eso. No tiene unidades, así que sirve para comparar problemas distintos.</li>
+</ul>
+
+<div class="callout ejemplo">
+  <span class="lbl">Ejemplo numérico · cuatro películas a mano</span>
+  <p>Audiencia real de cuatro películas en su primera semana, en miles de espectadores: 100, 200, 150 y 250 (cifras inventadas para el ejemplo). El recomendador de Netflix había predicho 110, 190, 170 y 230.</p>
+  <table>
+    <thead><tr><th>Película</th><th>Real</th><th>Predicho</th><th>Error \( e \)</th><th>\( |e| \)</th><th>\( e^2 \)</th><th>\( (y-\bar y)^2 \)</th></tr></thead>
+    <tbody>
+      <tr><td>Toy Story</td><td>100</td><td>110</td><td>+10</td><td>10</td><td>100</td><td>(100 − 175)² = 5.625</td></tr>
+      <tr><td>Shrek</td><td>200</td><td>190</td><td>−10</td><td>10</td><td>100</td><td>(200 − 175)² = 625</td></tr>
+      <tr><td>Titanic</td><td>150</td><td>170</td><td>+20</td><td>20</td><td>400</td><td>(150 − 175)² = 625</td></tr>
+      <tr><td>Matrix</td><td>250</td><td>230</td><td>−20</td><td>20</td><td>400</td><td>(250 − 175)² = 5.625</td></tr>
+      <tr><td><strong>Suma</strong></td><td></td><td></td><td></td><td>60</td><td>1.000 (SSE)</td><td>12.500 (SST)</td></tr>
+    </tbody>
+  </table>
+  <ol class="pasos">
+    <li><strong>MAE</strong> = 60 / 4 = <strong>15</strong>: el recomendador se equivoca, de media, en 15.000 espectadores por película.</li>
+    <li><strong>RMSE</strong> = \( \sqrt{1000/4} = \sqrt{250} \approx \) <strong>15,81</strong>. Es algo mayor que el MAE porque los errores de 20 pesan más que los de 10.</li>
+    <li>La media real es \( \bar y = (100+200+150+250)/4 = 175 \). <strong>SST</strong> = 12.500.</li>
+    <li><strong>R²</strong> = 1 − 1.000 / 12.500 = 1 − 0,08 = <strong>0,92</strong>: el modelo elimina el 92 % de la variación que tendría el baseline de la media.</li>
+    <li>El baseline de la media (predecir 175 siempre) tiene MAE 50, RMSE 55,9 y R² = 0 por construcción: es la vara de medir.</li>
+  </ol>
+  <p>El <a href="#frag-4">fragmento 4</a> repite estas cuentas, con los mismos números, en Python, las compara con las funciones de scikit-learn y define la función <code>evaluar</code> que usaremos de ahí en adelante.</p>
+</div>
+
+<div class="callout recuerda">
+  <span class="lbl">Experimento de arriba: «MAE, RMSE y R² con ocho películas», con todo detalle</span>
+  <p><strong>Haz esto.</strong> Cada punto es una película: su audiencia real (miles de espectadores, cifras inventadas) y la que predijo el recomendador. Empieza con σ = 15 y sesgo 0. Sube σ a 80: el R² cae. Activa «un estreno inesperado» y mira cómo el RMSE se separa del MAE. Pon un sesgo de +60: aunque el modelo «sigue la forma», el R² se hunde. Arrastra un punto azul en vertical para provocar tus propios errores.</p>
+  <p><strong>Fíjate en.</strong> Las líneas rojas son los errores del modelo; las grises, los de «predecir siempre la media». <strong>R² = 1 − (suma de rojas²) / (suma de grises²)</strong>: cuando los errores del modelo se parecen en tamaño a los del baseline, R² ≈ 0; si son mayores, R² &lt; 0. Un solo error enorme aumenta el RMSE mucho más que el MAE.</p>
+</div>
+
+<h3>Los baselines: lo que hay que superar</h3>
+<p>Un <strong>baseline</strong> es un modelo de referencia, simple y barato. Sirve para saber cuánto vale de verdad tu modelo complejo: si una regresión lineal de cinco líneas consigue casi lo mismo, ¿para qué una red? Es como el recomendador más tonto de Netflix, «recomendar a todos la película más vista»: si tu algoritmo sofisticado no lo mejora, no merece el trabajo. Tres baselines escalonados:</p>
+<ol>
+  <li><strong>La media</strong> (<code>DummyRegressor</code>): predice siempre el precio medio. R² ≈ 0. Es el suelo.</li>
+  <li><strong>Regresión lineal</strong>: el modelo «razonable» más sencillo. Aprende un peso por columna y los suma.</li>
+  <li><strong>Random forest</strong>: cientos de árboles de decisión cuyo promedio da la predicción. No necesita escalado y capta relaciones no lineales; suele ser un rival duro con datos tabulares.</li>
+</ol>
+
+<p>En el <a href="#frag-5">fragmento 5</a> los tres se montan dentro de un <code>make_pipeline(pre, modelo)</code>, de modo que el preprocesado se ajusta con el train y se reaplica solo a la validación. Resultados en validación:</p>
+
 <table>
-<thead><tr><th>Columna</th><th>Valor</th><th>Cuenta \( (x-\mu)/\sigma \)</th><th>Resultado</th></tr></thead>
-<tbody>
-<tr><td>superficie</td><td>100</td><td>(100 − 84,73) / 26,91</td><td class="res">0,57</td></tr>
-<tr><td>habitaciones</td><td>4</td><td>(4 − 3,05) / 1,17</td><td class="res">0,81</td></tr>
-<tr><td>antigüedad</td><td>10</td><td>(10 − 30,96) / 17,10</td><td class="res">−1,23</td></tr>
-<tr><td>distancia</td><td>1</td><td>(1 − 4,30) / 3,27</td><td class="res">−1,01</td></tr>
-<tr><td>planta</td><td>5</td><td>(5 − 4,52) / 2,88</td><td class="res">0,17</td></tr>
-<tr><td>ascensor</td><td>1</td><td>(1 − 0,80) / 0,40</td><td class="res">0,51</td></tr>
-<tr><td>zona = Centro</td><td>«Centro»</td><td>one-hot (Centro, Ensanche, Periferia, Playa)</td><td class="res">1, 0, 0, 0</td></tr>
-</tbody>
+  <thead><tr><th>Modelo</th><th>MAE (miles €)</th><th>RMSE (miles €)</th><th>R²</th></tr></thead>
+  <tbody>
+    <tr><th scope="row">Predecir la media</th><td>72,390</td><td>90,794</td><td>−0,011</td></tr>
+    <tr><th scope="row">Regresión lineal</th><td>22,104</td><td>30,735</td><td>0,884</td></tr>
+    <tr><th scope="row">Random forest (200 árboles)</th><td>11,998</td><td>18,216</td><td>0,959</td></tr>
+  </tbody>
 </table>
-<p>La fila que entra en la red tiene <strong>10 números</strong>: 6 numéricos escalados y 4 del one-hot. Por eso los datos pasan de 7 columnas a la forma <code>(2400, 10)</code> que imprime el <a href="#frag-3">fragmento 3</a>.</p>
-</div>
-<p>Una comprobación útil del <a href="#frag-3">fragmento 3</a>: las medias de las columnas numéricas en el <em>train</em> son 0 (el escalador las centró), mientras que en la <em>validación</em> son pequeñas pero no cero (0,084; 0,088; −0,060…). Es lo esperado: la validación se transforma con las cifras del train, y su media real es ligeramente distinta. Si en la validación te salieran exactamente 0, sería la señal de que algo se ha ajustado con ella.</p>
-<h3>Escalar también lo que se predice</h3>
-<p>Una red entrena mejor cuando la salida ronda los valores pequeños: con precios de 15 a 575 la pérdida (el error al cuadrado) vale miles al principio y los gradientes son enormes. Por eso <strong>estandarizamos también el objetivo</strong>: \( t = (\text{precio} - \mu_y)/\sigma_y \) con \( \mu_y = 145{,}4 \) y \( \sigma_y = 85{,}0 \) (de nuevo calculados solo con el train). La red predice \( t \) y, para dar el resultado real, se deshace: \( \text{precio} = t\cdot\sigma_y + \mu_y \). Todas las métricas se calculan <strong>en miles de euros</strong>, porque un error de «0,12 desviaciones» no le dice nada a nadie.</p>
-<div class="callout ojo">
-<span class="lbl">Ojo · la validación tampoco es gratis</span>
-<p>Fíjate en que la validación sí participa en las decisiones (parar el entrenamiento, elegir hiperparámetros). Eso no es una fuga, es su trabajo; por eso existe el test aparte. Las fugas de verdad son las que meten en el <em>entrenamiento</em> información que no existiría al predecir: datos del test, del futuro o de la propia etiqueta (una columna calculada a partir del precio, por ejemplo).</p>
-</div>
-</section></div></details><details class="profundizar" id="codigo"><summary><span>Ver código explicado paso a paso<small>3 fragmento(s) original(es), con cada línea comentada y salida esperada.</small></span></summary><div class="prof-body"><article class="snippet" data-lang="python" id="frag-2">
-<header>
-<h3>2 · Dos fugas de datos: escalar antes de repartir y elegir variables antes de validar</h3>
-<p class="para-que"><strong>Para qué sirve</strong> Medir con números reales cuánto cambia un escalador ajustado con todo el conjunto en lugar de solo con el train, y ver cómo elegir variables antes de validar convierte <em>ruido puro</em> en un acierto del 83 %. Continúa el fragmento 1 (usa <code>X</code>, <code>X_train</code> y <code>X_test</code>).</p>
-</header>
-<pre class="code"><code>from sklearn.preprocessing import StandardScaler
-from sklearn.feature_selection import SelectKBest, f_classif
-from sklearn.linear_model import LogisticRegression
-from sklearn.model_selection import cross_val_score
-from sklearn.pipeline import make_pipeline
-
-col = ["superficie_m2"]
-mal = StandardScaler().fit(X[col])
-bien = StandardScaler().fit(X_train[col])
-print("media y desviación MAL  (todo el conjunto):", mal.mean_.round(2), mal.scale_.round(2))
-print("media y desviación BIEN (solo train)      :", bien.mean_.round(2), bien.scale_.round(2))
-print("media del test escalado MAL :", mal.transform(X_test[col]).mean().round(4))
-print("media del test escalado BIEN:", bien.transform(X_test[col]).mean().round(4))
-
-rng = np.random.default_rng(0)
-Xr = rng.normal(size=(60, 300))
-yr = rng.integers(0, 2, 60)
-Xsel = SelectKBest(f_classif, k=10).fit_transform(Xr, yr)
-acierto_mal = cross_val_score(LogisticRegression(), Xsel, yr, cv=5).mean()
-tubo = make_pipeline(SelectKBest(f_classif, k=10), LogisticRegression())
-acierto_bien = cross_val_score(tubo, Xr, yr, cv=5).mean()
-print(f"ruido puro, exactitud MAL (elegir antes de validar): {acierto_mal:.2f}")
-print(f"ruido puro, exactitud BIEN (dentro del pipeline)   : {acierto_bien:.2f}")</code></pre>
-<details class="linea-a-linea">
-<summary>Línea por línea</summary>
-<p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
-<table class="lineas">
-<thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
-<tbody>
-<tr data-lines="1-5"><td><code>from sklearn.preprocessing import StandardScaler …</code></td><td>Importa el escalador estándar, el selector de las <code>k</code> mejores columnas (<code>SelectKBest</code> con el criterio <code>f_classif</code>), la regresión logística, <code>cross_val_score</code> (validación cruzada) y <code>make_pipeline</code> (encadena pasos en un solo objeto).</td></tr>
-<tr data-lines="7"><td><code>col = ["superficie_m2"]</code></td><td>Trabajaremos solo con la columna de la superficie.</td></tr>
-<tr data-lines="8"><td><code>mal = StandardScaler().fit(X[col])</code></td><td><strong>Mal:</strong> ajusta el escalador con la superficie de <em>todos</em> los pisos (train, validación y test). <code>fit</code> calcula media y desviación.</td></tr>
-<tr data-lines="9"><td><code>bien = StandardScaler().fit(X_train[col])</code></td><td><strong>Bien:</strong> lo ajusta solo con los pisos del train.</td></tr>
-<tr data-lines="10-11"><td><code>print("media y desviación MAL  (todo el conjunto):", ma…</code></td><td>Imprime la media y la desviación (<code>mean_</code> y <code>scale_</code>) que aprendió cada escalador, con 2 decimales.</td></tr>
-<tr data-lines="12-13"><td><code>print("media del test escalado MAL :", mal.transform(X_…</code></td><td>Transforma el test con cada escalador y calcula la media de lo que sale (<code>.mean()</code>): si el escalador hubiera «visto» el test, estaría mejor centrado.</td></tr>
-<tr data-lines="15"><td><code>rng = np.random.default_rng(0)</code></td><td>Segundo caso. Crea un generador aleatorio con semilla.</td></tr>
-<tr data-lines="16-17"><td><code>Xr = rng.normal(size=(60, 300)) …</code></td><td><code>Xr</code>: 60 filas con 300 columnas de números <strong>al azar</strong> (sin relación con nada); <code>yr</code>: 60 etiquetas 0 o 1 también al azar. No hay ninguna señal que aprender.</td></tr>
-<tr data-lines="18"><td><code>Xsel = SelectKBest(f_classif, k=10).fit_transform(Xr, y…</code></td><td><strong>Mal:</strong> elige las 10 columnas más relacionadas con <code>yr</code> usando <em>todas</em> las filas (<code>fit_transform</code> las elige y devuelve solo esas).</td></tr>
-<tr data-lines="19"><td><code>acierto_mal = cross_val_score(LogisticRegression(), Xse…</code></td><td>Valida con 5 particiones (<code>cv=5</code>) una regresión logística sobre esas 10 columnas y promedia el acierto. Pero las columnas ya se eligieron mirando también las filas de test de cada partición: trampa.</td></tr>
-<tr data-lines="20-21"><td><code>tubo = make_pipeline(SelectKBest(f_classif, k=10), Logi…</code></td><td><strong>Bien:</strong> mete la selección <em>dentro</em> de un pipeline. En cada una de las 5 particiones, el selector se ajusta solo con las filas de entrenamiento de esa partición.</td></tr>
-<tr data-lines="22-23"><td><code>print(f"ruido puro, exactitud MAL (elegir antes de vali…</code></td><td>Imprime las dos exactitudes con dos decimales.</td></tr>
-</tbody>
-</table>
+<p>La media da R² = −0,011 (ligeramente negativo, porque la media del train no es exactamente la de la validación). La regresión lineal explica ya el 88 % de la variación, pero se equivoca de media en 22.104 €. El random forest baja el error a la mitad (11.998 €), porque capta los efectos multiplicativos que una suma de efectos no puede representar. <strong>Este es el listón:</strong> una red que no baje de 12 de MAE en validación no merece el trabajo que cuesta.</p>
+  </div>
 </details>
-<div class="salida">
-<strong>Salida esperada</strong>
-<pre>media y desviación MAL  (todo el conjunto): [85.54] [27.47]
-media y desviación BIEN (solo train)      : [84.73] [26.91]
-media del test escalado MAL : 0.0354
-media del test escalado BIEN: 0.0662
-ruido puro, exactitud MAL (elegir antes de validar): 0.83
-ruido puro, exactitud BIEN (dentro del pipeline)   : 0.57</pre>
-<p>El escalador «malo» aprende media 85,54 y desviación 27,47; el «bueno», 84,73 y 26,91: casi lo mismo, pero no igual. Escalado con el «malo», el test queda centrado en 0,0354; con el «bueno», en 0,0662. Es muy poca diferencia: el escalado es una fuga <em>pequeña</em>. El segundo caso es la fuga <em>grande</em>: con datos que son puro ruido, elegir antes de validar da una exactitud de <strong>0,83</strong>, imposible de verdad; elegir dentro del pipeline da <strong>0,57</strong>, cerca del 0,5 del azar (con solo 60 filas el azar se mueve unos puntos).</p>
-</div>
-</article><article class="snippet" data-lang="python" id="frag-3">
-<header>
-<h3>3 · El preprocesado con ColumnTransformer, ajustado solo con el train</h3>
-<p class="para-que"><strong>Para qué sirve</strong> Montar en un único objeto el tratamiento de las columnas numéricas (rellenar huecos y escalar) y de la categórica (one-hot), ajustarlo con el train, aplicarlo a validación y test, y estandarizar también el precio. Continúa el fragmento 2.</p>
-</header>
-<pre class="code"><code>from sklearn.compose import ColumnTransformer
-from sklearn.impute import SimpleImputer
-from sklearn.preprocessing import OneHotEncoder
 
-numericas = ["superficie_m2", "habitaciones", "antiguedad", "distancia_centro_km", "planta", "ascensor"]
-categoricas = ["zona"]
-pre = ColumnTransformer([
-    ("num", make_pipeline(SimpleImputer(strategy="median"), StandardScaler()), numericas),
-    ("cat", OneHotEncoder(handle_unknown="ignore"), categoricas),
-])
-Z_train = pre.fit_transform(X_train).astype("float32")
-Z_val = pre.transform(X_val).astype("float32")
-Z_test = pre.transform(X_test).astype("float32")
-print("formas:", Z_train.shape, Z_val.shape, Z_test.shape)
-print("columnas:", list(pre.get_feature_names_out()))
-print("media de las 6 numéricas en train:", Z_train[:, :6].mean(axis=0).round(3))
-print("media de las 6 numéricas en val  :", Z_val[:, :6].mean(axis=0).round(3))
-print("huecos que quedan:", int(np.isnan(Z_train).sum()))
-escalador = pre.named_transformers_["num"][-1]
-print("medias que aprendió el escalador:", escalador.mean_.round(2))
-print("desviaciones que aprendió       :", escalador.scale_.round(2))
 
-y_mu, y_sd = y_train.mean(), y_train.std()
-t_train = ((y_train - y_mu) / y_sd).to_numpy("float32")
-t_val = ((y_val - y_mu) / y_sd).to_numpy("float32")
-print(f"precio medio en train: {y_mu:.1f} miles; desviación: {y_sd:.1f}")</code></pre>
-<details class="linea-a-linea">
-<summary>Línea por línea</summary>
-<p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
-<table class="lineas">
-<thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
-<tbody>
-<tr data-lines="1-3"><td><code>from sklearn.compose import ColumnTransformer …</code></td><td>Importa <code>ColumnTransformer</code> (aplica transformaciones distintas a columnas distintas), <code>SimpleImputer</code> (rellena huecos) y <code>OneHotEncoder</code> (convierte categorías en columnas de 0 y 1).</td></tr>
-<tr data-lines="5-6"><td><code>numericas = ["superficie_m2", "habitaciones", "antigued…</code></td><td>Listas con las columnas numéricas y la categórica.</td></tr>
-<tr data-lines="7-10"><td><code>pre = ColumnTransformer([ …</code></td><td>Define el <code>ColumnTransformer</code> con dos ramas. Rama <code>"num"</code>: un mini-pipeline que primero rellena con la <strong>mediana</strong> y después escala. Rama <code>"cat"</code>: one-hot; <code>handle_unknown="ignore"</code> evita errores si aparece una zona no vista.</td></tr>
-<tr data-lines="11"><td><code>Z_train = pre.fit_transform(X_train).astype("float32")</code></td><td><code>fit_transform</code> sobre el <strong>train</strong>: aprende medianas, medias, desviaciones y categorías, y transforma. <code>.astype("float32")</code> baja a 32 bits, el tipo que usa Keras.</td></tr>
-<tr data-lines="12-13"><td><code>Z_val = pre.transform(X_val).astype("float32") …</code></td><td><code>transform</code> (sin <code>fit</code>) sobre validación y test: aplica lo aprendido con el train.</td></tr>
-<tr data-lines="14-15"><td><code>print("formas:", Z_train.shape, Z_val.shape, Z_test.sha…</code></td><td>Imprime las formas de las tres matrices y los nombres de las 10 columnas resultantes (<code>get_feature_names_out</code>).</td></tr>
-<tr data-lines="16-17"><td><code>print("media de las 6 numéricas en train:", Z_train[:,…</code></td><td>Media de las 6 columnas numéricas (<code>[:, :6]</code>) en train y en validación. En train debe ser 0; en validación, cercana pero no exactamente 0.</td></tr>
-<tr data-lines="18"><td><code>print("huecos que quedan:", int(np.isnan(Z_train).sum()…</code></td><td>Cuenta los <code>NaN</code> que quedan: 0, el imputador ha hecho su trabajo.</td></tr>
-<tr data-lines="19-21"><td><code>escalador = pre.named_transformers_["num"][-1] …</code></td><td>Saca del <code>ColumnTransformer</code> el escalador (<code>[-1]</code> es el último paso del mini-pipeline numérico) e imprime las medias y desviaciones que aprendió.</td></tr>
-<tr data-lines="23"><td><code>y_mu, y_sd = y_train.mean(), y_train.std()</code></td><td>Media y desviación del precio, <strong>solo del train</strong>.</td></tr>
-<tr data-lines="24-25"><td><code>t_train = ((y_train - y_mu) / y_sd).to_numpy("float32") …</code></td><td>Estandariza el precio de train y de validación con esas cifras: \( t=(y-\mu_y)/\sigma_y \). <code>to_numpy("float32")</code> lo convierte en un array de NumPy para Keras.</td></tr>
-<tr data-lines="26"><td><code>print(f"precio medio en train: {y_mu:.1f} miles; desvia…</code></td><td>Imprime el precio medio y su desviación del train.</td></tr>
-</tbody>
-</table>
-</details>
-<div class="salida">
-<strong>Salida esperada</strong>
-<pre>formas: (2400, 10) (800, 10) (800, 10)
-columnas: ['num__superficie_m2', 'num__habitaciones', 'num__antiguedad', 'num__distancia_centro_km', 'num__planta', 'num__ascensor', 'cat__zona_Centro', 'cat__zona_Ensanche', 'cat__zona_Periferia', 'cat__zona_Playa']
-media de las 6 numéricas en train: [ 0. -0.  0. -0.  0.  0.]
-media de las 6 numéricas en val  : [ 0.084  0.088 -0.06  -0.002 -0.037 -0.012]
-huecos que quedan: 0
-medias que aprendió el escalador: [84.73  3.05 30.96  4.3   4.52  0.8 ]
-desviaciones que aprendió       : [26.91  1.17 17.1   3.27  2.88  0.4 ]
-precio medio en train: 145.4 miles; desviación: 85.0</pre>
-<p>Los datos pasan de 7 columnas a <strong>10</strong>: seis numéricas escaladas y cuatro del one-hot de la zona (<code>cat__zona_Centro</code>, <code>…_Ensanche</code>, <code>…_Periferia</code>, <code>…_Playa</code>). En train la media de cada numérica es 0 (el redondeo a 3 decimales muestra <code>-0.</code> en alguna: es −0,000…); en validación salen 0,084, 0,088, −0,060… porque el escalador usa las cifras del train. No quedan huecos. Las medias aprendidas (84,73; 3,05; 30,96; 4,30; 4,52; 0,80) y desviaciones (26,91; 1,17; 17,10; 3,27; 2,88; 0,40) son las del ejemplo a mano de arriba. El precio medio del train es 145,4 y su desviación 85,0.</p>
-</div>
-</article><article class="snippet" data-lang="python" id="frag-4">
-<header>
-<h3>4 · MAE, RMSE y R² a mano y con scikit-learn</h3>
-<p class="para-que"><strong>Para qué sirve</strong> Calcular las tres métricas de regresión con las cuentas de cuatro películas (audiencia en miles de espectadores), comprobar que scikit-learn da lo mismo y definir la función <code>evaluar</code> que se reutiliza en todo el módulo.</p>
-</header>
-<pre class="code"><code>from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
+<section>
+<h2 class="sin-num">Código</h2>
+<article class="snippet" data-lang="python" id="frag-4">
+  <header>
+    <h3>4 · MAE, RMSE y R² a mano y con scikit-learn</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Calcular las tres métricas de regresión con las cuentas de cuatro películas (audiencia en miles de espectadores), comprobar que scikit-learn da lo mismo y definir la función <code>evaluar</code> que se reutiliza en todo el módulo.</p>
+  </header>
+  <pre class="code"><code>from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 
 real = np.array([100.0, 200.0, 150.0, 250.0])
 pred = np.array([110.0, 190.0, 170.0, 230.0])
@@ -205,32 +226,83 @@ def evaluar(real, pred):
             "R2": r2_score(real, pred)}
 
 print("siempre la media:", {k: round(v, 2) for k, v in evaluar(real, np.full(4, real.mean())).items()})</code></pre>
-<details class="linea-a-linea">
-<summary>Línea por línea</summary>
-<p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
-<table class="lineas">
-<thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
-<tbody>
-<tr data-lines="1"><td><code>from sklearn.metrics import mean_absolute_error, mean_s…</code></td><td>Importa las tres métricas de scikit-learn.</td></tr>
-<tr data-lines="3-4"><td><code>real = np.array([100.0, 200.0, 150.0, 250.0]) …</code></td><td>Audiencia real y predicha de las cuatro películas del ejemplo (en miles de espectadores; cifras inventadas).</td></tr>
-<tr data-lines="5"><td><code>error = pred - real</code></td><td>Error de cada película: predicho − real.</td></tr>
-<tr data-lines="6"><td><code>mae = np.abs(error).mean()</code></td><td>MAE: la media (<code>.mean()</code>) de los errores en valor absoluto (<code>np.abs</code>).</td></tr>
-<tr data-lines="7"><td><code>rmse = np.sqrt((error ** 2).mean())</code></td><td>RMSE: raíz cuadrada (<code>np.sqrt</code>) de la media de los errores al cuadrado (<code>** 2</code>).</td></tr>
-<tr data-lines="8"><td><code>sse = (error ** 2).sum()</code></td><td>SSE: suma de los errores al cuadrado.</td></tr>
-<tr data-lines="9"><td><code>sst = ((real - real.mean()) ** 2).sum()</code></td><td>SST: suma de los cuadrados de lo que se aleja cada valor real de su media.</td></tr>
-<tr data-lines="10"><td><code>r2 = 1 - sse / sst</code></td><td>R² = 1 − SSE/SST.</td></tr>
-<tr data-lines="11"><td><code>print(f"a mano : MAE={mae:.2f}  RMSE={rmse:.2f}  SSE={s…</code></td><td>Imprime las métricas calculadas a mano (<code>:.2f</code> son dos decimales; <code>:.0f</code>, ninguno).</td></tr>
-<tr data-lines="12-13"><td><code>print(f"sklearn: MAE={mean_absolute_error(real, pred):.…</code></td><td>Imprime las mismas con las funciones de scikit-learn. El RMSE es la raíz (<code>** 0.5</code>) del error cuadrático medio. Las dos líneas de código se unen porque los paréntesis siguen abiertos.</td></tr>
-<tr data-lines="15-18"><td><code>def evaluar(real, pred): …</code></td><td><code>evaluar(real, pred)</code>: devuelve un diccionario con las tres métricas, para llamarla con cualquier modelo.</td></tr>
-<tr data-lines="20"><td><code>print("siempre la media:", {k: round(v, 2) for k, v in…</code></td><td>Evalúa el baseline «predecir siempre la media» (<code>np.full(4, real.mean())</code> crea un array de cuatro copias de la media) y redondea cada valor a 2 decimales con una comprensión de diccionario.</td></tr>
-</tbody>
-</table>
-</details>
-<div class="salida">
-<strong>Salida esperada</strong>
-<pre>a mano : MAE=15.00  RMSE=15.81  SSE=1000  SST=12500  R2=0.92
+  <details class="linea-a-linea">
+    <summary>Línea por línea</summary>
+    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+      <tbody>
+        <tr data-lines="1"><td><code>from sklearn.metrics import mean_absolute_error, mean_s…</code></td><td>Importa las tres métricas de scikit-learn.</td></tr>
+        <tr data-lines="3-4"><td><code>real = np.array([100.0, 200.0, 150.0, 250.0]) …</code></td><td>Audiencia real y predicha de las cuatro películas del ejemplo (en miles de espectadores; cifras inventadas).</td></tr>
+        <tr data-lines="5"><td><code>error = pred - real</code></td><td>Error de cada película: predicho − real.</td></tr>
+        <tr data-lines="6"><td><code>mae = np.abs(error).mean()</code></td><td>MAE: la media (<code>.mean()</code>) de los errores en valor absoluto (<code>np.abs</code>).</td></tr>
+        <tr data-lines="7"><td><code>rmse = np.sqrt((error ** 2).mean())</code></td><td>RMSE: raíz cuadrada (<code>np.sqrt</code>) de la media de los errores al cuadrado (<code>** 2</code>).</td></tr>
+        <tr data-lines="8"><td><code>sse = (error ** 2).sum()</code></td><td>SSE: suma de los errores al cuadrado.</td></tr>
+        <tr data-lines="9"><td><code>sst = ((real - real.mean()) ** 2).sum()</code></td><td>SST: suma de los cuadrados de lo que se aleja cada valor real de su media.</td></tr>
+        <tr data-lines="10"><td><code>r2 = 1 - sse / sst</code></td><td>R² = 1 − SSE/SST.</td></tr>
+        <tr data-lines="11"><td><code>print(f"a mano : MAE={mae:.2f}  RMSE={rmse:.2f}  SSE={s…</code></td><td>Imprime las métricas calculadas a mano (<code>:.2f</code> son dos decimales; <code>:.0f</code>, ninguno).</td></tr>
+        <tr data-lines="12-13"><td><code>print(f"sklearn: MAE={mean_absolute_error(real, pred):.…</code></td><td>Imprime las mismas con las funciones de scikit-learn. El RMSE es la raíz (<code>** 0.5</code>) del error cuadrático medio. Las dos líneas de código se unen porque los paréntesis siguen abiertos.</td></tr>
+        <tr data-lines="15-18"><td><code>def evaluar(real, pred): …</code></td><td><code>evaluar(real, pred)</code>: devuelve un diccionario con las tres métricas, para llamarla con cualquier modelo.</td></tr>
+        <tr data-lines="20"><td><code>print("siempre la media:", {k: round(v, 2) for k, v in…</code></td><td>Evalúa el baseline «predecir siempre la media» (<code>np.full(4, real.mean())</code> crea un array de cuatro copias de la media) y redondea cada valor a 2 decimales con una comprensión de diccionario.</td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>a mano : MAE=15.00  RMSE=15.81  SSE=1000  SST=12500  R2=0.92
 sklearn: MAE=15.00  RMSE=15.81  R2=0.92
 siempre la media: {'MAE': 50.0, 'RMSE': 55.9, 'R2': 0.0}</pre>
-<p>A mano y con scikit-learn salen las mismas cifras: MAE 15,00, RMSE 15,81 (la raíz de 250), SSE 1.000, SST 12.500 y R² = 1 − 1.000/12.500 = 0,92. Predecir siempre la media da MAE 50, RMSE 55,9 y R² exactamente 0, que es la vara de medir: un R² positivo significa «mejor que predecir la media».</p>
+    <p>A mano y con scikit-learn salen las mismas cifras: MAE 15,00, RMSE 15,81 (la raíz de 250), SSE 1.000, SST 12.500 y R² = 1 − 1.000/12.500 = 0,92. Predecir siempre la media da MAE 50, RMSE 55,9 y R² exactamente 0, que es la vara de medir: un R² positivo significa «mejor que predecir la media».</p>
+  </div>
+</article>
+
+<article class="snippet" data-lang="python" id="frag-5">
+  <header>
+    <h3>5 · Los tres baselines sobre la validación</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Entrenar la media, la regresión lineal y un random forest, cada uno dentro de un pipeline con el preprocesado, y compararlos en una tabla. Es el listón que tendrá que superar la red. Continúa los fragmentos 3 y 4 (usa <code>pre</code> y <code>evaluar</code>).</p>
+  </header>
+  <pre class="code"><code>from sklearn.dummy import DummyRegressor
+from sklearn.linear_model import LinearRegression
+from sklearn.ensemble import RandomForestRegressor
+
+candidatos = {
+    "media (dummy)": DummyRegressor(strategy="mean"),
+    "regresión lineal": LinearRegression(),
+    "random forest": RandomForestRegressor(n_estimators=200, random_state=0, n_jobs=1),
+}
+filas = {}
+for nombre, modelo_sk in candidatos.items():
+    tubo = make_pipeline(pre, modelo_sk).fit(X_train, y_train)
+    filas[nombre] = evaluar(y_val, tubo.predict(X_val))
+tabla = pd.DataFrame(filas).T.round(3)
+print(tabla.to_string())</code></pre>
+  <details class="linea-a-linea">
+    <summary>Línea por línea</summary>
+    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+      <tbody>
+        <tr data-lines="1-3"><td><code>from sklearn.dummy import DummyRegressor …</code></td><td>Importa los tres modelos: <code>DummyRegressor</code> (predice siempre lo mismo), <code>LinearRegression</code> y <code>RandomForestRegressor</code>.</td></tr>
+        <tr data-lines="5-9"><td><code>candidatos = { …</code></td><td>Un diccionario con los tres candidatos. El random forest tiene 200 árboles, <code>random_state=0</code> (reproducible) y <code>n_jobs=1</code> (un solo procesador, para no saturar la máquina).</td></tr>
+        <tr data-lines="10"><td><code>filas = {}</code></td><td>Diccionario vacío donde guardar los resultados.</td></tr>
+        <tr data-lines="11-13"><td><code>for nombre, modelo_sk in candidatos.items(): …</code></td><td>Para cada candidato: <code>make_pipeline(pre, modelo_sk)</code> encadena el preprocesado y el modelo; <code>.fit(X_train, y_train)</code> ajusta ambos con el train; <code>predict(X_val)</code> predice la validación (el preprocesado se aplica solo, con lo aprendido) y <code>evaluar</code> mide.</td></tr>
+        <tr data-lines="14-15"><td><code>tabla = pd.DataFrame(filas).T.round(3) …</code></td><td>Convierte el diccionario en tabla (<code>.T</code> la traspone para que cada modelo sea una fila), redondea a 3 decimales y la imprime.</td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>                     MAE    RMSE     R2
+media (dummy)     72.390  90.794 -0.011
+regresión lineal  22.104  30.735  0.884
+random forest     11.998  18.216  0.959</pre>
+    <p>La media no explica nada (R² = −0,011). La regresión lineal tiene MAE 22,104 (22.104 € de error medio) y R² 0,884. El random forest baja el MAE a 11,998 y sube el R² a 0,959. <strong>Ese es el listón en validación:</strong> la red tendrá que acercarse a 12 de MAE para justificarse.</p>
+  </div>
+</article>
+</section>
+
+
 </div>
-</article></div></details></div></main></body></html>
+</main>
+</body>
+</html>

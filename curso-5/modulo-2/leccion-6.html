@@ -1,201 +1,377 @@
-<!DOCTYPE html>
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lección 6 · BatchNorm: todas las capas hablan en la misma escala · Módulo 2 · Curso 5 · Cuaderno de IA</title>
+<meta name="description" content="Qué hace nn.BatchNorm1d con las estadísticas del lote, sus parámetros γ y β, las medias móviles en evaluación y sus trampas.">
+<script>try{var t=localStorage.getItem('cuaderno-ia:tema');if(t)document.documentElement.setAttribute('data-theme',t)}catch(e){}</script>
+<link rel="stylesheet" href="../../assets/css/style.css">
+<script src="../../assets/js/curriculum.js"></script>
+<script src="../../assets/js/lab.js"></script>
+<script src="../../assets/js/app.js" defer></script>
+</head>
+<body data-root="../../" data-course="5" data-module="2" data-lesson="6">
+<main>
+<div class="page">
 
-<html lang="es"><head><meta charset="utf-8"/><meta content="width=device-width,initial-scale=1" name="viewport"/><title>Lección 6 · Dropout: apagar neuronas al azar para que no memoricen · Curso 5 · Cuaderno de IA</title><meta content="En cada paso de entrenamiento, nn.Dropout(p) apaga cada activación con probabilidad \( p \) (la pone a 0) y multiplica las que sobreviven por \( 1/(1-p) \) :" name="description"/><script>try{var t=localStorage.getItem('cuaderno-ia:tema');if(t)document.documentElement.setAttribute('data-theme',t)}catch(e){}</script><link href="../../assets/css/style.css" rel="stylesheet"/><script src="../../assets/js/curriculum.js"></script><script src="../../assets/js/lab.js"></script><script defer="" src="../../assets/js/app.js"></script><script defer="" src="../../assets/js/microanimations.js"></script></head><body data-course="5" data-lesson="6" data-module="2" data-root="../../"><main><div class="page" data-micro="3min"><header class="hero leccion"><div class="hero-grid"><div><p class="eyebrow">Curso 5 · Módulo 2 · Lección 6 de 11</p><h1>Dropout: apagar neuronas al azar para que no memoricen</h1><p class="lead">En cada paso de entrenamiento, nn.Dropout(p) apaga cada activación con probabilidad \( p \) (la pone a 0) y multiplica las que sobreviven por \( 1/(1-p) \) :</p><p class="meta-line"><span class="read-time" data-render="read-time"></span><a href="../modulo-2.html">Índice del módulo</a></p></div><div aria-hidden="true" class="hero-tile"></div></div></header><details class="predice"><summary>Mi recomendador acierta el 99 % con las valoraciones que ya había visto y solo el 84 % con usuarios nuevos: se ha aprendido las valoraciones de memoria. ¿Cómo lo obligo a aprender gustos de verdad en vez de memorizar?<span class="hint"></span></summary><div><p>En cada paso de entrenamiento, nn.Dropout(p) apaga cada activación con probabilidad \( p \) (la pone a 0) y multiplica las que sobreviven por \( 1/(1-p) \) :</p></div></details><section aria-label="Explicación breve" class="micro-core"><div class="micro-kicker">01 · ENTENDER <span>≈ 45 s</span></div><h2>La idea en palabras sencillas</h2><p>En esta lección descubrirás cómo funciona «Dropout: apagar neuronas al azar para que no memoricen» con un caso sencillo. Observa el cambio en la demostración antes de elegir una respuesta.</p><div class="micro-example"><span aria-hidden="true" class="micro-example-icon">🐾</span><div><strong>Otro ejemplo · Mascotas</strong><p>Una red combina tamaño, orejas y pelaje para distinguir patrones que no dependen de una sola regla.</p></div></div></section><div class="micro-kicker micro-checkpoint">02 · RESPONDER <span>≈ 15 s</span></div><section aria-label="Pregunta intercalada" class="quiz mini micro-check"><script class="quiz-data" type="application/json">{"titulo": "Pausa rápida · Comprueba la idea", "preguntas": [{"q": "Durante TRAIN, Dropout(0.3) hace…", "opciones": ["Multiplicar la loss por 30", "Desactivar temporalmente aprox. 30 % de unidades", "Borrar para siempre el 30 % de neuronas"], "correcta": 1, "porque": "Dropout desconecta aleatoriamente unidades durante entrenamiento."}]}</script></section><section aria-label="Animación interactiva" class="micro-viz" data-index="13" data-micro-viz="neural"><div class="micro-kicker">03 · EXPERIMENTAR <span>≈ 45 s</span></div><div class="micro-viz-title"><div><h2>Señales que atraviesan una red</h2><p>Pulsa «Propagar» para seguir el recorrido de entradas a salida.</p></div><span aria-hidden="true" class="micro-viz-symbol">✦</span></div><div aria-live="polite" class="micro-viz-stage"><p>Animación interactiva: Señales que atraviesan una red</p></div></section><div class="micro-kicker micro-checkpoint">04 · APLICAR <span>≈ 15 s</span></div><section aria-label="Pregunta intercalada" class="quiz mini micro-check"><script class="quiz-data" type="application/json">{"titulo": "Pausa rápida · ¿Lo aplicarías?", "preguntas": [{"q": "¿La máscara de Dropout debe actuar igual durante inferencia?", "opciones": ["No, en inferencia normalmente está desactivado", "Sí, siempre se aplica igual", "Elimina el test"], "correcta": 0, "porque": "La red se comporta de manera distinta al entrenar y predecir."}]}</script></section><div class="micro-finish"><strong>Idea que te llevas</strong><span>En esta lección descubrirás cómo funciona «Dropout: apagar neuronas al azar para que no memoricen» con un caso sencillo</span><small>¿Quieres más ejemplos, fórmulas o código? Los tienes justo debajo, sin límite de tiempo.</small></div><details class="profundizar micro-legacy"><summary><span>Explorar más: explicación y simulaciones completas<small>Todo el texto original, tablas y demos avanzadas. Opcional.</small></span></summary><div class="prof-body"><section><h2>Dropout: apagar neuronas al azar para que no memoricen</h2>
-<p>En cada paso de entrenamiento, <code>nn.Dropout(p)</code> apaga cada activación con probabilidad \( p \) (la pone a 0) y <strong>multiplica las que sobreviven por \( 1/(1-p) \)</strong>:</p>
-<p>El <a href="#codigo">fragmento 8</a> entrena la misma red grande con solo 60 puntos y mucho ruido, con \( p=0 \), \( 0{,}2 \) y \( 0{,}5 \), promediando 10 semillas. Sin dropout, la red memoriza (99,3 % en entrenamiento) y acierta el 83,7 % en datos nuevos; con \( p=0{,}5 \) baja en entrenamiento (90,5 %) pero acierta el 85,8 % en test, y la pérdida de test cae de 0,967 a 0,423. Es la señal típica de que una regularización funciona: <strong>peor en entrenamiento, mejor con datos nuevos</strong>. La ganancia en acierto es modesta; en la pérdida, grande.</p>
-<div class="callout ejemplo"><span class="lbl">Ejemplo tomado del módulo</span><p>Imagina un panel de 8 críticos (8 neuronas).</p></div></section><figure class="demo" data-demo="curso5/c5m2-dropout-mascara" data-titulo="la máscara de dropout y el reescalado">
-<div class="haz">Cada barra es un crítico del panel y su altura es su entusiasmo por la película. Pulsa «Sortear otra máscara» varias veces: cada vez faltan críticos distintos. Cambia \( p \). Luego pulsa «Sortear 2000 máscaras» con el reescalado activado y mira el histograma de la salida \( z \) de la neurona siguiente. Desactiva el reescalado y repite.</div>
-<div class="observa">Con el reescalado, la media de \( z \) en las 2000 máscaras queda en 1,62, el valor de la red <em>sin</em> dropout (que es lo que se calcula en <code>eval</code>). Sin reescalado, la media baja a \( (1-p)\cdot1{,}62 \): en evaluación la red recibiría señales más grandes que durante el entrenamiento. Con \( p \) alto, el histograma se ensancha: el dropout mete ruido.</div>
-</figure><div class="resumen"><h2 class="sin-num sin-toc">En pocas líneas</h2><ul><li><strong>Dropout: apagar neuronas al azar para que no memoricen:</strong> En cada paso de entrenamiento, nn.Dropout(p) apaga cada activación con probabilidad \( p \) (la pone a 0) y multiplica las que…</li><li>Antes de continuar, intenta explicar la demo sin mirar su resultado.</li></ul></div><section class="quiz mini"><script class="quiz-data" type="application/json">{"titulo": "¿Lo tienes?", "preguntas": [{"q": "¿Qué concepto estamos trabajando en esta lección?", "opciones": ["Optimizadores adaptativos: RMSprop, Adam y planificadores del learning rate", "Dropout: apagar neuronas al azar para que no memoricen", "Momentum y Nesterov: darle memoria al descenso"], "correcta": 1, "porque": "En cada paso de entrenamiento, nn.Dropout(p) apaga cada activación con probabilidad \\( p \\) (la pone a 0) y multiplica las que sobreviven por \\( 1/(1-p) \\) :"}, {"q": "¿Cuál de estas afirmaciones recoge lo que acabas de estudiar?", "opciones": ["Siempre hay un único método que sirve para todos los problemas.", "Lo importante es comprender la idea y comprobarla con ejemplos, no memorizar términos.", "En cada paso de entrenamiento, nn.Dropout(p) apaga cada activación con probabilidad \\( p \\) (la pone a 0) y multiplica las que sobreviven por \\( 1/(1-p) \\) :"], "correcta": 2, "porque": "La explicación central es: En cada paso de entrenamiento, nn.Dropout(p) apaga cada activación con probabilidad \\( p \\) (la pone a 0) y multiplica las que sobreviven por \\( 1/(1-p) \\) :"}, {"q": "Si una demo o un ejemplo te desconcierta, ¿cuál es la mejor forma de aprenderlo?", "opciones": ["Ignorar los resultados que no coinciden con tu intuición.", "Memorizar el nombre sin entender la operación.", "Volver a los números, cambiar un valor y explicar qué ocurre."], "correcta": 2, "porque": "Explorar qué cambia y por qué ayuda a conectar el concepto con su resultado."}]}</script></section></div></details><details class="profundizar"><summary><span>Profundizar: explicación completa<small>Matices, fórmulas, tablas, otros ejemplos y experimentos del módulo original.</small></span></summary><div class="prof-body"><section>
-<h2 id="dropout">Dropout: apagar neuronas al azar para que no memoricen</h2>
-<p class="pregunta">Mi recomendador acierta el 99 % con las valoraciones que ya había visto y solo el 84 % con usuarios nuevos: se ha aprendido las valoraciones de memoria. ¿Cómo lo obligo a aprender gustos de verdad en vez de memorizar?</p>
-<div class="callout recuerda">
-<span class="lbl">Recuerda (<a href="../../curso-3/modulo-5.html#regularizacion">Curso 3 · módulo 5</a>)</span>
-<p>El sobreajuste es memorizar el ruido de los datos de entrenamiento; la regularización (L2, <code>Dropout</code>, parada temprana) lo frena. En Keras ponías <code>Dropout(0.5)</code> entre capas y el argumento <code>training</code> decidía si actuaba. En PyTorch es <code>nn.Dropout(p=0.5)</code> y lo decide <code>model.train()</code> frente a <code>model.eval()</code>.</p>
-</div>
-<div class="callout analogia">
-<span class="lbl">Analogía</span>
-<p>Un rodaje en el que cada día falta al azar la mitad del reparto. Nadie puede dejar la escena en manos de una única estrella: todos tienen que aprender a aportar algo útil por sí solos y a trabajar con compañeros distintos cada día. Una película así sale más robusta que una que se hunde si falta el protagonista. Las neuronas hacen lo mismo: dejan de depender de que otra neurona concreta esté presente (la «co-adaptación»).</p>
-</div>
-<h3>Cómo funciona, con 8 números</h3>
-<p>En cada paso de entrenamiento, <code>nn.Dropout(p)</code> apaga cada activación con probabilidad \( p \) (la pone a 0) y <strong>multiplica las que sobreviven por \( 1/(1-p) \)</strong>:</p>
-<div class="formula">\[ \tilde h_i=\frac{m_i}{1-p}\,h_i,\qquad m_i\sim\text{Bernoulli}(1-p)\quad(m_i=1\text{ con probabilidad }1-p,\ \text{si no }0) \]</div>
-<div class="callout ejemplo">
-<span class="lbl">Ejemplo numérico</span>
-<p>Imagina un panel de 8 críticos (8 neuronas). Cada uno da su entusiasmo por una película, \( h \), entre 0 y 1. Hoy falta cada uno con probabilidad \( p=0{,}5 \), y los que se quedan hablan el doble de alto para que el volumen total del panel sea el mismo: se multiplican por \( 1/(1-0{,}5)=2 \). Entusiasmos \( h=(0{,}8;\,0{,}5;\,0{,}9;\,0{,}3;\,0{,}6;\,0{,}2;\,0{,}7;\,0{,}4) \). Una máscara posible deja sin venir a los críticos 1, 2, 4, 5 y 6 y deja a la 3, la 7 y la 8:</p>
-<table>
-<thead><tr><th>Crítico</th><th>1</th><th>2</th><th>3</th><th>4</th><th>5</th><th>6</th><th>7</th><th>8</th></tr></thead>
-<tbody>
-<tr><td>\( h \)</td><td>0,8</td><td>0,5</td><td>0,9</td><td>0,3</td><td>0,6</td><td>0,2</td><td>0,7</td><td>0,4</td></tr>
-<tr><td>\( \tilde h \)</td><td class="res">0</td><td class="res">0</td><td class="res">1,8</td><td class="res">0</td><td class="res">0</td><td class="res">0</td><td class="res">1,4</td><td class="res">0,8</td></tr>
-</tbody>
-</table>
-<p>Esa es justo la primera salida del fragmento 7. <strong>¿Por qué multiplicar por 2?</strong> Porque cada activación sobrevive la mitad de las veces: su valor medio es \( 0{,}5\cdot 2h=h \). El reescalado mantiene el <em>valor esperado</em>, de modo que en evaluación (sin dropout) las neuronas siguientes ven la misma escala que vieron al entrenar. Esta versión se llama <abbr class="t" data-def="Inverted dropout: se reescala durante el entrenamiento (÷(1−p)), de modo que en evaluación no hay que tocar nada. Es lo que hacen nn.Dropout y Keras.">inverted dropout</abbr>.</p>
-</div>
-<h3><code>model.train()</code> frente a <code>model.eval()</code></h3>
-<ul>
-<li><strong>Entrenar:</strong> <code>model.train()</code> → dropout activo, una máscara distinta en cada llamada.</li>
-<li><strong>Evaluar / predecir:</strong> <code>model.eval()</code> → dropout apagado, la salida es determinista.</li>
-<li>Ambas funciones recorren <em>todos</em> los submódulos y cambian su atributo <code>training</code> (el fragmento 7 lo imprime). No cambian nada más: no desactivan el cálculo del gradiente. Para eso se usa <code>torch.no_grad()</code>.</li>
-<li>El dropout no tiene parámetros que aprender; durante el backward, las neuronas apagadas dejan pasar gradiente 0.</li>
-</ul>
-<div class="callout ojo">
-<span class="lbl">Ojo · la trampa de <code>F.dropout</code></span>
-<p>La versión funcional <code>torch.nn.functional.dropout(x, p)</code> tiene <code>training=True</code> <strong>por defecto</strong> y no mira el modo del modelo. Si la usas dentro de <code>forward</code> sin escribir <code>training=self.training</code>, el dropout sigue activo en <code>eval()</code>: las predicciones salen distintas cada vez (el fragmento 7 muestra −0,1736 y −0,1031 para la misma entrada). Con <code>nn.Dropout</code> como capa no hay este problema. Y otro error clásico: <strong>olvidar llamar a <code>model.eval()</code> antes de validar</strong>, con lo que la validación se mide con neuronas apagadas.</p>
-</div>
-<h3>¿Funciona? Medido con 10 semillas</h3>
-<p>El <a href="#codigo">fragmento 8</a> entrena la misma red grande con solo 60 puntos y mucho ruido, con \( p=0 \), \( 0{,}2 \) y \( 0{,}5 \), promediando 10 semillas. Sin dropout, la red memoriza (99,3 % en entrenamiento) y acierta el 83,7 % en datos nuevos; con \( p=0{,}5 \) baja en entrenamiento (90,5 %) pero acierta el 85,8 % en test, y la pérdida de test cae de 0,967 a 0,423. Es la señal típica de que una regularización funciona: <strong>peor en entrenamiento, mejor con datos nuevos</strong>. La ganancia en acierto es modesta; en la pérdida, grande.</p>
-<div class="callout regla">
-<span class="lbl">Regla fácil</span>
-<p>Dropout: \( p \) entre 0,1 y 0,5 en las capas ocultas, nunca en la salida. <code>train()</code> para entrenar, <code>eval()</code> para medir. Si tu red no sobreajusta, no lo uses: solo añadiría ruido.</p>
-</div>
-</section></div></details><details class="profundizar" id="codigo"><summary><span>Ver código explicado paso a paso<small>2 fragmento(s) original(es), con cada línea comentada y salida esperada.</small></span></summary><div class="prof-body"><article class="snippet" data-lang="python">
-<header>
-<h3>7 · Dropout: la máscara, <code>train</code> frente a <code>eval</code> y la trampa de <code>F.dropout</code></h3>
-<p class="para-que"><strong>Para qué sirve</strong> Ver con 8 números cómo <code>nn.Dropout</code> apaga neuronas al azar y reescala el resto, que en evaluación no hace nada, y cómo un <code>F.dropout</code> mal escrito sigue apagando neuronas cuando creías estar en evaluación.</p>
+<header class="hero leccion">
+  <div class="hero-grid">
+    <div>
+      <p class="eyebrow">Curso 5 · Módulo 2 · Lección 6 de 8</p>
+      <h1>BatchNorm: todas las capas hablan en la misma escala</h1>
+      <p class="lead">Cada capa recibe la salida de la anterior, que cambia de escala mientras se entrena. BatchNorm la pone en media 0 y desviación 1 con los datos del lote y deja que la red elija su escala final.</p>
+      <p class="meta-line"><span class="read-time" data-render="read-time"></span><a href="../modulo-2.html">Índice del módulo</a></p>
+    </div>
+    <div class="hero-tile" aria-hidden="true"></div>
+  </div>
 </header>
-<pre class="code"><code>import torch
-import torch.nn as nn
-import torch.nn.functional as F
 
-
-def r(t):
-    return [round(v, 2) for v in t.flatten().tolist()]
-
-
-torch.manual_seed(0)
-drop = nn.Dropout(p=0.5)
-h = torch.tensor([[0.8, 0.5, 0.9, 0.3, 0.6, 0.2, 0.7, 0.4]])
-print("entrada          :", r(h))
-print("train, 1ª llamada:", r(drop(h)))
-print("train, 2ª llamada:", r(drop(h)))
-
-drop.eval()
-print("eval             :", r(drop(h)))
-
-drop.train()
-muchas = torch.stack([drop(h) for _ in range(20000)])
-print("media de 20000 máscaras:", r(muchas.mean(0)))
-print("fracción de ceros      :", round((muchas == 0).float().mean().item(), 3))
-
-# El mismo modelo, dos modos
-modelo = nn.Sequential(nn.Linear(8, 16), nn.ReLU(), nn.Dropout(0.5), nn.Linear(16, 1))
-x = torch.randn(1, 8)
-modelo.train()
-print("train:", round(modelo(x).item(), 4), round(modelo(x).item(), 4), " training =", modelo.training, modelo[2].training)
-modelo.eval()
-print("eval :", round(modelo(x).item(), 4), round(modelo(x).item(), 4), " training =", modelo.training, modelo[2].training)
-
-
-class Trampa(nn.Module):
-    def __init__(self):
-        super().__init__()
-        self.lineal = nn.Linear(8, 1)
-
-    def forward(self, x):
-        return self.lineal(F.dropout(x, p=0.5))      # se olvida training=self.training
-
-
-trampa = Trampa().eval()
-print("F.dropout olvidado en eval:", round(trampa(x).item(), 4), round(trampa(x).item(), 4))</code></pre>
-<details class="linea-a-linea" open="">
-<summary>Línea por línea</summary>
-<p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
-<table class="lineas">
-<thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
-<tbody>
-<tr data-lines="1-3"><td><code>import torch …</code></td><td>Importamos <code>torch</code>, <code>nn</code> y <code>torch.nn.functional as F</code> (la versión «función» de las capas).</td></tr>
-<tr data-lines="6-7"><td><code>def r(t): …</code></td><td>Ayudante <code>r</code> que convierte un tensor en una lista de números con dos decimales, para imprimir cómodo.</td></tr>
-<tr data-lines="10-12"><td><code>torch.manual_seed(0) …</code></td><td>Semilla, una capa <code>nn.Dropout(p=0.5)</code> (probabilidad de <strong>apagar</strong> cada neurona) y 8 activaciones inventadas <code>h</code> en forma de fila (una muestra).</td></tr>
-<tr data-lines="13-15"><td><code>print("entrada          :", r(h)) …</code></td><td>Imprime la entrada y dos aplicaciones seguidas en modo entrenamiento: cada llamada saca una máscara distinta. Las neuronas que sobreviven se multiplican por \(1/(1-p)=2\).</td></tr>
-<tr data-lines="17-18"><td><code>drop.eval() …</code></td><td><code>drop.eval()</code> pasa la capa a modo evaluación: ahora devuelve la entrada sin tocarla.</td></tr>
-<tr data-lines="20-23"><td><code>drop.train() …</code></td><td>Vuelve a modo entrenamiento, aplica el dropout 20 000 veces (<code>torch.stack</code> apila los resultados) y calcula la media por neurona y la fracción de ceros.</td></tr>
-<tr data-lines="25-27"><td><code># El mismo modelo, dos modos …</code></td><td>Un modelo completo con <code>Linear → ReLU → Dropout → Linear</code> y una muestra de entrada <code>x</code>.</td></tr>
-<tr data-lines="28-29"><td><code>modelo.train() …</code></td><td>En modo entrenamiento (<code>modelo.train()</code>) dos llamadas con la misma entrada dan resultados diferentes; también imprime el atributo <code>training</code> del modelo y de la capa de dropout.</td></tr>
-<tr data-lines="30-31"><td><code>modelo.eval() …</code></td><td><code>modelo.eval()</code> cambia el modo de <strong>todas</strong> las capas hijas: las dos salidas son iguales y <code>training</code> vale <code>False</code> en ambos niveles.</td></tr>
-<tr data-lines="34-37"><td><code>class Trampa(nn.Module): …</code></td><td>Clase con la trampa: guarda una capa lineal.</td></tr>
-<tr data-lines="39-40"><td><code>def forward(self, x): …</code></td><td>En su <code>forward</code> usa <code>F.dropout(x, p=0.5)</code> sin pasarle <code>training=self.training</code>. Esa función funcional tiene <code>training=True</code> por defecto, así que ignora el modo del modelo.</td></tr>
-<tr data-lines="43-44"><td><code>trampa = Trampa().eval() …</code></td><td>La ponemos en <code>eval()</code> y la llamamos dos veces con la misma entrada: debería dar el mismo resultado.</td></tr>
-</tbody>
-</table>
+<details class="predice">
+  <summary>Dos críticos puntúan las mismas cuatro películas: uno sobre 10 (2, 4, 6, 8) y otro sobre 100 (10, 20, 30, 40). Tras pasar por BatchNorm, ¿sus notas siguen en escalas distintas?<span class="hint"></span></summary>
+  <div>
+    <p><strong>No: salen exactamente iguales.</strong> A cada crítico se le resta su media y se le divide por su dispersión; como el segundo es el primero multiplicado por 5 y desplazado, los dos quedan en −1,34; −0,45; 0,45; 1,34.</p>
+  </div>
 </details>
-<div class="salida">
-<strong>Salida esperada</strong>
-<pre>entrada          : [0.8, 0.5, 0.9, 0.3, 0.6, 0.2, 0.7, 0.4]
-train, 1ª llamada: [0.0, 0.0, 1.8, 0.0, 0.0, 0.0, 1.4, 0.8]
-train, 2ª llamada: [0.0, 1.0, 1.8, 0.6, 1.2, 0.0, 1.4, 0.8]
-eval             : [0.8, 0.5, 0.9, 0.3, 0.6, 0.2, 0.7, 0.4]
-media de 20000 máscaras: [0.79, 0.5, 0.9, 0.3, 0.61, 0.2, 0.7, 0.4]
-fracción de ceros      : 0.5
-train: 0.331 0.1135  training = True True
-eval : 0.1441 0.1441  training = False False
-F.dropout olvidado en eval: -0.1736 -0.1031</pre>
-<p>Las dos llamadas en entrenamiento dan máscaras distintas, y los supervivientes valen el doble (0.9→1.8, 0.7→1.4, 0.4→0.8). En <code>eval</code> la salida es la entrada. La media de 20 000 máscaras se parece mucho a la entrada original (0.79, 0.5, 0.9…), y la mitad de los valores son ceros: el reescalado mantiene el valor esperado. En el modelo, <code>train</code> da dos resultados distintos (0.331, 0.1135) y <code>eval</code> el mismo (0.1441). La trampa: <code>F.dropout</code> sin <code>training</code> da −0.1736 y −0.1031 incluso en <code>eval()</code>.</p>
-</div>
-</article><article class="snippet" data-lang="python">
-<header>
-<h3>8 · Dropout contra el sobreajuste (60 puntos, 10 semillas)</h3>
-<p class="para-que"><strong>Para qué sirve</strong> Entrenar la misma red con y sin dropout sobre muy pocos datos y medir si el acierto en datos nuevos mejora de verdad, promediando 10 semillas para que el resultado no sea cuestión de suerte.</p>
-</header>
-<pre class="code"><code>import numpy as np
-import torch
-import torch.nn as nn
-from sklearn.datasets import make_moons
 
-torch.set_num_threads(1)
+<section>
+<h2 id="idea">Una escala común para cada neurona</h2>
+<p>Una web de cine recibe notas de críticos con escalas distintas. Antes de compararlas, las pasa a una escala común: resta la media del grupo y divide por la dispersión. <strong>BatchNorm</strong> hace eso con cada neurona y cada lote, y luego reescala con dos parámetros que la red aprende, \( \gamma \) y \( \beta \): \( y=\gamma\,\hat x+\beta \).</p>
+<p>Al <em>predecir</em> puede haber una sola película: no hay lote del que sacar la media. Por eso, al entrenar, la capa va guardando <strong>medias móviles</strong> (<code>running_mean</code>, <code>running_var</code>) y en <code>model.eval()</code> usa esas. Igual que con el dropout, <code>train()</code> y <code>eval()</code> cambian lo que hace.</p>
+<p>¿Para qué? Estabiliza los gradientes, permite learning rates mayores y hace menos crítica la inicialización. Se coloca entre la capa lineal y la activación: <code>Linear → BatchNorm1d → ReLU</code>.</p>
+</section>
+
+<figure class="demo" data-demo="curso5/c5m2-batchnorm-batch" data-titulo="BatchNorm con estadísticas del lote y con medias móviles">
+  <div class="haz">Pulsa «Procesar un lote nuevo» y luego «Procesar 20 lotes» varias veces. Mueve γ y β.</div>
+  <div class="observa">Los puntos azules (entrenamiento) siempre salen con media β y desviación γ. Los aros (evaluación) tardan unos 30 lotes en alcanzarlos.</div>
+</figure>
+
+<section>
+<h2 id="numeros">Con números: un lote de 4 películas</h2>
+<div class="callout ejemplo">
+  <span class="lbl">Ejemplo numérico · crítico sobre 10</span>
+  <ol class="pasos">
+    <li><strong>Lote:</strong> 2, 4, 6, 8. Media \( \mu_B=5 \), varianza \( \sigma_B^2=(9+1+1+9)/4=5 \).</li>
+    <li><strong>Normalizar:</strong> \( (-3,-1,1,3)/\sqrt5= \) <span class="res">−1,34; −0,45; 0,45; 1,34</span>. El crítico sobre 100 (10, 20, 30, 40) da las mismas cifras.</li>
+    <li><strong>Media móvil</strong> tras este lote (parte de 0, momentum 0,1): \( 0{,}9\cdot0+0{,}1\cdot5= \) <span class="res">0,5</span>, aún muy lejos de 5.</li>
+  </ol>
+  <p>En una red de 10 capas sigmoides la pérdida se queda en 2,30 sin BatchNorm; con BatchNorm baja a <span class="res">0,36</span> en 300 pasos.</p>
+</div>
+</section>
+
+<details class="predice">
+  <summary>Predices una sola película con el modelo en modo <code>train()</code> y una capa <code>BatchNorm1d</code>. ¿Qué pasa?<span class="hint"></span></summary>
+  <div>
+    <p><strong>Error:</strong> <code>ValueError: Expected more than 1 value per channel when training</code>. Con una muestra no hay varianza que calcular. Para predecir usa <code>model.eval()</code>; al entrenar, <code>drop_last=True</code> evita un último lote diminuto.</p>
+  </div>
+</details>
+
+<div class="resumen">
+  <h2 class="sin-num sin-toc">En tres líneas</h2>
+  <ul>
+    <li>BatchNorm resta la media y divide por la desviación del lote, y reescala con \( \gamma \) y \( \beta \), que se aprenden.</li>
+    <li>En <code>eval()</code> usa las medias móviles (momentum 0,1 en PyTorch, al revés que en Keras).</li>
+    <li>Estabiliza los gradientes: rescata una red de 10 sigmoides (2,30 → 0,36). Nada de lotes de 1.</li>
+  </ul>
+</div>
+
+<section class="quiz mini">
+<script type="application/json" class="quiz-data">
+{
+ "titulo": "¿Lo tienes?",
+ "preguntas": [
+  {
+   "q": "Una capa <code>BatchNorm1d</code> tiene <code>running_mean = 0</code>, <code>momentum = 0.1</code> y recibe un lote cuya media es 5. ¿Cuánto vale <code>running_mean</code> después?",
+   "opciones": [
+    "5",
+    "0,5",
+    "4,5",
+    "0,05"
+   ],
+   "correcta": 1,
+   "porque": "<code>running = (1 − 0,1)·running + 0,1·media_lote = 0,9·0 + 0,1·5 = 0,5</code> (el fragmento 10 da exactamente 0,5). En PyTorch el momentum es la parte que entra de la estadística nueva; en Keras es la que se conserva de la vieja."
+  },
+  {
+   "q": "¿Cuántos parámetros <strong>entrenables</strong> tiene <code>nn.BatchNorm1d(32)</code>?",
+   "opciones": [
+    "0: solo normaliza",
+    "32",
+    "64 (32 γ y 32 β)",
+    "128 (contando medias y varianzas)"
+   ],
+   "correcta": 2,
+   "porque": "Tiene un \\( \\gamma \\) (<code>weight</code>) y un \\( \\beta \\) (<code>bias</code>) por neurona: 2·32 = 64. <code>running_mean</code> y <code>running_var</code> son <em>buffers</em>: se guardan en el <code>state_dict</code> pero no se entrenan."
+  },
+  {
+   "q": "En <code>model.eval()</code>, ¿con qué media normaliza una capa BatchNorm?",
+   "opciones": [
+    "Con la del lote que le llega",
+    "Con <code>running_mean</code>, la media móvil acumulada al entrenar",
+    "Con 0 siempre",
+    "Con la media del conjunto de test"
+   ],
+   "correcta": 1,
+   "porque": "En evaluación la predicción de una película no debe depender de con quién llegue en el lote, así que se usan las estadísticas acumuladas durante el entrenamiento."
+  }
+ ]
+}
+</script>
+</section>
+
+<details class="profundizar">
+  <summary><span>Profundizar: la explicación completa<small>La fórmula completa, la tabla de los dos críticos, las medias móviles con la varianza insesgada, para qué sirve, cómo se escribe en PyTorch y las tres trampas (lote de 1, eval olvidado, momentum al revés que Keras).</small></span></summary>
+  <div class="prof-body">
+<h2 id="batchnorm">Batch normalization: normalizar lo que ve cada capa</h2>
+
+<p class="pregunta">Cada capa oculta recibe como entrada la salida de la anterior, que cambia en cada paso mientras se entrena, como si los críticos cambiaran de escala de puntuación cada día. ¿Podemos darle a cada capa entradas de un tamaño estable?</p>
+
+<div class="callout recuerda">
+  <span class="lbl">Recuerda (<a href="../../curso-3/modulo-5.html">Curso 3 · módulo 5</a>)</span>
+  <p>En Keras, <code>BatchNormalization</code> iba entre la capa y su activación, y su comportamiento dependía del argumento <code>training</code>. Aquí es <code>nn.BatchNorm1d</code> y depende de <code>model.train()</code> frente a <code>model.eval()</code>, igual que el dropout.</p>
+</div>
+
+<div class="callout analogia">
+  <span class="lbl">Analogía</span>
+  <p>Una web de cine recibe las notas de varios críticos, y cada uno usa su propia escala (uno puntúa sobre 10, otro sobre 100). Antes de comparar las películas, pasa las notas a una escala común: resta la media del grupo y divide por la dispersión. Después deja que cada capa decida su escala final con dos mandos propios (γ y β). Esa «escala común» es lo que hace BatchNorm con cada neurona y cada lote.</p>
+</div>
+
+<h3>Qué hace: normalizar con el lote y reescalar</h3>
+
+<p>Para cada característica, con los \( N \) valores del lote:</p>
+
+<div class="formula">\[ \mu_B=\frac1N\sum_{i}x_i,\qquad \sigma_B^2=\frac1N\sum_i(x_i-\mu_B)^2,\qquad \hat x_i=\frac{x_i-\mu_B}{\sqrt{\sigma_B^2+\varepsilon}},\qquad y_i=\gamma\,\hat x_i+\beta \]</div>
+
+<p>\( \mu_B \) y \( \sigma_B^2 \) son la media y la varianza <strong>del lote</strong>; \( \varepsilon \) (en PyTorch \( 10^{-5} \)) evita dividir entre cero; \( \hat x \) es el valor normalizado (media 0, desviación 1) y \( \gamma \), \( \beta \) son <strong>dos parámetros que la red aprende</strong> (en PyTorch se llaman <code>weight</code> y <code>bias</code>) para deshacer la normalización si le conviene.</p>
+
+<div class="callout ejemplo">
+  <span class="lbl">Ejemplo numérico</span>
+  <p>Un lote de 4 películas puntuadas por dos críticos: el primero (sobre 10) pone \( 2,\,4,\,6,\,8 \) y el segundo (sobre 100) pone \( 10,\,20,\,30,\,40 \). Cada crítico es una «característica».</p>
+  <table>
+    <thead><tr><th>Característica</th><th>\( \mu_B \)</th><th>\( \sigma_B^2 \)</th><th>Normalizada \( \hat x \)</th></tr></thead>
+    <tbody>
+      <tr><td>1ª (crítico sobre 10): 2, 4, 6, 8</td><td>5</td><td>(9+1+1+9)/4 = 5</td><td class="res">(−3, −1, 1, 3)/√5 = −1,3416 ; −0,4472 ; 0,4472 ; 1,3416</td></tr>
+      <tr><td>2ª (crítico sobre 100): 10, 20, 30, 40</td><td>25</td><td>125</td><td class="res">las mismas cifras</td></tr>
+    </tbody>
+  </table>
+  <p>Las dos características tenían escalas muy distintas (la segunda era cinco veces mayor), pero tras BatchNorm los dos críticos hablan en <strong>exactamente la misma escala</strong>: media 0 y desviación 1.</p>
+</div>
+
+<h3>Entrenar frente a evaluar: las medias móviles</h3>
+
+<p>Al <em>entrenar</em>, BatchNorm normaliza con las estadísticas del lote. Pero al <em>predecir</em> puedes tener una sola muestra (¿qué media usas?), y además el resultado de una muestra no debe depender de con quién llegue en el lote. Por eso durante el entrenamiento la capa va apuntando unas <strong>medias móviles</strong> de la media y la varianza, y en <code>eval()</code> usa esas:</p>
+
+<div class="formula">\[ \text{running}\leftarrow(1-m)\cdot\text{running}+m\cdot\text{estadística del lote}\qquad(m=0{,}1\text{ por defecto en PyTorch}) \]</div>
+
+<div class="callout ejemplo">
+  <span class="lbl">Ejemplo numérico</span>
+  <p>Tras el primer lote de arriba, partiendo de <code>running_mean = 0</code> y <code>running_var = 1</code> (los valores iniciales):</p>
+  <ul>
+    <li><code>running_mean</code> \( =0{,}9\cdot0+0{,}1\cdot5=0{,}5 \) (y \( 2{,}5 \) para la 2ª característica).</li>
+    <li><code>running_var</code> \( =0{,}9\cdot1+0{,}1\cdot\tfrac{20}{3}=1{,}5667 \). Fíjate: se actualiza con la varianza <em>insesgada</em> (\( 20/3=6{,}67 \), dividiendo entre \( N-1 \)), mientras que la normalización de entrenamiento usa la sesgada (5, entre \( N \)).</li>
+    <li>En <code>eval()</code>, el primer valor (2) sale \( (2-0{,}5)/\sqrt{1{,}5667}=1{,}1984 \), muy distinto de los \( -1{,}3416 \) de entrenamiento: las medias móviles aún están lejos de la realidad. Tras 100 lotes se acercan a la media y la varianza verdaderas (en el fragmento 10: 2,95 y −1,96 frente a 3 y −2).</li>
+  </ul>
+</div>
+
+<div class="callout recuerda">
+  <span class="lbl">Experimento de arriba: «BatchNorm con estadísticas del lote y con medias móviles», con todo detalle</span>
+  <p><strong>Haz esto.</strong> Cada punto es una película del lote y sus dos coordenadas son las notas de dos críticos con escalas distintas (características 1 y 2). Compara las dos gráficas: a la izquierda, esas notas antes de BatchNorm; a la derecha, después (puntos azules = modo entrenamiento, aros terracota = modo evaluación). Pulsa «Procesar un lote nuevo» y luego «Procesar 20 lotes» varias veces. Reduce el tamaño del lote N a 2 o 3. Mueve γ y β.</p>
+  <p><strong>Fíjate en.</strong> Los puntos azules siempre salen con media β y desviación γ, valga lo que valga la escala de entrada. Los aros terracota (evaluación) al principio están desplazados, porque las medias móviles parten de 0 y 1 y tardan unos 30 lotes en acercarse. Con lotes minúsculos, las estadísticas de cada lote son ruidosas y la normalización cambia mucho de un lote a otro.</p>
+</div>
+
+<h3>Para qué sirve (y qué mide el fragmento 11)</h3>
+
+<ul>
+  <li><strong>Estabiliza los gradientes.</strong> Al reescalar cada capa, la señal y el gradiente no se encogen capa a capa. En el <a href="#frag-11">fragmento 11</a>, una red de 10 capas sigmoides sin BatchNorm tiene un cociente de gradientes de \( 9\cdot10^{-9} \) y no aprende (pérdida 2,30 constante); con BatchNorm el cociente es 1,2 y la pérdida baja a 0,36 en 300 pasos.</li>
+  <li><strong>Permite learning rates mayores</strong> y hace menos crítica la inicialización.</li>
+  <li><strong>Regulariza un poco:</strong> como cada muestra se normaliza con las de su lote, mete un ruido parecido (más suave) al del dropout.</li>
+</ul>
+
+<h3>Cómo se escribe en PyTorch</h3>
+
+<ul>
+  <li><code>nn.BatchNorm1d(n)</code> para entradas de forma <code>(lote, n)</code> (redes densas); <code>BatchNorm2d(canales)</code> para imágenes (próximo módulo).</li>
+  <li>Se coloca entre la capa lineal y la activación: <code>Linear → BatchNorm1d → ReLU</code>. Como \( \beta \) ya hace de sesgo, el <code>Linear</code> anterior puede llevar <code>bias=False</code> (el fragmento 15 lo hace).</li>
+  <li>Tiene <strong>parámetros</strong> (<code>weight</code> = γ, <code>bias</code> = β) y <strong>buffers</strong> (<code>running_mean</code>, <code>running_var</code>, <code>num_batches_tracked</code>): los buffers no se entrenan pero sí se guardan en el <code>state_dict</code>.</li>
+</ul>
+
+<div class="callout ojo">
+  <span class="lbl">Ojo · tres trampas</span>
+  <p><strong>1)</strong> Un lote de <strong>una sola muestra</strong> en modo entrenamiento da <code>ValueError: Expected more than 1 value per channel when training</code>, y un último lote muy pequeño (con 1347 muestras y lotes de 64, el último tiene 3) produce estadísticas ruidosas que estropean las medias móviles: usa <code>drop_last=True</code> en el <code>DataLoader</code>. <strong>2)</strong> Si olvidas <code>model.eval()</code>, la predicción de una muestra depende de las demás del lote. <strong>3)</strong> El «momentum» tiene el convenio inverso al de Keras: en PyTorch <code>momentum=0.1</code> es la parte que entra de la estadística nueva (<code>running = 0.9·running + 0.1·lote</code>); en Keras <code>momentum=0.99</code> es la parte que se conserva de la vieja. Valores equivalentes: 0,1 en PyTorch ↔ 0,9 en Keras (y el 0,99 de Keras ↔ 0,01 en PyTorch).</p>
+</div>
+
+<div class="callout regla">
+  <span class="lbl">Regla fácil</span>
+  <p>BatchNorm en entrenamiento: estadísticas <em>del lote</em>. BatchNorm en evaluación: estadísticas <em>acumuladas</em>. Lotes de tamaño 1 o muy pequeños: no.</p>
+</div>
+  </div>
+</details>
+
+
+<section>
+<h2 class="sin-num">Código</h2>
+<article class="snippet" data-lang="python" id="frag-10">
+  <header>
+    <h3>10 · <code>nn.BatchNorm1d</code>: estadísticas del lote, medias móviles y <code>eval</code></h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Abrir una capa de BatchNorm: comprobar a mano la normalización, ver qué son sus parámetros y sus <em>buffers</em>, cómo se actualizan las medias móviles y qué cambia entre <code>train()</code> y <code>eval()</code>.</p>
+  </header>
+  <pre class="code"><code>import torch
+import torch.nn as nn
+
+x = torch.tensor([[2.0, 10.0], [4.0, 20.0], [6.0, 30.0], [8.0, 40.0]])   # 4 muestras, 2 características
+bn = nn.BatchNorm1d(2)
+print("parámetros:", [n for n, _ in bn.named_parameters()], " buffers:", [n for n, _ in bn.named_buffers()])
+
+# Modo entrenamiento: estadísticas del propio lote
+y_train = bn(x)
+mu = x.mean(dim=0)
+var = x.var(dim=0, unbiased=False)                   # varianza del lote, dividiendo entre N
+a_mano = (x - mu) / torch.sqrt(var + bn.eps)
+print("media del lote:", mu.tolist(), " varianza del lote:", var.tolist())
+print("salida (columna 1):", [round(v, 4) for v in y_train[:, 0].tolist()])
+print("¿coincide con la cuenta a mano?", torch.allclose(y_train, a_mano, atol=1e-6))
+print("running_mean:", bn.running_mean.tolist(), " running_var:", [round(v, 4) for v in bn.running_var.tolist()])
+
+# Modo evaluación: usa las medias móviles, no el lote
+bn.eval()
+print("eval (columna 1):", [round(v, 4) for v in bn(x)[:, 0].tolist()])
+
+# Con muchos lotes, las medias móviles convergen a las estadísticas de los datos
+torch.manual_seed(0)
+bn2 = nn.BatchNorm1d(2)
+for _ in range(100):
+    lote = torch.randn(32, 2) * torch.tensor([1.0, 5.0]) + torch.tensor([3.0, -2.0])
+    bn2(lote)
+print("tras 100 lotes: running_mean =", [round(v, 2) for v in bn2.running_mean.tolist()],
+      " running_var =", [round(v, 2) for v in bn2.running_var.tolist()])
+print("num_batches_tracked:", bn2.num_batches_tracked.item(), " claves del state_dict:", list(bn2.state_dict().keys()))
+
+# Un lote de una sola muestra no tiene varianza
+bn2.train()
+try:
+    bn2(torch.randn(1, 2))
+except ValueError as e:
+    print("ValueError:", e)</code></pre>
+  <details class="linea-a-linea" open>
+    <summary>Línea por línea</summary>
+    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+      <tbody>
+        <tr data-lines="1-2"><td><code>import torch …</code></td><td>Importamos <code>torch</code> y <code>nn</code>.</td></tr>
+        <tr data-lines="4"><td><code>x = torch.tensor([[2.0, 10.0], [4.0, 20.0], [6.0, 30.0], [8.0, 40.0]])   # 4 muestras, 2 características</code></td><td>Un lote de 4 muestras con 2 características (cada fila es una muestra): la segunda característica es 5 veces mayor que la primera.</td></tr>
+        <tr data-lines="5"><td><code>bn = nn.BatchNorm1d(2)</code></td><td>Una capa <code>nn.BatchNorm1d(2)</code>, para 2 características.</td></tr>
+        <tr data-lines="6"><td><code>print("parámetros:", [n for n, _ in bn.named_parameters()], " buffers:", [n for n, _ in bn.named_buffers()])</code></td><td>Lista los <strong>parámetros</strong> (<code>weight</code> = γ y <code>bias</code> = β, se entrenan) y los <strong>buffers</strong> (<code>running_mean</code>, <code>running_var</code>, <code>num_batches_tracked</code>, se guardan en el modelo pero no se entrenan).</td></tr>
+        <tr data-lines="8-9"><td><code># Modo entrenamiento: estadísticas del propio lote …</code></td><td>Una llamada <code>bn(x)</code> en modo entrenamiento (el modo por defecto): normaliza con la media y la varianza <strong>del propio lote</strong>.</td></tr>
+        <tr data-lines="10-12"><td><code>mu = x.mean(dim=0) …</code></td><td>La misma cuenta a mano: media por columna (<code>dim=0</code>), varianza dividiendo entre N (<code>unbiased=False</code>) y \((x-\mu)/\sqrt{\sigma^2+\varepsilon}\) con el <code>eps</code> de la capa (\(10^{-5}\)).</td></tr>
+        <tr data-lines="13-15"><td><code>print("media del lote:", mu.tolist(), " varianza del lote:", var.tolist()) …</code></td><td>Imprime las estadísticas del lote, la primera columna ya normalizada y una comprobación de que coincide con la cuenta a mano. Como γ = 1 y β = 0 al principio, la salida es justo \(\hat x\).</td></tr>
+        <tr data-lines="16"><td><code>print("running_mean:", bn.running_mean.tolist(), " running_var:", [round(v, 4) for v in bn.running_var.tolist()])</code></td><td>Las medias móviles se han actualizado con ese único lote.</td></tr>
+        <tr data-lines="18-20"><td><code># Modo evaluación: usa las medias móviles, no el lote …</code></td><td><code>bn.eval()</code> pasa a modo evaluación: ahora normaliza con <code>running_mean</code> y <code>running_var</code>, no con el lote.</td></tr>
+        <tr data-lines="22-24"><td><code># Con muchos lotes, las medias móviles convergen a las estadísticas de los datos …</code></td><td>Segunda capa para ver la convergencia de las medias móviles: semilla y <code>BatchNorm1d(2)</code>.</td></tr>
+        <tr data-lines="25-27"><td><code>for _ in range(100): …</code></td><td>100 lotes de 32 muestras aleatorias con media (3, −2) y desviación (1, 5); la capa los procesa en modo entrenamiento y va actualizando sus medias móviles.</td></tr>
+        <tr data-lines="28-29"><td><code>print("tras 100 lotes: running_mean =", [round(v, 2) for v in bn2.running_mean.tolist()], …</code></td><td>Imprime las medias móviles tras los 100 lotes.</td></tr>
+        <tr data-lines="30"><td><code>print("num_batches_tracked:", bn2.num_batches_tracked.item(), " claves del state_dict:", list(bn2.state_dict().keys()))</code></td><td>Muestra <code>num_batches_tracked</code> y las claves del <code>state_dict</code>: por eso los buffers se guardan con <code>torch.save</code>.</td></tr>
+        <tr data-lines="32-37"><td><code># Un lote de una sola muestra no tiene varianza …</code></td><td>Vuelve a modo entrenamiento e intenta procesar un lote de una sola muestra: no se puede calcular una varianza, y PyTorch lanza <code>ValueError</code> (capturado para imprimirlo).</td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>parámetros: ['weight', 'bias']  buffers: ['running_mean', 'running_var', 'num_batches_tracked']
+media del lote: [5.0, 25.0]  varianza del lote: [5.0, 125.0]
+salida (columna 1): [-1.3416, -0.4472, 0.4472, 1.3416]
+¿coincide con la cuenta a mano? True
+running_mean: [0.5, 2.5]  running_var: [1.5667, 17.5667]
+eval (columna 1): [1.1984, 2.7963, 4.3941, 5.992]
+tras 100 lotes: running_mean = [2.95, -1.96]  running_var = [1.04, 26.42]
+num_batches_tracked: 100  claves del state_dict: ['weight', 'bias', 'running_mean', 'running_var', 'num_batches_tracked']
+ValueError: Expected more than 1 value per channel when training, got input size torch.Size([1, 2])</pre>
+    <p>La media del lote es (5, 25) y la varianza (5, 125); la primera columna normalizada queda \((-1.3416,-0.4472,0.4472,1.3416)\), que coincide con la cuenta a mano \((2-5)/\sqrt5=-1.3416\). Tras un lote, <code>running_mean</code> \(=0.9\cdot0+0.1\cdot(5,25)=(0.5,2.5)\) y <code>running_var</code> \(=0.9\cdot1+0.1\cdot(20/3)=1.5667\) (usa la varianza <em>insesgada</em>, entre N−1). En <code>eval</code>, la salida es otra: \((2-0.5)/\sqrt{1.5667}=1.1984\), porque usa las medias móviles, aún lejos de la realidad. Tras 100 lotes convergen a (2.95, −1.96) y (1.04, 26.42), cerca de los valores reales (3, −2) y (1, 25).</p>
+  </div>
+</article>
+
+<article class="snippet" data-lang="python" id="frag-11">
+  <header>
+    <h3>11 · BatchNorm en una red de 10 capas sigmoides</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Medir el efecto de BatchNorm sobre los gradientes por capa y sobre el entrenamiento en una red con sigmoides, el peor caso para el gradiente que se desvanece.</p>
+  </header>
+  <pre class="code"><code>import torch
+import torch.nn as nn
+from sklearn.datasets import load_digits
+
+X, y = load_digits(return_X_y=True)
+X = torch.tensor(X / 16.0, dtype=torch.float32)
+y = torch.tensor(y)
 perdida = nn.CrossEntropyLoss()
 
 
-def experimento(p, semilla):
-    Xtr, ytr = make_moons(60, noise=0.35, random_state=semilla)           # solo 60 puntos de entrenamiento
-    Xte, yte = make_moons(2000, noise=0.35, random_state=100 + semilla)   # 2000 que la red nunca ve
-    Xtr, Xte = torch.tensor(Xtr, dtype=torch.float32), torch.tensor(Xte, dtype=torch.float32)
-    ytr, yte = torch.tensor(ytr), torch.tensor(yte)
-    torch.manual_seed(semilla)
-    modelo = nn.Sequential(nn.Linear(2, 128), nn.ReLU(), nn.Dropout(p),
-                           nn.Linear(128, 128), nn.ReLU(), nn.Dropout(p),
-                           nn.Linear(128, 2))
-    optimizador = torch.optim.Adam(modelo.parameters(), lr=1e-3)
-    for epoca in range(500):
-        modelo.train()                                   # dropout activo
+def construir(con_bn, capas_ocultas=10, ancho=32):
+    torch.manual_seed(0)
+    modulos, entrada = [], 64
+    for _ in range(capas_ocultas):
+        modulos.append(nn.Linear(entrada, ancho))
+        if con_bn:
+            modulos.append(nn.BatchNorm1d(ancho))
+        modulos.append(nn.Sigmoid())
+        entrada = ancho
+    modulos.append(nn.Linear(entrada, 10))
+    return nn.Sequential(*modulos)
+
+
+for con_bn in [False, True]:
+    modelo = construir(con_bn)
+    perdida(modelo(X[:256]), y[:256]).backward()
+    normas = [m.weight.grad.norm().item() for m in modelo if isinstance(m, nn.Linear)]
+    print(f"{'con' if con_bn else 'sin'} BatchNorm: capa 1 = {normas[0]:.1e}, capa 11 = {normas[-1]:.1e}, cociente = {normas[0] / normas[-1]:.1e}")
+
+    modelo = construir(con_bn)
+    optimizador = torch.optim.SGD(modelo.parameters(), lr=0.1)
+    g = torch.Generator().manual_seed(0)
+    historial = []
+    for paso in range(1, 301):
+        idx = torch.randint(0, 1500, (64,), generator=g)
         optimizador.zero_grad()
-        perdida(modelo(Xtr), ytr).backward()
+        l = perdida(modelo(X[idx]), y[idx])
+        l.backward()
         optimizador.step()
-    modelo.eval()                                        # dropout apagado para medir
-    with torch.no_grad():
-        return [(modelo(Xtr).argmax(1) == ytr).float().mean().item(),
-                (modelo(Xte).argmax(1) == yte).float().mean().item(),
-                perdida(modelo(Xte), yte).item()]
+        if paso in (1, 50, 100, 200, 300):
+            historial.append(round(l.item(), 3))
+    print("   pérdida en los pasos 1, 50, 100, 200, 300:", historial)</code></pre>
+  <details class="linea-a-linea" open>
+    <summary>Línea por línea</summary>
+    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+      <tbody>
+        <tr data-lines="1-3"><td><code>import torch …</code></td><td>Importamos <code>torch</code>, <code>nn</code> y los dígitos de scikit-learn.</td></tr>
+        <tr data-lines="5-8"><td><code>X, y = load_digits(return_X_y=True) …</code></td><td>Datos escalados a 0-1, convertidos a tensores, y la pérdida de entropía cruzada.</td></tr>
+        <tr data-lines="11-12"><td><code>def construir(con_bn, capas_ocultas=10, ancho=32): …</code></td><td><code>construir</code> crea una red con 10 capas ocultas de 32 neuronas; <code>con_bn</code> decide si se añade BatchNorm.</td></tr>
+        <tr data-lines="13-14"><td><code>modulos, entrada = [], 64 …</code></td><td>Semilla fija y lista de módulos; <code>entrada</code> empieza en 64 (los píxeles).</td></tr>
+        <tr data-lines="15"><td><code>modulos.append(nn.Linear(entrada, ancho))</code></td><td>Capa lineal.</td></tr>
+        <tr data-lines="16-17"><td><code>if con_bn: …</code></td><td>Si se pide, una <code>BatchNorm1d(ancho)</code> <strong>antes</strong> de la activación.</td></tr>
+        <tr data-lines="18-19"><td><code>modulos.append(nn.Sigmoid()) …</code></td><td>Activación sigmoide, y la salida de esta capa es la entrada de la siguiente.</td></tr>
+        <tr data-lines="20-21"><td><code>modulos.append(nn.Linear(entrada, 10)) …</code></td><td>Capa de salida (sin activación) y empaquetado en <code>Sequential</code>.</td></tr>
+        <tr data-lines="24-25"><td><code>for con_bn in [False, True]: …</code></td><td>Bucle sobre las dos versiones: construye la red (en modo entrenamiento, el modo por defecto).</td></tr>
+        <tr data-lines="26-28"><td><code>perdida(modelo(X[:256]), y[:256]).backward() …</code></td><td>Una pasada con 256 muestras, <code>backward</code> y las normas de los gradientes de las 11 capas lineales; imprime la primera, la última y el cociente.</td></tr>
+        <tr data-lines="30-31"><td><code>modelo = construir(con_bn) …</code></td><td>Vuelve a construir (pesos iguales de nuevo) y prepara un optimizador SGD con \(lr=0.1\).</td></tr>
+        <tr data-lines="32-35"><td><code>g = torch.Generator().manual_seed(0) …</code></td><td>Generador de números aleatorios con semilla para elegir lotes de 64 muestras al azar entre las primeras 1500 (<code>torch.randint</code>).</td></tr>
+        <tr data-lines="36-39"><td><code>optimizador.zero_grad() …</code></td><td>Entrenamiento: pone a cero gradientes, calcula la pérdida del lote, <code>backward</code> y <code>step</code>.</td></tr>
+        <tr data-lines="40-42"><td><code>if paso in (1, 50, 100, 200, 300): …</code></td><td>Guarda la pérdida en los pasos 1, 50, 100, 200 y 300 y la imprime.</td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>sin BatchNorm: capa 1 = 2.1e-09, capa 11 = 2.3e-01, cociente = 9.0e-09
+   pérdida en los pasos 1, 50, 100, 200, 300: [2.302, 2.302, 2.307, 2.303, 2.315]
+con BatchNorm: capa 1 = 4.0e-01, capa 11 = 3.3e-01, cociente = 1.2e+00
+   pérdida en los pasos 1, 50, 100, 200, 300: [2.299, 1.498, 1.153, 0.554, 0.359]</pre>
+    <p>Sin BatchNorm, la capa 1 recibe \(2\cdot10^{-9}\) frente a 0.23 de la última (cociente \(9\cdot10^{-9}\)) y la pérdida se queda en 2.30 (\(\ln10\), elegir al azar entre 10 clases): la red no aprende nada. Con BatchNorm, las dos capas reciben 0.40 y 0.33 (cociente 1.2) y la pérdida baja de 2.30 a 0.36 en 300 pasos.</p>
+  </div>
+</article>
+</section>
 
 
-print(f"{'p':&gt;4s} {'acierto train':&gt;14s} {'acierto test':&gt;13s} {'pérdida test':&gt;13s}")
-for p in [0.0, 0.2, 0.5]:
-    r = np.array([experimento(p, s) for s in range(10)]).mean(axis=0)
-    print(f"{p:4.1f} {r[0]:14.3f} {r[1]:13.3f} {r[2]:13.3f}")</code></pre>
-<details class="linea-a-linea" open="">
-<summary>Línea por línea</summary>
-<p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
-<table class="lineas">
-<thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
-<tbody>
-<tr data-lines="1-4"><td><code>import numpy as np …</code></td><td>Importamos NumPy (para promediar), <code>torch</code>, <code>nn</code> y <code>make_moons</code> (dos lunas con ruido, un problema de juguete).</td></tr>
-<tr data-lines="6-7"><td><code>torch.set_num_threads(1) …</code></td><td>Un solo hilo de CPU y la pérdida de entropía cruzada.</td></tr>
-<tr data-lines="10-14"><td><code>def experimento(p, semilla): …</code></td><td><code>experimento(p, semilla)</code>: genera <strong>60</strong> puntos de entrenamiento y 2000 de test con otra semilla (la red no los ve nunca), con mucho ruido (0.35), y los convierte a tensores.</td></tr>
-<tr data-lines="15-18"><td><code>torch.manual_seed(semilla) …</code></td><td>Semilla de PyTorch y un modelo grande para tan pocos datos: dos capas ocultas de 128 con ReLU y <code>Dropout(p)</code> detrás de cada una. Con <code>p = 0.0</code> el dropout no hace nada.</td></tr>
-<tr data-lines="19"><td><code>optimizador = torch.optim.Adam(modelo.parameters(), lr=1e-3)</code></td><td>Optimizador Adam con learning rate \(10^{-3}\).</td></tr>
-<tr data-lines="20-24"><td><code>for epoca in range(500): …</code></td><td>500 épocas; en cada una: <code>modelo.train()</code> (dropout activo), puesta a cero de gradientes, <code>backward</code> de la pérdida sobre los 60 puntos y <code>step()</code>.</td></tr>
-<tr data-lines="25-29"><td><code>modelo.eval()                                        # dropout apagado para medir …</code></td><td>Para medir: <code>modelo.eval()</code> apaga el dropout, <code>torch.no_grad()</code> evita construir grafo y se devuelven el acierto en entrenamiento, el acierto en test (con <code>argmax(1)</code> eligiendo la clase de mayor puntuación) y la pérdida en test.</td></tr>
-<tr data-lines="32"><td><code>print(f"{'p':&gt;4s} {'acierto train':&gt;14s} {'acierto test':&gt;13s} {'pérdida test':&gt;13s}")</code></td><td>Cabecera de la tabla.</td></tr>
-<tr data-lines="33-35"><td><code>for p in [0.0, 0.2, 0.5]: …</code></td><td>Para cada valor de <code>p</code>, repite el experimento con 10 semillas, promedia con <code>.mean(axis=0)</code> e imprime.</td></tr>
-</tbody>
-</table>
-</details>
-<div class="salida">
-<strong>Salida esperada</strong>
-<pre>   p  acierto train  acierto test  pérdida test
- 0.0          0.993         0.837         0.967
- 0.2          0.933         0.847         0.554
- 0.5          0.905         0.858         0.423</pre>
-<p>Sin dropout la red memoriza: 99.3 % en entrenamiento pero 83.7 % en test, con una pérdida de test de 0.967 (muy segura de sí misma y a menudo equivocada). Con \(p=0.5\): peor en entrenamiento (90.5 %), pero mejor en test (85.8 %) y con pérdida 0.423, menos de la mitad. La ganancia en acierto es modesta (+2 puntos); la mejora en la pérdida es la más visible.</p>
 </div>
-</article></div></details></div></main></body></html>
+</main>
+</body>
+</html>
