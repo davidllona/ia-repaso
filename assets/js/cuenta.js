@@ -3,7 +3,7 @@
    - Correo y contraseña con Firebase Authentication (API REST, sin librerías).
    - La sesión se queda guardada en el navegador: sigues dentro hasta que
      pulses «Cerrar sesión» (el token se renueva solo).
-   - El progreso se guarda en Firestore, en progreso/{tu-uid}, y se fusiona
+   - El progreso se guarda en Firestore, en {coleccion}/{tu-uid}, y se fusiona
      entre dispositivos: para cada lección gana el cambio más reciente.
    ========================================================================= */
 (function () {
@@ -11,11 +11,15 @@
   var CFG = window.CUADERNO_CUENTA || {};
   var DONE_KEY = "cuaderno-ia:hecho:v1";
   var CHANGES_KEY = "cuaderno-ia:cambios:v1";
-  var SESSION_KEY = "cuaderno-ia:sesion:v1";
+  /* La sesión se guarda por proyecto de Firebase, así que todos los cuadernos que usen el mismo
+     proyecto (y estén en davidllona.github.io) comparten el inicio de sesión. */
+  var SESSION_KEY = "firebase:" + (CFG.projectId || "") + ":sesion:v1";
+  /* Carpeta (colección) de Firestore propia de este cuaderno: así el progreso no se mezcla con el de otros. */
+  var COLECCION = CFG.coleccion || "progreso";
   var configured = !!(CFG.apiKey && CFG.projectId);
   var AUTH = "https://identitytoolkit.googleapis.com/v1/accounts:";
   var TOKEN = "https://securetoken.googleapis.com/v1/token?key=";
-  var DOCS = "https://firestore.googleapis.com/v1/projects/" + encodeURIComponent(CFG.projectId || "") + "/databases/(default)/documents/progreso/";
+  var DOCS = "https://firestore.googleapis.com/v1/projects/" + encodeURIComponent(CFG.projectId || "") + "/databases/(default)/documents/" + encodeURIComponent(COLECCION) + "/";
 
   var btn = document.getElementById("cuenta-btn");
   if (!btn) return;
@@ -25,7 +29,13 @@
   /* ---------- almacenamiento local ---------- */
   function readJSON(k) { try { return JSON.parse(localStorage.getItem(k) || "{}") || {}; } catch (e) { return {}; } }
   function writeJSON(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
-  function loadSession() { try { var s = JSON.parse(localStorage.getItem(SESSION_KEY) || "null"); return s && s.refreshToken ? s : null; } catch (e) { return null; } }
+  function loadSession() {
+    try {
+      var s = JSON.parse(localStorage.getItem(SESSION_KEY) || "null");
+      if (!s) { s = JSON.parse(localStorage.getItem("cuaderno-ia:sesion:v1") || "null"); if (s) { localStorage.setItem(SESSION_KEY, JSON.stringify(s)); localStorage.removeItem("cuaderno-ia:sesion:v1"); } }
+      return s && s.refreshToken ? s : null;
+    } catch (e) { return null; }
+  }
   function saveSession(s) { session = s; try { if (s) localStorage.setItem(SESSION_KEY, JSON.stringify(s)); else localStorage.removeItem(SESSION_KEY); } catch (e) {} }
 
   /* ---------- Firebase Auth (REST) ---------- */
