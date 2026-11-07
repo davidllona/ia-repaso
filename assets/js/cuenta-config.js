@@ -5,6 +5,6 @@
    (ver docs/CUENTA_Y_SINCRONIZACION.md).
    Si se dejan vacías, la web funciona igual pero guarda el progreso solo en este navegador. */
 window.CUADERNO_CUENTA = {
-  apiKey: "",
-  projectId: ""
+  apiKey: "AIzaSyAnp3IH26oiY0zixEoZL-M49ghBtnrRYnU",
+  projectId: "repasoia"
 };
