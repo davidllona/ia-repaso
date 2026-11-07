@@ -1,51 +1,43 @@
-# Cuenta y sincronización del progreso
+# Cuenta y sincronización del progreso (Firebase)
 
 La web es estática (GitHub Pages), así que el inicio de sesión y el guardado del progreso
-en la nube los hace **Supabase** (plan gratuito). Mientras `assets/js/cuenta-config.js`
-esté vacío, todo funciona igual que antes y el progreso se guarda solo en el navegador.
+en la nube los hace **Firebase** (plan gratuito Spark), usando su API REST: no hace falta
+ninguna librería. Mientras `assets/js/cuenta-config.js` esté vacío, todo funciona igual que
+antes y el progreso se guarda solo en el navegador.
 
-## Activarlo (una vez, ~5 minutos)
+## Activarlo (una vez)
 
-1. Entra en <https://supabase.com>, crea una cuenta y pulsa **New project** (cualquier nombre,
-   región Europa, guarda la contraseña de la base de datos aunque no la vas a usar).
-2. Cuando termine de crearse, ve a **SQL Editor → New query**, pega esto y pulsa **Run**:
+1. **Authentication → Comenzar → Método de acceso → Correo electrónico/contraseña → Habilitar → Guardar.**
+2. **Authentication → Configuración → Dominios autorizados → Agregar dominio:** `davidllona.github.io`.
+3. **Firestore Database → Reglas**, sustituye todo por esto y pulsa **Publicar**:
 
-```sql
-create table if not exists public.progreso (
-  user_id uuid primary key references auth.users(id) on delete cascade,
-  datos jsonb not null default '{}'::jsonb,
-  actualizado timestamptz not null default now()
-);
-alter table public.progreso enable row level security;
-
-create policy "leer mi progreso" on public.progreso
-  for select using (auth.uid() = user_id);
-create policy "crear mi progreso" on public.progreso
-  for insert with check (auth.uid() = user_id);
-create policy "cambiar mi progreso" on public.progreso
-  for update using (auth.uid() = user_id) with check (auth.uid() = user_id);
+```
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /progreso/{uid} {
+      allow read, write: if request.auth != null && request.auth.uid == uid;
+    }
+  }
+}
 ```
 
-   Las reglas (RLS) hacen que cada persona solo pueda leer y escribir **su** fila.
+   Así cada persona solo puede leer y escribir **su** documento.
 
-3. **Authentication → URL Configuration**:
-   - *Site URL*: `https://davidllona.github.io/ia-repaso/`
-   - *Redirect URLs*: añade `https://davidllona.github.io/ia-repaso/**`
-4. (Opcional) **Authentication → Sign In / Providers → Email**: si desactivas
-   *Confirm email*, las cuentas nuevas entran al momento sin tener que abrir el correo.
-5. **Project Settings → API**: copia la **Project URL** y la clave **anon public** y pégalas en
-   `assets/js/cuenta-config.js`. La clave *anon* es pública por diseño (la protegen las reglas
-   RLS del paso 2). **Nunca** pegues la clave `service_role`.
-6. Sube el cambio a GitHub. En 1–2 minutos verás el botón «Entrar» funcionando.
+4. **Configuración del proyecto (rueda) → General → Tus apps → icono `</>` (Web)**: ponle un
+   nombre, *Registrar app*, y copia de `firebaseConfig` los valores `apiKey` y `projectId`
+   en `assets/js/cuenta-config.js`. La `apiKey` de Firebase es pública por diseño; la
+   protegen las reglas del paso 3.
+5. Sube el cambio a GitHub. En 1–2 minutos el botón «Entrar» funciona.
 
 ## Cómo funciona
 
-- Botón de cuenta en la barra superior → Entrar / Crear cuenta / He olvidado la contraseña.
-- La sesión se guarda en el navegador (`persistSession`) y se renueva sola: sigues dentro hasta
-  pulsar «Cerrar sesión».
+- Botón de cuenta en la barra superior → Entrar / Crear cuenta / He olvidado la contraseña
+  (Firebase envía el correo de recuperación con su propia página para poner la contraseña nueva).
+- La sesión (token de refresco) se guarda en `localStorage` y se renueva sola: sigues dentro
+  hasta pulsar «Cerrar sesión».
 - Cada vez que marcas o desmarcas una lección se guarda la fecha del cambio
-  (`localStorage` → `cuaderno-ia:cambios:v1`). Al entrar, al volver a la pestaña y tras cada
-  cambio, la web descarga tu progreso, lo **fusiona** (para cada lección gana el cambio más
-  reciente) y lo vuelve a subir. Lo que hubieras marcado antes de tener cuenta se conserva.
-- Archivos: `assets/js/cuenta.js` (lógica e interfaz), `assets/js/cuenta-config.js` (datos del
-  proyecto), `assets/vendor/supabase/` (librería supabase-js 2.45.4, MIT, incluida en la web).
+  (`cuaderno-ia:cambios:v1`). Al entrar, al volver a la pestaña y tras cada cambio, la web
+  descarga tu documento `progreso/{uid}`, lo **fusiona** (para cada lección gana el cambio más
+  reciente) y lo vuelve a subir. Lo marcado antes de tener cuenta se conserva.
+- Archivos: `assets/js/cuenta.js` (lógica e interfaz) y `assets/js/cuenta-config.js` (datos del proyecto).
