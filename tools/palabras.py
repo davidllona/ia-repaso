@@ -17,6 +17,7 @@ def visibles(html):
     s = re.sub(r"<article class=\"snippet\".*?</article>", "", s, flags=re.S)
     s = re.sub(r"<section class=\"quiz[^\"]*\">.*?</section>", "", s, flags=re.S)
     s = re.sub(r"<pre.*?</pre>", "", s, flags=re.S)
+    s = re.sub(r'<dl class="chuleta">.*?</dl>', "", s, flags=re.S)  # la chuleta es para repasar, no cuenta como lectura
     s = re.sub(r"<[^>]+>", " ", s)
     return len(s.split())
 

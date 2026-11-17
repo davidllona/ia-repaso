@@ -31,7 +31,7 @@ window.CURRICULUM = {
           tags: ["IA · ML · DL", "Features y target", "Ciclo de vida", "Pandas", "NaN y outliers", "Escalado", "One-Hot", "Generalización"],
           lessons: [
             {"n": 1, "slug": "leccion-1", "title": "Aprender es probar reglas y quedarse con la que menos falla", "blurb": "Programar es escribir la regla; aprender es dejar que salga de los ejemplos.", "min": 3},
-            {"n": 2, "slug": "leccion-2", "title": "X es lo que el modelo sabe; y, lo que debe adivinar", "blurb": "IA ⊃ ML ⊃ DL, y las piezas de cualquier problema: features, target, modelo, parámetros.", "min": 3},
+            {"n": 2, "slug": "leccion-2", "title": "X es lo que el modelo sabe; y, lo que debe adivinar", "blurb": "El vocabulario del curso con Netflix: X, y, clasificación, regresión, parámetros e hiperparámetros. Con chuleta de repaso.", "min": 4},
             {"n": 3, "slug": "leccion-3", "title": "Supervisado o no: todo depende de si tienes la respuesta", "blurb": "Los cuatro tipos de aprendizaje y por qué la misma película admite dos preguntas distintas.", "min": 3},
             {"n": 4, "slug": "leccion-4", "title": "Ocho preguntas, ocho técnicas: lo raro, el orden y lo que va junto", "blurb": "Cada técnica responde a una pregunta distinta; la anomalía y el orden, con números.", "min": 3},
             {"n": 5, "slug": "leccion-5", "title": "Un proyecto es una película de trece escenas, y el modelo es la más corta", "blurb": "Las trece escenas del ciclo de vida con StreamFlix: del problema a la deriva.", "min": 4},
