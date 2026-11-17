@@ -20,8 +20,8 @@
     <div>
       <p class="eyebrow">Curso 1 · Módulo 4 · Lección 7 de 8</p>
       <h1>Un grupo es una zona densa; lo que no cabe en ninguna es ruido (o una anomalía)</h1>
-      <p class="lead">K-Means obliga a cada usuario a entrar en algún grupo redondo. DBSCAN no: un grupo es una mancha de usuarios apretados, tenga la forma que tenga, y el usuario suelto en medio de la nada es ruido.</p>
-      <p class="meta-line"><span class="read-time" data-render="read-time"></span><a href="../modulo-4.html">Índice del módulo</a></p>
+      <p class="lead">Vas a entender DBSCAN, que agrupa por zonas con mucha gente en vez de por centros, y cómo ese mismo truco sirve para encontrar usuarios raros.</p>
+      <p class="meta-line"><span class="read-time" data-render="read-time"></span><a href="../modulo-4.html">Índice del módulo</a> · <a href="#chuleta">Ir a la chuleta</a></p>
     </div>
     <div class="hero-tile" aria-hidden="true"></div>
   </div>
@@ -29,65 +29,139 @@
 
 
 <details class="predice">
-  <summary>Los gustos de tus usuarios forman dos lunas entrelazadas. Ejecutas K-Means con K = 2. ¿Separará las dos lunas?<span class="hint"></span></summary>
+  <summary>Dibujas a tus usuarios y forman dos lunas que se abrazan, una encajada en la otra. Ejecutas K-Means con K = 2. ¿Separará las dos lunas?<span class="hint"></span></summary>
   <div>
-    <p>No, con ningún K. La frontera entre dos centroides es siempre una recta, y no hay recta que separe dos lunas que se abrazan. Hace falta un algoritmo que no piense en centros sino en <strong>densidad</strong>: ir saltando de usuario en usuario mientras el salto sea pequeño.</p>
+    <p>No. La frontera entre dos centroides es una línea recta, y ninguna recta separa dos lunas que se abrazan. Hace falta otra idea de grupo: «los que están <strong>apretados</strong>».</p>
   </div>
 </details>
 
 <section>
-<h2 id="idea">Dos números, tres tipos de punto</h2>
-<p><strong>DBSCAN</strong> define un grupo como una zona densa separada de otras por zonas vacías. Solo necesita dos parámetros: <code>eps</code>, el radio del vecindario, y <code>min_samples</code>, cuántos puntos tiene que haber dentro de ese radio (<strong>contando al propio punto</strong>) para que la zona sea densa. Con ellos cada usuario es:</p>
-<ul class="flow">
-  <li class="a">NÚCLEO<small>≥ min_samples vecinos a ≤ eps</small></li>
-  <li class="b">BORDE<small>no es núcleo, pero toca a uno</small></li>
-  <li class="c">RUIDO<small>ni núcleo ni cerca de uno (−1)</small></li>
-</ul>
-<p>El algoritmo coge un núcleo, le da un grupo y añade sus vecinos; si alguno es también núcleo, añade los suyos, y la mancha se extiende como aceite hasta que no puede más. Luego otro núcleo. El número de grupos <strong>sale solo</strong>, las formas pueden ser cualquiera y los atípicos no arrastran nada: quedan como ruido. Ese ruido es, de hecho, un detector de anomalías improvisado: todo lo que sale con etiqueta −1 es candidato a cuenta robada, bot o error de datos. Para eso hay herramientas específicas como <strong>Isolation Forest</strong> (lo raro se aísla con pocos cortes al azar) y <strong>LOF</strong> (lo raro vive en una zona menos densa que la de sus vecinos).</p>
-<p>El punto flaco es que <code>eps</code> es el mismo para todo el mapa: si un grupo es denso y otro disperso, ningún valor sirve a los dos. <strong>HDBSCAN</strong> lo arregla probando todos los <code>eps</code> a la vez y quedándose con los grupos más estables; solo le pides <code>min_cluster_size</code>.</p>
+<h2 id="idea">1 · Otra idea de grupo: una zona con mucha gente</h2>
+<p><strong>Densidad</strong> es cuántos puntos hay en un trozo del dibujo. <strong>DBSCAN</strong> llama grupo a una zona densa, rodeada de zonas vacías. Para decidir qué es «denso» le das dos números:</p>
+<table>
+  <thead><tr><th>Número</th><th>Qué es</th></tr></thead>
+  <tbody>
+    <tr><td><code>eps</code></td><td>El <strong>radio</strong>: hasta qué distancia cuenta alguien como vecino tuyo</td></tr>
+    <tr><td><code>min_samples</code></td><td>El <strong>mínimo</strong> de puntos dentro de ese radio para que la zona sea densa. El propio punto también cuenta.</td></tr>
+  </tbody>
+</table>
 </section>
 
-<figure class="demo" data-demo="curso1/c1m4-dbscan" data-titulo="DBSCAN: núcleo, borde y ruido">
-  <div class="haz">Haz clic en varios usuarios para ver su círculo de radio <code>eps</code>. Mueve <code>eps</code> hacia 0,4 y hacia 2,0, y <code>min_samples</code> de 2 a 12.</div>
-  <div class="observa">Rellenos = núcleo, huecos = borde, ✕ = ruido. Con <code>eps</code> pequeño todo es ruido; con <code>eps</code> grande los grupos se funden. Un puente de núcleos une dos grupos: efecto cadena.</div>
-</figure>
+<section>
+<h2 id="tipos">2 · Tres tipos de punto</h2>
+<ul class="flow">
+  <li class="a">NÚCLEO<small>tiene el mínimo de vecinos dentro de su radio</small></li>
+  <li class="b">BORDE<small>no llega al mínimo, pero está dentro del radio de un núcleo</small></li>
+  <li class="c">RUIDO<small>ni llega ni tiene un núcleo cerca</small></li>
+</ul>
+<p>El algoritmo coge un núcleo y añade a sus vecinos. Si alguno también es núcleo, añade a los suyos. El grupo crece como una mancha de aceite. Al ruido le pone la etiqueta <code>−1</code>: no es de ningún grupo.</p>
+</section>
 
 <section>
-<h2 id="numeros">Con números: 9 usuarios, eps = 1,5</h2>
+<h2 id="numeros">3 · Con números: 9 usuarios</h2>
 <div class="callout ejemplo">
-  <span class="lbl">Ejemplo numérico</span>
-  <p>Cinco fans parecidos P1(1,1), P2(2,1), P3(1,2), P4(2,2), P5(3,3); un trío Q1(7,7), Q2(8,7), Q3(7,8); un solitario N(5,5). Contamos cuántos usuarios hay a distancia ≤ 1,5 de cada uno, incluido él mismo: P1, P2, P3 → 4; P4 → 5; P5 → 2 (solo él y P4); Q1, Q2, Q3 → 3; N → 1.</p>
+  <span class="lbl">Con números</span>
+  <p>Cada usuario es un punto (acción, comedia). Radio <code>eps</code> = 1,5.</p>
+<pre class="ascii">8 │                   Q3
+7 │                   Q1 Q2
+6 │
+5 │             N
+4 │
+3 │       P5
+2 │ P3 P4
+1 │ P1 P2
+  └────────────────────────
+    1  2  3  4  5  6  7  8</pre>
+  <p>Cuentas cuántos puntos hay a 1,5 o menos de cada uno, él incluido (entre paréntesis). Luego pruebas con mínimo 3 y con mínimo 4:</p>
   <table>
-    <thead><tr><th>Punto</th><th>Vecinos</th><th><code>min_samples = 3</code></th><th><code>min_samples = 4</code></th></tr></thead>
+    <thead><tr><th>Punto</th><th>Mín. 3</th><th>Mín. 4</th></tr></thead>
     <tbody>
-      <tr><td>P1–P4</td><td>4, 4, 4, 5</td><td>núcleo → grupo 1</td><td>núcleo → grupo 1</td></tr>
-      <tr><td>P5</td><td>2</td><td class="res">borde (lo alcanza P4)</td><td class="res">borde</td></tr>
-      <tr><td>Q1–Q3</td><td>3</td><td class="res">núcleo → grupo 2</td><td class="res">ruido (no llegan a 4)</td></tr>
-      <tr><td>N</td><td>1</td><td>ruido</td><td>ruido</td></tr>
+      <tr><td>P1 a P4 (4, 4, 4, 5)</td><td>núcleo</td><td>núcleo</td></tr>
+      <tr><td>P5 (2)</td><td class="res">borde</td><td class="res">borde</td></tr>
+      <tr><td>Q1 a Q3 (3)</td><td class="res">núcleo</td><td class="res">ruido</td></tr>
+      <tr><td>N (1)</td><td>ruido</td><td>ruido</td></tr>
     </tbody>
   </table>
-  <p>Con <code>min_samples = 3</code>: 2 grupos y 1 ruido. Con 4: 1 grupo y 4 ruidos. Subir <code>min_samples</code> exige más densidad.</p>
+  <p>P5 solo tiene 2, pero uno es P4, que es núcleo: P5 es borde. Con mínimo 3 salen 2 grupos y 1 ruido. Con mínimo 4, el trío Q no llega: 1 grupo y 4 ruidos.</p>
 </div>
 </section>
 
-<figure class="demo" data-demo="curso1/c1m4-kmeans-vs-dbscan" data-titulo="K-Means contra DBSCAN en formas distintas">
-  <div class="haz">Recorre «Dos lunas», «Dos anillos», «Tres manchas» y «Manchas + ruido» sin tocar nada; luego intenta rescatar al algoritmo que falla.</div>
-  <div class="observa">En lunas y anillos ningún K arregla a K-Means (ARI 0,22 y 0,01); DBSCAN acierta (1,00). En «Dos anillos» el silhouette da 0,38 al K-Means equivocado y 0,04 al DBSCAN perfecto: mide compactación, no acierto.</div>
+<figure class="demo" data-demo="curso1/c1m4-dbscan" data-titulo="DBSCAN: núcleo, borde y ruido">
+  <div class="haz">Haz clic en varios usuarios para ver su círculo de radio <code>eps</code>. Luego mueve <code>eps</code> a 0,4 y a 2,0.</div>
+  <div class="observa">Rellenos = núcleo, huecos = borde, ✕ = ruido. Con un radio pequeño todo es ruido. Con uno grande, los grupos se funden en uno.</div>
 </figure>
 
+<section>
+<h2 id="comparar">4 · K-Means contra DBSCAN</h2>
+<table>
+  <thead><tr><th></th><th>K-Means</th><th>DBSCAN</th></tr></thead>
+  <tbody>
+    <tr><th scope="row">Un grupo es…</th><td>lo que rodea a un centroide</td><td>una zona densa</td></tr>
+    <tr><th scope="row">Tú eliges</th><td>K</td><td>radio y mínimo; K sale solo</td></tr>
+    <tr><th scope="row">Formas</th><td>solo redondas</td><td>cualquiera</td></tr>
+    <tr><th scope="row">Datos raros</th><td>arrastran el centroide</td><td>quedan como ruido</td></tr>
+  </tbody>
+</table>
+</section>
+
+<figure class="demo" data-demo="curso1/c1m4-kmeans-vs-dbscan" data-titulo="K-Means contra DBSCAN en formas distintas">
+  <div class="haz">Recorre «Dos lunas», «Dos anillos», «Tres manchas» y «Manchas + ruido» sin tocar nada más.</div>
+  <div class="observa">El ARI compara con los grupos reales: 1 es perfecto y 0, al azar. En lunas y anillos K-Means saca 0,22 y 0,01; DBSCAN, 1,00.</div>
+</figure>
+
+<section>
+<h2 id="raros">5 · El ruido sirve para encontrar anomalías</h2>
+<p>Una anomalía es un dato muy distinto del resto: una cuenta robada, un bot. Todo lo que DBSCAN marca con <code>−1</code> es candidato. Y hay dos herramientas hechas a propósito:</p>
+<table>
+  <thead><tr><th>Herramienta</th><th>Idea</th></tr></thead>
+  <tbody>
+    <tr><td><strong>Isolation Forest</strong></td><td>Parte los datos con cortes al azar. Lo raro se queda solo con muy pocos cortes.</td></tr>
+    <tr><td><strong>LOF</strong></td><td>Compara tu densidad con la de tus vecinos. Lo raro vive en una zona más vacía que ellos.</td></tr>
+  </tbody>
+</table>
+<div class="callout ejemplo">
+  <span class="lbl">Ejemplo</span>
+  <p>Nueve usuarios ven entre 1 y 9 películas al mes y otro ve 40. Un corte al azar casi siempre cae entre 9 y 40: el raro se queda solo a la primera.</p>
+</div>
+</section>
+
+<section>
+<h2 id="un-radio">6 · El punto débil: un solo radio para todos</h2>
+<p>El radio es el mismo para todos. Si un grupo está muy apretado y otro muy esparcido, ningún radio vale para los dos.</p>
+<p><strong>HDBSCAN</strong> lo arregla: prueba todos los radios a la vez y se queda con los grupos que más aguantan. Solo le dices <code>min_cluster_size</code>: el tamaño mínimo para que algo cuente como grupo.</p>
+</section>
+
 <details class="predice">
-  <summary>Dos clubes de fans con gustos casi idénticos, pegados uno al otro, y lejos de ellos el público general con gustos muy variados. ¿Existe un <code>eps</code> que recupere los tres grupos?<span class="hint"></span></summary>
+  <summary>Dos clubes de fans muy apretados, pegados uno al otro. Lejos de ellos, el público general, muy esparcido. ¿Existe un radio <code>eps</code> que saque los tres grupos?<span class="hint"></span></summary>
   <div>
-    <p>No. Con <code>eps</code> grande el público general aparece, pero los dos clubes se funden; con <code>eps</code> pequeño se separan los clubes, pero el público general entero se queda en ruido. Es el problema de las <strong>densidades distintas</strong>, y es exactamente lo que resuelve HDBSCAN (su demo está en «Profundizar»).</p>
+    <p>No. Con un radio grande, los dos clubes se funden en uno. Con uno pequeño, el público general queda como ruido. Es el caso que resuelve HDBSCAN.</p>
   </div>
 </details>
+
+<section>
+<h2 id="chuleta">Chuleta para repasar</h2>
+<dl class="chuleta">
+  <div><dt>Densidad</dt><dd>Cuántos puntos hay en un trozo del dibujo. <em>Un club de fans apretado.</em></dd></div>
+  <div><dt>DBSCAN</dt><dd>Agrupa por zonas densas. El número de grupos sale solo. <em>Separa las dos lunas.</em></dd></div>
+  <div><dt>eps</dt><dd>El radio: hasta dónde llegan tus vecinos. <em>eps = 1,5.</em></dd></div>
+  <div><dt>min_samples</dt><dd>Mínimo de puntos en el radio, contándote a ti. <em>Con 3, el trío Q es grupo; con 4, no.</em></dd></div>
+  <div><dt>Núcleo</dt><dd>Punto que llega al mínimo. <em>P4, con 5.</em></dd></div>
+  <div><dt>Borde</dt><dd>No llega, pero toca a un núcleo. <em>P5, pegado a P4.</em></dd></div>
+  <div><dt>Ruido (−1)</dt><dd>Ni llega ni toca a un núcleo. <em>N, solo en el centro.</em></dd></div>
+  <div><dt>Anomalía</dt><dd>Dato muy distinto del resto. <em>Un bot que ve 40 películas.</em></dd></div>
+  <div><dt>Isolation Forest</dt><dd>Lo raro se queda solo con pocos cortes al azar. <em>El 40, al primer corte.</em></dd></div>
+  <div><dt>LOF</dt><dd>Lo raro vive en una zona más vacía que sus vecinos. <em>Un usuario suelto junto a un club.</em></dd></div>
+  <div><dt>HDBSCAN</dt><dd>DBSCAN probando todos los radios. Solo pide <code>min_cluster_size</code>. <em>Clubes apretados y público esparcido.</em></dd></div>
+  <div><dt>ARI</dt><dd>Nota que compara con los grupos reales: 1 perfecto, 0 al azar. <em>DBSCAN en las lunas: 1,00.</em></dd></div>
+</dl>
+</section>
 
 <div class="resumen">
   <h2 class="sin-num sin-toc">En tres líneas</h2>
   <ul>
-    <li>DBSCAN: <code>eps</code> y <code>min_samples</code> (cuenta al propio punto) → núcleo, borde y ruido (−1). Formas libres, K sale solo.</li>
-    <li>El ruido es un detector de anomalías improvisado; Isolation Forest y LOF lo hacen a propósito.</li>
-    <li>Un solo <code>eps</code> no sirve para densidades distintas: HDBSCAN prueba todos y solo pide <code>min_cluster_size</code>.</li>
+    <li>DBSCAN: un radio (<code>eps</code>) y un mínimo (<code>min_samples</code>) → núcleo, borde y ruido (−1). Cualquier forma; K sale solo.</li>
+    <li>El ruido señala anomalías. Isolation Forest y LOF las buscan a propósito.</li>
+    <li>Un solo radio no vale para grupos apretados y esparcidos a la vez: HDBSCAN prueba todos.</li>
   </ul>
 </div>
 <section class="quiz mini">
@@ -96,41 +170,50 @@
  "titulo": "¿Lo tienes?",
  "preguntas": [
   {
-   "q": "Con <code>eps = 1,5</code> y <code>min_samples = 4</code>, un usuario tiene exactamente 3 usuarios con gustos a distancia ≤ 1,5 (contándose a sí mismo) y uno de ellos es un punto núcleo. ¿De qué tipo es?",
+   "q": "Radio <code>eps</code> = 1,5 y mínimo <code>min_samples</code> = 4. Un usuario tiene 3 puntos dentro de su radio (contándose a sí mismo), y uno de ellos es un núcleo. ¿De qué tipo es?",
    "opciones": [
-    "Borde: no llega a 4, pero está al alcance de un núcleo",
-    "Núcleo: con 3 vecinos ya le basta",
-    "Ruido: no llega a <code>min_samples</code>",
-    "No se puede saber sin conocer el orden de los datos"
+    "Borde: no llega a 4, pero está dentro del radio de un núcleo",
+    "Núcleo: con 3 ya le basta",
+    "Ruido: no llega al mínimo",
+    "No se puede saber"
    ],
    "correcta": 0,
-   "porque": "Para ser núcleo necesita al menos <code>min_samples</code> = 4 puntos en su vecindario, y solo tiene 3. Pero al estar a distancia ≤ eps de un núcleo, pertenece al grupo de ese núcleo: es un punto borde. Solo sería ruido si no tuviera ningún núcleo a su alcance."
+   "porque": "Para ser núcleo necesita 4 puntos y solo tiene 3. Pero está dentro del radio de un núcleo, así que entra en su grupo como borde. Sería ruido si no tuviera ningún núcleo cerca."
   },
   {
-   "q": "Una columna con las películas al mes de diez usuarios: 1, 2, 3, 4, 5, 6, 7, 8, 9 y 40. Isolation Forest elige el primer corte al azar entre 1 y 40. ¿Con qué probabilidad deja solo al usuario del 40 ya con ese primer corte?",
+   "q": "Diez usuarios ven al mes 1, 2, 3, 4, 5, 6, 7, 8, 9 y 40 películas. Isolation Forest hace un primer corte al azar entre 1 y 40. ¿Con qué probabilidad deja solo al del 40?",
    "opciones": [
     "Un 10 %",
     "Un 50 %",
     "Un 79,5 %"
    ],
    "correcta": 2,
-   "porque": "Para aislar el 40 el corte tiene que caer entre 9 y 40: un tramo de 31 sobre un rango de 39, es decir 31/39 = 79,5 %. Lo raro se aísla con muy pocos cortes; para dejar solo al 5 hacen falta como mínimo dos."
+   "porque": "Para dejarlo solo, el corte tiene que caer entre 9 y 40. Ese hueco mide 31, de un total de 39: 31 ÷ 39 = 79,5 %. Lo raro se queda solo con muy pocos cortes. Para dejar solo al del 5 hacen falta al menos dos."
   },
   {
-   "q": "¿Cuál es la ventaja principal de HDBSCAN sobre DBSCAN?",
+   "q": "¿Qué ventaja tiene HDBSCAN sobre DBSCAN?",
    "opciones": [
-    "Tiene <code>predict</code> para puntos nuevos",
-    "Maneja grupos de densidades distintas sin elegir <code>eps</code>: solo pide <code>min_cluster_size</code>",
+    "Coloca usuarios nuevos sin recalcular",
+    "Encuentra a la vez grupos apretados y grupos esparcidos, sin elegir el radio",
     "Nunca deja puntos como ruido"
    ],
    "correcta": 1,
-   "porque": "HDBSCAN construye una jerarquía equivalente a probar todos los <code>eps</code> y se queda con los grupos más estables. Sigue marcando ruido (−1) y en scikit-learn tampoco tiene <code>predict</code>."
+   "porque": "HDBSCAN prueba todos los radios y se queda con los grupos que más aguantan. Solo pide <code>min_cluster_size</code>. Sigue marcando ruido con −1."
+  },
+  {
+   "q": "Subes <code>min_samples</code> de 3 a 4 sin tocar el radio. ¿Qué pasa?",
+   "opciones": [
+    "Se exige más densidad: algunos grupos pequeños pasan a ser ruido",
+    "Los grupos se funden en uno",
+    "Nada: solo importa el radio"
+   ],
+   "correcta": 0,
+   "porque": "Con un mínimo más alto, cuesta más ser núcleo. En el ejemplo, el trío Q tenía 3 puntos por radio: con mínimo 3 era un grupo y con mínimo 4 se queda en ruido."
   }
  ]
 }
 </script>
 </section>
-
 <details class="profundizar">
   <summary><span>Profundizar: la explicación completa<small>DBSCAN completo: la analogía del mapa nocturno, las tarjetas núcleo/borde/ruido, el ejemplo de los 9 usuarios, la gráfica de k-distancias para elegir <code>eps</code> (percentiles 0,089 / 0,139 / 0,159 / 0,186), la tabla K-Means contra DBSCAN, los límites y la tabla de scikit-learn. HDBSCAN: el problema de las densidades, su demo, los cinco pasos (distancia núcleo, alcanzabilidad mutua, jerarquía, condensar, estabilidad), parámetros y aviso de versión. Anomalías: las tres familias, el usuario de 950 horas, Isolation Forest, LOF y su uso en scikit-learn.</small></span></summary>
   <div class="prof-body">

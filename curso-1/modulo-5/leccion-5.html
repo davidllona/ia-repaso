@@ -20,68 +20,141 @@
     <div>
       <p class="eyebrow">Curso 1 · Módulo 5 · Lección 5 de 8</p>
       <h1>Una sola nota es una lotería: la validación cruzada repite el examen K veces</h1>
-      <p class="lead">Cambias random_state de 42 a 7 y la nota pasa de 0,86 a 0,81. Ninguna es «la verdadera»: cada reparto es una estimación con ruido. La solución es repetir el examen y mirar la media y cuánto varía.</p>
-      <p class="meta-line"><span class="read-time" data-render="read-time"></span><a href="../modulo-5.html">Índice del módulo</a></p>
+      <p class="lead">Vas a entender por qué una sola nota no es de fiar, cómo la validación cruzada repite el examen varias veces y cómo se lee un resultado del tipo «0,80 ± 0,07».</p>
+      <p class="meta-line"><span class="read-time" data-render="read-time"></span><a href="../modulo-5.html">Índice del módulo</a> · <a href="#chuleta">Ir a la chuleta</a></p>
     </div>
     <div class="hero-tile" aria-hidden="true"></div>
   </div>
 </header>
 <details class="predice">
-  <summary>Para decidir si una serie es buena, ¿la juzgarías por el capítulo piloto o verías varios capítulos?<span class="hint"></span></summary>
+  <summary>Para decidir si una serie es buena, ¿la juzgas solo por el capítulo piloto o ves varios capítulos?<span class="hint"></span></summary>
   <div>
-    <p>Varios: el piloto puede ser flojísimo o brillante por casualidad. Si les pones 8, 9, 7, 8,5 y 7,5, sabes que la serie anda por el 8 y que un capítulo concreto puede quedar un punto arriba o abajo. Con un solo reparto train/test te pasa como con un solo capítulo: un 9 de suerte te engaña.</p>
+    <p>Varios. El piloto puede ser flojo o brillante por casualidad. Si a cinco capítulos les pones 8, 9, 7, 8,5 y 7,5, sabes dos cosas: la serie anda por el 8, y un capítulo suelto puede quedar un punto arriba o abajo. Examinar un modelo una sola vez es juzgar por el piloto.</p>
   </div>
 </details>
 
 <section>
-<h2 id="idea">K-Fold: cada trozo hace de examen una vez</h2>
+<h2 id="problema">1 · El problema: la nota depende del sorteo</h2>
+<p>Al partir en train y test, las filas se sortean. Cambias la semilla del sorteo (<code>random_state</code>) y cambia la nota, con el mismo modelo y los mismos datos:</p>
+<table>
+  <thead><tr><th>Semilla</th><th>Nota</th></tr></thead>
+  <tbody>
+    <tr><td>42</td><td>0,86</td></tr>
+    <tr><td>7</td><td>0,81</td></tr>
+  </tbody>
+</table>
+<p>Ninguna es «la verdadera». Cada reparto da una nota con algo de suerte dentro. Solución: repetir el examen y mirar la media.</p>
+</section>
+
+<section>
+<h2 id="idea">2 · K-Fold: cada trozo hace de examen una vez</h2>
+<p>La <strong>validación cruzada</strong> (en inglés <em>cross-validation</em>, CV) repite el examen dentro del train. Su versión básica se llama <strong>K-Fold</strong>:</p>
 <ol class="pasos">
-  <li>Parte el <strong>train</strong> en K trozos iguales (los <em>folds</em>); lo habitual es K = 5 o 10.</li>
-  <li>Ronda 1: el trozo 1 valida y los otros K − 1 entrenan un modelo <em>nuevo</em>. Anotas la nota.</li>
-  <li>Rondas 2 a K: repites cambiando el trozo que valida.</li>
-  <li>Promedias las K notas y calculas su desviación típica.</li>
+  <li>Parte el train en K trozos iguales. Cada trozo es un <strong>fold</strong>. Lo habitual es K = 5 o 10.</li>
+  <li>Ronda 1: el trozo A hace de examen. Con los otros cuatro entrenas un modelo <em>nuevo</em>. Apuntas su nota.</li>
+  <li>Rondas 2 a 5: lo mismo, cambiando el trozo que hace de examen.</li>
+  <li>Al final tienes 5 notas. Calculas su media y cuánto varían.</li>
 </ol>
-<pre class="ascii">Ronda 1: [A] B  C  D  E   A valida
-Ronda 2:  A [B] C  D  E   B valida
-Ronda 3:  A  B [C] D  E   C valida
-Ronda 4:  A  B  C [D] E   D valida
-Ronda 5:  A  B  C  D [E]  E valida</pre>
-<p>Cada muestra valida <strong>exactamente una vez</strong> y entrena K − 1 veces: no se desperdicia ningún dato y tienes K notas en lugar de una. En Scikit-learn: <code>cross_val_score(modelo, X, y, cv=5, scoring="f1")</code> devuelve las K notas de una métrica; <code>cross_validate</code> admite varias métricas a la vez; <code>cross_val_predict</code> devuelve la predicción de cada muestra hecha por el modelo que no la vio.</p>
+<pre class="ascii">          [ ] = hace de examen
+Ronda 1: [A] B  C  D  E   → nota 1
+Ronda 2:  A [B] C  D  E   → nota 2
+Ronda 3:  A  B [C] D  E   → nota 3
+Ronda 4:  A  B  C [D] E   → nota 4
+Ronda 5:  A  B  C  D [E]  → nota 5</pre>
+<p>Cada fila hace de examen <strong>una vez</strong> y sirve para entrenar las otras cuatro. No se desperdicia ningún dato.</p>
 </section>
 
 <figure class="demo" data-demo="curso1/c1m5-kfold" data-titulo="Cada ronda, un trozo distinto hace de examen">
-  <div class="haz">Pulsa «Ronda a ronda» y mira qué usuarios se resaltan en cada fila. Luego «Calcular todas», cambia K, activa «Mezclar antes» y por último «Estratificar».</div>
-  <div class="observa">Con los datos ordenados por clase y sin mezclar, algunas rondas no tienen <strong>ningún</strong> usuario que abandonó y los aciertos oscilan muchísimo. Estratificando, cada ronda tiene la misma proporción. Y los 25 repartos hold-out muestran que una sola partición es una lotería.</div>
+  <div class="haz">Pulsa «Ronda a ronda» y mira qué usuarios se resaltan en cada fila. Luego pulsa «Calcular todas» y activa «Estratificar».</div>
+  <div class="observa">Sin mezclar ni estratificar, a algunas rondas no les toca <strong>ningún</strong> usuario que abandonó, y las notas bailan muchísimo. Estratificando, cada ronda tiene la misma proporción. Los «25 repartos hold-out» son 25 exámenes de una sola partición: mira cuánto se dispersan.</div>
 </figure>
 
 <section>
-<h2 id="numeros">Con números: media ± desviación</h2>
+<h2 id="numeros">3 · Con números: media ± desviación</h2>
 <div class="callout ejemplo">
   <span class="lbl">Ejemplo numérico</span>
-  <p>Cinco rondas del recomendador dan estas accuracies: 0,80 · 0,90 · 0,70 · 0,85 · 0,75.</p>
+  <p>Cinco rondas del recomendador dan estos porcentajes de acierto:</p>
+  <table>
+    <caption>«Distancia» = cuánto se aleja de la media (0,80)</caption>
+    <thead><tr><th>Ronda</th><th>Nota</th><th>Distancia</th></tr></thead>
+    <tbody>
+      <tr><td>1</td><td>0,80</td><td>0</td></tr>
+      <tr><td>2</td><td>0,90</td><td>+0,10</td></tr>
+      <tr><td>3</td><td>0,70</td><td>−0,10</td></tr>
+      <tr><td>4</td><td>0,85</td><td>+0,05</td></tr>
+      <tr><td>5</td><td>0,75</td><td>−0,05</td></tr>
+    </tbody>
+  </table>
   <ol class="pasos">
-    <li><strong>Media:</strong> 4,00 / 5 = 0,80.</li>
-    <li><strong>Desviaciones:</strong> 0 · +0,10 · −0,10 · +0,05 · −0,05. Al cuadrado y sumadas: 0,025. Entre 5: 0,005.</li>
-    <li><strong>Raíz:</strong> \( \sqrt{0{,}005} \approx 0{,}071 \). Se escribe <span class="res">0,80 ± 0,07</span>.</li>
+    <li><strong>Media:</strong> las cinco notas suman 4,00. Entre 5: 0,80.</li>
+    <li><strong>Distancias al cuadrado, sumadas:</strong> 0 + 0,01 + 0,01 + 0,0025 + 0,0025 = 0,025. Entre 5: 0,005.</li>
+    <li><strong>Raíz:</strong> \( \sqrt{0{,}005} \approx 0{,}071 \). Es la <strong>desviación típica</strong>: lo que una ronda suele alejarse de la media.</li>
   </ol>
-  <p>Lectura: «espero un 80 % y, según el reparto, puede quedar entre el 70 % y el 90 %». Uso práctico: <strong>si dos modelos se diferencian menos que la desviación, no puedes decir que uno sea mejor</strong>. Un 0,812 ± 0,03 frente a un 0,808 ± 0,03 es un empate.</p>
+  <p>Se escribe <span class="res">0,80 ± 0,07</span>. Se lee: «espero un 80 %, y según el reparto puede quedar algo por encima o por debajo».</p>
 </div>
-<p>En el fragmento 9, la regresión logística sobre el dataset de cáncer da 0,982 · 0,982 · 0,974 · 0,974 · 0,991 = <strong>0,981 ± 0,007</strong>: un modelo estable.</p>
+<div class="callout regla">
+  <span class="lbl">Regla fácil</span>
+  <p>Si dos modelos se diferencian menos que la desviación, es un <strong>empate</strong>. Un 0,812 ± 0,03 frente a un 0,808 ± 0,03 no tiene ganador.</p>
+</div>
+</section>
+
+<section>
+<h2 id="sklearn">4 · En scikit-learn</h2>
+<table>
+  <thead><tr><th>Función</th><th>Qué devuelve</th></tr></thead>
+  <tbody>
+    <tr><td><code>cross_val_score</code></td><td>Las K notas de una métrica</td></tr>
+    <tr><td><code>cross_validate</code></td><td>Las K notas de varias métricas a la vez</td></tr>
+    <tr><td><code>cross_val_predict</code></td><td>La respuesta para cada fila, dada por el modelo que no la vio</td></tr>
+  </tbody>
+</table>
+<p>Se usa así: <code>cross_val_score(modelo, X, y, cv=5, scoring="f1")</code>. <code>cv=5</code> son los 5 trozos y <code>scoring</code>, la nota que quieres medir. En el fragmento 9 salen 0,982 · 0,982 · 0,974 · 0,974 · 0,991, es decir, <strong>0,981 ± 0,007</strong>: un modelo muy estable.</p>
+</section>
+
+<section>
+<h2 id="variantes">5 · Qué reparto usar según tus datos</h2>
+<table>
+  <thead><tr><th>Si tus datos…</th><th>Usa</th></tr></thead>
+  <tbody>
+    <tr><td>tienen una clase rara o vienen ordenados</td><td><code>StratifiedKFold</code><br>Cada trozo guarda la proporción de cada clase</td></tr>
+    <tr><td>tienen varias filas del mismo usuario</td><td><code>GroupKFold</code><br>Las filas de un usuario van al mismo trozo</td></tr>
+    <tr><td>llevan fechas</td><td><code>TimeSeriesSplit</code><br>Entrena con el pasado y examina con el futuro</td></tr>
+  </tbody>
+</table>
+<p>Con <code>shuffle=True</code> las filas se barajan antes de partir.</p>
 </section>
 
 <details class="predice">
-  <summary>Tu tabla viene ordenada por clase (primero todos los «terminó la serie», luego los «abandonó») y pasas <code>cv=5</code> sin más. ¿Qué pasa con el primer fold?<span class="hint"></span></summary>
+  <summary>Tu tabla viene ordenada: primero todos los «terminó la serie» y luego todos los «abandonó». La partes en 5 trozos tal cual, sin barajar. ¿Qué le pasa al primer trozo?<span class="hint"></span></summary>
   <div>
-    <p>En clasificación, <code>cv=5</code> usa <code>StratifiedKFold</code>, que te salva; pero con <code>KFold</code> a secas (regresión o si lo construyes tú) no se mezcla y el primer fold puede quedar <strong>sin ninguna muestra de una clase</strong>: en el fragmento 9 salen folds con [0, 16, 114, 114, 113] benignos. La solución es construir el objeto: <code>StratifiedKFold(n_splits=5, shuffle=True, random_state=42)</code>. Y si hay varias filas por usuario, <code>GroupKFold</code>; si hay tiempo, <code>TimeSeriesSplit</code>.</p>
+    <p>Que solo tiene filas de una clase. En el fragmento 9, con <code>KFold</code> a secas, los cinco trozos tienen 0, 16, 114, 114 y 113 casos de una clase: el primero, <strong>ninguno</strong>. La solución es <code>StratifiedKFold(n_splits=5, shuffle=True, random_state=42)</code>. Cuando clasificas y escribes solo <code>cv=5</code>, scikit-learn ya estratifica por ti.</p>
   </div>
 </details>
+
+<section>
+<h2 id="chuleta">Chuleta para repasar</h2>
+<dl class="chuleta">
+  <div><dt>Validación cruzada (CV)</dt><dd>Repetir el examen varias veces dentro del train. <em>Ver varios capítulos, no solo el piloto.</em></dd></div>
+  <div><dt>Fold</dt><dd>Cada uno de los trozos en que se parte el train. <em>A, B, C, D, E.</em></dd></div>
+  <div><dt>K</dt><dd>Cuántos trozos y cuántas rondas. <em>Lo habitual: 5 o 10.</em></dd></div>
+  <div><dt>K-Fold</dt><dd>La CV básica: cada trozo hace de examen una vez.</dd></div>
+  <div><dt>Media ± desviación</dt><dd>La nota esperada y cuánto baila según el reparto. <em>0,80 ± 0,07.</em></dd></div>
+  <div><dt>Empate</dt><dd>Dos modelos que se diferencian menos que la desviación. <em>0,812 y 0,808 con ± 0,03.</em></dd></div>
+  <div><dt>Hold-out</dt><dd>Un solo reparto train/test, sin repetir. <em>Juzgar por el piloto.</em></dd></div>
+  <div><dt>cross_val_score</dt><dd>La función que hace la CV y devuelve las K notas. <em>cv=5.</em></dd></div>
+  <div><dt>StratifiedKFold</dt><dd>Trozos con la misma proporción de cada clase.</dd></div>
+  <div><dt>GroupKFold</dt><dd>Las filas de un mismo usuario, siempre en el mismo trozo.</dd></div>
+  <div><dt>TimeSeriesSplit</dt><dd>Para datos con fechas: entrena con el pasado, examina con el futuro.</dd></div>
+  <div><dt>shuffle</dt><dd>Barajar las filas antes de partir.</dd></div>
+</dl>
+</section>
 
 <div class="resumen">
   <h2 class="sin-num sin-toc">En tres líneas</h2>
   <ul>
-    <li>K rondas, cada muestra valida una vez; se informa <strong>media ± desviación</strong>, no una sola nota.</li>
-    <li>Si dos modelos difieren menos que la desviación, es un empate técnico.</li>
-    <li>La CV se hace <em>solo con el train</em> para elegir y comparar; el test sigue mirándose una vez al final.</li>
+    <li>K rondas; cada fila hace de examen una vez. Se da <strong>media ± desviación</strong>, no una sola nota.</li>
+    <li>Si dos modelos se diferencian menos que la desviación, es un empate.</li>
+    <li>La validación cruzada se hace <em>solo con el train</em>, para elegir y comparar. El test se sigue mirando una vez, al final.</li>
   </ul>
 </div>
 <section class="quiz mini">
@@ -90,7 +163,7 @@ Ronda 5:  A  B  C  D [E]  E valida</pre>
  "titulo": "¿Lo tienes?",
  "preguntas": [
   {
-   "q": "Cinco rondas de validación cruzada del recomendador dan 0,70 · 0,80 · 0,90 · 0,80 · 0,80. ¿Cómo se expresa el resultado como «media ± desviación» (con la desviación de NumPy, que divide entre K)?",
+   "q": "Cinco rondas de validación cruzada dan 0,70 · 0,80 · 0,90 · 0,80 · 0,80. ¿Cómo se escribe el resultado como «media ± desviación»?",
    "opciones": [
     "0,80 ± 0,00",
     "0,76 ± 0,06",
@@ -98,27 +171,37 @@ Ronda 5:  A  B  C  D [E]  E valida</pre>
     "0,80 ± 0,06"
    ],
    "correcta": 3,
-   "porque": "Media = (0,70 + 0,80 + 0,90 + 0,80 + 0,80) / 5 = 0,80. Las desviaciones respecto a la media son −0,1, 0, +0,1, 0 y 0; sus cuadrados suman 0,02; entre 5 queda 0,004 y su raíz es 0,063 ≈ 0,06. (Dividiendo entre K − 1 saldría 0,07; el orden de magnitud es el mismo.) El 0,00 olvida que las rondas no son iguales y el 0,40 confunde la desviación con el rango."
+   "porque": "Media: las cinco suman 4,00; entre 5, 0,80. Distancias a la media: −0,1, 0, +0,1, 0 y 0. Al cuadrado suman 0,02; entre 5 queda 0,004; su raíz es 0,063 ≈ 0,06. El ± 0,00 olvida que las rondas no son iguales."
   },
   {
-   "q": "Con K = 5, ¿cuántas veces se usa cada muestra para validar y cuántas para entrenar?",
+   "q": "Con K = 5, ¿cuántas veces hace cada fila de examen y cuántas sirve para entrenar?",
    "opciones": [
-    "5 veces para validar y 5 para entrenar",
-    "1 vez para validar y 4 para entrenar",
-    "4 veces para validar y 1 para entrenar"
+    "5 veces de examen y 5 para entrenar",
+    "1 vez de examen y 4 para entrenar",
+    "4 veces de examen y 1 para entrenar"
    ],
    "correcta": 1,
-   "porque": "Cada muestra pertenece a un único fold; ese fold valida en una ronda y entrena en las otras K − 1 = 4."
+   "porque": "Cada fila está en un solo trozo. Ese trozo hace de examen en una ronda y entrena en las otras 4."
   },
   {
-   "q": "Tienes varias valoraciones del mismo usuario y quieres que el modelo no «reconozca» al usuario entre train y validación. ¿Qué estrategia usas?",
+   "q": "El modelo A saca 0,812 ± 0,03 y el modelo B, 0,808 ± 0,03. ¿Cuál es mejor?",
    "opciones": [
-    "KFold con shuffle=True",
-    "GroupKFold, para que todas las filas de un usuario caigan en el mismo fold",
-    "LeaveOneOut"
+    "A, porque 0,812 es mayor",
+    "No se puede decir: se diferencian mucho menos que la desviación. Es un empate",
+    "B, porque es más estable"
    ],
    "correcta": 1,
-   "porque": "Si las valoraciones de un usuario se reparten entre folds, el modelo acierta reconociendo al usuario, no generalizando. GroupKFold mantiene cada grupo entero en un solo fold. Para series temporales, el equivalente es TimeSeriesSplit."
+   "porque": "La diferencia es 0,004 y las notas bailan 0,03 según el reparto. Con otro sorteo podría ganar B. Elige el más sencillo o el más rápido."
+  },
+  {
+   "q": "Tienes varias valoraciones de cada usuario. No quieres que el modelo acierte solo por «reconocer» a un usuario que ya vio al entrenar. ¿Qué reparto usas?",
+   "opciones": [
+    "KFold barajando las filas",
+    "GroupKFold: todas las filas de un usuario caen en el mismo trozo",
+    "TimeSeriesSplit"
+   ],
+   "correcta": 1,
+   "porque": "Si las filas de un usuario se reparten entre trozos, el modelo lo reconoce en el examen y la nota sale inflada. GroupKFold mantiene a cada usuario entero en un solo trozo."
   }
  ]
 }
@@ -228,6 +311,10 @@ cross_val_score(modelo, X, y, cv=cv)</pre>
 
 <section>
 <h2 class="sin-num">Código</h2>
+<div class="callout recuerda">
+  <span class="lbl">Antes de leer el fragmento 9</span>
+  <p>Verás <code>make_pipeline(StandardScaler(), LogisticRegression())</code>. Es una cadena de dos pasos que funciona como un solo modelo: primero pone las columnas en la misma escala y después clasifica. Se explica en la lección 7. Ahora quédate con una idea: <code>cv=5</code> devuelve 5 notas, y de ellas salen la media y la desviación.</p>
+</div>
 <article class="snippet" data-lang="python">
   <header>
     <h3>9 · Validación cruzada con <code>cross_val_score</code>, <code>KFold</code> y <code>StratifiedKFold</code></h3>
@@ -299,6 +386,10 @@ StratifiedKFold    benignos en cada fold de validación: [71, 71, 72, 72, 71]
     <p>Con <code>cv=5</code> el accuracy es 0,982 · 0,982 · 0,974 · 0,974 · 0,991, de media 0,981 ± 0,007: el modelo es estable. Con los datos ordenados, <code>KFold</code> sin mezclar produce folds de validación con [0, 16, 114, 114, 113] benignos: el primero no tiene ninguno y el tercero y el cuarto son solo benignos, así que cada puntuación mide cosas distintas. <code>StratifiedKFold</code> reparte [71, 71, 72, 72, 71]: todos los folds son parecidos a la población. (En este conjunto fácil la media apenas se resiente, pero en datos reales difíciles el efecto puede ser enorme.)</p>
   </div>
 </article>
+<div class="callout recuerda">
+  <span class="lbl">Antes de leer el fragmento 10</span>
+  <p>Usa la misma cadena <code>make_pipeline</code> del fragmento 9 (lección 7). Quédate con dos ideas: <code>cross_validate</code> mide varias notas de una vez, y <code>cross_val_predict</code> da para cada fila la respuesta del modelo que no la vio al entrenar. A eso el título lo llama «fuera de bolsa».</p>
+</div>
 <article class="snippet" data-lang="python">
   <header>
     <h3>10 · <code>cross_validate</code> y <code>cross_val_predict</code>: varias métricas y predicciones fuera de bolsa</h3>

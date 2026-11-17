@@ -30,13 +30,13 @@ window.CURRICULUM = {
           summary: "Qué significa que un ordenador «aprenda», qué piezas tiene todo problema de ML y cómo dejar los datos listos para un modelo.",
           tags: ["IA · ML · DL", "Features y target", "Ciclo de vida", "Pandas", "NaN y outliers", "Escalado", "One-Hot", "Generalización"],
           lessons: [
-            {"n": 1, "slug": "leccion-1", "title": "Aprender es probar reglas y quedarse con la que menos falla", "blurb": "Programar es escribir la regla; aprender es dejar que salga de los ejemplos.", "min": 3},
+            {"n": 1, "slug": "leccion-1", "title": "Aprender es probar reglas y quedarse con la que menos falla", "blurb": "Programar es escribir la regla; aprender es dejar que salga de los ejemplos.", "min": 4},
             {"n": 2, "slug": "leccion-2", "title": "X es lo que el modelo sabe; y, lo que debe adivinar", "blurb": "El vocabulario del curso con Netflix: X, y, clasificación, regresión, parámetros e hiperparámetros. Con chuleta de repaso.", "min": 4},
-            {"n": 3, "slug": "leccion-3", "title": "Supervisado o no: todo depende de si tienes la respuesta", "blurb": "Los cuatro tipos de aprendizaje y por qué la misma película admite dos preguntas distintas.", "min": 3},
-            {"n": 4, "slug": "leccion-4", "title": "Ocho preguntas, ocho técnicas: lo raro, el orden y lo que va junto", "blurb": "Cada técnica responde a una pregunta distinta; la anomalía y el orden, con números.", "min": 3},
+            {"n": 3, "slug": "leccion-3", "title": "Supervisado o no: todo depende de si tienes la respuesta", "blurb": "Los cuatro tipos de aprendizaje y por qué la misma película admite dos preguntas distintas.", "min": 4},
+            {"n": 4, "slug": "leccion-4", "title": "Ocho preguntas, ocho técnicas: lo raro, el orden y lo que va junto", "blurb": "Cada técnica responde a una pregunta distinta; la anomalía y el orden, con números.", "min": 4},
             {"n": 5, "slug": "leccion-5", "title": "Un proyecto es una película de trece escenas, y el modelo es la más corta", "blurb": "Las trece escenas del ciclo de vida con StreamFlix: del problema a la deriva.", "min": 4},
             {"n": 6, "slug": "leccion-6", "title": "No entrenes tu propio LLM: adáptalo con prompts, RAG y PEFT", "blurb": "Ciencia de Datos vs Ingeniería de IA, del predictivo al prescriptivo, RAG y las herramientas.", "min": 4},
-            {"n": 7, "slug": "leccion-7", "title": "Los datos nunca llegan limpios: huecos, extremos, escalas y texto", "blurb": "NaN, outliers, StandardScaler y One-Hot: dejar la tabla lista para el modelo.", "min": 3},
+            {"n": 7, "slug": "leccion-7", "title": "Los datos nunca llegan limpios: huecos, extremos, escalas y texto", "blurb": "NaN, outliers, StandardScaler y One-Hot: dejar la tabla lista para el modelo.", "min": 4},
             {"n": 8, "slug": "leccion-8", "title": "La meta es generalizar: acertar con datos que el modelo nunca vio", "blurb": "Train/test, overfitting y el flujo de scikit-learn: crear → fit → predict → evaluar.", "min": 4}
           ]
         },
@@ -53,7 +53,7 @@ window.CURRICULUM = {
             {"n": 5, "slug": "leccion-5", "title": "Una curva también es regresión lineal: inventa columnas (x², ln x, seno)", "blurb": "Polinómica, exponencial, logarítmica y periódica con columnas nuevas; el grado y el sobreajuste.", "min": 4},
             {"n": 6, "slug": "leccion-6", "title": "La sigmoide aplasta cualquier puntuación entre 0 y 1: eso es una probabilidad", "blurb": "Por qué una recta falla para clasificar, la sigmoide, la probabilidad a mano, el umbral y la frontera.", "min": 4},
             {"n": 7, "slug": "leccion-7", "title": "Entrenar es bajar una montaña con niebla: coste, gradiente y learning rate", "blurb": "Las cuatro piezas, el log-loss, gradient descent a mano, learning rate y convergencia.", "min": 4},
-            {"n": 8, "slug": "leccion-8", "title": "SGD: un paso por película en vez de uno por catálogo", "blurb": "Batch, SGD y mini-batch; fórmula exacta o gradient descent; y el código completo de los laboratorios de IBM.", "min": 3}
+            {"n": 8, "slug": "leccion-8", "title": "SGD: un paso por película en vez de uno por catálogo", "blurb": "Batch, SGD y mini-batch; fórmula exacta o gradient descent; y el código completo de los laboratorios de IBM.", "min": 4}
           ]
         },
         {
@@ -64,11 +64,11 @@ window.CURRICULUM = {
           lessons: [
             {"n": 1, "slug": "leccion-1", "title": "Un árbol elige la pregunta que más desorden quita", "blurb": "Las cinco formas de decidir y la primera: Gini, entropía y ganancia de información.", "min": 4},
             {"n": 2, "slug": "leccion-2", "title": "Un árbol sin límites se aprende las películas de memoria", "blurb": "Profundidad y sobreajuste, árboles de regresión (una media por hoja) e importancias.", "min": 4},
-            {"n": 3, "slug": "leccion-3", "title": "KNN copia la respuesta de los vecinos, y K decide cuántos votan", "blurb": "Distancia euclídea, elegir K y por qué hay que escalar antes de medir.", "min": 3},
+            {"n": 3, "slug": "leccion-3", "title": "KNN copia la respuesta de los vecinos, y K decide cuántos votan", "blurb": "Distancia euclídea, elegir K y por qué hay que escalar antes de medir.", "min": 4},
             {"n": 4, "slug": "leccion-4", "title": "La SVM elige la calle más ancha entre dos grupos", "blurb": "Margen, vectores de soporte, C, kernel RBF y gamma; One-vs-Rest y One-vs-One.", "min": 4},
-            {"n": 5, "slug": "leccion-5", "title": "Naive Bayes cuenta palabras y les da la vuelta con Bayes", "blurb": "Reseñas positivas o negativas: prior, verosimilitud, independencia y Laplace.", "min": 3},
-            {"n": 6, "slug": "leccion-6", "title": "Un modelo falla por terco (sesgo) o por nervioso (varianza)", "blurb": "Error = sesgo² + varianza + ruido, y cómo diagnosticarlo con train y test.", "min": 3},
-            {"n": 7, "slug": "leccion-7", "title": "Cien árboles distintos votan mejor que uno", "blurb": "Comités, voting, bootstrap, bagging, OOB y Random Forest.", "min": 3},
+            {"n": 5, "slug": "leccion-5", "title": "Naive Bayes cuenta palabras y les da la vuelta con Bayes", "blurb": "Reseñas positivas o negativas: prior, verosimilitud, independencia y Laplace.", "min": 4},
+            {"n": 6, "slug": "leccion-6", "title": "Un modelo falla por terco (sesgo) o por nervioso (varianza)", "blurb": "Error = sesgo² + varianza + ruido, y cómo diagnosticarlo con train y test.", "min": 4},
+            {"n": 7, "slug": "leccion-7", "title": "Cien árboles distintos votan mejor que uno", "blurb": "Comités, voting, bootstrap, bagging, OOB y Random Forest.", "min": 4},
             {"n": 8, "slug": "leccion-8", "title": "El boosting encadena árboles que corrigen al anterior", "blurb": "AdaBoost, Gradient Boosting, XGBoost y cómo elegir algoritmo midiendo.", "min": 4}
           ]
         },
@@ -78,12 +78,12 @@ window.CURRICULUM = {
           summary: "Encontrar estructura en datos sin respuestas: grupos, anomalías y mapas con menos dimensiones.",
           tags: ["K-Means", "Jerárquico", "DBSCAN", "HDBSCAN", "PCA", "t-SNE", "UMAP"],
           lessons: [
-            {"n": 1, "slug": "leccion-1", "title": "Sin respuestas, lo único que puede mirar el modelo es qué se parece a qué", "blurb": "Sin columna respuesta, el modelo solo puede medir qué está cerca de qué: la distancia y las cuatro tareas.", "min": 3},
-            {"n": 2, "slug": "leccion-2", "title": "La confianza engaña; el lift dice si la pareja es real", "blurb": "Soporte, confianza y lift con 10 usuarios: Toy Story ⇒ Shrek sí, Toy Story ⇒ Stranger Things no.", "min": 3},
-            {"n": 3, "slug": "leccion-3", "title": "Para recomendar, pregunta a las personas que se parecen a ti", "blurb": "NearestNeighbors: tus 3 vecinos más parecidos votan Interstellar.", "min": 3},
-            {"n": 4, "slug": "leccion-4", "title": "K-Means: asignar al centroide más cercano, moverlo a la media, repetir", "blurb": "Asignar, mover a la media, repetir: seis películas, la inercia que nunca sube y k-means++.", "min": 3},
+            {"n": 1, "slug": "leccion-1", "title": "Sin respuestas, lo único que puede mirar el modelo es qué se parece a qué", "blurb": "Sin columna respuesta, el modelo solo puede medir qué está cerca de qué: la distancia y las cuatro tareas.", "min": 4},
+            {"n": 2, "slug": "leccion-2", "title": "La confianza engaña; el lift dice si la pareja es real", "blurb": "Soporte, confianza y lift con 10 usuarios: Toy Story ⇒ Shrek sí, Toy Story ⇒ Stranger Things no.", "min": 4},
+            {"n": 3, "slug": "leccion-3", "title": "Para recomendar, pregunta a las personas que se parecen a ti", "blurb": "NearestNeighbors: tus 3 vecinos más parecidos votan Interstellar.", "min": 4},
+            {"n": 4, "slug": "leccion-4", "title": "K-Means: asignar al centroide más cercano, moverlo a la media, repetir", "blurb": "Asignar, mover a la media, repetir: seis películas, la inercia que nunca sube y k-means++.", "min": 4},
             {"n": 5, "slug": "leccion-5", "title": "Sin respuestas correctas, un buen grupo es compacto y está lejos de los demás", "blurb": "Silhouette, Davies–Bouldin y el codo de la inercia para elegir cuántos tipos de espectador hay.", "min": 4},
-            {"n": 6, "slug": "leccion-6", "title": "El dendrograma guarda todas las K a la vez: tú decides dónde cortar", "blurb": "Clustering jerárquico: fusionar lo más cercano, los cuatro enlaces y dónde cortar el árbol.", "min": 3},
+            {"n": 6, "slug": "leccion-6", "title": "El dendrograma guarda todas las K a la vez: tú decides dónde cortar", "blurb": "Clustering jerárquico: fusionar lo más cercano, los cuatro enlaces y dónde cortar el árbol.", "min": 4},
             {"n": 7, "slug": "leccion-7", "title": "Un grupo es una zona densa; lo que no cabe en ninguna es ruido (o una anomalía)", "blurb": "DBSCAN (núcleo, borde, ruido), HDBSCAN para densidades distintas e Isolation Forest y LOF para lo raro.", "min": 4},
             {"n": 8, "slug": "leccion-8", "title": "Menos columnas sin perder lo esencial: PCA conserva la varianza, t-SNE y UMAP conservan a los vecinos", "blurb": "La maldición de la dimensionalidad, PCA a mano, t-SNE y UMAP, y el no supervisado dentro de un proyecto.", "min": 4}
           ]
@@ -95,10 +95,10 @@ window.CURRICULUM = {
           tags: ["Train/Test", "Matriz de confusión", "Precision · Recall · F1", "ROC-AUC", "Cross-validation", "Ridge · Lasso", "Data leakage", "GridSearchCV"],
           lessons: [
             {"n": 1, "slug": "leccion-1", "title": "Al modelo se le examina con datos que no ha visto, y el test se mira una sola vez", "blurb": "Train, validación y test; por qué mirar el test muchas veces infla la nota (data snooping) y para qué sirve stratify.", "min": 4},
-            {"n": 2, "slug": "leccion-2", "title": "Un «sí o no» tiene cuatro resultados: la matriz de confusión", "blurb": "TP, TN, FP y FN con el recomendador de películas; por qué los dos errores nunca pesan igual.", "min": 3},
+            {"n": 2, "slug": "leccion-2", "title": "Un «sí o no» tiene cuatro resultados: la matriz de confusión", "blurb": "TP, TN, FP y FN con el recomendador de películas; por qué los dos errores nunca pesan igual.", "min": 4},
             {"n": 3, "slug": "leccion-3", "title": "El accuracy engaña cuando una clase es rara: mira precision, recall y F1", "blurb": "Un modelo que nunca detecta ningún éxito acierta el 95 %; precision, recall y F1 lo delatan.", "min": 4},
-            {"n": 4, "slug": "leccion-4", "title": "El umbral reparte los errores; la curva ROC los enseña todos a la vez", "blurb": "predict_proba y el umbral que menos cuesta en euros; la ROC en escalera con 10 películas y qué significa el AUC.", "min": 3},
-            {"n": 5, "slug": "leccion-5", "title": "Una sola nota es una lotería: la validación cruzada repite el examen K veces", "blurb": "K-Fold paso a paso, leer «media ± desviación» y cuándo usar StratifiedKFold, GroupKFold o TimeSeriesSplit.", "min": 3},
+            {"n": 4, "slug": "leccion-4", "title": "El umbral reparte los errores; la curva ROC los enseña todos a la vez", "blurb": "predict_proba y el umbral que menos cuesta en euros; la ROC en escalera con 10 películas y qué significa el AUC.", "min": 4},
+            {"n": 5, "slug": "leccion-5", "title": "Una sola nota es una lotería: la validación cruzada repite el examen K veces", "blurb": "K-Fold paso a paso, leer «media ± desviación» y cuándo usar StratifiedKFold, GroupKFold o TimeSeriesSplit.", "min": 4},
             {"n": 6, "slug": "leccion-6", "title": "Ridge y Lasso cobran un impuesto a los pesos para que el modelo no memorice", "blurb": "Medir el error de una regresión (MAE, RMSE, R²) y frenar el sobreajuste: Ridge encoge, Lasso anula, alpha se elige con validación cruzada.", "min": 4},
             {"n": 7, "slug": "leccion-7", "title": "La fuga de datos no da error: fit solo con train, y un Pipeline lo garantiza", "blurb": "Las cuatro fugas (target, preprocesado, tiempo, duplicados), el escalador con números, y Pipeline + ColumnTransformer como defensa.", "min": 4},
             {"n": 8, "slug": "leccion-8", "title": "Los hiperparámetros se eligen con validación cruzada, nunca con el test: el flujo completo", "blurb": "GridSearchCV frente a RandomizedSearchCV, curvas de validación y de aprendizaje para diagnosticar, guardar el pipeline y la secuencia completa del módulo.", "min": 4}
