@@ -217,7 +217,8 @@
           if (m.lessons && m.lessons.length) {
             var lul = el("ul", { class: "side-toc side-lessons" });
             m.lessons.forEach(function (l) {
-              var la = el("a", { href: href(c, m, l), text: l.n + ". " + l.title });
+              var lab = l.slug === "laboratorio";
+              var la = el("a", { href: href(c, m, l), class: lab ? "is-lab" : "", text: lab ? "🧪 " + l.title : l.n + ". " + l.title });
               if (l.n === curLesson) la.setAttribute("aria-current", "page");
               if (isLessonDone(c.id, m.n, l.n)) la.classList.add("is-done");
               lul.appendChild(el("li", {}, la));
@@ -425,8 +426,9 @@
       var ol = el("ol", { class: "lesson-list" });
       m.lessons.forEach(function (l) {
         var done = isLessonDone(curCourse, curModule, l.n);
-        var a = el("a", { href: href(c, m, l), class: done ? "is-done" : "" },
-          el("span", { class: "ll-n", text: String(l.n) }),
+        var lab = l.slug === "laboratorio";
+        var a = el("a", { href: href(c, m, l), class: (done ? "is-done " : "") + (lab ? "is-lab" : "") },
+          el("span", { class: "ll-n", text: lab ? "Lab" : String(l.n) }),
           el("span", { class: "ll-body" }, el("span", { class: "ll-title", text: l.title }), l.blurb ? el("span", { class: "ll-blurb", text: l.blurb }) : null),
           el("span", { class: "ll-meta", text: done ? "✓ hecha" : (l.min ? l.min + " min" : "") }));
         ol.appendChild(el("li", {}, a));
