@@ -32,7 +32,7 @@ Lab.register("curso2/c2m5-pool-upsample", function (root, api) {
       for (i = 0; i < c; i++) for (j = 0; j < c; j++) {
         var val = get(i, j);
         api.d.rect(ctx, x0 + j * s, y0 + i * s, s, s, gray(val), diffFrom && Math.abs(val - diffFrom(i, j)) > 1e-9 ? C.terracota : C.line, diffFrom && Math.abs(val - diffFrom(i, j)) > 1e-9 ? 2.5 : 1);
-        api.d.text(ctx, fmt(val), x0 + (j + .5) * s, y0 + (i + .5) * s + 4, { size: Math.min(13, s * 0.38), align: "center", mono: true, color: val > 4 ? gray(0) : gray(9) });
+        api.d.text(ctx, fmt(val), x0 + (j + .5) * s, y0 + (i + .5) * s + 4, { size: Math.max(11, Math.min(13, s * 0.45)), align: "center", mono: true, color: val > 4 ? gray(0) : gray(9) });
       }
     });
   }

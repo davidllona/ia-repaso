@@ -14,11 +14,11 @@ Lab.register("curso2/c2m5-forma-autoencoder", function (root, api) {
     function up(name) { n = n * 2; rows.push([name, n + "×" + n + "×" + c, 0]); sizes.push([n, c]); }
     rows.push(["Input", n0 + "×" + n0 + "×1", 0]);
     conv("Conv " + f1, f1); pool("MaxPool");
-    conv("Conv " + f2, f2); pool("bottleneck (MaxPool)");
+    conv("Conv " + f2, f2); pool("bottleneck");
     var bi = rows.length - 1, bn = n, bc = c;
     conv("Conv " + f2, f2); up("UpSampling");
     conv("Conv " + f1, f1); up("UpSampling");
-    conv("Conv 1 (sigmoid)", 1);
+    conv("Conv 1 sigmoide", 1);
     return { rows: rows, total: tot, n: n, bi: bi, bn: bn, bc: bc, sizes: sizes };
   }
   view = api.view(root, { aspect: 3.2, minH: 110, maxH: 150, label: "Embudo del autoencoder (del póster al código y vuelta): tamaño de cada capa" });
@@ -28,7 +28,7 @@ Lab.register("curso2/c2m5-forma-autoencoder", function (root, api) {
   ui.select({ label: "Filtros de la capa exterior", options: [[8, "8"], [16, "16 (notas)"], [32, "32"]], value: f1, onChange: function (v) { f1 = +v; update(); } });
   ui.select({ label: "Filtros de la capa interior", options: [[4, "4"], [8, "8 (notas)"], [16, "16"]], value: f2, onChange: function (v) { f2 = +v; update(); } });
   out = api.readout(root);
-  tbl = api.table(root, ["Capa", "Forma de salida", "Parámetros"]);
+  tbl = api.table(root, ["Capa", "Forma", "Parám."]);
   tbl.el.classList.add("c2m5-fa");
   root.appendChild(api.el("style", { text: ".c2m5-fa .lab-table{font-size:.74rem}.c2m5-fa .lab-table td,.c2m5-fa .lab-table th{padding:.3rem .3rem!important}" }));
   var M = build();
@@ -41,9 +41,9 @@ Lab.register("curso2/c2m5-forma-autoencoder", function (root, api) {
       api.d.rect(ctx, cx - ww / 2, 8 + (maxH - hh) / 2, ww, hh, col);
     }
     var cxb = bx + gap * M.bi + gap / 2;
-    api.d.text(ctx, "entrada", bx + gap / 2, h - 6, { size: 10, align: "left", color: C.muted });
-    api.d.text(ctx, "cuello", Math.min(w - 30, Math.max(40, cxb)), h - 6, { size: 10, align: "center", color: C.terracotaInk, weight: 600 });
-    api.d.text(ctx, "salida", w - 12, h - 6, { size: 10, align: "right", color: C.muted });
+    api.d.text(ctx, "entrada", bx + gap / 2, h - 6, { size: 11, align: "left", color: C.muted });
+    api.d.text(ctx, "cuello", Math.min(w - 30, Math.max(40, cxb)), h - 6, { size: 11, align: "center", color: C.terracotaInk, weight: 600 });
+    api.d.text(ctx, "salida", w - 12, h - 6, { size: 11, align: "right", color: C.muted });
   });
   function update() {
     M = build();

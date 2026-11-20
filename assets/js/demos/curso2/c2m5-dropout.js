@@ -18,7 +18,7 @@ Lab.register("curso2/c2m5-dropout", function (root, api) {
       api.d.rect(ctx, x + bw * 0.1, base - VALS[i] * sc, bw * 0.38, VALS[i] * sc, off ? C.muted : C.cobalto);
       if (!off) api.d.rect(ctx, x + bw * 0.52, base - A[i] * sc, bw * 0.38, A[i] * sc, C.terracota);
       else api.d.text(ctx, "×", x + bw * 0.71, base - 4, { size: 13, align: "center", color: C.muted, weight: 700 });
-      api.d.text(ctx, String(i + 1), x + bw / 2, h - 7, { size: 10, align: "center", color: C.muted });
+      api.d.text(ctx, String(i + 1), x + bw / 2, h - 7, { size: 11, align: "center", color: C.muted });
     }
   });
   function update() {

@@ -26,9 +26,9 @@ Lab.register("curso2/c2m5-escenarios", function (root, api) {
       var y = 4 + i * rh, row = R[i];
       if (!row) { if (i === 13) api.d.text(ctx, "sin cabeza: la salida de la base son las features", left, y + rh / 2 + 4, { size: 11, color: C.muted }); continue; }
       var col = row.tr ? C.terracota : C.muted, bw = (w - left - right) * Math.sqrt(row.p) / mx;
-      api.d.text(ctx, row.name, 6, y + rh / 2 + 4, { size: 10.5, color: row.head ? C.ink : C.ink2, weight: row.head ? 600 : 400, mono: true });
+      api.d.text(ctx, row.name, 6, y + rh / 2 + 4, { size: 11, color: row.head ? C.ink : C.ink2, weight: row.head ? 600 : 400, mono: true });
       api.d.rect(ctx, left, y + 2, Math.max(2, bw), rh - 4, col);
-      api.d.text(ctx, fm(row.p), w - 6, y + rh / 2 + 4, { size: 10.5, align: "right", mono: true, color: C.ink });
+      api.d.text(ctx, fm(row.p), w - 6, y + rh / 2 + 4, { size: 11, align: "right", mono: true, color: C.ink });
     }
   });
   var NOTE = { 1: "Todo congelado. Se usa VGG16 solo para obtener features (25.088 números por imagen) y se pasan a otro método (clustering, PCA, un clasificador sencillo). Aquí no hay <code>fit</code> de la red.",

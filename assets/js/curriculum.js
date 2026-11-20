@@ -217,7 +217,8 @@ window.CURRICULUM = {
             {"n": 5, "slug": "leccion-5", "title": "Un preentrenado ya sabe ver: le quitas el clasificador y congelas lo demás", "blurb": "VGG16 e ImageNet, include_top=False y los 7×7×512 = 25.088 valores, y congelar con trainable=False: 13.108.737 entrenables de 27.823.425.", "min": 3},
             {"n": 6, "slug": "leccion-6", "title": "Con pocos datos, toca poco: tres escenarios y un learning rate diminuto", "blurb": "Feature extraction, transfer learning y fine-tuning; por qué Adam(1e-5), las trampas de trainable en Keras 3 y un experimento honesto.", "min": 3},
             {"n": 7, "slug": "leccion-7", "title": "El proyecto empieza en carpetas: las fotos llegan a la red en lotes de 32", "blurb": "Dent o crack con VGG16: las 10 tareas, train/valid/test, ImageDataGenerator, flow_from_directory, batches y steps, y la cabeza con Dropout.", "min": 3},
-            {"n": 8, "slug": "leccion-8", "title": "Un 90 % de acierto no basta: mira la brecha de las curvas y la matriz de confusión", "blurb": "compile y fit, loss frente a accuracy, curvas sanas o sobreajustadas, matriz de confusión y umbral, la parte 2 con BLIP y los errores típicos.", "min": 3}
+            {"n": 8, "slug": "leccion-8", "title": "Un 90 % de acierto no basta: mira la brecha de las curvas y la matriz de confusión", "blurb": "compile y fit, loss frente a accuracy, curvas sanas o sobreajustadas, matriz de confusión y umbral, la parte 2 con BLIP y los errores típicos.", "min": 3},
+            {"n": 9, "slug": "laboratorio", "title": "Laboratorio: comprimir, limpiar y reutilizar redes", "blurb": "Doce pasos explicados línea a línea: un autoencoder convolucional que quita ruido, VGG16 por dentro, congelar y afinar, y el detector de abolladuras y grietas de principio a fin.", "min": 60}
           ]
         }
       ]

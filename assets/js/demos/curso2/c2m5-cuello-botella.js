@@ -180,15 +180,15 @@ Lab.register("curso2/c2m5-cuello-botella", function (root, api) {
     api.d.rect(ctx, cx0, cy, cx1 - cx0, cb - cy, C.surface, C.line, 1);
     [0.001, 0.01, 0.1].forEach(function (v) {
       api.d.line(ctx, cx0, Y(v), cx1, Y(v), C.line, 1);
-      api.d.text(ctx, String(v).replace(".", ","), cx0 - 5, Y(v) + 4, { size: 10, align: "right", color: C.muted, mono: true });
+      api.d.text(ctx, String(v).replace(".", ","), cx0 - 5, Y(v) + 4, { size: 11, align: "right", color: C.muted, mono: true });
     });
-    api.d.text(ctx, "épocas: 0", cx0, cb + 14, { size: 10, color: C.muted });
-    api.d.text(ctx, String(maxE), cx1, cb + 14, { size: 10, align: "right", color: C.muted });
+    api.d.text(ctx, "épocas: 0", cx0, cb + 14, { size: 11, color: C.muted });
+    api.d.text(ctx, String(maxE), cx1, cb + 14, { size: 11, align: "right", color: C.muted });
     api.d.line(ctx, cx0, Y(baseMse), cx1, Y(baseMse), C.muted, 1.5, [5, 4]);
     api.d.line(ctx, cx0, Y(pca[k]), cx1, Y(pca[k]), C.terracota, 2, [6, 4]);
     var pts = hist.map(function (v, e) { return [E(e), Y(v)]; });
     api.d.path(ctx, pts, C.cobalto, 2.5);
-    api.d.text(ctx, "error (MSE, escala log)", 4, cy - 6, { size: 10, color: C.muted });
+    api.d.text(ctx, "error (MSE, escala log)", 4, cy - 6, { size: 11, color: C.muted });
   });
   function f4(v) { return v.toFixed(4).replace(".", ","); }
   function update() {

@@ -20,31 +20,75 @@
     <div>
       <p class="eyebrow">Curso 2 · Módulo 5 · Lección 3 de 8</p>
       <h1>El autoencoder convolucional baja con pooling y sube con UpSampling, pero el detalle no vuelve</h1>
-      <p class="lead">Con imágenes, mejor convoluciones. El encoder encoge la carátula con MaxPooling2D; el decoder la agranda con UpSampling2D, que repite valores pero no inventa el detalle perdido.</p>
-      <p class="meta-line"><span class="read-time" data-render="read-time"></span><a href="../modulo-5.html">Índice del módulo</a></p>
+      <p class="lead">Con imágenes, mejor convoluciones. El encoder encoge la carátula a la mitad dos veces; el decoder la agranda al doble dos veces, repitiendo valores, sin inventar el detalle perdido.</p>
+      <p class="meta-line"><span class="read-time" data-render="read-time"></span><a href="../modulo-5.html">Índice del módulo</a> · <a href="#chuleta">Ir a la chuleta</a></p>
     </div>
     <div class="hero-tile" aria-hidden="true"></div>
   </div>
 </header>
 
 <details class="predice">
-  <summary>MaxPooling2D se queda con el máximo de cada bloque 2×2; UpSampling2D repite cada valor en un bloque 2×2. Si aplicas los dos seguidos al bloque [[1, 0], [0, 0]], ¿recuperas el original?<span class="hint"></span></summary>
+  <summary>Una capa se queda con el máximo de cada bloque 2×2; otra repite cada valor en un bloque 2×2. Si aplicas las dos seguidas al bloque [[1, 0], [0, 0]], ¿recuperas el original?<span class="hint"></span></summary>
   <div>
-    <p>No. El pooling da 1 y el UpSampling da [[1, 1], [1, 1]]: recuperas el <strong>tamaño</strong>, no el <strong>detalle</strong>. Es como agrandar una miniatura de Netflix: sale «a cuadritos». Por eso, tras cada UpSampling, el decoder pone una convolución que rellena con lo aprendido.</p>
+    <p>No. La primera da 1 y la segunda, [[1, 1], [1, 1]]: recuperas el <strong>tamaño</strong>, no el <strong>detalle</strong>. Es como agrandar una miniatura de Netflix: sale «a cuadritos».</p>
   </div>
 </details>
 
 <section>
-<h2 id="idea">Bajar y subir sin perder la cuenta</h2>
-<p>El autoencoder de las notas trabaja con 500 carátulas de juguete de 28×28: fondo negro y un recuadro blanco. El <strong>encoder</strong> alterna <code>Conv2D</code> (detecta patrones) y <code>MaxPooling2D</code> (divide alto y ancho entre 2). El <strong>decoder</strong> hace lo contrario con <code>UpSampling2D</code>, que los duplica. Al final, <code>Conv2D(1, sigmoid)</code> deja cada píxel entre 0 y 1.</p>
-<ul class="flow">
-  <li class="a">ENTRADA<small>28×28×1</small></li>
-  <li class="b">ENCODER<small>(Conv + MaxPool) × 2</small></li>
-  <li class="d">CUELLO<small>7×7×8 = 392 números</small></li>
-  <li class="b">DECODER<small>(Conv + UpSampling) × 2</small></li>
-  <li class="c">SALIDA<small>Conv sigmoide: 28×28×1</small></li>
-</ul>
-<p>Todas las capas llevan <code>padding="same"</code>: las convoluciones no cambian el tamaño y las cuentas cuadran, 28 → 14 → 7 al bajar y 7 → 14 → 28 al subir. Solo así la salida mide lo mismo que la entrada y se puede calcular el MSE píxel a píxel.</p>
+<h2 id="idea">1 · Cuatro piezas para bajar y subir</h2>
+<p>Las carátulas de juguete de 28×28 (fondo negro y un recuadro blanco) se comprimen mejor con las capas de las redes de imágenes (<a href="../modulo-3.html">módulo 3</a>):</p>
+<table>
+  <thead><tr><th>Pieza</th><th>Qué hace</th><th>Lado</th></tr></thead>
+  <tbody>
+    <tr><td><code>Conv2D</code></td><td>Pasa filtros de 3×3 buscando patrones (bordes, esquinas)</td><td>Igual</td></tr>
+    <tr><td><code>MaxPooling2D</code></td><td>Se queda con el máximo de cada bloque 2×2</td><td>÷ 2</td></tr>
+    <tr><td><code>UpSampling2D</code></td><td>Repite cada valor en un bloque 2×2</td><td>× 2</td></tr>
+    <tr><td>Sigmoide final</td><td>Deja cada píxel entre 0 y 1</td><td>Igual</td></tr>
+  </tbody>
+</table>
+<p>El encoder usa las dos primeras; el decoder, la convolución y el UpSampling.</p>
+</section>
+
+<section>
+<h2 id="formas">2 · Las formas: 28 → 14 → 7 → 14 → 28</h2>
+<p>Todas las capas llevan <code>padding="same"</code>: rellenan el borde con ceros para que el filtro no encoja la imagen. Así las cuentas cuadran y la salida mide lo mismo que la entrada.</p>
+<div class="anim-pasos" data-titulo="La carátula atravesando el autoencoder">
+  <div class="paso"><p><strong>1.</strong> Entra la carátula: 28×28 y 1 canal (gris).</p><span class="grande">28×28×1</span></div>
+  <div class="paso"><p><strong>2.</strong> Conv2D con 16 filtros y MaxPooling: 16 mapas, la mitad de grandes.</p><span class="grande">14×14×16</span></div>
+  <div class="paso"><p><strong>3.</strong> Conv2D con 8 filtros y otro MaxPooling. Es el cuello: 7 · 7 · 8 = 392 números.</p><span class="grande">7×7×8</span></div>
+  <div class="paso"><p><strong>4.</strong> El decoder: Conv2D y UpSampling al doble.</p><span class="grande">14×14×16</span></div>
+  <div class="paso"><p><strong>5.</strong> Otro UpSampling y una Conv2D de 1 filtro con sigmoide: misma forma que la entrada.</p><span class="grande">28×28×1</span></div>
+</div>
+</section>
+<figure class="demo" data-demo="curso2/c2m5-forma-autoencoder" data-titulo="Las formas del autoencoder convolucional">
+  <div class="haz">Cambia <code>same</code> por <code>valid</code> y luego prueba una imagen de 25×25.</div>
+  <div class="observa">Con <code>valid</code> la salida se queda en 6×6; con 25×25 y <code>same</code> sale 28×28. En los dos casos ya no se puede comparar con la entrada.</div>
+</figure>
+
+<section>
+<h2 id="detalle">3 · UpSampling recupera el tamaño, no el detalle</h2>
+<figure class="figura">
+  <svg viewBox="0 0 640 210" role="img" aria-label="El bloque 1 0 0 0 pasa por MaxPooling a un solo 1 y por UpSampling a cuatro unos">
+    <text x="70" y="32" font-size="20" text-anchor="middle">Original</text>
+    <rect x="20" y="50" width="50" height="50" class="fill-d"/><rect x="70" y="50" width="50" height="50" class="stroke"/>
+    <rect x="20" y="100" width="50" height="50" class="stroke"/><rect x="70" y="100" width="50" height="50" class="stroke"/>
+    <text x="45" y="84" font-size="24" text-anchor="middle" class="mono">1</text><text x="95" y="84" font-size="24" text-anchor="middle" class="mono">0</text>
+    <text x="45" y="134" font-size="24" text-anchor="middle" class="mono">0</text><text x="95" y="134" font-size="24" text-anchor="middle" class="mono">0</text>
+    <text x="200" y="112" font-size="36" text-anchor="middle">→</text>
+    <text x="320" y="32" font-size="20" text-anchor="middle">MaxPooling</text>
+    <rect x="295" y="75" width="50" height="50" class="fill-d"/>
+    <text x="320" y="109" font-size="24" text-anchor="middle" class="mono">1</text>
+    <text x="440" y="112" font-size="36" text-anchor="middle">→</text>
+    <text x="560" y="32" font-size="20" text-anchor="middle">UpSampling</text>
+    <rect x="510" y="50" width="50" height="50" class="fill-d"/><rect x="560" y="50" width="50" height="50" class="fill-d"/>
+    <rect x="510" y="100" width="50" height="50" class="fill-d"/><rect x="560" y="100" width="50" height="50" class="fill-d"/>
+    <text x="535" y="84" font-size="24" text-anchor="middle" class="mono">1</text><text x="585" y="84" font-size="24" text-anchor="middle" class="mono">1</text>
+    <text x="535" y="134" font-size="24" text-anchor="middle" class="mono">1</text><text x="585" y="134" font-size="24" text-anchor="middle" class="mono">1</text>
+    <text x="320" y="195" font-size="20" text-anchor="middle" class="muted">mismo tamaño, otro dibujo</text>
+  </svg>
+  <figcaption>El pooling tiró tres valores; el UpSampling no puede adivinarlos.</figcaption>
+</figure>
+<p>Por eso, tras cada UpSampling, el decoder pone una convolución que rellena con lo aprendido.</p>
 </section>
 <figure class="demo" data-demo="curso2/c2m5-pool-upsample" data-titulo="Pooling y UpSampling2D, casilla a casilla">
   <div class="haz">Empieza con «Recuadro alineado a bloques 2×2» y prueba después «Grano de película» y «Subtítulo: línea fina».</div>
@@ -52,34 +96,53 @@
 </figure>
 
 <section>
-<h2 id="con-numeros">Con números: cuánto pesa este autoencoder</h2>
-<div class="callout ejemplo">
-  <span class="lbl">Ejemplo numérico</span>
-  <p>Una convolución 3×3 tiene \( 3\cdot3\cdot C_{in}\cdot C_{out} + C_{out} \) parámetros (pesos más un sesgo por filtro).</p>
-  <ol class="pasos">
-    <li>Encoder: <code>Conv2D(16)</code> sobre 1 canal: 9 · 1 · 16 + 16 = 160. <code>Conv2D(8)</code> sobre 16: 9 · 16 · 8 + 8 = 1.160.</li>
-    <li>Decoder: 584 + 1.168 + 145. Los pooling y UpSampling no tienen pesos.</li>
-    <li>Total: <span class="res">3.217</span>, frente a 209.968 del autoencoder denso: las convoluciones comparten pesos.</li>
-    <li>El cuello 7×7×8 son 392 números: comprime 784 / 392 = <strong>2 veces</strong>, no 24,5.</li>
-  </ol>
+<h2 id="con-numeros">4 · Con números: cuánto pesa este autoencoder</h2>
+<p>Los <strong>parámetros</strong> son los números que la red aprende. Un filtro 3×3 tiene 9 pesos por cada canal que entra, más un <strong>sesgo</strong> (un número extra por filtro).</p>
+<div class="anim-pasos" data-titulo="Contar los parámetros capa a capa">
+  <div class="paso"><p><strong>1.</strong> Conv2D(16) sobre 1 canal.</p><span class="grande">9 · 1 · 16 + 16 = 160</span></div>
+  <div class="paso"><p><strong>2.</strong> Conv2D(8) sobre 16 canales.</p><span class="grande">9 · 16 · 8 + 8 = 1.160</span></div>
+  <div class="paso"><p><strong>3.</strong> El decoder: 584 + 1.168 + 145. Pooling y UpSampling no tienen pesos.</p><span class="grande">1.897</span></div>
+  <div class="paso"><p><strong>4.</strong> Total. El autoencoder de capas densas tenía 209.968: los filtros se reutilizan por toda la imagen.</p><span class="grande">3.217</span></div>
+  <div class="paso"><p><strong>5.</strong> El cuello tiene 392 números: comprime solo 2 veces, porque conserva el «dónde».</p><span class="grande">784 / 392 = 2</span></div>
 </div>
 </section>
-<figure class="demo" data-demo="curso2/c2m5-forma-autoencoder" data-titulo="Las formas del autoencoder convolucional">
-  <div class="haz">Cambia <code>same</code> por <code>valid</code> y luego prueba una imagen de 25×25.</div>
-  <div class="observa">Con <code>valid</code> la salida se queda en 6×6; con 25×25 y <code>same</code> sale 28×28. En los dos casos ya no se puede comparar con la entrada.</div>
-</figure>
-<details class="predice">
-  <summary>Entrenas 8 épocas y el error de validación pasa de 0,0315 (la imagen ruidosa) a 0,0172: solo 1,8 veces menos. ¿El modelo es malo o está sin terminar?<span class="hint"></span></summary>
-  <div>
-    <p>Sin terminar: la pérdida seguía bajando cuando paró. Ocho épocas con 400 imágenes son pocos pasos (13 por época). Con 40 épocas más, el error de validación baja a <strong>0,0020</strong>, unas 15 veces menos que el ruido de partida.</p>
-  </div>
-</details>
+
+<section>
+<h2 id="entrenar">5 · Ocho épocas son pocas</h2>
+<p>Se entrena con <code>fit(sucias, limpias)</code>. Una <strong>época</strong> es una pasada por todas las imágenes. Error con 100 imágenes que no usó para aprender:</p>
+<table>
+  <thead><tr><th>Qué se compara con la limpia</th><th>Error</th></tr></thead>
+  <tbody>
+    <tr><td>La imagen sucia, sin la red</td><td>0,0315</td></tr>
+    <tr><td>La limpiada, tras 8 épocas</td><td>0,0172</td></tr>
+    <tr><td>La limpiada, tras 48 épocas</td><td class="res">0,0020</td></tr>
+  </tbody>
+</table>
+<p>Con 8 épocas el error seguía bajando: estaba sin terminar, no era malo.</p>
+</section>
+
+<section>
+<h2 id="chuleta">Chuleta para repasar</h2>
+<dl class="chuleta">
+  <div><dt><code>Conv2D</code></dt><dd>Filtros de 3×3 que buscan patrones. <em>Con <code>same</code>, no cambia el tamaño.</em></dd></div>
+  <div><dt><code>MaxPooling2D</code></dt><dd>El máximo de cada bloque 2×2: divide alto y ancho entre 2.</dd></div>
+  <div><dt><code>UpSampling2D</code></dt><dd>Repite cada valor en un bloque 2×2: multiplica por 2. <em>Recupera el tamaño, no el detalle.</em></dd></div>
+  <div><dt><code>padding="same"</code></dt><dd>Rellena el borde con ceros para no encoger. <em>Gracias a él, 28 → 14 → 7 → 14 → 28.</em></dd></div>
+  <div><dt>Sigmoide final</dt><dd>Deja cada píxel entre 0 y 1, como la carátula original.</dd></div>
+  <div><dt>Cuello convolucional</dt><dd>Un mapa 7×7×8 = 392 números. <em>Comprime 2 veces, no 24,5.</em></dd></div>
+  <div><dt>Parámetro</dt><dd>Un número que la red aprende: pesos y sesgos.</dd></div>
+  <div><dt>Sesgo</dt><dd>Un número extra por filtro o neurona que se suma al final.</dd></div>
+  <div><dt>Época</dt><dd>Una pasada por todas las imágenes de entrenamiento.</dd></div>
+  <div><dt>3.217</dt><dd>Los parámetros de este autoencoder. <em>El denso tenía 209.968.</em></dd></div>
+</dl>
+</section>
+
 <div class="resumen">
   <h2 class="sin-num sin-toc">En tres líneas</h2>
   <ul>
-    <li>Encoder: Conv + MaxPooling (÷2); decoder: Conv + UpSampling (×2); sigmoide al final.</li>
-    <li><code>padding="same"</code> mantiene 28 → 14 → 7 → 14 → 28; con <code>valid</code> o tamaños impares la salida ya no coincide.</li>
-    <li>Solo 3.217 parámetros porque las convoluciones comparten pesos; el cuello 7×7×8 son 392 números.</li>
+    <li>Encoder: Conv + MaxPooling (÷ 2); decoder: Conv + UpSampling (× 2); sigmoide al final.</li>
+    <li><code>padding="same"</code> mantiene 28 → 14 → 7 → 14 → 28; si no cuadra, no se puede comparar con la entrada.</li>
+    <li>Solo 3.217 parámetros; el cuello 7×7×8 son 392 números; y 8 épocas eran pocas.</li>
   </ul>
 </div>
 
@@ -89,7 +152,7 @@
  "titulo": "¿Lo tienes?",
  "preguntas": [
   {
-   "q": "Pasas imágenes de <strong>25×25</strong> por el autoencoder de las notas (<code>padding=\"same\"</code> en todo, dos <code>MaxPooling2D(2)</code> y dos <code>UpSampling2D(2)</code>). ¿Qué tamaño tiene la salida?",
+   "q": "Pasas imágenes de <strong>25×25</strong> por el autoencoder (<code>padding=\"same\"</code> en todo, dos <code>MaxPooling2D(2)</code> y dos <code>UpSampling2D(2)</code>). ¿Qué tamaño tiene la salida?",
    "opciones": [
     "28×28: el pooling redondea hacia arriba (25 → 13 → 7) y el UpSampling duplica (7 → 14 → 28), así que no coincide con la entrada.",
     "25×25, porque <code>same</code> conserva el tamaño siempre.",
@@ -97,10 +160,10 @@
     "7×7, el tamaño del cuello de botella."
    ],
    "correcta": 0,
-   "porque": "<code>padding=\"same\"</code> conserva el tamaño en las <em>convoluciones</em> con stride 1, pero el pooling con <code>same</code> redondea hacia arriba: 25 → 13 → 7. <code>UpSampling2D(2)</code> solo duplica: 7 → 14 → 28. La salida mide 28×28 y no se puede comparar con la entrada de 25×25. Por eso las notas usan 28 (que se divide entre 2 dos veces sin resto)."
+   "porque": "<code>same</code> conserva el tamaño en las convoluciones, pero en el pooling redondea hacia arriba: 25 → 13 → 7. El UpSampling solo duplica: 7 → 14 → 28. La salida mide 28×28 y no se puede comparar con la entrada. Por eso se usan 28 píxeles: se dividen entre 2 dos veces sin resto."
   },
   {
-   "q": "¿Cuántos parámetros tiene <code>Conv2D(8, 3×3)</code> sobre una entrada de 16 canales?",
+   "q": "¿Cuántos parámetros tiene <code>Conv2D</code> con 8 filtros de 3×3 sobre una entrada de 16 canales?",
    "opciones": [
     "1.160",
     "1.152",
@@ -108,17 +171,17 @@
     "136"
    ],
    "correcta": 0,
-   "porque": "3 · 3 · 16 · 8 = 1.152 pesos, más 8 sesgos (uno por filtro): 1.160. El 1.152 olvida los sesgos."
+   "porque": "9 pesos por canal: 9 · 16 · 8 = 1.152, más 8 sesgos (uno por filtro): 1.160. El 1.152 olvida los sesgos."
   },
   {
    "q": "¿Qué hace <code>autoencoder.compile(optimizer=\"adam\", loss=\"mean_squared_error\")</code>?",
    "opciones": [
     "Entrena el modelo una época",
-    "Define cómo medir el error (MSE) y cómo corregir los pesos (Adam); no entrena nada",
+    "Elige cómo medir el error (MSE) y cómo corregir los pesos (Adam); no entrena nada",
     "Comprime las imágenes al cuello de botella"
    ],
    "correcta": 1,
-   "porque": "<code>compile</code> solo configura. El entrenamiento empieza con <code>fit(noisy, clean, …)</code>."
+   "porque": "<code>compile</code> solo configura. El entrenamiento empieza con <code>fit(sucias, limpias, …)</code>."
   }
  ]
 }
@@ -139,7 +202,7 @@
   <li>Para cada imagen, <code>x1, y1 = np.random.randint(2, 14, size=2)</code> sortea la esquina superior izquierda del rectángulo (un entero entre 2 y 13, incluidos) y <code>x2, y2 = np.random.randint(14, 26, size=2)</code> la inferior derecha (entre 14 y 25).</li>
   <li><code>images[i, y1:y2, x1:x2, 0] = 1</code> pinta de blanco las filas de <code>y1</code> a <code>y2-1</code> y las columnas de <code>x1</code> a <code>x2-1</code>. (En NumPy, <code>a:b</code> excluye el <code>b</code>; y el orden es <em>filas primero</em>, por eso <code>y</code> va antes que <code>x</code>.)</li>
 </ol>
-<p>Con <code>np.random.seed(42)</code>, la imagen 0 tiene el rectángulo en las filas 5 a 20 y las columnas 8 a 23: 16×16 = 256 de los 784 píxeles encendidos (fragmento 1 (<a href="leccion-1.html">lección 1</a>), que dibuja la imagen en texto). Lado mínimo: 14 − 13 = 1 píxel, máximo 25 − 2 = 23.</p>
+<p>Con <code>np.random.seed(42)</code>, la imagen 0 tiene el rectángulo en las filas 5 a 20 y las columnas 8 a 23: 16×16 = 256 de los 784 píxeles encendidos (<a href="laboratorio.html#fragmento-1">fragmento 1</a>, que dibuja la imagen en texto). Lado mínimo: 14 − 13 = 1 píxel, máximo 25 − 2 = 23.</p>
 
 <h3>La arquitectura</h3>
 <p>El <strong>encoder</strong> alterna convolución (que detecta patrones) con <code>MaxPooling2D</code> (que reduce a la mitad el alto y el ancho). El <strong>decoder</strong> hace lo contrario: convoluciones y <code>UpSampling2D</code>, que <em>duplica</em> el alto y el ancho. La última capa es una convolución de 1 filtro con <strong>sigmoide</strong>, que deja cada píxel entre 0 y 1, igual que la imagen original.</p>
@@ -161,11 +224,11 @@
     <tr><td></td><td><strong>Total</strong></td><td></td><td class="res">3.217</td><td>160 + 1.160 + 584 + 1.168 + 145</td></tr>
   </tbody>
 </table>
-<p>Esas cifras salen idénticas del <code>summary()</code> real del fragmento 3. Observa que el modelo entero tiene solo 3.217 parámetros: las convoluciones comparten pesos (módulo 3), así que un autoencoder convolucional es mucho más pequeño que el denso de 209.968 de antes.</p>
+<p>Esas cifras salen idénticas del <code>summary()</code> real del <a href="laboratorio.html#fragmento-3">fragmento 3</a>. Observa que el modelo entero tiene solo 3.217 parámetros: las convoluciones comparten pesos (módulo 3), así que un autoencoder convolucional es mucho más pequeño que el denso de 209.968 de antes.</p>
 
 <div class="callout ojo">
   <span class="lbl">Ojo: el cuello de botella 7×7×8 son 392 números, no 8</span>
-  <p>El «cuello» aquí no es un vector corto: es un mapa de <strong>7×7×8 = 392</strong> valores. La compresión es de 784 / 392 = <strong>2 veces</strong>, mucho menos agresiva que el 24,5 del ejemplo denso. En un autoencoder convolucional la compresión es «espacial» (se conserva la forma de la imagen en pequeño) y se regula con el número de filtros y de pooling. Además, la ReLU deja muchos ceros: en el fragmento 5 (<a href="leccion-4.html">lección 4</a>), un 30 % de esos 392 valores vale exactamente 0.</p>
+  <p>El «cuello» aquí no es un vector corto: es un mapa de <strong>7×7×8 = 392</strong> valores. La compresión es de 784 / 392 = <strong>2 veces</strong>, mucho menos agresiva que el 24,5 del ejemplo denso. En un autoencoder convolucional la compresión es «espacial» (se conserva la forma de la imagen en pequeño) y se regula con el número de filtros y de pooling. Además, la ReLU deja muchos ceros: en el <a href="laboratorio.html#fragmento-5">fragmento 5</a>, un 30 % de esos 392 valores vale exactamente 0.</p>
 </div>
 
 <h3>MaxPooling2D baja, UpSampling2D sube (pero no devuelve el detalle)</h3>
@@ -209,7 +272,7 @@
   <p>Carátula limpia de 4 píxeles \( (0,\ 0,\ 1,\ 1) \) y reconstrucción \( (0{,}1,\ 0,\ 0{,}8,\ 1) \). Diferencias: \( (0{,}1,\ 0,\ -0{,}2,\ 0) \). Al cuadrado: \( (0{,}01,\ 0,\ 0{,}04,\ 0) \). Media: \( 0{,}05/4 = \) <span class="res">0,0125</span>. El MSE de las 784 posiciones se calcula igual.</p>
 </div>
 
-<h3>Qué pasó de verdad al ejecutarlo (fragmento 4)</h3>
+<h3>Qué pasó de verdad al ejecutarlo (<a href="laboratorio.html#fragmento-4">fragmento 4</a>)</h3>
 <table>
   <caption>Pérdida (MSE) por época, 500 imágenes con ruido 0,25 y semilla 42</caption>
   <thead><tr><th>Época</th><th>1</th><th>2</th><th>3</th><th>4</th><th>5</th><th>6</th><th>7</th><th>8</th></tr></thead>
@@ -222,157 +285,11 @@
   </div>
 </details>
 
-<section>
+<section class="ir-lab">
 <h2 class="sin-num">Código</h2>
-
-<article class="snippet" data-lang="python">
-  <header>
-    <h3>3 · El autoencoder convolucional (arquitectura de las notas)</h3>
-    <p class="para-que"><strong>Para qué sirve</strong> Construir el autoencoder de las notas con la API funcional de Keras: encoder de dos bloques Conv+MaxPool, cuello de botella «bottleneck» de 7×7×8 y decoder con UpSampling, y comprobar formas y parámetros con <code>summary()</code>.</p>
-  </header>
-  <pre class="code"><code>import keras
-from keras import layers
-
-keras.utils.set_random_seed(42)      # pesos iniciales reproducibles
-
-inputs = keras.Input(shape=(28, 28, 1))
-
-# Encoder: comprime
-x = layers.Conv2D(16, 3, activation="relu", padding="same")(inputs)
-x = layers.MaxPooling2D(2, padding="same")(x)
-x = layers.Conv2D(8, 3, activation="relu", padding="same")(x)
-bottleneck = layers.MaxPooling2D(2, padding="same", name="bottleneck")(x)
-
-# Decoder: reconstruye
-x = layers.Conv2D(8, 3, activation="relu", padding="same")(bottleneck)
-x = layers.UpSampling2D(2)(x)
-x = layers.Conv2D(16, 3, activation="relu", padding="same")(x)
-x = layers.UpSampling2D(2)(x)
-outputs = layers.Conv2D(1, 3, activation="sigmoid", padding="same")(x)
-
-autoencoder = keras.Model(inputs, outputs)
-autoencoder.summary()</code></pre>
-  <details class="linea-a-linea" open>
-    <summary>Línea por línea</summary>
-    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
-    <table class="lineas">
-      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
-      <tbody>
-        <tr data-lines="1-2"><td><code>import keras / from keras import layers</code></td><td>Importa Keras 3 y el módulo <code>layers</code> con todas las capas.</td></tr>
-        <tr data-lines="4"><td><code>keras.utils.set_random_seed(42)</code></td><td>Fija la semilla de Python, NumPy y TensorFlow a la vez: los pesos iniciales (aleatorios) serán siempre los mismos y los resultados se podrán reproducir.</td></tr>
-        <tr data-lines="6"><td><code>inputs = keras.Input(shape=(28, 28, 1))</code></td><td>Declara la entrada: imágenes de 28×28 con 1 canal. No hay que indicar el tamaño del lote.</td></tr>
-        <tr data-lines="8"><td><code># Encoder: comprime</code></td><td>Comentario: empieza el encoder.</td></tr>
-        <tr data-lines="9"><td><code>x = layers.Conv2D(16, 3, activation="relu", padding="same")(inputs)</code></td><td>Convolución con 16 filtros de 3×3, ReLU y <code>padding="same"</code> (conserva el tamaño 28×28). El <code>(inputs)</code> final conecta esta capa con la entrada: es la API funcional.</td></tr>
-        <tr data-lines="10"><td><code>x = layers.MaxPooling2D(2, padding="same")(x)</code></td><td>Reduce a la mitad: 28×28 → 14×14, quedándose con el máximo de cada bloque 2×2.</td></tr>
-        <tr data-lines="11"><td><code>x = layers.Conv2D(8, 3, activation="relu", padding="same")(x)</code></td><td>Segunda convolución: 8 filtros sobre los 16 mapas anteriores (14×14×8).</td></tr>
-        <tr data-lines="12"><td><code>bottleneck = layers.MaxPooling2D(2, padding="same", name="bottleneck")(x)</code></td><td>Segundo pooling: 14×14 → 7×7. Es el <strong>cuello de botella</strong>: 7×7×8 = 392 valores. El <code>name="bottleneck"</code> nos permitirá pedir esta capa por su nombre más adelante.</td></tr>
-        <tr data-lines="14"><td><code># Decoder: reconstruye</code></td><td>Comentario: empieza el decoder.</td></tr>
-        <tr data-lines="15"><td><code>x = layers.Conv2D(8, 3, activation="relu", padding="same")(bottleneck)</code></td><td>Convolución de 8 filtros sobre el código (7×7×8): empieza a interpretarlo.</td></tr>
-        <tr data-lines="16"><td><code>x = layers.UpSampling2D(2)(x)</code></td><td>Duplica alto y ancho repitiendo cada valor: 7×7 → 14×14. Es el proceso opuesto al pooling.</td></tr>
-        <tr data-lines="17"><td><code>x = layers.Conv2D(16, 3, activation="relu", padding="same")(x)</code></td><td>Convolución de 16 filtros que suaviza y «rellena» lo que el pooling había tirado (14×14×16).</td></tr>
-        <tr data-lines="18"><td><code>x = layers.UpSampling2D(2)(x)</code></td><td>Otra duplicación: 14×14 → 28×28.</td></tr>
-        <tr data-lines="19"><td><code>outputs = layers.Conv2D(1, 3, activation="sigmoid", padding="same")(x)</code></td><td>Última capa: un filtro (un canal de salida) con <strong>sigmoide</strong>, que deja cada píxel entre 0 y 1 como en la imagen original. Forma final 28×28×1.</td></tr>
-        <tr data-lines="21"><td><code>autoencoder = keras.Model(inputs, outputs)</code></td><td>Crea el modelo uniendo la entrada y la salida: todas las capas entre ambas forman el autoencoder.</td></tr>
-        <tr data-lines="22"><td><code>autoencoder.summary()</code></td><td>Imprime la tabla de capas, formas de salida y parámetros.</td></tr>
-      </tbody>
-    </table>
-  </details>
-  <div class="salida">
-    <strong>Salida esperada</strong>
-    <pre>Model: "functional"
-┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━┓
-┃ Layer (type)                    ┃ Output Shape           ┃       Param # ┃
-┡━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━┩
-│ input_layer (InputLayer)        │ (None, 28, 28, 1)      │             0 │
-├─────────────────────────────────┼────────────────────────┼───────────────┤
-│ conv2d (Conv2D)                 │ (None, 28, 28, 16)     │           160 │
-├─────────────────────────────────┼────────────────────────┼───────────────┤
-│ max_pooling2d (MaxPooling2D)    │ (None, 14, 14, 16)     │             0 │
-├─────────────────────────────────┼────────────────────────┼───────────────┤
-│ conv2d_1 (Conv2D)               │ (None, 14, 14, 8)      │         1,160 │
-├─────────────────────────────────┼────────────────────────┼───────────────┤
-│ bottleneck (MaxPooling2D)       │ (None, 7, 7, 8)        │             0 │
-├─────────────────────────────────┼────────────────────────┼───────────────┤
-│ conv2d_2 (Conv2D)               │ (None, 7, 7, 8)        │           584 │
-├─────────────────────────────────┼────────────────────────┼───────────────┤
-│ up_sampling2d (UpSampling2D)    │ (None, 14, 14, 8)      │             0 │
-├─────────────────────────────────┼────────────────────────┼───────────────┤
-│ conv2d_3 (Conv2D)               │ (None, 14, 14, 16)     │         1,168 │
-├─────────────────────────────────┼────────────────────────┼───────────────┤
-│ up_sampling2d_1 (UpSampling2D)  │ (None, 28, 28, 16)     │             0 │
-├─────────────────────────────────┼────────────────────────┼───────────────┤
-│ conv2d_4 (Conv2D)               │ (None, 28, 28, 1)      │           145 │
-└─────────────────────────────────┴────────────────────────┴───────────────┘
- Total params: 3,217 (12.57 KB)
- Trainable params: 3,217 (12.57 KB)
- Non-trainable params: 0 (0.00 B)</pre>
-    <p>La tabla confirma las cuentas del texto. Las formas bajan 28→14→7 y suben 7→14→28; el cuello de botella (<code>bottleneck</code>) es <code>(None, 7, 7, 8)</code> (el <code>None</code> es el tamaño del lote, que aún no se conoce). Los parámetros son 160 + 1.160 + 584 + 1.168 + 145 = <strong>3.217</strong>, todos entrenables; las capas de pooling y de UpSampling tienen 0 parámetros (no aprenden, solo aplican una regla). Es un modelo diminuto: 12,57 KB.</p>
-  </div>
-</article>
-
-<article class="snippet" data-lang="python">
-  <header>
-    <h3>4 · Compilar, entrenar y medir el error a mano</h3>
-    <p class="para-que"><strong>Para qué sirve</strong> Entrenar el autoencoder para quitar ruido (<code>fit(noisy, clean)</code>), medir el error de una imagen a mano como en las notas y comprobar con las imágenes de validación que la red de verdad limpia. Continúa los fragmentos 1-3.</p>
-  </header>
-  <pre class="code"><code>autoencoder.compile(optimizer="adam", loss="mean_squared_error")
-
-history = autoencoder.fit(
-    noisy, clean,
-    epochs=8, batch_size=32, validation_split=0.2, verbose=0,
-)
-print("loss (train):", np.round(history.history["loss"], 4))
-print("loss (val)  :", np.round(history.history["val_loss"], 4))
-
-reconstructed = autoencoder.predict(noisy[:1], verbose=0)
-print("MSE manual, imagen 0:", np.mean((reconstructed[0] - clean[0]) ** 2).round(4))
-
-val_noisy, val_clean = noisy[400:], clean[400:]       # el 20 % que fit no usó para entrenar
-val_rec = autoencoder.predict(val_noisy, verbose=0)
-print("validación, imagen ruidosa  -&gt; limpia: %.4f" % np.mean((val_noisy - val_clean) ** 2))
-print("validación, imagen limpiada -&gt; limpia: %.4f" % np.mean((val_rec - val_clean) ** 2))
-
-# 8 épocas es poco: seguimos entrenando 40 más
-history2 = autoencoder.fit(noisy, clean, epochs=40, batch_size=32, validation_split=0.2, verbose=0)
-val_rec = autoencoder.predict(val_noisy, verbose=0)
-print("tras 48 épocas, val_loss =", round(history2.history["val_loss"][-1], 4))
-print("validación, imagen limpiada -&gt; limpia: %.4f" % np.mean((val_rec - val_clean) ** 2))</code></pre>
-  <details class="linea-a-linea" open>
-    <summary>Línea por línea</summary>
-    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
-    <table class="lineas">
-      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
-      <tbody>
-        <tr data-lines="1"><td><code>autoencoder.compile(optimizer="adam", loss="mean_squared_error")</code></td><td>Configura el entrenamiento: Adam para corregir los pesos y el error cuadrático medio como pérdida. No entrena todavía.</td></tr>
-        <tr data-lines="3-6"><td><code>history = autoencoder.fit(noisy, clean, epochs=8, batch_size=32, validation_split=0.2, verbose=0)</code></td><td>Entrena: entrada = imágenes ruidosas, objetivo = limpias. <code>epochs=8</code>: ocho pasadas completas. <code>batch_size=32</code>: se actualizan los pesos cada 32 imágenes. <code>validation_split=0.2</code>: el último 20 % (imágenes 400-499) se aparta para validar. <code>verbose=0</code> evita imprimir el progreso. Las líneas 3 y 6 abren y cierran el paréntesis; 4-5 son los argumentos.</td></tr>
-        <tr data-lines="7"><td><code>print("loss (train):", np.round(history.history["loss"], 4))</code></td><td><code>history.history</code> es un diccionario con las listas por época; <code>"loss"</code> es el error en las imágenes de entrenamiento. <code>np.round(…, 4)</code> redondea a 4 decimales.</td></tr>
-        <tr data-lines="8"><td><code>print("loss (val)  :", np.round(history.history["val_loss"], 4))</code></td><td><code>"val_loss"</code> es el error en las 100 imágenes de validación (las que no entrenan).</td></tr>
-        <tr data-lines="10"><td><code>reconstructed = autoencoder.predict(noisy[:1], verbose=0)</code></td><td>Pasa por la red la primera imagen ruidosa (<code>noisy[:1]</code> mantiene el eje del lote) y devuelve su reconstrucción.</td></tr>
-        <tr data-lines="11"><td><code>print("MSE manual, imagen 0:", np.mean((reconstructed[0] - clean[0]) ** 2).round(4))</code></td><td>El MSE a mano: resta la reconstrucción y la imagen limpia, eleva al cuadrado y hace la media de los 784 píxeles.</td></tr>
-        <tr data-lines="13"><td><code>val_noisy, val_clean = noisy[400:], clean[400:]</code></td><td>Recupera el 20 % de validación (las imágenes 400 en adelante), que son las que <code>fit</code> apartó.</td></tr>
-        <tr data-lines="14"><td><code>val_rec = autoencoder.predict(val_noisy, verbose=0)</code></td><td>Reconstruye las 100 imágenes de validación ruidosas.</td></tr>
-        <tr data-lines="15"><td><code>print("validación, imagen ruidosa  -> limpia: %.4f" % np.mean((val_noisy - val_clean) ** 2))</code></td><td>Error de partida: lo lejos que está la imagen ruidosa de la limpia, sin usar la red.</td></tr>
-        <tr data-lines="16"><td><code>print("validación, imagen limpiada -> limpia: %.4f" % np.mean((val_rec - val_clean) ** 2))</code></td><td>Error tras pasar por el autoencoder: si es menor, la red limpia.</td></tr>
-        <tr data-lines="18"><td><code># 8 épocas es poco: seguimos entrenando 40 más</code></td><td>Comentario: el entrenamiento aún no había terminado.</td></tr>
-        <tr data-lines="19"><td><code>history2 = autoencoder.fit(noisy, clean, epochs=40, batch_size=32, validation_split=0.2, verbose=0)</code></td><td>Otro <code>fit</code>: continúa desde los pesos actuales (no empieza de cero) con 40 épocas más.</td></tr>
-        <tr data-lines="20"><td><code>val_rec = autoencoder.predict(val_noisy, verbose=0)</code></td><td>Reconstruye otra vez las imágenes de validación con la red ya más entrenada.</td></tr>
-        <tr data-lines="21"><td><code>print("tras 48 épocas, val_loss =", round(history2.history["val_loss"][-1], 4))</code></td><td>La última pérdida de validación (<code>[-1]</code> es el último elemento de la lista).</td></tr>
-        <tr data-lines="22"><td><code>print("validación, imagen limpiada -> limpia: %.4f" % np.mean((val_rec - val_clean) ** 2))</code></td><td>El mismo error calculado a mano: debe coincidir con el <code>val_loss</code> anterior.</td></tr>
-      </tbody>
-    </table>
-  </details>
-  <div class="salida">
-    <strong>Salida esperada</strong>
-    <pre>loss (train): [0.227  0.1668 0.1154 0.088  0.0732 0.0575 0.0307 0.0197]
-loss (val)  : [0.1936 0.141  0.1016 0.0828 0.0695 0.0449 0.0214 0.0172]
-MSE manual, imagen 0: 0.0183
-validación, imagen ruidosa  -&gt; limpia: 0.0315
-validación, imagen limpiada -&gt; limpia: 0.0172
-tras 48 épocas, val_loss = 0.002
-validación, imagen limpiada -&gt; limpia: 0.0020</pre>
-    <p>Las dos pérdidas bajan juntas durante las ocho épocas, de 0,227 a 0,0197 en entrenamiento y de 0,1936 a 0,0172 en validación: no hay sobreajuste. El MSE manual de la imagen 0 es 0,0183. Y la prueba que importa: en validación, el error de la imagen ruidosa es 0,0315 y el de la imagen «limpiada» 0,0172, es decir, la red ya quita ruido, pero poco (1,8 veces). Tras 40 épocas más (48 en total) el <code>val_loss</code> es <strong>0,0020</strong> y el cálculo manual da el mismo número: unas 15 veces menos que el ruido de partida. Ocho épocas eran pocas.</p>
-  </div>
-</article>
+<a class="lab-card" href="laboratorio.html#paso-3"><span class="lc-ico" aria-hidden="true">🧪</span>
+  <span><strong>Ver el código de esta lección en el Laboratorio</strong>
+  <span>Paso 3 · Montar el autoencoder convolucional. Paso 4 · Entrenarlo para quitar el ruido y medir el error a mano.</span></span></a>
 </section>
 
 </div>

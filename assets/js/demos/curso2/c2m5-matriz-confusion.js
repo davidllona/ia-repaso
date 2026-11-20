@@ -13,17 +13,17 @@ Lab.register("curso2/c2m5-matriz-confusion", function (root, api) {
     [["real: crack", 0, C.terracota], ["real: dent", 1, C.cobalto]].forEach(function (r) {
       var yy = y0 + r[1] * rowPitch;
       api.d.rect(ctx, x0, yy, x1 - x0, rowH, C.surface, C.line, 1);
-      api.d.text(ctx, r[0], x0, yy - 5, { size: 10, color: C.muted });
+      api.d.text(ctx, r[0], x0, yy - 5, { size: 11, color: C.muted });
     });
     PROB.forEach(function (p, i) { var yy = y0 + REAL[i] * rowPitch + 8 + J[i] * (rowH - 16); api.d.circle(ctx, X(p), yy, 3.4, REAL[i] ? C.cobalto : C.terracota); });
     api.d.line(ctx, X(th), y0 - 2, X(th), bottom + 2, C.ink, 2);
-    [0, 0.5, 1].forEach(function (t) { api.d.text(ctx, String(t).replace(".", ","), X(t), bottom + 16, { size: 10, align: "center", color: C.muted, mono: true }); });
+    [0, 0.5, 1].forEach(function (t) { api.d.text(ctx, String(t).replace(".", ","), X(t), bottom + 16, { size: 11, align: "center", color: C.muted, mono: true }); });
     /* matriz */
     var gy = mid + 52, cw = Math.min(110, (w - 120) / 2), ch = Math.min(64, (h - gy - 10) / 2), gx = (w - 2 * cw) / 2 + 30;
-    api.d.text(ctx, "Predicho: crack", gx + cw / 2, gy - 8, { size: 10.5, align: "center", color: C.ink2, weight: 600 });
-    api.d.text(ctx, "Predicho: dent", gx + cw * 1.5, gy - 8, { size: 10.5, align: "center", color: C.ink2, weight: 600 });
-    api.d.text(ctx, "Real: crack", gx - 6, gy + ch / 2 + 4, { size: 10.5, align: "right", color: C.ink2, weight: 600 });
-    api.d.text(ctx, "Real: dent", gx - 6, gy + ch * 1.5 + 4, { size: 10.5, align: "right", color: C.ink2, weight: 600 });
+    api.d.text(ctx, "Predicho: crack", gx + cw / 2, gy - 8, { size: 11, align: "center", color: C.ink2, weight: 600 });
+    api.d.text(ctx, "Predicho: dent", gx + cw * 1.5, gy - 8, { size: 11, align: "center", color: C.ink2, weight: 600 });
+    api.d.text(ctx, "Real: crack", gx - 6, gy + ch / 2 + 4, { size: 11, align: "right", color: C.ink2, weight: 600 });
+    api.d.text(ctx, "Real: dent", gx - 6, gy + ch * 1.5 + 4, { size: 11, align: "right", color: C.ink2, weight: 600 });
     [[m.tn, 0, 0, true], [m.fp, 1, 0, false], [m.fn, 0, 1, false], [m.tp, 1, 1, true]].forEach(function (c) {
       var okc = c[3], col = okc ? C.oliva : C.terracota, a = Math.min(1, c[0] / 30);
       api.d.rect(ctx, gx + c[1] * cw, gy + c[2] * ch, cw - 4, ch - 4, C.surface, col, 2);

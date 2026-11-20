@@ -58,8 +58,8 @@ Lab.register("curso2/c2m5-augmentation", function (root, api) {
       ctx.drawImage(cvs, cx, cy, cell, cell);
       api.d.rect(ctx, cx, cy, cell, cell, null, k === 0 ? C.terracota : C.line, k === 0 ? 3 : 1);
       var t = k === 0 ? "original" : variants[k - 1].txt;
-      api.d.rect(ctx, cx + 2, cy + cell - 16, Math.min(cell - 4, t.length * 6.2 + 8), 14, C.surface);
-      api.d.text(ctx, t, cx + 6, cy + cell - 5, { size: 10, color: C.ink, mono: true });
+      api.d.rect(ctx, cx + 2, cy + cell - 16, Math.min(cell - 4, t.length * 6.8 + 8), 15, C.surface);
+      api.d.text(ctx, t, cx + 6, cy + cell - 5, { size: 11, color: C.ink, mono: true });
     }
   });
   function update() {
