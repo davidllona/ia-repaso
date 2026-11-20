@@ -53,7 +53,8 @@ window.CURRICULUM = {
             {"n": 5, "slug": "leccion-5", "title": "Una curva también es regresión lineal: inventa columnas (x², ln x, seno)", "blurb": "Polinómica, exponencial, logarítmica y periódica con columnas nuevas; el grado y el sobreajuste.", "min": 4},
             {"n": 6, "slug": "leccion-6", "title": "La sigmoide aplasta cualquier puntuación entre 0 y 1: eso es una probabilidad", "blurb": "Por qué una recta falla para clasificar, la sigmoide, la probabilidad a mano, el umbral y la frontera.", "min": 4},
             {"n": 7, "slug": "leccion-7", "title": "Entrenar es bajar una montaña con niebla: coste, gradiente y learning rate", "blurb": "Las cuatro piezas, el log-loss, gradient descent a mano, learning rate y convergencia.", "min": 4},
-            {"n": 8, "slug": "leccion-8", "title": "SGD: un paso por película en vez de uno por catálogo", "blurb": "Batch, SGD y mini-batch; fórmula exacta o gradient descent; y el código completo de los laboratorios de IBM.", "min": 4}
+            {"n": 8, "slug": "leccion-8", "title": "SGD: un paso por película en vez de uno por catálogo", "blurb": "Batch, SGD y mini-batch; fórmula exacta o gradient descent; y el código completo de los laboratorios de IBM.", "min": 4},
+            {"n": 9, "slug": "laboratorio", "title": "Laboratorio: predecir horas vistas y cancelaciones en Netflix", "blurb": "Todo el código del módulo en un ejemplo completo, línea a línea: la recta a mano, scikit-learn, métricas, varias pistas, curvas, logística, gradient descent y SGD.", "min": 40}
           ]
         },
         {
