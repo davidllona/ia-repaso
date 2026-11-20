@@ -41,19 +41,20 @@ Lab.register("curso2/c2m4-forma-bloque", function (root, api) {
   var tab = api.table(root, ["paso", "forma de salida", "parámetros"]);
 
   function draw(ctx, w, h, C) {
-    var full = h - 46, x0 = 14, y0 = 26, sizes = [16, 64, 128, 512, 1024, 2048, 4096];
-    D.text(ctx, "Matriz n × n (a escala)", x0, 14, { size: 11, color: C.ink2, weight: 500 });
+    var narrow = w < 460, full = narrow ? Math.min(h - 46, w * 0.34) : h - 46, x0 = narrow ? 8 : 14, y0 = 26, sizes = [16, 64, 128, 512, 1024, 2048, 4096];
+    D.text(ctx, narrow ? "n × n a escala" : "Matriz n × n (a escala)", x0, 14, { size: 11, color: C.ink2, weight: 500 });
     sizes.forEach(function (q) { var sd = Math.max(2, full * q / 4096); D.rect(ctx, x0, y0, sd, sd, q === S.n ? C.terracotaWash : null, q === S.n ? C.terracota : C.line, q === S.n ? 2 : 1); });
     var side = Math.max(2, full * S.n / 4096);
-    D.text(ctx, "n × n", x0 + full + 10, y0 + full * 0.35, { size: 12, weight: 600, color: C.terracotaInk });
-    D.text(ctx, g(R.one), x0 + full + 10, y0 + full * 0.35 + 16, { size: 11, mono: true, color: C.ink2 });
+    D.text(ctx, "n × n", x0 + full + (narrow ? 6 : 10), y0 + full * 0.35, { size: 12, weight: 600, color: C.terracotaInk });
+    D.text(ctx, g(R.one), x0 + full + (narrow ? 6 : 10), y0 + full * 0.35 + 16, { size: 11, mono: true, color: C.ink2 });
     // reparto de parámetros
-    var bx = Math.max(w * 0.55, x0 + full + 90), bw = w - bx - 14, by = 40, bh = 26, tot = R.total, parts = [[R.pAtt, C.cobalto, "atención"], [R.pFF, C.oliva, "feed-forward"], [R.pLN, C.marker, "LN"]], acc = 0;
-    D.text(ctx, "Parámetros del bloque", bx, 14, { size: 11.5, color: C.ink2, weight: 500 });
+    var bx = narrow ? x0 + full + 74 : Math.max(w * 0.55, x0 + full + 90), bw = w - bx - (narrow ? 8 : 14), by = 40, bh = 26, tot = R.total, parts = [[R.pAtt, C.cobalto, "atención"], [R.pFF, C.oliva, "feed-forward"], [R.pLN, C.marker, "LN"]], acc = 0;
+    D.text(ctx, narrow ? "Parámetros" : "Parámetros del bloque", bx, 14, { size: 11.5, color: C.ink2, weight: 500 });
     parts.forEach(function (p) { var ww = bw * p[0] / tot; D.rect(ctx, bx + acc, by, ww, bh, p[1], C.ink, 1); acc += ww; });
-    D.text(ctx, "atención " + n(100 * R.pAtt / tot, 0) + " %", bx, by + bh + 16, { size: 11, color: C.cobaltoInk });
-    D.text(ctx, "feed-forward " + n(100 * R.pFF / tot, 0) + " %", bx, by + bh + 32, { size: 11, color: C.olivaInk });
-    D.text(ctx, g(tot) + " en total", bx, by + bh + 52, { size: 11.5, mono: true, weight: 600 });
+    D.text(ctx, (narrow ? "atenc. " : "atención ") + n(100 * R.pAtt / tot, 0) + " %", bx, by + bh + 16, { size: 11, color: C.cobaltoInk });
+    D.text(ctx, (narrow ? "feed-fw. " : "feed-forward ") + n(100 * R.pFF / tot, 0) + " %", bx, by + bh + 32, { size: 11, color: C.olivaInk });
+    if (narrow) { D.text(ctx, g(tot), bx, by + bh + 52, { size: 11.5, mono: true, weight: 600 }); D.text(ctx, "en total", bx, by + bh + 67, { size: 11, color: C.ink2 }); }
+    else D.text(ctx, g(tot) + " en total", bx, by + bh + 52, { size: 11.5, mono: true, weight: 600 });
   }
   compute(); view.draw(draw);
   function update() {

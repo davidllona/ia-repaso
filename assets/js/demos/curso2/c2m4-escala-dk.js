@@ -48,7 +48,7 @@ Lab.register("curso2/c2m4-escala-dk", function (root, api) {
     D.rect(ctx, L, T, bw, bh, C.surface, C.ink, 1.5);
     bins.forEach(function (c, k) { var bhh = bh * c / mx; D.rect(ctx, L + bw * k / NB + 0.5, T + bh - bhh, bw / NB - 1, bhh, S.scale ? C.cobalto : C.terracota); });
     D.line(ctx, L + bw / 2, T, L + bw / 2, T + bh, C.ink, 1, [3, 3]);
-    [-48, -24, 0, 24, 48].forEach(function (t) { D.text(ctx, String(t).replace("-", "−"), L + bw * (t + LIM) / (2 * LIM), h - 9, { size: 10.5, mono: true, align: "center", color: C.muted }); });
+    [-48, -24, 0, 24, 48].forEach(function (t) { D.text(ctx, String(t).replace("-", "−"), L + bw * (t + LIM) / (2 * LIM), h - 9, { size: 11, mono: true, align: "center", color: C.muted }); });
     var sx = L + bw * (R.sd + LIM) / (2 * LIM), sx2 = L + bw * (-R.sd + LIM) / (2 * LIM);
     D.line(ctx, sx2, T + bh + 3, sx, T + bh + 3, C.ink, 2);
     D.text(ctx, "±1 desviación = " + n(R.sd, 2), L + bw - 6, T + 14, { size: 11, align: "right", mono: true, color: C.ink });

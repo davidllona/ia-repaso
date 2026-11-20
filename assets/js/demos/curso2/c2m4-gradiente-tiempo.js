@@ -42,7 +42,7 @@ Lab.register("curso2/c2m4-gradiente-tiempo", function (root, api) {
     var b = plot.box;
     D.line(ctx, b.x, plot.y(0), b.x + b.w, plot.y(0), C.muted, 1.5, [5, 4]);
     D.line(ctx, b.x, plot.y(-2), b.x + b.w, plot.y(-2), C.line, 1, [2, 3]);
-    D.text(ctx, "1 % del gradiente original (casi olvidado)", b.x + 6, plot.y(-2) - 4, { size: 10.5, color: C.muted });
+    D.text(ctx, "1 % del gradiente original (casi olvidado)", b.x + 6, plot.y(-2) - 4, { size: 11, color: C.muted });
     line(ctx, S.fr, C.terracota, 2.6);
     line(ctx, S.fl, C.cobalto, 2.6);
     var yr = plot.y(Math.max(bd[0], Math.min(bd[1], lg(S.fr, S.L)))), yl = plot.y(Math.max(bd[0], Math.min(bd[1], lg(S.fl, S.L))));

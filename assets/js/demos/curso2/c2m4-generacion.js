@@ -87,11 +87,11 @@ Lab.register("curso2/c2m4-generacion", function (root, api) {
       D.text(ctx, o.t, L - 8, y + rowH * 0.62, { size: 12, align: "right", weight: o.keep ? 600 : 400, color: o.keep ? C.ink : C.muted });
       D.rect(ctx, L, y + 3, bw * o.p0, rowH - 6, C.line);
       if (o.keep) D.rect(ctx, L, y + rowH * 0.28, bw * o.p2, rowH * 0.44, C.cobalto);
-      else D.text(ctx, "descartada", L + bw * Math.max(o.p0, 0.02) + 6, y + rowH * 0.62, { size: 10.5, color: C.muted });
+      else D.text(ctx, "descartada", L + bw * Math.max(o.p0, 0.02) + 6, y + rowH * 0.62, { size: 11, color: C.muted });
       D.text(ctx, o.keep ? n(o.p2 * 100, 1) + " %" : n(o.p1 * 100, 1) + " %", w - 6, y + rowH * 0.62, { size: 11, mono: true, align: "right", color: o.keep ? C.cobaltoInk : C.muted });
       if (S.last && S.ctx.length > 1 && o.t === S.last.t) D.rect(ctx, 4, y + 1, w - 8, rowH - 2, null, C.terracota, 2);
     });
-    if (R.items.length > 9) D.text(ctx, "… y " + (R.items.length - 9) + " candidatas más (menos probables)", 8, h - 6, { size: 10.5, color: C.muted });
+    if (R.items.length > 9) D.text(ctx, "… y " + (R.items.length - 9) + " candidatas más (menos probables)", 8, h - 6, { size: 11, color: C.muted });
   }
   compute();
   view.draw(draw);

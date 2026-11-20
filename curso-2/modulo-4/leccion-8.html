@@ -21,7 +21,7 @@
       <p class="eyebrow">Curso 2 · Módulo 4 · Lección 8 de 8</p>
       <h1>GPT solo predice la siguiente palabra (y tú eliges cuánto arriesga)</h1>
       <p class="lead">Un GPT calcula, una y otra vez, la probabilidad de cada posible siguiente token. La temperatura, top-k y top-p deciden cómo se elige entre ellos.</p>
-      <p class="meta-line"><span class="read-time" data-render="read-time"></span><a href="../modulo-4.html">Índice del módulo</a></p>
+      <p class="meta-line"><span class="read-time" data-render="read-time"></span><a href="../modulo-4.html">Índice del módulo</a> · <a href="#chuleta">Ir a la chuleta</a></p>
     </div>
     <div class="hero-tile" aria-hidden="true"></div>
   </div>
@@ -30,54 +30,115 @@
 <details class="predice">
   <summary>Escribes «El detective persigue al…». ¿El modelo devuelve directamente una palabra o algo más?<span class="hint"></span></summary>
   <div>
-    <p>Devuelve una <strong>probabilidad para cada token</strong> del vocabulario (50.257 en GPT-2). Elegir cuál se escribe es un paso aparte, y ahí es donde entran la temperatura, top-k y top-p.</p>
+    <p>Devuelve una <strong>probabilidad para cada token</strong> del vocabulario (50.257 en GPT-2). Elegir cuál se escribe es un paso aparte, y ahí entran la temperatura, top-k y top-p.</p>
   </div>
 </details>
 
 <section>
-<h2 id="idea">Un bucle: probabilidades, un token, contexto más largo</h2>
-<p><strong>GPT</strong> = <em>Generative Pre-trained Transformer</em>: un Transformer de solo decoder, con atención causal (cada token ve solo los anteriores). Toma el vector de la última posición, lo convierte en un número por token del vocabulario (los <abbr class="t" data-def="Puntuaciones sin normalizar, una por token; pueden ser negativas y no suman 1.">logits</abbr>) y una softmax lo vuelve probabilidades. Se elige un token, se añade al contexto y vuelta a empezar.</p>
+<h2 id="idea">1 · GPT, letra a letra</h2>
+<table>
+  <thead><tr><th>Letra</th><th>Qué significa</th></tr></thead>
+  <tbody>
+    <tr><td><strong>G</strong>, <em>Generative</em></td><td>Produce texto, no solo lo clasifica.</td></tr>
+    <tr><td><strong>P</strong>, <em>Pre-trained</em></td><td>Primero aprende a completar frases con muchísimo texto.</td></tr>
+    <tr><td><strong>T</strong>, <em>Transformer</em></td><td>Bloques de la lección 7 con máscara causal: cada token solo ve los anteriores.</td></tr>
+  </tbody>
+</table>
+</section>
+
+<section>
+<h2 id="bucle">2 · Un bucle: una palabra cada vez</h2>
+<p>Tras el último bloque, el GPT toma el vector de la última posición y lo convierte en un número por token del vocabulario: los <strong>logits</strong> (puntuaciones sueltas, que pueden ser negativas). Una softmax los vuelve probabilidades. Se elige un token, se añade al texto y vuelta a empezar.</p>
 <ul class="flow">
   <li class="a">«El detective persigue al»</li>
   <li class="d">GPT<small>logits → softmax</small></li>
   <li class="b">ladrón 64 %<small>asesino 24 % · …</small></li>
   <li class="c">«… al ladrón»<small>y otra vuelta</small></li>
 </ul>
-<p>Se entrena escondiendo el siguiente token: la pérdida es \(-\ln p_{\text{correcto}}\) (0,105 si le dio 0,9; 4,605 si le dio 0,01). Y cómo elegir lo controlas tú:</p>
-<ul>
-  <li><strong>Temperatura</strong> \(T\): se divide cada logit entre \(T\). \(T &lt; 1\) concentra (seguro, repetitivo); \(T &gt; 1\) aplana (variado, más errores).</li>
-  <li><strong>top-k</strong>: solo las \(k\) más probables. <strong>top-p</strong>: el grupo más pequeño que suma \(p\).</li>
-</ul>
-<p>Un GPT predice texto <em>probable</em>, no necesariamente verdadero: puede inventar con total seguridad. ¿Y cuándo usar cada familia? Empieza por una línea base sencilla; LSTM o GRU para series y poco texto; un Transformer <strong>preentrenado</strong> para texto en serio.</p>
+<p>Se llama generación <strong>autorregresiva</strong>: cada token producido pasa a ser entrada del siguiente.</p>
 </section>
+
+<section>
+<h2 id="perdida">3 · Cómo aprende: −ln p</h2>
+<p>Se toma texto real, se esconde el siguiente token y se le pide que lo prediga. La <strong>pérdida</strong> (el número que el entrenamiento baja) es \(-\ln p\), donde \(p\) es la probabilidad que dio a la palabra correcta.</p>
+<div class="anim-pasos" data-titulo="Lo que cuesta cada predicción">
+  <div class="paso"><p><strong>Acierta con seguridad:</strong> p = 0,9.</p><span class="grande">−ln 0,9 = 0,105</span></div>
+  <div class="paso"><p><strong>Duda:</strong> p = 0,2.</p><span class="grande">−ln 0,2 = 1,609</span></div>
+  <div class="paso"><p><strong>Casi la descartó:</strong> p = 0,01.</p><span class="grande">−ln 0,01 = 4,605</span></div>
+  <div class="paso"><p><strong>No sabe nada:</strong> reparte igual entre 50.257 tokens.</p><span class="grande">ln 50.257 = 10,825</span></div>
+</div>
+</section>
+
+<section>
+<h2 id="numeros">4 · Con números: la temperatura</h2>
+<p>La <strong>temperatura</strong> \(T\) divide cada logit antes de la softmax. \(T\) baja concentra (texto seguro y repetitivo); \(T\) alta aplana (variado, con más errores).</p>
+<div class="anim-pasos" data-titulo="Cuatro candidatas tras «El detective persigue al…»">
+  <div class="paso"><p><strong>1. Logits.</strong> ladrón 2, asesino 1, fantasma 0, dragón −1.</p><span class="grande">(2, 1, 0, −1)</span></div>
+  <div class="paso"><p><strong>2. Exponenciales.</strong> Suman 11,475.</p><span class="grande">7,389 · 2,718 · 1 · 0,368</span></div>
+  <div class="paso"><p><strong>3. T = 1.</strong> Cada una entre 11,475.</p><span class="grande">0,644 · 0,237 · 0,087 · 0,032</span></div>
+  <div class="paso"><p><strong>4. T = 0,5.</strong> Los logits pasan a (4, 2, 0, −2): la favorita se dispara.</p><span class="grande">0,865 · 0,117 · 0,016 · 0,002</span></div>
+  <div class="paso"><p><strong>5. T = 2.</strong> Los logits pasan a (1; 0,5; 0; −0,5): se aplana.</p><span class="grande">0,455 · 0,276 · 0,167 · 0,102</span></div>
+</div>
+</section>
+
+<section>
+<h2 id="cortar">5 · Cortar la cola: top-k y top-p</h2>
+<p><strong>top-k</strong> deja solo las \(k\) más probables. <strong>top-p</strong> deja el grupo más pequeño cuya suma llega a \(p\). Después se reparte de nuevo para que sumen 1. Con T = 1:</p>
+<table>
+  <thead><tr><th>Ajuste</th><th>Quedan</th></tr></thead>
+  <tbody>
+    <tr><td>top-k = 2</td><td>ladrón 0,731 · asesino 0,269</td></tr>
+    <tr><td>top-p = 0,8</td><td>las mismas dos (0,644 + 0,237 = 0,881)</td></tr>
+    <tr><td>top-p = 0,95</td><td>tres: 0,665 · 0,245 · 0,090</td></tr>
+  </tbody>
+</table>
+<p>Para top-k = 2: 0,644 / 0,881 = 0,731.</p>
+</section>
+
 <figure class="demo" data-demo="curso2/c2m4-generacion" data-titulo="Generar texto palabra a palabra (con un modelo de juguete)">
   <div class="haz">Pulsa «Generar la siguiente palabra» con T = 1; luego baja T a 0,3 y súbela a 3.</div>
   <div class="observa">Con T baja ganan siempre las mismas palabras; con T alta casi se igualan. Es un modelo de conteos, pero el final es el de un GPT.</div>
 </figure>
 
 <section>
-<h2 id="numeros">Con números: cuatro candidatas</h2>
-<div class="callout ejemplo">
-  <span class="lbl">Ejemplo numérico</span>
-  <p>Logits: ladrón 2, asesino 1, fantasma 0, dragón −1. Exponenciales: 7,389 · 2,718 · 1 · 0,368; suma 11,475.</p>
-  <table>
-    <thead><tr><th>Ajuste</th><th>ladrón</th><th>asesino</th><th>fantasma</th><th>dragón</th></tr></thead>
-    <tbody>
-      <tr><td>\(T = 1\)</td><td>0,644</td><td>0,237</td><td>0,087</td><td>0,032</td></tr>
-      <tr><td>\(T = 0{,}5\)</td><td class="res">0,865</td><td>0,117</td><td>0,016</td><td>0,002</td></tr>
-      <tr><td>\(T = 2\)</td><td>0,455</td><td>0,276</td><td>0,167</td><td>0,102</td></tr>
-      <tr><td>top-k = 2</td><td>0,731</td><td>0,269</td><td>0</td><td>0</td></tr>
-    </tbody>
-  </table>
-  <p>top-k = 2: se quedan 0,644 y 0,237 (suman 0,881) y se renormaliza: 0,644 / 0,881 = 0,731.</p>
+<h2 id="elegir">6 · Probable no es verdadero, y cuál usar</h2>
+<div class="callout ojo">
+  <span class="lbl">Ojo</span>
+  <p>Un GPT elige texto <em>probable</em>, no consulta hechos. Puede inventar un dato con total seguridad (una «alucinación»).</p>
 </div>
+<table>
+  <thead><tr><th>Tienes…</th><th>Empieza por…</th></tr></thead>
+  <tbody>
+    <tr><td>Cualquier problema</td><td>Una línea base sencilla, como «repetir el último valor»</td></tr>
+    <tr><td>Series o poco texto</td><td>LSTM o GRU</td></tr>
+    <tr><td>Texto en serio</td><td>Un Transformer <strong>preentrenado</strong>, sin entrenar desde cero</td></tr>
+  </tbody>
+</table>
 </section>
+
 <details class="predice">
-  <summary>Con esos mismos logits y \(T = 1\) pones top-p = 0,8. ¿Cuántas candidatas quedan?<span class="hint"></span></summary>
+  <summary>Con los mismos logits y T = 1 pones top-p = 0,8. ¿Cuántas candidatas quedan?<span class="hint"></span></summary>
   <div>
-    <p>Dos. La acumulada de «ladrón» es 0,644 (no llega a 0,8); con «asesino», 0,881 (ya pasa). Queda lo mismo que con top-k = 2: 0,731 y 0,269. Con top-p = 0,95 harían falta tres (0,968).</p>
+    <p>Dos. La suma con «ladrón» es 0,644 (no llega a 0,8); con «asesino», 0,881 (ya pasa). Queda lo mismo que con top-k = 2: 0,731 y 0,269. Con top-p = 0,95 harían falta tres (0,968).</p>
   </div>
 </details>
+
+<section>
+<h2 id="chuleta">Chuleta para repasar</h2>
+<dl class="chuleta">
+  <div><dt>GPT</dt><dd>Transformer que predice el siguiente token. <em>Generative Pre-trained Transformer.</em></dd></div>
+  <div><dt>Logits</dt><dd>Una puntuación suelta por token. <em>ladrón 2, dragón −1.</em></dd></div>
+  <div><dt>Autorregresivo</dt><dd>Cada token producido entra en la siguiente vuelta.</dd></div>
+  <div><dt>Pérdida −ln p</dt><dd>Castiga dar poca probabilidad a la palabra correcta. <em>p = 0,01 → 4,605.</em></dd></div>
+  <div><dt>Temperatura</dt><dd>Divide los logits: baja concentra, alta aplana. <em>T = 0,5 → 0,865.</em></dd></div>
+  <div><dt>top-k</dt><dd>Solo las k más probables. <em>k = 2 → 0,731 y 0,269.</em></dd></div>
+  <div><dt>top-p</dt><dd>El grupo más pequeño que suma p. <em>p = 0,8 → dos candidatas.</em></dd></div>
+  <div><dt>Alucinación</dt><dd>Un dato inventado con seguridad: probable no es verdadero.</dd></div>
+  <div><dt>Preentrenado</dt><dd>Un modelo ya entrenado que reutilizas. <em>Módulo 5.</em></dd></div>
+  <div><dt>Línea base</dt><dd>La solución tonta que hay que batir. <em>Repetir el último valor.</em></dd></div>
+</dl>
+</section>
+
 <div class="resumen">
   <h2 class="sin-num sin-toc">En tres líneas</h2>
   <ul>
@@ -86,6 +147,7 @@
     <li>Línea base primero; LSTM/GRU para series y poco texto; Transformer preentrenado para texto serio.</li>
   </ul>
 </div>
+
 <section class="quiz mini">
 <script type="application/json" class="quiz-data">
 {
@@ -95,12 +157,12 @@
    "q": "Al generar texto con un GPT, se dividen los logits entre una temperatura T = 0,5 (en vez de T = 1) antes de la softmax. ¿Qué efecto tiene?",
    "opciones": [
     "La distribución se aplana: todas las palabras se parecen más en probabilidad",
-    "El modelo olvida el contexto anterior",
+    "El modelo olvida el texto anterior",
     "La distribución se concentra: las palabras más probables ganan aún más peso y el texto es más predecible",
     "Se descartan todas las palabras salvo las 5 más probables"
    ],
    "correcta": 2,
-   "porque": "Con logits (2, 1, 0, −1): T = 1 da (0,644; 0,237; 0,087; 0,032) y T = 0,5 da (0,865; 0,117; 0,016; 0,002). Descartar candidatas es lo que hacen top-k y top-p, no la temperatura; y T alta es la que aplana."
+   "porque": "Con logits (2, 1, 0, −1): T = 1 da (0,644; 0,237; 0,087; 0,032) y T = 0,5 da (0,865; 0,117; 0,016; 0,002). Descartar candidatas es lo que hacen top-k y top-p; y T alta es la que aplana."
   },
   {
    "q": "Un modelo dio probabilidad 0,01 al token correcto. ¿Cuánto vale su pérdida?",
@@ -120,12 +182,13 @@
     "Con un Transformer de 96 bloques"
    ],
    "correcta": 1,
-   "porque": "Con pocos datos y secuencias medias, una recurrente (o una CNN 1D) suele bastar; y si no mejora a «repetir el último valor», no compensa la complejidad."
+   "porque": "Con pocos datos y secuencias medias, una LSTM o GRU suele bastar; y si no mejora a «repetir el último valor», no compensa la complejidad."
   }
  ]
 }
 </script>
 </section>
+
 <details class="profundizar">
   <summary><span>Profundizar: la explicación completa<small>El nombre GPT, el bucle autorregresivo, logits y softmax, cómo se entrena (pérdida y perplejidad), preentrenamiento, ajuste y alineación, temperatura, top-k y top-p con la tabla completa, el tamaño de GPT-2 contado a mano, BERT, la comparación RNN / LSTM / Transformer y el resumen de todo el módulo.</small></span></summary>
   <div class="prof-body">
@@ -308,214 +371,14 @@
   </div>
 </details>
 
-<section>
+<section class="ir-lab">
 <h2 class="sin-num">Código</h2>
-<p class="codigo-intro">El fragmento 13 usa las clases <code>TokenAndPositionEmbedding</code> y <code>TransformerBlock</code> del fragmento 12 (<a href="leccion-7.html">lección 7</a>): ejecútalos en orden dentro del mismo cuaderno.</p>
-<article class="snippet" data-lang="python">
-  <header>
-    <h3>14 · Cómo se elige la siguiente palabra: temperatura, top-k, top-p y un modelo de juguete</h3>
-    <p class="para-que"><strong>Para qué sirve</strong> Implementar desde cero el último paso de un GPT (logits → temperatura → top-k/top-p → sorteo) y probarlo con un modelo de bigramas diminuto que se puede entender entero.</p>
-  </header>
-  <pre class="code"><code>import numpy as np
-
-def softmax(logits, T=1.0):
-    z = np.asarray(logits, dtype=float) / T            # la temperatura divide los logits
-    z = z - z.max()                                    # estabilidad numérica
-    e = np.exp(z)
-    return e / e.sum()
-
-# 1) El ejemplo de cuatro palabras candidatas tras «el detective persigue al…»: ladrón, asesino, fantasma, dragón
-logits = [2.0, 1.0, 0.0, -1.0]
-for T in (0.5, 1.0, 2.0):
-    print(f"T = {T}:", softmax(logits, T).round(3))
-
-def filtrar(p, top_k=None, top_p=None):
-    """Pone a 0 las candidatas descartadas por top-k y/o top-p, y renormaliza."""
-    p = p.copy()
-    orden = np.argsort(p)[::-1]                        # de más a menos probable
-    if top_k is not None:
-        p[orden[top_k:]] = 0.0
-    if top_p is not None:
-        acumulada = np.cumsum(p[orden]) / p.sum()
-        corte = np.searchsorted(acumulada, top_p) + 1  # cuántas hacen falta para llegar a top_p
-        p[orden[corte:]] = 0.0
-    return p / p.sum()
-
-p1 = softmax(logits, 1.0)
-print("top-k=2        :", filtrar(p1, top_k=2).round(3))
-print("top-p=0.8      :", filtrar(p1, top_p=0.8).round(3))
-print("top-p=0.95     :", filtrar(p1, top_p=0.95).round(3))
-
-# 2) Un modelo de lenguaje JUGUETE: bigramas contados en un corpus diminuto
-corpus = ("el capitán duerme en el camarote . el capitán bebe ron en la cubierta . el loro duerme en el puerto . "
-          "el loro corre por el barco . la sirena lee un mapa en el camarote . la sirena corre por el barco . "
-          "el capitán corre por el puerto . el loro come carne en la cubierta . la sirena bebe ron en la cubierta .")
-palabras = corpus.split()
-vocab = sorted(set(palabras))
-id_de = {w: i for i, w in enumerate(vocab)}
-conteos = np.zeros((len(vocab), len(vocab)))
-for a, b in zip(palabras[:-1], palabras[1:]):
-    conteos[id_de[a], id_de[b]] += 1
-logits_sig = np.log(conteos + 1e-9)                    # log-probabilidades: las parejas nunca vistas quedan muy abajo
-
-def siguiente_distribucion(palabra, T=1.0, top_k=None):
-    return filtrar(softmax(logits_sig[id_de[palabra]], T), top_k=top_k)
-
-def generar(inicio, rng, T=1.0, top_k=None, max_palabras=10):
-    texto = [inicio]
-    while texto[-1] != "." and len(texto) &lt; max_palabras:
-        p = siguiente_distribucion(texto[-1], T, top_k)
-        texto.append(vocab[rng.choice(len(vocab), p=p)])   # muestrea según las probabilidades
-    return " ".join(texto)
-
-rng = np.random.default_rng(0)
-print("tras «el» el corpus tiene:", {vocab[i]: int(conteos[id_de["el"], i]) for i in np.nonzero(conteos[id_de["el"]])[0]})
-for T, k in [(0.2, None), (1.0, None), (3.0, None), (1.0, 2)]:
-    p = siguiente_distribucion("el", T, k)
-    muestras = rng.choice(len(vocab), size=1000, p=p)
-    cuenta = {vocab[i]: int((muestras == i).sum()) for i in np.argsort(p)[::-1][:4]}
-    print(f"T={T:&lt;4} top_k={str(k):&lt;5} 1000 muestras tras «el»: {cuenta}")
-for T in (0.2, 1.0, 3.0):
-    print(f"T={T:&lt;4}", generar("la", rng, T))</code></pre>
-  <details class="linea-a-linea" open>
-    <summary>Línea por línea</summary>
-    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
-    <table class="lineas">
-      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
-      <tbody>
-        <tr data-lines="1"><td><code>import numpy as np</code></td><td>NumPy.</td></tr>
-        <tr data-lines="3-7"><td><code>def softmax(logits, T=1.0): ...</code></td><td>Softmax con temperatura. Divide los logits entre <code>T</code> (<code>z = logits / T</code>), resta el máximo por estabilidad numérica y normaliza. Con <code>T = 1</code> es la softmax de siempre.</td></tr>
-        <tr data-lines="9-12"><td><code>logits = [2.0, 1.0, 0.0, -1.0] / for T in (0.5, 1.0, 2.0):</code></td><td>Los cuatro logits del ejemplo (ladrón, asesino, fantasma, dragón) probados con tres temperaturas.</td></tr>
-        <tr data-lines="14-16"><td><code>def filtrar(p, top_k=None, top_p=None):</code></td><td>Función que descarta candidatas según top-k y/o top-p y renormaliza. Primero hace una copia y ordena los índices de más a menos probable (<code>argsort</code>, invertido con <code>[::-1]</code>).</td></tr>
-        <tr data-lines="17-19"><td><code>orden = np.argsort(p)[::-1] / if top_k is not None: ...</code></td><td><strong>Top-k</strong>: pone a cero todo lo que está más allá de las <code>k</code> primeras de la lista ordenada.</td></tr>
-        <tr data-lines="20-23"><td><code>if top_p is not None: ...</code></td><td><strong>Top-p</strong>: calcula la probabilidad acumulada en orden (<code>cumsum</code>), busca con <code>searchsorted</code> cuántas candidatas hacen falta para llegar a <code>top_p</code> (+ 1 para incluir la que cruza el umbral) y descarta el resto.</td></tr>
-        <tr data-lines="24"><td><code>return p / p.sum()</code></td><td>Renormaliza para que lo que queda sume 1.</td></tr>
-        <tr data-lines="26"><td><code>p1 = softmax(logits, 1.0)</code></td><td>Las probabilidades con T = 1.</td></tr>
-        <tr data-lines="27-29"><td><code>print("top-k=2 ...") / print("top-p=0.8 ...") / ...</code></td><td>Muestra el efecto de top-k = 2, top-p = 0,8 y top-p = 0,95.</td></tr>
-        <tr data-lines="31-34"><td><code>corpus = (...)</code></td><td>Un corpus diminuto de 9 frases (líneas de subtítulos de una película de piratas), para construir un modelo de lenguaje de juguete.</td></tr>
-        <tr data-lines="35-37"><td><code>palabras = corpus.split() / vocab = sorted(set(palabras)) / id_de = ...</code></td><td>Separa por espacios, saca el vocabulario ordenado y crea el diccionario palabra → id.</td></tr>
-        <tr data-lines="38-40"><td><code>conteos = np.zeros(...) / for a, b in zip(...): ...</code></td><td>Cuenta, para cada palabra, cuántas veces va detrás cada otra (bigramas). <code>zip(palabras[:-1], palabras[1:])</code> recorre las parejas consecutivas.</td></tr>
-        <tr data-lines="41"><td><code>logits_sig = np.log(conteos + 1e-9)</code></td><td>Convierte los conteos en «logits» (logaritmos). El <code>1e-9</code> evita el logaritmo de cero: las parejas nunca vistas quedan con un logit muy bajo, no con −∞.</td></tr>
-        <tr data-lines="43-44"><td><code>def siguiente_distribucion(palabra, T=1.0, top_k=None):</code></td><td>La distribución sobre la siguiente palabra dada la anterior: softmax con temperatura de su fila de logits y después el filtro top-k.</td></tr>
-        <tr data-lines="46-51"><td><code>def generar(inicio, rng, T=1.0, top_k=None, max_palabras=10):</code></td><td>El bucle autorregresivo: mientras la última palabra no sea el punto, calcula la distribución, <strong>sortea</strong> una palabra con esas probabilidades (<code>rng.choice(..., p=p)</code>) y la añade al texto.</td></tr>
-        <tr data-lines="53"><td><code>rng = np.random.default_rng(0)</code></td><td>Generador con semilla para que el sorteo se repita.</td></tr>
-        <tr data-lines="54"><td><code>print("tras «el» el corpus tiene:", ...)</code></td><td>Los conteos reales de lo que viene después de «el» en el corpus.</td></tr>
-        <tr data-lines="55-59"><td><code>for T, k in [...]: ... muestras = rng.choice(...)</code></td><td>Para cuatro ajustes, sortea 1.000 veces la palabra que sigue a «el» y cuenta cuántas veces sale cada una (las cuatro más probables).</td></tr>
-        <tr data-lines="60-61"><td><code>for T in (0.2, 1.0, 3.0): print(f"T={T:&lt;4}", generar("la", rng, T))</code></td><td>Genera una frase completa empezando por «la» con tres temperaturas.</td></tr>
-      </tbody>
-    </table>
-  </details>
-  <div class="salida">
-    <strong>Salida esperada (valores aproximados)</strong>
-    <pre>T = 0.5: [0.865 0.117 0.016 0.002]
-T = 1.0: [0.644 0.237 0.087 0.032]
-T = 2.0: [0.455 0.276 0.167 0.102]
-top-k=2        : [0.731 0.269 0.    0.   ]
-top-p=0.8      : [0.731 0.269 0.    0.   ]
-top-p=0.95     : [0.665 0.245 0.09  0.   ]
-tras «el» el corpus tiene: {'barco': 2, 'camarote': 2, 'capitán': 3, 'loro': 3, 'puerto': 2}
-T=0.2  top_k=None  1000 muestras tras «el»: {'loro': 453, 'capitán': 403, 'camarote': 48, 'barco': 46}
-T=1.0  top_k=None  1000 muestras tras «el»: {'loro': 218, 'capitán': 244, 'camarote': 176, 'barco': 193}
-T=3.0  top_k=None  1000 muestras tras «el»: {'loro': 197, 'capitán': 232, 'camarote': 180, 'barco': 194}
-T=1.0  top_k=2     1000 muestras tras «el»: {'loro': 495, 'capitán': 505, 'ron': 0, 'sirena': 0}
-T=0.2  la sirena corre por el loro corre por el capitán
-T=1.0  la sirena bebe ron en la cubierta .
-T=3.0  la cubierta puerto .</pre>
-    <p>Las seis primeras líneas coinciden con la tabla de la sección GPT: con T = 0,5 la favorita sube a 0,865; con T = 2 baja a 0,455. Top-k = 2 y top-p = 0,8 dan el mismo resultado (0,731 y 0,269). Tras «el», el corpus (un puñado de líneas de subtítulos de una película de piratas) tiene capitán 3, loro 3, barco 2, camarote 2 y puerto 2. Con T = 0,2, los sorteos se concentran en las dos más frecuentes (loro 453, capitán 403 de 1.000); con T = 1 siguen aproximadamente los conteos (218 / 244 / 176 / 193) y con T = 3 todo se aplana (entre 180 y 232, cerca de 200 cada una). Con top-k = 2 solo salen loro y capitán (495 y 505). Las tres frases generadas ilustran lo mismo: con T = 0,2 es repetitiva y se sale del tema («la sirena corre por el loro corre por el capitán»), con T = 1 sale una frase del corpus y con T = 3 se desordena. Este modelo no es un Transformer, pero el último paso (elegir una palabra con temperatura, top-k y top-p) es idéntico al de un GPT.</p>
-  </div>
-</article>
-
-<article class="snippet" data-lang="python">
-  <header>
-    <h3>13 · Cuando la atención gana: «¿el último token es igual al primero?»</h3>
-    <p class="para-que"><strong>Para qué sirve</strong> Una tarea que exige relacionar dos posiciones lejanas. Una bolsa de embeddings no puede resolverla; el Transformer del fragmento 12 sí, y se pueden ver los pesos de atención que ha aprendido.</p>
-  </header>
-  <pre class="code"><code>import numpy as np
-from tensorflow import keras
-from tensorflow.keras import layers
-
-# Necesita las clases TokenAndPositionEmbedding y TransformerBlock definidas en el fragmento 12
-keras.utils.set_random_seed(5)
-rng = np.random.default_rng(5)
-
-def crear(n, longitud=10, vocab=12):
-    """Etiqueta 1 si el ÚLTIMO token es igual al PRIMERO (en la mitad de los casos se fuerza)."""
-    X = rng.integers(0, vocab, size=(n, longitud))
-    forzar = rng.random(n) &lt; 0.5
-    X[forzar, -1] = X[forzar, 0]
-    return X, (X[:, 0] == X[:, -1]).astype("int32")
-
-X, y = crear(6000)
-print("ejemplos:", X[0], "-&gt;", y[0], "|", X[1], "-&gt;", y[1], "| fracción de 1:", round(float(y.mean()), 3))
-
-def bolsa():                       # promedia los embeddings: no ve posiciones ni relaciones
-    return keras.Sequential([keras.Input(shape=(10,)), layers.Embedding(12, 32),
-                             layers.GlobalAveragePooling1D(), layers.Dense(32, activation="relu"),
-                             layers.Dense(1, activation="sigmoid")])
-
-def transformer():
-    entrada = keras.Input(shape=(10,))
-    x = TokenAndPositionEmbedding(10, 12, 32)(entrada)
-    x = TransformerBlock(32, 2, 64)(x)
-    x = layers.GlobalAveragePooling1D()(x)
-    x = layers.Dense(32, activation="relu")(x)
-    return keras.Model(entrada, layers.Dense(1, activation="sigmoid")(x))
-
-for nombre, constructor in [("bolsa de embeddings", bolsa), ("Transformer (1 bloque)", transformer)]:
-    m = constructor()
-    m.compile(optimizer="adam", loss="binary_crossentropy", metrics=["accuracy"])
-    h = m.fit(X, y, epochs=20, batch_size=64, validation_split=0.2, verbose=0)
-    va = h.history["val_accuracy"]
-    print(f"{nombre:24s} acierto en validación en las épocas 1, 5, 10, 15, 20:",
-          [round(va[i], 3) for i in (0, 4, 9, 14, 19)])
-modelo = m                                          # el Transformer entrenado
-
-# ¿A qué mira el primer token? Pesos de atención de las dos cabezas para un ejemplo
-bloque = modelo.layers[2]
-emb = modelo.layers[1](X[:1])
-_, pesos = bloque.att(emb, emb, return_attention_scores=True)
-print("ejemplo:", X[0], "-&gt; etiqueta", y[0])
-print("pesos del token 0 (cabeza 1):", pesos[0, 0, 0].numpy().round(2))
-print("pesos del token 0 (cabeza 2):", pesos[0, 1, 0].numpy().round(2))</code></pre>
-  <details class="linea-a-linea" open>
-    <summary>Línea por línea</summary>
-    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
-    <table class="lineas">
-      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
-      <tbody>
-        <tr data-lines="1-3"><td><code>import numpy as np / from tensorflow import keras / ...</code></td><td>NumPy, Keras y capas.</td></tr>
-        <tr data-lines="5"><td><code># Necesita las clases ... definidas en el fragmento 12</code></td><td>Aviso: este fragmento reutiliza <code>TokenAndPositionEmbedding</code> y <code>TransformerBlock</code>; ejecútalo en el mismo cuaderno después del 12 (o copia esas dos clases).</td></tr>
-        <tr data-lines="6-7"><td><code>keras.utils.set_random_seed(5) / rng = np.random.default_rng(5)</code></td><td>Semillas para el modelo y para los datos.</td></tr>
-        <tr data-lines="9-10"><td><code>def crear(n, longitud=10, vocab=12):</code></td><td>Función que fabrica los datos: secuencias de 10 tokens de un vocabulario de 12. La etiqueta es 1 si el último token es igual al primero.</td></tr>
-        <tr data-lines="11"><td><code>X = rng.integers(0, vocab, size=(n, longitud))</code></td><td>Secuencias de enteros al azar entre 0 y 11.</td></tr>
-        <tr data-lines="12"><td><code>forzar = rng.random(n) &lt; 0.5</code></td><td>Elige al azar la mitad de las secuencias. Sin esto, el último sería igual al primero solo 1 de cada 12 veces y casi todas las etiquetas serían 0.</td></tr>
-        <tr data-lines="13"><td><code>X[forzar, -1] = X[forzar, 0]</code></td><td>En las secuencias elegidas, copia el primer token en la última posición (<code>-1</code> es «la última»).</td></tr>
-        <tr data-lines="14"><td><code>return X, (X[:, 0] == X[:, -1]).astype("int32")</code></td><td>Devuelve los datos y la etiqueta: 1 si primero y último coinciden (por copia o por casualidad).</td></tr>
-        <tr data-lines="16"><td><code>X, y = crear(6000)</code></td><td>6.000 ejemplos.</td></tr>
-        <tr data-lines="17"><td><code>print("ejemplos:", ...)</code></td><td>Muestra dos ejemplos y la fracción de unos (algo más de 0,5, porque a las no forzadas les queda un 1/12 de coincidir por azar).</td></tr>
-        <tr data-lines="19-22"><td><code>def bolsa(): ...</code></td><td>El modelo sin orden: embedding de 32 números, <code>GlobalAveragePooling1D</code> (promedio de todos los tokens) y dos capas densas. Al promediar, ya no sabe cuál era el primero ni el último.</td></tr>
-        <tr data-lines="24-30"><td><code>def transformer(): ...</code></td><td>El mini-Transformer del fragmento 12 con las dimensiones de esta tarea: contexto 10, vocabulario 12, ancho 32, 2 cabezas, feed-forward 64.</td></tr>
-        <tr data-lines="32"><td><code>for nombre, constructor in [("bolsa de embeddings", bolsa), ("Transformer (1 bloque)", transformer)]:</code></td><td>Recorre los dos modelos.</td></tr>
-        <tr data-lines="33-35"><td><code>m = constructor() / m.compile(...) / h = m.fit(...)</code></td><td>Construye, compila y entrena 20 épocas con el 20 % de validación.</td></tr>
-        <tr data-lines="36-38"><td><code>va = h.history["val_accuracy"] / print(...)</code></td><td>Guarda la curva de acierto en validación y escribe el valor en las épocas 1, 5, 10, 15 y 20 (índices 0, 4, 9, 14 y 19).</td></tr>
-        <tr data-lines="39"><td><code>modelo = m</code></td><td>Al terminar el bucle, <code>m</code> es el último modelo: el Transformer.</td></tr>
-        <tr data-lines="41-43"><td><code>bloque = modelo.layers[2] / emb = modelo.layers[1](X[:1])</code></td><td>Para mirar dentro: la capa 2 del modelo es el bloque Transformer (la 0 es la entrada y la 1, el embedding), y se calcula el embedding del primer ejemplo.</td></tr>
-        <tr data-lines="44"><td><code>_, pesos = bloque.att(emb, emb, return_attention_scores=True)</code></td><td>Llama a la atención del bloque y se queda con los pesos, de forma <code>(lote, cabezas, tokens, tokens)</code>.</td></tr>
-        <tr data-lines="45-47"><td><code>print("ejemplo:", ...) / print("pesos del token 0 ...")</code></td><td>Escribe el ejemplo y, para cada cabeza, los 10 pesos con los que el token 0 mira a los demás (<code>pesos[0, cabeza, 0]</code>: ejemplo 0, esa cabeza, fila del token 0).</td></tr>
-      </tbody>
-    </table>
-  </details>
-  <div class="salida">
-    <strong>Salida esperada (valores aproximados)</strong>
-    <pre>ejemplos: [ 8  9  0  9  5  6  7  3 11  0] -&gt; 0 | [ 3  4  6  4  1  0  0  0  1 11] -&gt; 0 | fracción de 1: 0.548
-bolsa de embeddings      acierto en validación en las épocas 1, 5, 10, 15, 20: [0.547, 0.547, 0.547, 0.557, 0.553]
-Transformer (1 bloque)   acierto en validación en las épocas 1, 5, 10, 15, 20: [0.53, 0.617, 1.0, 1.0, 1.0]
-ejemplo: [ 8  9  0  9  5  6  7  3 11  0] -&gt; etiqueta 0
-pesos del token 0 (cabeza 1): [0.37 0.01 0.02 0.01 0.01 0.01 0.02 0.01 0.01 0.54]
-pesos del token 0 (cabeza 2): [0.43 0.05 0.02 0.05 0.02 0.05 0.01 0.03 0.03 0.31]</pre>
-    <p>La <strong>bolsa de embeddings se queda en el azar</strong> (≈ 0,55 de acierto: es el porcentaje de etiquetas 0, así que equivale a responder siempre «no»), durante las 20 épocas. El <strong>Transformer</strong> pasa de 0,53 en la primera época a 0,617 en la quinta y llega a <strong>1,0</strong> en la décima. Los pesos de atención explican por qué: el token 0 reparte su atención entre sí mismo (0,37 y 0,43) y el <strong>último</strong> token (0,54 con la cabeza 1 y 0,31 con la cabeza 2), y casi nada al resto. En un solo vector tiene entonces la información del primero y del último para compararlos. Los pesos de las otras posiciones son 0,01–0,05. Con otra semilla los números exactos cambian, pero la historia es la misma.</p>
-  </div>
-</article>
+<a class="lab-card" href="laboratorio.html#paso-10"><span class="lc-ico" aria-hidden="true">🧪</span>
+  <span><strong>Ver el código de esta lección en el Laboratorio</strong>
+  <span>Paso 10 · Elegir la siguiente palabra: temperatura, top-k, top-p y un modelo de juguete que escribe.</span></span></a>
+<a class="lab-card" href="laboratorio.html#fragmento-13"><span class="lc-ico" aria-hidden="true">🧪</span>
+  <span><strong>Y en «Más código»</strong>
+  <span>Fragmento 13 · Cuando la atención gana: «¿el último token es igual al primero?».</span></span></a>
 </section>
 
 </div>

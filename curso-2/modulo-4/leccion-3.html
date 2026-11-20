@@ -21,7 +21,7 @@
       <p class="eyebrow">Curso 2 · Módulo 4 · Lección 3 de 8</p>
       <h1>Lo que viste hace 50 capítulos casi no llega: el gradiente se desvanece</h1>
       <p class="lead">Para aprender, el error viaja hacia atrás capítulo a capítulo y en cada paso se multiplica por un factor. Si es menor que 1, la señal del principio se apaga.</p>
-      <p class="meta-line"><span class="read-time" data-render="read-time"></span><a href="../modulo-4.html">Índice del módulo</a></p>
+      <p class="meta-line"><span class="read-time" data-render="read-time"></span><a href="../modulo-4.html">Índice del módulo</a> · <a href="#chuleta">Ir a la chuleta</a></p>
     </div>
     <div class="hero-tile" aria-hidden="true"></div>
   </div>
@@ -30,53 +30,97 @@
 <details class="predice">
   <summary>Un factor de 0,9 por paso parece suave: solo pierdes un 10 %. Tras 50 capítulos, ¿qué queda de la señal del capítulo 1: más o menos del 10 %?<span class="hint"></span></summary>
   <div>
-    <p>Muchísimo menos: 0,9<sup>50</sup> = 0,0052, apenas el <strong>0,5 %</strong>. Multiplicar 50 veces por algo un poco menor que 1 lo hunde de forma exponencial. Por eso una RNN simple «olvida» el giro del principio de la serie.</p>
+    <p>Muchísimo menos: 0,9<sup>50</sup> = 0,0052, apenas el <strong>0,5 %</strong>. Multiplicar 50 veces por algo un poco menor que 1 lo hunde. Por eso una RNN simple «olvida» el giro del principio de la serie.</p>
   </div>
 </details>
 
 <section>
-<h2 id="idea">El error tiene que atravesar todos los pasos</h2>
-<p>Para entrenar una RNN se <strong>despliega</strong> en el tiempo: queda una red profunda normal, con una «capa» por paso y los mismos pesos en todas. Se calcula el error al final y se aplica backpropagation hacia atrás por todos los pasos. Eso se llama <abbr class="t" data-def="Backpropagation Through Time: backpropagation aplicada a la red desplegada en el tiempo.">BPTT</abbr>.</p>
-<p>Para saber cuánto influye el capítulo 1 en el error final, el gradiente pasa por cada paso intermedio, y en cada uno se multiplica por un <strong>factor</strong> (como mucho \(w\), el peso recurrente, por la derivada de la tanh). Tras \(k\) pasos, el gradiente se ha multiplicado por <strong>factor<sup>k</sup></strong>.</p>
+<h2 id="idea">1 · Para aprender, el error viaja hacia atrás</h2>
+<p>Recuerda el módulo 1: la red mira su error y lo reparte hacia atrás para saber cuánto corregir cada peso. Ese reparto es la <strong>backpropagation</strong>. La señal que llega a cada peso es su <strong>gradiente</strong>: cuánto y hacia dónde moverlo.</p>
+<p>Con una RNN se hace igual, con un truco: se <strong>despliega</strong>. Se dibuja como una fila de copias, una por paso, con los mismos pesos. El error se calcula al final y viaja hacia atrás por todos los pasos. Se llama <strong>BPTT</strong> (<em>Backpropagation Through Time</em>, backpropagation a través del tiempo).</p>
 <ul class="flow">
   <li class="a">Error final<small>capítulo 50</small></li>
-  <li class="b">× 0,9<small>cap. 49</small></li>
-  <li class="b">× 0,9<small>cap. 48</small></li>
-  <li class="b">… × 0,9<small>50 veces</small></li>
-  <li class="c">Capítulo 1<small>llega el 0,5 %</small></li>
+  <li class="b">cap. 49</li>
+  <li class="b">cap. 48</li>
+  <li class="b">…</li>
+  <li class="c">Capítulo 1<small>¿cuánto llega?</small></li>
 </ul>
-<ul>
-  <li><strong>Factor &lt; 1 → vanishing gradient</strong>: la señal de lo lejano se hace casi cero y la red no aprende dependencias largas. Olvida.</li>
-  <li><strong>Factor &gt; 1 → exploding gradient</strong>: el gradiente se dispara, los pesos dan saltos y aparecen <code>NaN</code>. Se frena recortando el gradiente (<code>clipnorm</code>).</li>
-</ul>
-<p>Y hay un segundo problema: la RNN es <strong>secuencial</strong>. Para calcular \(h_t\) necesitas \(h_{t-1}\), así que ni una GPU puede hacer los pasos a la vez. La LSTM arreglará el olvido; los Transformers, las dos cosas.</p>
 </section>
+
+<section>
+<h2 id="factor">2 · En cada paso, el gradiente se multiplica</h2>
+<p>Al cruzar un paso hacia atrás, el gradiente se multiplica por un <strong>factor</strong>: como mucho, el peso de la memoria por la pendiente de la tanh. Tras \(k\) pasos, por factor<sup>k</sup>.</p>
+<div class="anim-pasos" data-titulo="El gradiente cruza 50 capítulos con factor 0,9">
+  <div class="paso"><p><strong>1.</strong> Sale del capítulo 50 entero.</p><span class="grande">1</span></div>
+  <div class="paso"><p><strong>2.</strong> Tras 10 capítulos hacia atrás.</p><span class="grande">0,9¹⁰ = 0,349</span></div>
+  <div class="paso"><p><strong>3.</strong> Tras 20.</p><span class="grande">0,9²⁰ = 0,122</span></div>
+  <div class="paso"><p><strong>4.</strong> Tras 50: al capítulo 1 llega el 0,5 %.</p><span class="grande">0,9⁵⁰ = 0,0052</span></div>
+  <div class="paso"><p><strong>5.</strong> El peso casi no se corrige por lo que pasó al principio: la red no aprende esa relación.</p><span class="grande">olvida</span></div>
+</div>
+</section>
+
+<section>
+<h2 id="numeros">3 · Menor que 1 se apaga; mayor que 1 explota</h2>
+<table>
+  <thead><tr><th>Factor</th><th>10 pasos</th><th>20 pasos</th><th>50 pasos</th></tr></thead>
+  <tbody>
+    <tr><td>0,9</td><td>0,349</td><td>0,122</td><td class="res">0,0052</td></tr>
+    <tr><td>0,5</td><td>0,00098</td><td>0,00000095</td><td>≈ 0</td></tr>
+    <tr><td>1,1</td><td>2,59</td><td>6,73</td><td class="res">117</td></tr>
+  </tbody>
+</table>
+<ul>
+  <li><strong>Factor &lt; 1: el gradiente se desvanece</strong> (<em>vanishing gradient</em>). Lo lejano no llega y la red olvida.</li>
+  <li><strong>Factor &gt; 1: el gradiente explota</strong> (<em>exploding gradient</em>). Los pesos dan saltos enormes y aparece <code>NaN</code> («no es un número»: la cuenta se ha roto).</li>
+</ul>
+<p>La explosión se frena <strong>recortando el gradiente</strong>: si es demasiado largo, se encoge sin cambiar su dirección. En Keras, <code>clipnorm</code>.</p>
+<div class="anim-pasos" data-titulo="Recortar un gradiente con clipnorm = 1">
+  <div class="paso"><p><strong>1.</strong> Llega un gradiente desbocado para dos pesos.</p><span class="grande">(30, 40)</span></div>
+  <div class="paso"><p><strong>2.</strong> Su longitud es \(\sqrt{30^2 + 40^2}\).</p><span class="grande">50</span></div>
+  <div class="paso"><p><strong>3.</strong> Pasa del máximo (1): se divide entre 50.</p><span class="grande">(0,6; 0,8)</span></div>
+  <div class="paso"><p><strong>4.</strong> Misma dirección, paso pequeño: el entrenamiento no se rompe.</p><span class="grande">longitud 1</span></div>
+</div>
+</section>
+
 <figure class="demo" data-demo="curso2/c2m4-gradiente-tiempo" data-titulo="Cuánto gradiente sobrevive a los pasos del tiempo">
   <div class="haz">Baja el factor de la RNN a 0,9, luego súbelo a 1,1 y alarga la serie a 100 capítulos.</div>
   <div class="observa">El eje es logarítmico: una recta que baja es un olvido exponencial. Con 0,9, el gradiente cae del 1 % en 44 pasos.</div>
 </figure>
 
 <section>
-<h2 id="numeros">Con números: factor elevado a k</h2>
-<div class="callout ejemplo">
-  <span class="lbl">Ejemplo numérico</span>
-  <table>
-    <thead><tr><th>Factor</th><th>10 pasos</th><th>20 pasos</th><th>50 pasos</th></tr></thead>
-    <tbody>
-      <tr><td>0,9</td><td>0,349</td><td>0,122</td><td class="res">0,0052</td></tr>
-      <tr><td>0,5</td><td>0,00098</td><td>0,00000095</td><td>≈ 0</td></tr>
-      <tr><td>1,1</td><td>2,59</td><td>6,73</td><td class="res">117</td></tr>
-    </tbody>
-  </table>
-  <p>En una serie de 50 capítulos, con factor 0,9 el capítulo 1 llega al final con el 0,5 % de su fuerza; con 1,1, multiplicado por 117. Ninguno de los dos extremos sirve para aprender.</p>
-</div>
+<h2 id="secuencial">4 · El segundo problema: va en fila</h2>
+<p>Para calcular \(h_3\) necesitas \(h_2\), y para \(h_2\), \(h_1\). Los pasos no se pueden hacer a la vez, ni con una <strong>GPU</strong> (el chip que hace miles de cuentas en paralelo). Con textos largos, la RNN es lenta.</p>
+<ul class="flow">
+  <li class="d">h₁</li>
+  <li class="d">h₂<small>espera a h₁</small></li>
+  <li class="d">h₃<small>espera a h₂</small></li>
+</ul>
+<p>La LSTM (lección 4) arreglará el olvido. Los Transformers (lecciones 6 a 8), el olvido y la fila.</p>
 </section>
+
 <details class="predice">
   <summary>Entonces sube el factor a 1,1: ¿problema resuelto, porque ahora la señal del principio llega con fuerza?<span class="hint"></span></summary>
   <div>
-    <p>No: 1,1<sup>50</sup> = 117. El gradiente <strong>explota</strong>, los pesos dan saltos enormes y el entrenamiento se rompe. Lo que hace falta es un factor muy cerca de 1 que la red pueda <em>controlar</em> según convenga recordar u olvidar. Eso es exactamente la puerta de olvido de la LSTM (siguiente lección).</p>
+    <p>No: 1,1<sup>50</sup> = 117. El gradiente <strong>explota</strong> y el entrenamiento se rompe. Hace falta un factor muy cerca de 1 que la red pueda <em>controlar</em> según convenga recordar u olvidar. Es la puerta de olvido de la LSTM (siguiente lección).</p>
   </div>
 </details>
+
+<section>
+<h2 id="chuleta">Chuleta para repasar</h2>
+<dl class="chuleta">
+  <div><dt>Backpropagation</dt><dd>Repartir el error hacia atrás para corregir cada peso.</dd></div>
+  <div><dt>Gradiente</dt><dd>Cuánto y hacia dónde mover un peso. <em>La señal de corrección.</em></dd></div>
+  <div><dt>Desplegar</dt><dd>Dibujar la RNN como una fila de copias, una por paso.</dd></div>
+  <div><dt>BPTT</dt><dd>Backpropagation sobre la RNN desplegada. <em>El error cruza todos los capítulos.</em></dd></div>
+  <div><dt>Factor por paso</dt><dd>Lo que se multiplica el gradiente al cruzar un paso. <em>Tras k pasos, factor elevado a k.</em></dd></div>
+  <div><dt>Vanishing gradient</dt><dd>Factor menor que 1: lo lejano no llega. <em>0,9⁵⁰ = 0,0052.</em></dd></div>
+  <div><dt>Exploding gradient</dt><dd>Factor mayor que 1: saltos y NaN. <em>1,1⁵⁰ = 117.</em></dd></div>
+  <div><dt>NaN</dt><dd>«No es un número»: la cuenta se ha roto.</dd></div>
+  <div><dt><code>clipnorm</code></dt><dd>Recorta el gradiente si pasa de un tamaño. <em>(30, 40) → (0,6; 0,8).</em></dd></div>
+  <div><dt>Secuencial</dt><dd>Cada paso espera al anterior: no se paraleliza.</dd></div>
+</dl>
+</section>
+
 <div class="resumen">
   <h2 class="sin-num sin-toc">En tres líneas</h2>
   <ul>
@@ -85,6 +129,7 @@
     <li>&lt; 1 se desvanece (olvida); &gt; 1 explota (<code>clipnorm</code>). Y además no se paraleliza.</li>
   </ul>
 </div>
+
 <section class="quiz mini">
 <script type="application/json" class="quiz-data">
 {
@@ -99,7 +144,7 @@
     "≈ 90 %"
    ],
    "correcta": 0,
-   "porque": "0,9⁵⁰ = 0,0052, es decir, medio por ciento. Es el vanishing gradient: aunque 0,9 parezca un factor suave, repetido 50 veces apaga casi toda la señal, y la red no puede aprender dependencias tan largas."
+   "porque": "0,9⁵⁰ = 0,0052, medio por ciento. Aunque 0,9 parezca suave, repetido 50 veces apaga casi toda la señal, y la red no puede aprender relaciones tan largas."
   },
   {
    "q": "¿Qué es BPTT?",
@@ -109,7 +154,7 @@
     "Una forma de barajar las series temporales"
    ],
    "correcta": 1,
-   "porque": "Al desplegar la RNN queda una red profunda con los mismos pesos en cada «capa»; el gradiente de esos pesos es la suma de las contribuciones de todos los pasos."
+   "porque": "Al desplegar la RNN queda una red profunda con los mismos pesos en cada copia; el gradiente de esos pesos es la suma de lo que aporta cada paso."
   },
   {
    "q": "Entrenas una RNN con series largas y la pérdida se convierte en <code>NaN</code>. ¿Qué pruebas primero?",
@@ -119,12 +164,13 @@
     "Alargar todavía más las series"
    ],
    "correcta": 0,
-   "porque": "NaN tras gradientes enormes es el síntoma del exploding gradient; el recorte limita el tamaño del paso. Quitar la tanh dejaría el estado sin acotar y alargar las series lo empeora."
+   "porque": "NaN tras gradientes enormes es el síntoma de la explosión; el recorte limita el tamaño del paso. Quitar la tanh dejaría la memoria sin límite y alargar las series lo empeora."
   }
  ]
 }
 </script>
 </section>
+
 <details class="profundizar">
   <summary><span>Profundizar: la explicación completa<small>La fórmula del gradiente a través del tiempo (producto de derivadas), la tabla completa del factor, el desvanecimiento y la explosión con el recorte del gradiente, y por qué la RNN es lenta: es secuencial.</small></span></summary>
   <div class="prof-body">
@@ -168,107 +214,11 @@
   </div>
 </details>
 
-<section>
+<section class="ir-lab">
 <h2 class="sin-num">Código</h2>
-<article class="snippet" data-lang="python">
-  <header>
-    <h3>3 · Medir cómo se desvanece el gradiente a lo largo del tiempo</h3>
-    <p class="para-que"><strong>Para qué sirve</strong> Ver con una RNN y una LSTM reales (con pesos controlados) cuánto influye la <em>primera</em> entrada en el <em>último</em> estado cuando la secuencia se alarga.</p>
-  </header>
-  <pre class="code"><code>import numpy as np
-import tensorflow as tf
-from tensorflow import keras
-from tensorflow.keras import layers
-
-keras.utils.set_random_seed(0)              # fija TODAS las semillas (Python, NumPy y TensorFlow)
-rng = np.random.default_rng(0)
-N_IN, N_H = 4, 8
-
-def influencia_primer_paso(capa, T, repeticiones=20):
-    """Media de la norma de d(h_T)/d(x_1): cuánto pesa la PRIMERA entrada en el ÚLTIMO estado."""
-    normas = []
-    for _ in range(repeticiones):
-        x = tf.constant(rng.normal(0, 1, (1, T, N_IN)), dtype=tf.float32)
-        with tf.GradientTape() as cinta:
-            cinta.watch(x)
-            h_ultimo = capa(x)                 # (1, N_H): estado oculto tras el último paso
-            valor = tf.reduce_sum(h_ultimo)    # un número que depende de h_T
-        g = cinta.gradient(valor, x)           # (1, T, N_IN)
-        normas.append(float(tf.norm(g[0, 0]))) # norma del gradiente respecto a x_1
-    return np.mean(normas)
-
-def rnn_con_escala(escala):
-    capa = layers.SimpleRNN(N_H)
-    capa.build((None, 40, N_IN))
-    W_x, _, b = capa.get_weights()
-    Q, _ = np.linalg.qr(rng.normal(size=(N_H, N_H)))        # matriz ortogonal: conserva la longitud
-    capa.set_weights([W_x, (escala * Q).astype("float32"), b])
-    return capa
-
-def lstm_con_sesgo_olvido(valor):
-    capa = layers.LSTM(N_H, unit_forget_bias=False)
-    capa.build((None, 40, N_IN))
-    W_x, W_h, b = capa.get_weights()
-    b[N_H:2 * N_H] = valor                                  # el sesgo de la puerta de olvido (orden i, f, c, o)
-    capa.set_weights([W_x, W_h, b])
-    return capa
-
-modelos = {
-    "RNN w=0.5": rnn_con_escala(0.5),
-    "RNN w=1.0": rnn_con_escala(1.0),
-    "LSTM f~0.73": lstm_con_sesgo_olvido(1.0),
-    "LSTM f~0.99": lstm_con_sesgo_olvido(5.0),
-}
-print("T   " + "".join(f"{n:&gt;14s}" for n in modelos))
-for T in (5, 10, 20, 40):
-    print(f"{T:&lt;4d}" + "".join(f"{influencia_primer_paso(m, T):14.2e}" for m in modelos.values()))</code></pre>
-  <details class="linea-a-linea" open>
-    <summary>Línea por línea</summary>
-    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
-    <table class="lineas">
-      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
-      <tbody>
-        <tr data-lines="1-4"><td><code>import numpy as np / import tensorflow as tf / ...</code></td><td>Importa NumPy, TensorFlow (necesitamos <code>tf.GradientTape</code>, que calcula derivadas), Keras y las capas.</td></tr>
-        <tr data-lines="6"><td><code>keras.utils.set_random_seed(0)</code></td><td>Fija las semillas de Python, NumPy y TensorFlow a la vez, para que los pesos iniciales y el resultado se puedan repetir.</td></tr>
-        <tr data-lines="7"><td><code>rng = np.random.default_rng(0)</code></td><td>Un generador de números aleatorios de NumPy, también con semilla, para crear las entradas de prueba.</td></tr>
-        <tr data-lines="8"><td><code>N_IN, N_H = 4, 8</code></td><td>Cada paso de la secuencia tiene 4 números, y las capas tienen 8 neuronas.</td></tr>
-        <tr data-lines="10-11"><td><code>def influencia_primer_paso(capa, T, repeticiones=20):</code></td><td>Función que mide, para una capa y una longitud <code>T</code>, cuánto afecta la entrada del paso 1 al estado del paso <code>T</code>. La cadena entre comillas triples es su documentación.</td></tr>
-        <tr data-lines="12"><td><code>normas = []</code></td><td>Lista donde guardaremos una medida por cada repetición.</td></tr>
-        <tr data-lines="13"><td><code>for _ in range(repeticiones):</code></td><td>Repite 20 veces con secuencias aleatorias distintas, para promediar y no depender de un caso concreto. El guion bajo <code>_</code> indica que no usamos el contador.</td></tr>
-        <tr data-lines="14"><td><code>x = tf.constant(rng.normal(0, 1, (1, T, N_IN)), dtype=tf.float32)</code></td><td>Crea una secuencia de números normales con forma <code>(1, T, 4)</code>: un ejemplo, <code>T</code> pasos, 4 variables.</td></tr>
-        <tr data-lines="15-16"><td><code>with tf.GradientTape() as cinta: ...</code></td><td><code>GradientTape</code> es una «cinta» que graba las operaciones para luego derivar. Como <code>x</code> es una constante (no una variable entrenable), hay que decirle a la cinta que la vigile con <code>cinta.watch(x)</code>.</td></tr>
-        <tr data-lines="17"><td><code>h_ultimo = capa(x)</code></td><td>Pasa la secuencia por la capa recurrente y obtiene el estado tras el último paso: forma <code>(1, 8)</code>.</td></tr>
-        <tr data-lines="18"><td><code>valor = tf.reduce_sum(h_ultimo)</code></td><td>Para derivar necesitamos un solo número. Sumamos las 8 neuronas del último estado: es un número que depende de toda la secuencia.</td></tr>
-        <tr data-lines="19"><td><code>g = cinta.gradient(valor, x)</code></td><td>La derivada de ese número respecto a cada entrada (backpropagation a través del tiempo). Tiene la forma de <code>x</code>: <code>(1, T, 4)</code>.</td></tr>
-        <tr data-lines="20"><td><code>normas.append(float(tf.norm(g[0, 0])))</code></td><td><code>g[0, 0]</code> es el gradiente respecto a la entrada del <strong>paso 1</strong> (4 números). <code>tf.norm</code> calcula su longitud: cuánto pesa el principio de la secuencia en el final.</td></tr>
-        <tr data-lines="21"><td><code>return np.mean(normas)</code></td><td>Devuelve la media de las 20 medidas.</td></tr>
-        <tr data-lines="23"><td><code>def rnn_con_escala(escala):</code></td><td>Crea una RNN simple cuya matriz recurrente tiene una «fuerza» controlada por <code>escala</code>.</td></tr>
-        <tr data-lines="24-25"><td><code>capa = layers.SimpleRNN(N_H) / capa.build(...)</code></td><td>Crea la capa y la <em>construye</em> para una entrada <code>(lote, 40, 4)</code>, de modo que ya existan sus pesos.</td></tr>
-        <tr data-lines="26"><td><code>W_x, _, b = capa.get_weights()</code></td><td>Lee los tres arrays de pesos (el guion bajo descarta la matriz recurrente aleatoria, que vamos a reemplazar).</td></tr>
-        <tr data-lines="27"><td><code>Q, _ = np.linalg.qr(rng.normal(size=(N_H, N_H)))</code></td><td>La descomposición QR de una matriz aleatoria produce <code>Q</code>, una matriz <strong>ortogonal</strong>: multiplicar por ella gira un vector sin cambiar su longitud.</td></tr>
-        <tr data-lines="28"><td><code>capa.set_weights([W_x, (escala * Q)..., b])</code></td><td>Pone \(W_h = \text{escala} \cdot Q\): cada multiplicación por \(W_h\) cambia la longitud del gradiente exactamente por <code>escala</code>. Es el «factor por paso» de la sección del gradiente.</td></tr>
-        <tr data-lines="29"><td><code>return capa</code></td><td>Devuelve la capa lista.</td></tr>
-        <tr data-lines="31"><td><code>def lstm_con_sesgo_olvido(valor):</code></td><td>Crea una LSTM en la que controlamos el sesgo de la puerta de olvido.</td></tr>
-        <tr data-lines="32-33"><td><code>capa = layers.LSTM(N_H, unit_forget_bias=False) / capa.build(...)</code></td><td>Crea y construye la capa. Por defecto Keras inicializa el sesgo del olvido a 1 (<code>unit_forget_bias=True</code>); lo desactivamos para poner nosotros el valor.</td></tr>
-        <tr data-lines="34"><td><code>W_x, W_h, b = capa.get_weights()</code></td><td>Lee los pesos de la LSTM: <code>kernel</code>, <code>recurrent_kernel</code> y <code>bias</code>.</td></tr>
-        <tr data-lines="35"><td><code>b[N_H:2 * N_H] = valor</code></td><td>El vector de sesgos tiene \(4 \cdot 8 = 32\) números, en el orden de las puertas <strong>i, f, c, o</strong>. Las posiciones 8 a 15 son las de la puerta de olvido \(f\). Con <code>valor = 1</code> la puerta ronda \(\sigma(1) = 0{,}73\); con <code>valor = 5</code>, \(\sigma(5) = 0{,}99\).</td></tr>
-        <tr data-lines="36-37"><td><code>capa.set_weights([...]) / return capa</code></td><td>Guarda los pesos modificados y devuelve la capa.</td></tr>
-        <tr data-lines="39-44"><td><code>modelos = { ... }</code></td><td>Cuatro capas para comparar: dos RNN (con fuerza 0,5 y 1,0) y dos LSTM (puerta de olvido ≈ 0,73 y ≈ 0,99).</td></tr>
-        <tr data-lines="45"><td><code>print("T   " + ...)</code></td><td>Escribe la cabecera de la tabla con el nombre de cada modelo, alineado a 14 caracteres.</td></tr>
-        <tr data-lines="46-47"><td><code>for T in (5, 10, 20, 40): print(...)</code></td><td>Para cada longitud de secuencia, mide y escribe la influencia de la primera entrada en cada modelo. <code>:14.2e</code> imprime en notación científica con 2 decimales.</td></tr>
-      </tbody>
-    </table>
-  </details>
-  <div class="salida">
-    <strong>Salida esperada (valores aproximados)</strong>
-    <pre>T        RNN w=0.5     RNN w=1.0   LSTM f~0.73   LSTM f~0.99
-5         1.59e-02      4.32e-01      1.48e-01      1.50e-01
-10        1.91e-04      2.20e-02      5.34e-02      1.99e-01
-20        6.52e-09      3.59e-04      6.64e-03      3.23e-01
-40        3.58e-18      6.79e-08      6.90e-05      2.94e-01</pre>
-    <p>Lee la tabla por columnas. La <strong>RNN con w = 0,5</strong> pierde la señal rapidísimo: de 1,6·10⁻² a 3,6·10⁻¹⁸ en 40 pasos (no queda nada). Con <strong>w = 1,0</strong> (el caso más favorable para una RNN) también cae, hasta 6,8·10⁻⁸, porque la tanh añade un factor menor que 1 en cada paso. La <strong>LSTM con f ≈ 0,73</strong> cae más despacio (6,9·10⁻⁵ a 40 pasos). Y con <strong>f ≈ 0,99</strong> la influencia de la primera entrada se mantiene (2,9·10⁻¹ a los 40 pasos): millones de veces más que la RNN. No sigue exactamente \(f^k\) porque el gradiente también pasa por las otras puertas, pero la forma es la misma que en la demostración de la sección de la RNN.</p>
-  </div>
-</article>
+<a class="lab-card" href="laboratorio.html#fragmento-3"><span class="lc-ico" aria-hidden="true">🧪</span>
+  <span><strong>Ver el código de esta lección en el Laboratorio</strong>
+  <span>Fragmento 3 (en «Más código») · Medir cuánto llega la primera entrada al último estado en una RNN y en una LSTM.</span></span></a>
 </section>
 
 </div>

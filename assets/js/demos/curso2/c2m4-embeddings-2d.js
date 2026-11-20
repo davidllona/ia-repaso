@@ -34,7 +34,7 @@ Lab.register("curso2/c2m4-embeddings-2d", function (root, api) {
 
   function draw(ctx, w, h, C) {
     plot.axes(ctx);
-    var ox = plot.x(0), oy = plot.y(0), b = plot.box, i, fs = w < 440 ? 10.5 : 12;
+    var ox = plot.x(0), oy = plot.y(0), b = plot.box, i, fs = w < 440 ? 11 : 12;
     D.line(ctx, b.x, oy, b.x + b.w, oy, C.muted, 1);
     D.line(ctx, ox, b.y, ox, b.y + b.h, C.muted, 1);
     var A = W[S.a], B = W[S.b];
@@ -47,10 +47,10 @@ Lab.register("curso2/c2m4-embeddings-2d", function (root, api) {
       // el eje y del canvas está invertido
       ctx.arc(ox, oy, rad, -a1, -(a1 + da), da > 0); ctx.stroke(); ctx.restore();
     }
-    D.text(ctx, "↑ luminosa y divertida", b.x + 4, b.y + 12, { size: 10, color: C.muted });
-    D.text(ctx, "↓ oscura y tensa", b.x + 4, b.y + b.h - 6, { size: 10, color: C.muted });
-    D.text(ctx, "← adultos", b.x + 4, oy - 6, { size: 10, color: C.muted });
-    D.text(ctx, "toda la familia →", b.x + b.w - 4, oy - 6, { size: 10, color: C.muted, align: "right" });
+    D.text(ctx, "↑ luminosa y divertida", b.x + 4, b.y + 12, { size: 11, color: C.muted });
+    D.text(ctx, "↓ oscura y tensa", b.x + 4, b.y + b.h - 6, { size: 11, color: C.muted });
+    D.text(ctx, "← adultos", b.x + 4, oy - 6, { size: 11, color: C.muted });
+    D.text(ctx, "toda la familia →", b.x + b.w - 4, oy - 6, { size: 11, color: C.muted, align: "right" });
     for (i = 0; i < W.length; i++) {
       var p = W[i], px = plot.x(p.x), py = plot.y(p.y), col = i === S.a ? C.terracota : (i === S.b ? C.cobalto : C.muted);
       D.arrow(ctx, ox, oy, px, py, col, i === S.a || i === S.b ? 2.2 : 1.2);

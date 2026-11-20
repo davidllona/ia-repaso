@@ -58,10 +58,11 @@ Lab.register("curso2/c2m4-atencion", function (root, api) {
   }
   function draw(ctx, w, h, C) {
     var g = geom(w, h), i, j;
-    D.text(ctx, "claves K →", g.L, 14, { size: 10.5, color: C.muted });
-    D.text(ctx, "consulta Q ↓", 4, 14 + 14, { size: 10.5, color: C.muted });
-    var fs = g.cell < 60 ? 10 : 11.5;
-    for (j = 0; j < N; j++) D.text(ctx, TOK[j], g.L + g.cell * (j + 0.5), g.T - 8, { size: fs, align: "center", weight: 600, color: C.ink });
+    D.text(ctx, "claves K →", g.L, 14, { size: 11, color: C.muted });
+    D.text(ctx, "consulta Q ↓", 4, 14 + 14, { size: 11, color: C.muted });
+    var fs = g.cell < 60 ? 11 : 11.5;
+    function corto(t) { return g.cell < 60 && t.length > 6 ? t.slice(0, 5) + "." : t; }
+    for (j = 0; j < N; j++) D.text(ctx, corto(TOK[j]), g.L + g.cell * (j + 0.5), g.T - 8, { size: fs, align: "center", weight: 600, color: C.ink });
     for (i = 0; i < N; i++) {
       D.text(ctx, TOK[i], g.L - 6, g.T + g.cell * (i + 0.5) + 4, { size: fs, align: "right", weight: i === S.q ? 700 : 500, color: i === S.q ? C.terracotaInk : C.ink });
       for (j = 0; j < N; j++) {
@@ -71,7 +72,7 @@ Lab.register("curso2/c2m4-atencion", function (root, api) {
           ctx.save(); ctx.strokeStyle = C.line; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(x + 4, y + g.cell - 4); ctx.lineTo(x + g.cell - 4, y + 4); ctx.stroke(); ctx.restore();
         } else {
           ctx.save(); ctx.globalAlpha = Math.min(1, 0.08 + v * 0.92); ctx.fillStyle = C.cobalto; ctx.fillRect(x + 1, y + 1, g.cell - 2, g.cell - 2); ctx.restore();
-          if (g.cell >= 36) D.text(ctx, n(v, 2), x + g.cell / 2, y + g.cell / 2 + 4, { size: g.cell >= 52 ? 12 : 10.5, mono: true, align: "center", color: v > 0.45 ? C.paper : C.ink });
+          if (g.cell >= 36) D.text(ctx, n(v, 2), x + g.cell / 2, y + g.cell / 2 + 4, { size: g.cell >= 52 ? 12 : 11, mono: true, align: "center", color: v > 0.45 ? C.paper : C.ink });
         }
       }
     }

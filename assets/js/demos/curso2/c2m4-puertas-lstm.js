@@ -68,36 +68,36 @@ Lab.register("curso2/c2m4-puertas-lstm", function (root, api) {
     // c_{t-1}
     bar(ctx, x0, base, S.c, C.cobalto, C, 18);
     D.text(ctx, "c\u209c\u208b\u2081", x0, beltY + 22, { size: 11.5, align: "center", weight: 600 });
-    D.text(ctx, n(S.c, 2), x0, beltY + 36, { size: 10.5, align: "center", mono: true, color: C.ink2 });
+    D.text(ctx, n(S.c, 2), x0, beltY + 36, { size: 11, align: "center", mono: true, color: C.ink2 });
     // puerta de olvido (la cinta pasa por su ranura)
     gate(ctx, xf, beltY, R.f, C, false);
     D.text(ctx, "olvido f", xf, beltY - 46, { size: 11, align: "center", weight: 600 });
-    D.text(ctx, n(R.f, 2), xf, beltY - 34, { size: 10.5, align: "center", mono: true, color: C.ink2 });
+    D.text(ctx, n(R.f, 2), xf, beltY - 34, { size: 11, align: "center", mono: true, color: C.ink2 });
     // tras el olvido
     bar(ctx, xk, base, R.keep, C.cobalto, C, 18);
     D.text(ctx, "f·c", xk, beltY + 22, { size: 11.5, align: "center", weight: 600 });
-    D.text(ctx, n(R.keep, 2), xk, beltY + 36, { size: 10.5, align: "center", mono: true, color: C.ink2 });
+    D.text(ctx, n(R.keep, 2), xk, beltY + 36, { size: 11, align: "center", mono: true, color: C.ink2 });
     // suma con lo nuevo
     D.circle(ctx, xp, beltY, 12, C.surface, C.ink, 2);
     D.text(ctx, "+", xp, beltY + 5, { size: 17, align: "center", weight: 600 });
     D.arrow(ctx, xp, beltY + 74, xp, beltY + 14, C.oliva, 2);
     D.text(ctx, "lo nuevo de hoy  i·g", xp, beltY + 90, { size: 11, align: "center", weight: 600, color: C.olivaInk });
-    D.text(ctx, n(R.i, 2) + " × " + n(R.g, 2) + " = " + n(R.add, 2), xp, beltY + 104, { size: 10.5, align: "center", mono: true, color: C.ink2 });
+    D.text(ctx, n(R.i, 2) + " × " + n(R.g, 2) + " = " + n(R.add, 2), xp, beltY + 104, { size: 11, align: "center", mono: true, color: C.ink2 });
     // c_t
     bar(ctx, xc, base, R.c, C.cobalto, C, 18);
     D.text(ctx, "c\u209c", xc, beltY + 22, { size: 11.5, align: "center", weight: 600 });
-    D.text(ctx, n(R.c, 2), xc, beltY + 36, { size: 10.5, align: "center", mono: true, color: C.ink2 });
+    D.text(ctx, n(R.c, 2), xc, beltY + 36, { size: 11, align: "center", mono: true, color: C.ink2 });
     // rama de salida: tanh(c_t) -> puerta o -> h_t
     D.line(ctx, xo, beltY + 6, xo, beltY + 50, C.muted, 1.5, [4, 3]);
-    D.text(ctx, "tanh", xo + 5, beltY + 28, { size: 10, color: C.muted });
+    D.text(ctx, "tanh", xo + 5, beltY + 28, { size: 11, color: C.muted });
     gate(ctx, xo, beltY + 62, R.o, C, true);
     D.text(ctx, "salida o", xo - 36, beltY + 58, { size: 11, align: "right", weight: 600 });
-    D.text(ctx, n(R.o, 2), xo - 36, beltY + 71, { size: 10.5, align: "right", mono: true, color: C.ink2 });
+    D.text(ctx, n(R.o, 2), xo - 36, beltY + 71, { size: 11, align: "right", mono: true, color: C.ink2 });
     D.line(ctx, xo, beltY + 74, xo, beltY + 98, C.muted, 1.5, [4, 3]);
     bar(ctx, xo, beltY + 122, R.h, C.terracota, C, 18);
     D.line(ctx, xo - 18, beltY + 122, xo + 18, beltY + 122, C.line, 1);
     D.text(ctx, "h\u209c", xo, beltY + 138, { size: 11.5, align: "center", weight: 600, color: C.terracotaInk });
-    D.text(ctx, n(R.h, 3), xo, beltY + 152, { size: 10.5, align: "center", mono: true, color: C.ink2 });
+    D.text(ctx, n(R.h, 3), xo, beltY + 152, { size: 11, align: "center", mono: true, color: C.ink2 });
     // medidores de las cuatro cajas
     var my = h - 56, mw = Math.min(w * 0.30, 160), mx = 14;
     meter(ctx, mx, my, mw, "olvido f = σ(z_f)", R.f, 0, 1, C.terracota, C);

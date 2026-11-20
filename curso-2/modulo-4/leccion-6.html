@@ -21,7 +21,7 @@
       <p class="eyebrow">Curso 2 · Módulo 4 · Lección 6 de 8</p>
       <h1>El Transformer no ve el orden: hay que sumárselo</h1>
       <p class="lead">La atención mira todos los tokens a la vez, como si te dieran la temporada entera de golpe. Para saber qué va primero, a cada embedding se le suma un sello de posición.</p>
-      <p class="meta-line"><span class="read-time" data-render="read-time"></span><a href="../modulo-4.html">Índice del módulo</a></p>
+      <p class="meta-line"><span class="read-time" data-render="read-time"></span><a href="../modulo-4.html">Índice del módulo</a> · <a href="#chuleta">Ir a la chuleta</a></p>
     </div>
     <div class="hero-tile" aria-hidden="true"></div>
   </div>
@@ -30,46 +30,95 @@
 <details class="predice">
   <summary>Sin información de posición, ¿recibe la palabra «persigue» lo mismo en «El detective persigue al ladrón» y en «El ladrón persigue al detective»?<span class="hint"></span></summary>
   <div>
-    <p>Sí, <strong>exactamente lo mismo</strong>. La atención mezcla vectores sin saber en qué lugar está cada uno: para ella las dos frases son la misma bolsa de palabras. El fragmento 10 lo comprueba con números.</p>
+    <p>Sí, <strong>exactamente lo mismo</strong>. La atención mezcla vectores sin saber en qué lugar está cada uno: para ella las dos frases son la misma bolsa de palabras. En el Laboratorio lo compruebas con números.</p>
   </div>
 </details>
 
 <section>
-<h2 id="idea">Embedding + posición</h2>
-<p>La RNN conocía el orden gratis, porque leía paso a paso. El Transformer procesa todos los tokens en paralelo y su operación central, la atención, es <strong>indiferente al orden</strong>. La solución: sumar a cada embedding un vector que codifica su posición.</p>
-<div class="formula">\[ x_{pos} = \text{embedding}(\text{token}) + \text{PE}(pos) \]</div>
-<p>Mismo token, entrada distinta según el lugar: como un capítulo que, según cuándo lo veas, es una sorpresa o un spoiler. El Transformer original construye \(\text{PE}\) con senos y cosenos de distintas frecuencias:</p>
-<div class="formula">\[ \text{PE}(pos, 2i) = \sin\frac{pos}{10000^{2i/d}}, \qquad \text{PE}(pos, 2i+1) = \cos\frac{pos}{10000^{2i/d}} \]</div>
-<p>Cada pareja (seno, coseno) es una <strong>manecilla de reloj</strong> con su propio ritmo: las primeras dimensiones giran deprisa y distinguen posiciones vecinas; las últimas, despacio, y distinguen zonas amplias. Juntas dan a cada posición una huella única, sin parámetros que aprender y para cualquier longitud. La otra opción son posiciones <em>aprendidas</em> (BERT, GPT-2), con un máximo fijo. En los dos casos, el vector se <strong>suma</strong>, así que debe medir lo mismo que el embedding (\(d_{model}\)).</p>
+<h2 id="idea">1 · La atención mira todo a la vez</h2>
+<p>El <strong>Transformer</strong> es la red que verás en las lecciones 7 y 8 (la de GPT). No lee paso a paso como la RNN. Usa la <strong>atención</strong>: cada token mira a la vez a todos los demás y se lleva una mezcla de ellos.</p>
+<p>Eso es rapidísimo, pero tiene un fallo: la atención no sabe en qué lugar está cada token.</p>
+<div class="anim-pasos" data-titulo="Dos frases que la atención confunde">
+  <div class="paso"><p><strong>1.</strong> «El detective persigue al ladrón».</p><span class="grande">{el, detective, persigue, al, ladrón}</span></div>
+  <div class="paso"><p><strong>2.</strong> «El ladrón persigue al detective».</p><span class="grande">{el, ladrón, persigue, al, detective}</span></div>
+  <div class="paso"><p><strong>3.</strong> Sin posición, las dos son el mismo montón de vectores. «persigue» recibe la misma mezcla.</p><span class="grande">iguales</span></div>
+  <div class="paso"><p><strong>4.</strong> Con un sello de posición en cada vector, las mezclas cambian.</p><span class="grande">distintas</span></div>
+</div>
 </section>
+
+<section>
+<h2 id="sumar">2 · La solución: sumar un sello de posición</h2>
+<div class="formula">\[ x = \text{embedding}(\text{token}) + \text{PE}(\text{posición}) \]</div>
+<p><strong>PE</strong> (<em>positional encoding</em>, codificación posicional) es un vector que dice «estoy en el lugar tal». Se <strong>suma</strong> número a número, así que debe tener tantos números como el embedding. Ese tamaño se llama \(d_{model}\).</p>
+<table>
+  <thead><tr><th>Frase</th><th>Lo que entra por «detective»</th></tr></thead>
+  <tbody>
+    <tr><td>El <strong>detective</strong> persigue al ladrón</td><td>embedding + PE(1)</td></tr>
+    <tr><td>El ladrón persigue al <strong>detective</strong></td><td>embedding + PE(4)</td></tr>
+  </tbody>
+</table>
+<p>Mismo token, entrada distinta según el lugar. Como un capítulo que, según cuándo lo veas, es sorpresa o spoiler.</p>
+</section>
+
+<section>
+<h2 id="reloj">3 · El sello: manecillas de reloj</h2>
+<p>El Transformer original fabrica el sello con <strong>senos y cosenos</strong>: ondas que suben y bajan entre −1 y 1.</p>
+<div class="formula">\[ \text{PE}(pos, 2i) = \sin\frac{pos}{10000^{2i/d}}, \qquad \text{PE}(pos, 2i+1) = \cos\frac{pos}{10000^{2i/d}} \]</div>
+<p>Cada pareja (seno, coseno) es una <strong>manecilla</strong> con su ritmo. Las primeras giran deprisa y distinguen posiciones vecinas. Las últimas giran despacio y distinguen zonas lejanas. Juntas, como segundos, minutos y horas, dan a cada posición una huella única. No hay nada que aprender y vale para cualquier longitud.</p>
+</section>
+
+<section>
+<h2 id="numeros">4 · Con números: el sello de los capítulos 0 a 3</h2>
+<p>Con \(d = 4\) hay dos manecillas: la rápida divide la posición entre 1 y la lenta entre \(10000^{2/4} = 100\). Cada sello es (seno rápido, coseno rápido, seno lento, coseno lento).</p>
+<div class="anim-pasos" data-titulo="Cuatro sellos de posición con d = 4">
+  <div class="paso"><p><strong>Posición 0.</strong> sen 0 = 0 y cos 0 = 1.</p><span class="grande">(0; 1; 0; 1)</span></div>
+  <div class="paso"><p><strong>Posición 1.</strong> Ángulos 1 y 0,01.</p><span class="grande">(0,8415; 0,5403; 0,0100; 1,0000)</span></div>
+  <div class="paso"><p><strong>Posición 2.</strong> Ángulos 2 y 0,02.</p><span class="grande">(0,9093; −0,4161; 0,0200; 0,9998)</span></div>
+  <div class="paso"><p><strong>Posición 3.</strong> Ángulos 3 y 0,03.</p><span class="grande">(0,1411; −0,9900; 0,0300; 0,9996)</span></div>
+  <div class="paso"><p><strong>Mira las columnas.</strong> Las dos primeras cambian mucho de un capítulo al siguiente; las dos últimas, casi nada. Cada fila es distinta: cada capítulo tiene su huella.</p></div>
+</div>
+</section>
+
 <figure class="demo" data-demo="curso2/c2m4-posicional" data-titulo="Codificación posicional: el mapa de calor y la similitud entre posiciones">
   <div class="haz">Haz clic en el mapa para elegir una posición y luego muévela.</div>
   <div class="observa">La curva naranja vale 1 en la posición elegida, baja al alejarse y siempre tiene la misma forma: solo depende de la distancia.</div>
 </figure>
 
 <section>
-<h2 id="numeros">Con números: el sello de los capítulos 0 a 3</h2>
-<div class="callout ejemplo">
-  <span class="lbl">Ejemplo numérico</span>
-  <p>Con \(d = 4\) hay dos manecillas: la rápida divide entre \(10000^0 = 1\) y la lenta entre \(10000^{2/4} = 100\). Para pos = 1: \(\sin 1 = 0{,}8415\), \(\cos 1 = 0{,}5403\), \(\sin 0{,}01 = 0{,}0100\), \(\cos 0{,}01 = 1{,}0000\).</p>
-  <table>
-    <thead><tr><th>pos</th><th>dim 0 (rápida)</th><th>dim 1 (rápida)</th><th>dim 2 (lenta)</th><th>dim 3 (lenta)</th></tr></thead>
-    <tbody>
-      <tr><td>0</td><td>0</td><td>1</td><td>0</td><td>1</td></tr>
-      <tr><td>1</td><td>0,8415</td><td>0,5403</td><td>0,0100</td><td>1,0000</td></tr>
-      <tr><td>2</td><td>0,9093</td><td>−0,4161</td><td>0,0200</td><td>0,9998</td></tr>
-      <tr><td>3</td><td>0,1411</td><td>−0,9900</td><td>0,0300</td><td>0,9996</td></tr>
-    </tbody>
-  </table>
-  <p>Cada fila es distinta: cada capítulo de tu maratón lleva su propia huella.</p>
-</div>
+<h2 id="aprendidas">5 · Sello fijo o sello aprendido</h2>
+<table>
+  <thead><tr><th>Tipo</th><th>Cómo es</th></tr></thead>
+  <tbody>
+    <tr><td><strong>Sinusoidal</strong></td><td>Fórmula fija, sin parámetros, para cualquier longitud.</td></tr>
+    <tr><td><strong>Aprendida</strong> (BERT, GPT-2)</td><td>Una tabla con una fila por posición que se entrena. No sabe qué hacer más allá de su máximo.</td></tr>
+  </tbody>
+</table>
+<p>En los dos casos, el sello se suma una vez, a la entrada.</p>
 </section>
+
 <details class="predice">
-  <summary>Mirando la tabla, ¿qué columna distingue mejor el capítulo 1 del 2: la dim 1 (rápida) o la dim 3 (lenta)?<span class="hint"></span></summary>
+  <summary>Mirando los sellos del paso 4, ¿qué número distingue mejor el capítulo 1 del 2: el segundo (coseno rápido) o el cuarto (coseno lento)?<span class="hint"></span></summary>
   <div>
-    <p>La dim 1: pasa de 0,5403 a −0,4161, casi un punto entero. La dim 3 apenas se mueve (1,0000 → 0,9998). Las lentas no sirven para vecinos, pero sí para distinguir zonas lejanas de la frase (la posición 3 de la 300).</p>
+    <p>El segundo: pasa de 0,5403 a −0,4161, casi un punto entero. El cuarto apenas se mueve (1,0000 → 0,9998). Las manecillas lentas no sirven para vecinos, pero sí para distinguir zonas lejanas (la posición 3 de la 300).</p>
   </div>
 </details>
+
+<section>
+<h2 id="chuleta">Chuleta para repasar</h2>
+<dl class="chuleta">
+  <div><dt>Transformer</dt><dd>Red que mira todos los tokens a la vez con atención. <em>La de GPT.</em></dd></div>
+  <div><dt>Atención</dt><dd>Cada token se lleva una mezcla de los demás. <em>Lección 7.</em></dd></div>
+  <div><dt>Indiferente al orden</dt><dd>Sin posición, barajar los tokens no cambia lo que recibe cada uno.</dd></div>
+  <div><dt>Codificación posicional</dt><dd>Vector que dice en qué lugar está un token. <em>PE(1) = (0,8415; 0,5403; 0,0100; 1,0000).</em></dd></div>
+  <div><dt>Embedding + posición</dt><dd>Se suman número a número a la entrada.</dd></div>
+  <div><dt>d_model</dt><dd>Cuántos números tiene cada vector. <em>Embedding y sello, igual.</em></dd></div>
+  <div><dt>Seno y coseno</dt><dd>Ondas entre −1 y 1. <em>sen 1 = 0,8415.</em></dd></div>
+  <div><dt>Manecilla rápida</dt><dd>Distingue posiciones vecinas.</dd></div>
+  <div><dt>Manecilla lenta</dt><dd>Distingue zonas lejanas.</dd></div>
+  <div><dt>Posición aprendida</dt><dd>Tabla entrenada con un máximo fijo. <em>BERT, GPT-2.</em></dd></div>
+</dl>
+</section>
+
 <div class="resumen">
   <h2 class="sin-num sin-toc">En tres líneas</h2>
   <ul>
@@ -78,6 +127,7 @@
     <li>Senos y cosenos de distintas frecuencias = manecillas de reloj; o posiciones aprendidas.</li>
   </ul>
 </div>
+
 <section class="quiz mini">
 <script type="application/json" class="quiz-data">
 {
@@ -86,38 +136,39 @@
   {
    "q": "¿Por qué un Transformer necesita sumar una codificación posicional a los embeddings?",
    "opciones": [
-    "Porque la atención por sí sola trata la frase como un conjunto: «el detective persigue al ladrón» y «el ladrón persigue al detective» darían lo mismo a «persigue»",
+    "Porque la atención por sí sola trata la frase como un montón: «el detective persigue al ladrón» y «el ladrón persigue al detective» darían lo mismo a «persigue»",
     "Para reducir el número de parámetros del modelo",
-    "Porque los embeddings no tienen suficientes dimensiones",
-    "Para que la softmax sume 1"
+    "Porque los embeddings no tienen suficientes números",
+    "Para que la atención vaya más rápido"
    ],
    "correcta": 0,
-   "porque": "La self-attention mezcla vectores sin saber en qué fila están. Sin posición, «persigue» recibe exactamente lo mismo en las dos frases (lo comprobaste en el fragmento 10). Sumar un vector de posición hace que cada token lleve también «dónde estoy»."
+   "porque": "La atención mezcla vectores sin saber en qué lugar están. Sin posición, «persigue» recibe exactamente lo mismo en las dos frases. Sumar un sello de posición hace que cada token lleve también «dónde estoy»."
   },
   {
    "q": "¿Por qué el embedding y la codificación posicional tienen que tener el mismo tamaño?",
    "opciones": [
     "Porque se suman número a número",
-    "Porque se concatenan uno detrás de otro",
-    "Para que la softmax sume 1"
+    "Porque se ponen uno detrás de otro",
+    "Para que salgan entre −1 y 1"
    ],
    "correcta": 0,
-   "porque": "La posición se suma (no se concatena) al embedding, una vez, a la entrada; para sumar dos vectores tienen que medir lo mismo, d<sub>model</sub>."
+   "porque": "La posición se suma al embedding, una vez, a la entrada; para sumar dos vectores tienen que medir lo mismo, d<sub>model</sub>."
   },
   {
-   "q": "¿Qué limitación tienen las posiciones aprendidas, una tabla <code>Embedding(maxlen, d)</code>?",
+   "q": "¿Qué limitación tienen las posiciones aprendidas, una tabla con una fila por posición hasta un máximo?",
    "opciones": [
     "No se pueden entrenar",
-    "No saben qué hacer con posiciones más allá de <code>maxlen</code>, que nunca vieron",
+    "No saben qué hacer con posiciones más allá del máximo, que nunca vieron",
     "Ocupan más memoria que todo el modelo"
    ],
    "correcta": 1,
-   "porque": "Funcionan muy bien, pero solo hay filas para las posiciones 0 a maxlen − 1. La versión sinusoidal vale para cualquier longitud."
+   "porque": "Funcionan muy bien, pero solo hay filas hasta el máximo. La versión con senos y cosenos vale para cualquier longitud."
   }
  ]
 }
 </script>
 </section>
+
 <details class="profundizar">
   <summary><span>Profundizar: la explicación completa<small>Por qué la atención es indiferente al orden, la fórmula sinusoidal letra a letra, la analogía del reloj, la tabla completa con d = 4, por qué senos y cosenos (acotados, sin parámetros, dependen de la distancia) y las posiciones aprendidas y RoPE.</small></span></summary>
   <div class="prof-body">
@@ -188,95 +239,11 @@
   </div>
 </details>
 
-<section>
+<section class="ir-lab">
 <h2 class="sin-num">Código</h2>
-<article class="snippet" data-lang="python">
-  <header>
-    <h3>10 · Codificación posicional sinusoidal y el problema del orden</h3>
-    <p class="para-que"><strong>Para qué sirve</strong> Calcular la codificación posicional del Transformer, comprobar que la similitud entre dos posiciones solo depende de su distancia, y demostrar que la atención sin posición no distingue «el detective persigue al ladrón» de «el ladrón persigue al detective».</p>
-  </header>
-  <pre class="code"><code>import numpy as np
-
-def codificacion_posicional(n_pos, d_modelo):
-    pos = np.arange(n_pos)[:, None]                   # (n_pos, 1): 0, 1, 2, ...
-    i = np.arange(d_modelo // 2)[None, :]             # (1, d/2): una frecuencia por pareja
-    angulos = pos / (10000 ** (2 * i / d_modelo))     # (n_pos, d/2)
-    pe = np.zeros((n_pos, d_modelo))
-    pe[:, 0::2] = np.sin(angulos)                     # dimensiones pares: seno
-    pe[:, 1::2] = np.cos(angulos)                     # dimensiones impares: coseno
-    return pe
-
-print(codificacion_posicional(4, 4).round(4))
-print("a mano, pos=1:", np.round([np.sin(1), np.cos(1), np.sin(0.01), np.cos(0.01)], 4))
-
-# La similitud entre dos posiciones depende solo de la DISTANCIA entre ellas
-pe = codificacion_posicional(50, 16)
-sim = lambda a, b: pe[a] @ pe[b] / (16 / 2)           # 8 = valor máximo (una posición consigo misma)
-print("distancia 1:", round(sim(3, 4), 3), round(sim(20, 21), 3), "| distancia 10:", round(sim(3, 13), 3), round(sim(30, 40), 3))
-
-# ¿Por qué hace falta? Una atención SIN posición no distingue el orden
-rng = np.random.default_rng(0)
-d = 8
-emb = {w: rng.normal(size=d) for w in ["el", "detective", "persigue", "al", "ladrón"]}
-Wq, Wk, Wv = (rng.normal(size=(d, d)) for _ in range(3))
-
-def atencion(X):
-    Q, K, V = X @ Wq, X @ Wk, X @ Wv
-    S = Q @ K.T / np.sqrt(d)
-    A = np.exp(S - S.max(axis=1, keepdims=True))
-    A /= A.sum(axis=1, keepdims=True)
-    return A @ V
-
-f1 = ["el", "detective", "persigue", "al", "ladrón"]
-f2 = ["el", "ladrón", "persigue", "al", "detective"]   # misma frase con detective y ladrón intercambiados
-X1 = np.array([emb[w] for w in f1])
-X2 = np.array([emb[w] for w in f2])
-print("sin posición, 'persigue' recibe lo mismo en ambas:", np.allclose(atencion(X1)[2], atencion(X2)[2]))
-P = codificacion_posicional(5, d)
-print("con posición, 'persigue' recibe lo mismo en ambas:", np.allclose(atencion(X1 + P)[2], atencion(X2 + P)[2]))</code></pre>
-  <details class="linea-a-linea" open>
-    <summary>Línea por línea</summary>
-    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
-    <table class="lineas">
-      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
-      <tbody>
-        <tr data-lines="1"><td><code>import numpy as np</code></td><td>NumPy.</td></tr>
-        <tr data-lines="3"><td><code>def codificacion_posicional(n_pos, d_modelo):</code></td><td>Devuelve una matriz con un vector de <code>d_modelo</code> números para cada una de las <code>n_pos</code> posiciones.</td></tr>
-        <tr data-lines="4"><td><code>pos = np.arange(n_pos)[:, None]</code></td><td>Las posiciones 0, 1, 2… como columna, forma (n_pos, 1).</td></tr>
-        <tr data-lines="5"><td><code>i = np.arange(d_modelo // 2)[None, :]</code></td><td>Los índices de pareja 0, 1, …, d/2 − 1 como fila, forma (1, d/2). Cada pareja tendrá su frecuencia.</td></tr>
-        <tr data-lines="6"><td><code>angulos = pos / (10000 ** (2 * i / d_modelo))</code></td><td>Los ángulos \(pos / 10000^{2i/d}\). Por <em>broadcasting</em>, columna ÷ fila da una matriz (n_pos, d/2). Las primeras parejas giran muy rápido; las últimas, muy despacio.</td></tr>
-        <tr data-lines="7"><td><code>pe = np.zeros((n_pos, d_modelo))</code></td><td>Matriz vacía donde guardar el resultado.</td></tr>
-        <tr data-lines="8"><td><code>pe[:, 0::2] = np.sin(angulos)</code></td><td>Las dimensiones pares (0, 2, 4…) reciben el seno.</td></tr>
-        <tr data-lines="9"><td><code>pe[:, 1::2] = np.cos(angulos)</code></td><td>Las dimensiones impares (1, 3, 5…) reciben el coseno.</td></tr>
-        <tr data-lines="10"><td><code>return pe</code></td><td>Devuelve la matriz.</td></tr>
-        <tr data-lines="12"><td><code>print(codificacion_posicional(4, 4).round(4))</code></td><td>La tabla de 4 posiciones con \(d = 4\), la de la sección de posición.</td></tr>
-        <tr data-lines="13"><td><code>print("a mano, pos=1:", ...)</code></td><td>Comprueba la fila de la posición 1 calculada con la fórmula: \(\sin 1,\ \cos 1,\ \sin 0{,}01,\ \cos 0{,}01\).</td></tr>
-        <tr data-lines="15-16"><td><code>pe = codificacion_posicional(50, 16)</code></td><td>Una tabla más grande (50 posiciones, 16 dimensiones) para el experimento de similitud.</td></tr>
-        <tr data-lines="17"><td><code>sim = lambda a, b: pe[a] @ pe[b] / (16 / 2)</code></td><td>Producto escalar entre las codificaciones de dos posiciones, dividido por 8 (su valor máximo, el de una posición consigo misma): una similitud entre −1 y 1.</td></tr>
-        <tr data-lines="18"><td><code>print("distancia 1:", ...)</code></td><td>Compara dos pares a distancia 1 (3–4 y 20–21) y dos a distancia 10 (3–13 y 30–40).</td></tr>
-        <tr data-lines="20-23"><td><code>rng = np.random.default_rng(0) / d = 8 / emb = {...}</code></td><td>Experimento del orden. Crea un embedding aleatorio de 8 números para cada una de las 5 palabras.</td></tr>
-        <tr data-lines="24"><td><code>Wq, Wk, Wv = (rng.normal(size=(d, d)) for _ in range(3))</code></td><td>Tres matrices aleatorias de pesos: las de la consulta, la clave y el valor.</td></tr>
-        <tr data-lines="26-31"><td><code>def atencion(X): ...</code></td><td>Self-attention de una cabeza completa: proyecta con \(W_Q, W_K, W_V\), calcula las puntuaciones \(QK^T/\sqrt d\), aplica softmax por filas (restando el máximo por estabilidad) y mezcla los valores.</td></tr>
-        <tr data-lines="33-34"><td><code>f1 = [...] / f2 = [...]</code></td><td>Dos frases con las mismas palabras: «el detective persigue al ladrón» y «el ladrón persigue al detective» (detective y ladrón intercambiados).</td></tr>
-        <tr data-lines="35-36"><td><code>X1 = np.array([emb[w] for w in f1])</code></td><td>Las matrices de entrada de cada frase: una fila (embedding) por palabra, en el orden de la frase.</td></tr>
-        <tr data-lines="37"><td><code>print("sin posición, ...", np.allclose(atencion(X1)[2], atencion(X2)[2]))</code></td><td>Compara lo que recibe «persigue» (índice 2) en las dos frases, <em>sin</em> información de posición.</td></tr>
-        <tr data-lines="38-39"><td><code>P = codificacion_posicional(5, d) / print("con posición, ...")</code></td><td>Suma la codificación posicional a los embeddings y repite la comparación.</td></tr>
-      </tbody>
-    </table>
-  </details>
-  <div class="salida">
-    <strong>Salida esperada (valores aproximados)</strong>
-    <pre>[[ 0.      1.      0.      1.    ]
- [ 0.8415  0.5403  0.01    1.    ]
- [ 0.9093 -0.4161  0.02    0.9998]
- [ 0.1411 -0.99    0.03    0.9996]]
-a mano, pos=1: [0.8415 0.5403 0.01   1.    ]
-distancia 1: 0.936 0.936 | distancia 10: 0.456 0.456
-sin posición, 'persigue' recibe lo mismo en ambas: True
-con posición, 'persigue' recibe lo mismo en ambas: False</pre>
-    <p>La tabla es la de la sección de posición, y la cuenta a mano de la posición 1 da lo mismo. La similitud entre posiciones separadas por 1 es 0,936 en los dos casos, y por 10, 0,456 en los dos: depende solo de la distancia, no de dónde estén. En el último experimento: <strong>sin posición, «persigue» recibe exactamente lo mismo en las dos frases</strong> (<code>True</code>), porque la atención solo ve un conjunto de vectores y mezcla los valores sin importar en qué fila están. Al sumar la posición, el resultado ya es distinto (<code>False</code>): el Transformer puede distinguir quién persigue a quién.</p>
-  </div>
-</article>
+<a class="lab-card" href="laboratorio.html#paso-8"><span class="lc-ico" aria-hidden="true">🧪</span>
+  <span><strong>Ver el código de esta lección en el Laboratorio</strong>
+  <span>Paso 8 · El sello de posición: calcularlo, ver que solo depende de la distancia y comprobar que sin él la atención no ve el orden.</span></span></a>
 </section>
 
 </div>

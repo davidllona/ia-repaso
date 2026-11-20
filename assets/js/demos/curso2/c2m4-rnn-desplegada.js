@@ -71,7 +71,7 @@ Lab.register("curso2/c2m4-rnn-desplegada", function (root, api) {
       D.rect(ctx, cx - bwid - 2, s.h[0] >= 0 ? yBars - s.h[0] * BARS : yBars, bwid, Math.abs(s.h[0]) * BARS, C.cobalto);
       D.rect(ctx, cx + 2, s.h[1] >= 0 ? yBars - s.h[1] * BARS : yBars, bwid, Math.abs(s.h[1]) * BARS, C.terracota);
       D.text(ctx, "h" + (t + 1), cx, yBars + BARS + 15, { size: 11.5, color: C.ink2, align: "center", weight: 600 });
-      if (g.cw >= 84) D.text(ctx, "(" + n(s.h[0]) + "; " + n(s.h[1]) + ")", cx, yBars + BARS + 29, { size: 10.5, mono: true, align: "center", color: C.muted });
+      if (g.cw >= 84) D.text(ctx, "(" + n(s.h[0]) + "; " + n(s.h[1]) + ")", cx, yBars + BARS + 29, { size: 11, mono: true, align: "center", color: C.muted });
       // caja
       var by = yBox + 10;
       D.rect(ctx, bx, by, g.bw, bh, C.surface, C.ink, 2);
@@ -82,14 +82,16 @@ Lab.register("curso2/c2m4-rnn-desplegada", function (root, api) {
       D.arrow(ctx, cx, yIn - 12, cx, by + bh + 1, C.ink2, 1.3);
       D.circle(ctx, cx, yIn, 11, C.paper, C.ink, 1.5);
       D.text(ctx, "x" + (t + 1), cx, yIn + 4, { size: 11, align: "center", weight: 600 });
-      D.text(ctx, n(s.x, 1), cx, yIn + 24, { size: 10.5, mono: true, align: "center", color: C.muted });
+      D.text(ctx, n(s.x, 1), cx, yIn + 24, { size: 11, mono: true, align: "center", color: C.muted });
       // memoria horizontal
       if (t < T - 1) {
         var nx = cx + g.cw;
         D.arrow(ctx, bx + g.bw + 1, by + bh / 2, nx - g.bw / 2 - 2, by + bh / 2, C.terracota, 2);
       }
     }
-    D.text(ctx, "h₀ = (0, 0)", g.padL + 2, yBox + 8, { size: 10.5, color: C.muted });
+    var bx0 = g.padL + g.cw * 0.5 - g.bw / 2;
+    if (bx0 - g.padL >= 64) D.text(ctx, "h₀ = 0", g.padL + 2, yBox + 10 + 44 / 2 + 4, { size: 11, color: C.muted });
+    else D.text(ctx, "h₀ = 0", g.padL, yBox + 4, { size: 11, color: C.muted });
   }
   function draw2(ctx, w, h, C) {
     var T = S.T, g = cellGeom(w, T), t, mx = Math.max.apply(null, dh.concat([0.05])), base = h - 26, top = 24;
@@ -99,7 +101,7 @@ Lab.register("curso2/c2m4-rnn-desplegada", function (root, api) {
       var cx = g.padL + g.cw * (t + 0.5), bh2 = (base - top - 4) * dh[t] / mx;
       D.rect(ctx, cx - g.bw / 3, base - bh2, g.bw * 2 / 3, bh2, C.marker, C.ink, 1);
       D.text(ctx, "h" + (t + 1), cx, h - 9, { size: 11, align: "center", color: C.ink2 });
-      if (g.cw >= 40) D.text(ctx, n(dh[t], 3), cx, Math.min(base - bh2 - 4, base - 3), { size: 10, mono: true, align: "center", color: C.ink });
+      if (g.cw >= 40) D.text(ctx, n(dh[t], 3), cx, Math.min(base - bh2 - 4, base - 3), { size: 11, mono: true, align: "center", color: C.ink });
     }
   }
   function pointer(px, py) {
