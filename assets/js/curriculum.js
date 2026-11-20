@@ -105,7 +105,8 @@ window.CURRICULUM = {
             {"n": 5, "slug": "leccion-5", "title": "Una sola nota es una lotería: la validación cruzada repite el examen K veces", "blurb": "K-Fold paso a paso, leer «media ± desviación» y cuándo usar StratifiedKFold, GroupKFold o TimeSeriesSplit.", "min": 4},
             {"n": 6, "slug": "leccion-6", "title": "Ridge y Lasso cobran un impuesto a los pesos para que el modelo no memorice", "blurb": "Medir el error de una regresión (MAE, RMSE, R²) y frenar el sobreajuste: Ridge encoge, Lasso anula, alpha se elige con validación cruzada.", "min": 4},
             {"n": 7, "slug": "leccion-7", "title": "La fuga de datos no da error: fit solo con train, y un Pipeline lo garantiza", "blurb": "Las cuatro fugas (target, preprocesado, tiempo, duplicados), el escalador con números, y Pipeline + ColumnTransformer como defensa.", "min": 4},
-            {"n": 8, "slug": "leccion-8", "title": "Los hiperparámetros se eligen con validación cruzada, nunca con el test: el flujo completo", "blurb": "GridSearchCV frente a RandomizedSearchCV, curvas de validación y de aprendizaje para diagnosticar, guardar el pipeline y la secuencia completa del módulo.", "min": 4}
+            {"n": 8, "slug": "leccion-8", "title": "Los hiperparámetros se eligen con validación cruzada, nunca con el test: el flujo completo", "blurb": "GridSearchCV frente a RandomizedSearchCV, curvas de validación y de aprendizaje para diagnosticar, guardar el pipeline y la secuencia completa del módulo.", "min": 4},
+            {"n": 9, "slug": "laboratorio", "title": "Laboratorio: ¿quién se dará de baja de Netflix?", "blurb": "Todo el código del módulo en un ejemplo completo, línea a línea: reparto con stratify, modelo perezoso, Pipeline sin fugas, validación cruzada, matriz de confusión, GridSearchCV, el umbral más barato, el examen final y guardar el modelo.", "min": 30}
           ]
         },
         {

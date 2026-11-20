@@ -46,7 +46,8 @@ Lab.register("curso1/c1m5-trampa-accuracy", function (root, api) {
       [[m.dummy, C.muted, -1], [m.real, C.cobalto, 1]].forEach(function (b) {
         var v = b[0][gr[1]], bx = cx + (b[2] < 0 ? -barW - 2 : 2), by = y0 + hh - v * hh;
         D.rect(ctx, bx, by, barW, v * hh, b[1], null);
-        D.text(ctx, v.toFixed(2), bx + barW / 2, by - 4, { size: 10.5, align: "center", color: C.ink, mono: true, weight: 600 });
+        var otro = (b[2] < 0 ? m.real : m.dummy)[gr[1]], junto = b[2] < 0 && barW < 30 && Math.abs(otro - v) * hh < 16;
+        D.text(ctx, v.toFixed(2), bx + barW / 2, by - 4 - (junto ? 13 : 0), { size: 11, align: "center", color: C.ink, mono: true, weight: 600 });
       });
       D.text(ctx, gr[0], cx, y0 + hh + 16, { size: 11, align: "center", color: C.ink2, weight: 500 });
     });

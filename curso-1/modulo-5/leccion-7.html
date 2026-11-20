@@ -72,18 +72,12 @@ En producción:   nota 0,62 (real)</pre>
 <div class="callout ejemplo">
   <span class="lbl">Ejemplo numérico</span>
   <p>Horas de Netflix a la semana. Train: 10, 12, 14 y 16. Test: 30 y 40, porque los usuarios nuevos se han enganchado a un estreno. Escalar es calcular (valor − media) / desviación. Un resultado lejos de 0 significa «valor raro».</p>
-  <table>
-    <caption>Bien = fit solo con train. Mal = fit con las 6 filas.</caption>
-    <thead><tr><th></th><th>Bien</th><th>Mal</th></tr></thead>
-    <tbody>
-      <tr><th scope="row">Media</th><td>13</td><td>20,33</td></tr>
-      <tr><th scope="row">Desviación</th><td>2,236</td><td>10,92</td></tr>
-      <tr><th scope="row">El 30 queda en</th><td><strong>7,60</strong></td><td>0,89</td></tr>
-      <tr><th scope="row">El 40 queda en</th><td><strong>12,07</strong></td><td>1,80</td></tr>
-    </tbody>
-  </table>
-  <p>Bien hecha: \( (30 - 13) / 2{,}236 = 7{,}60 \). Enorme: grita «esto no se parece a lo que vi».</p>
-  <p>Mal hecha, el 30 queda en 0,89 y parece normal. El train ya depende del test, y el cambio en los usuarios nuevos <strong>se disimula</strong>.</p>
+  <div class="anim-pasos" data-titulo="El escalador, bien y mal">
+    <div class="paso"><p><strong>Bien:</strong> fit solo con train. Media 13, desviación 2,236.</p><span class="grande">(30 − 13) / 2,236 = 7,60</span></div>
+    <div class="paso"><p>Enorme: grita «esto no se parece a lo que vi». El 40 queda en 12,07.</p><span class="grande">7,60 y 12,07</span></div>
+    <div class="paso"><p><strong>Mal:</strong> fit con las 6 filas. Media 20,33, desviación 10,92.</p><span class="grande">(30 − 20,33) / 10,92 = 0,89</span></div>
+    <div class="paso"><p>El 30 parece normal (y el 40 queda en 1,80). El train ya depende del test, y el cambio en los usuarios nuevos <strong>se disimula</strong>.</p><span class="grande">0,89 y 1,80</span></div>
+  </div>
 </div>
 </section>
 
@@ -101,7 +95,12 @@ En producción:   nota 0,62 (real)</pre>
   <li class="a">ONE-HOT<small>texto a números</small></li>
   <li class="d">MODELO<small>clasifica</small></li>
 </ul>
-<p>Cuando llamas a <code>fit</code>, toda la cadena aprende solo de las filas que le das. En una validación cruzada (lección 5) se vuelve a ajustar entera <strong>en cada ronda</strong>, solo con el train de esa ronda. La fuga del preprocesado es imposible.</p>
+<div class="anim-pasos" data-titulo="El pipeline dentro de la validación cruzada">
+  <div class="paso"><p><strong>1.</strong> Llamas a <code>fit</code>: toda la cadena aprende solo de las filas que le das.</p></div>
+  <div class="paso"><p><strong>2. Ronda 1</strong> de una validación cruzada (lección 5): la cadena se ajusta <strong>entera</strong> con el train de esa ronda.</p><span class="grande">imputar → escalar → One-Hot → modelo</span></div>
+  <div class="paso"><p><strong>3. Ronda 2:</strong> vuelve a empezar de cero, con otro train.</p></div>
+  <div class="paso"><p><strong>4.</strong> El trozo de examen nunca entra en un <code>fit</code>. La fuga del preprocesado es imposible.</p></div>
+</div>
 <p>Dentro va un <code>ColumnTransformer</code>: trata cada tipo de columna a su manera.</p>
 <table>
   <thead><tr><th>Columnas</th><th>Huecos</th><th>Después</th></tr></thead>
@@ -370,167 +369,12 @@ En producción:   nota 0,62 (real)</pre>
   </div>
 </details>
 
-<section>
+<section class="ir-lab">
 <h2 class="sin-num">Código</h2>
-<p class="codigo-intro">El fragmento 15 usa la tabla de clientes <code>df</code> que fabrica el fragmento 14 (está en la <a href="leccion-8.html#resto">lección 8</a>, en «Código: el resto del módulo»): ejecuta antes ese.</p>
-<article class="snippet" data-lang="python">
-  <header>
-    <h3>13 · Data leakage: la métrica «demasiado buena» y cómo evitarla con un <code>Pipeline</code></h3>
-    <p class="para-que"><strong>Para qué sirve</strong> Provocar tres fugas de datos a propósito (seleccionar variables con todas las etiquetas, una columna que contiene la respuesta y escalar con los datos de test) y ver cómo un <code>Pipeline</code> cierra la primera.</p>
-  </header>
-  <pre class="code"><code>import numpy as np
-from sklearn.feature_selection import SelectKBest, f_classif
-from sklearn.linear_model import LogisticRegression
-from sklearn.model_selection import cross_val_score
-from sklearn.pipeline import Pipeline
-from sklearn.preprocessing import StandardScaler
-
-rng = np.random.default_rng(0)
-X = rng.normal(size=(60, 1000))        # 60 muestras y 1000 columnas de PURO RUIDO
-y = rng.integers(0, 2, size=60)        # etiquetas al azar: no hay nada que aprender
-
-# MAL: elegimos las 10 "mejores" columnas mirando TODAS las etiquetas, y luego validamos
-X_mal = SelectKBest(f_classif, k=10).fit_transform(X, y)
-mal = cross_val_score(LogisticRegression(), X_mal, y, cv=5).mean()
-
-# BIEN: la selección va dentro del Pipeline y se repite en cada fold con su train
-pipe = Pipeline([("seleccion", SelectKBest(f_classif, k=10)), ("modelo", LogisticRegression())])
-bien = cross_val_score(pipe, X, y, cv=5).mean()
-print(f"Selección fuera de la validación : accuracy = {mal:.3f}   &lt;- fuga, resultado falso")
-print(f"Selección dentro del Pipeline    : accuracy = {bien:.3f}   &lt;- la realidad (ruido = azar)")
-
-# Fuga del target: una columna que ES la respuesta con un poco de ruido
-fuga = y + rng.normal(0, 0.1, size=60)
-X2 = np.c_[rng.normal(size=(60, 5)), fuga]
-print("Con la columna que filtra el target:", cross_val_score(LogisticRegression(), X2, y, cv=5).mean().round(3))
-
-# Fuga del escalado: la media cambia si incluyes (o no) los datos de test
-tr = np.array([[10.0], [12.0], [14.0], [16.0]])
-te = np.array([[30.0], [40.0]])
-bien_esc = StandardScaler().fit(tr)                       # aprende solo de train
-mal_esc = StandardScaler().fit(np.vstack([tr, te]))       # aprende también de test
-print("train escalado BIEN:", bien_esc.transform(tr).ravel().round(2))
-print("train escalado MAL :", mal_esc.transform(tr).ravel().round(2))</code></pre>
-  <details class="linea-a-linea" open>
-    <summary>Línea por línea</summary>
-    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
-    <table class="lineas">
-      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
-      <tbody>
-        <tr data-lines="1"><td><code>import numpy as np</code></td><td>Importa NumPy.</td></tr>
-        <tr data-lines="2"><td><code>from sklearn.feature_selection import SelectKBest, f_classif</code></td><td>Importa <code>SelectKBest</code> (se queda con las <em>k</em> columnas que mejor se relacionan con el objetivo) y la prueba estadística <code>f_classif</code> con la que las puntúa.</td></tr>
-        <tr data-lines="3"><td><code>from sklearn.linear_model import LogisticRegression</code></td><td>Importa la regresión logística.</td></tr>
-        <tr data-lines="4"><td><code>from sklearn.model_selection import cross_val_score</code></td><td>Importa la validación cruzada.</td></tr>
-        <tr data-lines="5"><td><code>from sklearn.pipeline import Pipeline</code></td><td>Importa <code>Pipeline</code>: encadena pasos en orden.</td></tr>
-        <tr data-lines="6"><td><code>from sklearn.preprocessing import StandardScaler</code></td><td>Importa el escalador.</td></tr>
-        <tr data-lines="8"><td><code>rng = np.random.default_rng(0)</code></td><td>Generador aleatorio con semilla.</td></tr>
-        <tr data-lines="9"><td><code>X = rng.normal(size=(60, 1000))        # 60 muestras y 1000 columnas de PURO RUIDO</code></td><td>60 muestras con 1000 columnas de <strong>ruido puro</strong>: números al azar sin ningún significado.</td></tr>
-        <tr data-lines="10"><td><code>y = rng.integers(0, 2, size=60)        # etiquetas al azar: no hay nada que aprender</code></td><td>60 etiquetas 0 o 1 echadas a suertes: no existe ninguna relación entre X e y. Un modelo honesto solo puede acertar el 50 %.</td></tr>
-        <tr data-lines="12"><td><code># MAL: elegimos las 10 "mejores" columnas mirando TODAS las etiquetas, y luego validamos</code></td><td>Comentario: la forma incorrecta.</td></tr>
-        <tr data-lines="13"><td><code>X_mal = SelectKBest(f_classif, k=10).fit_transform(X, y)</code></td><td>Elige las 10 columnas de ruido que, <em>por casualidad</em>, mejor se parecen a <code>y</code>, mirando <strong>todas</strong> las etiquetas, y se queda solo con ellas. Con 1000 candidatas siempre habrá 10 que casualmente «encajen».</td></tr>
-        <tr data-lines="14"><td><code>mal = cross_val_score(LogisticRegression(), X_mal, y, cv=5).mean()</code></td><td>Después valida con validación cruzada. Pero la trampa ya está hecha: las columnas se eligieron viendo también las etiquetas de los folds de validación.</td></tr>
-        <tr data-lines="16"><td><code># BIEN: la selección va dentro del Pipeline y se repite en cada fold con su train</code></td><td>Comentario: la forma correcta.</td></tr>
-        <tr data-lines="17"><td><code>pipe = Pipeline([("seleccion", SelectKBest(f_classif, k=10)), ("modelo", LogisticRegression())])</code></td><td>Pipeline con dos pasos con nombre: la selección de columnas y el modelo.</td></tr>
-        <tr data-lines="18"><td><code>bien = cross_val_score(pipe, X, y, cv=5).mean()</code></td><td>Ahora la validación cruzada pasa el pipeline entero: en cada fold, <code>SelectKBest</code> se ajusta <strong>solo con las muestras de train de ese fold</strong>.</td></tr>
-        <tr data-lines="19"><td><code>print(f"Selección fuera de la validación : accuracy = {mal:.3f}   &lt;- fuga, resultado falso")</code></td><td>Resultado con fuga.</td></tr>
-        <tr data-lines="20"><td><code>print(f"Selección dentro del Pipeline    : accuracy = {bien:.3f}   &lt;- la realidad (ruido = azar)")</code></td><td>Resultado sin fuga.</td></tr>
-        <tr data-lines="22"><td><code># Fuga del target: una columna que ES la respuesta con un poco de ruido</code></td><td>Comentario: la segunda fuga, una columna que es la respuesta.</td></tr>
-        <tr data-lines="23"><td><code>fuga = y + rng.normal(0, 0.1, size=60)</code></td><td>Fabrica una columna que es la etiqueta más un poco de ruido: algo así como «fecha de cancelación» en un problema de predecir cancelaciones.</td></tr>
-        <tr data-lines="24"><td><code>X2 = np.c_[rng.normal(size=(60, 5)), fuga]</code></td><td>Une 5 columnas de ruido y la columna de fuga (<code>np.c_</code> pega columnas).</td></tr>
-        <tr data-lines="25"><td><code>print("Con la columna que filtra el target:", cross_val_score(LogisticRegression(), X2, y, cv=5).mean().round(3))</code></td><td>Validación cruzada con esa columna incluida.</td></tr>
-        <tr data-lines="27"><td><code># Fuga del escalado: la media cambia si incluyes (o no) los datos de test</code></td><td>Comentario: la tercera fuga, mucho más sutil.</td></tr>
-        <tr data-lines="28"><td><code>tr = np.array([[10.0], [12.0], [14.0], [16.0]])</code></td><td>Cuatro datos de entrenamiento (una columna).</td></tr>
-        <tr data-lines="29"><td><code>te = np.array([[30.0], [40.0]])</code></td><td>Dos datos de test, mucho mayores.</td></tr>
-        <tr data-lines="30"><td><code>bien_esc = StandardScaler().fit(tr)                       # aprende solo de train</code></td><td>Escalador ajustado solo con train.</td></tr>
-        <tr data-lines="31"><td><code>mal_esc = StandardScaler().fit(np.vstack([tr, te]))       # aprende también de test</code></td><td>Escalador ajustado con train <strong>y</strong> test juntos (<code>np.vstack</code> apila las dos tablas).</td></tr>
-        <tr data-lines="32"><td><code>print("train escalado BIEN:", bien_esc.transform(tr).ravel().round(2))</code></td><td>Los datos de train escalados correctamente.</td></tr>
-        <tr data-lines="33"><td><code>print("train escalado MAL :", mal_esc.transform(tr).ravel().round(2))</code></td><td>Los mismos datos de train escalados con un escalador que ha «visto» el test.</td></tr>
-      </tbody>
-    </table>
-  </details>
-  <div class="salida">
-    <strong>Salida esperada</strong>
-    <pre>Selección fuera de la validación : accuracy = 0.817   &lt;- fuga, resultado falso
-Selección dentro del Pipeline    : accuracy = 0.433   &lt;- la realidad (ruido = azar)
-Con la columna que filtra el target: 1.0
-train escalado BIEN: [-1.34 -0.45  0.45  1.34]
-train escalado MAL : [-0.95 -0.76 -0.58 -0.4 ]</pre>
-    <p>Con datos que son <strong>ruido puro</strong>, la selección hecha fuera de la validación da un accuracy de 0,817: un modelo «brillante» que no sabe nada. Dentro del <code>Pipeline</code> baja a 0,433, que es lo que merece (azar). La columna que filtra el target da 1,0: perfección sospechosa. Y escalar con el test cambia los datos de train de [−1,34 −0,45 0,45 1,34] a [−0,95 −0,76 −0,58 −0,40]: el test ya ha «tocado» el entrenamiento aunque no se use para entrenar.</p>
-  </div>
-</article>
-<article class="snippet" data-lang="python">
-  <header>
-    <h3>15 · <code>Pipeline</code> + <code>ColumnTransformer</code>: imputar, escalar y codificar sin fugas</h3>
-    <p class="para-que"><strong>Para qué sirve</strong> Montar un único objeto que prepara los datos (rellena huecos, escala las columnas numéricas y convierte las de texto con One-Hot) y entrena el modelo. Se evalúa con validación cruzada y después con el test. Usa el <code>df</code> del fragmento 14.</p>
-  </header>
-  <pre class="code"><code>from sklearn.compose import ColumnTransformer
-from sklearn.impute import SimpleImputer
-from sklearn.linear_model import LogisticRegression
-from sklearn.metrics import roc_auc_score
-from sklearn.model_selection import cross_val_score, train_test_split
-from sklearn.pipeline import Pipeline
-from sklearn.preprocessing import OneHotEncoder, StandardScaler
-
-X = df.drop(columns="baja")
-y = df["baja"]
-X_tr, X_te, y_tr, y_te = train_test_split(X, y, test_size=0.25, stratify=y, random_state=42)
-
-numericas = ["edad", "horas_mes", "dias_sin_entrar"]
-categoricas = ["plan", "pais"]
-
-pre = ColumnTransformer([
-    ("num", Pipeline([("imp", SimpleImputer(strategy="median")),
-                      ("esc", StandardScaler())]), numericas),
-    ("cat", Pipeline([("imp", SimpleImputer(strategy="most_frequent")),
-                      ("ohe", OneHotEncoder(handle_unknown="ignore"))]), categoricas),
-])
-pipe = Pipeline([("pre", pre), ("clf", LogisticRegression(max_iter=1000))])
-
-cv_auc = cross_val_score(pipe, X_tr, y_tr, cv=5, scoring="roc_auc")
-print("AUC por fold:", cv_auc.round(3), "| media =", cv_auc.mean().round(3))
-
-pipe.fit(X_tr, y_tr)
-print("Pasos del pipeline:", list(pipe.named_steps))
-print("Columnas tras preprocesar:", list(pipe[:-1].get_feature_names_out()))
-print("AUC en test:", round(roc_auc_score(y_te, pipe.predict_proba(X_te)[:, 1]), 3))</code></pre>
-  <details class="linea-a-linea" open>
-    <summary>Línea por línea</summary>
-    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
-    <table class="lineas">
-      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
-      <tbody>
-        <tr data-lines="1"><td><code>from sklearn.compose import ColumnTransformer</code></td><td>Importa la herramienta que aplica <em>transformaciones distintas a columnas distintas</em>.</td></tr>
-        <tr data-lines="2"><td><code>from sklearn.impute import SimpleImputer</code></td><td>Importa el que rellena huecos.</td></tr>
-        <tr data-lines="3"><td><code>from sklearn.linear_model import LogisticRegression</code></td><td>Importa el modelo final.</td></tr>
-        <tr data-lines="4"><td><code>from sklearn.metrics import roc_auc_score</code></td><td>Importa el AUC, la métrica que usaremos.</td></tr>
-        <tr data-lines="5"><td><code>from sklearn.model_selection import cross_val_score, train_test_split</code></td><td>Importa la validación cruzada y el reparto.</td></tr>
-        <tr data-lines="6"><td><code>from sklearn.pipeline import Pipeline</code></td><td>Importa el encadenador de pasos.</td></tr>
-        <tr data-lines="7"><td><code>from sklearn.preprocessing import OneHotEncoder, StandardScaler</code></td><td>Importa el codificador One-Hot y el escalador.</td></tr>
-        <tr data-lines="9"><td><code>X = df.drop(columns="baja")</code></td><td><code>X</code>: todas las columnas menos el objetivo.</td></tr>
-        <tr data-lines="10"><td><code>y = df["baja"]</code></td><td><code>y</code>: solo el objetivo.</td></tr>
-        <tr data-lines="11"><td><code>X_tr, X_te, y_tr, y_te = train_test_split(X, y, test_size=0.25, stratify=y, random_state=42)</code></td><td>Reparto 75 / 25 estratificado. <strong>Se reparte antes de preprocesar nada.</strong></td></tr>
-        <tr data-lines="13"><td><code>numericas = ["edad", "horas_mes", "dias_sin_entrar"]</code></td><td>Nombres de las columnas numéricas.</td></tr>
-        <tr data-lines="14"><td><code>categoricas = ["plan", "pais"]</code></td><td>Nombres de las columnas de texto.</td></tr>
-        <tr data-lines="16-21"><td><code>pre = ColumnTransformer([…])</code></td><td>Cada entrada es una tupla <code>(nombre, qué_hacer, a_qué_columnas)</code>. Las numéricas pasan por un mini-pipeline: <code>SimpleImputer(strategy="median")</code> rellena huecos con la mediana y <code>StandardScaler</code> escala. Las categóricas, por otro: se rellenan con el valor más frecuente y <code>OneHotEncoder(handle_unknown="ignore")</code> crea una columna por categoría (y no falla si en test aparece una categoría nueva).</td></tr>
-        <tr data-lines="22"><td><code>pipe = Pipeline([("pre", pre), ("clf", LogisticRegression(max_iter=1000))])</code></td><td>El pipeline completo: el preprocesado <code>pre</code> y después la regresión logística <code>clf</code>.</td></tr>
-        <tr data-lines="24"><td><code>cv_auc = cross_val_score(pipe, X_tr, y_tr, cv=5, scoring="roc_auc")</code></td><td>Validación cruzada del pipeline <strong>entero</strong> sobre el train, con el AUC como métrica. En cada fold se vuelven a calcular medianas, medias y categorías solo con las filas de train de ese fold.</td></tr>
-        <tr data-lines="25"><td><code>print("AUC por fold:", cv_auc.round(3), "| media =", cv_auc.mean().round(3))</code></td><td>Muestra los 5 AUC y su media.</td></tr>
-        <tr data-lines="27"><td><code>pipe.fit(X_tr, y_tr)</code></td><td>Entrena el pipeline con todo el train.</td></tr>
-        <tr data-lines="28"><td><code>print("Pasos del pipeline:", list(pipe.named_steps))</code></td><td><code>named_steps</code> es un diccionario con los pasos por nombre.</td></tr>
-        <tr data-lines="29"><td><code>print("Columnas tras preprocesar:", list(pipe[:-1].get_feature_names_out()))</code></td><td><code>pipe[:-1]</code> son todos los pasos menos el último (el modelo); <code>get_feature_names_out()</code> da el nombre de cada columna resultante: 3 numéricas más una por cada plan y cada país.</td></tr>
-        <tr data-lines="30"><td><code>print("AUC en test:", round(roc_auc_score(y_te, pipe.predict_proba(X_te)[:, 1]), 3))</code></td><td>El examen final: AUC con el test (se mira una sola vez). <code>predict_proba(...)[:, 1]</code> son las probabilidades de la clase 1.</td></tr>
-      </tbody>
-    </table>
-  </details>
-  <div class="salida">
-    <strong>Salida esperada</strong>
-    <pre>AUC por fold: [0.807 0.76  0.821 0.795 0.731] | media = 0.783
-Pasos del pipeline: ['pre', 'clf']
-Columnas tras preprocesar: ['num__edad', 'num__horas_mes', 'num__dias_sin_entrar', 'cat__plan_Basic', 'cat__plan_Premium', 'cat__plan_Standard', 'cat__pais_AR', 'cat__pais_CO', 'cat__pais_ES', 'cat__pais_MX']
-AUC en test: 0.8</pre>
-    <p>El AUC en validación cruzada es 0,783 de media (entre 0,731 y 0,821 según el fold) y en test sale 0,800: coherentes, así que no hay sorpresa desagradable. El pipeline tiene dos pasos (<code>pre</code> y <code>clf</code>) y, tras preprocesar, 10 columnas: 3 numéricas escaladas, 3 de <code>plan</code> (Basic, Premium, Standard) y 4 de <code>pais</code> (AR, CO, ES, MX). Los huecos de <code>edad</code> y <code>plan</code> ya no dan problemas.</p>
-  </div>
-</article>
+<a class="lab-card" href="laboratorio.html#paso-4"><span class="lc-ico" aria-hidden="true">🧪</span>
+  <span><strong>Ver el código de esta lección en el Laboratorio</strong>
+  <span>Pasos 4 y 5 · ColumnTransformer + Pipeline, validado con validación cruzada y sin fugas.</span></span></a>
+<p>Los fragmentos 13 y 15 (tres fugas provocadas a propósito y el pipeline completo) están en <a href="laboratorio.html#frag-l7">«Más código del módulo»</a>.</p>
 </section>
 
 </div>
