@@ -89,7 +89,7 @@
   function effectiveTheme() {
     var t = document.documentElement.getAttribute("data-theme");
     if (t) return t;
-    return "dark";
+    return window.matchMedia && matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
   }
   function setTheme(t) {
     document.documentElement.setAttribute("data-theme", t);

@@ -59,7 +59,8 @@
   function colors() {
     if (colorCache) return colorCache;
     var cs = getComputedStyle(document.documentElement);
-    function g(n) { return cs.getPropertyValue(n).trim(); }
+    /* Los gráficos usan su propia paleta (--viz-*), pensada para distinguirse bien sobre el fondo */
+    function g(n) { return cs.getPropertyValue(n.replace(/^--(cobalto|terracota|oliva)/, "--viz-$1")).trim() || cs.getPropertyValue(n).trim(); }
     colorCache = {
       ink: g("--ink"), ink2: g("--ink-2"), muted: g("--muted"), line: g("--line"),
       paper: g("--paper"), paper2: g("--paper-2"), surface: g("--surface"),

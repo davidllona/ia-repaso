@@ -77,3 +77,8 @@ Objetivo: que cada idea importante tenga algo que se mueve. Calidad antes que ca
 
 ## Informe final (breve, en español; uno solo y terminas, sin trabajo en segundo plano)
 Por lección: qué quedó en «Antes de leer el código» (nº de fichas), nº de fragmentos con la tabla reescrita, animaciones añadidas (paso a paso / demos nuevas con nombre), si reescribiste la parte visible, palabras. Y problemas de móvil o del framework.
+
+## Notas añadidas
+- Tema: oscuro suave (gris carbón, texto hueso, rojo de acento) o claro cálido según el sistema; los gráficos usan su propia paleta azul/ámbar/verde (`api.colors()` ya la devuelve). No fijes colores.
+- Revisa a 375 px TODAS las demos de tu módulo (no solo las nuevas): si los rótulos del canvas se pisan o se cortan (p. ej. en `curso1/aprende-umbral` se pisan «predice: se queda», el título del eje y el texto del segundo gráfico), arréglalo en el JS de la demo: textos más cortos en pantallas estrechas, más margen o dos líneas. Esto sí puedes tocarlo aunque la demo no sea nueva (salvo las de `comun/`: avisa en el informe).
+- Las capturas guárdalas en `/home/claude/shots/<tu-modulo>/` (crea la carpeta). Hay un ejemplo de script de capturas en `/home/claude/shots/shot.py`.
