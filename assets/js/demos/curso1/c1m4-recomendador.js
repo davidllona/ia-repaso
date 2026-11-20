@@ -36,11 +36,11 @@ function draw(ctx, w, h, C) {
     var r = ranked[i], y = top + i * rh, isN = i < K, bw = Math.max(2, (x1 - x0) * r.d / maxd);
     if (isN) D.rect(ctx, 2, y + 1, w - 4, rh - 2, C.cobaltoWash, null);
     D.text(ctx, r.u.n, 8, y + rh * 0.45, { size: 12.5, weight: isN ? 700 : 500, color: C.ink });
-    D.text(ctx, "(" + r.u.t.join(", ") + ")", 8, y + rh * 0.82, { size: 10.5, mono: true, color: C.ink2 });
+    D.text(ctx, "(" + r.u.t.join(", ") + ")", 8, y + rh * 0.82, { size: 11, mono: true, color: C.ink2 });
     D.rect(ctx, x0, y + rh * 0.25, bw, rh * 0.5, isN ? C.cobalto : C.muted, null);
     D.text(ctx, r.d.toFixed(2), x0 + bw + 5, y + rh * 0.62, { size: 11.5, mono: true, weight: isN ? 700 : 400, color: C.ink });
   }
-  D.text(ctx, "distancia euclídea a tus gustos", x0, top - 6, { size: 10.5, color: C.ink2 });
+  D.text(ctx, "distancia euclídea a tus gustos", x0, top - 6, { size: 11, color: C.ink2 });
 }
 function update() {
   rank();

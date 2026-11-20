@@ -52,8 +52,8 @@ function frame(ctx, plot, C, grid) {
 /* Rótulos de los ejes: cada punto es un usuario de la plataforma, situado según lo que le gusta. */
 function axisCaps(ctx, plot, C, xt, yt) {
   var b = plot.box, D = api.d;
-  D.text(ctx, xt, b.x + b.w / 2, b.y + b.h + 14, { size: 10.5, align: "center", color: C.ink2 });
-  D.text(ctx, yt, b.x - 6, b.y + b.h / 2, { size: 10.5, align: "center", color: C.ink2, rotate: -Math.PI / 2 });
+  D.text(ctx, xt, b.x + b.w / 2, b.y + b.h + 14, { size: 11, align: "center", color: C.ink2 });
+  D.text(ctx, yt, b.x - 6, b.y + b.h / 2, { size: 11, align: "center", color: C.ink2, rotate: -Math.PI / 2 });
 }
 function sq2(a, b) { var dx = a[0] - b[0], dy = a[1] - b[1]; return dx * dx + dy * dy; }
 function dist2(a, b) { return Math.sqrt(sq2(a, b)); }
@@ -249,7 +249,7 @@ function drawG(ctx, w, h, C) {
   function gx(v) { return L0 + (v + 1) / 2 * (R0 - L0); }
   var gr = ctx.createLinearGradient(L0, 0, R0, 0); gr.addColorStop(0, C.terracotaWash); gr.addColorStop(0.5, C.paper2); gr.addColorStop(1, C.olivaWash);
   ctx.fillStyle = gr; ctx.fillRect(L0, y0, R0 - L0, bh); D.rect(ctx, L0, y0, R0 - L0, bh, null, C.ink, 1.2);
-  [-1, -0.5, 0, 0.5, 1].forEach(function (t) { D.line(ctx, gx(t), y0 + bh, gx(t), y0 + bh + 4, C.ink, 1); D.text(ctx, String(t), gx(t), y0 + bh + 17, { size: 10.5, align: "center", color: C.muted, mono: true }); });
+  [-1, -0.5, 0, 0.5, 1].forEach(function (t) { D.line(ctx, gx(t), y0 + bh, gx(t), y0 + bh + 4, C.ink, 1); D.text(ctx, String(t), gx(t), y0 + bh + 17, { size: 11, align: "center", color: C.muted, mono: true }); });
   var mx = gx(Math.max(-1, Math.min(1, r.s)));
   ctx.fillStyle = C.ink; ctx.beginPath(); ctx.moveTo(mx, y0 - 2); ctx.lineTo(mx - 6, y0 - 12); ctx.lineTo(mx + 6, y0 - 12); ctx.closePath(); ctx.fill();
   D.line(ctx, mx, y0, mx, y0 + bh, C.ink, 3);

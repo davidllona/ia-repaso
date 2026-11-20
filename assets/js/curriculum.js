@@ -88,7 +88,8 @@ window.CURRICULUM = {
             {"n": 5, "slug": "leccion-5", "title": "Sin respuestas correctas, un buen grupo es compacto y está lejos de los demás", "blurb": "Silhouette, Davies–Bouldin y el codo de la inercia para elegir cuántos tipos de espectador hay.", "min": 4},
             {"n": 6, "slug": "leccion-6", "title": "El dendrograma guarda todas las K a la vez: tú decides dónde cortar", "blurb": "Clustering jerárquico: fusionar lo más cercano, los cuatro enlaces y dónde cortar el árbol.", "min": 4},
             {"n": 7, "slug": "leccion-7", "title": "Un grupo es una zona densa; lo que no cabe en ninguna es ruido (o una anomalía)", "blurb": "DBSCAN (núcleo, borde, ruido), HDBSCAN para densidades distintas e Isolation Forest y LOF para lo raro.", "min": 4},
-            {"n": 8, "slug": "leccion-8", "title": "Menos columnas sin perder lo esencial: PCA conserva la varianza, t-SNE y UMAP conservan a los vecinos", "blurb": "La maldición de la dimensionalidad, PCA a mano, t-SNE y UMAP, y el no supervisado dentro de un proyecto.", "min": 4}
+            {"n": 8, "slug": "leccion-8", "title": "Menos columnas sin perder lo esencial: PCA conserva la varianza, t-SNE y UMAP conservan a los vecinos", "blurb": "La maldición de la dimensionalidad, PCA a mano, t-SNE y UMAP, y el no supervisado dentro de un proyecto.", "min": 4},
+            {"n": 9, "slug": "laboratorio", "title": "Laboratorio: descubrir los tipos de espectador de Netflix", "blurb": "Todo el código del módulo explicado línea a línea: escalar, reglas, vecinos, K-Means, elegir K, árbol, DBSCAN, anomalías y PCA con 305 usuarios.", "min": 100}
           ]
         },
         {

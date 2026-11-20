@@ -9,7 +9,9 @@ var ui = api.controls(root);
 var sa = ui.select({ label: "Si el usuario ve… (A)", options: ITEMS.map(function (x) { return [x, x]; }), value: A, onChange: function (v) { A = v; update(); } });
 var sb = ui.select({ label: "…¿ve también? (B)", options: ITEMS.map(function (x) { return [x, x]; }), value: B, onChange: function (v) { B = v; update(); } });
 var wrap = api.el("div", { style: { overflowX: "auto" } }), tbl = api.el("table", { class: "lab-table" }), thead = api.el("thead"), tbody = api.el("tbody");
-var hr = api.el("tr"); hr.appendChild(api.el("th", { text: "Nº" })); ITEMS.forEach(function (it) { var th = api.el("th", { text: it }); th.style.textAlign = "center"; th.style.whiteSpace = "normal"; th.style.fontSize = "0.62rem"; th.style.padding = "0.3rem 0.2rem"; hr.appendChild(th); }); thead.appendChild(hr);
+var hr = api.el("tr"); hr.appendChild(api.el("th", { text: "Nº" })); var SHORT = { "Toy Story": "Toy Story", "Shrek": "Shrek", "Stranger Things": "S. Things", "Breaking Bad": "B. Bad", "El juego del calamar": "Calamar" };
+var narrow = (root.clientWidth || window.innerWidth) < 480;
+ITEMS.forEach(function (it) { var th = api.el("th", { text: narrow ? SHORT[it] : it, title: it }); th.style.textAlign = "center"; th.style.whiteSpace = "normal"; th.style.setProperty("font-size", narrow ? "0.6rem" : "0.62rem", "important"); th.style.setProperty("padding", "0.3rem 0.12rem", "important"); th.style.letterSpacing = "0"; hr.appendChild(th); }); thead.appendChild(hr);
 tbl.style.width = "100%"; tbl.appendChild(thead); tbl.appendChild(tbody); wrap.appendChild(tbl); root.appendChild(wrap);
 var out = api.readout(root);
 function has(b, it) { return b.indexOf(it) >= 0; }
@@ -20,8 +22,8 @@ function update() {
     var a = has(b, A), bb = has(b, B), both = a && bb && A !== B;
     if (a) nA++; if (bb) nB++; if (both) nAB++;
     var tr = api.el("tr"); tr.style.background = both ? C.olivaWash : (a || bb) ? C.markerWash : "transparent";
-    var tn = api.el("td", { text: "#" + (i + 1) }); tn.style.padding = "0.35rem 0.3rem"; tr.appendChild(tn);
-    ITEMS.forEach(function (it) { var td = api.el("td", { text: has(b, it) ? "●" : "·" }); td.style.textAlign = "center"; td.style.padding = "0.35rem 0.2rem"; if (it === A || it === B) td.style.fontWeight = "700"; tr.appendChild(td); });
+    var tn = api.el("td", { text: "#" + (i + 1) }); tn.style.setProperty("padding", "0.35rem 0.3rem", "important"); tr.appendChild(tn);
+    ITEMS.forEach(function (it) { var td = api.el("td", { text: has(b, it) ? "●" : "·" }); td.style.textAlign = "center"; td.style.setProperty("padding", "0.35rem 0.12rem", "important"); if (it === A || it === B) td.style.fontWeight = "700"; tr.appendChild(td); });
     tbody.appendChild(tr);
   });
   if (A === B) { out.set("Elige dos títulos distintos: una regla relaciona A con otro título B."); return; }

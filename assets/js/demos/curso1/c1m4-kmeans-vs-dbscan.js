@@ -52,8 +52,8 @@ function frame(ctx, plot, C, grid) {
 /* Rótulos de los ejes: cada punto es un usuario de la plataforma, situado según lo que le gusta. */
 function axisCaps(ctx, plot, C, xt, yt) {
   var b = plot.box, D = api.d;
-  D.text(ctx, xt, b.x + b.w / 2, b.y + b.h + 13, { size: 10, align: "center", color: C.ink2 });
-  D.text(ctx, yt, b.x - 5, b.y + b.h / 2, { size: 10, align: "center", color: C.ink2, rotate: -Math.PI / 2 });
+  D.text(ctx, xt, b.x + b.w / 2, b.y + b.h + 13, { size: 11, align: "center", color: C.ink2 });
+  D.text(ctx, yt, b.x - 5, b.y + b.h / 2, { size: 11, align: "center", color: C.ink2, rotate: -Math.PI / 2 });
 }
 function sq2(a, b) { var dx = a[0] - b[0], dy = a[1] - b[1]; return dx * dx + dy * dy; }
 function dist2(a, b) { return Math.sqrt(sq2(a, b)); }

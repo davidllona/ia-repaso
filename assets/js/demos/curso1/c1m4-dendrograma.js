@@ -52,8 +52,8 @@ function frame(ctx, plot, C, grid) {
 /* Rótulos de los ejes: cada punto es un usuario de la plataforma, situado según lo que le gusta. */
 function axisCaps(ctx, plot, C, xt, yt) {
   var b = plot.box, D = api.d;
-  D.text(ctx, xt, b.x + b.w / 2, b.y + b.h + 13, { size: 10, align: "center", color: C.ink2 });
-  D.text(ctx, yt, b.x - 5, b.y + b.h / 2, { size: 10, align: "center", color: C.ink2, rotate: -Math.PI / 2 });
+  D.text(ctx, xt, b.x + b.w / 2, b.y + b.h + 13, { size: 11, align: "center", color: C.ink2 });
+  D.text(ctx, yt, b.x - 5, b.y + b.h / 2, { size: 11, align: "center", color: C.ink2, rotate: -Math.PI / 2 });
 }
 function sq2(a, b) { var dx = a[0] - b[0], dy = a[1] - b[1]; return dx * dx + dy * dy; }
 function dist2(a, b) { return Math.sqrt(sq2(a, b)); }
@@ -277,7 +277,11 @@ function draw(ctx, w, h, C) {
   fit(); frame(ctx, plot, C, false); axisCaps(ctx, plot, C, "gusto por la acción →", "gusto por la comedia →"); ctx.save(); plot.clip(ctx);
   for (i = 0; i < P.length; i++) shape(ctx, cl.lab[i], plot.x(P[i][0]), plot.y(P[i][1]), 5, pal[cl.lab[i] % 10], C.ink, 0.8);
   ctx.restore();
-  for (i = 0; i < P.length; i++) D.text(ctx, String(i + 1), plot.x(P[i][0]) + 7, plot.y(P[i][1]) - 6, { size: 10.5, color: C.ink2, mono: true });
+  for (i = 0; i < P.length; i++) {
+    var lx = plot.x(P[i][0]) + 7, ly = plot.y(P[i][1]) - 6;
+    ctx.save(); ctx.font = "400 11px 'IBM Plex Mono',monospace"; ctx.lineWidth = 3; ctx.strokeStyle = C.surface; ctx.lineJoin = "round"; ctx.strokeText(String(i + 1), lx, ly); ctx.restore();
+    D.text(ctx, String(i + 1), lx, ly, { size: 11, color: C.ink, mono: true });
+  }
 }
 function dGeom(w, h) { return { l: 38, r: 10, t: 12, b: 24, w: w, h: h }; }
 function drawD(ctx, w, h, C) {
@@ -287,7 +291,7 @@ function drawD(ctx, w, h, C) {
   function Y(v) { return g.t + bh - v / top * bh; }
   ctx.fillStyle = C.surface; ctx.fillRect(g.l, g.t, bw, bh); D.rect(ctx, g.l, g.t, bw, bh, null, C.ink, 1.5);
   var t, nt = 4;
-  for (t = 0; t <= nt; t++) { var v = top * t / nt; D.line(ctx, g.l, Y(v), g.l + bw, Y(v), C.line, 1); D.text(ctx, v.toFixed(1), g.l - 5, Y(v) + 4, { size: 10.5, align: "right", color: C.muted, mono: true }); }
+  for (t = 0; t <= nt; t++) { var v = top * t / nt; D.line(ctx, g.l, Y(v), g.l + bw, Y(v), C.line, 1); D.text(ctx, v.toFixed(1), g.l - 5, Y(v) + 4, { size: 11, align: "right", color: C.muted, mono: true }); }
   var nodeX = {}, nodeY = {}, nodeCol = {};
   function colorOf(id) { // color del subárbol si queda por debajo del corte
     if (id < n) return cl.lab[id];
@@ -299,7 +303,7 @@ function drawD(ctx, w, h, C) {
     var c = m.h <= cut ? pal[cl.lab[m.pts[0]] % 10] : C.muted, wd = m.h <= cut ? 2.6 : 1.6;
     D.path(ctx, [[nodeX[m.a], Y(nodeY[m.a])], [nodeX[m.a], Y(m.h)], [nodeX[m.b], Y(m.h)], [nodeX[m.b], Y(nodeY[m.b])]], c, wd);
   });
-  for (i = 0; i < n; i++) { D.text(ctx, String(i + 1), nodeX[i], g.t + bh + 14, { size: 10.5, align: "center", color: C.ink2, mono: true }); }
+  for (i = 0; i < n; i++) { D.text(ctx, String(i + 1), nodeX[i], g.t + bh + 14, { size: 11, align: "center", color: C.ink2, mono: true }); }
   var cy = Y(Math.min(cut, top)); D.line(ctx, g.l - 4, cy, g.l + bw, cy, C.terracota, 2.5, [7, 4]);
   D.circle(ctx, g.l + bw - 7, cy, 6, C.terracota, C.paper, 1.5);
 }
