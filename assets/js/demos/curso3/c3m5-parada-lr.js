@@ -82,7 +82,7 @@ Lab.register("curso3/c3m5-parada-lr", function (root, api) {
       D.line(ctx, pL.x(run.stopAt + 1), bx.y, pL.x(run.stopAt + 1), bx.y + bx.h, C.ink, 2);
       D.text(ctx, "para", pL.x(run.stopAt + 1) - 4, bx.y + 12, { align: "right", size: 11, weight: 700, color: C.ink });
     }
-    D.text(ctx, "líneas de puntos = el learning rate se reduce", bx.x + bx.w - 4, bx.y + bx.h - 6, { align: "right", size: 10.5, color: C.muted });
+    D.text(ctx, "líneas de puntos = el learning rate se reduce", bx.x + bx.w - 4, bx.y + bx.h - 6, { align: "right", size: 11, color: C.muted });
   }
   function drawR(ctx, w, h, C) {
     pR.axes(ctx);
@@ -92,7 +92,7 @@ Lab.register("curso3/c3m5-parada-lr", function (root, api) {
     for (i = 0; i < run.n; i++) pts.push([pR.x(i + 1), pR.y(Math.log10(run.out[i][2]))]);
     D.path(ctx, pts, C.cobalto, 2.4);
     ctx.restore();
-    D.text(ctx, "learning rate (escala log)", pR.box.x + pR.box.w - 6, pR.box.y + pR.box.h - 6, { align: "right", size: 10.5, color: C.muted });
+    D.text(ctx, "learning rate (escala log)", pR.box.x + pR.box.w - 6, pR.box.y + pR.box.h - 6, { align: "right", size: 11, color: C.muted });
   }
   vL.draw(drawL); vR.draw(drawR);
 

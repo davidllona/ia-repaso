@@ -27,12 +27,12 @@ Lab.register("curso3/c3m5-shuffle", function (root, api) {
     pl.axes(ctx);
     D.line(ctx, pl.x(0), pl.y(0), pl.x(N), pl.y(N), C.line, 1.5, [4, 4]);
     S.out.forEach(function (orig, pos) { D.circle(ctx, pl.x(orig), pl.y(pos), 3.4, orig < 30 ? C.cobalto : C.terracota, C.paper, 0.8); });
-    D.text(ctx, "diagonal = no se ha barajado nada", pl.box.x + 8, pl.box.y + pl.box.h - 8, { size: 10.5, color: C.muted });
+    D.text(ctx, "diagonal = no se ha barajado nada", pl.box.x + 8, pl.box.y + pl.box.h - 8, { size: 11, color: C.muted });
   }
   view.draw(draw);
   function drawB(ctx, w, h, C) {
     var nb = N / BS, bw = (w - 20) / nb, i, j;
-    D.text(ctx, (w < 520 ? "Columna = lote de 6; naranja = fracción de comedias" : "Cada columna = un lote de 6 a la salida; la parte naranja es la fracción de comedias"), 10, 12, { size: 10.5, color: C.muted });
+    D.text(ctx, (w < 520 ? "Columna = lote de 6; naranja = fracción de comedias" : "Cada columna = un lote de 6 a la salida; la parte naranja es la fracción de comedias"), 10, 12, { size: 11, color: C.muted });
     for (i = 0; i < nb; i++) {
       var cnt = 0; for (j = 0; j < BS; j++) if (S.out[i * BS + j] >= 30) cnt++;
       var x = 10 + i * bw, hh = h - 30;

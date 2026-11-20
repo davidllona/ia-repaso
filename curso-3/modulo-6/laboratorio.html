@@ -1,0 +1,2052 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Laboratorio · Del lago helado a un DQN que equilibra un palo · Módulo 6 · Curso 3 · Cuaderno de IA</title>
+<meta name="description" content="Todo el código del módulo 6 en 10 pasos explicados línea a línea: Gymnasium, el retorno descontado, la línea base del azar, Bellman con NumPy, el bandido con ε-greedy, Q-learning a mano y en FrozenLake, SARSA frente a Q-learning en el acantilado, la red Q con Huber y un DQN completo en CartPole con Keras.">
+<script>var t;try{t=localStorage.getItem('cuaderno-ia:tema:v2')}catch(e){}if(t!=='light'&&t!=='dark')t=(window.matchMedia&&matchMedia('(prefers-color-scheme: light)').matches)?'light':'dark';document.documentElement.setAttribute('data-theme',t)</script>
+<link rel="stylesheet" href="../../assets/css/style.css">
+<script src="../../assets/js/curriculum.js"></script>
+<script src="../../assets/js/lab.js"></script>
+<script src="../../assets/js/app.js" defer></script>
+</head>
+<body data-root="../../" data-course="3" data-module="6" data-lesson="9">
+<main>
+<div class="page">
+
+<header class="hero leccion">
+  <div class="hero-grid">
+    <div>
+      <p class="eyebrow">Curso 3 · Módulo 6 · Laboratorio</p>
+      <h1>Laboratorio: del lago helado a un DQN que equilibra un palo</h1>
+      <p class="lead">Vamos a programar con Python, de principio a fin, todo el aprendizaje por refuerzo del módulo: un entorno de Gymnasium, el retorno, Bellman, la exploración, Q-learning, SARSA y una red de Keras que aprende a mantener un palo en pie.</p>
+      <p class="meta-line"><span class="read-time" data-render="read-time"></span><a href="../modulo-6.html">Índice del módulo</a> · <a href="#completo">Código completo</a> · <a href="#chuleta">Chuleta</a></p>
+    </div>
+    <div class="hero-tile" aria-hidden="true"></div>
+  </div>
+</header>
+
+<section>
+<h2 id="mapa">Lo que vamos a hacer</h2>
+<p>Diez pasos, en el orden de las lecciones. Cada paso dice con qué lección conecta. Aquí cada paso <strong>funciona solo</strong>: trae sus propias librerías y no usa nada de los anteriores, así que puedes ejecutar el que quieras. Se leen en una hora larga; «Más código del módulo», al final, es para consultar.</p>
+<ol class="lab-mapa">
+  <li><a href="#paso-1">Crear un entorno y dar los primeros pasos</a></li>
+  <li><a href="#paso-2">El retorno: sumar premios futuros, encogidos</a></li>
+  <li><a href="#paso-3">CartPole al azar: la marca que hay que batir</a></li>
+  <li><a href="#paso-4">Bellman con NumPy: el sistema y los barridos</a></li>
+  <li><a href="#paso-5">El bandido: explorar con ε-greedy</a></li>
+  <li><a href="#paso-6">Una corrección de Q-learning, a mano</a></li>
+  <li><a href="#paso-7">Q-learning entero en el lago helado</a></li>
+  <li><a href="#paso-8">SARSA frente a Q-learning en el acantilado</a></li>
+  <li><a href="#paso-9">La red Q de Keras y la pérdida de Huber</a></li>
+  <li><a href="#paso-10">El DQN completo en CartPole</a></li>
+</ol>
+<ul class="flow">
+  <li class="a">ENTORNO<small>pasos 1 a 3</small></li>
+  <li class="d">VALORES<small>pasos 4 y 5</small></li>
+  <li class="b">TABLA Q<small>pasos 6 a 8</small></li>
+  <li class="c">RED Q<small>pasos 9 y 10</small></li>
+</ul>
+<div class="callout regla">
+  <span class="lbl">Cómo leer cada paso</span>
+  <p>Arriba, el código. Debajo, una tabla con <strong>una fila por línea</strong> (o por grupo de líneas): qué hace, <strong>por qué</strong> hace falta y, en las difíciles, <strong>cómo se lee en voz alta</strong>. Al final, la salida real y cómo leer cada número. En el móvil, las salidas anchas se deslizan hacia el lado.</p>
+</div>
+<div class="callout ojo">
+  <span class="lbl">Sobre los datos y las cifras</span>
+  <p>No hay usuarios reales de Netflix: los premios del recomendador son inventados y los entornos (el lago, el carro, el acantilado) vienen dentro de Gymnasium, sin descargar nada. Las salidas son reales, con semillas fijas: Python 3.13, NumPy 2, Gymnasium 1.4.0, TensorFlow 2.21 y Keras 3.15, en CPU. Cada fragmento se ha vuelto a ejecutar para este laboratorio y da exactamente estas salidas. En otra versión u otro ordenador, los últimos decimales del paso 10 pueden cambiar un poco; las conclusiones, no.</p>
+</div>
+</section>
+
+<section>
+<h2 id="antes">Antes de empezar: las piezas</h2>
+<p><strong>Python</strong> es el lenguaje en el que se escribe todo. Sus órdenes se leen de arriba abajo, una por línea.</p>
+<p>Python, solo, sabe hacer poco. Por eso se usan <strong>librerías</strong>: paquetes de código que otra gente ya escribió (para cuentas, para entornos de juego, para redes…). La orden <code>import</code> mete una librería en tu programa; desde ese momento puedes usar sus herramientas.</p>
+<ul class="flow">
+  <li class="a">IMPORT<small>traer las librerías</small></li>
+  <li class="d">ENTORNO<small>reset y step</small></li>
+  <li class="b">APRENDER<small>tabla o red</small></li>
+  <li class="c">RESULTADO<small>print y salida</small></li>
+</ul>
+
+<h3>La sintaxis de Python que vas a ver</h3>
+<dl class="chuleta">
+  <div><dt>Variable y el signo =</dt><dd><code>gamma = 0.9</code>: «guarda 0,9 con el nombre gamma». <em><code>==</code> pregunta «¿es igual?» y <code>!=</code>, «¿es distinto?».</em></dd></div>
+  <div><dt>Varios nombres a la vez</dt><dd><code>a, b = 1, 2</code> guarda 1 en a y 2 en b, en orden. <em>Así se recogen las cinco cosas de <code>step</code>. <code>a = b = False</code> da el mismo valor a los dos.</em></dd></div>
+  <div><dt><code>print</code></dt><dd>Escribe algo en pantalla. Todo lo de «Salida» sale de un <code>print</code>. <em><code>"\n"</code> dentro del texto es un salto de línea.</em></dd></div>
+  <div><dt>Comentario #</dt><dd>Lo que va detrás de <code>#</code> es una nota para personas: Python no lo ejecuta.</dd></div>
+  <div><dt><code>import … as …</code></dt><dd>Trae una librería y le pone un apodo. <em><code>import numpy as np</code>: «trae NumPy y llámala np».</em></dd></div>
+  <div><dt><code>from … import …</code></dt><dd>Trae una pieza de una librería. <em><code>from keras import layers</code>: «de Keras, trae el cajón de capas».</em></dd></div>
+  <div><dt>Punto y paréntesis</dt><dd><code>cosa.accion(dato)</code>: «a esta cosa, hazle esta acción con este dato». <em><code>env.step(2)</code>. Sin paréntesis, es un dato: <code>env.action_space</code>.</em></dd></div>
+  <div><dt>Argumento con nombre</dt><dd>Un dato que se pasa diciendo qué es. <em><code>is_slippery=False</code>: «que no resbale».</em></dd></div>
+  <div><dt>Lista [ ] y tupla ( )</dt><dd>Varios valores en orden. La lista se puede cambiar (<code>append</code> añade al final); la tupla es fija. <em><code>(4,)</code> es una tupla de un solo número.</em></dd></div>
+  <div><dt>Diccionario { }</dt><dd>Parejas «nombre → valor». <em><code>.items()</code> da las parejas una a una.</em></dd></div>
+  <div><dt>Sangría</dt><dd>Los espacios al principio de una línea dicen qué líneas van dentro de un <code>def</code>, un <code>for</code>, un <code>while</code>, un <code>if</code> o un <code>with</code>.</dd></div>
+  <div><dt><code>def</code> y <code>return</code></dt><dd><code>def</code> escribe una receta con nombre (una <strong>función</strong>); <code>return</code> dice qué entrega. <em>No hace nada hasta que la llamas.</em></dd></div>
+  <div><dt>Valor por defecto</dt><dd>En <code>def jugar(epsilon, pasos=1000)</code>, si no dices pasos, vale 1000.</dd></div>
+  <div><dt><code>lambda</code></dt><dd>Una receta de una línea, sin <code>def</code>. <em><code>lambda ep: 0.1</code>: «dada ep, devuelve 0,1».</em></dd></div>
+  <div><dt><code>for … in …</code></dt><dd>Repite las líneas sangradas una vez por elemento. <em><code>for accion in [2, 2, 1]:</code> da tres vueltas.</em></dd></div>
+  <div><dt><code>range</code> y _</dt><dd><code>range(3)</code> cuenta 0, 1, 2; <code>range(1, 6)</code>, de 1 a 5. El guion bajo <code>_</code> es un nombre para «esto no lo uso».</dd></div>
+  <div><dt><code>enumerate</code> y <code>reversed</code></dt><dd>Dar a la vez el número de vuelta y el elemento; y recorrer al revés.</dd></div>
+  <div><dt><code>while</code> y <code>break</code></dt><dd><code>while</code> repite mientras algo sea cierto; <code>break</code> sale del bucle en el acto.</dd></div>
+  <div><dt><code>if</code>, <code>else</code></dt><dd>«Si…», «si no…». <em><code>0 if ep == 0 else None</code>: «0 si es la primera; si no, nada».</em></dd></div>
+  <div><dt><code>not</code>, <code>and</code>, <code>or</code></dt><dd>«No», «y», «o». <em><code>not terminado</code> vale 1 en una cuenta si la partida sigue y 0 si acabó.</em></dd></div>
+  <div><dt><code>True</code>, <code>False</code> y <code>None</code></dt><dd>Verdadero, falso y «nada».</dd></div>
+  <div><dt><code>try</code> y <code>except</code></dt><dd>«Intenta esto; si falla con este error, haz lo otro sin romper el programa».</dd></div>
+  <div><dt><code>with</code></dt><dd>Abre algo que se cierra solo al acabar la sangría. <em>Aquí, la grabadora de gradientes.</em></dd></div>
+  <div><dt>Decorador @</dt><dd>Una línea con <code>@</code> encima de una receta la cambia. <em><code>@tf.function</code> la hace más rápida.</em></dd></div>
+  <div><dt>Asterisco *</dt><dd>Delante de una lista, la «abre» en piezas sueltas. <em><code>zip(*lote)</code>, <code>f(*cinco_cosas)</code>.</em></dd></div>
+  <div><dt>Lista con un bucle dentro</dt><dd><code>[evaluar(q) for q in tablas]</code>: «haz una lista con el resultado de cada una».</dd></div>
+  <div><dt>f-string</dt><dd>Texto con <code>f</code> delante: lo de entre llaves se cambia por su valor. <em><code>:.3f</code>, 3 decimales; <code>:2d</code>, un entero en 2 huecos; <code>:8.2f</code>, 8 huecos y 2 decimales; <code>:&lt;4</code> y <code>:24s</code>, rellenar con espacios.</em></dd></div>
+  <div><dt>Índices [ ]</dt><dd>Se cuenta desde 0. <code>[0]</code> el primero; <code>[-1]</code> el último; <code>[-100:]</code> los cien últimos; <code>[:-1]</code> todos menos el último; <code>[::-1]</code> al revés; <code>Q[14]</code> la fila 14; <code>Q[s, a]</code> la casilla de la fila s y columna a.</dd></div>
+  <div><dt>Operadores</dt><dd><code>**</code> «elevado a»; <code>//</code> dividir sin decimales; <code>%</code> el resto; <code>@</code> multiplicar tablas; <code>+=</code> «súmale y guárdalo».</dd></div>
+</dl>
+
+<h3>Las librerías y piezas de los diez pasos</h3>
+<dl class="chuleta">
+  <div><dt>Gymnasium (gym)</dt><dd>La librería de entornos de práctica para refuerzo; continúa la antigua <em>OpenAI Gym</em>, de ahí el apodo <code>gym</code>. <em>Aquí: el lago, el carro y el acantilado.</em></dd></div>
+  <div><dt><code>gym.make</code></dt><dd>Fabrica un entorno por su nombre. <em><code>"FrozenLake-v1"</code>, <code>"CartPole-v1"</code>, <code>"CliffWalking-v1"</code>; <code>-v1</code> es la versión de las reglas.</em></dd></div>
+  <div><dt><code>reset</code> y <code>step</code></dt><dd>Empezar una partida (devuelve estado e <code>info</code>) y hacer una acción (devuelve estado nuevo, premio, <code>terminated</code>, <code>truncated</code> e <code>info</code>).</dd></div>
+  <div><dt><code>terminated</code> y <code>truncated</code></dt><dd>Acabó de verdad (meta, agujero, palo caído) o se cortó por tiempo. <em>Solo el primero anula el futuro.</em></dd></div>
+  <div><dt><code>observation_space</code> y <code>action_space</code></dt><dd>Lo que el agente ve y lo que puede hacer. <code>Discrete(n)</code>: un entero de 0 a n − 1 (<code>.n</code> da n); <code>Box</code>: números con decimales.</dd></div>
+  <div><dt><code>unwrapped</code>, <code>desc</code> y <code>P</code></dt><dd>El entorno sin capas, su dibujo y su tabla secreta de probabilidades. <em>Solo para aprender: un agente no los ve.</em></dd></div>
+  <div><dt><code>env.close</code></dt><dd>Cerrar el entorno.</dd></div>
+  <div><dt>NumPy (np)</dt><dd>La librería de cuentas con listas enteras de números. Su nombre viene de «Numerical Python». <em>Aquí: tablas Q, Bellman y el bandido.</em></dd></div>
+  <div><dt>Array</dt><dd>Una lista o tabla de NumPy: las cuentas se hacen con todos sus números a la vez. <code>np.array</code> lo crea; <code>.shape</code> da su forma; <code>reshape</code> la cambia; <code>astype</code> cambia el tipo de número.</dd></div>
+  <div><dt><code>zeros</code>, <code>eye</code>, <code>arange</code></dt><dd>Una tabla de ceros, la tabla identidad (unos en la diagonal) y los números 0…n − 1.</dd></div>
+  <div><dt><code>default_rng</code> y semilla</dt><dd>Una máquina de azar; con la misma semilla salen los mismos números. <code>random()</code> da un decimal entre 0 y 1; <code>integers(n)</code>, un entero de 0 a n − 1; <code>normal</code>, un número alrededor de un centro; <code>choice</code>, uno de una lista.</dd></div>
+  <div><dt><code>max</code>, <code>argmax</code></dt><dd>El número más grande y su posición. <em><code>axis=1</code>: uno por fila.</em></dd></div>
+  <div><dt><code>mean</code>, <code>round</code>, <code>abs</code>, <code>where</code></dt><dd>Media, redondeo, valor sin signo, y «si se cumple, esto; si no, aquello» casilla a casilla.</dd></div>
+  <div><dt><code>flatnonzero</code></dt><dd>Las posiciones donde algo es cierto. <em>Para desempatar entre las mejores acciones.</em></dd></div>
+  <div><dt><code>np.linalg.solve</code></dt><dd>Resuelve un sistema de ecuaciones de golpe. <em>linalg = álgebra lineal.</em></dd></div>
+  <div><dt><code>random</code> y <code>deque</code></dt><dd>Dos cajones que vienen con Python: azar (<code>seed</code>, <code>sample</code> saca varios sin repetir) y una cola con tamaño máximo (de <code>collections</code>).</dd></div>
+  <div><dt>Keras</dt><dd>La librería para construir redes neuronales por piezas. <em><code>import keras</code>.</em></dd></div>
+  <div><dt><code>keras.utils.set_random_seed</code></dt><dd>Fija a la vez todas las semillas (Python, NumPy y TensorFlow).</dd></div>
+  <div><dt><code>keras.Sequential</code> y <code>keras.Input</code></dt><dd>Una red de capas en fila, y la forma de lo que entra. <em><code>shape=(4,)</code>: 4 números.</em></dd></div>
+  <div><dt><code>layers.Dense</code></dt><dd>Capa en la que cada neurona mira todas las entradas. <code>activation="relu"</code>: deja los positivos y cambia los negativos por 0; sin activación, cualquier número.</dd></div>
+  <div><dt><code>summary</code> y <code>predict</code></dt><dd>Escribir el resumen de la red; y pasarle datos para que responda (<code>verbose=0</code>: sin barra de progreso).</dd></div>
+  <div><dt><code>get_weights</code> y <code>set_weights</code></dt><dd>Sacar los pesos de una red y meterlos en otra. <em>Así se copia la red objetivo.</em></dd></div>
+  <div><dt><code>keras.losses.Huber</code></dt><dd>La pérdida de Huber: cuadrática para errores pequeños y recta para los grandes.</dd></div>
+  <div><dt><code>keras.optimizers.Adam</code></dt><dd>El optimizador que mueve los pesos; <code>1e-3</code> = 0,001 es el tamaño del paso.</dd></div>
+  <div><dt>TensorFlow (tf)</dt><dd>El motor de Google que hace las cuentas de las redes; su nombre viene de «tensores que fluyen». <em>Keras lo usa por debajo; aquí lo usamos directamente para el entrenamiento a mano.</em></dd></div>
+  <div><dt>Tensor</dt><dd>Una caja de números con forma, como un array. <code>tf.constant</code> crea uno.</dd></div>
+  <div><dt><code>tf.GradientTape</code></dt><dd>La grabadora de cuentas: luego <code>gradient</code> dice cuánto cambia la pérdida al mover cada peso.</dd></div>
+  <div><dt><code>apply_gradients</code> y <code>trainable_variables</code></dt><dd>Mover los pesos con los gradientes; y la lista de pesos que se pueden entrenar.</dd></div>
+  <div><dt><code>tf.function</code></dt><dd>Decorador que compila una receta para que vaya rápida.</dd></div>
+  <div><dt><code>reduce_max</code>, <code>reduce_sum</code>, <code>argmax</code>, <code>one_hot</code></dt><dd>Máximo, suma y posición del máximo por filas; y convertir una acción en [1, 0] o [0, 1].</dd></div>
+  <div><dt><code>zip</code></dt><dd>Empareja elementos de varias listas, uno a uno.</dd></div>
+</dl>
+
+<h3>Las que solo salen en «Más código del módulo»</h3>
+<dl class="chuleta">
+  <div><dt><code>ModuleNotFoundError</code> y <code>ValueError</code></dt><dd>Los errores de «no existe esa librería» y de «valor que no encaja».</dd></div>
+  <div><dt><code>type</code> y <code>len</code></dt><dd>El tipo de un dato y cuántos elementos tiene.</dd></div>
+  <div><dt><code>action_space.sample</code></dt><dd>Una acción válida al azar.</dd></div>
+  <div><dt><code>np.allclose</code> y <code>all</code></dt><dd>«¿Son casi iguales estos números?» y «¿es verdad para todos?».</dd></div>
+  <div><dt><code>keras.ops</code></dt><dd>Operaciones (media, suma…) que funcionan dentro de una red. <code>keepdims=True</code> conserva la forma.</dd></div>
+  <div><dt><code>keras.Model</code> y <code>count_params</code></dt><dd>Una red escrita pieza a pieza, uniendo entrada y salida; y cuántos parámetros tiene.</dd></div>
+  <div><dt><code>softmax</code></dt><dd>Convierte números en probabilidades que suman 1.</dd></div>
+  <div><dt><code>keras.optimizers.SGD</code> y <code>tf.math.log</code></dt><dd>El descenso de gradiente más sencillo y el logaritmo.</dd></div>
+</dl>
+</section>
+
+<section class="lab-paso" id="paso-1">
+<h2><span class="paso-n">1</span>Crear un entorno y dar los primeros pasos</h2>
+<p>Para qué sirve este paso: conocer el «tablero de juego» de todo el módulo. Creamos el lago helado, miramos qué puede ver y hacer el agente, y lo movemos a mano hasta la meta. Es el bucle agente–entorno de la <a href="leccion-1.html#bucle-paso">lección 1</a>.</p>
+<article class="snippet" data-lang="python" id="fragmento-1">
+  <header>
+    <h3>Paso 1 · Gymnasium: <code>make</code>, espacios, <code>reset</code> y <code>step</code> (fragmento 1)</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Crear un entorno de Gymnasium, ver qué observa y qué acciones admite, y dar seis pasos escritos a mano para ver qué devuelve <code>step</code>. Al final miramos la tabla secreta de probabilidades del lago resbaladizo.</p>
+  </header>
+  <pre class="code"><code>import gymnasium as gym
+
+print("Gymnasium", gym.__version__)
+env = gym.make("FrozenLake-v1", is_slippery=False)
+print("estados  :", env.observation_space)
+print("acciones :", env.action_space)
+print("tablero  :")
+for fila in env.unwrapped.desc:
+    print("  ", " ".join(c.decode() for c in fila))
+
+estado, info = env.reset(seed=0)
+print("reset -&gt;", estado, info)
+
+for accion in [2, 2, 1, 1, 1, 2]:
+    estado, recompensa, terminado, truncado, info = env.step(accion)
+    print(f"accion={accion} -&gt; estado={estado:2d} recompensa={recompensa} terminado={terminado} truncado={truncado}")
+env.close()
+
+resbaladizo = gym.make("FrozenLake-v1", is_slippery=True)
+print("P[14][2] con suelo resbaladizo:")
+for prob, siguiente, r, fin in resbaladizo.unwrapped.P[14][2]:
+    print(f"   prob={prob:.3f} -&gt; estado {siguiente:2d}, recompensa {r}, terminado={fin}")</code></pre>
+  <details class="linea-a-linea" open>
+    <summary>Línea por línea</summary>
+    <p class="hint">Toca una fila (o pasa el ratón) para ver su línea resaltada en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace y por qué</th></tr></thead>
+      <tbody>
+        <tr data-lines="1"><td><code>import gymnasium as gym</code></td><td>Trae <strong>Gymnasium</strong> con el apodo <code>gym</code>. Es la librería de «entornos de práctica»: tableros, juegos sencillos y físicas simuladas, todos con los mismos botones.<span class="por-que">Sin ella no existe <code>gym.make</code> ni ningún entorno.</span><span class="se-lee">trae Gymnasium y llámala gym</span></td></tr>
+        <tr data-lines="3"><td><code>print("Gymnasium", gym.__version__)</code></td><td>Escribe la versión instalada. <code>__version__</code> es un dato que traen casi todas las librerías.<span class="por-que">Es lo primero que se mira cuando un tutorial falla: la forma de usar Gymnasium cambió en 2022.</span><span class="se-lee">escribe «Gymnasium» y, al lado, el número de versión</span></td></tr>
+        <tr data-lines="4"><td><code>env = gym.make("FrozenLake-v1", is_slippery=False)</code></td><td><code>gym.make</code> fabrica un entorno a partir de su nombre. <code>"FrozenLake-v1"</code> es un lago helado de 4 × 4 casillas; <code>-v1</code> es la versión de sus reglas. El argumento con nombre <code>is_slippery=False</code> quita el hielo resbaladizo: cada acción hace justo lo que dice.<span class="por-que">Empezamos sin azar para que el resultado sea fácil de seguir. <code>env</code> (de <em>environment</em>, entorno) es el nombre de costumbre.</span><span class="se-lee">env es un lago helado de 4 × 4 en el que no se resbala</span></td></tr>
+        <tr data-lines="5"><td><code>print("estados  :", env.observation_space)</code></td><td><code>observation_space</code> describe lo que el agente puede ver. Saldrá <code>Discrete(16)</code>: «un número entero del 0 al 15», la casilla en la que está.<span class="por-que">Saber qué ve el agente decide qué algoritmo vale: con 16 estados cabe una tabla.</span><span class="se-lee">escribe qué tipo de cosa ve el agente</span></td></tr>
+        <tr data-lines="6"><td><code>print("acciones :", env.action_space)</code></td><td><code>action_space</code> describe lo que el agente puede hacer. <code>Discrete(4)</code>: cuatro acciones, 0 = izquierda, 1 = abajo, 2 = derecha, 3 = arriba.<span class="por-que">Así sabemos qué números podemos pasarle a <code>step</code>.</span><span class="se-lee">escribe qué acciones puede elegir el agente</span></td></tr>
+        <tr data-lines="7"><td><code>print("tablero  :")</code></td><td>Escribe un título; el tablero va debajo.</td></tr>
+        <tr data-lines="8"><td><code>for fila in env.unwrapped.desc:</code></td><td><code>for</code> repite la línea sangrada de debajo una vez por cada fila. <code>env.unwrapped</code> es el entorno «desnudo», sin las capas que le pone <code>make</code>; <code>.desc</code> es el dibujo del mapa, una tabla de letras.<span class="por-que">Queremos ver el lago antes de movernos por él.</span><span class="se-lee">para cada fila del mapa del lago, haz lo de debajo</span></td></tr>
+        <tr data-lines="9"><td><code>print("  ", " ".join(c.decode() for c in fila))</code></td><td>Las letras vienen como <strong>bytes</strong> (texto en crudo); <code>c.decode()</code> las convierte en texto normal. <code>" ".join(...)</code> las pega con un espacio entre medias.<span class="por-que">Sin <code>decode</code> saldría <code>b'S'</code> en lugar de <code>S</code>. S = salida, F = hielo firme, H = agujero, G = meta.</span><span class="se-lee">convierte cada letra de la fila en texto y escríbelas separadas por espacios</span></td></tr>
+        <tr data-lines="11"><td><code>estado, info = env.reset(seed=0)</code></td><td><code>reset</code> empieza un episodio (una partida) y devuelve <strong>dos</strong> cosas: el estado inicial y un diccionario <code>info</code> con datos extra. <code>seed=0</code> es la <strong>semilla</strong>: fija el azar para que salga siempre igual.<span class="por-que">Sin <code>reset</code> el entorno no sabe dónde empezar; sin semilla, tú y yo veríamos cosas distintas.</span><span class="se-lee">empieza una partida con la semilla 0 y guarda el estado en estado y los extras en info</span></td></tr>
+        <tr data-lines="12"><td><code>print("reset -&gt;", estado, info)</code></td><td>Escribe el estado inicial (0, la casilla de salida) y el <code>info</code>.</td></tr>
+        <tr data-lines="14"><td><code>for accion in [2, 2, 1, 1, 1, 2]:</code></td><td>Recorre una lista de acciones escrita a mano: derecha, derecha, abajo, abajo, abajo, derecha. Es el camino seguro hasta la meta.<span class="por-que">Aún no hay agente que decida: el «agente» somos nosotros.</span><span class="se-lee">para cada acción de la lista 2, 2, 1, 1, 1, 2, haz lo de debajo</span></td></tr>
+        <tr data-lines="15"><td><code>estado, recompensa, terminado, truncado, info = en …</code></td><td><code>step</code> ejecuta una acción y devuelve <strong>cinco</strong> cosas, que se reparten en cinco nombres: estado nuevo, recompensa, <code>terminado</code> (la partida acabó de verdad: meta o agujero), <code>truncado</code> (se cortó por tiempo) e <code>info</code>.<span class="por-que">Es el corazón del bucle: actuar y recibir premio y situación nueva.</span><span class="se-lee">haz esta acción y apunta dónde estoy, qué he cobrado, si se acabó de verdad, si se acabó el tiempo y los extras</span></td></tr>
+        <tr data-lines="16"><td><code>print(f"accion={accion} -&gt; estado={estado:2d} reco …</code></td><td>Escribe una línea por paso. Es una <strong>f-string</strong>: texto con <code>f</code> delante en el que lo que va entre llaves se cambia por su valor. <code>:2d</code> reserva dos huecos para el número.<span class="por-que">Ver cada paso con números es la mejor forma de entender qué devuelve <code>step</code>.</span></td></tr>
+        <tr data-lines="17"><td><code>env.close()</code></td><td>Cierra el entorno y libera lo que ocupaba.<span class="por-que">Es buena costumbre; en entornos con ventana, la cierra.</span></td></tr>
+        <tr data-lines="19"><td><code>resbaladizo = gym.make("FrozenLake-v1", is_slipper …</code></td><td>Crea otro lago, ahora resbaladizo (<code>is_slippery=True</code>, lo normal en FrozenLake).<span class="por-que">Queremos ver cómo es un entorno con azar.</span><span class="se-lee">resbaladizo es un lago igual pero en el que se patina</span></td></tr>
+        <tr data-lines="20"><td><code>print("P[14][2] con suelo resbaladizo:")</code></td><td>Escribe un título para lo que viene.</td></tr>
+        <tr data-lines="21"><td><code>for prob, siguiente, r, fin in resbaladizo.unwrapp …</code></td><td><code>P</code> es la <strong>tabla de transiciones</strong> del entorno: <code>P[14][2]</code> es la lista de lo que puede pasar si en la casilla 14 haces la acción 2 (derecha). Cada elemento trae cuatro datos que se reparten en <code>prob, siguiente, r, fin</code>.<span class="por-que">Un agente de verdad <strong>no</strong> puede mirarla; la miramos solo para aprender qué es una probabilidad de transición.</span><span class="se-lee">para cada resultado posible de ir a la derecha desde la casilla 14, apunta su probabilidad, la casilla a la que lleva, el premio y si acaba la partida</span></td></tr>
+        <tr data-lines="22"><td><code>print(f"   prob={prob:.3f} -&gt; estado {siguiente:2d …</code></td><td>Escribe cada resultado. <code>:.3f</code> pone tres decimales.</td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>Gymnasium 1.4.0
+estados  : Discrete(16)
+acciones : Discrete(4)
+tablero  :
+   S F F F
+   F H F H
+   F F F H
+   H F F G
+reset -&gt; 0 {'prob': 1}
+accion=2 -&gt; estado= 1 recompensa=0 terminado=False truncado=False
+accion=2 -&gt; estado= 2 recompensa=0 terminado=False truncado=False
+accion=1 -&gt; estado= 6 recompensa=0 terminado=False truncado=False
+accion=1 -&gt; estado=10 recompensa=0 terminado=False truncado=False
+accion=1 -&gt; estado=14 recompensa=0 terminado=False truncado=False
+accion=2 -&gt; estado=15 recompensa=1 terminado=True truncado=False
+P[14][2] con suelo resbaladizo:
+   prob=0.333 -&gt; estado 14, recompensa 0, terminado=False
+   prob=0.333 -&gt; estado 15, recompensa 1, terminado=True
+   prob=0.333 -&gt; estado 10, recompensa 0, terminado=False</pre>
+    <p><strong>Cómo leerla.</strong> El lago tiene 16 estados (se numeran por filas: casilla = fila · 4 + columna) y 4 acciones. <code>reset</code> deja al agente en la casilla 0. Los seis pasos van por 1, 2, 6, 10, 14 y 15: todos dan recompensa 0 menos el último, que llega a la meta, cobra 1 y pone <code>terminado=True</code>. <code>truncado</code> siempre vale <code>False</code>: no se acabó el tiempo. Lo último es lo más importante: con hielo, «derecha» desde la 14 tiene tres resultados con probabilidad 1/3 (0,333) cada uno: llegar a la meta (15), resbalar hacia arriba (10) o chocar con el borde y quedarse (14).</p>
+  </div>
+</article>
+</section>
+<section class="lab-paso" id="paso-2">
+<h2><span class="paso-n">2</span>El retorno: sumar premios futuros, encogidos</h2>
+<p>Para qué sirve este paso: calcular el número que el agente quiere hacer grande, el <strong>retorno</strong>, de dos formas que dan lo mismo. Es la cuenta de la <a href="leccion-2.html#numeros">lección 2</a>. No necesita Gymnasium: solo listas de premios.</p>
+<article class="snippet" data-lang="python" id="fragmento-4">
+  <header>
+    <h3>Paso 2 · El retorno descontado, calculado de dos formas (fragmento 4)</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Calcular el retorno descontado de dos recomendadores (uno prudente y otro pesado) con tres valores de gamma, y comprobar que la cuenta «hacia atrás» da lo mismo que la fórmula directa.</p>
+  </header>
+  <pre class="code"><code>import numpy as np
+
+prudente  = [1, 1, 1, 1, 1, 10, 1, 1, 1000]
+temerario = [1, 1, 1, 10, -100]
+
+def retorno(recompensas, gamma):
+    total = 0.0
+    for t, r in enumerate(recompensas):
+        total += gamma ** t * r
+    return total
+
+def retornos_hacia_atras(recompensas, gamma):
+    G = 0.0
+    salida = []
+    for r in reversed(recompensas):
+        G = r + gamma * G
+        salida.append(G)
+    return salida[::-1]
+
+for gamma in [1.0, 0.9, 0.5]:
+    print(f"gamma={gamma}: prudente={retorno(prudente, gamma):8.2f}  temerario={retorno(temerario, gamma):8.2f}")
+
+print("G_t hacia atrás (prudente, gamma=0.9):", np.round(retornos_hacia_atras(prudente, 0.9), 2))
+print("G_0 con la fórmula directa:            ", round(retorno(prudente, 0.9), 2))</code></pre>
+  <details class="linea-a-linea" open>
+    <summary>Línea por línea</summary>
+    <p class="hint">Toca una fila (o pasa el ratón) para ver su línea resaltada en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace y por qué</th></tr></thead>
+      <tbody>
+        <tr data-lines="1"><td><code>import numpy as np</code></td><td>Trae <strong>NumPy</strong> con el apodo <code>np</code>: la librería de cuentas con listas enteras de números.<span class="por-que">Aquí solo la usamos para redondear una lista entera de golpe al final.</span><span class="se-lee">trae NumPy y llámala np</span></td></tr>
+        <tr data-lines="3"><td><code>prudente  = [1, 1, 1, 1, 1, 10, 1, 1, 1000]</code></td><td>Una <strong>lista</strong> (entre corchetes) con los premios de un recomendador prudente: cinco aperturas (+1), una película terminada (+10), dos aperturas más y +1000 porque el usuario renueva.<span class="por-que">Son los datos de la cuenta: un premio por paso, en orden.</span><span class="se-lee">prudente es la lista de premios 1, 1, 1, 1, 1, 10, 1, 1 y 1000</span></td></tr>
+        <tr data-lines="4"><td><code>temerario = [1, 1, 1, 10, -100]</code></td><td>Los premios de un recomendador pesado: tres aperturas, una película terminada y la baja del usuario (−100).<span class="por-que">Así comparamos dos estrategias con la misma vara.</span><span class="se-lee">temerario es la lista 1, 1, 1, 10 y −100</span></td></tr>
+        <tr data-lines="6"><td><code>def retorno(recompensas, gamma):</code></td><td><code>def</code> escribe una <strong>función</strong>: una receta con nombre (<code>retorno</code>) que recibe dos ingredientes, la lista de premios y gamma.<span class="por-que">Así la cuenta se escribe una vez y se usa muchas.</span><span class="se-lee">define la receta retorno, que necesita unos premios y un gamma</span></td></tr>
+        <tr data-lines="7"><td><code>total = 0.0</code></td><td>Empieza la suma en 0. El <code>.0</code> la hace número con decimales.<span class="por-que">Hay que tener dónde ir sumando.</span><span class="se-lee">el total empieza en cero</span></td></tr>
+        <tr data-lines="8"><td><code>for t, r in enumerate(recompensas):</code></td><td><code>enumerate</code> recorre la lista dando a la vez la posición <code>t</code> (0, 1, 2…) y el premio <code>r</code>.<span class="por-que">Necesitamos saber cuántos pasos faltan para cada premio: eso es t.</span><span class="se-lee">para cada premio r, y su número de paso t, haz lo de debajo</span></td></tr>
+        <tr data-lines="9"><td><code>total += gamma ** t * r</code></td><td>Suma gamma elevado a t (<code>**</code> es «elevado a») por el premio. <code>+=</code> es «súmale esto y guárdalo».<span class="por-que">Es la fórmula del retorno: cada premio pesa γ<sup>t</sup>.</span><span class="se-lee">al total, súmale gamma elevado a t, por r</span></td></tr>
+        <tr data-lines="10"><td><code>return total</code></td><td><code>return</code> entrega el resultado de la receta.<span class="por-que">Sin él la función calcularía y no devolvería nada.</span><span class="se-lee">devuelve el total</span></td></tr>
+        <tr data-lines="12"><td><code>def retornos_hacia_atras(recompensas, gamma):</code></td><td>Segunda receta: calcula el retorno desde <em>cada</em> paso, empezando por el final.<span class="por-que">Es la forma que usan todos los algoritmos: G<sub>t</sub> = r<sub>t</sub> + γ·G<sub>t+1</sub>.</span></td></tr>
+        <tr data-lines="13"><td><code>G = 0.0</code></td><td>Tras el último paso no queda futuro: el retorno de partida es 0.<span class="por-que">Es el punto de apoyo de la cuenta hacia atrás.</span><span class="se-lee">G empieza valiendo cero</span></td></tr>
+        <tr data-lines="14"><td><code>salida = []</code></td><td>Una lista vacía para ir guardando resultados.<span class="se-lee">salida empieza vacía</span></td></tr>
+        <tr data-lines="15"><td><code>for r in reversed(recompensas):</code></td><td><code>reversed</code> recorre la lista de atrás hacia delante.<span class="por-que">Para calcular G<sub>t</sub> hace falta G<sub>t+1</sub>: hay que empezar por el final.</span><span class="se-lee">para cada premio, desde el último hasta el primero, haz lo de debajo</span></td></tr>
+        <tr data-lines="16"><td><code>G = r + gamma * G</code></td><td>La recursión: el retorno desde aquí es el premio de ahora más gamma por el retorno de después.<span class="por-que">Es la idea que, promediada, se convierte en la ecuación de Bellman.</span><span class="se-lee">el nuevo G es este premio más gamma por el G que ya tenía</span></td></tr>
+        <tr data-lines="17"><td><code>salida.append(G)</code></td><td><code>append</code> añade ese retorno al final de la lista.<span class="se-lee">apunta este G en la lista</span></td></tr>
+        <tr data-lines="18"><td><code>return salida[::-1]</code></td><td><code>[::-1]</code> da la vuelta a la lista.<span class="por-que">Se rellenó al revés; así queda en orden de paso 0, 1, 2…</span><span class="se-lee">devuelve la lista dada la vuelta</span></td></tr>
+        <tr data-lines="20"><td><code>for gamma in [1.0, 0.9, 0.5]:</code></td><td>Repite con tres valores de gamma.<span class="por-que">Para ver cómo cambia el retorno al encoger más o menos el futuro.</span><span class="se-lee">para gamma 1, 0,9 y 0,5, haz lo de debajo</span></td></tr>
+        <tr data-lines="21"><td><code>print(f"gamma={gamma}: prudente={retorno(prudente, …</code></td><td>Escribe los dos retornos. <code>:8.2f</code>: ocupa 8 huecos con 2 decimales, para que las columnas queden alineadas.</td></tr>
+        <tr data-lines="23"><td><code>print("G_t hacia atrás (prudente, gamma=0.9):", np …</code></td><td>Escribe los retornos desde cada paso del camino prudente con gamma 0,9. <code>np.round(…, 2)</code> los redondea todos a 2 decimales.<span class="por-que">Debería empezar por el mismo número que la fórmula directa.</span></td></tr>
+        <tr data-lines="24"><td><code>print("G_0 con la fórmula directa:            ", r …</code></td><td>Escribe el retorno desde el paso 0 con la primera receta, redondeado con <code>round</code>.<span class="por-que">Si coincide con el primer número de la lista anterior, las dos formas son iguales.</span></td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>gamma=1.0: prudente= 1017.00  temerario=  -87.00
+gamma=0.9: prudente=  441.48  temerario=  -55.61
+gamma=0.5: prudente=    6.18  temerario=   -3.25
+G_t hacia atrás (prudente, gamma=0.9): [ 441.48  489.42  542.69  601.88  667.64  740.71  811.9   901.   1000.  ]
+G_0 con la fórmula directa:             441.48</pre>
+    <p><strong>Cómo leerla.</strong> Con gamma 1 no se descuenta nada: el prudente suma 1017 y el pesado −87. Con 0,9, el +1000 está 8 pasos lejos y vale 0,9<sup>8</sup> · 1000 = 430,47: el total baja a 441,48. Con 0,5 el +1000 vale 1000/256 ≈ 3,9 y el total, 6,18. El pesado también se «suaviza» (−3,25) porque su −100 queda lejos. La lista hacia atrás empieza en 441,48 (desde el paso 0) y acaba en 1000 (desde el último): el primer número coincide con la fórmula directa.</p>
+  </div>
+</article>
+</section>
+<section class="lab-paso" id="paso-3">
+<h2><span class="paso-n">3</span>CartPole al azar: la marca que hay que batir</h2>
+<p>Para qué sirve este paso: conocer el segundo entorno del módulo, el carro con un palo encima, y medir lo que consigue un agente que no sabe nada. Ese número, unos 22 pasos, es la <strong>línea base</strong>: el DQN del paso 10 tendrá que superarlo. Conecta con el retorno de la <a href="leccion-2.html#idea">lección 2</a> y con el bucle de la <a href="leccion-1.html#bucle-paso">lección 1</a>.</p>
+<article class="snippet" data-lang="python" id="fragmento-3">
+  <header>
+    <h3>Paso 3 · CartPole: espacios <code>Box</code>, una partida completa y el retorno del azar (fragmento 3)</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Ver cómo es un entorno de estados con decimales (un <code>Box</code> de 4 números), jugar 20 partidas con acciones al azar y medir su retorno medio.</p>
+  </header>
+  <pre class="code"><code>import numpy as np
+import gymnasium as gym
+
+env = gym.make("CartPole-v1")
+print("observation_space:", env.observation_space)
+print("action_space     :", env.action_space)
+print("max pasos        :", env.spec.max_episode_steps)
+
+rng = np.random.default_rng(0)
+retornos = []
+for ep in range(20):
+    obs, info = env.reset(seed=ep)
+    total, pasos = 0.0, 0
+    while True:
+        accion = int(rng.integers(2))
+        obs, r, terminated, truncated, info = env.step(accion)
+        total += r
+        pasos += 1
+        if terminated or truncated:
+            break
+    retornos.append(total)
+    if ep &lt; 3:
+        print(f"episodio {ep}: {pasos} pasos, retorno {total}, terminated={terminated}, truncated={truncated}")
+
+print("retorno medio con acciones al azar (20 episodios):", np.mean(retornos))
+print("mejor / peor:", max(retornos), "/", min(retornos))
+env.close()</code></pre>
+  <details class="linea-a-linea" open>
+    <summary>Línea por línea</summary>
+    <p class="hint">Toca una fila (o pasa el ratón) para ver su línea resaltada en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace y por qué</th></tr></thead>
+      <tbody>
+        <tr data-lines="1"><td><code>import numpy as np</code></td><td>Trae NumPy con el apodo <code>np</code>.<span class="por-que">La usamos para la máquina de azar y para la media.</span><span class="se-lee">trae NumPy y llámala np</span></td></tr>
+        <tr data-lines="2"><td><code>import gymnasium as gym</code></td><td>Trae Gymnasium con el apodo <code>gym</code>.<span class="por-que">Para el entorno CartPole.</span><span class="se-lee">trae Gymnasium y llámala gym</span></td></tr>
+        <tr data-lines="4"><td><code>env = gym.make("CartPole-v1")</code></td><td>Crea el CartPole: un carro que se mueve a izquierda o derecha con un palo de pie encima. Cada paso con el palo en pie da +1.<span class="por-que">Es el entorno donde luego entrenaremos una red.</span><span class="se-lee">env es el juego del carro y el palo</span></td></tr>
+        <tr data-lines="5"><td><code>print("observation_space:", env.observation_space)</code></td><td>Un <code>Box</code> es un espacio de números con decimales. Escribe los límites de cada uno de los 4 (<code>inf</code> es «sin límite»), la forma <code>(4,)</code> y el tipo <code>float32</code>.<span class="por-que">Con estados así ya no cabe una tabla: hará falta una red (lección 7).</span><span class="se-lee">escribe cómo son los 4 números que ve el agente</span></td></tr>
+        <tr data-lines="6"><td><code>print("action_space     :", env.action_space)</code></td><td><code>Discrete(2)</code>: dos acciones, 0 = empujar a la izquierda y 1 = a la derecha.</td></tr>
+        <tr data-lines="7"><td><code>print("max pasos        :", env.spec.max_episode_s …</code></td><td><code>env.spec.max_episode_steps</code> es el límite de tiempo: 500 pasos.<span class="por-que">Al llegar ahí, la partida se corta (<code>truncated</code>).</span><span class="se-lee">escribe cuántos pasos dura como mucho una partida</span></td></tr>
+        <tr data-lines="9"><td><code>rng = np.random.default_rng(0)</code></td><td>Crea una máquina de números al azar con semilla 0. <code>default_rng</code> significa «generador por defecto».<span class="por-que">Con semilla fija, el experimento sale siempre igual.</span><span class="se-lee">rng es una máquina de azar que empieza siempre en el mismo punto</span></td></tr>
+        <tr data-lines="10"><td><code>retornos = []</code></td><td>Lista vacía para guardar el retorno de cada partida.<span class="se-lee">retornos empieza vacía</span></td></tr>
+        <tr data-lines="11"><td><code>for ep in range(20):</code></td><td><code>range(20)</code> cuenta de 0 a 19: 20 partidas.<span class="por-que">Una sola partida dice poco: hay que hacer la media.</span><span class="se-lee">para cada partida ep, de la 0 a la 19, haz lo de debajo</span></td></tr>
+        <tr data-lines="12"><td><code>obs, info = env.reset(seed=ep)</code></td><td>Empieza la partida con una semilla distinta cada vez (<code>seed=ep</code>).<span class="por-que">Cada partida empieza en un sitio distinto, pero repetible.</span><span class="se-lee">empieza la partida número ep</span></td></tr>
+        <tr data-lines="13"><td><code>total, pasos = 0.0, 0</code></td><td>Pone a cero la suma de premios y el contador de pasos, los dos a la vez.<span class="por-que">Cada partida cuenta desde cero.</span><span class="se-lee">total vale 0,0 y pasos vale 0</span></td></tr>
+        <tr data-lines="14"><td><code>while True:</code></td><td><code>while True</code> repite lo de dentro sin fin, hasta que un <code>break</code> lo corte.<span class="por-que">No sabemos cuántos pasos durará la partida.</span><span class="se-lee">repite una y otra vez lo de debajo</span></td></tr>
+        <tr data-lines="15"><td><code>accion = int(rng.integers(2))</code></td><td>Elige 0 o 1 al azar (<code>integers(2)</code>). <code>int(…)</code> lo convierte en un entero normal de Python.<span class="por-que">Este «agente» no mira el estado: es la marca mínima.</span><span class="se-lee">acción es 0 o 1, a cara o cruz</span></td></tr>
+        <tr data-lines="16"><td><code>obs, r, terminated, truncated, info = env.step(acc …</code></td><td>Hace la acción y recoge las cinco cosas de <code>step</code>.<span class="se-lee">empuja y apunta estado nuevo, premio y los dos avisos de fin</span></td></tr>
+        <tr data-lines="17"><td><code>total += r</code></td><td>Suma el premio (+1) al total de la partida.<span class="se-lee">súmale r al total</span></td></tr>
+        <tr data-lines="18"><td><code>pasos += 1</code></td><td>Cuenta un paso más.<span class="se-lee">súmale uno a pasos</span></td></tr>
+        <tr data-lines="19-20"><td><code>if terminated or truncated: …</code></td><td><code>if</code>: si la partida acabó (el palo cayó o el carro se salió: <code>terminated</code>) o se cortó por tiempo (<code>truncated</code>), <code>break</code> sale del bucle.<span class="por-que">Sin esto, el bucle no pararía nunca.</span><span class="se-lee">si se acabó de verdad o se acabó el tiempo, deja de jugar</span></td></tr>
+        <tr data-lines="21"><td><code>retornos.append(total)</code></td><td>Guarda el total de la partida.<span class="se-lee">apunta el retorno de esta partida</span></td></tr>
+        <tr data-lines="22"><td><code>if ep &lt; 3:</code></td><td>Solo para las partidas 0, 1 y 2 (<code>&lt;</code> es «menor que»)…<span class="por-que">Para no llenar la pantalla con 20 líneas.</span><span class="se-lee">si es una de las tres primeras partidas…</span></td></tr>
+        <tr data-lines="23"><td><code>print(f"episodio {ep}: {pasos} pasos, retorno {tot …</code></td><td>…escribe cuántos pasos duró, su retorno y por qué acabó.</td></tr>
+        <tr data-lines="25"><td><code>print("retorno medio con acciones al azar (20 epis …</code></td><td><code>np.mean</code> es la media de los 20 retornos.<span class="por-que">Es la marca que hay que batir.</span></td></tr>
+        <tr data-lines="26"><td><code>print("mejor / peor:", max(retornos), "/", min(ret …</code></td><td><code>max</code> y <code>min</code>: la mejor y la peor partida.<span class="por-que">Para ver cuánto varía el azar.</span></td></tr>
+        <tr data-lines="27"><td><code>env.close()</code></td><td>Cierra el entorno.</td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>observation_space: Box([-4.8               -inf -0.41887903        -inf], [4.8               inf 0.41887903        inf], (4,), float32)
+action_space     : Discrete(2)
+max pasos        : 500
+episodio 0: 18 pasos, retorno 18.0, terminated=True, truncated=False
+episodio 1: 14 pasos, retorno 14.0, terminated=True, truncated=False
+episodio 2: 12 pasos, retorno 12.0, terminated=True, truncated=False
+retorno medio con acciones al azar (20 episodios): 22.9
+mejor / peor: 60.0 / 9.0</pre>
+    <p><strong>Cómo leerla.</strong> El estado son cuatro números (posición y velocidad del carro, ángulo y velocidad de giro del palo). Los ángulos tienen límite (±0,419 radianes, unos ±24°, aunque la partida acaba antes, a 12°); las velocidades, no. Al azar, el palo cae enseguida: 18, 14 y 12 pasos, siempre por <code>terminated=True</code>. La media de 20 partidas es <strong>22,9</strong> pasos, con extremos 60 y 9. Como cada paso vale +1, retorno = número de pasos. El máximo posible es 500.</p>
+  </div>
+</article>
+</section>
+<section class="lab-paso" id="paso-4">
+<h2><span class="paso-n">4</span>Bellman con NumPy: el sistema y los barridos</h2>
+<p>Para qué sirve este paso: calcular cuánto vale estar en la portada (A) y en la ficha (B) de dos maneras: resolviendo las ecuaciones de golpe y con <strong>barridos</strong> (aplicar la ecuación una y otra vez). Es la cuenta a mano de la <a href="leccion-3.html#numeros">lección 3</a>.</p>
+<article class="snippet" data-lang="python" id="fragmento-6">
+  <header>
+    <h3>Paso 4 · La ecuación de Bellman: sistema de ecuaciones y barridos (fragmento 6)</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Pasar el ejemplo de la portada y la ficha a tablas de NumPy y obtener V(A) = 5 y V(B) = 7, primero exacto y luego por barridos desde cero.</p>
+  </header>
+  <pre class="code"><code>import numpy as np
+
+gamma = 0.5
+# Estados: 0 = A, 1 = B, 2 = T (final). Una sola acción por estado (política fija).
+# Desde A: 50 % pasa a B con recompensa +4, 50 % se queda en A con recompensa 0.
+# Desde B: 60 % pasa a T con recompensa +10, 40 % vuelve a A con recompensa 0.
+P = np.array([[0.5, 0.5, 0.0],
+              [0.4, 0.0, 0.6],
+              [0.0, 0.0, 0.0]])
+R = np.array([0.5 * 4 + 0.5 * 0,
+              0.6 * 10 + 0.4 * 0,
+              0.0])
+print("recompensa esperada inmediata R:", R)
+
+V = np.linalg.solve(np.eye(3) - gamma * P, R)
+print("solución exacta V:", V.round(4))
+
+V = np.zeros(3)
+for k in range(1, 6):
+    V = R + gamma * P @ V
+    print(f"barrido {k}: V =", V.round(4))
+for _ in range(100):
+    V = R + gamma * P @ V
+print("tras 105 barridos:", V.round(4))
+print("Bellman en A:", R[0] + gamma * P[0] @ V, "| Bellman en B:", R[1] + gamma * P[1] @ V)</code></pre>
+  <details class="linea-a-linea" open>
+    <summary>Línea por línea</summary>
+    <p class="hint">Toca una fila (o pasa el ratón) para ver su línea resaltada en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace y por qué</th></tr></thead>
+      <tbody>
+        <tr data-lines="1"><td><code>import numpy as np</code></td><td>Trae NumPy con el apodo <code>np</code>.<span class="por-que">Aquí hace todo: tablas, sistema de ecuaciones y multiplicaciones.</span><span class="se-lee">trae NumPy y llámala np</span></td></tr>
+        <tr data-lines="3"><td><code>gamma = 0.5</code></td><td>Gamma, el factor de descuento, vale 0,5.<span class="por-que">Es el mismo del ejemplo a mano.</span><span class="se-lee">gamma vale 0,5</span></td></tr>
+        <tr data-lines="4-6"><td><code># Estados: 0 = A, 1 = B, 2 = T (final). Una sola a …</code></td><td>Tres <strong>comentarios</strong>: lo que va detrás de <code>#</code> Python no lo ejecuta. Explican los estados (0 = A, 1 = B, 2 = T, el final) y las probabilidades.<span class="por-que">El código se lee mejor con una nota al lado.</span></td></tr>
+        <tr data-lines="7-9"><td><code>P = np.array([[0.5, 0.5, 0.0], …</code></td><td>La <strong>tabla de transiciones</strong> P: la fila es «desde dónde» y la columna «hacia dónde». Fila A: 0,5 a A y 0,5 a B. Fila B: 0,4 a A y 0,6 a T. Fila T: todo 0, porque el final no lleva a ningún sitio. <code>np.array</code> convierte la lista de listas en una tabla de NumPy.<span class="por-que">Es la P(s′|s) de la fórmula, escrita como tabla para poder multiplicar.</span><span class="se-lee">P es la tabla de «desde aquí, con qué probabilidad voy allí»</span></td></tr>
+        <tr data-lines="10-12"><td><code>R = np.array([0.5 * 4 + 0.5 * 0, …</code></td><td>R es el <strong>premio medio inmediato</strong> de cada estado: desde A, 0,5 · 4 + 0,5 · 0 = 2; desde B, 0,6 · 10 + 0,4 · 0 = 6; desde T, 0.<span class="por-que">Bellman necesita lo que se cobra ahora; como hay azar, se usa la media.</span><span class="se-lee">R es lo que se cobra de media al salir de A, de B y de T</span></td></tr>
+        <tr data-lines="13"><td><code>print("recompensa esperada inmediata R:", R)</code></td><td>Escribe R para comprobarlo.</td></tr>
+        <tr data-lines="15"><td><code>V = np.linalg.solve(np.eye(3) - gamma * P, R)</code></td><td>Resuelve el sistema de golpe. Bellman dice V = R + γ·P·V, que se reordena como (I − γP)·V = R. <code>np.eye(3)</code> es la tabla identidad (unos en la diagonal, el «1» de las tablas) y <code>np.linalg.solve</code> despeja V. <code>linalg</code> viene de «álgebra lineal».<span class="por-que">Es la forma exacta: solo vale si hay pocos estados.</span><span class="se-lee">V es la solución de «uno menos gamma por P, por V, igual a R»</span></td></tr>
+        <tr data-lines="16"><td><code>print("solución exacta V:", V.round(4))</code></td><td>Escribe V con 4 decimales (<code>.round(4)</code>).</td></tr>
+        <tr data-lines="18"><td><code>V = np.zeros(3)</code></td><td>Para los barridos, empieza con todo a cero: <code>np.zeros(3)</code> es una lista de tres ceros.<span class="por-que">Los barridos parten de una suposición cualquiera.</span><span class="se-lee">V empieza valiendo 0, 0, 0</span></td></tr>
+        <tr data-lines="19"><td><code>for k in range(1, 6):</code></td><td>Cinco barridos: <code>range(1, 6)</code> cuenta 1, 2, 3, 4 y 5.<span class="por-que">Queremos ver los primeros uno a uno.</span><span class="se-lee">para k de 1 a 5, haz lo de debajo</span></td></tr>
+        <tr data-lines="20"><td><code>V = R + gamma * P @ V</code></td><td>Un barrido: el valor nuevo es el premio de ahora más gamma por la media de los valores de llegada. <code>@</code> multiplica la tabla P por la lista V (cada fila de P por V, sumando).<span class="por-que">Es Bellman usado como receta: «valor nuevo = lado derecho con los valores viejos».</span><span class="se-lee">el V nuevo es R más gamma por (P multiplicado por el V viejo)</span></td></tr>
+        <tr data-lines="21"><td><code>print(f"barrido {k}: V =", V.round(4))</code></td><td>Escribe el número de barrido y los valores.</td></tr>
+        <tr data-lines="22-23"><td><code>for _ in range(100): …</code></td><td>Cien barridos más, sin escribir nada. El <code>_</code> es un nombre para «este número no lo uso».<span class="por-que">Para ver a dónde llegan.</span><span class="se-lee">repite el barrido cien veces más, en silencio</span></td></tr>
+        <tr data-lines="24"><td><code>print("tras 105 barridos:", V.round(4))</code></td><td>Escribe los valores tras 105 barridos.<span class="por-que">Deberían ser los de la solución exacta.</span></td></tr>
+        <tr data-lines="25"><td><code>print("Bellman en A:", R[0] + gamma * P[0] @ V, "| …</code></td><td>Comprueba Bellman en A y en B: aplica la ecuación una vez más a cada estado. <code>P[0]</code> es la fila de A.<span class="por-que">El valor verdadero es el único que no cambia al aplicar la ecuación.</span><span class="se-lee">calcula el lado derecho de Bellman para A y para B y escríbelos</span></td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>recompensa esperada inmediata R: [2. 6. 0.]
+solución exacta V: [5. 7. 0.]
+barrido 1: V = [2. 6. 0.]
+barrido 2: V = [4.  6.4 0. ]
+barrido 3: V = [4.6 6.8 0. ]
+barrido 4: V = [4.85 6.92 0.  ]
+barrido 5: V = [4.9425 6.97   0.    ]
+tras 105 barridos: [5. 7. 0.]
+Bellman en A: 5.0 | Bellman en B: 7.0</pre>
+    <p><strong>Cómo leerla.</strong> R = [2, 6, 0]: lo que se cobra de media al salir de A y de B. La solución exacta es V(A) = 5 y V(B) = 7, como a mano. Con barridos, el primero da justo R (2 y 6), el segundo 4 y 6,4, y se acercan a 5 y 7 cada vez más. Tras 105 son iguales. La última línea da 5.0 y 7.0: aplicar la ecuación una vez más ya no los cambia. Ese es el criterio de que hemos llegado.</p>
+  </div>
+</article>
+</section>
+<section class="lab-paso" id="paso-5">
+<h2><span class="paso-n">5</span>El bandido: explorar con ε-greedy</h2>
+<p>Para qué sirve este paso: simular diez películas con premios medios ocultos y ver cuánto gana el recomendador según cuánto explore. Es el problema de la <a href="leccion-4.html#idea">lección 4</a>, con la media que se corrige sola.</p>
+<article class="snippet" data-lang="python" id="fragmento-5">
+  <header>
+    <h3>Paso 5 · Bandido de 10 películas con ε-greedy (fragmento 5)</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Comparar cuánto se gana por recomendación con cuatro valores de épsilon (0, 0,01, 0,1 y 0,3), usando la media incremental para estimar lo que vale cada película.</p>
+  </header>
+  <pre class="code"><code>import numpy as np
+
+rng = np.random.default_rng(0)
+medias_reales = rng.normal(0, 1, 10)
+print("medias reales:", medias_reales.round(2))
+print("mejor brazo  :", medias_reales.argmax(), "con media", medias_reales.max().round(2))
+
+def jugar(epsilon, pasos=1000, semilla=1):
+    r = np.random.default_rng(semilla)
+    Q = np.zeros(10)
+    N = np.zeros(10)
+    total = 0.0
+    for t in range(pasos):
+        if r.random() &lt; epsilon:
+            a = int(r.integers(10))
+        else:
+            a = int(Q.argmax())
+        recompensa = r.normal(medias_reales[a], 1)
+        N[a] += 1
+        Q[a] += (recompensa - Q[a]) / N[a]
+        total += recompensa
+    return total / pasos, int(Q.argmax()), int(N.argmax())
+
+for eps in [0.0, 0.01, 0.1, 0.3]:
+    media, mejor_est, mas_usado = jugar(eps)
+    print(f"epsilon={eps:&lt;4}: recompensa media={media:5.2f} | brazo estimado mejor={mejor_est} | brazo más usado={mas_usado}")</code></pre>
+  <details class="linea-a-linea" open>
+    <summary>Línea por línea</summary>
+    <p class="hint">Toca una fila (o pasa el ratón) para ver su línea resaltada en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace y por qué</th></tr></thead>
+      <tbody>
+        <tr data-lines="1"><td><code>import numpy as np</code></td><td>Trae NumPy con el apodo <code>np</code>.<span class="se-lee">trae NumPy y llámala np</span></td></tr>
+        <tr data-lines="3"><td><code>rng = np.random.default_rng(0)</code></td><td>Máquina de azar con semilla 0.<span class="por-que">Para que las películas salgan siempre iguales.</span></td></tr>
+        <tr data-lines="4"><td><code>medias_reales = rng.normal(0, 1, 10)</code></td><td>Sortea el premio medio real de 10 películas (<code>normal(0, 1, 10)</code>: 10 números alrededor de 0 que se separan como 1).<span class="por-que">Son los «gustos» ocultos que el agente tiene que descubrir.</span><span class="se-lee">medias_reales son 10 números al azar alrededor de cero</span></td></tr>
+        <tr data-lines="5"><td><code>print("medias reales:", medias_reales.round(2))</code></td><td>Escribe esas medias con 2 decimales.<span class="por-que">Nosotros las vemos; el agente no.</span></td></tr>
+        <tr data-lines="6"><td><code>print("mejor brazo  :", medias_reales.argmax(), "c …</code></td><td><code>argmax()</code> da la <strong>posición</strong> del número más grande; <code>max()</code>, el número.<span class="por-que">Así sabemos cuál es de verdad la mejor película.</span><span class="se-lee">escribe cuál es la mejor película y cuánto vale</span></td></tr>
+        <tr data-lines="8"><td><code>def jugar(epsilon, pasos=1000, semilla=1):</code></td><td>Receta <code>jugar</code>: recibe épsilon y, si no se dice otra cosa, 1000 recomendaciones y semilla 1 (<strong>valores por defecto</strong>).<span class="por-que">Así se juega igual con cada épsilon y solo cambia eso.</span><span class="se-lee">define la receta jugar; pasos vale 1000 y semilla vale 1 si no te dicen otra cosa</span></td></tr>
+        <tr data-lines="9"><td><code>r = np.random.default_rng(semilla)</code></td><td>Otra máquina de azar, propia de esta partida.<span class="por-que">Todas las épsilon juegan con la misma suerte.</span></td></tr>
+        <tr data-lines="10"><td><code>Q = np.zeros(10)</code></td><td><code>Q</code>: la nota estimada de cada película, al principio 0. <code>np.zeros(10)</code> son diez ceros.<span class="por-que">Es lo que el agente cree que vale cada una.</span><span class="se-lee">Q empieza con diez ceros</span></td></tr>
+        <tr data-lines="11"><td><code>N = np.zeros(10)</code></td><td><code>N</code>: cuántas veces se ha recomendado cada película.<span class="por-que">Hace falta para la media.</span><span class="se-lee">N empieza con diez ceros</span></td></tr>
+        <tr data-lines="12"><td><code>total = 0.0</code></td><td>Suma de todo lo ganado.</td></tr>
+        <tr data-lines="13"><td><code>for t in range(pasos):</code></td><td>Repite una vez por recomendación.<span class="se-lee">para cada recomendación t, haz lo de debajo</span></td></tr>
+        <tr data-lines="14"><td><code>if r.random() &lt; epsilon:</code></td><td><code>r.random()</code> da un número al azar entre 0 y 1. Si es menor que épsilon…<span class="por-que">Esto pasa con probabilidad épsilon: es el «dado» de ε-greedy.</span><span class="se-lee">si sale un número al azar menor que épsilon…</span></td></tr>
+        <tr data-lines="15"><td><code>a = int(r.integers(10))</code></td><td>…explora: elige una película al azar de las 10.<span class="por-que">Así descubre películas que creía malas.</span><span class="se-lee">…elige una película cualquiera</span></td></tr>
+        <tr data-lines="16-17"><td><code>else: …</code></td><td><code>else</code> es «si no»: explota, elige la de mayor nota estimada (<code>Q.argmax()</code>).<span class="por-que">Lo normal es aprovechar lo que ya sabe.</span><span class="se-lee">si no, elige la película con mejor nota</span></td></tr>
+        <tr data-lines="18"><td><code>recompensa = r.normal(medias_reales[a], 1)</code></td><td>El usuario reacciona: el premio sale de una campana centrada en la media real de esa película.<span class="por-que">Cada recomendación da un premio con ruido, no la media exacta.</span><span class="se-lee">el premio es un número al azar alrededor de lo que de verdad vale la película a</span></td></tr>
+        <tr data-lines="19"><td><code>N[a] += 1</code></td><td>Una vez más para esa película.<span class="se-lee">súmale uno al contador de a</span></td></tr>
+        <tr data-lines="20"><td><code>Q[a] += (recompensa - Q[a]) / N[a]</code></td><td>La <strong>media incremental</strong>: Q nuevo = Q viejo + (premio − Q viejo) / N.<span class="por-que">Calcula la media sin guardar todos los premios.</span><span class="se-lee">corrige la nota de a una parte del error, tanto más pequeña cuantas más veces la hayas probado</span></td></tr>
+        <tr data-lines="21"><td><code>total += recompensa</code></td><td>Suma el premio a lo ganado.</td></tr>
+        <tr data-lines="22"><td><code>return total / pasos, int(Q.argmax()), int(N.argma …</code></td><td>Devuelve tres cosas: lo ganado por recomendación, la que cree mejor y la que más ha usado.<span class="por-que">Para comparar épsilons con números.</span></td></tr>
+        <tr data-lines="24"><td><code>for eps in [0.0, 0.01, 0.1, 0.3]:</code></td><td>Prueba cuatro épsilons.<span class="se-lee">para épsilon 0, 0,01, 0,1 y 0,3, haz lo de debajo</span></td></tr>
+        <tr data-lines="25"><td><code>media, mejor_est, mas_usado = jugar(eps)</code></td><td>Juega y recoge las tres cosas en tres nombres.</td></tr>
+        <tr data-lines="26"><td><code>print(f"epsilon={eps:&lt;4}: recompensa media={media: …</code></td><td>Escribe una línea por épsilon. <code>:&lt;4</code> rellena a 4 huecos por la derecha; <code>:5.2f</code>, 5 huecos con 2 decimales.</td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>medias reales: [ 0.13 -0.13  0.64  0.1  -0.54  0.36  1.3   0.95 -0.7  -1.27]
+mejor brazo  : 6 con media 1.3
+epsilon=0.0 : recompensa media= 0.62 | brazo estimado mejor=2 | brazo más usado=2
+epsilon=0.01: recompensa media= 1.11 | brazo estimado mejor=6 | brazo más usado=6
+epsilon=0.1 : recompensa media= 1.06 | brazo estimado mejor=6 | brazo más usado=6
+epsilon=0.3 : recompensa media= 0.71 | brazo estimado mejor=6 | brazo más usado=7</pre>
+    <p><strong>Cómo leerla.</strong> La mejor película es la 6 (media 1,30). Con épsilon 0 el agente se engancha a la 2 (que vale 0,64): sus primeros premios le hicieron creer que era la mejor y nunca miró otra; gana 0,62 por recomendación. Con 0,01 y 0,1 descubre la 6 y gana 1,11 y 1,06. Con 0,3 también la encuentra, pero malgasta casi un tercio en películas al azar: 0,71. Es una sola semilla: enseña la forma, no un ganador universal.</p>
+  </div>
+</article>
+</section>
+<section class="lab-paso" id="paso-6">
+<h2><span class="paso-n">6</span>Una corrección de Q-learning, a mano</h2>
+<p>Para qué sirve este paso: hacer en código la cuenta de la <a href="leccion-5.html#numeros">lección 5</a>: objetivo, error y valor nuevo (0,40 → 0,441), y ver qué cambia cuando el paso es el último.</p>
+<article class="snippet" data-lang="python" id="fragmento-7">
+  <header>
+    <h3>Paso 6 · Una actualización de Q-learning (la regla TD), con las cuentas visibles (fragmento 7)</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Aplicar una vez la regla de Q-learning con las cuentas a la vista, en un paso normal y en un paso final.</p>
+  </header>
+  <pre class="code"><code>import numpy as np
+
+alpha, gamma = 0.1, 0.9
+
+Q = np.zeros((3, 2))
+Q[0, 1] = 0.40
+Q[1] = [0.2, 0.9]
+
+def actualizar(Q, s, a, r, s_sig, terminado):
+    objetivo = r + gamma * Q[s_sig].max() * (not terminado)
+    error_td = objetivo - Q[s, a]
+    Q[s, a] += alpha * error_td
+    return objetivo, error_td
+
+objetivo, error_td = actualizar(Q, s=0, a=1, r=0.0, s_sig=1, terminado=False)
+print("objetivo  r + γ·max Q(s',·) =", round(objetivo, 4))
+print("error TD  objetivo - Q(s,a) =", round(error_td, 4))
+print("Q(0,1) nuevo =", round(Q[0, 1], 4))
+
+objetivo, error_td = actualizar(Q, s=1, a=1, r=1.0, s_sig=2, terminado=True)
+print("paso terminal: objetivo =", objetivo, "| Q(1,1) nuevo =", round(Q[1, 1], 4))</code></pre>
+  <details class="linea-a-linea" open>
+    <summary>Línea por línea</summary>
+    <p class="hint">Toca una fila (o pasa el ratón) para ver su línea resaltada en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace y por qué</th></tr></thead>
+      <tbody>
+        <tr data-lines="1"><td><code>import numpy as np</code></td><td>Trae NumPy con el apodo <code>np</code>.<span class="se-lee">trae NumPy y llámala np</span></td></tr>
+        <tr data-lines="3"><td><code>alpha, gamma = 0.1, 0.9</code></td><td>Dos ajustes a la vez: alfa (la <strong>tasa de aprendizaje</strong>, qué parte del error se corrige) = 0,1 y gamma = 0,9.<span class="por-que">Son los números del ejemplo a mano.</span><span class="se-lee">alfa vale 0,1 y gamma vale 0,9</span></td></tr>
+        <tr data-lines="5"><td><code>Q = np.zeros((3, 2))</code></td><td>La tabla Q: 3 estados (filas) × 2 acciones (columnas), todo a cero. <code>(3, 2)</code> es la forma.<span class="por-que">Una casilla por pareja «estado, acción».</span><span class="se-lee">Q es una tabla de 3 filas y 2 columnas llena de ceros</span></td></tr>
+        <tr data-lines="6"><td><code>Q[0, 1] = 0.40</code></td><td>Pone 0,40 en la fila 0, columna 1: lo que el agente creía que valía recomendar <em>Shrek</em>.<span class="se-lee">la casilla del estado 0 y la acción 1 vale 0,40</span></td></tr>
+        <tr data-lines="7"><td><code>Q[1] = [0.2, 0.9]</code></td><td>Rellena la fila 1 entera: en la ficha de <em>Shrek</em> las acciones valen 0,2 y 0,9.<span class="por-que">Hacen falta para el «máximo de después».</span><span class="se-lee">la fila del estado 1 vale 0,2 y 0,9</span></td></tr>
+        <tr data-lines="9"><td><code>def actualizar(Q, s, a, r, s_sig, terminado):</code></td><td>Receta <code>actualizar</code>: recibe la tabla y la experiencia (estado, acción, premio, estado siguiente, y si fue el final).<span class="por-que">Es la regla TD que se usará en cada paso del juego.</span></td></tr>
+        <tr data-lines="10"><td><code>objetivo = r + gamma * Q[s_sig].max() * (not termi …</code></td><td>El <strong>objetivo</strong>: premio más gamma por el mayor valor de la fila siguiente (<code>Q[s_sig].max()</code>). Se multiplica por <code>(not terminado)</code>, que vale 1 si la partida sigue y 0 si acabó.<span class="por-que">Tras el final no hay futuro: el objetivo es solo el premio.</span><span class="se-lee">el objetivo es r más gamma por lo mejor de después, pero solo si la partida sigue</span></td></tr>
+        <tr data-lines="11"><td><code>error_td = objetivo - Q[s, a]</code></td><td>El <strong>error TD</strong>: cuánto se equivocaba la tabla.<span class="se-lee">el error es objetivo menos lo que creía</span></td></tr>
+        <tr data-lines="12"><td><code>Q[s, a] += alpha * error_td</code></td><td>Corrige la casilla una fracción alfa del error.<span class="por-que">Sin alfa, un premio con suerte movería demasiado la tabla.</span><span class="se-lee">súmale a la casilla alfa por el error</span></td></tr>
+        <tr data-lines="13"><td><code>return objetivo, error_td</code></td><td>Devuelve el objetivo y el error para poder escribirlos.</td></tr>
+        <tr data-lines="15"><td><code>objetivo, error_td = actualizar(Q, s=0, a=1, r=0.0 …</code></td><td>Usa la receta con <strong>argumentos con nombre</strong> (<code>s=0, a=1</code>…): estado 0, acción 1, premio 0, va al estado 1 y no acaba.<span class="por-que">Con nombres se ve qué es cada número.</span><span class="se-lee">actualiza la casilla del estado 0 y la acción 1 tras cobrar 0 y llegar al estado 1</span></td></tr>
+        <tr data-lines="16-18"><td><code>print("objetivo  r + γ·max Q(s',·) =", round(objet …</code></td><td>Escribe objetivo, error y valor nuevo, redondeados a 4 decimales.<span class="por-que">Para compararlos con la cuenta a mano.</span></td></tr>
+        <tr data-lines="20"><td><code>objetivo, error_td = actualizar(Q, s=1, a=1, r=1.0 …</code></td><td>Ahora un paso final: en el estado 1 hace la acción 1, cobra 1 y la partida termina.<span class="por-que">Para ver el caso sin futuro.</span><span class="se-lee">actualiza la casilla del estado 1 y la acción 1 tras cobrar 1 y terminar</span></td></tr>
+        <tr data-lines="21"><td><code>print("paso terminal: objetivo =", objetivo, "| Q( …</code></td><td>Escribe el objetivo y el valor nuevo.</td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>objetivo  r + γ·max Q(s',·) = 0.81
+error TD  objetivo - Q(s,a) = 0.41
+Q(0,1) nuevo = 0.441
+paso terminal: objetivo = 1.0 | Q(1,1) nuevo = 0.91</pre>
+    <p><strong>Cómo leerla.</strong> Objetivo 0 + 0,9 · 0,9 = 0,81; error 0,81 − 0,40 = 0,41; valor nuevo 0,40 + 0,1 · 0,41 = <strong>0,441</strong>: se mueve un 10 % del camino. En el paso final el objetivo es solo el premio, 1,0, y la casilla pasa de 0,9 a 0,91. Olvidar el <code>(not terminado)</code> es un fallo típico: el agente creería que tras la meta siguen los premios.</p>
+  </div>
+</article>
+</section>
+<section class="lab-paso" id="paso-7">
+<h2><span class="paso-n">7</span>Q-learning entero en el lago helado</h2>
+<p>Para qué sirve este paso: juntar todo lo anterior en un agente que aprende solo: tabla Q de 16 × 4, ε-greedy con épsilon que baja, la corrección del paso 6 en cada movimiento y, al final, leer el camino aprendido. Es el algoritmo de la <a href="leccion-5.html#idea">lección 5</a>.</p>
+<article class="snippet" data-lang="python" id="fragmento-8">
+  <header>
+    <h3>Paso 7 · Q-learning con tabla en FrozenLake, sin hielo (fragmento 8)</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Entrenar 500 partidas en el lago sin hielo, ver los valores aprendidos, dibujar la política con flechas y recorrer el camino que ha aprendido.</p>
+  </header>
+  <pre class="code"><code>import numpy as np
+import gymnasium as gym
+
+env = gym.make("FrozenLake-v1", is_slippery=False)
+n_estados, n_acciones = env.observation_space.n, env.action_space.n
+rng = np.random.default_rng(0)
+
+Q = np.zeros((n_estados, n_acciones))
+alpha, gamma = 0.5, 0.95
+epsilon, eps_min, decaimiento = 1.0, 0.05, 0.99
+episodios = 500
+
+def accion_epsilon_greedy(Q, estado, epsilon):
+    if rng.random() &lt; epsilon:
+        return int(rng.integers(Q.shape[1]))
+    mejores = np.flatnonzero(Q[estado] == Q[estado].max())
+    return int(rng.choice(mejores))
+
+exitos = 0
+for ep in range(episodios):
+    estado, _ = env.reset(seed=0 if ep == 0 else None)
+    terminado = truncado = False
+    while not (terminado or truncado):
+        accion = accion_epsilon_greedy(Q, estado, epsilon)
+        sig, r, terminado, truncado, _ = env.step(accion)
+        objetivo = r + gamma * Q[sig].max() * (not terminado)
+        Q[estado, accion] += alpha * (objetivo - Q[estado, accion])
+        estado = sig
+    exitos += r
+    epsilon = max(eps_min, epsilon * decaimiento)
+    if (ep + 1) % 100 == 0:
+        print(f"episodio {ep + 1:3d}: epsilon={epsilon:.3f}, éxitos acumulados={int(exitos)}")
+
+print("Q del estado 14 (a un paso de la meta):", Q[14].round(3))
+print("Q del estado 0 (salida):", Q[0].round(3))
+
+flechas = np.array(list("←↓→↑"))
+politica = flechas[Q.argmax(axis=1)]
+politica[[5, 7, 11, 12, 15]] = ["H", "H", "H", "H", "G"]
+print(politica.reshape(4, 4))
+
+estado, _ = env.reset()
+camino, terminado = [0], False
+while not terminado and len(camino) &lt; 20:
+    estado, r, terminado, truncado, _ = env.step(int(Q[estado].argmax()))
+    camino.append(estado)
+print("camino greedy:", camino, "| recompensa final:", r)</code></pre>
+  <details class="linea-a-linea" open>
+    <summary>Línea por línea</summary>
+    <p class="hint">Toca una fila (o pasa el ratón) para ver su línea resaltada en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace y por qué</th></tr></thead>
+      <tbody>
+        <tr data-lines="1"><td><code>import numpy as np</code></td><td>Trae NumPy con el apodo <code>np</code>.<span class="se-lee">trae NumPy y llámala np</span></td></tr>
+        <tr data-lines="2"><td><code>import gymnasium as gym</code></td><td>Trae Gymnasium con el apodo <code>gym</code>.<span class="se-lee">trae Gymnasium y llámala gym</span></td></tr>
+        <tr data-lines="4"><td><code>env = gym.make("FrozenLake-v1", is_slippery=False)</code></td><td>El lago sin resbalar del paso 1.<span class="por-que">Sin azar del entorno se aprende rápido y se lee fácil.</span></td></tr>
+        <tr data-lines="5"><td><code>n_estados, n_acciones = env.observation_space.n, e …</code></td><td>Lee cuántos estados (16) y cuántas acciones (4) hay. <code>.n</code> es el tamaño de un espacio <code>Discrete</code>.<span class="por-que">Así la tabla tiene el tamaño justo sin escribir 16 y 4 a mano.</span><span class="se-lee">n_estados es 16 y n_acciones es 4, leídos del entorno</span></td></tr>
+        <tr data-lines="6"><td><code>rng = np.random.default_rng(0)</code></td><td>Máquina de azar con semilla 0.</td></tr>
+        <tr data-lines="8"><td><code>Q = np.zeros((n_estados, n_acciones))</code></td><td>La tabla Q, 16 × 4, a cero.<span class="por-que">Al principio el agente no sabe nada.</span><span class="se-lee">Q es una tabla de 16 filas y 4 columnas de ceros</span></td></tr>
+        <tr data-lines="9"><td><code>alpha, gamma = 0.5, 0.95</code></td><td>Alfa 0,5 (corrige la mitad del error) y gamma 0,95.<span class="por-que">Sin azar, se puede corregir mucho de golpe.</span></td></tr>
+        <tr data-lines="10"><td><code>epsilon, eps_min, decaimiento = 1.0, 0.05, 0.99</code></td><td>Épsilon empieza en 1 (todo al azar), nunca baja de 0,05 y se multiplica por 0,99 tras cada partida.<span class="por-que">Explorar mucho al principio y poco al final.</span><span class="se-lee">épsilon empieza en 1, como mínimo 0,05, y encoge un 1 % por partida</span></td></tr>
+        <tr data-lines="11"><td><code>episodios = 500</code></td><td>Se juegan 500 partidas.</td></tr>
+        <tr data-lines="13"><td><code>def accion_epsilon_greedy(Q, estado, epsilon):</code></td><td>Receta para elegir acción con ε-greedy.</td></tr>
+        <tr data-lines="14-15"><td><code>if rng.random() &lt; epsilon: …</code></td><td>Con probabilidad épsilon devuelve una acción al azar entre 0 y 3 (<code>Q.shape[1]</code> es el número de columnas, 4).<span class="por-que">Explorar.</span><span class="se-lee">si sale el dado, devuelve una acción cualquiera</span></td></tr>
+        <tr data-lines="16"><td><code>mejores = np.flatnonzero(Q[estado] == Q[estado].ma …</code></td><td><code>np.flatnonzero</code> da las posiciones donde algo es cierto: aquí, las acciones que empatan en el máximo de su fila.<span class="por-que">Al principio todo vale 0 y empatan todas: no queremos elegir siempre la primera.</span><span class="se-lee">mejores son las acciones cuyo valor es el más alto de la fila</span></td></tr>
+        <tr data-lines="17"><td><code>return int(rng.choice(mejores))</code></td><td><code>rng.choice</code> elige una de ellas al azar.<span class="por-que">Desempatar al azar evita que el agente se quede quieto en un rincón.</span><span class="se-lee">devuelve una de las mejores, a suertes</span></td></tr>
+        <tr data-lines="19"><td><code>exitos = 0</code></td><td>Contador de partidas ganadas.</td></tr>
+        <tr data-lines="20"><td><code>for ep in range(episodios):</code></td><td>Una vuelta por partida.<span class="se-lee">para cada partida ep, haz lo de debajo</span></td></tr>
+        <tr data-lines="21"><td><code>estado, _ = env.reset(seed=0 if ep == 0 else None)</code></td><td>Empieza la partida. La semilla solo se pone en la primera (<code>0 if ep == 0 else None</code>: «0 si es la primera; si no, nada»). <code>_</code> recoge el <code>info</code>, que no usamos.<span class="por-que">Con una semilla al principio basta para que todo sea repetible.</span><span class="se-lee">empieza la partida; si es la primera, con semilla 0</span></td></tr>
+        <tr data-lines="22"><td><code>terminado = truncado = False</code></td><td>Los dos avisos de fin empiezan en <code>False</code>.<span class="por-que">El bucle de debajo los necesita.</span></td></tr>
+        <tr data-lines="23"><td><code>while not (terminado or truncado):</code></td><td><code>while not (…)</code>: repite mientras la partida no haya acabado por ninguno de los dos motivos.<span class="se-lee">mientras no se haya acabado ni de verdad ni por tiempo, haz lo de debajo</span></td></tr>
+        <tr data-lines="24"><td><code>accion = accion_epsilon_greedy(Q, estado, epsilon)</code></td><td>Elige la acción con la receta ε-greedy.</td></tr>
+        <tr data-lines="25"><td><code>sig, r, terminado, truncado, _ = env.step(accion)</code></td><td>Actúa y recibe estado siguiente (<code>sig</code>), premio y avisos.</td></tr>
+        <tr data-lines="26"><td><code>objetivo = r + gamma * Q[sig].max() * (not termina …</code></td><td>El objetivo de Q-learning, igual que en el paso 6.<span class="se-lee">objetivo es r más gamma por lo mejor de sig, si la partida sigue</span></td></tr>
+        <tr data-lines="27"><td><code>Q[estado, accion] += alpha * (objetivo - Q[estado, …</code></td><td>Corrige la casilla una fracción alfa del error.<span class="se-lee">acerca Q del estado y la acción a su objetivo, la mitad del camino</span></td></tr>
+        <tr data-lines="28"><td><code>estado = sig</code></td><td>Pasa al estado siguiente.<span class="por-que">Sin esto el agente se quedaría siempre en la misma casilla.</span></td></tr>
+        <tr data-lines="29"><td><code>exitos += r</code></td><td>Al acabar, suma el último premio: 1 si llegó a la meta, 0 si cayó o se acabó el tiempo.</td></tr>
+        <tr data-lines="30"><td><code>epsilon = max(eps_min, epsilon * decaimiento)</code></td><td>Encoge épsilon, sin bajar de 0,05 (<code>max</code> se queda con el mayor de los dos).<span class="se-lee">épsilon es lo mayor entre 0,05 y épsilon por 0,99</span></td></tr>
+        <tr data-lines="31-32"><td><code>if (ep + 1) % 100 == 0: …</code></td><td>Cada 100 partidas (<code>%</code> es el resto de dividir: si el resto entre 100 es 0) escribe épsilon y las partidas ganadas.<span class="por-que">Para ver el progreso.</span><span class="se-lee">si ep + 1 es múltiplo de 100, escribe cómo va</span></td></tr>
+        <tr data-lines="34"><td><code>print("Q del estado 14 (a un paso de la meta):", Q …</code></td><td>Escribe la fila de la casilla 14, al lado de la meta.</td></tr>
+        <tr data-lines="35"><td><code>print("Q del estado 0 (salida):", Q[0].round(3))</code></td><td>Escribe la fila de la casilla 0, la salida.</td></tr>
+        <tr data-lines="37"><td><code>flechas = np.array(list("←↓→↑"))</code></td><td><code>list("←↓→↑")</code> parte el texto en sus cuatro flechas; <code>np.array</code> lo hace array.<span class="por-que">Para dibujar la acción elegida en cada casilla.</span><span class="se-lee">flechas son izquierda, abajo, derecha y arriba</span></td></tr>
+        <tr data-lines="38"><td><code>politica = flechas[Q.argmax(axis=1)]</code></td><td><code>Q.argmax(axis=1)</code> da, para cada fila, la columna mayor: la mejor acción de cada casilla. Con ella se escoge su flecha.<span class="por-que">Es la <strong>política</strong> aprendida.</span><span class="se-lee">para cada casilla, coge la flecha de su mejor acción</span></td></tr>
+        <tr data-lines="39"><td><code>politica[[5, 7, 11, 12, 15]] = ["H", "H", "H", "H" …</code></td><td>En las casillas 5, 7, 11 y 12 (agujeros) pone H, y en la 15 (meta) G.<span class="por-que">En ellas no se decide nada.</span></td></tr>
+        <tr data-lines="40"><td><code>print(politica.reshape(4, 4))</code></td><td><code>reshape(4, 4)</code> coloca las 16 flechas como el tablero.<span class="se-lee">ordena las 16 flechas en 4 filas de 4</span></td></tr>
+        <tr data-lines="42"><td><code>estado, _ = env.reset()</code></td><td>Una partida nueva para recorrer el camino aprendido.</td></tr>
+        <tr data-lines="43"><td><code>camino, terminado = [0], False</code></td><td>El camino empieza en la casilla 0.</td></tr>
+        <tr data-lines="44"><td><code>while not terminado and len(camino) &lt; 20:</code></td><td>Mientras no acabe y el camino tenga menos de 20 casillas…<span class="por-que">El límite evita un bucle sin fin si la política diera vueltas.</span><span class="se-lee">mientras no haya terminado y no lleve 20 casillas…</span></td></tr>
+        <tr data-lines="45"><td><code>estado, r, terminado, truncado, _ = env.step(int(Q …</code></td><td>…avanza con la mejor acción de la tabla (sin explorar)…</td></tr>
+        <tr data-lines="46"><td><code>camino.append(estado)</code></td><td>…y apunta la casilla.</td></tr>
+        <tr data-lines="47"><td><code>print("camino greedy:", camino, "| recompensa fina …</code></td><td>Escribe el camino y el último premio.</td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>episodio 100: epsilon=0.366, éxitos acumulados=19
+episodio 200: epsilon=0.134, éxitos acumulados=89
+episodio 300: epsilon=0.050, éxitos acumulados=186
+episodio 400: epsilon=0.050, éxitos acumulados=283
+episodio 500: epsilon=0.050, éxitos acumulados=374
+Q del estado 14 (a un paso de la meta): [0.881 0.95  1.    0.902]
+Q del estado 0 (salida): [0.735 0.694 0.774 0.735]
+[['→' '→' '↓' '←']
+ ['↑' 'H' '↓' 'H']
+ ['→' '→' '↓' 'H']
+ ['H' '→' '→' 'G']]
+camino greedy: [0, 1, 2, 6, 10, 14, 15] | recompensa final: 1</pre>
+    <p><strong>Cómo leerla.</strong> Con épsilon alto ya encuentra la meta: 19 victorias en las 100 primeras partidas; al final, 374 de 500. En la casilla 14, «derecha» vale 1,0 (la meta da 1 y no hay nada después) y «abajo» 0,95 = gamma · 1 (choca con el borde y aún puede ir a la meta). En la salida, «derecha» vale 0,774 = 0,95<sup>5</sup>: la meta está a seis pasos. El camino [0, 1, 2, 6, 10, 14, 15] es el mismo del paso 1. Las flechas de casillas casi nunca visitadas (como la 3) no significan nada.</p>
+  </div>
+</article>
+</section>
+<section class="lab-paso" id="paso-8">
+<h2><span class="paso-n">8</span>SARSA frente a Q-learning en el acantilado</h2>
+<p>Para qué sirve este paso: entrenar los dos algoritmos con el mismo código, cambiando solo el objetivo, y ver que uno aprende a bordear el precipicio y el otro a rodearlo. Es la comparación de la <a href="leccion-6.html#numeros">lección 6</a>.</p>
+<article class="snippet" data-lang="python" id="fragmento-10">
+  <header>
+    <h3>Paso 8 · SARSA frente a Q-learning en el acantilado, <code>CliffWalking-v1</code> (fragmento 10)</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Entrenar SARSA y Q-learning en <code>CliffWalking-v1</code> con 5 semillas, medir lo que ganan mientras aprenden y dibujar el camino que aprende cada uno.</p>
+  </header>
+  <pre class="code"><code>import numpy as np
+import gymnasium as gym
+
+env = gym.make("CliffWalking-v1")
+FILAS, COLS = 4, 12
+alpha, gamma, epsilon = 0.5, 1.0, 0.1
+
+def elegir(Q, s, rng):
+    if rng.random() &lt; epsilon:
+        return int(rng.integers(4))
+    return int(rng.choice(np.flatnonzero(Q[s] == Q[s].max())))
+
+def entrenar(algoritmo, episodios=500, semilla=0):
+    rng = np.random.default_rng(semilla)
+    Q = np.zeros((48, 4))
+    recompensas = []
+    for ep in range(episodios):
+        s, _ = env.reset(seed=semilla if ep == 0 else None)
+        a = elegir(Q, s, rng)
+        total, pasos, fin = 0.0, 0, False
+        while not fin and pasos &lt; 500:
+            s2, r, terminado, truncado, _ = env.step(a)
+            a2 = elegir(Q, s2, rng)
+            if algoritmo == "sarsa":
+                siguiente = Q[s2, a2]
+            else:
+                siguiente = Q[s2].max()
+            Q[s, a] += alpha * (r + gamma * siguiente * (not terminado) - Q[s, a])
+            s, a = s2, a2
+            total += r
+            pasos += 1
+            fin = terminado or truncado
+        recompensas.append(total)
+    return Q, np.array(recompensas)
+
+def camino_greedy(Q):
+    s, _ = env.reset()
+    ruta = [s]
+    while s != 47 and len(ruta) &lt; 50:
+        s, _, _, _, _ = env.step(int(Q[s].argmax()))
+        ruta.append(s)
+    return ruta
+
+def dibujar(ruta):
+    tablero = [["."] * COLS for _ in range(FILAS)]
+    for c in range(1, COLS - 1):
+        tablero[3][c] = "C"
+    for celda in ruta:
+        tablero[celda // COLS][celda % COLS] = "*"
+    tablero[3][0], tablero[3][11] = "S", "G"
+    return ["".join(f) for f in tablero]
+
+for alg in ["sarsa", "qlearning"]:
+    medias = []
+    for semilla in range(5):
+        Q, rec = entrenar(alg, semilla=semilla)
+        medias.append(rec[-100:].mean())
+    Q, rec = entrenar(alg, semilla=0)
+    ruta = camino_greedy(Q)
+    print(f"{alg}: recompensa media por episodio (últimos 100, 5 semillas) = {np.mean(medias):.2f}")
+    print(f"{alg}: camino greedy de {len(ruta) - 1} pasos")
+    print("\n".join(dibujar(ruta)))</code></pre>
+  <details class="linea-a-linea" open>
+    <summary>Línea por línea</summary>
+    <p class="hint">Toca una fila (o pasa el ratón) para ver su línea resaltada en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace y por qué</th></tr></thead>
+      <tbody>
+        <tr data-lines="1"><td><code>import numpy as np</code></td><td>Trae NumPy con el apodo <code>np</code>.<span class="se-lee">trae NumPy y llámala np</span></td></tr>
+        <tr data-lines="2"><td><code>import gymnasium as gym</code></td><td>Trae Gymnasium con el apodo <code>gym</code>.<span class="se-lee">trae Gymnasium y llámala gym</span></td></tr>
+        <tr data-lines="4"><td><code>env = gym.make("CliffWalking-v1")</code></td><td>El <strong>acantilado</strong>: un tablero de 4 × 12 (48 casillas). La salida está abajo a la izquierda, la meta abajo a la derecha y entre ellas, el precipicio. Cada paso cuesta −1 y caer, −100 (y vuelves a la salida).<span class="por-que">Es el ejemplo clásico donde los dos algoritmos aprenden caminos distintos.</span><span class="se-lee">env es el tablero del acantilado</span></td></tr>
+        <tr data-lines="5"><td><code>FILAS, COLS = 4, 12</code></td><td>Filas y columnas del tablero, para dibujarlo. Van en mayúsculas porque no cambian (una costumbre).<span class="se-lee">FILAS vale 4 y COLS vale 12</span></td></tr>
+        <tr data-lines="6"><td><code>alpha, gamma, epsilon = 0.5, 1.0, 0.1</code></td><td>Alfa 0,5, gamma 1 (sin descuento: el −1 por paso ya premia llegar antes) y épsilon fijo de 0,1.<span class="por-que">Épsilon fijo: el agente sigue explorando todo el rato, y eso es lo que separa a los dos.</span></td></tr>
+        <tr data-lines="8"><td><code>def elegir(Q, s, rng):</code></td><td>Receta <code>elegir</code>: ε-greedy, como en el paso 7.</td></tr>
+        <tr data-lines="9-10"><td><code>if rng.random() &lt; epsilon: …</code></td><td>Con probabilidad épsilon, una acción al azar de las 4.<span class="se-lee">si sale el dado, devuelve una acción cualquiera</span></td></tr>
+        <tr data-lines="11"><td><code>return int(rng.choice(np.flatnonzero(Q[s] == Q[s]. …</code></td><td>Si no, una de las mejores de la fila, desempatando al azar.<span class="se-lee">si no, devuelve una de las acciones con valor más alto, a suertes</span></td></tr>
+        <tr data-lines="13"><td><code>def entrenar(algoritmo, episodios=500, semilla=0):</code></td><td>Receta <code>entrenar</code>: recibe el nombre del algoritmo (<code>"sarsa"</code> o <code>"qlearning"</code>), 500 partidas y una semilla.<span class="por-que">El mismo código sirve para los dos: solo cambia una línea.</span></td></tr>
+        <tr data-lines="14"><td><code>rng = np.random.default_rng(semilla)</code></td><td>Máquina de azar con esa semilla.</td></tr>
+        <tr data-lines="15"><td><code>Q = np.zeros((48, 4))</code></td><td>Tabla Q de 48 × 4 a cero.</td></tr>
+        <tr data-lines="16"><td><code>recompensas = []</code></td><td>Lista para guardar lo ganado en cada partida.</td></tr>
+        <tr data-lines="17"><td><code>for ep in range(episodios):</code></td><td>Una vuelta por partida.</td></tr>
+        <tr data-lines="18"><td><code>s, _ = env.reset(seed=semilla if ep == 0 else None)</code></td><td>Empieza la partida (semilla solo en la primera).</td></tr>
+        <tr data-lines="19"><td><code>a = elegir(Q, s, rng)</code></td><td>Elige ya la primera acción.<span class="por-que">SARSA necesita conocer la acción <em>antes</em> de darla: la de la casilla siguiente se elige un paso antes.</span><span class="se-lee">a es la primera acción, elegida con ε-greedy</span></td></tr>
+        <tr data-lines="20"><td><code>total, pasos, fin = 0.0, 0, False</code></td><td>Tres contadores a la vez: lo ganado, los pasos y si ha acabado.</td></tr>
+        <tr data-lines="21"><td><code>while not fin and pasos &lt; 500:</code></td><td>Repite mientras no acabe y no pase de 500 pasos.<span class="por-que">El tope evita partidas eternas al principio, cuando el agente da vueltas.</span><span class="se-lee">mientras no haya acabado y lleve menos de 500 pasos, haz lo de debajo</span></td></tr>
+        <tr data-lines="22"><td><code>s2, r, terminado, truncado, _ = env.step(a)</code></td><td>Hace la acción y recibe casilla nueva (<code>s2</code>), premio y avisos.</td></tr>
+        <tr data-lines="23"><td><code>a2 = elegir(Q, s2, rng)</code></td><td>Elige ya la acción siguiente <code>a2</code>, la que de verdad hará después.<span class="por-que">SARSA la usa en su objetivo; Q-learning no la mira, pero así los dos se comportan igual.</span><span class="se-lee">a2 es lo que haré en s2, con mis despistes incluidos</span></td></tr>
+        <tr data-lines="24-25"><td><code>if algoritmo == "sarsa": …</code></td><td>Si el algoritmo es SARSA, lo de después vale <code>Q[s2, a2]</code>: el valor de la acción que de verdad hará.<span class="por-que">Así cuenta con sus despistes: si a2 es un paso al azar hacia el precipicio, lo nota.</span><span class="se-lee">si soy SARSA, lo de después vale lo que vale la acción que voy a hacer</span></td></tr>
+        <tr data-lines="26-27"><td><code>else: …</code></td><td>Si no (Q-learning), lo de después vale el máximo de la fila: como si después fuera a jugar perfecto.<span class="por-que">Esta es la <strong>única</strong> línea que separa a los dos algoritmos.</span><span class="se-lee">si soy Q-learning, lo de después vale lo mejor que podría hacer</span></td></tr>
+        <tr data-lines="28"><td><code>Q[s, a] += alpha * (r + gamma * siguiente * (not t …</code></td><td>La corrección de siempre: objetivo = premio + gamma · lo de después (0 si acabó); se acerca la casilla una fracción alfa.<span class="se-lee">acerca Q de s y a a su objetivo, la mitad del camino</span></td></tr>
+        <tr data-lines="29"><td><code>s, a = s2, a2</code></td><td>Avanza: la casilla y la acción siguientes pasan a ser las actuales.<span class="por-que">Así la acción elegida en la línea 23 es la que de verdad se hace.</span><span class="se-lee">s pasa a ser s2 y a pasa a ser a2</span></td></tr>
+        <tr data-lines="30-32"><td><code>total += r …</code></td><td>Suma el premio, cuenta el paso y apunta si la partida acabó.</td></tr>
+        <tr data-lines="33"><td><code>recompensas.append(total)</code></td><td>Guarda lo ganado en la partida.</td></tr>
+        <tr data-lines="34"><td><code>return Q, np.array(recompensas)</code></td><td>Devuelve la tabla y lo ganado como array de NumPy.</td></tr>
+        <tr data-lines="36"><td><code>def camino_greedy(Q):</code></td><td>Receta para recorrer el camino que la tabla considera mejor.</td></tr>
+        <tr data-lines="37"><td><code>s, _ = env.reset()</code></td><td>Nueva partida.</td></tr>
+        <tr data-lines="38"><td><code>ruta = [s]</code></td><td>La ruta empieza en la casilla de salida.</td></tr>
+        <tr data-lines="39"><td><code>while s != 47 and len(ruta) &lt; 50:</code></td><td>Mientras no llegue a la meta (casilla 47; <code>!=</code> es «distinto de») y no pase de 50 casillas…<span class="se-lee">mientras no esté en la meta y la ruta sea corta…</span></td></tr>
+        <tr data-lines="40"><td><code>s, _, _, _, _ = env.step(int(Q[s].argmax()))</code></td><td>…avanza con la mejor acción. Los cuatro <code>_</code> son las cosas que <code>step</code> devuelve y no usamos.</td></tr>
+        <tr data-lines="41"><td><code>ruta.append(s)</code></td><td>…y apunta la casilla.</td></tr>
+        <tr data-lines="42"><td><code>return ruta</code></td><td>Devuelve la ruta.</td></tr>
+        <tr data-lines="44"><td><code>def dibujar(ruta):</code></td><td>Receta para dibujar el tablero con texto.</td></tr>
+        <tr data-lines="45"><td><code>tablero = [["."] * COLS for _ in range(FILAS)]</code></td><td>Un tablero de puntos: una lista de 4 filas, cada una con 12 puntos. <code>["."] * COLS</code> repite el punto 12 veces.<span class="se-lee">tablero son 4 filas de 12 puntos</span></td></tr>
+        <tr data-lines="46-47"><td><code>for c in range(1, COLS - 1): …</code></td><td>Las casillas 1 a 10 de la última fila son el precipicio: C (de <em>cliff</em>).</td></tr>
+        <tr data-lines="48-49"><td><code>for celda in ruta: …</code></td><td>Marca con * cada casilla de la ruta. <code>celda // COLS</code> es la fila (dividir sin decimales) y <code>celda % COLS</code> la columna (el resto).<span class="por-que">Las casillas vienen numeradas de 0 a 47: hay que pasarlas a fila y columna.</span><span class="se-lee">para cada casilla de la ruta, pon un asterisco en su fila y su columna</span></td></tr>
+        <tr data-lines="50"><td><code>tablero[3][0], tablero[3][11] = "S", "G"</code></td><td>S en la salida y G en la meta.</td></tr>
+        <tr data-lines="51"><td><code>return ["".join(f) for f in tablero]</code></td><td>Junta cada fila en un texto.</td></tr>
+        <tr data-lines="53"><td><code>for alg in ["sarsa", "qlearning"]:</code></td><td>Repite todo para los dos algoritmos.</td></tr>
+        <tr data-lines="54-57"><td><code>medias = [] …</code></td><td>Entrena con 5 semillas y guarda la media de las últimas 100 partidas de cada una (<code>rec[-100:]</code>: los 100 últimos).<span class="por-que">Con una sola semilla podría ser suerte.</span><span class="se-lee">para cada semilla de 0 a 4, entrena y apunta lo ganado de media al final</span></td></tr>
+        <tr data-lines="58"><td><code>Q, rec = entrenar(alg, semilla=0)</code></td><td>Entrena otra vez con la semilla 0 para dibujar su camino.</td></tr>
+        <tr data-lines="59"><td><code>ruta = camino_greedy(Q)</code></td><td>Saca el camino sin explorar.</td></tr>
+        <tr data-lines="60"><td><code>print(f"{alg}: recompensa media por episodio (últi …</code></td><td>Escribe la media de las 5 semillas.</td></tr>
+        <tr data-lines="61"><td><code>print(f"{alg}: camino greedy de {len(ruta) - 1} pa …</code></td><td>Escribe cuántos pasos tiene el camino (las casillas menos la de salida).</td></tr>
+        <tr data-lines="62"><td><code>print("\n".join(dibujar(ruta)))</code></td><td>Escribe el tablero; <code>"\n".join</code> pone un salto de línea entre filas.</td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>sarsa: recompensa media por episodio (últimos 100, 5 semillas) = -32.84
+sarsa: camino greedy de 17 pasos
+..*********.
+***.......**
+*..........*
+SCCCCCCCCCCG
+qlearning: recompensa media por episodio (últimos 100, 5 semillas) = -51.25
+qlearning: camino greedy de 13 pasos
+............
+............
+************
+SCCCCCCCCCCG</pre>
+    <p><strong>Cómo leerla.</strong> Mientras aprenden (épsilon 0,1), SARSA gana −32,84 por partida y Q-learning −51,25: Q-learning se cae más. Los dibujos dicen por qué. Q-learning aprende el camino más corto, pegado al precipicio (13 pasos, la fila de encima de las C); pero como sigue explorando un 10 %, a veces un paso al azar lo tira (−100). SARSA cuenta con esos despistes y aprende un rodeo por arriba (17 pasos). Sin explorar, gana el de Q-learning (−13 frente a −17).</p>
+  </div>
+</article>
+</section>
+<section class="lab-paso" id="paso-9">
+<h2><span class="paso-n">9</span>La red Q de Keras y la pérdida de Huber</h2>
+<p>Para qué sirve este paso: construir la red que sustituye a la tabla cuando los estados son números con decimales, ver sus formas y sus parámetros, y comparar a mano la pérdida de Huber con el error cuadrático. Es la red de la <a href="leccion-7.html#red-q">lección 7</a>.</p>
+<article class="snippet" data-lang="python" id="fragmento-11">
+  <header>
+    <h3>Paso 9 · La red Q de Keras: entra el estado, sale un valor por acción; y la pérdida de Huber (fragmento 11)</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Montar una red pequeña que recibe los 4 números de CartPole y devuelve un valor por acción, elegir acción con argmax y calcular la pérdida de Huber a mano y con Keras.</p>
+  </header>
+  <pre class="code"><code>import numpy as np
+import keras
+from keras import layers
+
+keras.utils.set_random_seed(0)
+
+red_q = keras.Sequential([
+    keras.Input(shape=(4,)),
+    layers.Dense(32, activation="relu"),
+    layers.Dense(32, activation="relu"),
+    layers.Dense(2),
+], name="red_q")
+red_q.summary()
+
+estado = np.array([[0.02, -0.5, 0.05, 0.8]], dtype="float32")
+valores_q = red_q.predict(estado, verbose=0)
+print("forma de la entrada:", estado.shape, "| forma de la salida:", valores_q.shape)
+print("Q(s, izquierda), Q(s, derecha) =", valores_q.round(4)[0])
+print("acción greedy (argmax):", int(valores_q.argmax()))
+
+lote = np.random.default_rng(0).normal(size=(5, 4)).astype("float32")
+print("salida para un lote de 5 estados:", red_q.predict(lote, verbose=0).shape)
+
+y_objetivo = np.array([1.5, 0.2, 3.0])
+q_actual = np.array([1.0, 0.0, -1.0])
+error = y_objetivo - q_actual
+mse = np.mean(error ** 2)
+huber = np.mean(np.where(np.abs(error) &lt;= 1, 0.5 * error ** 2, np.abs(error) - 0.5))
+print("errores:", error, "| MSE =", round(mse, 4), "| Huber =", round(huber, 4))
+print("Huber de Keras:", round(float(keras.losses.Huber()(y_objetivo, q_actual)), 4))</code></pre>
+  <details class="linea-a-linea" open>
+    <summary>Línea por línea</summary>
+    <p class="hint">Toca una fila (o pasa el ratón) para ver su línea resaltada en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace y por qué</th></tr></thead>
+      <tbody>
+        <tr data-lines="1"><td><code>import numpy as np</code></td><td>Trae NumPy con el apodo <code>np</code>.<span class="se-lee">trae NumPy y llámala np</span></td></tr>
+        <tr data-lines="2"><td><code>import keras</code></td><td>Trae <strong>Keras</strong>, la librería para construir redes neuronales por piezas.<span class="por-que">Sin ella habría que escribir cada multiplicación de la red a mano.</span><span class="se-lee">trae Keras</span></td></tr>
+        <tr data-lines="3"><td><code>from keras import layers</code></td><td>De Keras, trae el cajón <code>layers</code> (las capas).<span class="por-que">Así se escribe <code>layers.Dense</code> en lugar de <code>keras.layers.Dense</code>.</span><span class="se-lee">de Keras, trae el cajón de capas</span></td></tr>
+        <tr data-lines="5"><td><code>keras.utils.set_random_seed(0)</code></td><td>Fija todas las semillas a la vez (Python, NumPy y TensorFlow).<span class="por-que">Los pesos iniciales de la red se sortean: así salen siempre iguales.</span><span class="se-lee">fija el azar en 0 para todo</span></td></tr>
+        <tr data-lines="7"><td><code>red_q = keras.Sequential([</code></td><td><code>keras.Sequential</code> monta una red con capas en fila: lo que sale de una entra en la siguiente.<span class="por-que">Es la forma más sencilla de construir una red.</span><span class="se-lee">red_q es una red de capas en fila, que son las siguientes</span></td></tr>
+        <tr data-lines="8"><td><code>keras.Input(shape=(4,)),</code></td><td><code>keras.Input(shape=(4,))</code>: la entrada son 4 números (el estado de CartPole).<span class="por-que">La red necesita saber qué tamaño le llega.</span><span class="se-lee">entran 4 números</span></td></tr>
+        <tr data-lines="9"><td><code>layers.Dense(32, activation="relu"),</code></td><td>Una capa <code>Dense</code> de 32 neuronas: cada una mira los 4 números, los multiplica por sus pesos, suma y aplica <code>relu</code> (deja los positivos y cambia los negativos por 0).<span class="por-que">Es la parte que aprende combinaciones útiles del estado.</span><span class="se-lee">una capa de 32 neuronas que miran todo, con relu</span></td></tr>
+        <tr data-lines="10"><td><code>layers.Dense(32, activation="relu"),</code></td><td>Otra igual, que mira las 32 salidas de la anterior.<span class="por-que">Dos capas aprenden relaciones más complicadas que una.</span></td></tr>
+        <tr data-lines="11"><td><code>layers.Dense(2),</code></td><td>La capa de salida: 2 neuronas, <strong>sin activación</strong>. Cada una es el valor Q de una acción.<span class="por-que">Sin activación puede dar cualquier número, también negativo o grande: un valor Q no es una probabilidad.</span><span class="se-lee">una capa de 2 salidas, una por acción, que puede dar cualquier número</span></td></tr>
+        <tr data-lines="12"><td><code>], name="red_q")</code></td><td>Cierra la lista y le pone nombre a la red.</td></tr>
+        <tr data-lines="13"><td><code>red_q.summary()</code></td><td><code>summary()</code> escribe una tabla con las capas, sus formas y sus parámetros.<span class="por-que">Para comprobar la red antes de usarla.</span><span class="se-lee">escribe el resumen de la red</span></td></tr>
+        <tr data-lines="15"><td><code>estado = np.array([[0.02, -0.5, 0.05, 0.8]], dtype …</code></td><td>Un estado inventado, como tabla de 1 fila y 4 columnas (los dobles corchetes). <code>dtype="float32"</code>: decimales de 32 bits, el tipo de Keras.<span class="por-que">La red trabaja por <strong>lotes</strong>: aunque sea un solo estado, va en una fila de una tabla.</span><span class="se-lee">estado es un lote de un solo estado con estos 4 números</span></td></tr>
+        <tr data-lines="16"><td><code>valores_q = red_q.predict(estado, verbose=0)</code></td><td><code>predict</code> pasa el estado por la red y devuelve sus salidas. <code>verbose=0</code>: sin barra de progreso.<span class="se-lee">valores_q es lo que la red dice que vale cada acción en ese estado</span></td></tr>
+        <tr data-lines="17"><td><code>print("forma de la entrada:", estado.shape, "| for …</code></td><td>Escribe las formas de entrada y salida con <code>.shape</code>.<span class="por-que">Entra (1, 4) y sale (1, 2): un lote de 1, con dos valores.</span></td></tr>
+        <tr data-lines="18"><td><code>print("Q(s, izquierda), Q(s, derecha) =", valores_ …</code></td><td>Escribe los dos valores, redondeados. <code>[0]</code> saca la primera (y única) fila.</td></tr>
+        <tr data-lines="19"><td><code>print("acción greedy (argmax):", int(valores_q.arg …</code></td><td>La acción elegida es la de mayor valor: <code>argmax</code>.<span class="por-que">Así se actúa con una red Q: la acción que más vale.</span><span class="se-lee">escribe qué acción vale más</span></td></tr>
+        <tr data-lines="21"><td><code>lote = np.random.default_rng(0).normal(size=(5, 4) …</code></td><td>Un lote de 5 estados al azar, convertido a float32 con <code>astype</code>.<span class="por-que">Para ver que la red responde a varios a la vez.</span></td></tr>
+        <tr data-lines="22"><td><code>print("salida para un lote de 5 estados:", red_q.p …</code></td><td>Escribe la forma de la salida para esos 5.</td></tr>
+        <tr data-lines="24"><td><code>y_objetivo = np.array([1.5, 0.2, 3.0])</code></td><td>Tres objetivos inventados…</td></tr>
+        <tr data-lines="25"><td><code>q_actual = np.array([1.0, 0.0, -1.0])</code></td><td>…y tres valores de la red.</td></tr>
+        <tr data-lines="26"><td><code>error = y_objetivo - q_actual</code></td><td>Los errores: objetivo menos valor, casilla a casilla.</td></tr>
+        <tr data-lines="27"><td><code>mse = np.mean(error ** 2)</code></td><td>El <strong>MSE</strong> (error cuadrático medio): la media de los errores al cuadrado.<span class="por-que">Un error grande pesa muchísimo: 4 al cuadrado es 16.</span><span class="se-lee">mse es la media de los errores elevados al cuadrado</span></td></tr>
+        <tr data-lines="28"><td><code>huber = np.mean(np.where(np.abs(error) &lt;= 1, 0.5 * …</code></td><td>La <strong>pérdida de Huber</strong> a mano. <code>np.where(condición, a, b)</code> elige casilla a casilla: si el error (sin signo, <code>np.abs</code>) es como mucho 1, usa medio cuadrado; si no, el error menos 0,5.<span class="por-que">Huber trata los errores pequeños como el MSE y los grandes en línea recta: un objetivo disparatado no da un tirón enorme.</span><span class="se-lee">para cada error: si es pequeño, la mitad de su cuadrado; si es grande, su tamaño menos medio; y luego la media</span></td></tr>
+        <tr data-lines="29"><td><code>print("errores:", error, "| MSE =", round(mse, 4), …</code></td><td>Escribe los errores, el MSE y el Huber.</td></tr>
+        <tr data-lines="30"><td><code>print("Huber de Keras:", round(float(keras.losses. …</code></td><td>Calcula Huber con Keras (<code>keras.losses.Huber()</code> la crea; los paréntesis siguientes la aplican).<span class="por-que">Si coincide, nuestra fórmula a mano está bien.</span></td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>Model: "red_q"
+┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━┓
+┃ Layer (type)                    ┃ Output Shape           ┃       Param # ┃
+┡━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━┩
+│ dense (Dense)                   │ (None, 32)             │           160 │
+├─────────────────────────────────┼────────────────────────┼───────────────┤
+│ dense_1 (Dense)                 │ (None, 32)             │         1,056 │
+├─────────────────────────────────┼────────────────────────┼───────────────┤
+│ dense_2 (Dense)                 │ (None, 2)              │            66 │
+└─────────────────────────────────┴────────────────────────┴───────────────┘
+ Total params: 1,282 (5.01 KB)
+ Trainable params: 1,282 (5.01 KB)
+ Non-trainable params: 0 (0.00 B)
+forma de la entrada: (1, 4) | forma de la salida: (1, 2)
+Q(s, izquierda), Q(s, derecha) = [ 0.0697 -0.026 ]
+acción greedy (argmax): 0
+salida para un lote de 5 estados: (5, 2)
+errores: [0.5 0.2 4. ] | MSE = 5.43 | Huber = 1.215
+Huber de Keras: 1.215</pre>
+    <p><strong>Cómo leerla.</strong> La tabla del resumen: la primera capa tiene 4 · 32 + 32 = 160 parámetros (un peso por entrada y neurona, más un número propio por neurona), la segunda 32 · 32 + 32 = 1056 y la salida 32 · 2 + 2 = 66: <strong>1282</strong> en total. «None» en la forma significa «el tamaño del lote, el que sea». Los dos valores iniciales son casi 0 (0,0697 y −0,026): la red aún no sabe nada, y elige la acción 0. Para un lote de 5 estados salen 5 parejas. Con errores 0,5, 0,2 y 4, el MSE es 5,43 (el 4 aporta 16) y el Huber 1,215 (el 4 aporta solo 3,5). Keras da lo mismo.</p>
+  </div>
+</article>
+</section>
+<section class="lab-paso" id="paso-10">
+<h2><span class="paso-n">10</span>El DQN completo en CartPole</h2>
+<p>Para qué sirve este paso: juntar todas las piezas (red Q, red objetivo, replay buffer, épsilon que baja y la pérdida de Huber) y entrenar un agente que mantiene el palo en pie mucho más que el azar del paso 3. Es el algoritmo de la <a href="leccion-7.html#algoritmo">lección 7</a>, el que mejora la <a href="leccion-8.html#idea">lección 8</a>. Tarda un minuto.</p>
+<article class="snippet" data-lang="python" id="fragmento-13">
+  <header>
+    <h3>Paso 10 · DQN completo en CartPole: Keras y Gymnasium (fragmento 13)</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Entrenar de punta a punta un DQN pequeño durante 300 partidas y evaluarlo después sin explorar. Es un entrenamiento corto a propósito: se le ve aprender, con altibajos.</p>
+  </header>
+  <pre class="code"><code>import random
+from collections import deque
+import numpy as np
+import tensorflow as tf
+import keras
+from keras import layers
+import gymnasium as gym
+
+tf.config.threading.set_intra_op_parallelism_threads(1)
+tf.config.threading.set_inter_op_parallelism_threads(1)
+SEMILLA = 0
+keras.utils.set_random_seed(SEMILLA)
+random.seed(SEMILLA)
+rng = np.random.default_rng(SEMILLA)
+
+env = gym.make("CartPole-v1")
+gamma, tam_lote = 0.99, 64
+episodios, pasos_eps, sync_cada, empezar_en = 300, 5000, 500, 1000
+
+def crear_red():
+    return keras.Sequential([keras.Input(shape=(4,)),
+                             layers.Dense(64, activation="relu"),
+                             layers.Dense(64, activation="relu"),
+                             layers.Dense(2)])
+
+q = crear_red()
+q_obj = crear_red()
+q_obj.set_weights(q.get_weights())
+optimizador = keras.optimizers.Adam(1e-3)
+huber = keras.losses.Huber()
+buffer = deque(maxlen=10000)
+
+def como_lote(lote):
+    s, a, r, s2, f = zip(*lote)
+    return (np.array(s, "float32"), np.array(a, "int32"), np.array(r, "float32"),
+            np.array(s2, "float32"), np.array(f, "float32"))
+
+@tf.function
+def entrenar_lote(s, a, r, s2, f):
+    y = r + gamma * tf.reduce_max(q_obj(s2), axis=1) * (1.0 - f)
+    with tf.GradientTape() as cinta:
+        q_sa = tf.reduce_sum(q(s) * tf.one_hot(a, 2), axis=1)
+        perdida = huber(y, q_sa)
+    grads = cinta.gradient(perdida, q.trainable_variables)
+    optimizador.apply_gradients(zip(grads, q.trainable_variables))
+
+@tf.function
+def accion_greedy(estado):
+    return tf.argmax(q(estado[None, :]), axis=1)[0]
+
+retornos, pasos_totales = [], 0
+for ep in range(episodios):
+    obs, _ = env.reset(seed=SEMILLA if ep == 0 else None)
+    total, fin = 0.0, False
+    while not fin:
+        eps = max(0.05, 1.0 - pasos_totales / pasos_eps)
+        if rng.random() &lt; eps:
+            a = int(rng.integers(2))
+        else:
+            a = int(accion_greedy(tf.constant(obs)))
+        obs2, r, terminated, truncated, _ = env.step(a)
+        buffer.append((obs, a, r, obs2, float(terminated)))
+        obs, total, fin = obs2, total + r, terminated or truncated
+        pasos_totales += 1
+        if len(buffer) &gt;= empezar_en:
+            lote = random.sample(buffer, tam_lote)
+            entrenar_lote(*como_lote(lote))
+        if pasos_totales % sync_cada == 0:
+            q_obj.set_weights(q.get_weights())
+    retornos.append(total)
+    if (ep + 1) % 30 == 0:
+        print(f"episodio {ep + 1:3d} | pasos {pasos_totales:5d} | epsilon {eps:.2f} | retorno medio (últimos 30) {np.mean(retornos[-30:]):6.1f}")
+
+greedy = []
+for i in range(10):
+    obs, _ = env.reset(seed=1000 + i)
+    total, fin = 0.0, False
+    while not fin:
+        obs, r, terminated, truncated, _ = env.step(int(accion_greedy(tf.constant(obs))))
+        total, fin = total + r, terminated or truncated
+    greedy.append(total)
+print("10 episodios con la política greedy (sin explorar):", greedy)
+print("media greedy:", np.mean(greedy), "| azar puro, para comparar: unos 22")</code></pre>
+  <details class="linea-a-linea" open>
+    <summary>Línea por línea</summary>
+    <p class="hint">Toca una fila (o pasa el ratón) para ver su línea resaltada en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace y por qué</th></tr></thead>
+      <tbody>
+        <tr data-lines="1"><td><code>import random</code></td><td>Trae <code>random</code>, el cajón de azar que viene con Python.<span class="por-que">Su <code>random.sample</code> saca el minilote del buffer.</span><span class="se-lee">trae el cajón de azar de Python</span></td></tr>
+        <tr data-lines="2"><td><code>from collections import deque</code></td><td>De <code>collections</code> (cajón de Python con «recipientes» especiales), trae <code>deque</code>: una cola con tamaño máximo.<span class="por-que">Es el <strong>replay buffer</strong>: cuando se llena, lo nuevo empuja fuera lo más viejo.</span><span class="se-lee">de collections, trae la cola deque</span></td></tr>
+        <tr data-lines="3"><td><code>import numpy as np</code></td><td>Trae NumPy con el apodo <code>np</code>.<span class="se-lee">trae NumPy y llámala np</span></td></tr>
+        <tr data-lines="4"><td><code>import tensorflow as tf</code></td><td>Trae <strong>TensorFlow</strong> con el apodo <code>tf</code>: el motor que hace las cuentas de la red y calcula los gradientes.<span class="por-que">Usamos sus herramientas de bajo nivel para escribir el entrenamiento a mano.</span><span class="se-lee">trae TensorFlow y llámalo tf</span></td></tr>
+        <tr data-lines="5"><td><code>import keras</code></td><td>Trae Keras.</td></tr>
+        <tr data-lines="6"><td><code>from keras import layers</code></td><td>De Keras, trae el cajón de capas.</td></tr>
+        <tr data-lines="7"><td><code>import gymnasium as gym</code></td><td>Trae Gymnasium con el apodo <code>gym</code>.</td></tr>
+        <tr data-lines="9-10"><td><code>tf.config.threading.set_intra_op_parallelism_threa …</code></td><td>Le dice a TensorFlow que use un solo hilo (un solo «trabajador»).<span class="por-que">Con varios hilos el orden de las sumas cambia y los decimales pueden variar: así el resultado es repetible.</span><span class="se-lee">haz las cuentas de una en una</span></td></tr>
+        <tr data-lines="11"><td><code>SEMILLA = 0</code></td><td>La semilla, en mayúsculas porque no cambia.</td></tr>
+        <tr data-lines="12-14"><td><code>keras.utils.set_random_seed(SEMILLA) …</code></td><td>Fija las semillas de Keras, de <code>random</code> y de NumPy.<span class="por-que">Cada una controla un azar distinto: los pesos, el minilote y épsilon.</span><span class="se-lee">fija las tres máquinas de azar en 0</span></td></tr>
+        <tr data-lines="16"><td><code>env = gym.make("CartPole-v1")</code></td><td>El CartPole del paso 3.</td></tr>
+        <tr data-lines="17"><td><code>gamma, tam_lote = 0.99, 64</code></td><td>Gamma 0,99 (mira unos 100 pasos adelante) y minilotes de 64 transiciones.<span class="se-lee">gamma vale 0,99 y cada minilote tiene 64 recuerdos</span></td></tr>
+        <tr data-lines="18"><td><code>episodios, pasos_eps, sync_cada, empezar_en = 300, …</code></td><td>Cuatro ajustes: 300 partidas; épsilon baja en 5000 pasos; la red objetivo se copia cada 500 pasos; no se entrena hasta tener 1000 transiciones.<span class="por-que">Empezar a entrenar con el buffer casi vacío daría minilotes casi iguales.</span></td></tr>
+        <tr data-lines="20-24"><td><code>def crear_red(): …</code></td><td>Receta que fabrica una red: 4 números de entrada, dos capas de 64 neuronas con relu y 2 salidas sin activación (como en el paso 9, más grande).<span class="por-que">Hace falta dos veces: la red principal y la objetivo.</span><span class="se-lee">crear_red devuelve una red Q nueva</span></td></tr>
+        <tr data-lines="26"><td><code>q = crear_red()</code></td><td><code>q</code>: la red principal, la que aprende.</td></tr>
+        <tr data-lines="27"><td><code>q_obj = crear_red()</code></td><td><code>q_obj</code>: la <strong>red objetivo</strong>, la diana quieta.</td></tr>
+        <tr data-lines="28"><td><code>q_obj.set_weights(q.get_weights())</code></td><td><code>get_weights</code> saca los pesos de una red y <code>set_weights</code> los mete en otra: las dos empiezan iguales.<span class="por-que">La red objetivo debe ser una copia de la principal.</span><span class="se-lee">copia los pesos de q en q_obj</span></td></tr>
+        <tr data-lines="29"><td><code>optimizador = keras.optimizers.Adam(1e-3)</code></td><td>El <strong>optimizador</strong> Adam, que decide cuánto mover cada peso; <code>1e-3</code> es 0,001, el tamaño del paso.<span class="se-lee">el optimizador es Adam con pasos de 0,001</span></td></tr>
+        <tr data-lines="30"><td><code>huber = keras.losses.Huber()</code></td><td>La pérdida de Huber del paso 9.</td></tr>
+        <tr data-lines="31"><td><code>buffer = deque(maxlen=10000)</code></td><td>El replay buffer: una <code>deque</code> que guarda como mucho 10 000 transiciones.<span class="se-lee">el buffer es una cola que guarda las últimas 10 000 experiencias</span></td></tr>
+        <tr data-lines="33"><td><code>def como_lote(lote):</code></td><td>Receta que convierte un minilote (lista de transiciones) en cinco arrays.</td></tr>
+        <tr data-lines="34"><td><code>s, a, r, s2, f = zip(*lote)</code></td><td><code>zip(*lote)</code> «da la vuelta» a la lista: de 64 quíntuplas (s, a, r, s2, f) pasa a 5 grupos de 64. El <code>*</code> abre la lista para que <code>zip</code> reciba cada transición por separado.<span class="por-que">La red quiere todos los estados juntos, no transición a transición.</span><span class="se-lee">separa los estados, las acciones, los premios, los estados siguientes y los finales en cinco montones</span></td></tr>
+        <tr data-lines="35-36"><td><code>return (np.array(s, "float32"), np.array(a, "int32 …</code></td><td>Devuelve los cinco montones como arrays, con el tipo de número adecuado (las acciones, enteros; lo demás, decimales).</td></tr>
+        <tr data-lines="38"><td><code>@tf.function</code></td><td><code>@tf.function</code> es un <strong>decorador</strong>: la línea con @ cambia la receta de debajo. TensorFlow la «compila» la primera vez y luego va mucho más rápida.<span class="por-que">Se llama miles de veces: sin esto, el entrenamiento tardaría varias veces más.</span><span class="se-lee">convierte la receta de debajo en una versión rápida de TensorFlow</span></td></tr>
+        <tr data-lines="39"><td><code>def entrenar_lote(s, a, r, s2, f):</code></td><td>Receta que da un paso de entrenamiento con un minilote.</td></tr>
+        <tr data-lines="40"><td><code>y = r + gamma * tf.reduce_max(q_obj(s2), axis=1) * …</code></td><td>El <strong>objetivo</strong> de Bellman: premio + gamma · el mayor valor que da la red objetivo en el estado siguiente (<code>tf.reduce_max(…, axis=1)</code>, uno por fila) · (1 − final).<span class="por-que">Se calcula con la red objetivo, quieta, para que la diana no se mueva a cada paso.</span><span class="se-lee">y es r más gamma por lo mejor de después según la red quieta, salvo si acabó</span></td></tr>
+        <tr data-lines="41"><td><code>with tf.GradientTape() as cinta:</code></td><td><code>with tf.GradientTape() as cinta:</code> abre una «grabadora»: todo lo que se calcule dentro queda apuntado. <code>with</code> abre un bloque que se cierra solo al salir de la sangría.<span class="por-que">Para saber luego cuánto cambia la pérdida al mover cada peso (el <strong>gradiente</strong>).</span><span class="se-lee">graba las cuentas de debajo</span></td></tr>
+        <tr data-lines="42"><td><code>q_sa = tf.reduce_sum(q(s) * tf.one_hot(a, 2), axis …</code></td><td>El valor que la red da a la acción que se hizo. <code>tf.one_hot(a, 2)</code> convierte cada acción en [1, 0] o [0, 1]; al multiplicar y sumar por filas (<code>reduce_sum</code>), queda solo esa columna.<span class="por-que">Solo se corrige la acción que de verdad se hizo; la otra no tiene objetivo.</span><span class="se-lee">q_sa es, para cada recuerdo, lo que la red cree que vale la acción que se hizo</span></td></tr>
+        <tr data-lines="43"><td><code>perdida = huber(y, q_sa)</code></td><td>La pérdida de Huber entre objetivos y valores.</td></tr>
+        <tr data-lines="44"><td><code>grads = cinta.gradient(perdida, q.trainable_variab …</code></td><td><code>cinta.gradient</code> calcula los gradientes de la pérdida respecto a los pesos que se pueden entrenar.<span class="se-lee">calcula hacia dónde mover cada peso para bajar la pérdida</span></td></tr>
+        <tr data-lines="45"><td><code>optimizador.apply_gradients(zip(grads, q.trainable …</code></td><td>El optimizador mueve los pesos. <code>zip</code> empareja cada gradiente con su peso.<span class="se-lee">mueve cada peso un poco según su gradiente</span></td></tr>
+        <tr data-lines="47-49"><td><code>@tf.function …</code></td><td>Otra receta compilada: la acción de mayor valor para un estado. <code>estado[None, :]</code> le añade la dimensión de lote, de (4,) a (1, 4); <code>tf.argmax(…, axis=1)[0]</code> da la columna mayor.<span class="por-que">Se usa en cada paso del juego: compilada va rápida.</span><span class="se-lee">devuelve la acción que más vale en este estado</span></td></tr>
+        <tr data-lines="51"><td><code>retornos, pasos_totales = [], 0</code></td><td>Dos contadores: retornos de cada partida y pasos totales.</td></tr>
+        <tr data-lines="52"><td><code>for ep in range(episodios):</code></td><td>Una vuelta por partida.</td></tr>
+        <tr data-lines="53"><td><code>obs, _ = env.reset(seed=SEMILLA if ep == 0 else No …</code></td><td>Empieza la partida (semilla solo en la primera).</td></tr>
+        <tr data-lines="54"><td><code>total, fin = 0.0, False</code></td><td>Pone a cero lo ganado y el aviso de fin.</td></tr>
+        <tr data-lines="55"><td><code>while not fin:</code></td><td>Repite hasta que acabe la partida.<span class="se-lee">mientras no haya acabado, haz lo de debajo</span></td></tr>
+        <tr data-lines="56"><td><code>eps = max(0.05, 1.0 - pasos_totales / pasos_eps)</code></td><td>Épsilon baja en línea recta de 1 a 0,05 durante los primeros 5000 pasos y luego se queda en 0,05.<span class="por-que">Explorar mucho al principio y poco al final.</span><span class="se-lee">épsilon es 1 menos lo recorrido de los 5000 pasos, pero nunca menos de 0,05</span></td></tr>
+        <tr data-lines="57-58"><td><code>if rng.random() &lt; eps: …</code></td><td>Con probabilidad épsilon, acción al azar.</td></tr>
+        <tr data-lines="59-60"><td><code>else: …</code></td><td>Si no, la mejor según la red. <code>tf.constant(obs)</code> convierte el estado en un tensor (la caja de números de TensorFlow).<span class="se-lee">si no, pregunta a la red qué acción vale más</span></td></tr>
+        <tr data-lines="61"><td><code>obs2, r, terminated, truncated, _ = env.step(a)</code></td><td>Actúa y recibe lo de siempre.</td></tr>
+        <tr data-lines="62"><td><code>buffer.append((obs, a, r, obs2, float(terminated)))</code></td><td>Guarda la transición en el buffer. El aviso de fin es <code>terminated</code>, no <code>truncated</code>.<span class="por-que">Si se cortó por tiempo, el futuro seguía existiendo: no hay que anularlo en el objetivo.</span><span class="se-lee">apunta este recuerdo; el fin solo cuenta si el palo cayó de verdad</span></td></tr>
+        <tr data-lines="63"><td><code>obs, total, fin = obs2, total + r, terminated or t …</code></td><td>Tres cosas a la vez: avanza el estado, suma el premio y apunta si acabó por cualquiera de los dos motivos.</td></tr>
+        <tr data-lines="64"><td><code>pasos_totales += 1</code></td><td>Un paso más en total.</td></tr>
+        <tr data-lines="65-67"><td><code>if len(buffer) &gt;= empezar_en: …</code></td><td>Si el buffer ya tiene 1000 transiciones, saca 64 al azar (<code>random.sample</code>) y entrena con ellas. <code>*como_lote(lote)</code> abre los cinco arrays como cinco argumentos.<span class="por-que">Al azar: así el minilote mezcla momentos distintos y no veinte pasos seguidos casi iguales.</span><span class="se-lee">si ya hay 1000 recuerdos, coge 64 al azar y aprende con ellos</span></td></tr>
+        <tr data-lines="68-69"><td><code>if pasos_totales % sync_cada == 0: …</code></td><td>Cada 500 pasos, copia la red principal en la objetivo.<span class="por-que">Es lo único que mueve la diana: así está quieta entre copias.</span><span class="se-lee">si el número de pasos es múltiplo de 500, actualiza la red quieta</span></td></tr>
+        <tr data-lines="70"><td><code>retornos.append(total)</code></td><td>Guarda el retorno de la partida.</td></tr>
+        <tr data-lines="71-72"><td><code>if (ep + 1) % 30 == 0: …</code></td><td>Cada 30 partidas escribe pasos, épsilon y la media de los 30 últimos retornos (<code>retornos[-30:]</code>).</td></tr>
+        <tr data-lines="74"><td><code>greedy = []</code></td><td>Lista para la evaluación final.</td></tr>
+        <tr data-lines="75"><td><code>for i in range(10):</code></td><td>Diez partidas de examen.</td></tr>
+        <tr data-lines="76"><td><code>obs, _ = env.reset(seed=1000 + i)</code></td><td>Con semillas nuevas (1000 a 1009), que nunca vio.<span class="por-que">Para no examinar con las mismas partidas del entrenamiento.</span></td></tr>
+        <tr data-lines="77-81"><td><code>total, fin = 0.0, False …</code></td><td>Juega sin explorar: siempre la mejor acción según la red. Apunta lo ganado.<span class="por-que">Es lo que de verdad ha aprendido, sin dados.</span><span class="se-lee">juega diez partidas eligiendo siempre lo que la red cree mejor</span></td></tr>
+        <tr data-lines="82"><td><code>print("10 episodios con la política greedy (sin ex …</code></td><td>Escribe los diez resultados.</td></tr>
+        <tr data-lines="83"><td><code>print("media greedy:", np.mean(greedy), "| azar pu …</code></td><td>Escribe su media y la del azar para comparar.</td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>episodio  30 | pasos   698 | epsilon 0.86 | retorno medio (últimos 30)   23.3
+episodio  60 | pasos  1264 | epsilon 0.75 | retorno medio (últimos 30)   18.9
+episodio  90 | pasos  1726 | epsilon 0.66 | retorno medio (últimos 30)   15.4
+episodio 120 | pasos  2182 | epsilon 0.56 | retorno medio (últimos 30)   15.2
+episodio 150 | pasos  2689 | epsilon 0.46 | retorno medio (últimos 30)   16.9
+episodio 180 | pasos  4732 | epsilon 0.05 | retorno medio (últimos 30)   68.1
+episodio 210 | pasos  9077 | epsilon 0.05 | retorno medio (últimos 30)  144.8
+episodio 240 | pasos 12848 | epsilon 0.05 | retorno medio (últimos 30)  125.7
+episodio 270 | pasos 17667 | epsilon 0.05 | retorno medio (últimos 30)  160.6
+episodio 300 | pasos 23591 | epsilon 0.05 | retorno medio (últimos 30)  197.5
+10 episodios con la política greedy (sin explorar): [208.0, 198.0, 212.0, 192.0, 172.0, 188.0, 191.0, 198.0, 190.0, 171.0]
+media greedy: 192.0 | azar puro, para comparar: unos 22</pre>
+    <p><strong>Cómo leerla.</strong> Hasta la partida 150 (unos 2700 pasos) épsilon baja de 1 a 0,46 y el retorno medio ronda 15–23: igual que el azar. Además, la red no entrena hasta el paso 1000. Cuando épsilon llega a 0,05 (paso 4750) el retorno sube: 68 en la partida 180, 145 en la 210, luego 126, 161 y <strong>197,5</strong> al final (sube y baja: es inestable). Sin explorar, gana entre 171 y 212 pasos (media <strong>192</strong>), unas ocho veces el azar, pero lejos del máximo de 500. Con otras semillas sale peor (106–110): por eso se prueban varias.</p>
+  </div>
+</article>
+</section>
+
+<section>
+<h2 id="completo">El código completo</h2>
+<p>Los diez pasos seguidos, para copiarlos y ejecutarlos de una vez. Tres formas:</p>
+<ul>
+  <li><strong>Google Colab</strong> (sin instalar nada): abre un cuaderno nuevo, escribe en una celda <code>!pip install gymnasium</code> y ejecútala; después pega todo en otra celda y pulsa ▶. Colab ya trae NumPy, TensorFlow y Keras.</li>
+  <li><strong>Jupyter</strong>: igual, en una celda.</li>
+  <li><strong>En tu ordenador</strong>: guárdalo como <code>refuerzo_netflix.py</code> y escribe <code>python refuerzo_netflix.py</code> en la terminal. Antes, una vez: <code>pip install gymnasium tensorflow</code>.</li>
+</ul>
+<p>Los <code>import</code> se repiten porque cada paso funciona solo; repetirlos no hace daño. Tarda unos dos minutos en una CPU normal (el paso 10 entrena un minuto).</p>
+<pre class="code"><code># ===== Paso 1 · Crear un entorno y dar los primeros pasos =====
+import gymnasium as gym
+
+print("Gymnasium", gym.__version__)
+env = gym.make("FrozenLake-v1", is_slippery=False)
+print("estados  :", env.observation_space)
+print("acciones :", env.action_space)
+print("tablero  :")
+for fila in env.unwrapped.desc:
+    print("  ", " ".join(c.decode() for c in fila))
+
+estado, info = env.reset(seed=0)
+print("reset -&gt;", estado, info)
+
+for accion in [2, 2, 1, 1, 1, 2]:
+    estado, recompensa, terminado, truncado, info = env.step(accion)
+    print(f"accion={accion} -&gt; estado={estado:2d} recompensa={recompensa} terminado={terminado} truncado={truncado}")
+env.close()
+
+resbaladizo = gym.make("FrozenLake-v1", is_slippery=True)
+print("P[14][2] con suelo resbaladizo:")
+for prob, siguiente, r, fin in resbaladizo.unwrapped.P[14][2]:
+    print(f"   prob={prob:.3f} -&gt; estado {siguiente:2d}, recompensa {r}, terminado={fin}")
+
+# ===== Paso 2 · El retorno: sumar premios futuros, encogidos =====
+import numpy as np
+
+prudente  = [1, 1, 1, 1, 1, 10, 1, 1, 1000]
+temerario = [1, 1, 1, 10, -100]
+
+def retorno(recompensas, gamma):
+    total = 0.0
+    for t, r in enumerate(recompensas):
+        total += gamma ** t * r
+    return total
+
+def retornos_hacia_atras(recompensas, gamma):
+    G = 0.0
+    salida = []
+    for r in reversed(recompensas):
+        G = r + gamma * G
+        salida.append(G)
+    return salida[::-1]
+
+for gamma in [1.0, 0.9, 0.5]:
+    print(f"gamma={gamma}: prudente={retorno(prudente, gamma):8.2f}  temerario={retorno(temerario, gamma):8.2f}")
+
+print("G_t hacia atrás (prudente, gamma=0.9):", np.round(retornos_hacia_atras(prudente, 0.9), 2))
+print("G_0 con la fórmula directa:            ", round(retorno(prudente, 0.9), 2))
+
+# ===== Paso 3 · CartPole al azar: la marca que hay que batir =====
+import numpy as np
+import gymnasium as gym
+
+env = gym.make("CartPole-v1")
+print("observation_space:", env.observation_space)
+print("action_space     :", env.action_space)
+print("max pasos        :", env.spec.max_episode_steps)
+
+rng = np.random.default_rng(0)
+retornos = []
+for ep in range(20):
+    obs, info = env.reset(seed=ep)
+    total, pasos = 0.0, 0
+    while True:
+        accion = int(rng.integers(2))
+        obs, r, terminated, truncated, info = env.step(accion)
+        total += r
+        pasos += 1
+        if terminated or truncated:
+            break
+    retornos.append(total)
+    if ep &lt; 3:
+        print(f"episodio {ep}: {pasos} pasos, retorno {total}, terminated={terminated}, truncated={truncated}")
+
+print("retorno medio con acciones al azar (20 episodios):", np.mean(retornos))
+print("mejor / peor:", max(retornos), "/", min(retornos))
+env.close()
+
+# ===== Paso 4 · Bellman con NumPy: el sistema y los barridos =====
+import numpy as np
+
+gamma = 0.5
+# Estados: 0 = A, 1 = B, 2 = T (final). Una sola acción por estado (política fija).
+# Desde A: 50 % pasa a B con recompensa +4, 50 % se queda en A con recompensa 0.
+# Desde B: 60 % pasa a T con recompensa +10, 40 % vuelve a A con recompensa 0.
+P = np.array([[0.5, 0.5, 0.0],
+              [0.4, 0.0, 0.6],
+              [0.0, 0.0, 0.0]])
+R = np.array([0.5 * 4 + 0.5 * 0,
+              0.6 * 10 + 0.4 * 0,
+              0.0])
+print("recompensa esperada inmediata R:", R)
+
+V = np.linalg.solve(np.eye(3) - gamma * P, R)
+print("solución exacta V:", V.round(4))
+
+V = np.zeros(3)
+for k in range(1, 6):
+    V = R + gamma * P @ V
+    print(f"barrido {k}: V =", V.round(4))
+for _ in range(100):
+    V = R + gamma * P @ V
+print("tras 105 barridos:", V.round(4))
+print("Bellman en A:", R[0] + gamma * P[0] @ V, "| Bellman en B:", R[1] + gamma * P[1] @ V)
+
+# ===== Paso 5 · El bandido: explorar con ε-greedy =====
+import numpy as np
+
+rng = np.random.default_rng(0)
+medias_reales = rng.normal(0, 1, 10)
+print("medias reales:", medias_reales.round(2))
+print("mejor brazo  :", medias_reales.argmax(), "con media", medias_reales.max().round(2))
+
+def jugar(epsilon, pasos=1000, semilla=1):
+    r = np.random.default_rng(semilla)
+    Q = np.zeros(10)
+    N = np.zeros(10)
+    total = 0.0
+    for t in range(pasos):
+        if r.random() &lt; epsilon:
+            a = int(r.integers(10))
+        else:
+            a = int(Q.argmax())
+        recompensa = r.normal(medias_reales[a], 1)
+        N[a] += 1
+        Q[a] += (recompensa - Q[a]) / N[a]
+        total += recompensa
+    return total / pasos, int(Q.argmax()), int(N.argmax())
+
+for eps in [0.0, 0.01, 0.1, 0.3]:
+    media, mejor_est, mas_usado = jugar(eps)
+    print(f"epsilon={eps:&lt;4}: recompensa media={media:5.2f} | brazo estimado mejor={mejor_est} | brazo más usado={mas_usado}")
+
+# ===== Paso 6 · Una corrección de Q-learning, a mano =====
+import numpy as np
+
+alpha, gamma = 0.1, 0.9
+
+Q = np.zeros((3, 2))
+Q[0, 1] = 0.40
+Q[1] = [0.2, 0.9]
+
+def actualizar(Q, s, a, r, s_sig, terminado):
+    objetivo = r + gamma * Q[s_sig].max() * (not terminado)
+    error_td = objetivo - Q[s, a]
+    Q[s, a] += alpha * error_td
+    return objetivo, error_td
+
+objetivo, error_td = actualizar(Q, s=0, a=1, r=0.0, s_sig=1, terminado=False)
+print("objetivo  r + γ·max Q(s',·) =", round(objetivo, 4))
+print("error TD  objetivo - Q(s,a) =", round(error_td, 4))
+print("Q(0,1) nuevo =", round(Q[0, 1], 4))
+
+objetivo, error_td = actualizar(Q, s=1, a=1, r=1.0, s_sig=2, terminado=True)
+print("paso terminal: objetivo =", objetivo, "| Q(1,1) nuevo =", round(Q[1, 1], 4))
+
+# ===== Paso 7 · Q-learning entero en el lago helado =====
+import numpy as np
+import gymnasium as gym
+
+env = gym.make("FrozenLake-v1", is_slippery=False)
+n_estados, n_acciones = env.observation_space.n, env.action_space.n
+rng = np.random.default_rng(0)
+
+Q = np.zeros((n_estados, n_acciones))
+alpha, gamma = 0.5, 0.95
+epsilon, eps_min, decaimiento = 1.0, 0.05, 0.99
+episodios = 500
+
+def accion_epsilon_greedy(Q, estado, epsilon):
+    if rng.random() &lt; epsilon:
+        return int(rng.integers(Q.shape[1]))
+    mejores = np.flatnonzero(Q[estado] == Q[estado].max())
+    return int(rng.choice(mejores))
+
+exitos = 0
+for ep in range(episodios):
+    estado, _ = env.reset(seed=0 if ep == 0 else None)
+    terminado = truncado = False
+    while not (terminado or truncado):
+        accion = accion_epsilon_greedy(Q, estado, epsilon)
+        sig, r, terminado, truncado, _ = env.step(accion)
+        objetivo = r + gamma * Q[sig].max() * (not terminado)
+        Q[estado, accion] += alpha * (objetivo - Q[estado, accion])
+        estado = sig
+    exitos += r
+    epsilon = max(eps_min, epsilon * decaimiento)
+    if (ep + 1) % 100 == 0:
+        print(f"episodio {ep + 1:3d}: epsilon={epsilon:.3f}, éxitos acumulados={int(exitos)}")
+
+print("Q del estado 14 (a un paso de la meta):", Q[14].round(3))
+print("Q del estado 0 (salida):", Q[0].round(3))
+
+flechas = np.array(list("←↓→↑"))
+politica = flechas[Q.argmax(axis=1)]
+politica[[5, 7, 11, 12, 15]] = ["H", "H", "H", "H", "G"]
+print(politica.reshape(4, 4))
+
+estado, _ = env.reset()
+camino, terminado = [0], False
+while not terminado and len(camino) &lt; 20:
+    estado, r, terminado, truncado, _ = env.step(int(Q[estado].argmax()))
+    camino.append(estado)
+print("camino greedy:", camino, "| recompensa final:", r)
+
+# ===== Paso 8 · SARSA frente a Q-learning en el acantilado =====
+import numpy as np
+import gymnasium as gym
+
+env = gym.make("CliffWalking-v1")
+FILAS, COLS = 4, 12
+alpha, gamma, epsilon = 0.5, 1.0, 0.1
+
+def elegir(Q, s, rng):
+    if rng.random() &lt; epsilon:
+        return int(rng.integers(4))
+    return int(rng.choice(np.flatnonzero(Q[s] == Q[s].max())))
+
+def entrenar(algoritmo, episodios=500, semilla=0):
+    rng = np.random.default_rng(semilla)
+    Q = np.zeros((48, 4))
+    recompensas = []
+    for ep in range(episodios):
+        s, _ = env.reset(seed=semilla if ep == 0 else None)
+        a = elegir(Q, s, rng)
+        total, pasos, fin = 0.0, 0, False
+        while not fin and pasos &lt; 500:
+            s2, r, terminado, truncado, _ = env.step(a)
+            a2 = elegir(Q, s2, rng)
+            if algoritmo == "sarsa":
+                siguiente = Q[s2, a2]
+            else:
+                siguiente = Q[s2].max()
+            Q[s, a] += alpha * (r + gamma * siguiente * (not terminado) - Q[s, a])
+            s, a = s2, a2
+            total += r
+            pasos += 1
+            fin = terminado or truncado
+        recompensas.append(total)
+    return Q, np.array(recompensas)
+
+def camino_greedy(Q):
+    s, _ = env.reset()
+    ruta = [s]
+    while s != 47 and len(ruta) &lt; 50:
+        s, _, _, _, _ = env.step(int(Q[s].argmax()))
+        ruta.append(s)
+    return ruta
+
+def dibujar(ruta):
+    tablero = [["."] * COLS for _ in range(FILAS)]
+    for c in range(1, COLS - 1):
+        tablero[3][c] = "C"
+    for celda in ruta:
+        tablero[celda // COLS][celda % COLS] = "*"
+    tablero[3][0], tablero[3][11] = "S", "G"
+    return ["".join(f) for f in tablero]
+
+for alg in ["sarsa", "qlearning"]:
+    medias = []
+    for semilla in range(5):
+        Q, rec = entrenar(alg, semilla=semilla)
+        medias.append(rec[-100:].mean())
+    Q, rec = entrenar(alg, semilla=0)
+    ruta = camino_greedy(Q)
+    print(f"{alg}: recompensa media por episodio (últimos 100, 5 semillas) = {np.mean(medias):.2f}")
+    print(f"{alg}: camino greedy de {len(ruta) - 1} pasos")
+    print("\n".join(dibujar(ruta)))
+
+# ===== Paso 9 · La red Q de Keras y la pérdida de Huber =====
+import numpy as np
+import keras
+from keras import layers
+
+keras.utils.set_random_seed(0)
+
+red_q = keras.Sequential([
+    keras.Input(shape=(4,)),
+    layers.Dense(32, activation="relu"),
+    layers.Dense(32, activation="relu"),
+    layers.Dense(2),
+], name="red_q")
+red_q.summary()
+
+estado = np.array([[0.02, -0.5, 0.05, 0.8]], dtype="float32")
+valores_q = red_q.predict(estado, verbose=0)
+print("forma de la entrada:", estado.shape, "| forma de la salida:", valores_q.shape)
+print("Q(s, izquierda), Q(s, derecha) =", valores_q.round(4)[0])
+print("acción greedy (argmax):", int(valores_q.argmax()))
+
+lote = np.random.default_rng(0).normal(size=(5, 4)).astype("float32")
+print("salida para un lote de 5 estados:", red_q.predict(lote, verbose=0).shape)
+
+y_objetivo = np.array([1.5, 0.2, 3.0])
+q_actual = np.array([1.0, 0.0, -1.0])
+error = y_objetivo - q_actual
+mse = np.mean(error ** 2)
+huber = np.mean(np.where(np.abs(error) &lt;= 1, 0.5 * error ** 2, np.abs(error) - 0.5))
+print("errores:", error, "| MSE =", round(mse, 4), "| Huber =", round(huber, 4))
+print("Huber de Keras:", round(float(keras.losses.Huber()(y_objetivo, q_actual)), 4))
+
+# ===== Paso 10 · El DQN completo en CartPole =====
+import random
+from collections import deque
+import numpy as np
+import tensorflow as tf
+import keras
+from keras import layers
+import gymnasium as gym
+
+tf.config.threading.set_intra_op_parallelism_threads(1)
+tf.config.threading.set_inter_op_parallelism_threads(1)
+SEMILLA = 0
+keras.utils.set_random_seed(SEMILLA)
+random.seed(SEMILLA)
+rng = np.random.default_rng(SEMILLA)
+
+env = gym.make("CartPole-v1")
+gamma, tam_lote = 0.99, 64
+episodios, pasos_eps, sync_cada, empezar_en = 300, 5000, 500, 1000
+
+def crear_red():
+    return keras.Sequential([keras.Input(shape=(4,)),
+                             layers.Dense(64, activation="relu"),
+                             layers.Dense(64, activation="relu"),
+                             layers.Dense(2)])
+
+q = crear_red()
+q_obj = crear_red()
+q_obj.set_weights(q.get_weights())
+optimizador = keras.optimizers.Adam(1e-3)
+huber = keras.losses.Huber()
+buffer = deque(maxlen=10000)
+
+def como_lote(lote):
+    s, a, r, s2, f = zip(*lote)
+    return (np.array(s, "float32"), np.array(a, "int32"), np.array(r, "float32"),
+            np.array(s2, "float32"), np.array(f, "float32"))
+
+@tf.function
+def entrenar_lote(s, a, r, s2, f):
+    y = r + gamma * tf.reduce_max(q_obj(s2), axis=1) * (1.0 - f)
+    with tf.GradientTape() as cinta:
+        q_sa = tf.reduce_sum(q(s) * tf.one_hot(a, 2), axis=1)
+        perdida = huber(y, q_sa)
+    grads = cinta.gradient(perdida, q.trainable_variables)
+    optimizador.apply_gradients(zip(grads, q.trainable_variables))
+
+@tf.function
+def accion_greedy(estado):
+    return tf.argmax(q(estado[None, :]), axis=1)[0]
+
+retornos, pasos_totales = [], 0
+for ep in range(episodios):
+    obs, _ = env.reset(seed=SEMILLA if ep == 0 else None)
+    total, fin = 0.0, False
+    while not fin:
+        eps = max(0.05, 1.0 - pasos_totales / pasos_eps)
+        if rng.random() &lt; eps:
+            a = int(rng.integers(2))
+        else:
+            a = int(accion_greedy(tf.constant(obs)))
+        obs2, r, terminated, truncated, _ = env.step(a)
+        buffer.append((obs, a, r, obs2, float(terminated)))
+        obs, total, fin = obs2, total + r, terminated or truncated
+        pasos_totales += 1
+        if len(buffer) &gt;= empezar_en:
+            lote = random.sample(buffer, tam_lote)
+            entrenar_lote(*como_lote(lote))
+        if pasos_totales % sync_cada == 0:
+            q_obj.set_weights(q.get_weights())
+    retornos.append(total)
+    if (ep + 1) % 30 == 0:
+        print(f"episodio {ep + 1:3d} | pasos {pasos_totales:5d} | epsilon {eps:.2f} | retorno medio (últimos 30) {np.mean(retornos[-30:]):6.1f}")
+
+greedy = []
+for i in range(10):
+    obs, _ = env.reset(seed=1000 + i)
+    total, fin = 0.0, False
+    while not fin:
+        obs, r, terminated, truncated, _ = env.step(int(accion_greedy(tf.constant(obs))))
+        total, fin = total + r, terminated or truncated
+    greedy.append(total)
+print("10 episodios con la política greedy (sin explorar):", greedy)
+print("media greedy:", np.mean(greedy), "| azar puro, para comparar: unos 22")</code></pre>
+</section>
+
+<section>
+<h2 id="mas-codigo">Más código del módulo</h2>
+<p>El resto del código de las lecciones: seis fragmentos que no forman parte del ejemplo (el 2, el 16, el 9, el 12, el 14 y el 15). Ninguno se pierde: cada uno conserva su número, su código y su salida real, con su tabla línea a línea con el <strong>por qué</strong> y el <strong>se lee así</strong>. Como los pasos, cada uno funciona solo.</p>
+
+<h3 class="grupo-frag" id="mas-l1">Lección 1 · La interfaz de Gymnasium y el código antiguo</h3>
+<p><a href="leccion-1.html#gymnasium">Volver a la lección 1</a>. El primero es el esqueleto de todo experimento; el segundo, los errores al copiar tutoriales viejos.</p>
+<article class="snippet" data-lang="python" id="fragmento-16">
+  <header>
+    <h3>16 · La interfaz de Gymnasium en cuatro verbos</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> El esqueleto de cualquier experimento con Gymnasium, en cuatro verbos: crear, empezar, actuar y cerrar. Aquí el «agente» elige al azar; en un agente de verdad, esa línea es la que cambia.</p>
+  </header>
+  <pre class="code"><code>import gymnasium as gym
+
+env = gym.make("CartPole-v1")                    # 1. crear el entorno
+obs, info = env.reset(seed=0)                    # 2. empezar un episodio
+terminado = truncado = False
+while not (terminado or truncado):
+    accion = env.action_space.sample()           #    (aquí decidiría tu agente)
+    obs, r, terminado, truncado, info = env.step(accion)   # 3. actuar
+env.close()                                      # 4. cerrar</code></pre>
+  <details class="linea-a-linea" open>
+    <summary>Línea por línea</summary>
+    <p class="hint">Toca una fila (o pasa el ratón) para ver su línea resaltada en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace y por qué</th></tr></thead>
+      <tbody>
+        <tr data-lines="1"><td><code>import gymnasium as gym</code></td><td>Trae Gymnasium con el apodo <code>gym</code>.<span class="se-lee">trae Gymnasium y llámala gym</span></td></tr>
+        <tr data-lines="3"><td><code>env = gym.make("CartPole-v1")                    # …</code></td><td>Verbo 1, <strong>crear</strong>: el entorno CartPole. Lo de detrás de <code>#</code> es un comentario.</td></tr>
+        <tr data-lines="4"><td><code>obs, info = env.reset(seed=0)                    # …</code></td><td>Verbo 2, <strong>empezar</strong>: <code>reset</code> devuelve el estado inicial y los extras.<span class="se-lee">empieza una partida y guarda el estado y los extras</span></td></tr>
+        <tr data-lines="5"><td><code>terminado = truncado = False</code></td><td>Dos nombres a <code>False</code> en una línea: <code>a = b = False</code> da el mismo valor a los dos.<span class="por-que">El bucle de debajo pregunta por ellos antes del primer paso.</span><span class="se-lee">terminado y truncado empiezan los dos en falso</span></td></tr>
+        <tr data-lines="6"><td><code>while not (terminado or truncado):</code></td><td>Repite mientras la partida no haya acabado por ninguno de los dos motivos.<span class="se-lee">mientras no se haya acabado ni de verdad ni por tiempo, haz lo de debajo</span></td></tr>
+        <tr data-lines="7"><td><code>accion = env.action_space.sample()           # …</code></td><td><code>action_space.sample()</code> saca una acción válida al azar.<span class="por-que">Aquí es donde un agente de verdad decidiría.</span><span class="se-lee">acción es una cualquiera de las permitidas</span></td></tr>
+        <tr data-lines="8"><td><code>obs, r, terminado, truncado, info = env.step(accio …</code></td><td>Verbo 3, <strong>actuar</strong>: <code>step</code> devuelve cinco cosas.</td></tr>
+        <tr data-lines="9"><td><code>env.close()                                      # …</code></td><td>Verbo 4, <strong>cerrar</strong>.</td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <p><strong>Cómo leerla.</strong> No escribe nada: no tiene ningún <code>print</code>. Si se ejecuta sin errores, el esqueleto funciona. Para ver algo, añade al final del bucle <code>print(obs, r)</code>.</p>
+  </div>
+</article>
+<article class="snippet" data-lang="python" id="fragmento-2">
+  <header>
+    <h3>2 · El código antiguo (<code>gym</code>) frente al actual (<code>gymnasium</code>)</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Reproducir a propósito los dos errores típicos al copiar tutoriales de antes de 2022 (importar <code>gym</code> y recoger cuatro valores de <code>step</code>) y ver la forma correcta.</p>
+  </header>
+  <pre class="code"><code>import gymnasium as gym
+
+try:
+    import gym as gym_antiguo
+except ModuleNotFoundError as e:
+    print("import gym -&gt;", e)
+
+env = gym.make("CartPole-v1")
+
+obs = env.reset(seed=0)
+print("reset() devuelve", type(obs).__name__, "de", len(obs), "elementos")
+
+try:
+    obs, r, done, info = env.step(0)
+except ValueError as e:
+    print("ValueError:", e)
+
+obs, info = env.reset(seed=0)
+obs, r, terminated, truncated, info = env.step(0)
+print("observacion:", obs.round(3))
+print("recompensa:", r, "| terminated:", terminated, "| truncated:", truncated)
+done = terminated or truncated
+print("done =", done)</code></pre>
+  <details class="linea-a-linea" open>
+    <summary>Línea por línea</summary>
+    <p class="hint">Toca una fila (o pasa el ratón) para ver su línea resaltada en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace y por qué</th></tr></thead>
+      <tbody>
+        <tr data-lines="1"><td><code>import gymnasium as gym</code></td><td>Trae la librería actual, Gymnasium.<span class="se-lee">trae Gymnasium y llámala gym</span></td></tr>
+        <tr data-lines="3-5"><td><code>try: …</code></td><td><code>try</code> / <code>except</code>: «intenta esto; si falla con este error, no rompas el programa y haz lo de <code>except</code>». Intenta traer el paquete antiguo <code>gym</code>. <code>as e</code> guarda el error en <code>e</code>.<span class="por-que">Así vemos el mensaje sin que el programa se pare.</span><span class="se-lee">intenta traer gym; si no existe, guarda el error en e</span></td></tr>
+        <tr data-lines="6"><td><code>print("import gym -&gt;", e)</code></td><td>Escribe el mensaje del error.<span class="por-que">En un ordenador con <code>gym</code> instalado no saldría.</span></td></tr>
+        <tr data-lines="8"><td><code>env = gym.make("CartPole-v1")</code></td><td>Crea el CartPole con la librería actual.</td></tr>
+        <tr data-lines="10"><td><code>obs = env.reset(seed=0)</code></td><td>Estilo antiguo: guardar lo que da <code>reset</code> en un solo nombre. Ahora llega una <strong>tupla</strong> (estado, extras).<span class="por-que">No falla aquí, pero todo lo de después se rompe de formas confusas.</span><span class="se-lee">obs es lo que devuelve reset, que ahora son dos cosas</span></td></tr>
+        <tr data-lines="11"><td><code>print("reset() devuelve", type(obs).__name__, "de" …</code></td><td><code>type(obs).__name__</code> es el nombre del tipo de dato; <code>len</code>, cuántos elementos tiene.<span class="por-que">Para ver que ha llegado una tupla de 2.</span></td></tr>
+        <tr data-lines="13-16"><td><code>try: …</code></td><td>Estilo antiguo con <code>step</code>: repartir en 4 nombres. Como llegan 5, Python lanza <code>ValueError</code>; <code>except</code> lo atrapa y lo escribe.<span class="por-que">Es el error más frecuente al copiar tutoriales viejos.</span><span class="se-lee">intenta repartir lo de step en cuatro nombres; si no cabe, escribe el error</span></td></tr>
+        <tr data-lines="18"><td><code>obs, info = env.reset(seed=0)</code></td><td>Forma actual de <code>reset</code>: dos nombres.<span class="por-que">Reinicia la partida (el <code>step</code> fallido ya la había movido).</span><span class="se-lee">empieza otra vez y guarda estado y extras</span></td></tr>
+        <tr data-lines="19"><td><code>obs, r, terminated, truncated, info = env.step(0)</code></td><td>Forma actual de <code>step</code>: cinco nombres. La acción 0 es empujar a la izquierda.</td></tr>
+        <tr data-lines="20"><td><code>print("observacion:", obs.round(3))</code></td><td>El estado son 4 números; <code>.round(3)</code> los deja con 3 decimales.</td></tr>
+        <tr data-lines="21"><td><code>print("recompensa:", r, "| terminated:", terminate …</code></td><td>Escribe el premio y los dos avisos.</td></tr>
+        <tr data-lines="22"><td><code>done = terminated or truncated</code></td><td>El antiguo <code>done</code> se reconstruye con <code>or</code> («uno u otro»).<span class="por-que">Para parar el bucle basta con esto; para el objetivo del DQN hay que separarlos (paso 10).</span><span class="se-lee">done es verdad si acabó de verdad o se acabó el tiempo</span></td></tr>
+        <tr data-lines="23"><td><code>print("done =", done)</code></td><td>Escribe <code>done</code>.</td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>import gym -&gt; No module named 'gym'
+reset() devuelve tuple de 2 elementos
+ValueError: too many values to unpack (expected 4)
+observacion: [ 0.013 -0.217 -0.047  0.23 ]
+recompensa: 1.0 | terminated: False | truncated: False
+done = False</pre>
+    <p><strong>Cómo leerla.</strong> <code>import gym</code> falla porque aquí solo está Gymnasium. <code>reset()</code> devuelve una tupla de 2 elementos. Repartir <code>step</code> en 4 da <code>too many values to unpack (expected 4)</code>: «demasiados valores para repartir; esperaba 4». La corrección: <code>import gymnasium as gym</code>, <code>obs, info = env.reset()</code> y cinco nombres en <code>step</code>. El palo sigue en pie tras un paso: premio 1 y <code>done = False</code>.</p>
+  </div>
+</article>
+
+<h3 class="grupo-frag" id="mas-l4">Lección 4 · Explorar en el lago resbaladizo</h3>
+<p><a href="leccion-4.html#explorar">Volver a la lección 4</a>. Usa el mismo Q-learning del paso 7, ahora con hielo.</p>
+<article class="snippet" data-lang="python" id="fragmento-9">
+  <header>
+    <h3>9 · FrozenLake resbaladizo: cuatro formas de explorar</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Entrenar Q-learning en el lago <strong>resbaladizo</strong> con cuatro formas de explorar y medir qué parte de las partidas gana la política aprendida. Tarda unos 30 segundos.</p>
+  </header>
+  <pre class="code"><code>import numpy as np
+import gymnasium as gym
+
+def entrenar(esquema, episodios=5000, semilla=0, alpha=0.1, gamma=0.99):
+    env = gym.make("FrozenLake-v1", is_slippery=True)
+    rng = np.random.default_rng(semilla)
+    Q = np.zeros((16, 4))
+    for ep in range(episodios):
+        eps = esquema(ep)
+        estado, _ = env.reset(seed=semilla if ep == 0 else None)
+        fin = False
+        while not fin:
+            if rng.random() &lt; eps:
+                a = int(rng.integers(4))
+            else:
+                a = int(rng.choice(np.flatnonzero(Q[estado] == Q[estado].max())))
+            sig, r, terminado, truncado, _ = env.step(a)
+            Q[estado, a] += alpha * (r + gamma * Q[sig].max() * (not terminado) - Q[estado, a])
+            estado, fin = sig, terminado or truncado
+    return Q
+
+def evaluar(Q, n=1000, semilla=123):
+    env = gym.make("FrozenLake-v1", is_slippery=True)
+    exitos = 0
+    for i in range(n):
+        estado, _ = env.reset(seed=semilla if i == 0 else None)
+        fin = False
+        while not fin:
+            estado, r, terminado, truncado, _ = env.step(int(Q[estado].argmax()))
+            fin = terminado or truncado
+        exitos += r
+    return exitos / n
+
+esquemas = {
+    "ε = 0 (nunca explora)":   lambda ep: 0.0,
+    "ε = 0.1 fijo":            lambda ep: 0.1,
+    "ε = 1.0 fijo (azar)":     lambda ep: 1.0,
+    "ε de 1.0 a 0.05":         lambda ep: max(0.05, 1.0 * 0.999 ** ep),
+}
+for nombre, esquema in esquemas.items():
+    tasas = [evaluar(entrenar(esquema, semilla=s)) for s in range(3)]
+    print(f"{nombre:24s} éxito con política greedy: {np.round(tasas, 3)}  media={np.mean(tasas):.3f}")</code></pre>
+  <details class="linea-a-linea" open>
+    <summary>Línea por línea</summary>
+    <p class="hint">Toca una fila (o pasa el ratón) para ver su línea resaltada en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace y por qué</th></tr></thead>
+      <tbody>
+        <tr data-lines="1"><td><code>import numpy as np</code></td><td>Trae NumPy con el apodo <code>np</code>.<span class="se-lee">trae NumPy y llámala np</span></td></tr>
+        <tr data-lines="2"><td><code>import gymnasium as gym</code></td><td>Trae Gymnasium con el apodo <code>gym</code>.<span class="se-lee">trae Gymnasium y llámala gym</span></td></tr>
+        <tr data-lines="4"><td><code>def entrenar(esquema, episodios=5000, semilla=0, a …</code></td><td>Receta <code>entrenar</code>: recibe un <strong>esquema</strong> de épsilon (una receta que, dado el número de partida, dice cuánto explorar), 5000 partidas, semilla, alfa 0,1 y gamma 0,99.<span class="por-que">Así se compara la exploración cambiando solo el esquema.</span></td></tr>
+        <tr data-lines="5"><td><code>env = gym.make("FrozenLake-v1", is_slippery=True)</code></td><td>El lago con hielo: cada acción puede hacerte resbalar.<span class="por-que">Con azar en el entorno, explorar importa mucho más.</span></td></tr>
+        <tr data-lines="6"><td><code>rng = np.random.default_rng(semilla)</code></td><td>Máquina de azar con la semilla.</td></tr>
+        <tr data-lines="7"><td><code>Q = np.zeros((16, 4))</code></td><td>Tabla Q de 16 × 4 a cero.</td></tr>
+        <tr data-lines="8"><td><code>for ep in range(episodios):</code></td><td>Una vuelta por partida.</td></tr>
+        <tr data-lines="9"><td><code>eps = esquema(ep)</code></td><td>Pregunta al esquema cuánto explorar en esta partida.<span class="se-lee">eps es lo que diga el esquema para la partida ep</span></td></tr>
+        <tr data-lines="10"><td><code>estado, _ = env.reset(seed=semilla if ep == 0 else …</code></td><td>Empieza la partida (semilla solo en la primera).</td></tr>
+        <tr data-lines="11-12"><td><code>fin = False …</code></td><td>Repite hasta que acabe.</td></tr>
+        <tr data-lines="13-16"><td><code>if rng.random() &lt; eps: …</code></td><td>ε-greedy con desempate al azar, como en el paso 7.<span class="se-lee">con probabilidad eps, una acción cualquiera; si no, una de las mejores a suertes</span></td></tr>
+        <tr data-lines="17"><td><code>sig, r, terminado, truncado, _ = env.step(a)</code></td><td>Actúa.</td></tr>
+        <tr data-lines="18"><td><code>Q[estado, a] += alpha * (r + gamma * Q[sig].max() …</code></td><td>La corrección de Q-learning en una sola línea: objetivo (con <code>(not terminado)</code>) menos valor, por alfa.<span class="se-lee">acerca la casilla a r más gamma por lo mejor de después, un 10 % del camino</span></td></tr>
+        <tr data-lines="19"><td><code>estado, fin = sig, terminado or truncado</code></td><td>Pasa a la casilla siguiente y apunta si acabó, las dos cosas a la vez.</td></tr>
+        <tr data-lines="20"><td><code>return Q</code></td><td>Devuelve la tabla aprendida.</td></tr>
+        <tr data-lines="22"><td><code>def evaluar(Q, n=1000, semilla=123):</code></td><td>Receta <code>evaluar</code>: juega 1000 partidas sin explorar y cuenta las ganadas.</td></tr>
+        <tr data-lines="23"><td><code>env = gym.make("FrozenLake-v1", is_slippery=True)</code></td><td>Otro lago resbaladizo para el examen.</td></tr>
+        <tr data-lines="24"><td><code>exitos = 0</code></td><td>Contador de victorias.</td></tr>
+        <tr data-lines="25-30"><td><code>for i in range(n): …</code></td><td>Cada partida: siempre la mejor acción de la tabla, hasta que acabe.<span class="por-que">Así medimos la política aprendida, sin dados.</span><span class="se-lee">juega eligiendo siempre lo que la tabla cree mejor</span></td></tr>
+        <tr data-lines="31"><td><code>exitos += r</code></td><td>Suma el último premio (1 si llegó a la meta).</td></tr>
+        <tr data-lines="32"><td><code>return exitos / n</code></td><td>Devuelve la proporción de victorias.</td></tr>
+        <tr data-lines="34"><td><code>esquemas = {</code></td><td>Un <strong>diccionario</strong> (entre llaves): parejas «nombre → esquema».<span class="por-que">Para recorrer los cuatro con un solo bucle.</span></td></tr>
+        <tr data-lines="35"><td><code>"ε = 0 (nunca explora)":   lambda ep: 0.0,</code></td><td><code>lambda ep: 0.0</code> es una receta de una línea sin <code>def</code>: «dada la partida ep, devuelve 0». Nunca explora.<span class="se-lee">para cualquier partida, épsilon vale 0</span></td></tr>
+        <tr data-lines="36"><td><code>"ε = 0.1 fijo":            lambda ep: 0.1,</code></td><td>Épsilon siempre 0,1.</td></tr>
+        <tr data-lines="37"><td><code>"ε = 1.0 fijo (azar)":     lambda ep: 1.0,</code></td><td>Épsilon siempre 1: todo al azar.</td></tr>
+        <tr data-lines="38"><td><code>"ε de 1.0 a 0.05":         lambda ep: max(0.05, 1. …</code></td><td>Épsilon que empieza en 1 y se multiplica por 0,999 en cada partida, sin bajar de 0,05.<span class="se-lee">épsilon es 0,999 elevado a ep, pero nunca menos de 0,05</span></td></tr>
+        <tr data-lines="39"><td><code>}</code></td><td>Cierra el diccionario.</td></tr>
+        <tr data-lines="40"><td><code>for nombre, esquema in esquemas.items():</code></td><td><code>.items()</code> da las parejas del diccionario: nombre y esquema.<span class="se-lee">para cada nombre y su esquema, haz lo de debajo</span></td></tr>
+        <tr data-lines="41"><td><code>tasas = [evaluar(entrenar(esquema, semilla=s)) for …</code></td><td>Una <strong>lista con un bucle dentro</strong>: entrena y evalúa con las semillas 0, 1 y 2, y guarda las tres tasas.<span class="por-que">Tres semillas para no fiarse de una.</span><span class="se-lee">tasas son las victorias tras entrenar con cada una de las tres semillas</span></td></tr>
+        <tr data-lines="42"><td><code>print(f"{nombre:24s} éxito con política greedy: {n …</code></td><td>Escribe el nombre (<code>:24s</code>: 24 huecos de texto), las tres tasas y su media.</td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>ε = 0 (nunca explora)    éxito con política greedy: [0.066 0.043 0.063]  media=0.057
+ε = 0.1 fijo             éxito con política greedy: [0.744 0.741 0.753]  media=0.746
+ε = 1.0 fijo (azar)      éxito con política greedy: [0.741 0.662 0.508]  media=0.637
+ε de 1.0 a 0.05          éxito con política greedy: [0.744 0.745 0.753]  media=0.747</pre>
+    <p><strong>Cómo leerla.</strong> En este lago, la mejor política posible gana alrededor del 74 % (el hielo y el límite de 100 pasos impiden ganar siempre). Con épsilon 0,1 fijo y con épsilon que baja, el agente llega a 0,746 y 0,747: casi lo mejor posible. Sin explorar se queda en 0,057: nunca descubre dónde está el premio. Todo al azar aprende algo (Q-learning aprende de lo que hace aunque juegue mal), pero es irregular: 0,741, 0,662 y 0,508 según la semilla.</p>
+  </div>
+</article>
+
+<h3 class="grupo-frag" id="mas-l7">Lección 7 · Las piezas del DQN, una a una</h3>
+<p><a href="leccion-7.html#dqn">Volver a la lección 7</a>. Es el paso 10 «a cámara lenta», con un buffer de 12 transiciones.</p>
+<article class="snippet" data-lang="python" id="fragmento-12">
+  <header>
+    <h3>12 · Replay buffer, objetivo con red objetivo y un paso de entrenamiento</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Montar en pequeño las tres piezas del DQN que no son «la red»: guardar transiciones en una cola, sacar un minilote, calcular el objetivo con una segunda red y entrenar con <code>GradientTape</code>, escribiendo cada cifra.</p>
+  </header>
+  <pre class="code"><code>import random
+from collections import deque
+import numpy as np
+import tensorflow as tf
+import keras
+from keras import layers
+import gymnasium as gym
+
+keras.utils.set_random_seed(0)
+random.seed(0)
+gamma = 0.99
+
+def crear_red():
+    return keras.Sequential([keras.Input(shape=(4,)),
+                             layers.Dense(16, activation="relu"),
+                             layers.Dense(2)])
+
+q, q_obj = crear_red(), crear_red()
+print("¿pesos iguales al crearlas?", np.allclose(q.get_weights()[0], q_obj.get_weights()[0]))
+q_obj.set_weights(q.get_weights())
+print("¿pesos iguales tras set_weights?", np.allclose(q.get_weights()[0], q_obj.get_weights()[0]))
+copia_objetivo = [w.copy() for w in q_obj.get_weights()]
+
+env = gym.make("CartPole-v1")
+env.action_space.seed(0)
+buffer = deque(maxlen=12)
+obs, _ = env.reset(seed=3)
+fin = False
+while not fin:
+    a = env.action_space.sample()
+    obs2, r, terminated, truncated, _ = env.step(a)
+    buffer.append((obs, a, r, obs2, float(terminated)))
+    obs, fin = obs2, terminated or truncated
+print("transiciones guardadas (capacidad 12):", len(buffer), "| la última es final:", buffer[-1][4])
+
+lote = random.sample(list(buffer)[:-1], 3) + [buffer[-1]]
+s, a, r, s2, f = [np.array(x, dtype="float32") for x in zip(*lote)]
+a = a.astype("int32")
+
+q_sig = q_obj.predict(s2, verbose=0)
+y = r + gamma * q_sig.max(axis=1) * (1 - f)
+for i in range(4):
+    print(f"transición {i}: r={r[i]:.0f} fin={f[i]:.0f} max Q_obj(s')={q_sig[i].max():7.4f} -&gt; y={y[i]:.4f}")
+
+optimizador = keras.optimizers.Adam(1e-2)
+huber = keras.losses.Huber()
+for paso in range(51):
+    with tf.GradientTape() as cinta:
+        q_sa = tf.reduce_sum(q(s) * tf.one_hot(a, 2), axis=1)
+        perdida = huber(y, q_sa)
+    grads = cinta.gradient(perdida, q.trainable_variables)
+    optimizador.apply_gradients(zip(grads, q.trainable_variables))
+    if paso in (0, 10, 50):
+        print(f"paso {paso:2d}: pérdida Huber = {float(perdida):.4f}")
+
+objetivo_quieta = all(np.allclose(a, b) for a, b in zip(copia_objetivo, q_obj.get_weights()))
+print("¿la red objetivo sigue sin moverse tras 51 pasos?", objetivo_quieta)
+print("¿la red principal sí ha cambiado?", not np.allclose(q.get_weights()[0], q_obj.get_weights()[0]))</code></pre>
+  <details class="linea-a-linea" open>
+    <summary>Línea por línea</summary>
+    <p class="hint">Toca una fila (o pasa el ratón) para ver su línea resaltada en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace y por qué</th></tr></thead>
+      <tbody>
+        <tr data-lines="1"><td><code>import random</code></td><td>Trae el cajón de azar de Python.<span class="por-que">Para sacar el minilote.</span><span class="se-lee">trae random</span></td></tr>
+        <tr data-lines="2"><td><code>from collections import deque</code></td><td>Trae <code>deque</code>, la cola con tamaño máximo.<span class="por-que">Es el replay buffer.</span><span class="se-lee">de collections, trae deque</span></td></tr>
+        <tr data-lines="3-7"><td><code>import numpy as np …</code></td><td>Trae NumPy, TensorFlow, Keras, sus capas y Gymnasium.</td></tr>
+        <tr data-lines="9-10"><td><code>keras.utils.set_random_seed(0) …</code></td><td>Fija las semillas de Keras y de <code>random</code>.</td></tr>
+        <tr data-lines="11"><td><code>gamma = 0.99</code></td><td>Gamma 0,99.</td></tr>
+        <tr data-lines="13-16"><td><code>def crear_red(): …</code></td><td>Receta que fabrica una red pequeña: 4 entradas, 16 neuronas con relu y 2 salidas.<span class="se-lee">crear_red devuelve una red Q pequeña nueva</span></td></tr>
+        <tr data-lines="18"><td><code>q, q_obj = crear_red(), crear_red()</code></td><td>Fabrica dos redes a la vez: la principal y la objetivo.</td></tr>
+        <tr data-lines="19"><td><code>print("¿pesos iguales al crearlas?", np.allclose(q …</code></td><td>Pregunta si sus primeros pesos son iguales. <code>np.allclose</code>: «¿son casi iguales todos los números?». <code>get_weights()[0]</code> es la primera tabla de pesos.<span class="por-que">Dos redes nuevas sortean pesos distintos.</span><span class="se-lee">¿la primera tabla de pesos de q es igual a la de q_obj?</span></td></tr>
+        <tr data-lines="20"><td><code>q_obj.set_weights(q.get_weights())</code></td><td>Copia los pesos de la principal en la objetivo.<span class="se-lee">pon en q_obj los pesos de q</span></td></tr>
+        <tr data-lines="21"><td><code>print("¿pesos iguales tras set_weights?", np.allcl …</code></td><td>Pregunta otra vez.<span class="por-que">Ahora deben ser iguales.</span></td></tr>
+        <tr data-lines="22"><td><code>copia_objetivo = [w.copy() for w in q_obj.get_weig …</code></td><td>Guarda una copia aparte de los pesos de la objetivo (<code>w.copy()</code> de cada tabla).<span class="por-que">Para comprobar al final que no se han movido.</span><span class="se-lee">copia_objetivo es una foto de los pesos de q_obj</span></td></tr>
+        <tr data-lines="24"><td><code>env = gym.make("CartPole-v1")</code></td><td>El CartPole.</td></tr>
+        <tr data-lines="25"><td><code>env.action_space.seed(0)</code></td><td>Fija la semilla del sorteo de acciones.</td></tr>
+        <tr data-lines="26"><td><code>buffer = deque(maxlen=12)</code></td><td>Un buffer diminuto: capacidad 12.<span class="por-que">Pequeño a propósito, para ver que lo viejo sale.</span><span class="se-lee">el buffer guarda como mucho 12 recuerdos</span></td></tr>
+        <tr data-lines="27-28"><td><code>obs, _ = env.reset(seed=3) …</code></td><td>Empieza una partida.</td></tr>
+        <tr data-lines="29-33"><td><code>while not fin: …</code></td><td>Juega al azar hasta que acabe; en cada paso guarda (estado, acción, premio, estado siguiente, fin) con fin = <code>terminated</code> como número.<span class="se-lee">apunta cada experiencia; al llegar a 12, la más vieja se va</span></td></tr>
+        <tr data-lines="34"><td><code>print("transiciones guardadas (capacidad 12):", le …</code></td><td>Escribe cuántas hay y si la última es final (<code>buffer[-1][4]</code>: el quinto dato de la última).</td></tr>
+        <tr data-lines="36"><td><code>lote = random.sample(list(buffer)[:-1], 3) + [buff …</code></td><td>El minilote: 3 al azar de todas menos la última (<code>[:-1]</code>), más la última.<span class="por-que">Así seguro que hay una final, para ver cómo se apaga el futuro.</span><span class="se-lee">lote son tres recuerdos al azar y el último</span></td></tr>
+        <tr data-lines="37"><td><code>s, a, r, s2, f = [np.array(x, dtype="float32") for …</code></td><td>Separa el lote en cinco arrays, igual que en el paso 10.</td></tr>
+        <tr data-lines="38"><td><code>a = a.astype("int32")</code></td><td>Las acciones, a enteros.<span class="por-que">Para <code>one_hot</code>.</span></td></tr>
+        <tr data-lines="40"><td><code>q_sig = q_obj.predict(s2, verbose=0)</code></td><td>Lo que la red objetivo dice que vale cada acción en los estados siguientes.</td></tr>
+        <tr data-lines="41"><td><code>y = r + gamma * q_sig.max(axis=1) * (1 - f)</code></td><td>El objetivo: premio + gamma · el mayor de esos valores · (1 − fin).<span class="se-lee">y es r más gamma por lo mejor de después según la red quieta, salvo si acabó</span></td></tr>
+        <tr data-lines="42-43"><td><code>for i in range(4): …</code></td><td>Escribe cada transición: premio, fin, el máximo de la red objetivo y el objetivo.</td></tr>
+        <tr data-lines="45"><td><code>optimizador = keras.optimizers.Adam(1e-2)</code></td><td>Optimizador Adam con paso 0,01.</td></tr>
+        <tr data-lines="46"><td><code>huber = keras.losses.Huber()</code></td><td>La pérdida de Huber.</td></tr>
+        <tr data-lines="47"><td><code>for paso in range(51):</code></td><td>51 pasos de entrenamiento con el mismo lote.</td></tr>
+        <tr data-lines="48-52"><td><code>with tf.GradientTape() as cinta: …</code></td><td>Un paso con la grabadora de gradientes, igual que <code>entrenar_lote</code> del paso 10.<span class="se-lee">graba, calcula la pérdida, saca los gradientes y mueve los pesos</span></td></tr>
+        <tr data-lines="53-54"><td><code>if paso in (0, 10, 50): …</code></td><td>En los pasos 0, 10 y 50 escribe la pérdida.</td></tr>
+        <tr data-lines="56"><td><code>objetivo_quieta = all(np.allclose(a, b) for a, b i …</code></td><td><code>all(…)</code>: «¿es verdad para todos?». Compara cada tabla de la foto con la red objetivo actual.<span class="se-lee">¿todos los pesos de q_obj siguen como en la foto?</span></td></tr>
+        <tr data-lines="57"><td><code>print("¿la red objetivo sigue sin moverse tras 51 …</code></td><td>Escribe la respuesta.</td></tr>
+        <tr data-lines="58"><td><code>print("¿la red principal sí ha cambiado?", not np. …</code></td><td>Pregunta si la principal ya es distinta de la objetivo. <code>not</code> da la vuelta a la respuesta.</td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>¿pesos iguales al crearlas? False
+¿pesos iguales tras set_weights? True
+transiciones guardadas (capacidad 12): 12 | la última es final: 1.0
+transición 0: r=1 fin=0 max Q_obj(s')= 0.0840 -&gt; y=1.0831
+transición 1: r=1 fin=0 max Q_obj(s')=-0.0196 -&gt; y=0.9806
+transición 2: r=1 fin=0 max Q_obj(s')= 0.0482 -&gt; y=1.0477
+transición 3: r=1 fin=1 max Q_obj(s')= 0.1586 -&gt; y=1.0000
+paso  0: pérdida Huber = 0.5026
+paso 10: pérdida Huber = 0.1260
+paso 50: pérdida Huber = 0.0061
+¿la red objetivo sigue sin moverse tras 51 pasos? True
+¿la red principal sí ha cambiado? True</pre>
+    <p><strong>Cómo leerla.</strong> Dos redes nuevas tienen pesos distintos (<code>False</code>); tras <code>set_weights</code>, iguales (<code>True</code>). El buffer guardó solo las 12 últimas transiciones. Las tres primeras del lote tienen premio 1 y un futuro pequeño, así que su objetivo ronda 1 (1,0831; 0,9806; 1,0477). La cuarta es final: aunque la red objetivo le da 0,1586, su objetivo es exactamente 1,0000 porque fin = 1 apaga el futuro. En 51 pasos la pérdida baja de 0,5026 a 0,0061, y la red objetivo no se ha movido: ese es su trabajo.</p>
+  </div>
+</article>
+
+<h3 class="grupo-frag" id="mas-l8">Lección 8 · Double DQN, Dueling y policy gradient</h3>
+<p><a href="leccion-8.html#mejoras">Volver a la lección 8</a>.</p>
+<article class="snippet" data-lang="python" id="fragmento-14">
+  <header>
+    <h3>14 · Double DQN y red Dueling</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Comprobar con números que el máximo de estimaciones con ruido sale optimista, calcular a mano los objetivos de DQN y Double DQN, y construir una red <strong>Dueling</strong> que separa el valor del estado de la ventaja de cada acción.</p>
+  </header>
+  <pre class="code"><code>import numpy as np
+import keras
+from keras import layers, ops
+
+gamma, r, fin = 0.9, 1.0, 0.0
+q_principal = np.array([2.0, 3.5, 3.0])
+q_objetivo = np.array([2.2, 2.4, 3.1])
+
+y_dqn = r + gamma * q_objetivo.max() * (1 - fin)
+a_estrella = q_principal.argmax()
+y_double = r + gamma * q_objetivo[a_estrella] * (1 - fin)
+print("DQN clásico   : y =", round(y_dqn, 3), "(el max se calcula con la red objetivo)")
+print("Double DQN    : y =", round(y_double, 3), f"(elige la acción {a_estrella} con la red principal y la evalúa con la objetivo)")
+
+rng = np.random.default_rng(0)
+ruido_a = rng.normal(0, 1, size=(100000, 10))
+ruido_b = rng.normal(0, 1, size=(100000, 10))
+print("10 acciones con Q real = 0 y estimaciones con ruido N(0,1):")
+print("  media de max(estimaciones)        =", ruido_a.max(axis=1).mean().round(3), "(sobreestima)")
+elegida = ruido_a.argmax(axis=1)
+print("  media evaluando con otra estimación =", ruido_b[np.arange(100000), elegida].mean().round(3), "(sin sesgo)")
+
+keras.utils.set_random_seed(0)
+entrada = keras.Input(shape=(4,))
+h = layers.Dense(32, activation="relu")(entrada)
+valor = layers.Dense(1, name="V")(h)
+ventaja = layers.Dense(2, name="A")(h)
+q = valor + (ventaja - ops.mean(ventaja, axis=1, keepdims=True))
+dueling = keras.Model(entrada, q, name="dueling")
+estado = np.array([[0.1, -0.2, 0.05, 0.3]], dtype="float32")
+print("params dueling:", dueling.count_params())
+print("Q(s,·) =", dueling.predict(estado, verbose=0).round(4)[0])
+extractor = keras.Model(entrada, [valor, ventaja])
+v, a = extractor.predict(estado, verbose=0)
+print("V(s) =", v.round(4)[0], "| A(s,·) =", a.round(4)[0], "| A centrada =", (a - a.mean()).round(4)[0])
+print("media de Q(s,·) =", dueling.predict(estado, verbose=0).mean().round(4), "= V(s)")</code></pre>
+  <details class="linea-a-linea" open>
+    <summary>Línea por línea</summary>
+    <p class="hint">Toca una fila (o pasa el ratón) para ver su línea resaltada en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace y por qué</th></tr></thead>
+      <tbody>
+        <tr data-lines="1-2"><td><code>import numpy as np …</code></td><td>Trae NumPy y Keras.</td></tr>
+        <tr data-lines="3"><td><code>from keras import layers, ops</code></td><td>De Keras, trae las capas y <code>ops</code>, el cajón de operaciones matemáticas (medias, sumas…) que funcionan dentro de una red.<span class="por-que">Para centrar la ventaja dentro de la red.</span><span class="se-lee">de Keras, trae capas y operaciones</span></td></tr>
+        <tr data-lines="5"><td><code>gamma, r, fin = 0.9, 1.0, 0.0</code></td><td>Gamma 0,9, premio 1 y fin 0 (la partida sigue).</td></tr>
+        <tr data-lines="6"><td><code>q_principal = np.array([2.0, 3.5, 3.0])</code></td><td>Lo que la red principal dice de las 3 películas candidatas.</td></tr>
+        <tr data-lines="7"><td><code>q_objetivo = np.array([2.2, 2.4, 3.1])</code></td><td>Lo que dice la red objetivo.</td></tr>
+        <tr data-lines="9"><td><code>y_dqn = r + gamma * q_objetivo.max() * (1 - fin)</code></td><td>Objetivo de DQN: el máximo de la red objetivo (elige y valora la misma).<span class="se-lee">y_dqn es r más gamma por lo mejor según la red objetivo</span></td></tr>
+        <tr data-lines="10"><td><code>a_estrella = q_principal.argmax()</code></td><td>Double DQN, parte 1: la red principal <strong>elige</strong> la acción.<span class="se-lee">a_estrella es la acción que la red principal cree mejor</span></td></tr>
+        <tr data-lines="11"><td><code>y_double = r + gamma * q_objetivo[a_estrella] * (1 …</code></td><td>Double DQN, parte 2: la red objetivo <strong>valora</strong> esa acción.<span class="por-que">Si una se equivoca a favor de una acción, es raro que la otra se equivoque igual.</span><span class="se-lee">y_double es r más gamma por lo que la red objetivo da a esa acción</span></td></tr>
+        <tr data-lines="12-13"><td><code>print("DQN clásico   : y =", round(y_dqn, 3), "(el …</code></td><td>Escribe los dos objetivos.</td></tr>
+        <tr data-lines="15"><td><code>rng = np.random.default_rng(0)</code></td><td>Máquina de azar con semilla 0.</td></tr>
+        <tr data-lines="16"><td><code>ruido_a = rng.normal(0, 1, size=(100000, 10))</code></td><td>100 000 sorteos de 10 estimaciones con ruido (todas valen 0 de verdad).<span class="se-lee">ruido_a son 100 000 filas de 10 notas al azar</span></td></tr>
+        <tr data-lines="17"><td><code>ruido_b = rng.normal(0, 1, size=(100000, 10))</code></td><td>Otras 100 000 filas independientes: el «segundo crítico».</td></tr>
+        <tr data-lines="18-19"><td><code>print("10 acciones con Q real = 0 y estimaciones c …</code></td><td>La media del máximo de cada fila.<span class="por-que">Si fuera justo, daría 0.</span><span class="se-lee">escribe la media de la nota más alta de cada fila</span></td></tr>
+        <tr data-lines="20"><td><code>elegida = ruido_a.argmax(axis=1)</code></td><td>La posición del máximo en cada fila: la elegida.</td></tr>
+        <tr data-lines="21"><td><code>print("  media evaluando con otra estimación =", r …</code></td><td>La valora con la segunda estimación. <code>ruido_b[np.arange(100000), elegida]</code> coge, en cada fila, la columna elegida.<span class="se-lee">escribe la media de lo que el segundo crítico da a la elegida</span></td></tr>
+        <tr data-lines="23"><td><code>keras.utils.set_random_seed(0)</code></td><td>Fija las semillas.</td></tr>
+        <tr data-lines="24"><td><code>entrada = keras.Input(shape=(4,))</code></td><td>Entrada de 4 números. Ahora la red se escribe «pieza a pieza» (estilo <strong>funcional</strong>): cada capa se aplica a lo anterior con paréntesis.<span class="por-que">Hacen falta dos ramas, y eso no cabe en un <code>Sequential</code>.</span></td></tr>
+        <tr data-lines="25"><td><code>h = layers.Dense(32, activation="relu")(entrada)</code></td><td>Una capa oculta de 32 aplicada a la entrada.</td></tr>
+        <tr data-lines="26"><td><code>valor = layers.Dense(1, name="V")(h)</code></td><td>Rama del <strong>valor</strong> V(s): un solo número.<span class="se-lee">valor es una salida de 1 número: lo bueno que es el estado</span></td></tr>
+        <tr data-lines="27"><td><code>ventaja = layers.Dense(2, name="A")(h)</code></td><td>Rama de la <strong>ventaja</strong> A(s, a): un número por acción.<span class="se-lee">ventaja son 2 números: lo que suma o resta cada acción</span></td></tr>
+        <tr data-lines="28"><td><code>q = valor + (ventaja - ops.mean(ventaja, axis=1, k …</code></td><td>Q = V + (ventaja − su media). <code>ops.mean(…, axis=1, keepdims=True)</code> hace la media por fila y deja la forma lista para restar.<span class="por-que">Al centrar la ventaja, la media de las Q es exactamente V.</span><span class="se-lee">Q es el valor más la ventaja de cada acción menos la ventaja media</span></td></tr>
+        <tr data-lines="29"><td><code>dueling = keras.Model(entrada, q, name="dueling")</code></td><td><code>keras.Model(entrada, q)</code> une la entrada y la salida en una red.</td></tr>
+        <tr data-lines="30"><td><code>estado = np.array([[0.1, -0.2, 0.05, 0.3]], dtype= …</code></td><td>Un estado de prueba.</td></tr>
+        <tr data-lines="31"><td><code>print("params dueling:", dueling.count_params())</code></td><td><code>count_params()</code> cuenta los parámetros.</td></tr>
+        <tr data-lines="32"><td><code>print("Q(s,·) =", dueling.predict(estado, verbose= …</code></td><td>Escribe las dos Q.</td></tr>
+        <tr data-lines="33"><td><code>extractor = keras.Model(entrada, [valor, ventaja])</code></td><td>Otra red que comparte las mismas capas pero devuelve V y la ventaja por separado.<span class="por-que">Para mirar dentro.</span></td></tr>
+        <tr data-lines="34"><td><code>v, a = extractor.predict(estado, verbose=0)</code></td><td>Recoge V y la ventaja.</td></tr>
+        <tr data-lines="35"><td><code>print("V(s) =", v.round(4)[0], "| A(s,·) =", a.rou …</code></td><td>Escribe V, la ventaja y la ventaja centrada.</td></tr>
+        <tr data-lines="36"><td><code>print("media de Q(s,·) =", dueling.predict(estado, …</code></td><td>Escribe la media de las Q.<span class="por-que">Debe ser V.</span></td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>DQN clásico   : y = 3.79 (el max se calcula con la red objetivo)
+Double DQN    : y = 3.16 (elige la acción 1 con la red principal y la evalúa con la objetivo)
+10 acciones con Q real = 0 y estimaciones con ruido N(0,1):
+  media de max(estimaciones)        = 1.54 (sobreestima)
+  media evaluando con otra estimación = -0.002 (sin sesgo)
+params dueling: 259
+Q(s,·) = [-0.0494 -0.1849]
+V(s) = [-0.1172] | A(s,·) = [ 0.0842 -0.0513] | A centrada = [ 0.0677 -0.0677]
+media de Q(s,·) = -0.1172 = V(s)</pre>
+    <p><strong>Cómo leerla.</strong> DQN da 1 + 0,9 · 3,1 = 3,79; Double DQN, 1 + 0,9 · 2,4 = 3,16: la película que la principal creía mejor (la 1, contando desde 0) no lo es tanto para la otra red. La simulación lo generaliza: con 10 acciones que valen 0, el máximo con ruido vale de media 1,54 (puro optimismo); valorar la elegida con otra estimación da −0,002, casi 0. La red Dueling tiene 259 parámetros; V = −0,1172 y la media de las dos Q es exactamente −0,1172.</p>
+  </div>
+</article>
+<article class="snippet" data-lang="python" id="fragmento-15">
+  <header>
+    <h3>15 · Policy gradient mínimo: un paso de REINFORCE</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Ver con una sola transición qué hace el <strong>gradiente de política</strong>: si el retorno es positivo, sube la probabilidad de la acción hecha; si es negativo, la baja. Es la idea de REINFORCE, A2C y PPO reducida a un paso.</p>
+  </header>
+  <pre class="code"><code>import numpy as np
+import tensorflow as tf
+import keras
+from keras import layers
+
+keras.utils.set_random_seed(0)
+politica = keras.Sequential([keras.Input(shape=(4,)),
+                             layers.Dense(2, activation="softmax")])
+optimizador = keras.optimizers.SGD(0.5)
+
+estado = np.array([[0.1, -0.2, 0.05, 0.3]], dtype="float32")
+accion = 1
+print("π(a|s) antes:", politica(estado).numpy().round(4)[0])
+
+def paso_reinforce(retorno):
+    with tf.GradientTape() as cinta:
+        probs = politica(estado)
+        log_prob = tf.math.log(probs[0, accion])
+        perdida = -log_prob * retorno
+    grads = cinta.gradient(perdida, politica.trainable_variables)
+    optimizador.apply_gradients(zip(grads, politica.trainable_variables))
+    return float(perdida)
+
+pesos = politica.get_weights()
+perdida = paso_reinforce(retorno=+1.0)
+print(f"retorno +1 -&gt; pérdida {perdida:.4f}; π(a|s) después:", politica(estado).numpy().round(4)[0])
+
+politica.set_weights(pesos)
+perdida = paso_reinforce(retorno=-1.0)
+print(f"retorno -1 -&gt; pérdida {perdida:.4f}; π(a|s) después:", politica(estado).numpy().round(4)[0])</code></pre>
+  <details class="linea-a-linea" open>
+    <summary>Línea por línea</summary>
+    <p class="hint">Toca una fila (o pasa el ratón) para ver su línea resaltada en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace y por qué</th></tr></thead>
+      <tbody>
+        <tr data-lines="1-4"><td><code>import numpy as np …</code></td><td>Trae NumPy, TensorFlow, Keras y sus capas.</td></tr>
+        <tr data-lines="6"><td><code>keras.utils.set_random_seed(0)</code></td><td>Fija las semillas.</td></tr>
+        <tr data-lines="7-8"><td><code>politica = keras.Sequential([keras.Input(shape=(4, …</code></td><td>La <strong>política</strong> es una red: 4 números de entrada y 2 salidas con <code>softmax</code>, que convierte los números en probabilidades que suman 1.<span class="por-que">Aquí la red no da valores, sino la probabilidad de cada acción.</span><span class="se-lee">politica es una red que da la probabilidad de cada acción</span></td></tr>
+        <tr data-lines="9"><td><code>optimizador = keras.optimizers.SGD(0.5)</code></td><td>Optimizador <strong>SGD</strong> (descenso de gradiente sencillo) con paso 0,5.<span class="por-que">Un paso grande para que el cambio se vea con un solo intento.</span></td></tr>
+        <tr data-lines="11"><td><code>estado = np.array([[0.1, -0.2, 0.05, 0.3]], dtype= …</code></td><td>Un estado de prueba.</td></tr>
+        <tr data-lines="12"><td><code>accion = 1</code></td><td>La acción que «se hizo»: la 1.</td></tr>
+        <tr data-lines="13"><td><code>print("π(a|s) antes:", politica(estado).numpy().ro …</code></td><td>Escribe las probabilidades antes de aprender. <code>.numpy()</code> pasa el tensor a array.</td></tr>
+        <tr data-lines="15"><td><code>def paso_reinforce(retorno):</code></td><td>Receta para un paso de REINFORCE con un retorno dado.</td></tr>
+        <tr data-lines="16"><td><code>with tf.GradientTape() as cinta:</code></td><td>Abre la grabadora de gradientes.</td></tr>
+        <tr data-lines="17"><td><code>probs = politica(estado)</code></td><td>Probabilidades de la política para el estado.</td></tr>
+        <tr data-lines="18"><td><code>log_prob = tf.math.log(probs[0, accion])</code></td><td><code>tf.math.log</code>: el logaritmo de la probabilidad de la acción hecha.<span class="por-que">La fórmula del gradiente de política usa el logaritmo.</span></td></tr>
+        <tr data-lines="19"><td><code>perdida = -log_prob * retorno</code></td><td>La pérdida: menos el logaritmo por el retorno.<span class="por-que">Bajar esta pérdida sube la probabilidad si el retorno es positivo y la baja si es negativo.</span><span class="se-lee">la pérdida es menos log de la probabilidad, por lo bien que salió</span></td></tr>
+        <tr data-lines="20-21"><td><code>grads = cinta.gradient(perdida, politica.trainable …</code></td><td>Gradientes y paso del optimizador.</td></tr>
+        <tr data-lines="22"><td><code>return float(perdida)</code></td><td>Devuelve la pérdida como número normal.</td></tr>
+        <tr data-lines="24"><td><code>pesos = politica.get_weights()</code></td><td>Guarda los pesos para poder volver atrás.</td></tr>
+        <tr data-lines="25"><td><code>perdida = paso_reinforce(retorno=+1.0)</code></td><td>Un paso con retorno +1 («salió bien»).</td></tr>
+        <tr data-lines="26"><td><code>print(f"retorno +1 -&gt; pérdida {perdida:.4f}; π(a|s …</code></td><td>Escribe la pérdida y las probabilidades nuevas.</td></tr>
+        <tr data-lines="28"><td><code>politica.set_weights(pesos)</code></td><td>Vuelve a los pesos de antes.<span class="por-que">Para probar el otro caso desde el mismo punto.</span></td></tr>
+        <tr data-lines="29-30"><td><code>perdida = paso_reinforce(retorno=-1.0) …</code></td><td>Un paso con retorno −1 («salió mal») y escribe el resultado.</td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>π(a|s) antes: [0.3721 0.6279]
+retorno +1 -&gt; pérdida 0.4653; π(a|s) después: [0.2792 0.7208]
+retorno -1 -&gt; pérdida -0.4653; π(a|s) después: [0.4754 0.5246]</pre>
+    <p><strong>Cómo leerla.</strong> Antes, 0,3721 para la acción 0 y 0,6279 para la 1. Con retorno +1 la pérdida es −ln 0,6279 = 0,4653, y la acción 1 sube a 0,7208: «salió bien, hazlo más». Con retorno −1 baja a 0,5246: «salió mal, hazlo menos». Un episodio real hace esto con cada paso, pesando cada acción por el retorno que le siguió.</p>
+  </div>
+</article>
+</section>
+
+<section>
+<h2 id="chuleta">Chuleta del laboratorio</h2>
+<dl class="chuleta">
+  <div><dt><code>gym.make</code></dt><dd>Crear un entorno: <code>gym.make("FrozenLake-v1", is_slippery=False)</code>.</dd></div>
+  <div><dt><code>reset</code></dt><dd><code>estado, info = env.reset(seed=0)</code>: dos cosas.</dd></div>
+  <div><dt><code>step</code></dt><dd><code>s2, r, terminated, truncated, info = env.step(a)</code>: cinco cosas.</dd></div>
+  <div><dt>Retorno</dt><dd>Hacia atrás: <code>G = r + gamma * G</code>.</dd></div>
+  <div><dt>Bellman</dt><dd>Barrido: <code>V = R + gamma * P @ V</code>; exacto: <code>np.linalg.solve(np.eye(n) - gamma * P, R)</code>.</dd></div>
+  <div><dt>Media incremental</dt><dd><code>Q[a] += (r - Q[a]) / N[a]</code>.</dd></div>
+  <div><dt>Épsilon-greedy</dt><dd><code>if rng.random() &lt; eps:</code> al azar; si no, <code>argmax</code> desempatando con <code>flatnonzero</code>.</dd></div>
+  <div><dt>Q-learning</dt><dd><code>Q[s, a] += alpha * (r + gamma * Q[s2].max() * (not terminado) - Q[s, a])</code>.</dd></div>
+  <div><dt>SARSA</dt><dd>Igual, con <code>Q[s2, a2]</code> en lugar de <code>Q[s2].max()</code>.</dd></div>
+  <div><dt>Red Q</dt><dd><code>Dense</code> con relu y una salida <code>Dense(n_acciones)</code> sin activación; actuar con <code>argmax</code>.</dd></div>
+  <div><dt>Objetivo DQN</dt><dd><code>r + gamma * max(q_obj(s2)) * (1 - f)</code>, con f = <code>terminated</code>.</dd></div>
+  <div><dt>Replay y red objetivo</dt><dd><code>deque(maxlen=…)</code> + <code>random.sample</code>; copiar con <code>set_weights</code> cada C pasos.</dd></div>
+  <div><dt><code>GradientTape</code></dt><dd>Grabar, <code>gradient</code>, <code>apply_gradients</code>.</dd></div>
+</dl>
+</section>
+
+<div class="resumen">
+  <h2 class="sin-num sin-toc">En tres líneas</h2>
+  <ul>
+    <li>Gymnasium da el bucle: <code>reset</code> para empezar y <code>step</code> para actuar, con cinco cosas de vuelta.</li>
+    <li>Con pocos estados, una tabla Q que se corrige hacia «premio + gamma · lo mejor de después», explorando con ε-greedy.</li>
+    <li>Con estados de números reales, una red Q con replay buffer y red objetivo: el DQN pasa de 22 a 192 pasos en CartPole.</li>
+  </ul>
+</div>
+
+</div>
+</main>
+</body>
+</html>

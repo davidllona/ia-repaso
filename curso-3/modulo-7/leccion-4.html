@@ -21,7 +21,7 @@
       <p class="eyebrow">Curso 3 · Módulo 7 · Lección 4 de 8</p>
       <h1>Una red pequeña con frenos, y tres vigilantes que deciden cuándo parar</h1>
       <p class="lead">La red repite un bloque Dense → BatchNorm → ReLU → Dropout con L2. Al entrenar, tres callbacks miran la validación en cada época: paran, bajan el learning rate y guardan el mejor modelo.</p>
-      <p class="meta-line"><span class="read-time" data-render="read-time"></span><a href="../modulo-7.html">Índice del módulo</a></p>
+      <p class="meta-line"><span class="read-time" data-render="read-time"></span><a href="../modulo-7.html">Índice del módulo</a> · <a href="#chuleta">Ir a la chuleta</a></p>
     </div>
     <div class="hero-tile" aria-hidden="true"></div>
   </div>
@@ -30,21 +30,67 @@
 <details class="predice">
   <summary>Entrenas 400 épocas con solo 25 películas. La pérdida de entrenamiento no deja de bajar. ¿La de validación también?<span class="hint"></span></summary>
   <div>
-    <p>No necesariamente. A partir de un momento la red se sabe de memoria las 25 películas: el train sigue bajando y la validación sube. Eso es <strong>sobreajuste</strong>, y por eso un callback vigila <code>val_loss</code> y se queda con la mejor época, no con la última.</p>
+    <p>No necesariamente. A partir de un momento la red se sabe de memoria las 25 películas: el train sigue bajando y la validación sube. Eso es <strong>sobreajuste</strong>, y por eso un vigilante mira la validación y se queda con la mejor época, no con la última.</p>
   </div>
 </details>
 
 <section>
-<h2 id="idea">Frenos dentro de la red, vigilantes fuera</h2>
-<p>La red de pisos repite dos veces el mismo bloque (64 y 32 neuronas) y termina en <code>Dense(1)</code> sin activación, porque es una regresión y la salida puede valer cualquier número.</p>
+<h2 id="idea">1 · La red: un bloque que se repite</h2>
+<p>La red de pisos recibe los 10 números de cada piso y repite dos veces el mismo bloque, primero con 64 neuronas y luego con 32:</p>
 <ul class="flow">
-  <li class="a">DENSE<small>combina las columnas</small></li>
-  <li class="b">BATCHNORM<small>re-centra cada neurona</small></li>
-  <li class="c">RELU<small>no linealidad</small></li>
-  <li class="d">DROPOUT<small>apaga neuronas al azar</small></li>
+  <li class="a">DENSE<small>cada neurona mezcla todas las entradas con sus pesos</small></li>
+  <li class="b">BATCHNORM<small>deja cada neurona a un nivel parecido</small></li>
+  <li class="c">RELU<small>lo negativo pasa a 0</small></li>
+  <li class="d">DROPOUT<small>apaga neuronas al azar al entrenar</small></li>
 </ul>
-<p><strong>BatchNorm</strong> es el ecualizador de volumen entre tráilers: deja cada neurona a un nivel parecido y el entrenamiento es más estable. <strong>Dropout</strong> es un ensayo en el que cada día faltan actores al azar: nadie depende del protagonista. <strong>L2</strong> suma a la pérdida \( \lambda \sum w^2 \) y cobra más a los pesos grandes.</p>
-<p>Al entrenar, tres callbacks del <a href="../modulo-5.html">módulo 5</a> miran <code>val_loss</code> tras cada época: <code>EarlyStopping(patience=15, restore_best_weights=True)</code> para y devuelve los pesos de la mejor época; <code>ReduceLROnPlateau</code> parte el learning rate por la mitad si se estanca; <code>ModelCheckpoint</code> guarda el mejor en disco.</p>
+<p>Termina en <code>Dense(1)</code> <strong>sin activación</strong>: es una regresión y la salida tiene que poder valer cualquier número.</p>
+</section>
+
+<section>
+<h2 id="frenos">2 · Dos frenos dentro de la red</h2>
+<p>Una red puede aprenderse el train de memoria, ruido incluido, y fallar con datos nuevos: es el <strong>sobreajuste</strong>. Los frenos lo dificultan.</p>
+<table>
+  <thead><tr><th>Freno</th><th>Qué hace</th><th>Se parece a</th></tr></thead>
+  <tbody>
+    <tr><td>BatchNorm</td><td>Centra y escala cada neurona con el lote (el grupo de filas que entra a la vez)</td><td>El ecualizador de volumen entre tráilers</td></tr>
+    <tr><td>Dropout</td><td>Apaga al azar el 10 % de las neuronas en cada paso</td><td>Un ensayo en el que faltan actores: nadie depende del protagonista</td></tr>
+  </tbody>
+</table>
+</section>
+
+<section>
+<h2 id="l2">3 · El tercer freno: L2 cobra los pesos grandes</h2>
+<p>La <strong>pérdida</strong> es la cifra de error que la red intenta bajar al entrenar. <strong>L2</strong> le suma un recargo: \( \lambda \sum w^2 \), la suma de los pesos al cuadrado por un número pequeño \( \lambda \) (lambda) que decide cuánto se cobra.</p>
+<div class="anim-pasos" data-titulo="El recargo L2 de una neurona con tres pesos">
+  <div class="paso"><p><strong>1.</strong> Una neurona decide si ver una película por género, actor y duración. Sus pesos:</p><span class="grande">0,5 · −2 · 1</span></div>
+  <div class="paso"><p><strong>2.</strong> Al cuadrado y sumados.</p><span class="grande">0,25 + 4 + 1 = 5,25</span></div>
+  <div class="paso"><p><strong>3.</strong> Por \( \lambda = 0{,}1 \): es lo que se suma a la pérdida.</p><span class="grande">0,1 · 5,25 = 0,525</span></div>
+  <div class="paso"><p><strong>4.</strong> El peso del actor (−2) pone 4 de los 5,25. L2 empuja sobre todo a los pesos grandes hacia 0: que un solo rasgo no lo decida todo.</p><span class="grande">4 de 5,25</span></div>
+</div>
+</section>
+
+<section>
+<h2 id="numeros">4 · Con números: cuántos parámetros tiene</h2>
+<div class="anim-pasos" data-titulo="Contar los parámetros, capa a capa">
+  <div class="paso"><p><strong>1.</strong> densa1: 10 entradas × 64 neuronas, más un sesgo (un número que se suma) por neurona.</p><span class="grande">10 · 64 + 64 = 704</span></div>
+  <div class="paso"><p><strong>2.</strong> bn1: 4 números por neurona (escala, desplazamiento, media y varianza).</p><span class="grande">4 · 64 = 256</span></div>
+  <div class="paso"><p><strong>3.</strong> densa2 y bn2.</p><span class="grande">64 · 32 + 32 = 2.080 · 4 · 32 = 128</span></div>
+  <div class="paso"><p><strong>4.</strong> La salida: 32 pesos y un sesgo.</p><span class="grande">33</span></div>
+  <div class="paso"><p><strong>5.</strong> Total. La media y la varianza de BatchNorm no se aprenden con el error: son 192 no entrenables.</p><span class="grande">3.201 (192 fijos)</span></div>
+</div>
+</section>
+
+<section>
+<h2 id="vigilantes">5 · Tres vigilantes al entrenar</h2>
+<p>Una <strong>época</strong> es una pasada por todo el train. Después de cada una, tres <strong>callbacks</strong> (funciones que Keras llama solas) miran <code>val_loss</code>, la pérdida en validación:</p>
+<table>
+  <thead><tr><th>Vigilante</th><th>Qué hace</th></tr></thead>
+  <tbody>
+    <tr><td><code>EarlyStopping</code></td><td>Si en 15 épocas no mejora, para y recupera la mejor</td></tr>
+    <tr><td><code>ReduceLROnPlateau</code></td><td>Si se estanca 6 épocas, parte el learning rate (el tamaño del paso) por la mitad</td></tr>
+    <tr><td><code>ModelCheckpoint</code></td><td>Guarda en disco el mejor modelo</td></tr>
+  </tbody>
+</table>
 </section>
 
 <figure class="demo" data-demo="curso3/c3m7-curvas" data-titulo="Curvas de aprendizaje: sobreajuste, infraajuste y parada">
@@ -53,30 +99,38 @@
 </figure>
 
 <section>
-<h2 id="numeros">Con números: los parámetros y la parada</h2>
-<div class="callout ejemplo">
-  <span class="lbl">Ejemplo numérico</span>
-<table>
-    <thead><tr><th>Capa</th><th>Cuenta</th><th>Parámetros</th></tr></thead>
-    <tbody>
-      <tr><td>densa1 (10 → 64)</td><td>10 · 64 + 64</td><td class="res">704</td></tr>
-      <tr><td>bn1</td><td>4 · 64</td><td class="res">256</td></tr>
-      <tr><td>densa2 (64 → 32)</td><td>64 · 32 + 32</td><td class="res">2.080</td></tr>
-      <tr><td>bn2</td><td>4 · 32</td><td class="res">128</td></tr>
-      <tr><td>precio (32 → 1)</td><td>32 + 1</td><td class="res">33</td></tr>
-      <tr><td><strong>Total</strong></td><td>de ellos 192 no entrenables</td><td class="res">3.201</td></tr>
-    </tbody>
-  </table>
-  <p>Al entrenar: 2.400 filas en lotes de 128 son ⌈18,75⌉ = 19 pasos por época. La mejor <code>val_loss</code> llegó en la época 97 y, con paciencia 15, el entrenamiento se detuvo en la 97 + 15 = <strong>112</strong>.</p>
+<h2 id="parada">6 · Con números: cuándo paró</h2>
+<div class="anim-pasos" data-titulo="El entrenamiento de los pisos">
+  <div class="paso"><p><strong>1.</strong> 2.400 filas en lotes de 128: 18 lotes llenos y uno de 96.</p><span class="grande">19 pasos por época</span></div>
+  <div class="paso"><p><strong>2.</strong> La mejor <code>val_loss</code> llega en la época 97.</p><span class="grande">0,0357</span></div>
+  <div class="paso"><p><strong>3.</strong> Con paciencia 15, espera 15 épocas más sin mejora y para.</p><span class="grande">97 + 15 = 112</span></div>
+  <div class="paso"><p><strong>4.</strong> El learning rate empezó en 0,001 y se partió por la mitad 5 veces.</p><span class="grande">0,001 · 0,5⁵ ≈ 0,000031</span></div>
 </div>
 </section>
 
 <details class="predice">
   <summary>Al final, la <code>loss</code> de entrenamiento vale 0,058 y la de validación 0,036. ¿Es un error que el train salga peor que la validación?<span class="hint"></span></summary>
   <div>
-    <p>No. Al entrenar, Dropout apaga neuronas y BatchNorm usa las estadísticas del lote: la red trabaja «con las manos atadas». Al validar se usa la red completa. Es lo normal en redes con Dropout.</p>
+    <p>No. Al entrenar, Dropout apaga neuronas y BatchNorm usa las cifras del lote: la red trabaja «con las manos atadas». Al validar se usa la red completa.</p>
   </div>
 </details>
+
+<section>
+<h2 id="chuleta">Chuleta para repasar</h2>
+<dl class="chuleta">
+  <div><dt><code>Dense</code></dt><dd>Capa en la que cada neurona mezcla todas las entradas con sus pesos. <em>10 → 64: 704 parámetros.</em></dd></div>
+  <div><dt>ReLU</dt><dd>Deja lo positivo y pone lo negativo a 0.</dd></div>
+  <div><dt>Sobreajuste</dt><dd>Aprenderse el train de memoria y fallar con datos nuevos.</dd></div>
+  <div><dt>BatchNorm</dt><dd>Centra y escala cada neurona con el lote. <em>4 números por neurona, 2 fijos.</em></dd></div>
+  <div><dt>Dropout</dt><dd>Apaga neuronas al azar al entrenar. <em>Al predecir no hace nada.</em></dd></div>
+  <div><dt>L2</dt><dd>Suma λ · Σ w² a la pérdida. <em>Pesos 0,5, −2, 1 con λ = 0,1 → 0,525.</em></dd></div>
+  <div><dt>Época</dt><dd>Una pasada por todo el train. <em>19 pasos de 128 filas.</em></dd></div>
+  <div><dt>Callback</dt><dd>Función que Keras llama sola durante el entrenamiento.</dd></div>
+  <div><dt><code>EarlyStopping</code></dt><dd>Para si no mejora y recupera la mejor época. <em>Mejor 97, para en 112.</em></dd></div>
+  <div><dt><code>ReduceLROnPlateau</code></dt><dd>Parte el learning rate por la mitad si se estanca.</dd></div>
+  <div><dt><code>ModelCheckpoint</code></dt><dd>Guarda en disco el mejor modelo.</dd></div>
+</dl>
+</section>
 
 <div class="resumen">
   <h2 class="sin-num sin-toc">En tres líneas</h2>
@@ -101,10 +155,10 @@
     "224 entrenables y 32 no entrenables"
    ],
    "correcta": 0,
-   "porque": "La <code>Dense</code> tiene 12·16 pesos + 16 sesgos = 208 parámetros entrenables. La <code>BatchNormalization</code> tiene 4 parámetros por neurona: γ y β (entrenables, 2·16 = 32) y la media y la varianza móviles (no entrenables, 2·16 = 32). Total: 208 + 32 = 240 entrenables y 32 no entrenables. Las medias móviles no se actualizan con el gradiente, sino con un promedio durante el entrenamiento."
+   "porque": "La <code>Dense</code> tiene 12·16 pesos + 16 sesgos = 208 entrenables. La BatchNorm tiene 4 números por neurona: escala y desplazamiento (entrenables, 2·16 = 32) y la media y la varianza (no entrenables, 2·16 = 32). Total: 240 entrenables y 32 no entrenables."
   },
   {
-   "q": "Entrenas con <code>EarlyStopping(monitor='val_loss', patience=10)</code> y sin <code>restore_best_weights</code>. El entrenamiento se detiene en la época 60 y el mejor valor de val_loss fue en la época 50. ¿Con qué pesos te quedas?",
+   "q": "Entrenas con <code>EarlyStopping(monitor='val_loss', patience=10)</code> y sin <code>restore_best_weights</code>. Para en la época 60 y la mejor val_loss fue en la 50. ¿Con qué pesos te quedas?",
    "opciones": [
     "Con los de la época 50, porque Keras guarda siempre los mejores",
     "Con la media de los pesos de las épocas 50 a 60",
@@ -112,10 +166,10 @@
     "Con los iniciales, porque la parada reinicia el modelo"
    ],
    "correcta": 2,
-   "porque": "Sin <code>restore_best_weights=True</code> el modelo se queda como estaba al parar, diez épocas después de su mejor momento. Con <code>restore_best_weights=True</code> Keras devolvería los de la época 50. Para guardar el mejor modelo en disco se usa <code>ModelCheckpoint(save_best_only=True)</code>, que es una pieza distinta."
+   "porque": "Sin <code>restore_best_weights=True</code> el modelo se queda como estaba al parar, diez épocas después de su mejor momento. Con él, Keras devolvería los de la época 50. Guardar el mejor en disco es trabajo de <code>ModelCheckpoint</code>."
   },
   {
-   "q": "Tienes 2.400 filas de entrenamiento y <code>batch_size=128</code>. ¿Cuántos pasos da cada época?",
+   "q": "Tienes 2.400 filas de entrenamiento y lotes de 128 (<code>batch_size=128</code>). ¿Cuántos pasos da cada época?",
    "opciones": [
     "18",
     "128",
@@ -129,7 +183,6 @@
 }
 </script>
 </section>
-
 
 <details class="profundizar">
   <summary><span>Profundizar: la explicación completa<small>Por qué la API funcional, cada pieza del bloque con su cuenta, la penalización L2 a mano (0,525), los tres callbacks con el learning rate que baja a 0,000031 y cómo leer la curva de los pisos.</small></span></summary>
@@ -166,19 +219,19 @@
 <div class="callout ejemplo">
   <span class="lbl">Ejemplo numérico · contar los parámetros de la red</span>
   <table>
-    <thead><tr><th>Capa</th><th>Cuenta</th><th>Parámetros</th></tr></thead>
+    <thead><tr><th>Capa</th><th>Cuenta</th><th>Total</th></tr></thead>
     <tbody>
-      <tr><td><code>densa1</code> (10 → 64)</td><td>10 · 64 + 64</td><td class="res">704</td></tr>
-      <tr><td><code>bn1</code> (64)</td><td>4 · 64</td><td class="res">256</td></tr>
-      <tr><td><code>densa2</code> (64 → 32)</td><td>64 · 32 + 32</td><td class="res">2.080</td></tr>
-      <tr><td><code>bn2</code> (32)</td><td>4 · 32</td><td class="res">128</td></tr>
-      <tr><td><code>precio</code> (32 → 1)</td><td>32 · 1 + 1</td><td class="res">33</td></tr>
+      <tr><td><code>densa1</code><br>(10 → 64)</td><td>10 · 64 + 64</td><td class="res">704</td></tr>
+      <tr><td><code>bn1</code><br>(64)</td><td>4 · 64</td><td class="res">256</td></tr>
+      <tr><td><code>densa2</code><br>(64 → 32)</td><td>64 · 32 + 32</td><td class="res">2.080</td></tr>
+      <tr><td><code>bn2</code><br>(32)</td><td>4 · 32</td><td class="res">128</td></tr>
+      <tr><td><code>precio</code><br>(32 → 1)</td><td>32 · 1 + 1</td><td class="res">33</td></tr>
       <tr><td><strong>Total</strong></td><td>704 + 256 + 2.080 + 128 + 33</td><td class="res">3.201</td></tr>
-      <tr><td>No entrenables</td><td>2 · (64 + 32): medias y varianzas móviles</td><td class="res">192</td></tr>
-      <tr><td>Entrenables</td><td>3.201 − 192</td><td class="res">3.009</td></tr>
+      <tr><td>Fijos (no se entrenan)</td><td>2 · (64 + 32): medias y varianzas</td><td class="res">192</td></tr>
+      <tr><td>Se entrenan</td><td>3.201 − 192</td><td class="res">3.009</td></tr>
     </tbody>
   </table>
-  <p>Son cifras minúsculas (3.201 parámetros frente a los millones de una CNN): para una tabla de 10 columnas no hace falta más. El <a href="#frag-6">fragmento 6</a> construye la red y su <code>summary()</code> confirma cada número.</p>
+  <p>Son cifras minúsculas (3.201 parámetros frente a los millones de una CNN): para una tabla de 10 columnas no hace falta más. El <a href="laboratorio.html#fragmento-6">fragmento 6</a> construye la red y su <code>summary()</code> confirma cada número.</p>
 </div>
 
 <h3>Regularización L2: castigar los pesos grandes</h3>
@@ -189,11 +242,11 @@
   <span class="lbl">Ejemplo numérico · la penalización L2</span>
   <p>Imagina una neurona que decide si ver una película según tres rasgos: género, actor y duración. Sus pesos son \( (0{,}5;\,-2;\,1) \) (uno por rasgo) y \( \lambda = 0{,}1 \): \( \sum w^2 = 0{,}25 + 4 + 1 = 5{,}25 \), así que la penalización es \( 0{,}1 \cdot 5{,}25 = 0{,}525 \). El peso −2, el del actor, aporta casi todo (4 de 5,25): si un solo rasgo lo decide todo, la neurona falla en cuanto sale una película con otro actor, y L2 le cobra más justo por eso. Presiona sobre todo a los pesos <em>grandes</em>. En el descenso de gradiente, cada peso sufre un empujón extra de \( 2\lambda w \) hacia cero (−0,4 para el peso −2: lo empuja hacia arriba, hacia 0).</p>
 </div>
-<p>El <a href="leccion-8.html#frag-7">fragmento 7</a> lo comprueba con una capa de 3 pesos: el MSE de los datos más la penalización a mano coincide exactamente con el número que da <code>evaluate()</code>.</p>
+<p>El <a href="laboratorio.html#fragmento-7">fragmento 7</a> lo comprueba con una capa de 3 pesos: el MSE de los datos más la penalización a mano coincide exactamente con el número que da <code>evaluate()</code>.</p>
 
 <div class="callout ojo">
   <span class="lbl">Ojo · la penalización está dentro de <code>loss</code> y de <code>val_loss</code></span>
-  <p>La penalización L2 se suma a la pérdida tanto al entrenar como al evaluar (lo demuestra el <a href="leccion-8.html#frag-7">fragmento 7</a>). Por eso la <code>loss</code> de Keras es el MSE <em>más</em> la penalización, y no es directamente el «MSE del modelo». Si quieres el error real del modelo, calcula las métricas aparte (con <code>evaluar</code>), como haremos con MAE, RMSE y R² en las unidades originales.</p>
+  <p>La penalización L2 se suma a la pérdida tanto al entrenar como al evaluar (lo demuestra el <a href="laboratorio.html#fragmento-7">fragmento 7</a>). Por eso la <code>loss</code> de Keras es el MSE <em>más</em> la penalización, y no es directamente el «MSE del modelo». Si quieres el error real del modelo, calcula las métricas aparte (con <code>evaluar</code>), como haremos con MAE, RMSE y R² en las unidades originales.</p>
 </div>
 
 <h2 id="entrenar">Entrenar con callbacks y leer las curvas</h2>
@@ -209,7 +262,7 @@
 
 <div class="callout ejemplo">
   <span class="lbl">Ejemplo numérico · pasos, épocas y paciencia</span>
-  <p>Con 2.400 filas de entrenamiento y <code>batch_size=128</code>, una época son \( \lceil 2400/128 \rceil = \lceil 18{,}75 \rceil = 19 \) pasos (18 lotes de 128 y uno de 96). Si la mejor <code>val_loss</code> se logró en la época 97 y <code>patience=15</code>, el entrenamiento se detendría, como muy pronto, tras la época 112 (97 + 15) si ninguna de las 15 siguientes la supera. Es justo lo que ocurre en el <a href="#frag-8">fragmento 8</a>: 112 épocas ejecutadas y mejor época la 97.</p>
+  <p>Con 2.400 filas de entrenamiento y <code>batch_size=128</code>, una época son \( \lceil 2400/128 \rceil = \lceil 18{,}75 \rceil = 19 \) pasos (18 lotes de 128 y uno de 96). Si la mejor <code>val_loss</code> se logró en la época 97 y <code>patience=15</code>, el entrenamiento se detendría, como muy pronto, tras la época 112 (97 + 15) si ninguna de las 15 siguientes la supera. Es justo lo que ocurre en el <a href="laboratorio.html#fragmento-8">fragmento 8</a>: 112 épocas ejecutadas y mejor época la 97.</p>
   <p>El learning rate empezó en 0,001 y <code>ReduceLROnPlateau</code> lo redujo cinco veces a la mitad: \( 0{,}001 \cdot 0{,}5^5 = 0{,}00003125 \), que es el «lr final» de 0,000031 que imprime el fragmento. En la mejor época (la 97) iba por dos reducciones: \( 0{,}001 \cdot 0{,}5^2 = 0{,}00025 \).</p>
 </div>
 
@@ -219,7 +272,7 @@
   <p><strong>Fíjate en.</strong> El diagnóstico sale de comparar las dos curvas. <strong>Sobreajuste:</strong> train baja, validación sube (la red se sabe de memoria las 25 películas y falla con las nuevas). <strong>Infraajuste:</strong> las dos se quedan altas. <strong>Learning rate alto:</strong> la curva de entrenamiento da saltos. <strong>Ajuste sano:</strong> ambas bajan juntas y se estabilizan cerca del nivel del ruido (línea de puntos). EarlyStopping se queda con la mejor época (punto verde) en vez de con la última.</p>
 </div>
 
-<p>La curva de la red de pisos (<a href="#frag-8">fragmento 8</a>) es de las sanas: la <code>val_loss</code> baja de 0,634 en la época 1 a 0,113 en la 10 y a 0,0357 en la mejor época, y se queda ahí sin repuntar (0,0358 en la última). Que la <code>loss</code> de entrenamiento (0,058) sea <em>mayor</em> que la de validación (0,036) no es un error: durante el entrenamiento Dropout apaga neuronas y BatchNorm usa estadísticas del lote, así que el modelo trabaja «con las manos atadas»; al validar se usa la red completa. Es normal en redes con Dropout.</p>
+<p>La curva de la red de pisos (<a href="laboratorio.html#fragmento-8">fragmento 8</a>) es de las sanas: la <code>val_loss</code> baja de 0,634 en la época 1 a 0,113 en la 10 y a 0,0357 en la mejor época, y se queda ahí sin repuntar (0,0358 en la última). Que la <code>loss</code> de entrenamiento (0,058) sea <em>mayor</em> que la de validación (0,036) no es un error: durante el entrenamiento Dropout apaga neuronas y BatchNorm usa estadísticas del lote, así que el modelo trabaja «con las manos atadas»; al validar se usa la red completa. Es normal en redes con Dropout.</p>
 
 <div class="callout ojo">
   <span class="lbl">Ojo · la validación se va gastando</span>
@@ -228,140 +281,12 @@
   </div>
 </details>
 
-
-<section>
+<section class="ir-lab">
 <h2 class="sin-num">Código</h2>
-<article class="snippet" data-lang="python" id="frag-6">
-  <header>
-    <h3>6 · La red de regresión con la API funcional y su resumen</h3>
-    <p class="para-que"><strong>Para qué sirve</strong> Escribir una función <code>construir_modelo</code> que monte la red (Dense, BatchNorm, ReLU, Dropout, L2) con la API funcional y devuelva el modelo ya compilado, y ver su <code>summary()</code> con el número de parámetros de cada capa. Continúa el fragmento 3 (usa <code>Z_train</code>).</p>
-  </header>
-  <pre class="code"><code>import keras
-from keras import layers, regularizers
-
-def construir_modelo(n_entradas, unidades=(64, 32), dropout=0.1, l2=1e-4, bn=True, lr=1e-3):
-    entrada = keras.Input(shape=(n_entradas,), name="pisos")
-    x = entrada
-    for i, u in enumerate(unidades, start=1):
-        x = layers.Dense(u, kernel_regularizer=regularizers.l2(l2) if l2 else None, name=f"densa{i}")(x)
-        if bn:
-            x = layers.BatchNormalization(name=f"bn{i}")(x)
-        x = layers.Activation("relu", name=f"relu{i}")(x)
-        if dropout:
-            x = layers.Dropout(dropout, name=f"drop{i}")(x)
-    salida = layers.Dense(1, name="precio")(x)
-    modelo = keras.Model(entrada, salida, name="red_pisos")
-    modelo.compile(optimizer=keras.optimizers.Adam(lr), loss="mse", metrics=["mae"])
-    return modelo
-
-keras.utils.set_random_seed(42)
-modelo = construir_modelo(Z_train.shape[1])
-modelo.summary()</code></pre>
-  <details class="linea-a-linea">
-    <summary>Línea por línea</summary>
-    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
-    <table class="lineas">
-      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
-      <tbody>
-        <tr data-lines="1-2"><td><code>import keras …</code></td><td>Importa Keras y, de él, las capas (<code>layers</code>) y los regularizadores (<code>regularizers</code>).</td></tr>
-        <tr data-lines="4"><td><code>def construir_modelo(n_entradas, unidades=(64, 32), dro…</code></td><td>La función recibe cuántas columnas entran y los ajustes de la red: neuronas de cada capa oculta (<code>unidades</code>), tasa de Dropout, fuerza de L2, si lleva BatchNorm y learning rate. Los valores por defecto son los que usamos.</td></tr>
-        <tr data-lines="5-6"><td><code>entrada = keras.Input(shape=(n_entradas,), name="pisos") …</code></td><td><code>keras.Input</code> crea la entrada de forma <code>(n_entradas,)</code> (una fila de 10 números), con nombre. <code>x</code> es el «hilo» al que iremos enganchando capas.</td></tr>
-        <tr data-lines="7"><td><code>for i, u in enumerate(unidades, start=1):</code></td><td>Un bucle que construye un bloque por cada tamaño de <code>unidades</code> (<code>enumerate(…, start=1)</code> numera desde 1 para los nombres).</td></tr>
-        <tr data-lines="8"><td><code>x = layers.Dense(u, kernel_regularizer=regularizers.l2(…</code></td><td>Capa <code>Dense</code> aplicada a <code>x</code> con <code>(x)</code>. Si <code>l2</code> no es 0, lleva la penalización L2 en sus pesos (<code>kernel_regularizer</code>); si es 0, <code>None</code>.</td></tr>
-        <tr data-lines="9-10"><td><code>if bn: …</code></td><td>Si <code>bn</code> es cierto, añade una <code>BatchNormalization</code>.</td></tr>
-        <tr data-lines="11"><td><code>x = layers.Activation("relu", name=f"relu{i}")(x)</code></td><td>Activación ReLU como capa independiente (así la normalización queda antes de ella).</td></tr>
-        <tr data-lines="12-13"><td><code>if dropout: …</code></td><td>Si <code>dropout</code> no es 0, añade Dropout.</td></tr>
-        <tr data-lines="14"><td><code>salida = layers.Dense(1, name="precio")(x)</code></td><td>Capa de salida: una sola neurona, <strong>sin activación</strong> (regresión).</td></tr>
-        <tr data-lines="15"><td><code>modelo = keras.Model(entrada, salida, name="red_pisos")</code></td><td><code>keras.Model(entrada, salida)</code> recoge el grafo de capas en un modelo con nombre.</td></tr>
-        <tr data-lines="16"><td><code>modelo.compile(optimizer=keras.optimizers.Adam(lr), los…</code></td><td>Compila: optimizador Adam con el learning rate dado, pérdida MSE y el MAE como métrica a vigilar.</td></tr>
-        <tr data-lines="17"><td><code>return modelo</code></td><td>Devuelve el modelo.</td></tr>
-        <tr data-lines="19"><td><code>keras.utils.set_random_seed(42)</code></td><td>Fija la semilla de Python, NumPy y Keras de golpe, para que los pesos iniciales sean siempre los mismos.</td></tr>
-        <tr data-lines="20"><td><code>modelo = construir_modelo(Z_train.shape[1])</code></td><td>Construye la red con la configuración por defecto; <code>Z_train.shape[1]</code> es 10.</td></tr>
-        <tr data-lines="21"><td><code>modelo.summary()</code></td><td>Imprime la tabla resumen: capa, forma de salida y parámetros.</td></tr>
-      </tbody>
-    </table>
-  </details>
-  <div class="salida">
-    <strong>Salida esperada</strong>
-    <pre>Model: "red_pisos"
-┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━┓
-┃ Layer (type)                    ┃ Output Shape           ┃       Param # ┃
-┡━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━┩
-│ pisos (InputLayer)              │ (None, 10)             │             0 │
-├─────────────────────────────────┼────────────────────────┼───────────────┤
-│ densa1 (Dense)                  │ (None, 64)             │           704 │
-├─────────────────────────────────┼────────────────────────┼───────────────┤
-│ bn1 (BatchNormalization)        │ (None, 64)             │           256 │
-├─────────────────────────────────┼────────────────────────┼───────────────┤
-│ relu1 (Activation)              │ (None, 64)             │             0 │
-├─────────────────────────────────┼────────────────────────┼───────────────┤
-│ drop1 (Dropout)                 │ (None, 64)             │             0 │
-├─────────────────────────────────┼────────────────────────┼───────────────┤
-│ densa2 (Dense)                  │ (None, 32)             │         2,080 │
-├─────────────────────────────────┼────────────────────────┼───────────────┤
-│ bn2 (BatchNormalization)        │ (None, 32)             │           128 │
-├─────────────────────────────────┼────────────────────────┼───────────────┤
-│ relu2 (Activation)              │ (None, 32)             │             0 │
-├─────────────────────────────────┼────────────────────────┼───────────────┤
-│ drop2 (Dropout)                 │ (None, 32)             │             0 │
-├─────────────────────────────────┼────────────────────────┼───────────────┤
-│ precio (Dense)                  │ (None, 1)              │            33 │
-└─────────────────────────────────┴────────────────────────┴───────────────┘
- Total params: 3,201 (12.50 KB)
- Trainable params: 3,009 (11.75 KB)
- Non-trainable params: 192 (768.00 B)</pre>
-    <p>La tabla coincide con las cuentas a mano: <code>densa1</code> 704, <code>bn1</code> 256, <code>densa2</code> 2.080, <code>bn2</code> 128 y <code>precio</code> 33. Total <strong>3.201</strong> parámetros, de los que <strong>3.009</strong> son entrenables y <strong>192</strong> no (las medias y varianzas móviles de las dos BatchNorm: 2 · (64 + 32)). Las capas ReLU y Dropout no tienen parámetros. El <code>None</code> de las formas es el tamaño del lote, que aún no se conoce.</p>
-  </div>
-</article>
-
-<article class="snippet" data-lang="python" id="frag-8">
-  <header>
-    <h3>8 · Entrenar con EarlyStopping, ReduceLROnPlateau y ModelCheckpoint</h3>
-    <p class="para-que"><strong>Para qué sirve</strong> Entrenar la red de los pisos dejando que tres callbacks decidan cuándo parar, cuándo bajar el learning rate y cuándo guardar, y leer de <code>history</code> qué pasó. Continúa el fragmento 6 (usa <code>modelo</code>).</p>
-  </header>
-  <pre class="code"><code>callbacks = [
-    keras.callbacks.EarlyStopping(monitor="val_loss", patience=15, restore_best_weights=True),
-    keras.callbacks.ReduceLROnPlateau(monitor="val_loss", factor=0.5, patience=6, min_lr=1e-5),
-    keras.callbacks.ModelCheckpoint("mejor_pisos.keras", monitor="val_loss", save_best_only=True),
-]
-hist = modelo.fit(Z_train, t_train, validation_data=(Z_val, t_val),
-                  epochs=150, batch_size=128, callbacks=callbacks, verbose=0)
-h = hist.history
-mejor = int(np.argmin(h["val_loss"]))
-print("épocas ejecutadas:", len(h["loss"]), "| mejor época:", mejor + 1)
-print(f"val_loss en la mejor época: {h['val_loss'][mejor]:.4f} | lr final: {h['learning_rate'][-1]:.6f}")
-for e in [0, 4, 9, mejor, len(h["loss"]) - 1]:
-    print(f"época {e + 1:3d}  loss={h['loss'][e]:.4f}  val_loss={h['val_loss'][e]:.4f}  lr={h['learning_rate'][e]:.5f}")</code></pre>
-  <details class="linea-a-linea">
-    <summary>Línea por línea</summary>
-    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
-    <table class="lineas">
-      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
-      <tbody>
-        <tr data-lines="1-5"><td><code>callbacks = [ …</code></td><td>Lista de tres <em>callbacks</em>: <code>EarlyStopping</code> (para si <code>val_loss</code> no mejora en 15 épocas y <code>restore_best_weights=True</code> devuelve los pesos de la mejor época), <code>ReduceLROnPlateau</code> (a la mitad tras 6 épocas sin mejorar, con suelo en 1e-5) y <code>ModelCheckpoint</code> (guarda en <code>mejor_pisos.keras</code> solo si mejora).</td></tr>
-        <tr data-lines="6-7"><td><code>hist = modelo.fit(Z_train, t_train, validation_data=(Z_…</code></td><td><code>fit</code> entrena: datos de train, validación para vigilar, hasta 150 épocas (el EarlyStopping parará antes), lotes de 128 y los callbacks. <code>verbose=0</code> silencia la barra de progreso.</td></tr>
-        <tr data-lines="8"><td><code>h = hist.history</code></td><td><code>hist.history</code> es un diccionario con la pérdida, la métrica y el learning rate de cada época.</td></tr>
-        <tr data-lines="9"><td><code>mejor = int(np.argmin(h["val_loss"]))</code></td><td><code>np.argmin</code> da la posición del menor <code>val_loss</code> (empezando en 0).</td></tr>
-        <tr data-lines="10"><td><code>print("épocas ejecutadas:", len(h["loss"]), "| mejor ép…</code></td><td>Cuántas épocas se ejecutaron (longitud de la lista) y cuál fue la mejor (+1 porque contamos desde 1).</td></tr>
-        <tr data-lines="11"><td><code>print(f"val_loss en la mejor época: {h['val_loss'][mejo…</code></td><td>La <code>val_loss</code> de la mejor época y el último learning rate.</td></tr>
-        <tr data-lines="12-13"><td><code>for e in [0, 4, 9, mejor, len(h["loss"]) - 1]: …</code></td><td>Imprime la primera época, la quinta, la décima, la mejor y la última: pérdida, pérdida de validación y learning rate.</td></tr>
-      </tbody>
-    </table>
-  </details>
-  <div class="salida">
-    <strong>Salida esperada</strong>
-    <pre>épocas ejecutadas: 112 | mejor época: 97
-val_loss en la mejor época: 0.0357 | lr final: 0.000031
-época   1  loss=0.9334  val_loss=0.6338  lr=0.00100
-época   5  loss=0.2059  val_loss=0.3034  lr=0.00100
-época  10  loss=0.1468  val_loss=0.1127  lr=0.00100
-época  97  loss=0.0584  val_loss=0.0357  lr=0.00025
-época 112  loss=0.0575  val_loss=0.0358  lr=0.00003</pre>
-    <p>Se ejecutaron <strong>112</strong> épocas (97 + 15 de paciencia) y la mejor fue la <strong>97</strong>, con <code>val_loss</code> 0,0357. El learning rate empezó en 0,001 y acabó en 0,000031 (cinco reducciones a la mitad; en la mejor época iba por 0,00025). La <code>val_loss</code> cae de 0,634 (época 1) a 0,113 (época 10) y 0,0357; la <code>loss</code> de entrenamiento queda por encima (0,058) por el Dropout y la BatchNorm en modo entrenamiento. Entre la época 97 y la 112 la validación apenas cambia (0,0357 → 0,0358): no hay sobreajuste.</p>
-  </div>
-</article>
+<a class="lab-card" href="laboratorio.html#paso-4"><span class="lc-ico" aria-hidden="true">🧪</span>
+  <span><strong>Ver el código de esta lección en el Laboratorio</strong>
+  <span>Paso 4 · La red con la API funcional y su resumen; paso 5 · entrenar con los tres vigilantes. La comprobación de L2 a mano está en «Más código», fragmento 7.</span></span></a>
 </section>
-
 
 </div>
 </main>

@@ -20,40 +20,43 @@
     <div>
       <p class="eyebrow">Curso 3 · Módulo 5 · Lección 2 de 8</p>
       <h1>tf.function rueda tu paso una vez; train_step lo mete en fit</h1>
-      <p class="lead">Decora con <code>@tf.function</code> la función que entrena un lote y se convierte en un grafo reutilizable que solo se vuelve a trazar si cambia la firma. Y si quieres tu paso sin perder <code>fit</code>, sobrescribe <code>train_step</code>.</p>
-      <p class="meta-line"><span class="read-time" data-render="read-time"></span><a href="../modulo-5.html">Índice del módulo</a></p>
+      <p class="lead">Con <code>@tf.function</code>, el paso de un lote se monta una vez y luego se repite muy rápido. Y si quieres tu paso sin perder <code>fit</code>, cambias solo <code>train_step</code>.</p>
+      <p class="meta-line"><span class="read-time" data-render="read-time"></span><a href="../modulo-5.html">Índice del módulo</a> · <a href="#chuleta">Ir a la chuleta</a></p>
     </div>
     <div class="hero-tile" aria-hidden="true"></div>
   </div>
 </header>
 <details class="predice">
-  <summary>Tu bucle propio funciona, pero va mucho más lento que <code>fit</code> con el mismo modelo. ¿Es que tu código Python está mal escrito?<span class="hint"></span></summary>
+  <summary>Tu bucle propio funciona, pero va mucho más lento que <code>fit</code> con el mismo modelo. ¿Has escrito mal el Python?<span class="hint"></span></summary>
   <div>
-    <p>Probablemente no. Tu bucle ejecuta cada operación desde Python, una a una. <code>fit</code>, en cambio, convierte el paso de entrenamiento en un <strong>grafo</strong> con <code>tf.function</code> y lo reutiliza en cada lote. Tú puedes hacer lo mismo: decora la función que hace <strong>un lote</strong> y deja el <code>for</code> fuera.</p>
+    <p>Probablemente no. Tu bucle hace cada cuenta desde Python, una a una. <code>fit</code> convierte el paso de un lote en un <strong>grafo</strong> y lo reutiliza. Tú puedes hacer lo mismo.</p>
   </div>
 </details>
 
 <section>
-<h2 id="idea">Rodar una vez, proyectar muchas</h2>
-<p>Rodar una película cuesta meses; proyectar una copia es rápido. Con <code>@tf.function</code> pasa igual: la primera llamada ejecuta tu Python y lo «rueda» como grafo (<strong>trazar</strong>); las siguientes solo proyectan la copia. Pero cada formato de pantalla necesita su copia: si llega un lote con <strong>otra forma</strong>, otro tipo o otro número de Python, se traza de nuevo (<em>retracing</em>).</p>
+<h2 id="idea">1 · Rodar una vez, proyectar muchas</h2>
+<p>Rodar una película cuesta meses; proyectar una copia es rápido. Un <strong>grafo</strong> es esa copia: la lista de cuentas del paso, ya montada, que TensorFlow repite sin pasar por Python.</p>
+<p>Se pide con <code>@tf.function</code> encima de la función. Esa línea con <code>@</code> es un <strong>decorador</strong>: transforma la función de debajo. La primera llamada ejecuta tu Python y monta el grafo: eso es <strong>trazar</strong>. Las siguientes solo lo repiten.</p>
+<ul class="flow">
+  <li class="a">1.ª LLAMADA<small>Python se ejecuta y traza</small></li>
+  <li class="b">GRAFO GUARDADO<small>en una caché</small></li>
+  <li class="d">LLAMADAS 2, 3…<small>solo el grafo: rápido</small></li>
+</ul>
+</section>
+
+<section>
+<h2 id="dentro">2 · Qué va dentro y qué va fuera</h2>
+<p>Se decora el paso de <strong>un</strong> lote; el bucle que reparte los lotes se queda fuera, en Python.</p>
 <div class="cards">
   <div class="card">
-    <h4>Dentro de la <code>tf.function</code></h4>
-    <p>Cinta, forward, pérdida, gradientes, <code>apply_gradients</code> y los <code>update_state</code>.</p>
+    <h4>Dentro del grafo</h4>
+    <p>Cinta, predicción, pérdida, gradientes, <code>apply_gradients</code> y apuntar en las libretas.</p>
   </div>
   <div class="card">
     <h4>Fuera</h4>
-    <p>El <code>for</code> sobre el dataset, <code>reset_state()</code>, <code>result()</code> y los <code>print</code>.</p>
+    <p>El <code>for</code> de los lotes, borrar libretas, leer la media y los <code>print</code>.</p>
   </div>
 </div>
-<p>¿Y si quieres tu paso propio <strong>sin perder</strong> la barra de progreso, la validación, el <code>History</code> y los callbacks? Sobrescribe solo <code>train_step</code>. Es un cine ya montado: butacas, taquilla y pantalla son de Keras; tú cambias la película que se proyecta.</p>
-<pre class="ascii">fit(X, y, epochs=E, callbacks=[...])
- para cada época:
-    para cada lote:
-        logs = train_step(lote)    &lt;-- AQUÍ entras tú
-    si hay validación: test_step(lote)
-    on_epoch_end(epoca, logs)</pre>
-<p>El contrato: <code>train_step(self, data)</code> hace forward con <code>self(x, training=True)</code>, pérdida con <code>self.compute_loss</code>, aplica gradientes con <code>self.optimizer</code>, actualiza <code>self.metrics</code> y <strong>devuelve un diccionario</strong> <code>{nombre: valor}</code>. Ese diccionario es lo que ves en la barra y lo que reciben los callbacks.</p>
 </section>
 
 <figure class="demo" data-demo="curso3/c3m5-tf-function" data-titulo="La caché de trazados de tf.function">
@@ -62,31 +65,76 @@
 </figure>
 
 <section>
-<h2 id="numeros">Con números: el último lote</h2>
-<div class="callout ejemplo">
-  <span class="lbl">Ejemplo numérico</span>
-  <p>Tienes <strong>1347 valoraciones</strong> de películas y usas <code>batch(64)</code>.</p>
-  <ol class="pasos">
-    <li>\( 21\cdot64 = 1344 \): salen 21 lotes de forma <code>(64, …)</code>.</li>
-    <li>Sobran \( 1347-1344 = 3 \): un último lote de forma <code>(3, …)</code>.</li>
-    <li>Dos formas distintas → <strong>2 trazados</strong> (no 22: los lotes iguales reutilizan el grafo).</li>
-  </ol>
-  <p>Arreglos: <code>batch(64, drop_remainder=True)</code>, <code>@tf.function(reduce_retracing=True)</code> o una <code>input_signature</code> con <code>None</code> en el eje del lote.</p>
+<h2 id="numeros">3 · Cada forma nueva, un trazado más</h2>
+<p>Cada copia sirve para un formato de pantalla. Si llega un lote con otra <strong>forma</strong> (otro número de filas), se traza otra vez: es el <em>retracing</em>.</p>
+<div class="anim-pasos" data-titulo="1347 valoraciones en lotes de 64">
+  <div class="paso"><p><strong>1.</strong> 21 · 64 = 1344: salen 21 lotes de 64 filas.</p><span class="grande">21 lotes (64, …)</span></div>
+  <div class="paso"><p><strong>2.</strong> Sobran 1347 − 1344 = 3: un último lote de 3 filas.</p><span class="grande">1 lote (3, …)</span></div>
+  <div class="paso"><p><strong>3.</strong> Dos formas distintas, dos grafos. No 22: los lotes iguales reutilizan el suyo.</p><span class="grande">2 trazados</span></div>
+  <div class="paso"><p><strong>4.</strong> Arreglos: tirar el lote incompleto (<code>drop_remainder=True</code>) o pedir un grafo que valga para cualquier tamaño (<code>reduce_retracing=True</code>).</p><span class="grande">1 trazado</span></div>
+</div>
+<div class="callout ojo">
+  <span class="lbl">Ojo</span>
+  <p>Un número de Python (como la época, <code>paso(x, y, 7)</code>) también cuenta como forma nueva: 30 épocas, 30 trazados. Pásalo como tensor: <code>tf.constant(7)</code>. Y un <code>print</code> de Python dentro solo sale al trazar; usa <code>tf.print</code>.</p>
 </div>
 </section>
 
 <details class="predice">
-  <summary>Tus capas llevan <code>kernel_regularizer=l2(...)</code>. En tu bucle propio la pérdida es solo el error de las notas. ¿El modelo se está regularizando?<span class="hint"></span></summary>
+  <summary>Tus capas llevan una multa L2 por pesos grandes (<code>kernel_regularizer</code>). En tu bucle propio la pérdida es solo el fallo. ¿Se aplica la multa?<span class="hint"></span></summary>
   <div>
-    <p><strong>No.</strong> Los regularizadores dejan su multa en <code>modelo.losses</code> y en un bucle propio tienes que sumarla tú: <code>perdida + tf.add_n(modelo.losses)</code>. <code>fit</code> y <code>self.compute_loss</code> (dentro de <code>train_step</code>) sí la suman. Es un error silencioso: entrena, pero sin multa.</p>
+    <p><strong>No.</strong> La multa queda guardada en <code>modelo.losses</code> y en un bucle propio la sumas tú: <code>perdida + tf.add_n(modelo.losses)</code>. <code>fit</code> sí la suma. Entrena igual, pero sin multa, y nada avisa.</p>
   </div>
 </details>
+
+<section>
+<h2 id="dentro-fit">4 · Tu paso, dentro de <code>fit</code></h2>
+<p>Con un bucle propio pierdes la barra de progreso, la validación, el historial y los callbacks. Para cambiar solo el paso y conservar todo eso, se reescribe <code>train_step</code>: el método que <code>fit</code> llama con cada lote. Es un cine ya montado: butacas y pantalla son de Keras; tú cambias la película.</p>
+<div class="anim-pasos" data-titulo="Lo que hace fit por dentro">
+  <div class="paso"><p><strong>1.</strong> Empieza una época. Keras pone las métricas a cero.</p><span class="grande">época 1</span></div>
+  <div class="paso"><p><strong>2.</strong> Con cada lote llama a <code>train_step(lote)</code>: aquí entras tú.</p><span class="grande">train_step(lote)</span></div>
+  <div class="paso"><p><strong>3.</strong> <code>train_step</code> devuelve un <strong>diccionario</strong>: parejas nombre → valor.</p><span class="grande">{"loss": 0,33, "accuracy": 0,88}</span></div>
+  <div class="paso"><p><strong>4.</strong> Con ese diccionario Keras pinta la barra y lo guarda en el historial.</p><span class="grande">barra · History</span></div>
+  <div class="paso"><p><strong>5.</strong> Si hay validación, llama a <code>test_step</code>; después avisa a los callbacks.</p><span class="grande">test_step → callbacks</span></div>
+</div>
+</section>
+
+<section>
+<h2 id="contrato">5 · El contrato de <code>train_step</code></h2>
+<ul class="flow">
+  <li class="a">DESEMPAQUETAR<small>x, y = data</small></li>
+  <li class="b">CINTA<small>self(x) + self.compute_loss</small></li>
+  <li class="c">APLICAR<small>self.optimizer</small></li>
+  <li class="d">MÉTRICAS<small>self.metrics</small></li>
+  <li class="a">DEVOLVER<small>{nombre: valor}</small></li>
+</ul>
+<p><code>self</code> es el propio modelo. <code>self.compute_loss</code> calcula la pérdida del <code>compile</code> y <strong>ya suma las multas</strong>.</p>
+<div class="callout ojo">
+  <span class="lbl">Ojo</span>
+  <p>Sin el <code>return</code> del diccionario, <code>fit</code> falla con un error raro sobre «OptionalFromValue» que no nombra <code>train_step</code>.</p>
+</div>
+</section>
+
+<section>
+<h2 id="chuleta">Chuleta para repasar</h2>
+<dl class="chuleta">
+  <div><dt>Grafo</dt><dd>Las cuentas del paso ya montadas, que se repiten sin pasar por Python.</dd></div>
+  <div><dt><code>@tf.function</code></dt><dd>Decorador que convierte una función en grafo. <em>Se pone en el paso de un lote.</em></dd></div>
+  <div><dt>Trazar</dt><dd>Ejecutar el Python una vez para montar el grafo.</dd></div>
+  <div><dt>Retracing</dt><dd>Volver a trazar por una forma, un tipo o un número de Python nuevos. <em>1347 en lotes de 64: 2 trazados.</em></dd></div>
+  <div><dt><code>drop_remainder</code></dt><dd>Tira el último lote incompleto: una sola forma.</dd></div>
+  <div><dt><code>tf.print</code></dt><dd>El <code>print</code> que sí sale en cada llamada del grafo.</dd></div>
+  <div><dt><code>modelo.losses</code></dt><dd>Las multas de regularización; en un bucle propio se suman a mano.</dd></div>
+  <div><dt><code>train_step</code></dt><dd>El paso de un lote dentro de <code>fit</code>; se reescribe para cambiarlo.</dd></div>
+  <div><dt>Diccionario de métricas</dt><dd>Lo que devuelve <code>train_step</code>: barra, historial y callbacks salen de ahí.</dd></div>
+  <div><dt><code>compute_loss</code></dt><dd>La pérdida del <code>compile</code> con las multas ya sumadas.</dd></div>
+</dl>
+</section>
 
 <div class="resumen">
   <h2 class="sin-num sin-toc">En tres líneas</h2>
   <ul>
-    <li><code>@tf.function</code> en el paso de un lote: se traza una vez por firma y se reutiliza el grafo.</li>
-    <li>Formas nuevas, el último lote pequeño o enteros de Python provocan <em>retracing</em>.</li>
+    <li><code>@tf.function</code> en el paso de un lote: se traza una vez por forma y se reutiliza el grafo.</li>
+    <li>Formas nuevas, el último lote pequeño o números de Python provocan <em>retracing</em>.</li>
     <li><code>train_step</code> cambia el paso y conserva <code>fit</code>, siempre que devuelva el diccionario de métricas.</li>
   </ul>
 </div>
@@ -97,18 +145,18 @@
  "titulo": "¿Lo tienes?",
  "preguntas": [
   {
-   "q": "Entrenas con un bucle propio donde el paso está decorado con <code>@tf.function</code>. Tienes 1347 valoraciones de películas y usas <code>batch(64)</code>. ¿Cuántas veces se traza el paso y cómo se evita el trazado extra?",
+   "q": "Entrenas con un bucle propio cuyo paso lleva <code>@tf.function</code>. Tienes 1347 valoraciones y lotes de 64. ¿Cuántas veces se traza el paso y cómo se evita el trazado extra?",
    "opciones": [
-    "2 veces: el último lote tiene solo 3 ejemplos y su forma es distinta. Se evita con <code>drop_remainder=True</code> o <code>reduce_retracing=True</code>.",
+    "2 veces: el último lote tiene solo 3 filas y su forma es distinta. Se evita con <code>drop_remainder=True</code> o <code>reduce_retracing=True</code>.",
     "1 vez: TensorFlow generaliza las formas por sí solo.",
-    "22 veces, una por lote, porque cada llamada recibe tensores nuevos.",
-    "Ninguna: dentro de un bucle propio todo se ejecuta siempre en modo inmediato."
+    "22 veces, una por lote, porque cada llamada recibe datos nuevos.",
+    "Ninguna: dentro de un bucle propio todo se ejecuta siempre desde Python."
    ],
    "correcta": 0,
-   "porque": "La caché de trazados usa como clave el tipo y la forma de los tensores, no sus valores. Hay 21 lotes de forma (64, 64) y uno de (3, 64): dos formas, dos trazados (el fragmento 3 lo mide). No son 22 porque un lote nuevo con la misma forma reutiliza el grafo. Y la decoración con <code>tf.function</code> es justamente lo que deja de ejecutar Python en cada paso."
+   "porque": "La caché de grafos se guía por la forma y el tipo de los datos, no por sus valores. Hay 21 lotes de 64 filas y uno de 3: dos formas, dos trazados (el laboratorio lo mide). No son 22 porque un lote con la misma forma reutiliza el grafo."
   },
   {
-   "q": "Un <code>train_step</code> personalizado calcula la pérdida, aplica los gradientes y actualiza las métricas, pero acaba sin <code>return</code>. ¿Qué ocurre al llamar a <code>fit</code>?",
+   "q": "Un <code>train_step</code> propio calcula la pérdida, aplica los gradientes y apunta las métricas, pero acaba sin <code>return</code>. ¿Qué ocurre al llamar a <code>fit</code>?",
    "opciones": [
     "Entrena con normalidad, pero el historial queda vacío.",
     "Keras lo detecta y devuelve las métricas por su cuenta.",
@@ -116,25 +164,24 @@
     "Entrena, pero la pérdida vale siempre 0."
    ],
    "correcta": 2,
-   "porque": "<code>fit</code> usa el diccionario que devuelve <code>train_step</code> para la barra de progreso, el historial y los callbacks. Si devuelve <code>None</code> no hay nada que registrar y TensorFlow falla dentro del grafo con un mensaje que no menciona <code>train_step</code> (lo viste en el fragmento 2). Por eso no entrena «con normalidad», ni Keras lo repara, ni acaba con pérdida 0: simplemente falla."
+   "porque": "<code>fit</code> usa el diccionario que devuelve <code>train_step</code> para la barra, el historial y los callbacks. Si no devuelve nada, TensorFlow falla dentro del grafo con un mensaje que no menciona <code>train_step</code> (lo ves en el laboratorio)."
   },
   {
-   "q": "Le pasas a tu paso decorado el número de época como entero de Python (<code>paso(x, y, epoca)</code>). Entrenas 30 épocas. ¿Qué ocurre?",
+   "q": "Le pasas a tu paso decorado el número de época como número de Python (<code>paso(x, y, epoca)</code>). Entrenas 30 épocas. ¿Qué ocurre?",
    "opciones": [
     "Se traza una sola vez, como con cualquier argumento",
-    "Se traza una vez por época: cada valor de Python es otra clave de la caché",
-    "Falla: <code>tf.function</code> no acepta enteros"
+    "Se traza una vez por época: cada valor de Python cuenta como una forma nueva",
+    "Falla: <code>tf.function</code> no acepta números"
    ],
    "correcta": 1,
-   "porque": "Los números de Python se «graban» dentro del grafo, así que cada valor distinto fuerza un trazado nuevo: 30 trazados. Pasa un tensor, <code>tf.constant(epoca)</code>, y se traza una sola vez."
+   "porque": "Los números de Python se graban dentro del grafo, así que cada valor distinto fuerza un trazado nuevo: 30 trazados. Pasa un tensor, <code>tf.constant(epoca)</code>, y se traza una sola vez."
   }
  ]
 }
 </script>
 </section>
-
 <details class="profundizar">
-  <summary><span>Profundizar: la explicación completa<small>Las cuatro trampas de tf.function en un bucle, el contrato completo de train_step pieza a pieza, sus tres trampas en Keras 3 y el resultado del fragmento 2.</small></span></summary>
+  <summary><span>Profundizar: la explicación completa<small>Las cuatro trampas de tf.function en un bucle, el contrato completo de train_step pieza a pieza, sus tres trampas en Keras 3 y el resultado del <a href="laboratorio.html#frag-2">fragmento 2</a>.</small></span></summary>
   <div class="prof-body">
 <h2 id="tf-function"><code>tf.function</code> dentro del bucle: rapidez y trampas</h2>
 
@@ -176,11 +223,11 @@
   <p><strong>Fíjate en.</strong> Las dos primeras llamadas comparten grafo (mismo tipo y forma): solo la primera traza. Cada forma nueva cuesta otro trazado. Con <code>reduce_retracing=True</code>, al ver una segunda forma del mismo tipo y rango, TensorFlow traza una versión generalizada con dimensiones <code>None</code> que sirve para cualquier longitud y las siguientes ya no trazan. El bucle de enteros de Python traza cinco veces; el de <code>tf.constant</code>, una.</p>
 </div>
 
-<p>El fragmento 3 reúne todo en un bucle completo: dígitos de <code>sklearn</code>, un modelo con regularización L2 y Dropout, un planificador de coseno, recorte de gradientes, cuatro métricas y dos <code>tf.function</code> (entrenamiento y validación). El contador <code>experimental_get_tracing_count()</code> confirma la trampa del último lote: <strong>2 trazados</strong> en cada función. Para depurar un paso dentro de una <code>tf.function</code> con puntos de interrupción existe <code>tf.config.run_functions_eagerly(True)</code>, que la desactiva temporalmente.</p>
+<p>El <a href="laboratorio.html#frag-3">fragmento 3</a> reúne todo en un bucle completo: dígitos de <code>sklearn</code>, un modelo con regularización L2 y Dropout, un planificador de coseno, recorte de gradientes, cuatro métricas y dos <code>tf.function</code> (entrenamiento y validación). El contador <code>experimental_get_tracing_count()</code> confirma la trampa del último lote: <strong>2 trazados</strong> en cada función. Para depurar un paso dentro de una <code>tf.function</code> con puntos de interrupción existe <code>tf.config.run_functions_eagerly(True)</code>, que la desactiva temporalmente.</p>
 
 <div class="callout ojo">
   <span class="lbl">Ojo · la pérdida de un bucle propio no incluye la regularización por sí sola</span>
-  <p>En un bucle escrito a mano, la penalización L2 de <code>kernel_regularizer</code> <strong>no se suma sola</strong>: los regularizadores dejan su término en <code>modelo.losses</code> y tú tienes que añadirlo (<code>perdida + tf.add_n(modelo.losses)</code>, línea 37 del fragmento 3). <code>fit</code> y <code>self.compute_loss</code> (en <code>train_step</code>) sí lo suman. Es un error silencioso: el modelo entrena, pero sin regularizar.</p>
+  <p>En un bucle escrito a mano, la penalización L2 de <code>kernel_regularizer</code> <strong>no se suma sola</strong>: los regularizadores dejan su término en <code>modelo.losses</code> y tú tienes que añadirlo (<code>perdida + tf.add_n(modelo.losses)</code>, línea 37 del <a href="laboratorio.html#frag-3">fragmento 3</a>). <code>fit</code> y <code>self.compute_loss</code> (en <code>train_step</code>) sí lo suman. Es un error silencioso: el modelo entrena, pero sin regularizar.</p>
 </div>
 
 <h2 id="train-step">Sobrescribir <code>train_step</code>: tu paso con el <code>fit</code> de siempre</h2>
@@ -201,7 +248,7 @@
     on_epoch_end(epoca, logs)           (EarlyStopping, ModelCheckpoint, ...)
  on_train_end</pre>
 
-<p>Hay que cumplir un contrato muy concreto. <code>train_step(self, data)</code> recibe un lote, hace forward, gradiente y actualización, actualiza las métricas y <strong>devuelve un diccionario</strong> <code>{nombre: valor}</code>. Ese diccionario es lo que Keras muestra en la barra de progreso, guarda en <code>History</code> y pasa a los callbacks como <code>logs</code>. El fragmento 2 es el esqueleto completo:</p>
+<p>Hay que cumplir un contrato muy concreto. <code>train_step(self, data)</code> recibe un lote, hace forward, gradiente y actualización, actualiza las métricas y <strong>devuelve un diccionario</strong> <code>{nombre: valor}</code>. Ese diccionario es lo que Keras muestra en la barra de progreso, guarda en <code>History</code> y pasa a los callbacks como <code>logs</code>. El <a href="laboratorio.html#frag-2">fragmento 2</a> es el esqueleto completo:</p>
 
 <ul class="flow">
   <li class="a">DESEMPAQUETAR<small>x, y = data</small></li>
@@ -222,17 +269,17 @@
   <li><code>self.optimizer</code> y <code>self.trainable_variables</code> existen ya porque llamaste a <code>compile</code>. No hace falta crear el optimizador ni <code>build</code>.</li>
   <li><code>self.metrics</code> es la lista de métricas de Keras: la pérdida (llamada <code>"loss"</code>) y las que pusiste en <code>compile(metrics=[...])</code>. La pérdida se actualiza con <code>update_state(perdida)</code> y las demás con <code>update_state(y, y_pred)</code>. Por eso el bucle distingue por nombre.</li>
   <li>Si tus datos traen pesos por ejemplo, <code>data</code> es <code>(x, y, sample_weight)</code>; <code>keras.utils.unpack_x_y_sample_weight(data)</code> lo desempaqueta en los tres casos.</li>
-  <li><code>test_step</code> es lo mismo sin cinta ni optimizador y con <code>training=False</code>. Si no lo sobrescribes, Keras usa el suyo y ya funciona; el fragmento 2 lo escribe solo para mostrar el esqueleto.</li>
+  <li><code>test_step</code> es lo mismo sin cinta ni optimizador y con <code>training=False</code>. Si no lo sobrescribes, Keras usa el suyo y ya funciona; el <a href="laboratorio.html#frag-2">fragmento 2</a> lo escribe solo para mostrar el esqueleto.</li>
 </ul>
 
 <div class="callout ojo">
   <span class="lbl">Ojo · las tres trampas de <code>train_step</code> en Keras 3</span>
-  <p><strong>(1) Olvidar el <code>return</code>.</strong> El fragmento 2 lo provoca a propósito y el error no dice nada de diccionarios: <code>ValueError: Attr 'Toutput_types' of 'OptionalFromValue' Op passed list of length 0</code>. Si ves un mensaje así dentro de <code>fit</code>, mira primero si <code>train_step</code> devuelve el diccionario.</p>
+  <p><strong>(1) Olvidar el <code>return</code>.</strong> El <a href="laboratorio.html#frag-2">fragmento 2</a> lo provoca a propósito y el error no dice nada de diccionarios: <code>ValueError: Attr 'Toutput_types' of 'OptionalFromValue' Op passed list of length 0</code>. Si ves un mensaje así dentro de <code>fit</code>, mira primero si <code>train_step</code> devuelve el diccionario.</p>
   <p><strong>(2) Usar la API de Keras 2.</strong> En los tutoriales antiguos aparecen <code>self.compiled_loss(y, y_pred)</code> y <code>self.compiled_metrics.update_state(y, y_pred)</code>. En Keras 3.15 siguen existiendo pero están <strong>obsoletos</strong> (avisan y desaparecerán): usa <code>self.compute_loss</code> y el bucle <code>for m in self.metrics</code>.</p>
   <p><strong>(3) Depender del backend.</strong> Este <code>train_step</code> usa <code>tf.GradientTape</code>, así que solo vale con el backend de TensorFlow. En JAX (funcional, sin estado) y en PyTorch (<code>loss.backward()</code>) el paso se escribe con otras llamadas. Si quieres código portable, el bucle sobre <code>self.metrics</code> y <code>compute_loss</code> sí lo es; la cinta no.</p>
 </div>
 
-<p>Resultado del fragmento 2: el modelo con <code>train_step</code> propio devuelve las claves <code>['accuracy', 'loss', 'val_accuracy', 'val_loss']</code> en <code>History</code> (igual que un modelo normal) y baja la pérdida de 0,760 a 0,331 en 30 épocas, con 0,883 de precisión en validación. Es decir: personalizamos el paso y <strong>todo lo demás siguió funcionando</strong>.</p>
+<p>Resultado del <a href="laboratorio.html#frag-2">fragmento 2</a>: el modelo con <code>train_step</code> propio devuelve las claves <code>['accuracy', 'loss', 'val_accuracy', 'val_loss']</code> en <code>History</code> (igual que un modelo normal) y baja la pérdida de 0,760 a 0,331 en 30 épocas, con 0,883 de precisión en validación. Es decir: personalizamos el paso y <strong>todo lo demás siguió funcionando</strong>.</p>
 
 <div class="callout regla">
   <span class="lbl">Regla fácil</span>
@@ -242,224 +289,11 @@
   </div>
 </details>
 
-<section>
+<section class="ir-lab">
 <h2 class="sin-num">Código</h2>
-<!-- ---------- Fragmento 2 ---------- -->
-<article class="snippet" data-lang="python" id="frag-2">
-  <header>
-    <h3>2 · Sobrescribir train_step y test_step</h3>
-    <p class="para-que"><strong>Para qué sirve</strong> Personaliza <em>qué se hace en cada lote</em> y conserva <code>fit</code>, la validación, el historial y los callbacks. Incluye la trampa típica: olvidar el <code>return</code>.</p>
-  </header>
-  <pre class="code"><code>import tensorflow as tf
-import keras
-from sklearn.datasets import make_moons
-
-keras.utils.set_random_seed(1)
-X, y = make_moons(n_samples=600, noise=0.2, random_state=0)
-X, y = X.astype("float32"), y.astype("float32")
-
-class ModeloConPasoPropio(keras.Model):
-    def train_step(self, data):
-        x, y = data
-        with tf.GradientTape() as cinta:
-            y_pred = self(x, training=True)
-            perdida = self.compute_loss(x=x, y=y, y_pred=y_pred)
-        grads = cinta.gradient(perdida, self.trainable_variables)
-        self.optimizer.apply_gradients(zip(grads, self.trainable_variables))
-        for m in self.metrics:
-            if m.name == "loss":
-                m.update_state(perdida)
-            else:
-                m.update_state(y, y_pred)
-        return {m.name: m.result() for m in self.metrics}
-
-    def test_step(self, data):
-        x, y = data
-        y_pred = self(x, training=False)
-        perdida = self.compute_loss(x=x, y=y, y_pred=y_pred)
-        for m in self.metrics:
-            if m.name == "loss":
-                m.update_state(perdida)
-            else:
-                m.update_state(y, y_pred)
-        return {m.name: m.result() for m in self.metrics}
-
-entrada = keras.Input(shape=(2,))
-h = keras.layers.Dense(16, activation="relu")(entrada)
-salida = keras.layers.Dense(1, activation="sigmoid")(h)
-modelo = ModeloConPasoPropio(entrada, salida)
-
-modelo.compile(optimizer="adam", loss="binary_crossentropy", metrics=["accuracy"])
-historia = modelo.fit(X, y, epochs=30, batch_size=32, validation_split=0.2, verbose=0)
-print("claves de logs:", sorted(historia.history.keys()))
-print("loss época 1 -&gt; 30:", round(historia.history["loss"][0], 3), "-&gt;", round(historia.history["loss"][-1], 3))
-print("val_accuracy final:", round(historia.history["val_accuracy"][-1], 3))
-print("evaluate:", [round(float(v), 3) for v in modelo.evaluate(X, y, verbose=0)])
-
-# Trampa: un train_step que no devuelve el diccionario de métricas
-class SinReturn(keras.Model):
-    def train_step(self, data):
-        x, y = data
-        with tf.GradientTape() as cinta:
-            y_pred = self(x, training=True)
-            perdida = self.compute_loss(x=x, y=y, y_pred=y_pred)
-        grads = cinta.gradient(perdida, self.trainable_variables)
-        self.optimizer.apply_gradients(zip(grads, self.trainable_variables))
-
-roto = SinReturn(entrada, salida)
-roto.compile(optimizer="adam", loss="binary_crossentropy")
-try:
-    roto.fit(X, y, epochs=1, verbose=0)
-except ValueError as e:
-    print("ValueError:", str(e)[:70], "...")</code></pre>
-  <details class="linea-a-linea" open>
-    <summary>Línea por línea</summary>
-    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
-    <table class="lineas">
-      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
-      <tbody>
-        <tr data-lines="1-3"><td><code>import tensorflow as tf …</code></td><td>Importamos TensorFlow (para la cinta), Keras y <code>make_moons</code>, un generador de dos lunas entrelazadas para clasificar en 2 clases.</td></tr>
-        <tr data-lines="5"><td><code>keras.utils.set_random_seed(1)</code></td><td>Semilla fija.</td></tr>
-        <tr data-lines="6-7"><td><code>X, y = make_moons(n_samples=600, noise=0.2, random_state=0) …</code></td><td>600 puntos con ruido 0,2; <code>astype("float32")</code> porque Keras trabaja en 32 bits.</td></tr>
-        <tr data-lines="9-10"><td><code>class ModeloConPasoPropio(keras.Model): …</code></td><td>Una clase que hereda de <code>keras.Model</code> y redefine <code>train_step</code>, el método que <code>fit</code> llama una vez por lote. Recibe <code>data</code>, el lote.</td></tr>
-        <tr data-lines="11"><td><code>x, y = data</code></td><td>Desempaqueta el lote en entradas <code>x</code> y etiquetas <code>y</code> (si hubiera pesos por ejemplo vendrían como tercer elemento).</td></tr>
-        <tr data-lines="12-14"><td><code>with tf.GradientTape() as cinta: …</code></td><td>La cinta graba el forward: <code>self(x, training=True)</code> llama al propio modelo y <code>self.compute_loss(...)</code> calcula la pérdida que pondremos en <code>compile</code> <strong>más</strong> las pérdidas de regularización.</td></tr>
-        <tr data-lines="15-16"><td><code>grads = cinta.gradient(perdida, self.trainable_variables) …</code></td><td>Gradientes respecto a las variables entrenables y paso del optimizador que se creó en <code>compile</code> (<code>self.optimizer</code>).</td></tr>
-        <tr data-lines="17-21"><td><code>for m in self.metrics: …</code></td><td>Actualiza las métricas. <code>self.metrics</code> contiene la pérdida (nombre <code>"loss"</code>) y las demás métricas del <code>compile</code>. La pérdida se actualiza con el valor ya calculado y las demás con <code>(y, y_pred)</code>.</td></tr>
-        <tr data-lines="22"><td><code>return {m.name: m.result() for m in self.metrics}</code></td><td><strong>El contrato:</strong> devolver un diccionario <code>{nombre: valor}</code>. Es lo que Keras muestra, guarda en <code>History</code> y pasa a los callbacks.</td></tr>
-        <tr data-lines="24-27"><td><code>def test_step(self, data): …</code></td><td><code>test_step</code> hace lo mismo sin cinta ni optimizador: forward con <code>training=False</code> y pérdida. Lo usan la validación y <code>evaluate</code>.</td></tr>
-        <tr data-lines="28-33"><td><code>for m in self.metrics: …</code></td><td>Actualiza las métricas y devuelve el diccionario, igual que en el entrenamiento.</td></tr>
-        <tr data-lines="35-38"><td><code>entrada = keras.Input(shape=(2,)) …</code></td><td>Se construye el modelo con la API funcional (<code>Input</code> → <code>Dense(16, relu)</code> → <code>Dense(1, sigmoid)</code>), pero con <em>nuestra</em> clase: <code>ModeloConPasoPropio(entrada, salida)</code>.</td></tr>
-        <tr data-lines="40"><td><code>modelo.compile(optimizer="adam", loss="binary_crossentropy", metric…</code></td><td><code>compile</code> como siempre: el optimizador <code>"adam"</code>, la pérdida de entropía cruzada binaria y la métrica <code>accuracy</code>.</td></tr>
-        <tr data-lines="41"><td><code>historia = modelo.fit(X, y, epochs=30, batch_size=32, validation_sp…</code></td><td><code>fit</code> normal: 30 épocas, lotes de 32 y el 20 % de los datos como validación. Por dentro usa nuestro <code>train_step</code> y <code>test_step</code>.</td></tr>
-        <tr data-lines="42-45"><td><code>print("claves de logs:", sorted(historia.history.keys())) …</code></td><td>Comprobaciones: las claves del historial, cómo baja la pérdida, la precisión final de validación y el resultado de <code>evaluate</code> (devuelve la pérdida y la precisión).</td></tr>
-        <tr data-lines="47-55"><td><code># Trampa: un train_step que no devuelve el diccionario de métricas …</code></td><td>La trampa. Una clase idéntica salvo que <strong>no tiene <code>return</code></strong> (ni actualiza las métricas): <code>train_step</code> devuelve <code>None</code>.</td></tr>
-        <tr data-lines="57-58"><td><code>roto = SinReturn(entrada, salida) …</code></td><td>Se construye y compila el modelo defectuoso con el mismo grafo de capas.</td></tr>
-        <tr data-lines="59-62"><td><code>try: …</code></td><td>Intenta entrenarlo y captura el <code>ValueError</code>. Imprime solo los 70 primeros caracteres del mensaje, que es críptico.</td></tr>
-      </tbody>
-    </table>
-  </details>
-  <div class="salida">
-    <strong>Salida esperada</strong>
-    <pre>claves de logs: ['accuracy', 'loss', 'val_accuracy', 'val_loss']
-loss época 1 -&gt; 30: 0.76 -&gt; 0.331
-val_accuracy final: 0.883
-evaluate: [0.328, 0.865]
-ValueError: Attr 'Toutput_types' of 'OptionalFromValue' Op passed list of length 0 ...</pre>
-    <p>El historial tiene las cuatro claves de siempre (<code>accuracy</code>, <code>loss</code>, <code>val_accuracy</code>, <code>val_loss</code>): <strong>nuestro paso es invisible para el resto de Keras</strong>. La pérdida baja de 0,760 a 0,331 y la precisión de validación llega a 0,883; <code>evaluate</code> da [0,328 ; 0,865] (pérdida y precisión sobre los 600 datos, con el modelo ya entrenado). La última línea es la trampa: sin <code>return</code> no hay diccionario y Keras falla con un mensaje que habla de «OptionalFromValue» y «lista de longitud 0», que no menciona <code>train_step</code> por ningún lado. Cuando veas algo así dentro de <code>fit</code>, revisa si tu paso devuelve el diccionario.</p>
-  </div>
-</article>
-<!-- ---------- Fragmento 3 ---------- -->
-<article class="snippet" data-lang="python" id="frag-3">
-  <header>
-    <h3>3 · Un bucle completo con tf.function, planificador, recorte y regularización</h3>
-    <p class="para-que"><strong>Para qué sirve</strong> Reúne casi todo el módulo en un bucle propio: dígitos con <code>tf.data</code>, L2 y Dropout, un planificador de coseno, <code>clipnorm</code>, cuatro métricas y dos <code>tf.function</code>. Muestra además la trampa del último lote.</p>
-  </header>
-  <pre class="code"><code>import numpy as np
-import tensorflow as tf
-import keras
-from sklearn.datasets import load_digits
-from sklearn.model_selection import train_test_split
-
-keras.utils.set_random_seed(0)
-datos = load_digits()
-X = (datos.data / 16.0).astype("float32")
-y = datos.target.astype("int32")
-X_ent, X_val, y_ent, y_val = train_test_split(X, y, test_size=0.25, stratify=y, random_state=0)
-
-ds_ent = tf.data.Dataset.from_tensor_slices((X_ent, y_ent)).shuffle(1000, seed=0).batch(64).prefetch(tf.data.AUTOTUNE)
-ds_val = tf.data.Dataset.from_tensor_slices((X_val, y_val)).batch(64)
-
-modelo = keras.Sequential([
-    keras.Input(shape=(64,)),
-    keras.layers.Dense(64, activation="relu", kernel_regularizer=keras.regularizers.l2(1e-4)),
-    keras.layers.Dropout(0.2),
-    keras.layers.Dense(10),                                  # logits: sin softmax
-])
-pasos_por_epoca = len(ds_ent)
-plan = keras.optimizers.schedules.CosineDecay(0.01, decay_steps=pasos_por_epoca * 8)
-optimizador = keras.optimizers.Adam(plan, clipnorm=1.0)
-optimizador.build(modelo.trainable_variables)                # crear las variables del optimizador ANTES de tf.function
-perdida_fn = keras.losses.SparseCategoricalCrossentropy(from_logits=True)
-
-m_loss = keras.metrics.Mean(name="loss")
-m_acc = keras.metrics.SparseCategoricalAccuracy(name="acc")
-v_loss = keras.metrics.Mean(name="val_loss")
-v_acc = keras.metrics.SparseCategoricalAccuracy(name="val_acc")
-
-@tf.function
-def paso_entrenamiento(x, y):
-    with tf.GradientTape() as cinta:
-        logits = modelo(x, training=True)                    # training=True activa Dropout
-        perdida = perdida_fn(y, logits) + tf.add_n(modelo.losses)    # + penalización L2
-    grads = cinta.gradient(perdida, modelo.trainable_variables)
-    optimizador.apply_gradients(zip(grads, modelo.trainable_variables))
-    m_loss.update_state(perdida)
-    m_acc.update_state(y, logits)
-
-@tf.function
-def paso_validacion(x, y):
-    logits = modelo(x, training=False)                       # training=False apaga Dropout
-    v_loss.update_state(perdida_fn(y, logits))
-    v_acc.update_state(y, logits)
-
-for epoca in range(1, 9):
-    for m in (m_loss, m_acc, v_loss, v_acc):
-        m.reset_state()
-    for x, y_ in ds_ent:
-        paso_entrenamiento(x, y_)
-    for x, y_ in ds_val:
-        paso_validacion(x, y_)
-    print(f"época {epoca}: loss={m_loss.result():.3f} acc={m_acc.result():.3f} | val_loss={v_loss.result():.3f} val_acc={v_acc.result():.3f} | lr={float(optimizador.learning_rate):.4f}")
-
-print("lotes por época:", pasos_por_epoca, "| tamaño del último lote:", len(X_ent) % 64)
-print("trazados: entrenamiento =", paso_entrenamiento.experimental_get_tracing_count(),
-      "| validación =", paso_validacion.experimental_get_tracing_count(),
-      "| pasos del optimizador:", int(optimizador.iterations.numpy()))</code></pre>
-  <details class="linea-a-linea" open>
-    <summary>Línea por línea</summary>
-    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
-    <table class="lineas">
-      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
-      <tbody>
-        <tr data-lines="1-5"><td><code>import numpy as np …</code></td><td>Importaciones. <code>load_digits</code> es un conjunto pequeño de imágenes 8×8 de dígitos (1797 muestras, sin descarga) y <code>train_test_split</code> separa entrenamiento y validación.</td></tr>
-        <tr data-lines="7"><td><code>keras.utils.set_random_seed(0)</code></td><td>Semilla fija para repetir los resultados.</td></tr>
-        <tr data-lines="8-11"><td><code>datos = load_digits() …</code></td><td>Cada imagen son 64 píxeles de 0 a 16: se dividen entre 16 para escalarlos a 0-1. Las etiquetas son enteros (0 a 9). Se reserva el 25 % para validación, repartiendo las clases por igual (<code>stratify=y</code>).</td></tr>
-        <tr data-lines="13-14"><td><code>ds_ent = tf.data.Dataset.from_tensor_slices((X_ent, y_ent)).shuffle… …</code></td><td>Los dos datasets. El de entrenamiento: baraja con un buffer de 1000 elementos (algo menor que los 1347 datos: casi uniforme; para un barajado perfecto el buffer debe ser ≥ el tamaño del dataset), agrupa en lotes de 64 y precarga con <code>prefetch</code>. El de validación solo agrupa.</td></tr>
-        <tr data-lines="16-21"><td><code>modelo = keras.Sequential([ …</code></td><td>Un modelo con una capa oculta de 64 neuronas con regularización L2 de 1e-4, un Dropout del 20 % y una salida de 10 <em>logits</em> (sin softmax: la pérdida lo hace con <code>from_logits=True</code>).</td></tr>
-        <tr data-lines="22-24"><td><code>pasos_por_epoca = len(ds_ent) …</code></td><td><code>len(ds_ent)</code> son los lotes por época (22). El planificador <code>CosineDecay</code> baja el learning rate de 0,01 a 0 en <code>22 × 8</code> pasos (8 épocas). Se pasa al optimizador Adam, que además recorta cada gradiente a norma 1 (<code>clipnorm=1.0</code>).</td></tr>
-        <tr data-lines="25"><td><code>optimizador.build(modelo.trainable_variables)                # crea…</code></td><td><strong>Crea las variables del optimizador antes de la <code>tf.function</code></strong>: así no se crean durante el primer trazado, lo que provocaría un trazado de más.</td></tr>
-        <tr data-lines="26"><td><code>perdida_fn = keras.losses.SparseCategoricalCrossentropy(from_logits…</code></td><td>La pérdida: entropía cruzada categórica con etiquetas enteras y salidas en logits.</td></tr>
-        <tr data-lines="28-31"><td><code>m_loss = keras.metrics.Mean(name="loss") …</code></td><td>Cuatro métricas: media de la pérdida y precisión, para entrenamiento y para validación (cada una con su nombre).</td></tr>
-        <tr data-lines="33-34"><td><code>@tf.function …</code></td><td><code>@tf.function</code> compila este paso a un grafo. Recibe un lote <code>(x, y)</code>.</td></tr>
-        <tr data-lines="35-37"><td><code>with tf.GradientTape() as cinta: …</code></td><td>Dentro de la cinta: forward con <code>training=True</code> (activa Dropout) y pérdida total = entropía cruzada + penalización L2. <code>modelo.losses</code> es la lista de penalizaciones de regularización; <code>tf.add_n</code> las suma. Un bucle propio <strong>no las suma solo</strong>.</td></tr>
-        <tr data-lines="38-39"><td><code>grads = cinta.gradient(perdida, modelo.trainable_variables) …</code></td><td>Gradientes y paso del optimizador (con su recorte y su planificador).</td></tr>
-        <tr data-lines="40-41"><td><code>m_loss.update_state(perdida) …</code></td><td>Actualizan las métricas con el lote: la pérdida con el escalar y la precisión con <code>(y, logits)</code>.</td></tr>
-        <tr data-lines="43-47"><td><code>@tf.function …</code></td><td>El paso de validación: <code>training=False</code> (sin Dropout), sin cinta ni optimizador, solo métricas. <code>from_logits</code> ya está en <code>perdida_fn</code>.</td></tr>
-        <tr data-lines="49-51"><td><code>for epoca in range(1, 9): …</code></td><td>Ocho épocas. Al empezar cada una, se reinician las cuatro métricas.</td></tr>
-        <tr data-lines="52-53"><td><code>for x, y_ in ds_ent: …</code></td><td>Recorre los lotes de entrenamiento llamando al paso compilado.</td></tr>
-        <tr data-lines="54-55"><td><code>for x, y_ in ds_val: …</code></td><td>Recorre los de validación.</td></tr>
-        <tr data-lines="56"><td><code>print(f"época {epoca}: loss={m_loss.result():.3f} acc={m_acc.result…</code></td><td>Imprime las medias de la época y el learning rate actual del planificador (<code>float(optimizador.learning_rate)</code>).</td></tr>
-        <tr data-lines="58"><td><code>print("lotes por época:", pasos_por_epoca, "| tamaño del último lot…</code></td><td>22 lotes por época: 21 de 64 y uno de 3 (el resto de dividir 1347 entre 64).</td></tr>
-        <tr data-lines="59-61"><td><code>print("trazados: entrenamiento =", paso_entrenamiento.experimental_… …</code></td><td>Cuenta los trazados de cada función (<code>experimental_get_tracing_count</code>) y los pasos del optimizador: 22 × 8 = 176.</td></tr>
-      </tbody>
-    </table>
-  </details>
-  <div class="salida">
-    <strong>Salida esperada</strong>
-    <pre>época 1: loss=1.443 acc=0.593 | val_loss=0.703 val_acc=0.840 | lr=0.0096
-época 2: loss=0.539 acc=0.840 | val_loss=0.459 val_acc=0.913 | lr=0.0085
-época 3: loss=0.337 acc=0.903 | val_loss=0.373 val_acc=0.924 | lr=0.0069
-época 4: loss=0.256 acc=0.938 | val_loss=0.317 val_acc=0.944 | lr=0.0050
-época 5: loss=0.239 acc=0.929 | val_loss=0.291 val_acc=0.956 | lr=0.0031
-época 6: loss=0.248 acc=0.943 | val_loss=0.286 val_acc=0.953 | lr=0.0015
-época 7: loss=0.194 acc=0.950 | val_loss=0.287 val_acc=0.953 | lr=0.0004
-época 8: loss=0.207 acc=0.949 | val_loss=0.287 val_acc=0.953 | lr=0.0000
-lotes por época: 22 | tamaño del último lote: 3
-trazados: entrenamiento = 2 | validación = 2 | pasos del optimizador: 176</pre>
-    <p>Cada época baja la pérdida y sube la precisión de validación: de 0,840 a <strong>0,953</strong>. El learning rate sigue la curva del coseno: 0,0096 al final de la época 1, 0,0050 a mitad (época 4) y 0,0000 en la última. Los 176 pasos del optimizador son 22 lotes × 8 épocas. Y la trampa: <strong>2 trazados</strong> en cada función, aunque solo hay un modelo. La causa es el último lote, de 3 datos (en el de validación también es más pequeño): su forma <code>(3, 64)</code> no coincide con <code>(64, 64)</code> y TensorFlow traza otra vez. Arreglo: <code>.batch(64, drop_remainder=True)</code> o <code>reduce_retracing=True</code>.</p>
-  </div>
-</article>
+<a class="lab-card" href="laboratorio.html#paso-2"><span class="lc-ico" aria-hidden="true">🧪</span>
+  <span><strong>Ver el código de esta lección en el Laboratorio</strong>
+  <span>Paso 2 · El bucle completo y rápido con tf.function (y los 2 trazados). En «Más código», el fragmento 2: train_step y test_step.</span></span></a>
 </section>
 
 </div>

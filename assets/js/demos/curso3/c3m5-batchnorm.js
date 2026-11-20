@@ -37,7 +37,7 @@ Lab.register("curso3/c3m5-batchnorm", function (root, api) {
     D.rect(ctx, pA.box.x, 4, pA.box.w, h - 8, C.surface, C.ink, 1.5);
     function axis(y, lo, hi, label, tf) {
       D.line(ctx, pA.box.x + 6, y + 14, pA.box.x + pA.box.w - 6, y + 14, C.ink2, 1.5);
-      for (var t = Math.ceil(lo); t <= hi; t += (hi - lo > 12 ? 2 : 1)) { var px = pA.box.x + 6 + (t - lo) / (hi - lo) * (pA.box.w - 12); D.line(ctx, px, y + 14, px, y + 18, C.ink2, 1.5); D.text(ctx, String(t), px, y + 29, { align: "center", size: 10.5, color: C.muted, mono: true }); }
+      for (var t = Math.ceil(lo); t <= hi; t += (hi - lo > 12 ? 2 : 1)) { var px = pA.box.x + 6 + (t - lo) / (hi - lo) * (pA.box.w - 12); D.line(ctx, px, y + 14, px, y + 18, C.ink2, 1.5); D.text(ctx, String(t), px, y + 29, { align: "center", size: 11, color: C.muted, mono: true }); }
       D.text(ctx, label, pA.box.x + 8, y - 30, { size: 11.5, weight: 600, color: C.ink2 });
     }
     var X0 = -4, X1 = 12, Z0 = -4, Z1 = 4;
@@ -69,7 +69,7 @@ Lab.register("curso3/c3m5-batchnorm", function (root, api) {
     D.path(ctx, S.hist.map(function (q) { return [pB.x(q[0]), pB.y(q[1])]; }), C.terracota, 2.4);
     D.path(ctx, S.hist.map(function (q) { return [pB.x(q[0]), pB.y(q[2])]; }), C.oliva, 2.4);
     ctx.restore();
-    D.text(ctx, "líneas de puntos = valores reales (μ y σ²)", pB.box.x + pB.box.w - 6, pB.box.y + pB.box.h - 8, { align: "right", size: 10.5, color: C.muted });
+    D.text(ctx, "líneas de puntos = valores reales (μ y σ²)", pB.box.x + pB.box.w - 6, pB.box.y + pB.box.h - 8, { align: "right", size: 11, color: C.muted });
   }
   vB.draw(drawB);
 

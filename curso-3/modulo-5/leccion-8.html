@@ -20,72 +20,127 @@
     <div>
       <p class="eyebrow">Curso 3 · Módulo 5 · Lección 8 de 8</p>
       <h1>Como en el streaming: que los datos no se corten y que puedas continuar</h1>
-      <p class="lead"><code>tf.data</code> prepara el siguiente lote mientras el modelo entrena el actual; guardar con <code>.keras</code> y fijar la semilla te deja continuar y repetir el experimento.</p>
-      <p class="meta-line"><span class="read-time" data-render="read-time"></span><a href="../modulo-5.html">Índice del módulo</a></p>
+      <p class="lead"><code>tf.data</code> prepara el siguiente lote mientras el modelo entrena el actual. Guardar en <code>.keras</code> y fijar la semilla te deja continuar y repetir el experimento.</p>
+      <p class="meta-line"><span class="read-time" data-render="read-time"></span><a href="../modulo-5.html">Índice del módulo</a> · <a href="#chuleta">Ir a la chuleta</a></p>
     </div>
     <div class="hero-tile" aria-hidden="true"></div>
   </div>
 </header>
 <details class="predice">
-  <summary>Leer un lote tarda 20 ms, preprocesarlo con <code>map</code> 40 ms y entrenar con él 50 ms. Si añades <code>prefetch</code>, ¿cuánto tarda cada lote: 110, 60 o 50 ms?<span class="hint"></span></summary>
+  <summary>Leer un lote tarda 20 ms, prepararlo 40 ms y entrenar con él 50 ms. Si preparas el siguiente mientras entrenas el actual, ¿cuánto tarda cada lote: 110, 60 o 50 ms?<span class="hint"></span></summary>
   <div>
-    <p><strong>60 ms.</strong> Sin <code>prefetch</code> todo va en serie: \( 20+40+50=110 \). Con <code>prefetch</code> se prepara el siguiente lote mientras se entrena el actual y manda el más lento: \( \max(60, 50)=60 \). Para bajar a 50 hay que acortar también la preparación.</p>
+    <p><strong>60 ms.</strong> En fila serían 20 + 40 + 50 = 110. Solapando, manda el más lento: preparar (60) frente a entrenar (50).</p>
   </div>
 </details>
 
 <section>
-<h2 id="idea">Como en el streaming: que no se corte y que puedas continuar</h2>
-<p>El reproductor de Netflix (el modelo) es rápido, pero necesita que le lleguen los trozos de vídeo (los lotes). Si se queda esperando, ves «cargando…». Un <code>tf.data.Dataset</code> es una cadena de etapas que se ejecutan en paralelo con el entrenamiento:</p>
-<pre class="ascii">ds.map(leer_y_preprocesar, num_parallel_calls=AUTOTUNE)   # lo caro
-  .cache()                 # se hace UNA vez
-  .shuffle(buffer_size)    # barajar ejemplos, no lotes
-  .map(aumentar_datos)     # lo aleatorio, DESPUÉS de la cache
-  .batch(tamano_lote)
-  .prefetch(AUTOTUNE)      # siempre lo último</pre>
-<p><code>prefetch</code> es el <em>buffer</em>: descarga los minutos siguientes mientras ves el actual. <code>cache</code> es tener la película descargada: solo ayuda desde la segunda época. <code>map</code> en paralelo es descargar varios trozos a la vez. El orden importa: si cacheas un volteo aleatorio, todas las épocas ven el mismo volteo; si haces <code>batch</code> antes de <code>shuffle</code>, solo se reordenan lotes enteros.</p>
-<p>Y lo segundo de Netflix: <strong>«Continuar viendo»</strong>. Un <code>modelo.save("m.keras")</code> guarda arquitectura, pesos y también el <strong>estado del optimizador</strong>; <code>BackupAndRestore</code> retoma solo un <code>fit</code> que se cortó. Para que tu compañero obtenga tus mismos números, llama a <code>keras.utils.set_random_seed(0)</code> al principio, antes de crear el modelo.</p>
+<h2 id="idea">1 · Que el vídeo no se corte</h2>
+<p>El reproductor de Netflix (el modelo) es rápido, pero necesita que le lleguen los trozos de vídeo (los lotes). Si espera, ves «cargando…». Un <code>tf.data.Dataset</code> es una <strong>cadena de etapas</strong> que prepara los datos en paralelo con el entrenamiento:</p>
+<ul class="flow vertical">
+  <li class="a">map<small>transforma cada dato (lo caro), en paralelo</small></li>
+  <li class="b">cache<small>guarda el resultado: se hace una sola vez</small></li>
+  <li class="c">shuffle<small>baraja ejemplos sueltos</small></li>
+  <li class="d">batch<small>agrupa en lotes</small></li>
+  <li class="a">prefetch<small>ten listo el siguiente lote: siempre lo último</small></li>
+</ul>
+<p><code>prefetch</code> es el <em>buffer</em>: descarga el minuto siguiente mientras ves el actual. <code>cache</code> es tener la película descargada: ayuda desde la segunda época.</p>
 </section>
 
 <figure class="demo" data-demo="curso3/c3m5-tfdata-pipeline" data-titulo="Un pipeline tf.data como una cadena de producción">
   <div class="haz">Activa uno a uno <code>map</code> paralelo, <code>prefetch</code> y <code>cache</code>. Luego sube el paso de entrenamiento a 120 ms.</div>
-  <div class="observa">Los huecos blancos son esperas. Con un modelo lento ningún truco acelera: mide antes de optimizar.</div>
+  <div class="observa">Los huecos son esperas. Con un modelo lento ningún truco acelera: mide antes de optimizar.</div>
 </figure>
 
 <section>
-<h2 id="numeros">Con números: una época de 100 lotes</h2>
-<div class="callout ejemplo">
-  <span class="lbl">Ejemplo numérico</span>
-  <p>Leer 20 ms, <code>map</code> 40 ms (10 ms en 4 núcleos), entrenar 50 ms. «Ocupado» es el tiempo que el modelo trabaja en vez de esperar.</p>
-  <table>
-    <thead><tr><th>Con</th><th>Lote</th><th>Ocupado</th></tr></thead>
-    <tbody>
-      <tr><td>Nada (en serie)</td><td>110 ms</td><td>45 %</td></tr>
-      <tr><td><code>prefetch</code></td><td>60 ms</td><td>83 %</td></tr>
-      <tr><td><code>map</code> paralelo</td><td>80 ms</td><td>63 %</td></tr>
-      <tr><td>Los dos</td><td class="res">50 ms</td><td class="res">99 %</td></tr>
-    </tbody>
-  </table>
-  <p>Cuando preparar (30 ms) es más rápido que entrenar (50 ms), el límite es el modelo y más trucos no ganan nada.</p>
+<h2 id="numeros">2 · Esconder, acortar o quitar la espera</h2>
+<p>Leer 20 ms, preparar 40 ms (10 ms repartido en 4 núcleos), entrenar 50 ms. «Ocupado» es el tiempo que el modelo trabaja en vez de esperar.</p>
+<div class="anim-pasos" data-titulo="Un lote, truco a truco">
+  <div class="paso"><p><strong>En fila.</strong> 20 + 40 + 50.</p><span class="grande">110 ms · ocupado 45 %</span></div>
+  <div class="paso"><p><strong>Con <code>prefetch</code>.</strong> Preparar (60) se solapa con entrenar (50): manda el más lento.</p><span class="grande">60 ms · 83 %</span></div>
+  <div class="paso"><p><strong>Solo <code>map</code> en paralelo.</strong> Preparar baja a 20 + 10 = 30, pero sigue en fila: 30 + 50.</p><span class="grande">80 ms · 63 %</span></div>
+  <div class="paso"><p><strong>Los dos.</strong> Preparar (30) cabe dentro de entrenar (50).</p><span class="grande">50 ms · 99 %</span></div>
+  <div class="paso"><p><strong>Y ya no hay más.</strong> El límite es el modelo: más trucos no ganan nada.</p><span class="grande">límite: 50 ms</span></div>
 </div>
+</section>
+
+<section>
+<h2 id="orden">3 · El orden importa</h2>
+<table>
+  <thead><tr><th>Si haces…</th><th>Pasa…</th><th>Mejor</th></tr></thead>
+  <tbody>
+    <tr><td>Un volteo al azar antes de <code>cache</code></td><td>Todas las épocas ven el mismo volteo</td><td>Lo aleatorio, después</td></tr>
+    <tr><td><code>batch</code> antes de <code>shuffle</code></td><td>Solo se reordenan lotes enteros</td><td><code>shuffle</code> antes</td></tr>
+    <tr><td><code>shuffle</code> con cubo pequeño</td><td>Baraja a medias</td><td>Cubo ≥ nº de datos</td></tr>
+  </tbody>
+</table>
+<p>El «cubo» es <code>buffer_size</code>: de cuántos datos a la vez saca uno al azar.</p>
 </section>
 
 <figure class="demo" data-demo="curso3/c3m5-shuffle" data-titulo="¿Qué hace buffer_size en shuffle?">
   <div class="haz">60 películas ordenadas: 30 de terror y 30 de comedia. Mueve <code>buffer_size</code> de 1 a 60.</div>
-  <div class="observa">Con un buffer pequeño al principio solo sale terror. Para barajar bien, <code>buffer_size</code> ≥ tamaño del dataset.</div>
+  <div class="observa">Con un cubo pequeño, al principio solo sale terror. Para barajar bien, <code>buffer_size</code> ≥ tamaño del dataset.</div>
+</figure>
+
+<section>
+<h2 id="continuar">4 · «Continuar viendo»: guardar el modelo</h2>
+<table>
+  <thead><tr><th>Guardas</th><th>Con</th><th>Para</th></tr></thead>
+  <tbody>
+    <tr><td>Todo: receta, pesos y optimizador</td><td><code>save("m.keras")</code></td><td>Continuar entrenando</td></tr>
+    <tr><td>Solo los pesos</td><td><code>.weights.h5</code></td><td>Cargar en el mismo modelo, rehecho a mano</td></tr>
+    <tr><td>Un modelo para servir</td><td><code>export</code></td><td>Usarlo sin Keras</td></tr>
+  </tbody>
+</table>
+<div class="anim-pasos" data-titulo="El optimizador también viaja en el .keras">
+  <div class="paso"><p><strong>1.</strong> 3 épocas de 4 lotes: el optimizador lleva la cuenta.</p><span class="grande">12 pasos</span></div>
+  <div class="paso"><p><strong>2.</strong> <code>save</code> y <code>load_model</code>: la cuenta sigue ahí, y las medias de Adam también.</p><span class="grande">12 → 12</span></div>
+  <div class="paso"><p><strong>3.</strong> Una época más: continúa donde lo dejó.</p><span class="grande">16 pasos</span></div>
+  <div class="paso"><p><strong>4.</strong> Con solo los pesos, Adam empezaría de cero y daría un tirón.</p><span class="grande">0 → tirón</span></div>
+</div>
+</section>
+
+<figure class="demo" data-demo="curso3/c3m5-reanudar" data-titulo="Se va la luz: reanudar con .keras o solo con los pesos">
+  <div class="haz">Mueve el paso del corte a 100 y luego a 160. Compara la curva azul con la naranja justo después del corte.</div>
+  <div class="observa">Con <code>.keras</code> la curva no nota el corte. Solo con pesos, Adam olvida su historia y la pérdida salta.</div>
 </figure>
 
 <details class="predice">
-  <summary>Se va la luz a mitad del entrenamiento. Habías guardado solo los pesos (<code>.weights.h5</code>). Al reanudar con Adam, ¿sigue exactamente igual que si no se hubiera cortado?<span class="hint"></span></summary>
+  <summary>Llamas a <code>keras.utils.set_random_seed(0)</code> después de crear el modelo y entrenas dos veces. ¿Salen los mismos números?<span class="hint"></span></summary>
   <div>
-    <p><strong>No del todo.</strong> Adam empezaría con sus medias \( m=s=0 \) y el contador de pasos a 0, con un pequeño «tirón». Un <code>.keras</code> guarda también el optimizador: tras 12 pasos, el modelo cargado cuenta 12 y sigue a 16. Usa <code>initial_epoch</code> para que las épocas sigan numerándose.</p>
+    <p><strong>No necesariamente.</strong> Los pesos iniciales se sortean al crear el modelo, antes de fijar la semilla.</p>
   </div>
 </details>
+
+<section>
+<h2 id="semilla">5 · Repetir el experimento</h2>
+<p>La <strong>semilla</strong> fija el azar: misma semilla, mismos sorteos. <code>keras.utils.set_random_seed(0)</code> la fija en Python, NumPy y TensorFlow a la vez. En el laboratorio, misma semilla: diferencia 0,0; otra semilla: 1,324.</p>
+<ul class="flow">
+  <li class="a">SEMILLA<small>set_random_seed(0)</small></li>
+  <li class="b">CREAR MODELO<small>pesos sorteados</small></li>
+  <li class="d">ENTRENAR<small>mismos números</small></li>
+</ul>
+</section>
+
+<section>
+<h2 id="chuleta">Chuleta para repasar</h2>
+<dl class="chuleta">
+  <div><dt><code>tf.data.Dataset</code></dt><dd>Cadena de etapas que prepara los datos en paralelo con el entrenamiento.</dd></div>
+  <div><dt><code>map</code></dt><dd>Transforma cada dato; en paralelo con <code>AUTOTUNE</code>.</dd></div>
+  <div><dt><code>cache</code></dt><dd>Guarda el resultado la primera vez. <em>Lo aleatorio, después.</em></dd></div>
+  <div><dt><code>shuffle</code></dt><dd>Baraja con un cubo de <code>buffer_size</code>; antes de <code>batch</code>.</dd></div>
+  <div><dt><code>prefetch</code></dt><dd>Prepara el siguiente lote mientras entrena: siempre lo último. <em>110 → 60 ms.</em></dd></div>
+  <div><dt><code>.keras</code></dt><dd>Receta, pesos y optimizador: se puede continuar. <em>12 → 16 pasos.</em></dd></div>
+  <div><dt><code>.weights.h5</code></dt><dd>Solo pesos: hay que rehacer el modelo y Adam empieza de cero.</dd></div>
+  <div><dt><code>export</code></dt><dd>Un SavedModel para usar el modelo sin Keras.</dd></div>
+  <div><dt>Semilla</dt><dd>Fija el azar; va antes de crear el modelo.</dd></div>
+</dl>
+</section>
 
 <div class="resumen">
   <h2 class="sin-num sin-toc">En tres líneas</h2>
   <ul>
     <li><code>map → cache → shuffle → batch → prefetch</code>; lo aleatorio después de la caché.</li>
-    <li><code>prefetch</code> esconde la preparación, el <code>map</code> paralelo la acorta y <code>cache</code> la elimina.</li>
+    <li><code>prefetch</code> esconde la preparación, el <code>map</code> paralelo la acorta y <code>cache</code> la quita.</li>
     <li><code>.keras</code> guarda también el optimizador; fija la semilla antes de crear el modelo.</li>
   </ul>
 </div>
@@ -96,7 +151,7 @@
  "titulo": "¿Lo tienes?",
  "preguntas": [
   {
-   "q": "Tu pipeline <code>tf.data</code> aplica un volteo aleatorio a las carátulas de las películas (aumento de datos) y además usa <code>.cache()</code>. ¿Dónde debe ir el volteo?",
+   "q": "Tu cadena <code>tf.data</code> voltea al azar las carátulas de las películas (aumento de datos) y además usa <code>.cache()</code>. ¿Dónde debe ir el volteo?",
    "opciones": [
     "Antes de <code>.cache()</code>: así se guarda ya volteado y es más rápido.",
     "Da igual: el orden de las etapas no cambia el resultado.",
@@ -104,7 +159,7 @@
     "Después de <code>.cache()</code> y antes de <code>.batch()</code>, para que cada época vea un volteo distinto."
    ],
    "correcta": 3,
-   "porque": "<code>cache</code> guarda el resultado de lo anterior la primera vez que se recorre el dataset. Si el volteo aleatorio va antes, la primera época se congela y todas las siguientes ven exactamente las mismas imágenes volteadas: se pierde el aumento. Lo caro y determinista va antes de la caché; lo aleatorio, después. Y <code>prefetch</code> va siempre al final."
+   "porque": "<code>cache</code> guarda lo anterior la primera vez. Si el volteo va antes, se congela: todas las épocas ven las mismas imágenes volteadas y se pierde el aumento. Lo caro y fijo, antes de la caché; lo aleatorio, después. Y <code>prefetch</code>, siempre al final."
   },
   {
    "q": "Con los números 0 a 9, haces <code>batch(5)</code> y después <code>shuffle</code>. ¿Qué obtienes?",
@@ -117,20 +172,19 @@
    "porque": "Después de <code>batch</code> cada elemento es un lote entero, así que <code>shuffle</code> solo reordena lotes. Para mezclar ejemplos, <code>shuffle</code> va antes de <code>batch</code>."
   },
   {
-   "q": "Llamas a <code>keras.utils.set_random_seed(0)</code> <em>después</em> de crear el modelo. Entrenas dos veces. ¿Obtienes los mismos números?",
+   "q": "Se va la luz a mitad del entrenamiento. Habías guardado solo los pesos (<code>.weights.h5</code>). Al reanudar con Adam, ¿sigue exactamente igual que si no se hubiera cortado?",
    "opciones": [
-    "Sí: la semilla vale para todo lo que venga después",
-    "No necesariamente: los pesos iniciales ya se sortearon antes de fijar la semilla",
-    "Sí, pero solo en GPU"
+    "Sí: los pesos son todo lo que importa",
+    "No del todo: Adam empieza con sus medias a 0 y el contador de pasos a 0, y da un tirón",
+    "No: hay que empezar el entrenamiento desde el principio"
    ],
    "correcta": 1,
-   "porque": "La semilla se fija una vez, al principio y antes de crear el modelo; si no, la inicialización cambia en cada ejecución. Lo mismo pasa con un inicializador creado antes de fijarla."
+   "porque": "Los pesos se recuperan, pero el estado del optimizador no. Adam olvida su historia y sus primeros pasos son grandes. Un <code>.keras</code> guarda también el optimizador: tras 12 pasos, el modelo cargado cuenta 12 y sigue a 16."
   }
  ]
 }
 </script>
 </section>
-
 <details class="profundizar">
   <summary><span>Profundizar: la explicación completa<small>Cada etapa de tf.data, el orden, el barajado a medias y los cuellos de botella; guardar, reanudar y reproducir; la chuleta síntoma-causa-remedio y el resumen de todo el módulo.</small></span></summary>
   <div class="prof-body">
@@ -143,7 +197,7 @@
   <p>El streaming de una película. El reproductor (el modelo) es rápido, pero necesita que le lleguen los trozos de vídeo (leer y transformar los datos). Si reproduce un trozo y se queda parado esperando a que se descargue el siguiente, ves el círculo de «cargando…». <code>prefetch</code> es el <em>buffer</em> de Netflix: va descargando los minutos siguientes mientras ves el actual. <code>cache</code> es tener la película ya descargada (modo sin conexión). <code>map(num_parallel_calls=...)</code> es descargar varios trozos a la vez desde varios servidores.</p>
 </div>
 
-<p>Una <code>tf.data.Dataset</code> es una secuencia de elementos y una cadena de transformaciones que se aplican de forma <em>perezosa</em> (cuando alguien pide el siguiente elemento) y que se ejecutan en el motor de TensorFlow, en paralelo con el entrenamiento. Los conceptos básicos, que usaste con <code>image_dataset_from_directory</code> en el <a href="../modulo-2/leccion-5.html#tf-image">módulo 2</a>, aquí los vemos desde dentro (fragmento 13).</p>
+<p>Una <code>tf.data.Dataset</code> es una secuencia de elementos y una cadena de transformaciones que se aplican de forma <em>perezosa</em> (cuando alguien pide el siguiente elemento) y que se ejecutan en el motor de TensorFlow, en paralelo con el entrenamiento. Los conceptos básicos, que usaste con <code>image_dataset_from_directory</code> en el <a href="../modulo-2/leccion-5.html#tf-image">módulo 2</a>, aquí los vemos desde dentro (<a href="laboratorio.html#frag-13">fragmento 13</a>).</p>
 
 <h3>Crear y transformar</h3>
 <ul>
@@ -158,12 +212,14 @@
 
 <h3>El orden de las etapas importa</h3>
 <p>Una receta que funciona casi siempre es:</p>
-<pre class="ascii">ds.map(leer_y_preprocesar, num_parallel_calls=AUTOTUNE)   # lo caro y determinista
-  .cache()                                                # se hace UNA vez
-  .shuffle(buffer_size)                                   # barajar ejemplos, no lotes
-  .map(aumentar_datos)                                    # lo aleatorio, DESPUÉS de la cache
-  .batch(tamano_lote)
-  .prefetch(tf.data.AUTOTUNE)                             # siempre lo último</pre>
+<ol class="pasos">
+  <li><code>map(leer_y_preprocesar, num_parallel_calls=AUTOTUNE)</code>: lo caro y fijo, en paralelo.</li>
+  <li><code>cache()</code>: se hace una sola vez.</li>
+  <li><code>shuffle(buffer_size)</code>: barajar ejemplos, no lotes.</li>
+  <li><code>map(aumentar_datos)</code>: lo aleatorio, después de la caché.</li>
+  <li><code>batch(tamano_lote)</code>.</li>
+  <li><code>prefetch(AUTOTUNE)</code>: siempre lo último.</li>
+</ol>
 <ul>
   <li><strong><code>cache</code> después de lo caro y determinista, antes de lo aleatorio</strong>: si cacheas un <code>RandomFlip</code>, cada época vería la <em>misma</em> imagen volteada y se acaba el aumento de datos.</li>
   <li><strong><code>shuffle</code> antes de <code>batch</code></strong>: el fragmento lo demuestra con los diez números 0-9. <code>shuffle → batch(5)</code> da los lotes <code>[4,9,1,0,7]</code> y <code>[3,5,2,8,6]</code> (ejemplos mezclados); <code>batch(5) → shuffle</code> da <code>[5,6,7,8,9]</code> y <code>[0,1,2,3,4]</code>: <strong>solo reordenó los lotes enteros</strong>, cada lote sigue siendo la misma tanda.</li>
@@ -206,7 +262,7 @@
 </div>
 
 <h3>Pasarle el dataset a <code>fit</code></h3>
-<p>Un <code>Dataset</code> ya trae las parejas <code>(x, y)</code> y el tamaño de lote, así que <code>modelo.fit(pipeline, epochs=40)</code> no lleva <code>y=</code> ni <code>batch_size=</code>; y <code>validation_data=ds_val</code> admite otro dataset. El fragmento 13 lo hace con un pipeline de diez datos (<code>map → cache → shuffle → batch(4) → prefetch</code>), cuya <code>cardinality()</code> es 3 lotes por época (\( \lceil 10/4\rceil=3 \)), y una neurona que aprende \( y=2x \): la pérdida baja de 0,1641 a 4,4·10⁻¹¹ en 40 épocas y predice 1,0 para \( x=1 \) (el 9 escalado).</p>
+<p>Un <code>Dataset</code> ya trae las parejas <code>(x, y)</code> y el tamaño de lote, así que <code>modelo.fit(pipeline, epochs=40)</code> no lleva <code>y=</code> ni <code>batch_size=</code>; y <code>validation_data=ds_val</code> admite otro dataset. El <a href="laboratorio.html#frag-13">fragmento 13</a> lo hace con un pipeline de diez datos (<code>map → cache → shuffle → batch(4) → prefetch</code>), cuya <code>cardinality()</code> es 3 lotes por época (\( \lceil 10/4\rceil=3 \)), y una neurona que aprende \( y=2x \): la pérdida baja de 0,1641 a 4,4·10⁻¹¹ en 40 épocas y predice 1,0 para \( x=1 \) (el 9 escalado).</p>
 
 <div class="callout ojo">
   <span class="lbl">Ojo · tres trampas de <code>tf.data</code></span>
@@ -236,12 +292,12 @@
 </table>
 
 <h3>El optimizador también se guarda</h3>
-<p>Un detalle que importa: <code>.keras</code> incluye las variables del optimizador. Con Adam eso son las medias \( m \) y \( s \) de cada peso y el contador de pasos; con un planificador, el contador decide en qué punto de la curva estás. Si solo guardaras los pesos, al reanudar Adam empezaría con \( m=s=0 \) y el contador en 0, con un pequeño «tirón» inicial. El fragmento 14 lo comprueba: entrena 3 épocas de 4 lotes (12 pasos), guarda, recarga y el modelo cargado cuenta <strong>12 pasos</strong>; tras una época más pasa a <strong>16</strong>: «sigue contando donde lo dejó». Al reanudar con <code>fit</code> usa <code>initial_epoch</code> para que los números de época sigan (<code>fit(..., initial_epoch=3, epochs=6)</code> entrena las épocas 4, 5 y 6).</p>
+<p>Un detalle que importa: <code>.keras</code> incluye las variables del optimizador. Con Adam eso son las medias \( m \) y \( s \) de cada peso y el contador de pasos; con un planificador, el contador decide en qué punto de la curva estás. Si solo guardaras los pesos, al reanudar Adam empezaría con \( m=s=0 \) y el contador en 0, con un pequeño «tirón» inicial. El <a href="laboratorio.html#frag-14">fragmento 14</a> lo comprueba: entrena 3 épocas de 4 lotes (12 pasos), guarda, recarga y el modelo cargado cuenta <strong>12 pasos</strong>; tras una época más pasa a <strong>16</strong>: «sigue contando donde lo dejó». Al reanudar con <code>fit</code> usa <code>initial_epoch</code> para que los números de época sigan (<code>fit(..., initial_epoch=3, epochs=6)</code> entrena las épocas 4, 5 y 6).</p>
 
 <h3>Reproducibilidad: fijar el azar</h3>
 <p>El entrenamiento tiene mucho azar escondido: los pesos iniciales, el orden de los lotes, las máscaras de Dropout, el aumento de datos, la partición entrenamiento/validación. (Es como el modo aleatorio de una lista de reproducción: si dos personas usan la misma «semilla», la lista sale en el mismo orden.) Con una sola llamada se fijan a la vez el generador de Python, el de NumPy y el del backend:</p>
 <div class="formula">\[ \texttt{keras.utils.set\_random\_seed(0)} \]</div>
-<p>Se llama <strong>una vez, al principio</strong> y antes de crear el modelo (si no, los pesos iniciales cambian). El fragmento 14 entrena dos veces con semilla 0 y compara todos los pesos: diferencia máxima <strong>0,0</strong>. Con la semilla 1 la diferencia es de 1,324: otra inicialización, otro modelo. Fíjate en lo que implica: <strong>una sola ejecución no basta para decir que un método es mejor que otro</strong>; la diferencia entre semillas puede ser tan grande como la diferencia entre métodos. Para comparar de verdad, repite con varias semillas y compara medias.</p>
+<p>Se llama <strong>una vez, al principio</strong> y antes de crear el modelo (si no, los pesos iniciales cambian). El <a href="laboratorio.html#frag-14">fragmento 14</a> entrena dos veces con semilla 0 y compara todos los pesos: diferencia máxima <strong>0,0</strong>. Con la semilla 1 la diferencia es de 1,324: otra inicialización, otro modelo. Fíjate en lo que implica: <strong>una sola ejecución no basta para decir que un método es mejor que otro</strong>; la diferencia entre semillas puede ser tan grande como la diferencia entre métodos. Para comparar de verdad, repite con varias semillas y compara medias.</p>
 
 <table>
   <caption>De dónde viene el azar y cómo se fija</caption>
@@ -258,10 +314,10 @@
 
 <div class="callout ojo">
   <span class="lbl">Ojo · reproducible no es lo mismo que portable</span>
-  <p>Con la misma semilla, el mismo código y las mismas versiones y hardware, se obtienen los mismos números. Si cambias de CPU a GPU, o de versión de TensorFlow, los números pueden diferir (suman en otro orden y los decimales cambian en las últimas cifras). Anota las versiones (<code>keras.__version__</code>, <code>tf.__version__</code>) junto con la semilla. En el fragmento 14 la llamada a <code>enable_op_determinism()</code> va por seguridad: en esta CPU los resultados ya se repetían idénticos sin ella, pero eso no está garantizado.</p>
+  <p>Con la misma semilla, el mismo código y las mismas versiones y hardware, se obtienen los mismos números. Si cambias de CPU a GPU, o de versión de TensorFlow, los números pueden diferir (suman en otro orden y los decimales cambian en las últimas cifras). Anota las versiones (<code>keras.__version__</code>, <code>tf.__version__</code>) junto con la semilla. En el <a href="laboratorio.html#frag-14">fragmento 14</a> la llamada a <code>enable_op_determinism()</code> va por seguridad: en esta CPU los resultados ya se repetían idénticos sin ella, pero eso no está garantizado.</p>
 </div>
 
-<h3>Los otros tres casos del fragmento 14</h3>
+<h3>Los otros tres casos del <a href="laboratorio.html#frag-14">fragmento 14</a></h3>
 <ul>
   <li><strong>Solo los pesos:</strong> <code>save_weights("pesos.weights.h5")</code>; en un modelo nuevo construido con el <em>mismo</em> código, <code>load_weights</code> da las mismas predicciones (<code>True</code>).</li>
   <li><strong>Exportar para servir:</strong> <code>modelo.export("servir")</code> escribe un SavedModel con las firmas <code>['serve', 'serving_default']</code>; cargado con <code>tf.saved_model.load</code>, <code>sm.serve(...)</code> predice lo mismo. <code>export</code> imprime un resumen largo con rutas temporales; el fragmento lo silencia con <code>contextlib.redirect_stdout</code>.</li>
@@ -293,13 +349,15 @@
 </table>
 
 <h3>Un punto de partida razonable</h3>
-<pre class="ascii">datos       tf.data:  map -> cache -> shuffle -> batch -> prefetch
-modelo      Dense/Conv con he_normal (ReLU); BatchNorm si es profundo
-optimizador Adam(1e-3)  o  AdamW + coseno con warmup   (+ clipnorm=1.0 de cinturón)
-callbacks   ModelCheckpoint + ReduceLROnPlateau + EarlyStopping (mismo monitor)
-azar        keras.utils.set_random_seed(0) y repetir con varias semillas
-búsqueda    Keras Tuner (RandomSearch o Hyperband) sobre lr, capas, unidades
-extras      precisión mixta solo si hay GPU adecuada; bucle propio solo si hace falta</pre>
+<ul>
+  <li><strong>Datos:</strong> <code>tf.data</code> con <code>map → cache → shuffle → batch → prefetch</code>.</li>
+  <li><strong>Modelo:</strong> capas con <code>he_normal</code> si usan ReLU; BatchNorm si es profundo.</li>
+  <li><strong>Optimizador:</strong> <code>Adam(1e-3)</code>, o AdamW con coseno y calentamiento (y <code>clipnorm=1.0</code> de cinturón).</li>
+  <li><strong>Callbacks:</strong> ModelCheckpoint + ReduceLROnPlateau + EarlyStopping, vigilando lo mismo.</li>
+  <li><strong>Azar:</strong> <code>keras.utils.set_random_seed(0)</code>, y repetir con varias semillas.</li>
+  <li><strong>Búsqueda:</strong> Keras Tuner (RandomSearch o Hyperband) sobre learning rate, capas y neuronas.</li>
+  <li><strong>Extras:</strong> precisión mixta solo con una GPU adecuada; bucle propio solo si hace falta.</li>
+</ul>
 
 <section class="resumen">
 <h2 class="sin-num sin-toc">Resumen del módulo</h2>
@@ -322,337 +380,11 @@ extras      precisión mixta solo si hay GPU adecuada; bucle propio solo si hace
   </div>
 </details>
 
-<section>
+<section class="ir-lab">
 <h2 class="sin-num">Código</h2>
-<!-- ---------- Fragmento 13 ---------- -->
-<article class="snippet" data-lang="python" id="frag-13">
-  <header>
-    <h3>13 · tf.data: map, cache, shuffle, batch, prefetch y fit con un Dataset</h3>
-    <p class="para-que"><strong>Para qué sirve</strong> Mide con contadores qué ejecuta cada etapa, comprueba que <code>cache</code> evita repetir trabajo, enseña por qué el orden de <code>shuffle</code> y <code>batch</code> importa y entrena con un pipeline completo.</p>
-  </header>
-  <pre class="code"><code>import numpy as np
-import tensorflow as tf
-import keras
-
-X = np.arange(10, dtype="float32").reshape(-1, 1)          # 0, 1, ..., 9
-y = (X * 2).astype("float32")                               # el doble
-
-ds = tf.data.Dataset.from_tensor_slices((X, y))
-print("element_spec:", ds.element_spec)
-print("primer elemento:", [t.numpy().tolist() for t in next(iter(ds))])
-
-# map: una transformación por elemento. Contamos cuántas veces se ejecuta de verdad la función de Python
-llamadas = {"n": 0}
-def escalar(x, y):
-    llamadas["n"] += 1                                      # esto solo corre al TRAZAR el grafo
-    return x / 9.0, y / 18.0
-
-ds_map = ds.map(escalar, num_parallel_calls=tf.data.AUTOTUNE)
-for _ in ds_map:                                            # recorremos el dataset entero
-    pass
-print("elementos recorridos: 10 | veces que Python ejecutó escalar:", llamadas["n"])
-
-# cache: la 2.ª pasada no vuelve a ejecutar el map (contamos con py_function, que sí corre en cada elemento)
-contador = {"n": 0}
-def lento(x, y):
-    contador["n"] += 1
-    return x, y
-def con_py(x, y):
-    return tf.py_function(lento, [x, y], [tf.float32, tf.float32])
-
-for nombre, d in [("sin cache", ds.map(con_py)), ("con cache", ds.map(con_py).cache())]:
-    contador["n"] = 0
-    for _ in range(2):                                      # dos épocas
-        for _ in d:
-            pass
-    print(f"{nombre}: el map se ejecutó {contador['n']} veces en 2 épocas de 10 elementos")
-
-# El orden de las etapas importa: shuffle ANTES de batch baraja ejemplos; después solo baraja lotes enteros
-tf.random.set_seed(0)
-a = ds.shuffle(buffer_size=10, seed=0).batch(5)
-b = ds.batch(5).shuffle(buffer_size=2, seed=1)
-print("shuffle -&gt; batch :", [lote[0].numpy().ravel().astype(int).tolist() for lote in a])
-print("batch -&gt; shuffle :", [lote[0].numpy().ravel().astype(int).tolist() for lote in b])
-
-# batch con drop_remainder, take, repeat
-print("batch(4):              ", [len(l[0]) for l in ds.batch(4)])
-print("batch(4, drop_remainder):", [len(l[0]) for l in ds.batch(4, drop_remainder=True)])
-print("repeat(2).take(13) tiene", len(list(ds.repeat(2).take(13))), "elementos")
-
-# Pipeline típico y su uso directo en fit
-tf.random.set_seed(1)
-pipeline = (ds.map(escalar, num_parallel_calls=tf.data.AUTOTUNE)
-              .cache()
-              .shuffle(buffer_size=10, seed=1)
-              .batch(4)
-              .prefetch(tf.data.AUTOTUNE))
-print("cardinalidad del pipeline (lotes por época):", pipeline.cardinality().numpy())
-
-keras.utils.set_random_seed(0)
-modelo = keras.Sequential([keras.Input(shape=(1,)), keras.layers.Dense(1)])
-modelo.compile(optimizer=keras.optimizers.SGD(0.5), loss="mse")
-h = modelo.fit(pipeline, epochs=40, shuffle=False, verbose=0)               # fit acepta el Dataset directamente: no se pasa y ni batch_size
-print("loss época 1 -&gt; 40:", round(h.history["loss"][0], 4), "-&gt;", f'{h.history["loss"][-1]:.1e}')
-print("predicción para x = 9 / 9 = 1.0 (debería acercarse a 1.0):", round(float(modelo.predict(np.array([[1.0]]), verbose=0)[0, 0]), 3))</code></pre>
-  <details class="linea-a-linea" open>
-    <summary>Línea por línea</summary>
-    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
-    <table class="lineas">
-      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
-      <tbody>
-        <tr data-lines="1-3"><td><code>import numpy as np …</code></td><td>Importaciones.</td></tr>
-        <tr data-lines="5-6"><td><code>X = np.arange(10, dtype="float32").reshape(-1, 1)          # 0, 1, … …</code></td><td>Diez datos \( x = 0,\dots,9 \) (una columna) y su doble como etiqueta.</td></tr>
-        <tr data-lines="8-10"><td><code>ds = tf.data.Dataset.from_tensor_slices((X, y)) …</code></td><td>Crea el <code>Dataset</code> con <code>from_tensor_slices</code>, imprime la especificación de un elemento (pareja de tensores de forma <code>(1,)</code>) y el primer elemento.</td></tr>
-        <tr data-lines="12-13"><td><code># map: una transformación por elemento. Contamos cuántas veces se e… …</code></td><td>Un contador en un diccionario (se puede modificar desde la función).</td></tr>
-        <tr data-lines="14-16"><td><code>def escalar(x, y): …</code></td><td><code>escalar</code> normaliza a 0-1 (<code>x/9</code> y <code>y/18</code>) y suma 1 al contador. Ese <code>+= 1</code> es código de Python normal.</td></tr>
-        <tr data-lines="18-21"><td><code>ds_map = ds.map(escalar, num_parallel_calls=tf.data.AUTOTUNE) …</code></td><td>Aplica <code>map</code> con ejecución paralela automática, recorre el dataset entero (<code>pass</code> no hace nada con cada elemento) e imprime cuántas veces ejecutó Python la función.</td></tr>
-        <tr data-lines="23-24"><td><code># cache: la 2.ª pasada no vuelve a ejecutar el map (contamos con py… …</code></td><td>Para medir la caché necesitamos código de Python que corra de verdad en cada elemento. Otro contador.</td></tr>
-        <tr data-lines="25-29"><td><code>def lento(x, y): …</code></td><td><code>lento</code> suma uno al contador y devuelve lo mismo; <code>con_py</code> lo envuelve en <code>tf.py_function</code>, que sí ejecuta Python en cada elemento.</td></tr>
-        <tr data-lines="31-36"><td><code>for nombre, d in [("sin cache", ds.map(con_py)), ("con cache", ds.m… …</code></td><td>Compara dos pipelines (sin y con <code>.cache()</code>). Para cada uno, pone el contador a 0, recorre el dataset <strong>dos veces</strong> (dos «épocas») e imprime cuántas veces se ejecutó el <code>map</code>.</td></tr>
-        <tr data-lines="38-39"><td><code># El orden de las etapas importa: shuffle ANTES de batch baraja eje… …</code></td><td>Fija la semilla de TensorFlow.</td></tr>
-        <tr data-lines="40-41"><td><code>a = ds.shuffle(buffer_size=10, seed=0).batch(5) …</code></td><td>Dos pipelines: baraja y luego agrupa de 5 (<code>a</code>) o agrupa y luego baraja (con buffer 2, <code>b</code>).</td></tr>
-        <tr data-lines="42-43"><td><code>print("shuffle -&gt; batch :", [lote[0].numpy().ravel().astype(int).to… …</code></td><td>Imprime los ejemplos que contiene cada lote de los dos pipelines.</td></tr>
-        <tr data-lines="45-48"><td><code># batch con drop_remainder, take, repeat …</code></td><td><code>batch(4)</code> con 10 datos da lotes de 4, 4 y 2; con <code>drop_remainder=True</code>, 4 y 4; <code>repeat(2).take(13)</code> tiene 13 elementos.</td></tr>
-        <tr data-lines="50-51"><td><code># Pipeline típico y su uso directo en fit …</code></td><td>Un pipeline típico completo. Semilla de TensorFlow.</td></tr>
-        <tr data-lines="52-56"><td><code>pipeline = (ds.map(escalar, num_parallel_calls=tf.data.AUTOTUNE) …</code></td><td><code>map</code> paralelo, <code>cache</code>, <code>shuffle</code> con buffer 10, lotes de 4 y <code>prefetch</code>. Los paréntesis permiten encadenar los métodos en varias líneas.</td></tr>
-        <tr data-lines="57"><td><code>print("cardinalidad del pipeline (lotes por época):", pipeline.card…</code></td><td><code>cardinality()</code> da el número de lotes por época.</td></tr>
-        <tr data-lines="59-61"><td><code>keras.utils.set_random_seed(0) …</code></td><td>Fija la semilla de Keras y crea una neurona (<code>Dense(1)</code>) compilada con SGD de 0,5 y MSE.</td></tr>
-        <tr data-lines="62-64"><td><code>h = modelo.fit(pipeline, epochs=40, shuffle=False, verbose=0)      … …</code></td><td><code>fit</code> recibe el Dataset directamente: sin <code>y</code> ni <code>batch_size</code>, con <code>shuffle=False</code> porque ya baraja el pipeline. Después predice para \( x = 1 \) (el 9 escalado), esperando 1.</td></tr>
-      </tbody>
-    </table>
-  </details>
-  <div class="salida">
-    <strong>Salida esperada</strong>
-    <pre>element_spec: (TensorSpec(shape=(1,), dtype=tf.float32, name=None), TensorSpec(shape=(1,), dtype=tf.float32, name=None))
-primer elemento: [[0.0], [0.0]]
-elementos recorridos: 10 | veces que Python ejecutó escalar: 1
-sin cache: el map se ejecutó 20 veces en 2 épocas de 10 elementos
-con cache: el map se ejecutó 10 veces en 2 épocas de 10 elementos
-shuffle -&gt; batch : [[4, 9, 1, 0, 7], [3, 5, 2, 8, 6]]
-batch -&gt; shuffle : [[5, 6, 7, 8, 9], [0, 1, 2, 3, 4]]
-batch(4):               [4, 4, 2]
-batch(4, drop_remainder): [4, 4]
-repeat(2).take(13) tiene 13 elementos
-cardinalidad del pipeline (lotes por época): 3
-loss época 1 -&gt; 40: 0.1641 -&gt; 4.4e-11
-predicción para x = 9 / 9 = 1.0 (debería acercarse a 1.0): 1.0</pre>
-    <p>El primer elemento es la pareja (0, 0). El <code>map</code> recorrió 10 elementos y <strong>Python ejecutó <code>escalar</code> una sola vez</strong> (al trazar el grafo). Con <code>py_function</code>: 20 ejecuciones en dos épocas sin <code>cache</code> y 10 con <code>cache</code> (la segunda época usa los resultados guardados). <code>shuffle → batch</code> da los lotes [4, 9, 1, 0, 7] y [3, 5, 2, 8, 6] (ejemplos mezclados); <code>batch → shuffle</code> da [5…9] y [0…4]: solo ha intercambiado los lotes. Los tamaños son [4, 4, 2] frente a [4, 4] con <code>drop_remainder</code>. El pipeline tiene 3 lotes por época (\( \lceil 10/4\rceil \)) y la red aprende la relación \( y=2x \): la pérdida pasa de 0,1641 a 4,4·10⁻¹¹ y la predicción para \( x=1 \) es 1,0.</p>
-  </div>
-</article>
-<!-- ---------- Fragmento 14 ---------- -->
-<article class="snippet" data-lang="python" id="frag-14">
-  <header>
-    <h3>14 · Guardar, reanudar, semillas, exportar y capas propias</h3>
-    <p class="para-que"><strong>Para qué sirve</strong> Comprueba que la misma semilla da los mismos pesos, que un modelo guardado reanuda con su optimizador, que se pueden guardar solo los pesos o exportar un SavedModel y qué pasa con una capa propia sin registrar.</p>
-  </header>
-  <pre class="code"><code>import contextlib, io, os, tempfile
-import numpy as np
-import tensorflow as tf
-import keras
-
-tf.config.experimental.enable_op_determinism()      # operaciones deterministas (más lentas en GPU)
-
-@keras.saving.register_keras_serializable(package="curso3")
-class EscalaYSesgo(keras.layers.Layer):
-    def __init__(self, factor=2.0, **kwargs):
-        super().__init__(**kwargs)
-        self.factor = factor
-    def call(self, x):
-        return x * self.factor
-    def get_config(self):                           # lo que hace falta para reconstruir la capa
-        return {**super().get_config(), "factor": self.factor}
-
-def construir():
-    return keras.Sequential([keras.Input(shape=(3,)), keras.layers.Dense(8, activation="relu"),
-                             EscalaYSesgo(0.5), keras.layers.Dense(1)])
-
-rng = np.random.default_rng(0)
-X = rng.normal(size=(64, 3)).astype("float32")
-y = X.sum(axis=1, keepdims=True)
-
-def entrenar(semilla=None):
-    if semilla is not None:
-        keras.utils.set_random_seed(semilla)
-    m = construir()
-    m.compile(optimizer=keras.optimizers.Adam(0.01), loss="mse")
-    m.fit(X, y, epochs=3, batch_size=16, verbose=0)
-    return m
-
-# 1) Reproducibilidad: misma semilla -&gt; mismos pesos; sin semilla -&gt; distintos
-a, b = entrenar(0), entrenar(0)
-print("misma semilla: diferencia máxima de pesos =", max(float(np.abs(p - q).max()) for p, q in zip(a.get_weights(), b.get_weights())))
-c = entrenar(1)
-print("otra semilla : diferencia máxima de pesos =", round(max(float(np.abs(p - q).max()) for p, q in zip(a.get_weights(), c.get_weights())), 3))
-
-carpeta = tempfile.mkdtemp()
-
-# 2) Guardar y cargar el modelo entero (arquitectura + pesos + optimizador)
-a.save(os.path.join(carpeta, "modelo.keras"))
-cargado = keras.models.load_model(os.path.join(carpeta, "modelo.keras"))        # la capa registrada se encuentra sola
-print("predicciones idénticas tras cargar:", bool(np.allclose(a.predict(X, verbose=0), cargado.predict(X, verbose=0))))
-print("pasos del optimizador guardados:", int(a.optimizer.iterations.numpy()), "-&gt;", int(cargado.optimizer.iterations.numpy()))
-cargado.fit(X, y, epochs=1, batch_size=16, verbose=0)
-print("tras 1 época más: pasos =", int(cargado.optimizer.iterations.numpy()), "(sigue contando donde lo dejó)")
-
-# 3) Solo los pesos: hay que reconstruir la arquitectura a mano
-a.save_weights(os.path.join(carpeta, "pesos.weights.h5"))
-nuevo = construir()
-nuevo.load_weights(os.path.join(carpeta, "pesos.weights.h5"))
-print("pesos cargados en un modelo nuevo:", bool(np.allclose(a.predict(X, verbose=0), nuevo.predict(X, verbose=0))))
-
-# 4) Exportar para servir (formato SavedModel de TensorFlow)
-with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
-    a.export(os.path.join(carpeta, "servir"))        # imprime un resumen largo con rutas temporales: lo silenciamos
-sm = tf.saved_model.load(os.path.join(carpeta, "servir"))
-print("firmas del SavedModel:", list(sm.signatures.keys()))
-print("el SavedModel predice lo mismo:", bool(np.allclose(a.predict(X[:4], verbose=0), sm.serve(tf.constant(X[:4])).numpy(), atol=1e-5)))
-
-# 5) Qué pasa si la capa propia NO está registrada
-class SinRegistrar(keras.layers.Layer):
-    def call(self, x):
-        return x * 3.0
-m = keras.Sequential([keras.Input(shape=(3,)), SinRegistrar()])
-m.save(os.path.join(carpeta, "malo.keras"))
-try:
-    keras.models.load_model(os.path.join(carpeta, "malo.keras"))
-except TypeError as e:
-    mensaje = str(e)
-    print("TypeError ...", mensaje[mensaje.index("Could not locate"):][:62], "...")
-arreglado = keras.models.load_model(os.path.join(carpeta, "malo.keras"), custom_objects={"SinRegistrar": SinRegistrar})
-print("con custom_objects carga bien:", arreglado.predict(np.array([[1.0, 2.0, 3.0]]), verbose=0).tolist())</code></pre>
-  <details class="linea-a-linea" open>
-    <summary>Línea por línea</summary>
-    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
-    <table class="lineas">
-      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
-      <tbody>
-        <tr data-lines="1-4"><td><code>import contextlib, io, os, tempfile …</code></td><td>Importaciones: <code>contextlib</code> e <code>io</code> (para silenciar una salida), <code>os</code> y <code>tempfile</code> (carpetas), NumPy, TensorFlow y Keras.</td></tr>
-        <tr data-lines="6"><td><code>tf.config.experimental.enable_op_determinism()      # operaciones d…</code></td><td>Pide a TensorFlow operaciones deterministas: algo más lento en GPU, pero resultados repetibles.</td></tr>
-        <tr data-lines="8-14"><td><code>@keras.saving.register_keras_serializable(package="curso3") …</code></td><td>Una capa propia <code>EscalaYSesgo</code> que multiplica por un factor. El decorador <code>@register_keras_serializable</code> la da de alta con el nombre <code>curso3&gt;EscalaYSesgo</code> para que <code>load_model</code> la encuentre sola. El constructor guarda el factor y <code>call</code> lo aplica.</td></tr>
-        <tr data-lines="15-16"><td><code>def get_config(self):                           # lo que hace falta… …</code></td><td><code>get_config</code> devuelve los argumentos del constructor (con los de la clase base), lo que hace falta para reconstruir la capa al cargar.</td></tr>
-        <tr data-lines="18-20"><td><code>def construir(): …</code></td><td><code>construir()</code> crea el modelo: <code>Dense(8)</code> ReLU, la capa propia con factor 0,5 y <code>Dense(1)</code>.</td></tr>
-        <tr data-lines="22-24"><td><code>rng = np.random.default_rng(0) …</code></td><td>64 datos de 3 variables; la etiqueta es su suma.</td></tr>
-        <tr data-lines="26-32"><td><code>def entrenar(semilla=None): …</code></td><td><code>entrenar(semilla)</code>: si se da una semilla la fija <em>antes</em> de construir el modelo; crea y compila el modelo (Adam 0,01) y entrena 3 épocas con lotes de 16 (4 lotes: 12 pasos).</td></tr>
-        <tr data-lines="34-36"><td><code># 1) Reproducibilidad: misma semilla -&gt; mismos pesos; sin semilla -… …</code></td><td>1) Reproducibilidad: dos entrenamientos con semilla 0 y diferencia máxima entre todos los pesos (<code>zip</code> empareja los arrays de uno y otro).</td></tr>
-        <tr data-lines="37-38"><td><code>c = entrenar(1) …</code></td><td>Con la semilla 1 los pesos son otros.</td></tr>
-        <tr data-lines="40"><td><code>carpeta = tempfile.mkdtemp()</code></td><td>Carpeta temporal.</td></tr>
-        <tr data-lines="42-45"><td><code># 2) Guardar y cargar el modelo entero (arquitectura + pesos + opti… …</code></td><td>2) Guarda el modelo entero en un <code>.keras</code>, lo carga (sin <code>custom_objects</code>, porque la capa está registrada) y comprueba que las predicciones son iguales (<code>np.allclose</code>).</td></tr>
-        <tr data-lines="46-48"><td><code>print("pasos del optimizador guardados:", int(a.optimizer.iteration… …</code></td><td>Compara el contador de pasos del optimizador antes y después de cargar, y tras entrenar una época más (4 pasos).</td></tr>
-        <tr data-lines="50-54"><td><code># 3) Solo los pesos: hay que reconstruir la arquitectura a mano …</code></td><td>3) Solo los pesos: <code>save_weights</code> en un <code>.weights.h5</code>; en un modelo nuevo, construido con el mismo código, <code>load_weights</code> y comprobación de las predicciones.</td></tr>
-        <tr data-lines="56-58"><td><code># 4) Exportar para servir (formato SavedModel de TensorFlow) …</code></td><td>4) Exportar para servir con <code>export</code>. Imprime un resumen largo con rutas temporales, así que se silencian la salida y los errores con <code>redirect_stdout/stderr</code>.</td></tr>
-        <tr data-lines="59-61"><td><code>sm = tf.saved_model.load(os.path.join(carpeta, "servir")) …</code></td><td>Carga el SavedModel con <code>tf.saved_model.load</code>, imprime sus firmas y comprueba que <code>sm.serve(...)</code> predice lo mismo.</td></tr>
-        <tr data-lines="63-68"><td><code># 5) Qué pasa si la capa propia NO está registrada …</code></td><td>5) Una capa propia <strong>sin registrar ni <code>get_config</code></strong>: multiplica por 3. Se guarda un modelo que la contiene.</td></tr>
-        <tr data-lines="69-73"><td><code>try: …</code></td><td>Intenta cargarlo sin ayuda: falla con <code>TypeError</code>. Imprime desde «Could not locate» los primeros 62 caracteres del mensaje.</td></tr>
-        <tr data-lines="74-75"><td><code>arreglado = keras.models.load_model(os.path.join(carpeta, "malo.ker… …</code></td><td>La solución: pasar la clase con <code>custom_objects</code>. Ahora carga y predice \( [1,2,3]\cdot3 \).</td></tr>
-      </tbody>
-    </table>
-  </details>
-  <div class="salida">
-    <strong>Salida esperada</strong>
-    <pre>misma semilla: diferencia máxima de pesos = 0.0
-otra semilla : diferencia máxima de pesos = 1.324
-predicciones idénticas tras cargar: True
-pasos del optimizador guardados: 12 -&gt; 12
-tras 1 época más: pasos = 16 (sigue contando donde lo dejó)
-pesos cargados en un modelo nuevo: True
-firmas del SavedModel: ['serve', 'serving_default']
-el SavedModel predice lo mismo: True
-TypeError ... Could not locate class 'SinRegistrar'. Make sure custom classe ...
-con custom_objects carga bien: [[3.0, 6.0, 9.0]]</pre>
-    <p>Misma semilla: diferencia 0,0; otra semilla: 1,324. El modelo recargado predice igual y su optimizador cuenta 12 pasos (los de 3 épocas de 4 lotes), que pasan a 16 tras una época más: <strong>el estado del optimizador viaja en el <code>.keras</code></strong>. Los pesos solos también reproducen el modelo. El SavedModel tiene las firmas <code>serve</code> y <code>serving_default</code> y predice lo mismo. Sin registrar la clase, el error pide registrarla (<code>Could not locate class 'SinRegistrar'</code>); con <code>custom_objects</code> carga y devuelve [[3, 6, 9]].</p>
-  </div>
-</article>
-</section>
-
-<section>
-<h2 class="sin-num" id="resto">Código: el resto del módulo</h2>
-<p>El fragmento que falta: la precisión mixta y el <em>loss scaling</em> de la <a href="leccion-5.html#precision-mixta">lección 5</a>. Como todos, se ha ejecutado de verdad y es independiente de los demás.</p>
-<!-- ---------- Fragmento 15 ---------- -->
-<article class="snippet" data-lang="python" id="frag-15">
-  <header>
-    <h3>15 · Precisión mixta y loss scaling</h3>
-    <p class="para-que"><strong>Para qué sirve</strong> Enseña los límites del float16 con NumPy, activa la política <code>mixed_float16</code> en Keras y comprueba qué se calcula en cada precisión y cómo trabaja el optimizador con escala dinámica.</p>
-  </header>
-  <pre class="code"><code>import warnings
-import numpy as np
-import keras
-
-warnings.filterwarnings("ignore", category=RuntimeWarning)   # NumPy avisa del overflow que vamos a provocar a propósito
-
-# 1) Los límites del float16, con NumPy
-print("float16: máximo =", float(np.finfo(np.float16).max), "| mínimo normal =", float(np.finfo(np.float16).tiny), "| float32 máximo =", float(np.finfo(np.float32).max))
-print("np.float16(70000)  -&gt;", np.float16(np.float32(70000)), "(overflow)")
-print("np.float16(1e-8)   -&gt;", np.float16(1e-8), "(underflow)")
-escalado = np.float16(1e-8 * 1024)
-print("np.float16(1e-8 * 1024) -&gt;", escalado, "-&gt; desescalado:", f"{float(escalado) / 1024:.4e}", "(el valor real era 1e-08)")
-
-# 2) La política de precisión mixta: cálculo en float16, pesos en float32
-keras.utils.set_random_seed(0)
-keras.mixed_precision.set_global_policy("mixed_float16")
-print()
-print("política global:", keras.mixed_precision.global_policy().name)
-modelo = keras.Sequential([
-    keras.Input(shape=(4,)),
-    keras.layers.Dense(16, activation="relu"),
-    keras.layers.Dense(3),
-    keras.layers.Activation("softmax", dtype="float32"),     # la salida, en float32 por estabilidad numérica
-])
-capa = modelo.layers[0]
-print("capa Dense -&gt; cálculo:", capa.compute_dtype, "| variables:", capa.kernel.dtype)
-print("salida de la última capa:", modelo(np.random.rand(2, 4).astype("float32")).dtype)
-
-modelo.compile(optimizer=keras.optimizers.Adam(0.01), loss="sparse_categorical_crossentropy", metrics=["accuracy"])
-print("optimizador tras compile:", type(modelo.optimizer).__name__, "envolviendo a", type(modelo.optimizer.inner_optimizer).__name__)
-print("escala inicial:", modelo.optimizer.initial_scale, "= 2^15 | sube x2 tras", modelo.optimizer.dynamic_growth_steps, "pasos sin overflow")
-
-rng = np.random.default_rng(0)
-X = rng.normal(size=(200, 4)).astype("float32")
-y = (X[:, 0] + X[:, 1] &gt; 0).astype("int32") + (X[:, 2] &gt; 1).astype("int32")
-h = modelo.fit(X, y, epochs=5, batch_size=32, verbose=0)
-print("entrena sin problemas: loss", round(h.history["loss"][0], 3), "-&gt;", round(h.history["loss"][-1], 3))
-estado = {v.path.split("/")[-1]: float(v.numpy()) for v in modelo.optimizer.variables if v.shape == ()}
-print("tras 5 épocas (35 pasos): escala =", estado["dynamic_scale"], "| pasos buenos seguidos =", estado["step_counter"])
-
-keras.mixed_precision.set_global_policy("float32")           # restaurar</code></pre>
-  <details class="linea-a-linea" open>
-    <summary>Línea por línea</summary>
-    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
-    <table class="lineas">
-      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
-      <tbody>
-        <tr data-lines="1-3"><td><code>import warnings …</code></td><td>Importaciones.</td></tr>
-        <tr data-lines="5"><td><code>warnings.filterwarnings("ignore", category=RuntimeWarning)   # NumP…</code></td><td>NumPy avisa del desbordamiento que vamos a provocar a propósito; se silencia el aviso.</td></tr>
-        <tr data-lines="7-10"><td><code># 1) Los límites del float16, con NumPy …</code></td><td>1) Los límites del float16 con NumPy: máximo 65504, menor valor normal \( 6{,}1\cdot10^{-5} \) y el máximo de float32. Convertir 70000 da <code>inf</code> (overflow) y 1e-8 da 0 (underflow).</td></tr>
-        <tr data-lines="11-12"><td><code>escalado = np.float16(1e-8 * 1024) …</code></td><td>Escalar antes de convertir: \( 10^{-8}\cdot1024 \) sí se representa; al desescalar (dividir entre 1024 en float32) se recupera casi el valor real.</td></tr>
-        <tr data-lines="14-16"><td><code># 2) La política de precisión mixta: cálculo en float16, pesos en f… …</code></td><td>2) Fija la semilla y activa la política global <code>mixed_float16</code>: las capas que se creen a partir de ahora usarán float16 para calcular y float32 para sus pesos.</td></tr>
-        <tr data-lines="17-18"><td><code>print() …</code></td><td>Imprime el nombre de la política.</td></tr>
-        <tr data-lines="19-24"><td><code>modelo = keras.Sequential([ …</code></td><td>Un modelo de 4 entradas, una capa oculta de 16, una de 3 salidas (3 clases) y una capa <code>Activation("softmax", dtype="float32")</code>: la salida se calcula en float32 por estabilidad.</td></tr>
-        <tr data-lines="25-27"><td><code>capa = modelo.layers[0] …</code></td><td>Comprueba el tipo de cálculo y el de las variables de la primera capa, y el tipo de la salida del modelo.</td></tr>
-        <tr data-lines="29-31"><td><code>modelo.compile(optimizer=keras.optimizers.Adam(0.01), loss="sparse_… …</code></td><td><code>compile</code> envuelve el optimizador en un <code>LossScaleOptimizer</code>. Imprime su tipo y el del optimizador interior, la escala inicial (\( 2^{15} \)) y cada cuántos pasos sin problemas se duplica.</td></tr>
-        <tr data-lines="33-35"><td><code>rng = np.random.default_rng(0) …</code></td><td>Datos: 200 muestras, 4 variables y una etiqueta de 3 clases (0, 1 o 2) que depende de ellas.</td></tr>
-        <tr data-lines="36-37"><td><code>h = modelo.fit(X, y, epochs=5, batch_size=32, verbose=0) …</code></td><td>Entrena 5 épocas con lotes de 32 (35 pasos) e imprime la pérdida inicial y la final.</td></tr>
-        <tr data-lines="38-39"><td><code>estado = {v.path.split("/")[-1]: float(v.numpy()) for v in modelo.o… …</code></td><td>Lee del optimizador sus variables escalares (<code>dynamic_scale</code> y <code>step_counter</code>) e imprime la escala actual y los pasos buenos seguidos.</td></tr>
-        <tr data-lines="41"><td><code>keras.mixed_precision.set_global_policy("float32")           # rest…</code></td><td>Restaura la política global a float32 para no afectar a otros experimentos.</td></tr>
-      </tbody>
-    </table>
-  </details>
-  <div class="salida">
-    <strong>Salida esperada</strong>
-    <pre>float16: máximo = 65504.0 | mínimo normal = 6.103515625e-05 | float32 máximo = 3.4028234663852886e+38
-np.float16(70000)  -&gt; inf (overflow)
-np.float16(1e-8)   -&gt; 0.0 (underflow)
-np.float16(1e-8 * 1024) -&gt; 1.025e-05 -&gt; desescalado: 1.0012e-08 (el valor real era 1e-08)
-
-política global: mixed_float16
-capa Dense -&gt; cálculo: float16 | variables: float32
-salida de la última capa: &lt;dtype: 'float32'&gt;
-optimizador tras compile: LossScaleOptimizer envolviendo a Adam
-escala inicial: 32768.0 = 2^15 | sube x2 tras 2000 pasos sin overflow
-entrena sin problemas: loss 1.175 -&gt; 0.549
-tras 5 épocas (35 pasos): escala = 32768.0 | pasos buenos seguidos = 35.0</pre>
-    <p>El máximo de float16 es 65504 (el de float32 es \( 3{,}4\cdot10^{38} \)). 70000 se convierte en <code>inf</code> y \( 10^{-8} \) en 0, pero escalado por 1024 se guarda como 1,025·10⁻⁵ y, al desescalar, vale 1,0012·10⁻⁸: el 0,12 % de error. La política es <code>mixed_float16</code>: la capa calcula en float16 y guarda sus pesos en float32, y la salida es float32. El optimizador es un <code>LossScaleOptimizer</code> que envuelve a Adam, con escala inicial 32768 (\( 2^{15} \)) y duplicación tras 2000 pasos buenos. El entrenamiento va bien (pérdida de 1,175 a 0,549) y tras 35 pasos la escala sigue en 32768 con 35 pasos buenos seguidos: no hubo ningún overflow.</p>
-  </div>
-</article>
+<a class="lab-card" href="laboratorio.html#paso-8"><span class="lc-ico" aria-hidden="true">🧪</span>
+  <span><strong>Ver el código de esta lección en el Laboratorio</strong>
+  <span>Pasos 8 y 9 · tf.data con diez números (map, cache, shuffle, batch, prefetch) y guardar, continuar y repetir el experimento.</span></span></a>
 </section>
 
 </div>

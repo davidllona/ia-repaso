@@ -5,7 +5,7 @@ Lab.register("curso3/c3m5-clip-geometria", function (root, api) {
   var D = api.d, M = api.math, coarse = !!(window.matchMedia && matchMedia("(pointer:coarse)").matches);
   var S = { g: [4.2, 1.2], c: 2, v: 1.5, showN: true, showV: true };
   var view = api.view(root, { aspect: 1.5, minH: 260, maxH: 420, drag: !coarse, label: "Plano del gradiente con el círculo de clipnorm y el cuadrado de clipvalue" });
-  var plot = api.plot(view, { xr: [-6, 6], yr: [-4, 4], grid: false, xticks: 1, yticks: 1, pad: { l: 34, r: 12, t: 12, b: 28 }, xfmt: function () { return ""; }, yfmt: function () { return ""; }, xlabel: "gradiente respecto a w₁", ylabel: "gradiente respecto a w₂" });
+  var plot = api.plot(view, { xr: [-6, 6], yr: [-4, 4], grid: false, xticks: 1, yticks: 1, pad: { l: 44, r: 12, t: 12, b: 38 }, xfmt: function () { return ""; }, yfmt: function () { return ""; }, xlabel: "gradiente respecto a w₁", ylabel: "gradiente respecto a w₂" });
   var ui = api.controls(root), out = api.readout(root);
   var sg1 = ui.slider({ label: "g₁ (gradiente respecto a w₁)", min: -6, max: 6, step: 0.05, value: S.g[0], fmt: function (v) { return v.toFixed(2); }, onInput: function (v) { S.g[0] = v; update(); } });
   var sg2 = ui.slider({ label: "g₂ (gradiente respecto a w₂)", min: -3.5, max: 3.5, step: 0.05, value: S.g[1], fmt: function (v) { return v.toFixed(2); }, onInput: function (v) { S.g[1] = v; update(); } });
@@ -31,8 +31,9 @@ Lab.register("curso3/c3m5-clip-geometria", function (root, api) {
     plot.yr = [-(b.h / sc) / 2, (b.h / sc) / 2];
     plot.axes(ctx);
     var k, hh = Math.floor((b.h / sc) / 2);
-    for (k = -6; k <= 6; k++) { D.line(ctx, plot.x(k), b.y, plot.x(k), b.y + b.h, C.line, 1); D.text(ctx, String(k), plot.x(k), b.y + b.h + 14, { align: "center", size: 11, color: C.muted, mono: true }); }
-    for (k = -hh; k <= hh; k++) { D.line(ctx, b.x, plot.y(k), b.x + b.w, plot.y(k), C.line, 1); D.text(ctx, String(k), b.x - 6, plot.y(k) + 4, { align: "right", size: 11, color: C.muted, mono: true }); }
+    var stx = b.w < 380 ? 2 : 1, sty = sc < 26 ? 2 : 1;
+    for (k = -6; k <= 6; k++) { D.line(ctx, plot.x(k), b.y, plot.x(k), b.y + b.h, C.line, 1); if (k % stx === 0) D.text(ctx, String(k), plot.x(k), b.y + b.h + 14, { align: "center", size: 11, color: C.muted, mono: true }); }
+    for (k = -hh; k <= hh; k++) { D.line(ctx, b.x, plot.y(k), b.x + b.w, plot.y(k), C.line, 1); if (k % sty === 0) D.text(ctx, String(k), b.x - 6, plot.y(k) + 4, { align: "right", size: 11, color: C.muted, mono: true }); }
     D.rect(ctx, b.x, b.y, b.w, b.h, null, C.ink, 1.5);
     var ox = plot.x(0), oy = plot.y(0);
     ctx.save(); plot.clip(ctx);

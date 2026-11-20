@@ -41,7 +41,7 @@ Lab.register("curso3/c3m5-tfdata-pipeline", function (root, api) {
     function X(t) { return x0 + t / tmax * W; }
     for (ep = 0; ep < 2; ep++) {
       var oy = 4 + ep * (panelH + 2), laneH = Math.min(30, (panelH - 36) / 2), y1 = oy + 20, y2 = y1 + laneH + 10, rr = res[ep];
-      D.text(ctx, "Época " + (ep + 1) + (ep === 1 ? (S.cache ? " (con cache: datos ya en memoria)" : " (igual que la 1.ª: sin cache)") : "") + " · primeros " + NSHOW + " lotes", padL, oy + 12, { size: narrow ? 10.5 : 12, weight: 600, color: C.ink2 });
+      D.text(ctx, "Época " + (ep + 1) + (ep === 1 ? (S.cache ? " (con cache: datos ya en memoria)" : " (igual que la 1.ª: sin cache)") : "") + " · primeros " + NSHOW + " lotes", padL, oy + 12, { size: narrow ? 11 : 12, weight: 600, color: C.ink2 });
       D.rect(ctx, x0, y1, W, laneH, C.surface, C.line, 1); D.rect(ctx, x0, y2, W, laneH, C.surface, C.line, 1);
       if (!narrow) { D.text(ctx, "datos", padL, y1 + laneH / 2 + 4, { size: 11, color: C.muted }); D.text(ctx, "modelo", padL, y2 + laneH / 2 + 4, { size: 11, color: C.muted }); }
       for (i = 0; i < NSHOW; i++) {
@@ -49,9 +49,9 @@ Lab.register("curso3/c3m5-tfdata-pipeline", function (root, api) {
         D.rect(ctx, X(ps), y1 + 2, Math.max(1, X(ps + rt) - X(ps)), laneH - 4, C.cobalto, C.paper, 1);
         D.rect(ctx, X(ps + rt), y1 + 2, Math.max(1, X(ps + rt + mt) - X(ps + rt)), laneH - 4, C.marker, C.paper, 1);
         D.rect(ctx, X(rr.r.cs[i]), y2 + 2, Math.max(1, X(rr.r.ce[i]) - X(rr.r.cs[i])), laneH - 4, C.terracota, C.paper, 1);
-        if (X(rr.r.ce[i]) - X(rr.r.cs[i]) > 14) D.text(ctx, String(i + 1), (X(rr.r.cs[i]) + X(rr.r.ce[i])) / 2, y2 + laneH / 2 + 4, { align: "center", size: 10.5, weight: 700, color: C.paper, mono: true });
+        if (X(rr.r.ce[i]) - X(rr.r.cs[i]) > 14) D.text(ctx, String(i + 1), (X(rr.r.cs[i]) + X(rr.r.ce[i])) / 2, y2 + laneH / 2 + 4, { align: "center", size: 11, weight: 700, color: C.paper, mono: true });
       }
-      D.text(ctx, "tiempo →  (" + rr.r.ce[NSHOW - 1].toFixed(0) + " ms para " + NSHOW + " lotes)", x0 + W, y2 + laneH + 14, { align: "right", size: 10.5, color: C.muted });
+      D.text(ctx, "tiempo →  (" + rr.r.ce[NSHOW - 1].toFixed(0) + " ms para " + NSHOW + " lotes)", x0 + W, y2 + laneH + 14, { align: "right", size: 11, color: C.muted });
     }
   }
   view.draw(draw);

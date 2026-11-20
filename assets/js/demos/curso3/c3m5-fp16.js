@@ -54,9 +54,9 @@ Lab.register("curso3/c3m5-fp16", function (root, api) {
     }
     D.line(ctx, pl.x(lo), b.y, pl.x(lo), b.y + b.h, C.ink, 1.8, [5, 3]); D.line(ctx, pl.x(nlo), b.y, pl.x(nlo), b.y + b.h, C.ink2, 1.2, [2, 3]); D.line(ctx, pl.x(hi), b.y, pl.x(hi), b.y + b.h, C.ink, 1.8, [5, 3]);
     ctx.restore();
-    D.text(ctx, "mín. 6·10⁻⁸", pl.x(lo) + 4, b.y + 12, { size: 10.5, weight: 600, color: C.ink });
-    D.text(ctx, "máx. 65504", pl.x(hi) - 4, b.y + 12, { align: "right", size: 10.5, weight: 600, color: C.ink });
-    D.text(ctx, "underflow", pl.x(-12) + 6, b.y + b.h - 6, { size: 10.5, color: C.terracotaInk, weight: 600 });
+    D.text(ctx, "mín. 6·10⁻⁸", pl.x(lo) + 4, b.y + 12, { size: 11, weight: 600, color: C.ink });
+    D.text(ctx, "máx. 65504", pl.x(hi) - 4, b.y + 12, { align: "right", size: 11, weight: 600, color: C.ink });
+    D.text(ctx, "underflow", pl.x(-12) + 6, b.y + b.h - 6, { size: 11, color: C.terracotaInk, weight: 600 });
   }
   view.draw(draw);
 

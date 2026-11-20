@@ -20,68 +20,103 @@
     <div>
       <p class="eyebrow">Curso 3 · Módulo 5 · Lección 5 de 8</p>
       <h1>El gradiente tiene que caber: ni infinito ni cero</h1>
-      <p class="lead">Con pesos iniciales mal escalados la señal explota o se apaga capa a capa. La inicialización He lo evita, el recorte frena los <code>nan</code> y el <em>loss scaling</em> rescata los gradientes diminutos de float16.</p>
-      <p class="meta-line"><span class="read-time" data-render="read-time"></span><a href="../modulo-5.html">Índice del módulo</a></p>
+      <p class="lead">Con pesos iniciales mal elegidos la señal explota o se apaga capa a capa. La inicialización He lo evita, el recorte frena los saltos locos y el <em>loss scaling</em> rescata los gradientes diminutos.</p>
+      <p class="meta-line"><span class="read-time" data-render="read-time"></span><a href="../modulo-5.html">Índice del módulo</a> · <a href="#chuleta">Ir a la chuleta</a></p>
     </div>
     <div class="hero-tile" aria-hidden="true"></div>
   </div>
 </header>
 <details class="predice">
-  <summary>Una red de 10 capas ReLU de 100 neuronas empieza con pesos de desviación típica 1,0. La señal que llega a la última capa, ¿es más grande, más pequeña o igual que la de entrada?<span class="hint"></span></summary>
+  <summary>Una red de 10 capas de 100 neuronas empieza con pesos de tamaño típico 1. La señal que llega a la última capa, ¿es más grande, más pequeña o igual que la de entrada?<span class="hint"></span></summary>
   <div>
-    <p><strong>Unas 300 millones de veces más grande.</strong> Cada capa multiplica el tamaño por \( \sqrt{100\cdot1/2}=7{,}07 \), y \( 7{,}07^{10}\approx3\cdot10^8 \). El gradiente recorre el mismo camino hacia atrás, así que también explota: <code>loss: nan</code> en pocos lotes.</p>
+    <p><strong>Unas 300 millones de veces más grande.</strong> Cada capa la multiplica por 7,07, y 7,07 diez veces seguidas da unos 3·10⁸. El gradiente hace el mismo camino hacia atrás: la pérdida sale <code>nan</code> («no es un número») en pocos lotes.</p>
   </div>
 </details>
 
 <section>
-<h2 id="idea">El gradiente tiene que caber: ni infinito ni cero</h2>
-<p>Imagina el sonido de una película pasando por 10 amplificadores seguidos. Si cada uno multiplica el volumen por 0,07, al final no se oye nada (<strong>se desvanece</strong>); si lo multiplica por 7, revientan los altavoces (<strong>explota</strong>). Solo con factor 1 llega tal cual. En una capa <code>Dense</code> con \( n \) entradas y ReLU, ese factor es:</p>
+<h2 id="idea">1 · Diez amplificadores seguidos</h2>
+<p>El sonido de una película pasa por 10 amplificadores. Si cada uno multiplica el volumen por 0,07, al final no se oye nada: la señal <strong>se desvanece</strong>. Si lo multiplica por 7, revientan los altavoces: <strong>explota</strong>. Solo con 1 llega tal cual. Con el gradiente pasa igual, hacia atrás.</p>
+<p>En una capa con <em>n</em> entradas y activación ReLU, el factor depende de σ, el tamaño típico de los pesos al nacer (su desviación típica):</p>
 <div class="formula">\[ \text{factor por capa}=\sqrt{\frac{n\,\sigma^2}{2}} \]</div>
-<p>donde \( \sigma^2 \) es la varianza de los pesos iniciales. Para que valga 1, \( \sigma^2=2/n \): es la inicialización <strong>He</strong> (<code>kernel_initializer="he_normal"</code>). La de serie, Glorot, está pensada para tanh y sigmoide; con ReLU encoge la señal un 30 % por capa.</p>
-<p>Si aun así la pérdida da <code>nan</code>, el cinturón de seguridad es <strong>recortar</strong> el gradiente antes de aplicarlo: <code>clipnorm=1.0</code> lo acorta sin cambiar su dirección, <code>clipvalue</code> recorta cada componente (y la dirección cambia) y <code>global_clipnorm</code> usa una sola norma para todas las capas. Solo actúa cuando el gradiente se pasa del umbral.</p>
-<p>El problema contrario aparece con la <strong>precisión mixta</strong>: en float16 un gradiente menor que unos \( 6\cdot10^{-8} \) se redondea a 0 y su peso no se mueve. El arreglo es el <em>loss scaling</em>: multiplicar la pérdida por \( S \) (todos los gradientes crecen \( S \) veces) y dividir entre \( S \) en float32 antes del paso.</p>
+<div class="anim-pasos" data-titulo="10 capas de 100 neuronas">
+  <div class="paso"><p><strong>Pesos diminutos, σ = 0,01.</strong> Factor 0,071 por capa.</p><span class="grande">0,071¹⁰ ≈ 3·10⁻¹²: se apaga</span></div>
+  <div class="paso"><p><strong>Pesos grandes, σ = 1.</strong> Factor 7,07.</p><span class="grande">7,07¹⁰ ≈ 3·10⁸: explota</span></div>
+  <div class="paso"><p><strong>Glorot, el de serie en Keras.</strong> Pensado para otras activaciones; con ReLU, factor 0,71.</p><span class="grande">0,71¹⁰ ≈ 0,031: encoge</span></div>
+  <div class="paso"><p><strong>He.</strong> Factor exacto 1. Keras lo mide en el laboratorio: 0,98.</p><span class="grande">1¹⁰ = 1</span></div>
+</div>
+</section>
+
+<section>
+<h2 id="he">2 · He: elegir el tamaño para que el factor sea 1</h2>
+<p>Para que la raíz valga 1 basta con σ² = 2/<em>n</em>. Esa es la <strong>inicialización He</strong>, y se pide en la capa con <code>kernel_initializer="he_normal"</code>.</p>
+<ul class="flow">
+  <li class="a">n = 100 ENTRADAS<small>por neurona</small></li>
+  <li class="b">σ² = 2/100<small>σ ≈ 0,14</small></li>
+  <li class="d">FACTOR 1<small>ni crece ni encoge</small></li>
+</ul>
+</section>
+
+<section>
+<h2 id="recorte">3 · El cinturón de seguridad: recortar</h2>
+<p>Si aun así sale <code>nan</code>, se <strong>recorta</strong> el gradiente antes de dar el paso. Su <strong>norma</strong> es su longitud: la de [3, 4] es 5. El recorte solo actúa si se pasa del límite.</p>
+<div class="anim-pasos" data-titulo="Un gradiente [3, 4] con límite 1">
+  <div class="paso"><p><strong>Sin recorte.</strong> Longitud 5: paso entero.</p><span class="grande">[3, 4]</span></div>
+  <div class="paso"><p><strong><code>clipnorm=1.0</code>.</strong> Lo encoge hasta longitud 1 sin cambiar la dirección.</p><span class="grande">[0,6 ; 0,8]</span></div>
+  <div class="paso"><p><strong><code>clipvalue=1.0</code>.</strong> Corta cada número a 1. La dirección cambia.</p><span class="grande">[1 ; 1]</span></div>
+  <div class="paso"><p><strong><code>global_clipnorm=1.0</code>.</strong> Si otro peso tiene gradiente [12], mide todo junto: √(9 + 16 + 144) = 13, y divide todo entre 13.</p><span class="grande">[12] → 0,923</span></div>
+</div>
 </section>
 
 <figure class="demo" data-demo="curso3/c3m5-clip-precipicio" data-titulo="Un precipicio en la pérdida: con y sin clipnorm">
-  <div class="haz">Empieza en \( w=3 \), contra la pared, y compara las dos trayectorias. Luego empieza en 2,2.</div>
+  <div class="haz">Empieza en w = 3, contra la pared, y compara las dos trayectorias. Luego empieza en 2,2.</div>
   <div class="observa">Sin recorte, un paso de 12 lanza el peso lejísimos; con <code>clipnorm</code> baja por la pared. Desde 2,2 el recorte solo frena.</div>
 </figure>
 
 <section>
-<h2 id="numeros">Con números: 10 capas de 100 neuronas</h2>
-<div class="callout ejemplo">
-  <span class="lbl">Ejemplo numérico</span>
-  <p>Con \( n=100 \) y ReLU, el factor por capa según la desviación σ de los pesos, y elevado a 10 capas (Glorot es el inicializador por defecto):</p>
-  <table>
-    <thead><tr><th>Pesos</th><th>Factor</th><th>10 capas</th></tr></thead>
-    <tbody>
-      <tr><td>σ = 0,01</td><td>0,071</td><td>\( 3\cdot10^{-12} \)</td></tr>
-      <tr><td>σ = 1,0</td><td>7,07</td><td>\( 3\cdot10^{8} \)</td></tr>
-      <tr><td>Glorot</td><td>0,71</td><td>0,031</td></tr>
-      <tr><td>He</td><td class="res">1,00</td><td class="res">1</td></tr>
-    </tbody>
-  </table>
-  <p>Medido con Keras (<a href="#frag-8">fragmento 8</a>): 2,5·10⁻¹², 2,5·10⁸, 0,024 y 0,98. La cuenta acierta el orden de magnitud.</p>
-</div>
+<h2 id="numeros">4 · El problema contrario: números que no caben</h2>
+<p>La <strong>precisión mixta</strong> calcula con <code>float16</code>, números de 16 bits: más rápidos y ligeros, pero con menos sitio. No caben más de 65504 (<em>overflow</em>: sale infinito) ni menos de unos 6·10⁻⁸ (<em>underflow</em>: sale 0). Un gradiente de 10⁻⁸ se vuelve 0 y su peso no se mueve.</p>
+<ul class="flow">
+  <li class="a">PÉRDIDA × S<small>S = 1024, por ejemplo</small></li>
+  <li class="b">GRADIENTES × S<small>ya caben en float16</small></li>
+  <li class="d">÷ S EN FLOAT32<small>el valor real, rescatado</small></li>
+</ul>
+<p>Eso es el <strong><em>loss scaling</em></strong>. Keras lo ajusta solo: si algún gradiente sale infinito, baja S.</p>
 </section>
 
 <figure class="demo" data-demo="curso3/c3m5-fp16" data-titulo="Loss scaling: rescatar gradientes del underflow">
   <div class="haz">Mira el porcentaje de ceros sin escalar y sube la escala <em>S</em>. Luego sube la magnitud a 10⁻³.</div>
-  <div class="observa">Sin escalar, el 15,7 % se vuelve 0; con \( S=2^{10} \), ninguno. Con \( S \) enorme aparecen <code>inf</code>.</div>
+  <div class="observa">Sin escalar, el 15,7 % se vuelve 0; con S = 2¹⁰, ninguno. Con S enorme aparecen <code>inf</code>.</div>
 </figure>
 
 <details class="predice">
-  <summary>Un gradiente de \( 10^{-8} \) en float16 es 0. Si multiplicas la pérdida por \( S=1024 \) y luego divides entre 1024, ¿recuperas el gradiente?<span class="hint"></span></summary>
+  <summary>Un gradiente de 10⁻⁸ en float16 es 0. Si multiplicas la pérdida por 1024 y luego divides entre 1024, ¿recuperas el gradiente?<span class="hint"></span></summary>
   <div>
-    <p><strong>Sí, casi exacto.</strong> \( 10^{-8}\cdot1024=1{,}024\cdot10^{-5} \) sí cabe en float16 (se guarda como 1,025·10⁻⁵); al dividir da \( 1{,}0012\cdot10^{-8} \), un error del 0,12 %. Pero si \( S \) es demasiado grande, los gradientes grandes pasan de 65504 y dan <code>inf</code>: por eso Keras ajusta \( S \) solo.</p>
+    <p><strong>Sí, casi exacto.</strong> 10⁻⁸ · 1024 ≈ 1,024·10⁻⁵ sí cabe; al dividir da 1,0012·10⁻⁸, un 0,12 % de error.</p>
   </div>
 </details>
+
+<section>
+<h2 id="chuleta">Chuleta para repasar</h2>
+<dl class="chuleta">
+  <div><dt>Explotar</dt><dd>La señal o el gradiente crece capa a capa hasta <code>nan</code>. <em>Factor 7,07.</em></dd></div>
+  <div><dt>Desvanecerse</dt><dd>Encoge capa a capa hasta casi 0: no aprende. <em>Factor 0,071.</em></dd></div>
+  <div><dt>Factor por capa</dt><dd>Raíz de n · σ² / 2, con ReLU.</dd></div>
+  <div><dt>He</dt><dd>Pesos con σ² = 2/n: factor 1. <em><code>"he_normal"</code>.</em></dd></div>
+  <div><dt>Glorot</dt><dd>El inicializador de serie; con ReLU encoge un 30 % por capa.</dd></div>
+  <div><dt>Norma</dt><dd>La longitud de un gradiente. <em>[3, 4] mide 5.</em></dd></div>
+  <div><dt><code>clipnorm</code></dt><dd>Encoge a una longitud máxima; conserva la dirección.</dd></div>
+  <div><dt><code>clipvalue</code></dt><dd>Corta cada número; cambia la dirección.</dd></div>
+  <div><dt><code>global_clipnorm</code></dt><dd>Una sola longitud para todos los pesos juntos.</dd></div>
+  <div><dt>float16</dt><dd>Números de 16 bits: hasta 65504 y desde unos 6·10⁻⁸.</dd></div>
+  <div><dt>Loss scaling</dt><dd>Multiplicar la pérdida por S y dividir los gradientes entre S.</dd></div>
+</dl>
+</section>
 
 <div class="resumen">
   <h2 class="sin-num sin-toc">En tres líneas</h2>
   <ul>
-    <li>Con ReLU, inicializa con He (\( \sigma^2=2/n \)): factor 1 por capa.</li>
-    <li><code>nan</code>: baja \( \eta \), usa He y añade <code>clipnorm</code> o <code>global_clipnorm</code> como cinturón.</li>
+    <li>Con ReLU, inicializa con He (σ² = 2/n): factor 1 por capa.</li>
+    <li>Si sale <code>nan</code>: baja el learning rate, usa He y añade <code>clipnorm</code> o <code>global_clipnorm</code>.</li>
     <li>En float16 los gradientes diminutos se vuelven 0: el <em>loss scaling</em> los rescata.</li>
   </ul>
 </div>
@@ -92,33 +127,32 @@
  "titulo": "¿Lo tienes?",
  "preguntas": [
   {
-   "q": "Una red tiene capas <code>Dense</code> con ReLU y 200 entradas por capa. ¿Qué desviación típica de los pesos iniciales conserva el tamaño de las activaciones de una capa a otra (inicialización He)?",
+   "q": "Una red tiene capas <code>Dense</code> con ReLU y 200 entradas por capa. ¿Qué tamaño típico (σ) de los pesos iniciales conserva la señal de una capa a otra (inicialización He)?",
    "opciones": ["0,01", "0,05", "1,0", "0,1"],
    "correcta": 3,
-   "porque": "El factor por capa es la raíz de (n·σ²/2), y vale 1 cuando σ² = 2/n. Con n = 200, σ² = 0,01 y σ = 0,1. Con σ = 0,01 el factor es 0,1 (la señal se apaga capa a capa y los gradientes se desvanecen), con 0,05 es 0,5 (también se encoge) y con 1,0 es 10 (explota)."
+   "porque": "El factor es la raíz de n·σ²/2, y vale 1 cuando σ² = 2/n. Con n = 200, σ² = 0,01 y σ = 0,1. Con 0,01 el factor es 0,1 (se apaga), con 0,05 es 0,5 (encoge) y con 1,0 es 10 (explota)."
   },
   {
-   "q": "Con <code>SGD(learning_rate=1.0, global_clipnorm=1.0)</code> se aplican dos gradientes a la vez: [3, 4] a la variable a y [12] a la variable b. ¿Cuánto vale el gradiente recortado de b?",
+   "q": "Con <code>SGD(learning_rate=1.0, global_clipnorm=1.0)</code> se aplican dos gradientes a la vez: [3, 4] al peso a y [12] al peso b. ¿Cuánto vale el gradiente recortado de b?",
    "opciones": ["1,0", "0,923", "0,2308", "12,0"],
    "correcta": 1,
-   "porque": "<code>global_clipnorm</code> calcula una sola norma con todos los gradientes: √(9 + 16 + 144) = 13, y como supera 1, los divide todos entre 13. El de b queda en 12/13 = 0,923 y el de a en [0,2308 ; 0,3077]. El 1,0 sería <code>clipnorm</code> (que recorta cada variable por separado) y el 12 es sin recorte."
+   "porque": "<code>global_clipnorm</code> mide todos juntos: √(9 + 16 + 144) = 13, y como pasa de 1, divide todo entre 13. El de b queda en 12/13 = 0,923. El 1,0 sería <code>clipnorm</code> (cada peso por separado) y el 12, sin recorte."
   },
   {
-   "q": "En precisión mixta (<code>mixed_float16</code>), ¿para qué sirve el escalado de la pérdida (loss scaling)?",
+   "q": "En precisión mixta, ¿para qué sirve el escalado de la pérdida (loss scaling)?",
    "opciones": [
     "Para que la pérdida valga más y el modelo aprenda más rápido.",
-    "Para que los gradientes muy pequeños no se conviertan en 0 al calcularlos en float16: se multiplican por una escala S y luego se dividen entre S en float32.",
+    "Para que los gradientes muy pequeños no se conviertan en 0 en float16: se multiplican por una escala S y luego se dividen entre S en float32.",
     "Para convertir los pesos de float32 a float16 sin perder precisión.",
-    "Para evitar el overflow de los gradientes grandes."
+    "Para evitar que los gradientes grandes se salgan del máximo."
    ],
    "correcta": 1,
-   "porque": "En float16 un gradiente de 10⁻⁸ se redondea a 0 (underflow) y su peso no se actualiza. Multiplicar la pérdida por S multiplica todos los gradientes por S (regla de la cadena) y los saca de esa zona; luego se desescalan en float32. No cambia la velocidad de aprendizaje, no convierte pesos (se guardan en float32) y de hecho una escala demasiado grande provoca overflow: por eso Keras la ajusta de forma dinámica (salta el paso y la reduce a la mitad si aparece <code>inf</code>)."
+   "porque": "En float16 un gradiente de 10⁻⁸ se redondea a 0 y su peso no se mueve. Multiplicar la pérdida por S multiplica todos los gradientes por S y los saca de esa zona; luego se dividen en float32. Una escala demasiado grande provoca justo el problema contrario: por eso Keras la ajusta sola."
   }
  ]
 }
 </script>
 </section>
-
 <details class="profundizar">
   <summary><span>Profundizar: la explicación completa<small>La escala de una capa a otra con la tabla medida, los inicializadores de Keras, los tres recortes con números, la demo del círculo y el cuadrado, normalizar frente a recortar y la precisión mixta en Keras 3.</small></span></summary>
   <div class="prof-body">
@@ -142,7 +176,7 @@
 <p>Si el factor es distinto de 1, la señal (y el gradiente, que recorre el mismo camino hacia atrás) crece o se encoge <strong>de forma exponencial</strong> con la profundidad. Con \( n=100 \) entradas en cada capa y 10 capas:</p>
 
 <table>
-  <caption>Predicción a mano frente a lo medido (fragmento 8, 10 capas ReLU de 100 neuronas)</caption>
+  <caption>Predicción a mano frente a lo medido (<a href="laboratorio.html#frag-8">fragmento 8</a>, 10 capas ReLU de 100 neuronas)</caption>
   <thead><tr><th>Inicializador</th><th>Varianza \( \sigma^2 \)</th><th>Factor por capa</th><th>Factor\( ^{10} \)</th><th>Desviación medida en la capa 10</th></tr></thead>
   <tbody>
     <tr><td><code>RandomNormal(stddev=0.01)</code></td><td>\( 10^{-4} \)</td><td>\( \sqrt{100\cdot10^{-4}/2}=0{,}071 \)</td><td>\( 3\cdot10^{-12} \)</td><td>2,5·10⁻¹²</td></tr>
@@ -155,7 +189,7 @@
 
 <div class="callout ejemplo">
   <span class="lbl">Ejemplo numérico · sigmoide: el gradiente de la capa 1 frente al de la capa 10</span>
-  <p>La última fila del fragmento 8 usa sigmoide con Glorot. La derivada de la sigmoide vale como mucho 0,25, así que cada capa multiplica el gradiente por una cifra pequeña. Medido: la norma del gradiente del <code>kernel</code> de la capa 10 es 0,52 y la de la capa 1, <strong>5,9·10⁻⁷</strong>: un millón de veces menos. Con ese gradiente la primera capa <strong>no aprende nada</strong>, aunque el entrenamiento no dé ningún error.</p>
+  <p>La última fila del <a href="laboratorio.html#frag-8">fragmento 8</a> usa sigmoide con Glorot. La derivada de la sigmoide vale como mucho 0,25, así que cada capa multiplica el gradiente por una cifra pequeña. Medido: la norma del gradiente del <code>kernel</code> de la capa 10 es 0,52 y la de la capa 1, <strong>5,9·10⁻⁷</strong>: un millón de veces menos. Con ese gradiente la primera capa <strong>no aprende nada</strong>, aunque el entrenamiento no dé ningún error.</p>
 </div>
 
 <h3>Los inicializadores de Keras</h3>
@@ -174,14 +208,14 @@
 
 <div class="callout ojo">
   <span class="lbl">Ojo · un inicializador creado antes de fijar la semilla no usa esa semilla</span>
-  <p>Al hacer los experimentos del fragmento 8 salió algo desconcertante: con <code>RandomNormal(stddev=0.01)</code> los resultados cambiaban de una ejecución a otra aunque usábamos <code>keras.utils.set_random_seed(0)</code>. La causa: el objeto inicializador se había creado <em>antes</em> de fijar la semilla y llevaba ya su propia semilla aleatoria. La solución es crear el inicializador <strong>después</strong> de <code>set_random_seed</code> (el fragmento lo hace con una función fábrica) o pasarle <code>seed=</code>.</p>
+  <p>Al hacer los experimentos del <a href="laboratorio.html#frag-8">fragmento 8</a> salió algo desconcertante: con <code>RandomNormal(stddev=0.01)</code> los resultados cambiaban de una ejecución a otra aunque usábamos <code>keras.utils.set_random_seed(0)</code>. La causa: el objeto inicializador se había creado <em>antes</em> de fijar la semilla y llevaba ya su propia semilla aleatoria. La solución es crear el inicializador <strong>después</strong> de <code>set_random_seed</code> (el fragmento lo hace con una función fábrica) o pasarle <code>seed=</code>.</p>
 </div>
 
 <h3>Cuando explota: recortar el gradiente</h3>
-<p>Si la pérdida se vuelve <code>nan</code>, un gradiente enorme ha lanzado los pesos a un valor absurdo. El remedio de urgencia es <strong>recortar</strong> el gradiente <em>antes</em> de aplicarlo. Keras lo hace dentro de <code>apply_gradients</code> con tres argumentos de cualquier optimizador. El fragmento 9 prueba cada uno con un gradiente \( g=[3,4] \), de norma \( \sqrt{9+16}=5 \):</p>
+<p>Si la pérdida se vuelve <code>nan</code>, un gradiente enorme ha lanzado los pesos a un valor absurdo. El remedio de urgencia es <strong>recortar</strong> el gradiente <em>antes</em> de aplicarlo. Keras lo hace dentro de <code>apply_gradients</code> con tres argumentos de cualquier optimizador. El <a href="laboratorio.html#frag-9">fragmento 9</a> prueba cada uno con un gradiente \( g=[3,4] \), de norma \( \sqrt{9+16}=5 \):</p>
 
 <table>
-  <caption>Tres tipos de recorte con \( g=[3,4] \) (salida del fragmento 9)</caption>
+  <caption>Tres tipos de recorte con \( g=[3,4] \) (salida del <a href="laboratorio.html#frag-9">fragmento 9</a>)</caption>
   <thead><tr><th>Argumento</th><th>Regla</th><th>Resultado</th><th>Dirección</th></tr></thead>
   <tbody>
     <tr><td><em>(ninguno)</em></td><td>—</td><td>[3, 4]</td><td>la original</td></tr>
@@ -199,9 +233,9 @@
 </figure>
 
 <h3>Un entrenamiento que explota de verdad</h3>
-<p>El fragmento 9 construye una red de 6 capas ocultas con pesos iniciales demasiado grandes (<code>RandomNormal(stddev=1.0)</code>), le pone \( \eta=0{,}01 \) y entrena 15 épocas:</p>
+<p>El <a href="laboratorio.html#frag-9">fragmento 9</a> construye una red de 6 capas ocultas con pesos iniciales demasiado grandes (<code>RandomNormal(stddev=1.0)</code>), le pone \( \eta=0{,}01 \) y entrena 15 épocas:</p>
 <table>
-  <caption>Pérdida de la época 1, la 5 y la 15 (fragmento 9)</caption>
+  <caption>Pérdida de la época 1, la 5 y la 15 (<a href="laboratorio.html#frag-9">fragmento 9</a>)</caption>
   <thead><tr><th>Configuración</th><th>Época 1</th><th>Época 5</th><th>Época 15</th></tr></thead>
   <tbody>
     <tr><td>sin recorte</td><td class="res"><code>nan</code></td><td><code>nan</code></td><td><code>nan</code></td></tr>
@@ -218,7 +252,7 @@
 </div>
 
 <h3>Normalizar el gradiente no es lo mismo que recortarlo</h3>
-<p>La <strong>normalización de gradientes</strong> divide <em>siempre</em> el gradiente por su norma, \( g\leftarrow g/\lVert g\rVert \), de modo que el paso tenga siempre longitud \( \eta \) (una idea emparentada con la de optimizadores para lotes enormes como LARS y LAMB). El <strong>recorte</strong> solo actúa cuando \( \lVert g\rVert \) pasa del umbral. La diferencia es crucial cuando el gradiente es <em>pequeño</em>, que es lo que pasa cerca del mínimo. El fragmento 9 lo muestra con dos gradientes de la misma dirección:</p>
+<p>La <strong>normalización de gradientes</strong> divide <em>siempre</em> el gradiente por su norma, \( g\leftarrow g/\lVert g\rVert \), de modo que el paso tenga siempre longitud \( \eta \) (una idea emparentada con la de optimizadores para lotes enormes como LARS y LAMB). El <strong>recorte</strong> solo actúa cuando \( \lVert g\rVert \) pasa del umbral. La diferencia es crucial cuando el gradiente es <em>pequeño</em>, que es lo que pasa cerca del mínimo. El <a href="laboratorio.html#frag-9">fragmento 9</a> lo muestra con dos gradientes de la misma dirección:</p>
 <table>
   <thead><tr><th>Gradiente</th><th>Recortado (<code>clipnorm=1</code>)</th><th>Normalizado (<code>l2_normalize</code>)</th></tr></thead>
   <tbody>
@@ -237,7 +271,7 @@
 
 <p class="pregunta">Una GPU moderna hace cuentas con números de 16 bits mucho más deprisa (y con la mitad de memoria) que con 32. ¿Por qué no entrenamos todo en 16 bits? ¿Qué se rompe?</p>
 
-<p>Un número de <strong>float32</strong> usa 32 bits y cubre magnitudes de unos \( 10^{-38} \) a \( 3{,}4\cdot10^{38} \). Un <strong>float16</strong> usa 16 y solo llega de \( 6{,}1\cdot10^{-5} \) (el menor «normal»; por debajo pierde precisión hasta \( \approx6\cdot10^{-8} \)) a <strong>65504</strong>. Pasarse por arriba da <code>inf</code> (<em>overflow</em>) y quedarse por debajo da 0 (<em>underflow</em>). El fragmento 15 lo comprueba:</p>
+<p>Un número de <strong>float32</strong> usa 32 bits y cubre magnitudes de unos \( 10^{-38} \) a \( 3{,}4\cdot10^{38} \). Un <strong>float16</strong> usa 16 y solo llega de \( 6{,}1\cdot10^{-5} \) (el menor «normal»; por debajo pierde precisión hasta \( \approx6\cdot10^{-8} \)) a <strong>65504</strong>. Pasarse por arriba da <code>inf</code> (<em>overflow</em>) y quedarse por debajo da 0 (<em>underflow</em>). El <a href="laboratorio.html#frag-15">fragmento 15</a> lo comprueba:</p>
 <table>
   <thead><tr><th>Operación en NumPy</th><th>Resultado</th></tr></thead>
   <tbody>
@@ -270,7 +304,7 @@
 </div>
 
 <h3>En Keras 3</h3>
-<p>Basta una línea antes de crear el modelo: <code>keras.mixed_precision.set_global_policy("mixed_float16")</code>. Con ella, cada capa <strong>calcula en float16 pero guarda sus pesos en float32</strong> (el fragmento 15: <code>compute_dtype = float16</code>, <code>kernel.dtype = float32</code>), de modo que las actualizaciones pequeñas no se pierden. Al compilar, Keras envuelve tu optimizador en un <code>LossScaleOptimizer</code> con escala dinámica: parte de \( 2^{15}=32768 \) y la dobla tras 2000 pasos sin overflow (<code>dynamic_growth_steps</code>). Tras 5 épocas = 35 pasos la escala sigue en 32768 y lleva 35 pasos buenos seguidos: no hubo ningún <code>inf</code>.</p>
+<p>Basta una línea antes de crear el modelo: <code>keras.mixed_precision.set_global_policy("mixed_float16")</code>. Con ella, cada capa <strong>calcula en float16 pero guarda sus pesos en float32</strong> (el <a href="laboratorio.html#frag-15">fragmento 15</a>: <code>compute_dtype = float16</code>, <code>kernel.dtype = float32</code>), de modo que las actualizaciones pequeñas no se pierden. Al compilar, Keras envuelve tu optimizador en un <code>LossScaleOptimizer</code> con escala dinámica: parte de \( 2^{15}=32768 \) y la dobla tras 2000 pasos sin overflow (<code>dynamic_growth_steps</code>). Tras 5 épocas = 35 pasos la escala sigue en 32768 y lleva 35 pasos buenos seguidos: no hubo ningún <code>inf</code>.</p>
 
 <div class="callout ojo">
   <span class="lbl">Ojo · tres detalles de la precisión mixta</span>
@@ -285,171 +319,11 @@
   </div>
 </details>
 
-<section>
+<section class="ir-lab">
 <h2 class="sin-num">Código</h2>
-<!-- ---------- Fragmento 8 ---------- -->
-<article class="snippet" data-lang="python" id="frag-8">
-  <header>
-    <h3>8 · Inicializadores y gradientes en una red de 10 capas</h3>
-    <p class="para-que"><strong>Para qué sirve</strong> Mide cómo cambia el tamaño de las activaciones y de los gradientes capa a capa según el inicializador y la activación, y comprueba la regla del factor por capa.</p>
-  </header>
-  <pre class="code"><code>import numpy as np
-import tensorflow as tf
-import keras
-
-rng = np.random.default_rng(0)
-X = rng.normal(size=(512, 100)).astype("float32")           # entrada con desviación típica 1
-y = rng.normal(size=(512, 1)).astype("float32")
-
-def probar(nombre, fabrica, activacion="relu", capas=10):
-    keras.utils.set_random_seed(0)
-    init = fabrica()                                          # el inicializador se crea DESPUÉS de fijar la semilla
-    modelo = keras.Sequential([keras.Input(shape=(100,))] +
-                              [keras.layers.Dense(100, activation=activacion, kernel_initializer=init) for _ in range(capas)] +
-                              [keras.layers.Dense(1)])
-    # desviación típica de la activación de cada capa oculta
-    h, stds = X, []
-    for capa in modelo.layers[:-1]:
-        h = capa(h)
-        stds.append(float(np.std(h.numpy())))
-    # norma del gradiente del kernel de la primera y de la última capa oculta
-    with tf.GradientTape() as cinta:
-        perdida = tf.reduce_mean(tf.square(modelo(X) - y))
-    g = cinta.gradient(perdida, [modelo.layers[0].kernel, modelo.layers[capas - 1].kernel])
-    g1, g10 = [float(tf.norm(v)) for v in g]
-    print(f"{nombre:&lt;24}{stds[0]:&gt;9.3g}{stds[4]:&gt;10.3g}{stds[-1]:&gt;10.3g} |{g1:&gt;10.3g}{g10:&gt;10.3g}")
-
-print(f"{'inicializador':&lt;24}{'std c.1':&gt;9}{'std c.5':&gt;10}{'std c.10':&gt;10} |{'grad c.1':&gt;10}{'grad c.10':&gt;10}")
-probar("RandomNormal(0.01)", lambda: keras.initializers.RandomNormal(stddev=0.01))
-probar("RandomNormal(1.0)", lambda: keras.initializers.RandomNormal(stddev=1.0))
-probar("GlorotUniform (defecto)", lambda: "glorot_uniform")
-probar("HeNormal", lambda: "he_normal")
-probar("sigmoid + Glorot", lambda: "glorot_uniform", activacion="sigmoid")</code></pre>
-  <details class="linea-a-linea" open>
-    <summary>Línea por línea</summary>
-    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
-    <table class="lineas">
-      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
-      <tbody>
-        <tr data-lines="1-3"><td><code>import numpy as np …</code></td><td>Importaciones: NumPy, TensorFlow (para la cinta) y Keras.</td></tr>
-        <tr data-lines="5-7"><td><code>rng = np.random.default_rng(0) …</code></td><td>512 muestras de 100 variables con desviación típica 1 como entrada y una salida aleatoria como objetivo (no importa que no tenga sentido: solo medimos escalas).</td></tr>
-        <tr data-lines="9-11"><td><code>def probar(nombre, fabrica, activacion="relu", capas=10): …</code></td><td><code>probar</code> recibe un nombre, una <em>función fábrica</em> del inicializador, la activación y el número de capas. Fija la semilla y <strong>después</strong> crea el inicializador (si se creara antes llevaría su propia semilla y la ejecución no sería repetible).</td></tr>
-        <tr data-lines="12-14"><td><code>modelo = keras.Sequential([keras.Input(shape=(100,))] + …</code></td><td>Construye 10 capas <code>Dense(100)</code> con esa activación e inicializador y una salida lineal.</td></tr>
-        <tr data-lines="15-19"><td><code># desviación típica de la activación de cada capa oculta …</code></td><td>Pasa los datos capa a capa y guarda la desviación típica de cada activación. <code>modelo.layers[:-1]</code> son las 10 capas ocultas.</td></tr>
-        <tr data-lines="20-24"><td><code># norma del gradiente del kernel de la primera y de la última capa … …</code></td><td>Con una cinta calcula la pérdida (MSE con el objetivo) y la norma del gradiente del <code>kernel</code> de la primera y de la décima capa oculta (<code>tf.norm</code>).</td></tr>
-        <tr data-lines="25"><td><code>print(f"{nombre:&lt;24}{stds[0]:&gt;9.3g}{stds[4]:&gt;10.3g}{stds[-1]:&gt;10.3g…</code></td><td>Imprime una fila: desviación en las capas 1, 5 y 10 y normas de los dos gradientes.</td></tr>
-        <tr data-lines="27"><td><code>print(f"{'inicializador':&lt;24}{'std c.1':&gt;9}{'std c.5':&gt;10}{'std c.1…</code></td><td>Cabecera de la tabla.</td></tr>
-        <tr data-lines="28-29"><td><code>probar("RandomNormal(0.01)", lambda: keras.initializers.RandomNorma… …</code></td><td>Pesos normales con desviación 0,01 (demasiado pequeña) y con 1,0 (demasiado grande).</td></tr>
-        <tr data-lines="30-31"><td><code>probar("GlorotUniform (defecto)", lambda: "glorot_uniform") …</code></td><td>El inicializador por defecto de Keras (Glorot uniforme) y He normal, ambos con ReLU.</td></tr>
-        <tr data-lines="32"><td><code>probar("sigmoid + Glorot", lambda: "glorot_uniform", activacion="si…</code></td><td>Sigmoide con Glorot, para ver el desvanecimiento clásico.</td></tr>
-      </tbody>
-    </table>
-  </details>
-  <div class="salida">
-    <strong>Salida esperada</strong>
-    <pre>inicializador             std c.1   std c.5  std c.10 |  grad c.1 grad c.10
-RandomNormal(0.01)         0.0593  1.53e-06  2.53e-12 |  5.12e-11  4.06e-11
-RandomNormal(1.0)            5.93  1.53e+04  2.53e+08 |  2.33e+16  2.77e+17
-GlorotUniform (defecto)     0.587     0.126    0.0242 |    0.0535    0.0693
-HeNormal                    0.825     0.811     0.976 |      4.78      74.2
-sigmoid + Glorot            0.209     0.106     0.113 |  5.92e-07     0.522</pre>
-    <p>Con pesos de desviación 0,01 la señal cae a 2,5·10⁻¹² en la capa 10 y los gradientes valen 10⁻¹¹: no aprende. Con desviación 1 explota a 2,5·10⁸ (gradientes de 2·10¹⁶ y 3·10¹⁷). Con Glorot y ReLU baja de 0,59 a 0,024: la señal se encoge, aunque sin llegar al desastre. Con <strong>He se mantiene en 0,83 → 0,81 → 0,98</strong>. Y con sigmoide el gradiente de la capa 1 (5,9·10⁻⁷) es un millón de veces menor que el de la capa 10 (0,52). Compara con la tabla de predicciones del texto: los factores por capa 0,071, 7,07, 0,71 y 1 dan 3·10⁻¹², 3·10⁸, 0,031 y 1.</p>
-  </div>
-</article>
-<!-- ---------- Fragmento 9 ---------- -->
-<article class="snippet" data-lang="python" id="frag-9">
-  <header>
-    <h3>9 · Recorte de gradientes: clipnorm, clipvalue, global_clipnorm y normalización</h3>
-    <p class="para-que"><strong>Para qué sirve</strong> Aplica los tres tipos de recorte a un gradiente conocido, entrena una red que explota con y sin recorte, y compara recortar con normalizar.</p>
-  </header>
-  <pre class="code"><code>import numpy as np
-import tensorflow as tf
-import keras
-
-# 1) Qué hace cada tipo de recorte con un gradiente [3, 4] (norma 5), con lr = 1 para ver el paso entero
-def un_paso(**kw):
-    w = keras.Variable([0.0, 0.0])
-    keras.optimizers.SGD(learning_rate=1.0, **kw).apply_gradients([(tf.constant([3.0, 4.0]), w)])
-    return [round(float(v), 4) for v in -w.numpy()]       # el paso dado = -(nuevo w)
-
-print("sin recorte        :", un_paso())
-print("clipnorm=1.0       :", un_paso(clipnorm=1.0), "-&gt; misma dirección, norma 1")
-print("clipvalue=1.0      :", un_paso(clipvalue=1.0), "-&gt; cada componente a ±1: dirección distinta")
-
-# 2) Dos variables: clipnorm recorta cada una por separado; global_clipnorm mira todas juntas
-def dos_vars(**kw):
-    a, b = keras.Variable([0.0, 0.0]), keras.Variable([0.0])
-    keras.optimizers.SGD(learning_rate=1.0, **kw).apply_gradients(
-        [(tf.constant([3.0, 4.0]), a), (tf.constant([12.0]), b)])
-    return [round(float(v), 4) for v in -a.numpy()], [round(float(v), 4) for v in -b.numpy()]
-
-print("clipnorm=1.0       :", dos_vars(clipnorm=1.0))
-print("global_clipnorm=1.0:", dos_vars(global_clipnorm=1.0), "(norma global = raíz(9+16+144) = 13)")
-
-# 3) Un entrenamiento que explota: 6 capas ocultas con pesos iniciales demasiado grandes (std = 1)
-rng = np.random.default_rng(0)
-X = rng.normal(size=(200, 4)).astype("float32")
-y = (X @ np.array([1.0, -2.0, 0.5, 3.0], dtype="float32")).reshape(-1, 1)
-
-def entrenar(**kw):
-    keras.utils.set_random_seed(0)
-    capas = [keras.Input(shape=(4,))]
-    for _ in range(6):
-        capas.append(keras.layers.Dense(16, activation="relu",
-                                        kernel_initializer=keras.initializers.RandomNormal(stddev=1.0)))
-    capas.append(keras.layers.Dense(1))
-    m = keras.Sequential(capas)
-    m.compile(optimizer=keras.optimizers.SGD(learning_rate=0.01, **kw), loss="mse")
-    h = m.fit(X, y, epochs=15, batch_size=20, shuffle=False, verbose=0)
-    return [float(v) for v in h.history["loss"]]
-
-for nombre, kw in [("sin recorte", {}), ("clipnorm=1.0", {"clipnorm": 1.0}), ("clipvalue=0.1", {"clipvalue": 0.1})]:
-    l = entrenar(**kw)
-    print(f"{nombre:&lt;14} loss época 1: {l[0]:&gt;9.4g} | época 5: {l[4]:&gt;9.4g} | época 15: {l[-1]:&gt;9.4g}")
-
-# 4) Normalizar el gradiente (siempre a norma 1) frente a recortarlo (solo si pasa de 1)
-print()
-for v in ([3.0, 4.0], [0.03, 0.04]):
-    g = tf.constant(v)
-    print("g =", g.numpy(), "| recortado a norma 1:", tf.clip_by_norm(g, 1.0).numpy().round(3), "| normalizado:", tf.math.l2_normalize(g).numpy().round(3))</code></pre>
-  <details class="linea-a-linea" open>
-    <summary>Línea por línea</summary>
-    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
-    <table class="lineas">
-      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
-      <tbody>
-        <tr data-lines="1-3"><td><code>import numpy as np …</code></td><td>Importaciones.</td></tr>
-        <tr data-lines="5-9"><td><code># 1) Qué hace cada tipo de recorte con un gradiente [3, 4] (norma 5… …</code></td><td><code>un_paso(**kw)</code> aplica <strong>un</strong> paso de SGD con \( \eta=1 \) y gradiente \( [3,4] \) a una variable \( [0,0] \), con los argumentos de recorte que le pasemos (<code>**kw</code>), y devuelve el paso dado (menos el nuevo valor, para verlo en positivo). Con \( \eta=1 \) el paso es igual al gradiente recortado.</td></tr>
-        <tr data-lines="11-13"><td><code>print("sin recorte        :", un_paso()) …</code></td><td>Sin recorte, con <code>clipnorm=1.0</code> (reduce la norma, 5, a 1) y con <code>clipvalue=1.0</code> (cada componente a como mucho 1).</td></tr>
-        <tr data-lines="15-20"><td><code># 2) Dos variables: clipnorm recorta cada una por separado; global_… …</code></td><td><code>dos_vars</code>: dos variables, <code>a</code> con gradiente \( [3,4] \) y <code>b</code> con \( [12] \), para comparar el recorte por variable y el global.</td></tr>
-        <tr data-lines="22-23"><td><code>print("clipnorm=1.0       :", dos_vars(clipnorm=1.0)) …</code></td><td><code>clipnorm</code> recorta cada variable por separado; <code>global_clipnorm</code> calcula una sola norma con todas (\( \sqrt{9+16+144}=13 \)) y reduce todos los gradientes por el mismo factor.</td></tr>
-        <tr data-lines="25-28"><td><code># 3) Un entrenamiento que explota: 6 capas ocultas con pesos inicia… …</code></td><td>Datos para una red que va a explotar: 200 muestras de 4 variables y una etiqueta que es una combinación lineal de ellas.</td></tr>
-        <tr data-lines="30-31"><td><code>def entrenar(**kw): …</code></td><td><code>entrenar(**kw)</code>: recibe los argumentos de recorte del optimizador y fija la semilla.</td></tr>
-        <tr data-lines="32-36"><td><code>capas = [keras.Input(shape=(4,))] …</code></td><td>Construye la red: una entrada, <strong>6 capas ocultas</strong> de 16 neuronas ReLU con pesos iniciales de desviación 1 (demasiado grandes a propósito) y una salida lineal.</td></tr>
-        <tr data-lines="37-38"><td><code>m = keras.Sequential(capas) …</code></td><td>Crea el modelo y lo compila con SGD a 0,01 y los argumentos de recorte, con pérdida MSE.</td></tr>
-        <tr data-lines="39-40"><td><code>h = m.fit(X, y, epochs=15, batch_size=20, shuffle=False, verbose=0) …</code></td><td>Entrena 15 épocas con lotes de 20, sin barajar (para repetir exactamente) y devuelve la pérdida de cada época.</td></tr>
-        <tr data-lines="42-44"><td><code>for nombre, kw in [("sin recorte", {}), ("clipnorm=1.0", {"clipnorm… …</code></td><td>Tres configuraciones: sin recorte, con <code>clipnorm=1.0</code> y con <code>clipvalue=0.1</code>. Imprime la pérdida de las épocas 1, 5 y 15 con <code>:&gt;9.4g</code> (formato compacto de 4 cifras).</td></tr>
-        <tr data-lines="46-47"><td><code># 4) Normalizar el gradiente (siempre a norma 1) frente a recortarl… …</code></td><td>Parte 4: normalizar frente a recortar. Línea en blanco y comentario.</td></tr>
-        <tr data-lines="48-50"><td><code>for v in ([3.0, 4.0], [0.03, 0.04]): …</code></td><td>Para dos gradientes con la misma dirección y distinta norma (5 y 0,05), calcula el recortado con <code>tf.clip_by_norm</code> (lo que hace <code>clipnorm</code>) y el normalizado con <code>tf.math.l2_normalize</code> (divide siempre entre la norma).</td></tr>
-      </tbody>
-    </table>
-  </details>
-  <div class="salida">
-    <strong>Salida esperada</strong>
-    <pre>sin recorte        : [3.0, 4.0]
-clipnorm=1.0       : [0.6, 0.8] -&gt; misma dirección, norma 1
-clipvalue=1.0      : [1.0, 1.0] -&gt; cada componente a ±1: dirección distinta
-clipnorm=1.0       : ([0.6, 0.8], [1.0])
-global_clipnorm=1.0: ([0.2308, 0.3077], [0.9231]) (norma global = raíz(9+16+144) = 13)
-sin recorte    loss época 1:       nan | época 5:       nan | época 15:       nan
-clipnorm=1.0   loss época 1:      6456 | época 5:     548.7 | época 15:     78.75
-clipvalue=0.1  loss época 1:      7716 | época 5:      2020 | época 15:     165.3
-
-g = [3. 4.] | recortado a norma 1: [0.6 0.8] | normalizado: [0.6 0.8]
-g = [0.03 0.04] | recortado a norma 1: [0.03 0.04] | normalizado: [0.6 0.8]</pre>
-    <p>Las primeras tres líneas: \( g=[3,4] \) sin recorte da [3, 4]; <code>clipnorm</code> lo reduce a [0,6 ; 0,8] (<strong>misma dirección</strong>, norma 1) y <code>clipvalue</code> a [1 ; 1] (la dirección cambia). Las dos siguientes: el recorte por variable da \( b \to 1 \) y el global \( b \to 0{,}9231 \) con \( a \to [0{,}2308;\,0{,}3077] \) (todos divididos entre 13). La red con pesos grandes: sin recorte la pérdida ya es <code>nan</code> en la primera época; con <code>clipnorm=1.0</code> pasa de 6456 a 548,7 y 78,75; con <code>clipvalue=0.1</code> de 7716 a 2020 y 165,3: decrece sin explotar. Al final: con un gradiente grande, recortar y normalizar dan lo mismo ([0,6 ; 0,8]), pero con uno de norma 0,05 el recorte no toca nada y la normalización lo multiplica por 20.</p>
-  </div>
-</article>
+<a class="lab-card" href="laboratorio.html#paso-5"><span class="lc-ico" aria-hidden="true">🧪</span>
+  <span><strong>Ver el código de esta lección en el Laboratorio</strong>
+  <span>Paso 5 · Pesos iniciales: medir capa a capa si la señal explota o se apaga. En «Más código», los fragmentos 9 (recorte) y 15 (precisión mixta).</span></span></a>
 </section>
 
 </div>

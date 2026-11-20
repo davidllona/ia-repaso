@@ -69,9 +69,9 @@ Lab.register("curso3/c3m5-bucle-paso", function (root, api) {
     for (j = 0; j < PH.length; j++) {
       var on = S.ph === j, done = S.ph > j;
       D.rect(ctx, bx.x + j * cw + 2, 6, cw - 4, 20, on ? C.terracota : (done ? C.olivaWash : C.surface), on ? C.ink : C.line, on ? 2 : 1);
-      D.text(ctx, (j + 1) + " " + PH[j], bx.x + j * cw + cw / 2, 20, { align: "center", size: w < 420 ? 10 : 11.5, weight: on ? 700 : 500, color: on ? C.paper : C.ink2, mono: true });
+      D.text(ctx, (j + 1) + " " + PH[j], bx.x + j * cw + cw / 2, 20, { align: "center", size: w < 420 ? 11 : 11.5, weight: on ? 700 : 500, color: on ? C.paper : C.ink2, mono: true });
     }
-    D.text(ctx, "discontinua: y = 2x + 1 (la nota «real»)", bx.x + 6, bx.y + 14, { size: 10.5, color: C.muted });
+    D.text(ctx, "discontinua: y = 2x + 1 (la nota «real»)", bx.x + 6, bx.y + 14, { size: 11, color: C.muted });
     D.text(ctx, "y = " + f2(S.w) + "·x + " + f2(S.b), bx.x + bx.w - 6, bx.y + bx.h - 8, { align: "right", size: 12, color: C.cobaltoInk, weight: 600, mono: true });
   }
   function drawB(ctx, w, h, C) {
@@ -80,7 +80,7 @@ Lab.register("curso3/c3m5-bucle-paso", function (root, api) {
     var pts = S.hist.map(function (v, k) { return [pB.x(k + 1), pB.y(v)]; });
     D.path(ctx, pts, C.cobalto, 2.4);
     S.hist.forEach(function (v, k) { D.circle(ctx, pB.x(k + 1), pB.y(v), 3.5, C.cobalto); });
-    D.text(ctx, "Mean.result() al acabar cada época", pB.box.x + pB.box.w - 4, pB.box.y + 12, { align: "right", size: 10.5, color: C.muted });
+    D.text(ctx, "Mean.result() al acabar cada época", pB.box.x + pB.box.w - 4, pB.box.y + 12, { align: "right", size: 11, color: C.muted });
   }
   vA.draw(drawA); vB.draw(drawB);
 

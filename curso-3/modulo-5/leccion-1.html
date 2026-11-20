@@ -20,70 +20,124 @@
     <div>
       <p class="eyebrow">Curso 3 · Módulo 5 · Lección 1 de 8</p>
       <h1>Entrenar a mano: cinco piezas que se repiten en cada lote</h1>
-      <p class="lead">Dentro de <code>fit</code> hay un bucle que repite lo mismo por cada lote: grabar la predicción en la cinta, pedir los gradientes, dárselos al optimizador y anotar la pérdida. Si lo escribes tú, controlas cada paso.</p>
-      <p class="meta-line"><span class="read-time" data-render="read-time"></span><a href="../modulo-5.html">Índice del módulo</a></p>
+      <p class="lead">Dentro de <code>fit</code> hay un bucle que repite lo mismo con cada trozo de datos: predecir, medir el fallo, calcular hacia dónde corregir, corregir y apuntar. Si lo escribes tú, controlas cada paso.</p>
+      <p class="meta-line"><span class="read-time" data-render="read-time"></span><a href="../modulo-5.html">Índice del módulo</a> · <a href="#chuleta">Ir a la chuleta</a></p>
     </div>
     <div class="hero-tile" aria-hidden="true"></div>
   </div>
 </header>
 <details class="predice">
-  <summary>Netflix entrena con <code>model.fit</code> un modelo que predice la nota que pondrás a una película. Si quitas <code>fit</code> y lo escribes tú, ¿cuántas líneas son «aprendizaje de verdad» y cuántas son contabilidad (lotes, épocas, medias)?<span class="hint"></span></summary>
+  <summary>Netflix entrena con <code>fit</code> un modelo que predice la nota que pondrás a una película. Si quitas <code>fit</code> y lo escribes tú, ¿cuántas líneas son «aprender de verdad» y cuántas son llevar las cuentas?<span class="hint"></span></summary>
   <div>
-    <p>El aprendizaje de verdad son <strong>cuatro líneas</strong>: calcular la predicción y la pérdida dentro de la cinta, pedir los gradientes y dárselos al optimizador. Todo lo demás (recorrer lotes, contar épocas, promediar la pérdida) es organización.</p>
+    <p><strong>Cuatro líneas</strong>: predecir y medir el fallo grabando, pedir los gradientes y dárselos al optimizador. Lo demás es llevar las cuentas.</p>
   </div>
 </details>
 
 <section>
-<h2 id="idea">Lo que <code>fit</code> repite miles de veces</h2>
-<p>Piensa en <code>fit</code> como el botón <strong>«Reproducir»</strong>: lo pulsas y la serie se ve sola. Es perfecto mientras quieras verla tal cual. Pero si quieres dos optimizadores, una pérdida rara o entrenar dos redes por turnos (una GAN), necesitas controlar el reproductor por dentro. Y por dentro, para cada lote, hay siempre estas cinco piezas:</p>
+<h2 id="idea">1 · Lo que hay detrás de «Reproducir»</h2>
+<p><code>fit</code> es el botón «Reproducir»: lo pulsas y el modelo aprende solo. Para algo raro (dos redes por turnos, una pérdida inventada) hay que abrir el reproductor.</p>
+<p>Los datos se reparten en <strong>lotes</strong>: trozos de, por ejemplo, 32 usuarios. Una <strong>época</strong> es una vuelta a todos los lotes. En cada lote se repite lo mismo:</p>
 <ul class="flow">
-  <li class="a">1 · CINTA<small>with tf.GradientTape()</small></li>
-  <li class="b">2 · FORWARD Y PÉRDIDA<small>modelo(x, training=True)</small></li>
-  <li class="c">3 · GRADIENTES<small>cinta.gradient(…, variables)</small></li>
-  <li class="d">4 · ACTUALIZAR<small>optimizer.apply_gradients</small></li>
-  <li class="a">5 · MÉTRICA<small>Mean.update_state(pérdida)</small></li>
+  <li class="a">ÉPOCA<small>una vuelta a todos los datos</small></li>
+  <li class="b">LOTE<small>32 usuarios cada vez</small></li>
+  <li class="c">5 PIEZAS<small>se repiten en cada lote</small></li>
 </ul>
-<p>Tres detalles causan casi todos los errores. <strong>El forward va dentro del <code>with</code></strong>: solo se graba lo que pasa dentro. <strong><code>training=True</code></strong>: sin él, <code>Dropout</code> no apaga nada y entrenas otro modelo distinto del que usarás. Y <strong><code>zip(grads, variables)</code></strong>: si una variable no está conectada a la pérdida, su gradiente es <code>None</code> y Keras 3 solo avisa; esa variable se queda quieta todo el entrenamiento.</p>
-<p>¿Por qué <code>apply_gradients</code> y no restar a mano? Porque el optimizador también guarda su estado (momentum, medias de Adam) y cuenta los pasos: cambiar de SGD a Adam es cambiar una línea.</p>
-<div class="callout regla">
-  <span class="lbl">Regla fácil</span>
-  <p><strong>Usa lo más simple que baste:</strong> <code>fit</code> con callbacks; si solo cambia lo que se calcula en cada lote, <code>train_step</code>; un bucle propio solo cuando el entrenamiento no es «un lote, una pérdida, un optimizador».</p>
+</section>
+
+<section>
+<h2 id="piezas">2 · Las cinco piezas</h2>
+<p>Dos palabras antes. La <strong>pérdida</strong> es un número que mide cuánto falla el modelo: cuanto más bajo, mejor. El <strong>gradiente</strong> dice, para cada peso, hacia dónde sube esa pérdida; el modelo irá en sentido contrario.</p>
+<div class="anim-pasos" data-titulo="Lo que pasa con cada lote">
+  <div class="paso"><p><strong>1. Encender la cinta.</strong> <code>tf.GradientTape</code> es una grabadora de las cuentas hechas dentro de su bloque <code>with</code>.</p><span class="grande">● REC</span></div>
+  <div class="paso"><p><strong>2. Predecir y medir.</strong> El modelo predice el lote (el <em>forward</em>, «hacia delante») y se calcula la pérdida, grabando.</p><span class="grande">predicción → pérdida</span></div>
+  <div class="paso"><p><strong>3. Rebobinar.</strong> <code>cinta.gradient</code> recorre la grabación hacia atrás y da un gradiente por peso.</p><span class="grande">un gradiente por peso</span></div>
+  <div class="paso"><p><strong>4. Corregir.</strong> El <strong>optimizador</strong>, la regla que mueve los pesos, da un paso con <code>apply_gradients</code>.</p><span class="grande">peso − paso × gradiente</span></div>
+  <div class="paso"><p><strong>5. Apuntar.</strong> La <strong>métrica</strong> <code>Mean</code> es una libreta que hace la media de la época. No toca el modelo.</p><span class="grande">libreta += pérdida</span></div>
 </div>
 </section>
 
 <figure class="demo" data-demo="curso3/c3m5-bucle-paso" data-titulo="Un bucle de entrenamiento, pieza a pieza">
   <div class="haz">Pulsa «Paso ▶» cinco veces y mira qué pieza se ilumina. Luego prueba «Época entera» con <code>batch_size</code> 2 y con 8.</div>
-  <div class="observa">La recta solo se mueve en la pieza 4; el <code>Mean</code> solo anota. Con <code>batch_size=8</code> hay un único paso por época y aprende más despacio.</div>
+  <div class="observa">La recta solo se mueve en la pieza 4; el <code>Mean</code> solo apunta. Con <code>batch_size=8</code> hay un único paso por época y aprende más despacio.</div>
 </figure>
 
 <section>
-<h2 id="numeros">Con números: un paso de entrenamiento</h2>
-<div class="callout ejemplo">
-  <span class="lbl">Ejemplo numérico</span>
-  <p>Una neurona \( \hat y = w\,x + b \) con \( w=1 \), \( b=0 \). Dato: el usuario ha visto \( x=2 \) películas de la saga y puso un \( y=7 \). Pérdida \( (y-\hat y)^2 \), SGD con \( \eta=0{,}1 \).</p>
-  <ol class="pasos">
-    <li><strong>Forward:</strong> \( \hat y = 2 \). Error 5, pérdida <strong>25</strong>.</li>
-    <li><strong>Gradientes:</strong> \( \partial L/\partial w = -2\cdot5\cdot2 = -20 \) y \( \partial L/\partial b = -10 \).</li>
-    <li><strong>Actualizar:</strong> \( w = 1 - 0{,}1\cdot(-20) = 3 \) y \( b = 0 + 1 = 1 \).</li>
-    <li><strong>Comprobar:</strong> \( \hat y = 3\cdot2 + 1 = 7 \). La pérdida pasa de 25 a 0.</li>
-  </ol>
+<h2 id="numeros">3 · Un paso, con lápiz</h2>
+<p>Una sola neurona predice la nota: nota = w · x + b. Empieza con w = 1 y b = 0. El usuario ha visto x = 2 películas de la saga y puso un 7. El optimizador es <strong>SGD</strong>, el más simple: peso nuevo = peso − 0,1 × gradiente. Ese 0,1 es el <strong>learning rate</strong>, el tamaño del paso.</p>
+<div class="anim-pasos" data-titulo="De pérdida 25 a pérdida 0">
+  <div class="paso"><p><strong>1. Predecir.</strong> 1 · 2 + 0 = 2. Falla por 7 − 2 = 5.</p><span class="grande">pérdida = 5² = 25</span></div>
+  <div class="paso"><p><strong>2. Gradiente de w.</strong> −2 × fallo × x = −2 · 5 · 2.</p><span class="grande">−20</span></div>
+  <div class="paso"><p><strong>3. Gradiente de b.</strong> −2 × fallo = −2 · 5. Los dos son negativos: subir w y b baja la pérdida.</p><span class="grande">−10</span></div>
+  <div class="paso"><p><strong>4. Corregir.</strong> w = 1 − 0,1 · (−20) y b = 0 − 0,1 · (−10).</p><span class="grande">w = 3 · b = 1</span></div>
+  <div class="paso"><p><strong>5. Comprobar.</strong> 3 · 2 + 1 = 7: acierta.</p><span class="grande">pérdida 25 → 0</span></div>
 </div>
-<p>Con un lote, lo único que cambia es que la pérdida es la <strong>media</strong> de los errores al cuadrado de todos los datos del lote.</p>
+</section>
+
+<section>
+<h2 id="errores">4 · Tres errores que no avisan</h2>
+<table>
+  <thead><tr><th>Error</th><th>Qué pasa</th><th>Arreglo</th></tr></thead>
+  <tbody>
+    <tr><td>Predecir fuera del <code>with</code></td><td>La cinta no grabó nada</td><td>Todo el forward dentro</td></tr>
+    <tr><td>Olvidar <code>training=True</code></td><td>Dropout no apaga neuronas: entrenas otro modelo</td><td>Pásalo al llamar al modelo</td></tr>
+    <tr><td>Un peso sin conexión con la pérdida</td><td>Gradiente <code>None</code>: Keras 3 solo avisa y ese peso no se mueve</td><td>Lee los avisos</td></tr>
+  </tbody>
+</table>
+<p><strong>Dropout</strong> apaga neuronas al azar mientras entrena (lección 6).</p>
 </section>
 
 <details class="predice">
   <summary>72 valoraciones en lotes de 32: dos lotes con pérdida 4 y un último lote de 8 con pérdida 10. ¿La pérdida de la época es 6?<span class="hint"></span></summary>
   <div>
-    <p>Depende de cómo promedies. Si cada lote pesa igual, \( (4+4+10)/3 = 6{,}00 \). Si pesa por su tamaño, \( (32\cdot4+32\cdot4+8\cdot10)/72 = 4{,}67 \), que es lo que hace <code>fit</code>. Y si olvidas <code>reset_state()</code> al empezar la época, la media mezcla épocas y la curva sale falsamente suave.</p>
+    <p>Depende de cómo hagas la media. Lo ves justo debajo, paso a paso.</p>
   </div>
 </details>
+
+<section>
+<h2 id="media">5 · La media de la época</h2>
+<div class="anim-pasos" data-titulo="Dos formas de hacer la media">
+  <div class="paso"><p><strong>1.</strong> Lotes de 32, 32 y 8 con pérdidas 4, 4 y 10.</p><span class="grande">4 · 4 · 10</span></div>
+  <div class="paso"><p><strong>2. Cada lote pesa igual.</strong> (4 + 4 + 10) / 3.</p><span class="grande">6,00</span></div>
+  <div class="paso"><p><strong>3. Cada lote pesa por su tamaño.</strong> (32·4 + 32·4 + 8·10) / 72. Es lo que hace <code>fit</code>.</p><span class="grande">4,67</span></div>
+  <div class="paso"><p><strong>4. Borrar la libreta.</strong> <code>reset_state()</code> al empezar cada época; si no, la media mezcla épocas.</p><span class="grande">total = 0 · cuenta = 0</span></div>
+</div>
+</section>
+
+<section>
+<h2 id="cuando">6 · ¿Cuándo escribir tu propio bucle?</h2>
+<ul class="flow">
+  <li class="a">FIT + CALLBACKS<small>casi siempre basta</small></li>
+  <li class="b">TRAIN_STEP<small>cambia solo qué pasa en cada lote</small></li>
+  <li class="d">BUCLE PROPIO<small>dos redes, dos optimizadores…</small></li>
+</ul>
+<div class="callout regla">
+  <span class="lbl">Regla fácil</span>
+  <p><strong>Usa lo más simple que baste.</strong> Bucle propio solo si no es «un lote, una pérdida, un optimizador».</p>
+</div>
+</section>
+
+<section>
+<h2 id="chuleta">Chuleta para repasar</h2>
+<dl class="chuleta">
+  <div><dt>Lote</dt><dd>Trozo pequeño de los datos con el que se da un paso. <em>32 usuarios.</em></dd></div>
+  <div><dt>Época</dt><dd>Una vuelta completa a todos los lotes.</dd></div>
+  <div><dt>Pérdida</dt><dd>Número que mide cuánto falla el modelo. <em>Fallo 5 → pérdida 25.</em></dd></div>
+  <div><dt>Gradiente</dt><dd>Hacia dónde sube la pérdida al mover un peso; se va al revés. <em>−20 para w.</em></dd></div>
+  <div><dt><code>GradientTape</code></dt><dd>La cinta: graba dentro del <code>with</code> y rebobina con <code>gradient</code>.</dd></div>
+  <div><dt>Optimizador</dt><dd>La regla que mueve los pesos con <code>apply_gradients</code>. <em>SGD: peso − 0,1 × gradiente.</em></dd></div>
+  <div><dt>Learning rate</dt><dd>El tamaño del paso. <em>0,1.</em></dd></div>
+  <div><dt><code>training=True</code></dt><dd>Le dice al modelo que entrena: Dropout se enciende.</dd></div>
+  <div><dt><code>Mean</code></dt><dd>Libreta de medias: <code>update_state</code>, <code>result</code>, <code>reset_state</code>. <em>4,67, no 6.</em></dd></div>
+  <div><dt>Gradiente <code>None</code></dt><dd>Peso desconectado de la pérdida: no se mueve y solo hay un aviso.</dd></div>
+</dl>
+</section>
 
 <div class="resumen">
   <h2 class="sin-num sin-toc">En tres líneas</h2>
   <ul>
-    <li>Por lote: cinta (forward + pérdida) → gradientes → <code>apply_gradients</code> → <code>update_state</code>.</li>
+    <li>Por lote: cinta (predecir + pérdida) → gradientes → <code>apply_gradients</code> → <code>update_state</code>.</li>
     <li>Forward dentro del <code>with</code>, <code>training=True</code> y ojo con los gradientes <code>None</code>.</li>
-    <li><code>keras.metrics.Mean</code> da la media de la época: <code>reset_state()</code> al empezar cada una.</li>
+    <li><code>Mean</code> da la media de la época: <code>reset_state()</code> al empezar cada una.</li>
   </ul>
 </div>
 
@@ -96,31 +150,30 @@
    "q": "En un bucle propio, ¿dónde va el cálculo de la predicción y de la pérdida?",
    "opciones": ["Fuera del <code>with tf.GradientTape()</code>, antes de abrirlo", "Dentro del <code>with</code>; y <code>cinta.gradient</code> se pide después, fuera", "Da igual: la cinta graba todo el programa"],
    "correcta": 1,
-   "porque": "La cinta solo graba lo que ocurre dentro del bloque <code>with</code>. Si el forward va fuera, no hay nada que derivar. Pedir el gradiente fuera del bloque es lo normal (y más eficiente)."
+   "porque": "La cinta solo graba lo que ocurre dentro del bloque <code>with</code>. Si la predicción va fuera, no hay nada que rebobinar. Pedir el gradiente fuera del bloque es lo normal."
   },
   {
-   "q": "Una variable del modelo no participa en la pérdida, así que su gradiente es <code>None</code>. ¿Qué hace Keras 3 al llamar a <code>apply_gradients</code>?",
-   "opciones": ["Lanza un error y para el entrenamiento", "Solo muestra un aviso: esa variable se queda quieta y las demás se actualizan", "La trata como gradiente 0 y la reinicia a 0"],
+   "q": "Un peso del modelo no participa en la pérdida, así que su gradiente es <code>None</code>. ¿Qué hace Keras 3 al llamar a <code>apply_gradients</code>?",
+   "opciones": ["Lanza un error y para el entrenamiento", "Solo muestra un aviso: ese peso se queda quieto y los demás se actualizan", "Lo trata como gradiente 0 y lo pone a 0"],
    "correcta": 1,
-   "porque": "En Keras 3 un gradiente <code>None</code> no es un error: sale el aviso «Gradients do not exist for variables…» y esa variable no cambia durante todo el entrenamiento. Por eso hay que leer los avisos."
+   "porque": "En Keras 3 un gradiente <code>None</code> no es un error: sale el aviso «Gradients do not exist for variables…» y ese peso no cambia en todo el entrenamiento. Por eso hay que leer los avisos."
   },
   {
-   "q": "Con \\( w=1 \\), \\( \\eta=0{,}1 \\) y un gradiente \\( \\partial L/\\partial w=-20 \\), ¿cuánto vale \\( w \\) tras un paso de SGD?",
+   "q": "Con w = 1, un learning rate de 0,1 y un gradiente de −20, ¿cuánto vale w tras un paso de SGD?",
    "opciones": ["−1", "3", "0,8"],
    "correcta": 1,
-   "porque": "\\( w \\leftarrow w-\\eta g = 1-0{,}1\\cdot(-20) = 1+2 = 3 \\). El gradiente es negativo, así que subir \\( w \\) baja la pérdida."
+   "porque": "Peso nuevo = 1 − 0,1 · (−20) = 1 + 2 = 3. El gradiente es negativo, así que subir w baja la pérdida."
   },
   {
    "q": "Llamas al modelo sin <code>training=True</code> dentro de tu bucle, y el modelo tiene <code>Dropout</code>. ¿Qué pasa?",
    "opciones": ["Nada: Keras detecta que estás entrenando", "Dropout no apaga ninguna neurona y entrenas un modelo distinto del previsto", "Falla con un error de forma"],
    "correcta": 1,
-   "porque": "Sin <code>training=True</code>, <code>Dropout</code> actúa como en predicción (no apaga nada) y <code>BatchNormalization</code> usa sus medias móviles. No hay error: simplemente entrenas otra cosa."
+   "porque": "Sin <code>training=True</code>, <code>Dropout</code> actúa como al predecir (no apaga nada). No hay error: simplemente entrenas otra cosa."
   }
  ]
 }
 </script>
 </section>
-
 <details class="profundizar">
   <summary><span>Profundizar: la explicación completa<small>El mapa completo del módulo (qué herramienta resuelve qué), los avisos de Keras 3, el paso a mano con todo detalle y la métrica Mean con lotes desiguales.</small></span></summary>
   <div class="prof-body">
@@ -187,7 +240,7 @@
   </ol>
 </div>
 
-<p>El fragmento 1 hace exactamente esa cuenta con TensorFlow (pérdida 25, gradientes −20 y −10, pesos finales 3 y 1) y después entrena un modelo de verdad. Una vez que lo has entendido con un dato, el paso a «un lote» es solo cambiar \( L \) por la <strong>media</strong> de los errores al cuadrado de los datos del lote.</p>
+<p>El <a href="laboratorio.html#frag-1">fragmento 1</a> hace exactamente esa cuenta con TensorFlow (pérdida 25, gradientes −20 y −10, pesos finales 3 y 1) y después entrena un modelo de verdad. Una vez que lo has entendido con un dato, el paso a «un lote» es solo cambiar \( L \) por la <strong>media</strong> de los errores al cuadrado de los datos del lote.</p>
 
 <h3>Las cinco piezas de un bucle propio</h3>
 <ul class="flow">
@@ -221,7 +274,7 @@
       <tr><td><code>update_state(perdida, sample_weight=tamaño_del_lote)</code></td><td>\( (32\cdot4+32\cdot4+8\cdot10)/72 \)</td><td class="res">4,67</td></tr>
     </tbody>
   </table>
-  <p>El segundo es el promedio «por dato», más justo cuando el último lote es pequeño; es lo que hace internamente el <code>fit</code> de Keras (pasa el tamaño del lote como peso). En el fragmento 1 todos los lotes miden lo mismo y da igual.</p>
+  <p>El segundo es el promedio «por dato», más justo cuando el último lote es pequeño; es lo que hace internamente el <code>fit</code> de Keras (pasa el tamaño del lote como peso). En el <a href="laboratorio.html#frag-1">fragmento 1</a> todos los lotes miden lo mismo y da igual.</p>
 </div>
 
 <p>Las tres llamadas que importan: <code>update_state(valor)</code> acumula, <code>result()</code> devuelve la media, y <code>reset_state()</code> pone <code>total</code> y <code>count</code> a cero. <strong>Si olvidas el <code>reset_state()</code> al empezar la época</strong>, la media mezcla épocas distintas y la curva sale mentirosamente suave y alta.</p>
@@ -240,95 +293,11 @@
   </div>
 </details>
 
-<section>
+<section class="ir-lab">
 <h2 class="sin-num">Código</h2>
-<p class="codigo-intro">Los quince fragmentos se han ejecutado con Python 3.13, TensorFlow 2.21, Keras 3.15 (backend TensorFlow) y keras-tuner 1.4.8, <strong>dos veces cada uno con la misma salida</strong>. Instalación: <code>pip install tensorflow keras keras-tuner scikit-learn tensorboard</code> (<code>tensorboard</code> solo lo necesita el fragmento 4). Cada fragmento es independiente: importa lo que usa y fija su semilla. Todos usan modelos diminutos y conjuntos de datos pequeños o sintéticos (<code>make_moons</code>, <code>load_digits</code> de scikit-learn), sin descargas. Los fragmentos 11 y 12 (Keras Tuner) tardan unos segundos más. Al ejecutar verás avisos de TensorFlow (por ejemplo, sobre <code>oneDNN</code> o la CPU) que no afectan a nada; en otra máquina los decimales finales pueden variar.</p>
-<!-- ---------- Fragmento 1 ---------- -->
-<article class="snippet" data-lang="python" id="frag-1">
-  <header>
-    <h3>1 · Un bucle de entrenamiento propio, paso a paso</h3>
-    <p class="para-que"><strong>Para qué sirve</strong> Escribe a mano lo que hace <code>fit</code>: primero un único paso con números que puedes comprobar con lápiz y luego el bucle completo con lotes, <code>apply_gradients</code> y la métrica <code>Mean</code>.</p>
-  </header>
-  <pre class="code"><code>import numpy as np
-import tensorflow as tf
-import keras
-
-keras.utils.set_random_seed(42)
-
-# Datos sintéticos: y = 3*x1 - 2*x2 + 1 + ruido
-rng = np.random.default_rng(0)
-X = rng.normal(size=(256, 2)).astype("float32")
-y = (3 * X[:, 0] - 2 * X[:, 1] + 1 + 0.1 * rng.normal(size=256)).astype("float32")
-y = y.reshape(-1, 1)
-
-# Un solo paso a mano con números pequeños: w = 1, b = 0, x = 2, y = 7
-w = tf.Variable([[1.0]])
-b = tf.Variable([0.0])
-x1, y1 = tf.constant([[2.0]]), tf.constant([[7.0]])
-with tf.GradientTape() as tape:
-    pred = x1 @ w + b
-    perdida = tf.reduce_mean(tf.square(y1 - pred))
-grad_w, grad_b = tape.gradient(perdida, [w, b])
-print("pérdida =", perdida.numpy(), "| dL/dw =", grad_w.numpy().ravel(), "| dL/db =", grad_b.numpy())
-opt0 = keras.optimizers.SGD(learning_rate=0.1)
-opt0.apply_gradients(zip([grad_w, grad_b], [w, b]))
-print("tras apply_gradients: w =", w.numpy().ravel(), "b =", b.numpy())
-
-# El bucle completo
-modelo = keras.Sequential([keras.Input(shape=(2,)), keras.layers.Dense(1)])
-optimizador = keras.optimizers.SGD(learning_rate=0.1)
-funcion_perdida = keras.losses.MeanSquaredError()
-media_perdida = keras.metrics.Mean(name="loss")
-datos = tf.data.Dataset.from_tensor_slices((X, y)).batch(32)
-
-for epoca in range(1, 6):
-    media_perdida.reset_state()
-    for lote_x, lote_y in datos:
-        with tf.GradientTape() as cinta:
-            pred = modelo(lote_x, training=True)
-            perdida = funcion_perdida(lote_y, pred)
-        grads = cinta.gradient(perdida, modelo.trainable_variables)
-        optimizador.apply_gradients(zip(grads, modelo.trainable_variables))
-        media_perdida.update_state(perdida)
-    print(f"época {epoca}: loss = {media_perdida.result().numpy():.4f}")
-
-pesos, sesgo = modelo.layers[0].get_weights()
-print("w aprendidos:", pesos.ravel().round(2), "| b:", sesgo.round(2), "| pasos del optimizador:", int(optimizador.iterations.numpy()))</code></pre>
-  <details class="linea-a-linea" open>
-    <summary>Línea por línea</summary>
-    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
-    <table class="lineas">
-      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
-      <tbody>
-        <tr data-lines="1-3"><td><code>import numpy as np …</code></td><td>Importamos NumPy (para generar datos), TensorFlow (<code>tf.GradientTape</code>, <code>tf.data</code>) y Keras (modelo, optimizador, pérdida y métrica).</td></tr>
-        <tr data-lines="5"><td><code>keras.utils.set_random_seed(42)</code></td><td>Fija la semilla de Python, NumPy y TensorFlow a la vez: así los pesos iniciales y el orden de los datos se repiten en cada ejecución.</td></tr>
-        <tr data-lines="7-11"><td><code># Datos sintéticos: y = 3*x1 - 2*x2 + 1 + ruido …</code></td><td>Datos sintéticos: 256 puntos con dos variables y \( y=3x_1-2x_2+1 \) más un ruido pequeño (desviación 0,1). Sabemos la verdad, así que podremos comprobar si el modelo la encuentra. <code>reshape(-1, 1)</code> convierte <code>y</code> en una columna, la forma que espera la pérdida.</td></tr>
-        <tr data-lines="13-16"><td><code># Un solo paso a mano con números pequeños: w = 1, b = 0, x = 2, y = 7 …</code></td><td>Un paso a mano con números pequeños: <code>w = 1</code>, <code>b = 0</code> (dos <code>tf.Variable</code>, las que se pueden derivar y modificar), un dato <code>x = 2</code> y su valor real <code>y = 7</code> (dos <code>tf.constant</code>).</td></tr>
-        <tr data-lines="17-19"><td><code>with tf.GradientTape() as tape: …</code></td><td>Abre la cinta; dentro, calcula la predicción \( \hat y = x\,w + b = 2 \) y la pérdida \( (7-2)^2 = 25 \).</td></tr>
-        <tr data-lines="20-21"><td><code>grad_w, grad_b = tape.gradient(perdida, [w, b]) …</code></td><td><code>tape.gradient</code> devuelve una derivada por variable: \( \partial L/\partial w = -20 \) y \( \partial L/\partial b = -10 \), justo la cuenta que hicimos a mano. <code>.ravel()</code> aplana el resultado para imprimirlo en una línea.</td></tr>
-        <tr data-lines="22-24"><td><code>opt0 = keras.optimizers.SGD(learning_rate=0.1) …</code></td><td>Crea un SGD con \( \eta = 0{,}1 \) y aplica los gradientes. <code>zip(...)</code> forma las parejas (gradiente, variable) que exige <code>apply_gradients</code>. Resultado: \( w = 1-0{,}1\cdot(-20) = 3 \) y \( b = 0-0{,}1\cdot(-10) = 1 \).</td></tr>
-        <tr data-lines="26-31"><td><code># El bucle completo …</code></td><td>Los ingredientes del bucle real: un modelo de una neurona (<code>Dense(1)</code>, sin activación: una regresión lineal), un optimizador SGD, una pérdida MSE, una métrica <code>Mean</code> para promediar la pérdida de cada época y un <code>Dataset</code> troceado en lotes de 32 (256/32 = 8 lotes por época).</td></tr>
-        <tr data-lines="33-34"><td><code>for epoca in range(1, 6): …</code></td><td>Cinco épocas. Al empezar cada una, <code>reset_state()</code> pone a cero el total y la cuenta de la métrica.</td></tr>
-        <tr data-lines="35-38"><td><code>for lote_x, lote_y in datos: …</code></td><td>Por cada lote: abre la cinta, llama al modelo con <code>training=True</code> y calcula la pérdida media del lote.</td></tr>
-        <tr data-lines="39-41"><td><code>grads = cinta.gradient(perdida, modelo.trainable_variables) …</code></td><td>Pide los gradientes respecto a <em>todas</em> las variables entrenables del modelo, los aplica y anota la pérdida en la métrica. Observa que <code>update_state</code> no cambia el modelo: solo acumula.</td></tr>
-        <tr data-lines="42"><td><code>print(f"época {epoca}: loss = {media_perdida.result().numpy():.4f}")</code></td><td>Al acabar la época, <code>result()</code> devuelve la media de las 8 pérdidas de lote.</td></tr>
-        <tr data-lines="44-45"><td><code>pesos, sesgo = modelo.layers[0].get_weights() …</code></td><td>Lee los pesos aprendidos con <code>get_weights()</code> (el <code>kernel</code> y el sesgo) y cuenta los pasos del optimizador: 5 épocas × 8 lotes = 40.</td></tr>
-      </tbody>
-    </table>
-  </details>
-  <div class="salida">
-    <strong>Salida esperada</strong>
-    <pre>pérdida = 25.0 | dL/dw = [-20.] | dL/db = [-10.]
-tras apply_gradients: w = [3.] b = [1.]
-época 1: loss = 3.6938
-época 2: loss = 0.1463
-época 3: loss = 0.0153
-época 4: loss = 0.0098
-época 5: loss = 0.0096
-w aprendidos: [ 3.01 -2.  ] | b: [1.] | pasos del optimizador: 40</pre>
-    <p>Las dos primeras líneas coinciden con la cuenta a mano: pérdida 25, gradientes −20 y −10, y pesos 3 y 1 tras el paso. Luego el bucle: la pérdida de época baja de 3,69 a 0,146 y se queda en <strong>0,0096</strong>. Ese suelo no es un fallo: el ruido que añadimos tiene desviación 0,1, es decir varianza \( 0{,}1^2=0{,}01 \), y ningún modelo puede bajar de ahí. Los pesos aprendidos (3,01 y −2,00, sesgo 1,0) son los de la verdad (3, −2 y 1). Los 40 pasos del optimizador son 5 × 8.</p>
-  </div>
-</article>
+<a class="lab-card" href="laboratorio.html#paso-1"><span class="lc-ico" aria-hidden="true">🧪</span>
+  <span><strong>Ver el código de esta lección en el Laboratorio</strong>
+  <span>Paso 1 · Un bucle de entrenamiento escrito a mano: el paso de lápiz (25 → 0) y cinco épocas, línea a línea.</span></span></a>
 </section>
 
 </div>

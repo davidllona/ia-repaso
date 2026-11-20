@@ -57,22 +57,22 @@ Lab.register("curso3/c3m5-tf-function", function (root, api) {
 
   function draw(ctx, w, h, C) {
     var narrow = w < 480, pad = 12, i, e;
-    D.text(ctx, (narrow ? "Llamadas: verde = reutiliza · naranja = traza" : "Últimas llamadas (verde = reutiliza el grafo · naranja = traza de nuevo)"), pad, 18, { size: narrow ? 10.5 : 12, weight: 600, color: C.ink2 });
+    D.text(ctx, (narrow ? "Llamadas: verde = reutiliza · naranja = traza" : "Últimas llamadas (verde = reutiliza el grafo · naranja = traza de nuevo)"), pad, 18, { size: narrow ? 11 : 12, weight: 600, color: C.ink2 });
     var n = 16, gap = 3, bw = Math.min(40, (w - 2 * pad - gap * (n - 1)) / n);
     for (i = 0; i < S.calls.length; i++) {
       var c = S.calls[i], x = pad + i * (bw + gap);
       D.rect(ctx, x, 28, bw, 26, c.trace ? C.terracota : C.olivaWash, c.trace ? C.terracotaInk : C.oliva, 1.5);
       D.text(ctx, c.trace ? "T" : "ok", x + bw / 2, 45, { align: "center", size: 11, weight: 700, color: c.trace ? C.paper : C.olivaInk, mono: true });
     }
-    D.text(ctx, "Caché de trazados (una fila por grafo guardado)", pad, 82, { size: narrow ? 10.5 : 12, weight: 600, color: C.ink2 });
+    D.text(ctx, "Caché de trazados (una fila por grafo guardado)", pad, 82, { size: narrow ? 11 : 12, weight: 600, color: C.ink2 });
     if (!S.cache.length) D.text(ctx, "vacía", pad, 106, { size: 12, color: C.muted });
     var rowH = 24, y0 = 90, maxRows = Math.floor((h - y0 - 6) / (rowH + 4));
     for (i = 0; i < Math.min(S.cache.length, maxRows); i++) {
       e = S.cache[i];
       var y = y0 + i * (rowH + 4);
       D.rect(ctx, pad, y, w - 2 * pad, rowH, e.relaxed ? C.markerWash : C.cobaltoWash, e.relaxed ? C.marker : C.cobalto, 1.5);
-      D.text(ctx, "grafo " + e.id + ": " + e.sig, pad + 8, y + 16, { size: narrow ? 10.5 : 12, mono: true, color: C.ink, weight: 600 });
-      D.text(ctx, e.uses + (e.uses === 1 ? " uso" : " usos"), w - pad - 8, y + 16, { align: "right", size: narrow ? 10.5 : 12, mono: true, color: C.ink2 });
+      D.text(ctx, "grafo " + e.id + ": " + e.sig, pad + 8, y + 16, { size: narrow ? 11 : 12, mono: true, color: C.ink, weight: 600 });
+      D.text(ctx, e.uses + (e.uses === 1 ? " uso" : " usos"), w - pad - 8, y + 16, { align: "right", size: narrow ? 11 : 12, mono: true, color: C.ink2 });
     }
     if (S.cache.length > maxRows) D.text(ctx, "… y " + (S.cache.length - maxRows) + " más", pad, h - 6, { size: 11, color: C.terracotaInk, weight: 600 });
   }

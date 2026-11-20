@@ -108,12 +108,12 @@ Lab.register("curso3/c3m5-tuner", function (root, api) {
     r.t.forEach(function (q, idx) {
       var px = pA.x(q.c[0]), py = pA.y(q.c[1]), rad = k === "hb" ? 3 + 5.5 * Math.log(q.r + 1) / Math.log(RMAX + 1) : 8;
       D.circle(ctx, px, py, rad, q.r === RMAX ? col(C, k) : C.paper, col(C, k), 2);
-      if (!many && k !== "hb") D.text(ctx, String(idx + 1), px, py + 3.5, { align: "center", size: 9.5, weight: 700, color: C.paper, mono: true });
+      if (!many && k !== "hb") D.text(ctx, String(idx + 1), px, py + 3.5, { align: "center", size: 11, weight: 700, color: C.paper, mono: true });
     });
     if (r.best) D.circle(ctx, pA.x(r.best.c[0]), pA.y(r.best.c[1]), 13, null, C.terracota, 3);
     ctx.restore();
-    if (k === "hb") D.text(ctx, "grande = más épocas · vacío = descartado", b.x + 6, b.y + b.h - 8, { size: 10.5, color: C.ink2 });
-    else D.text(ctx, "anillo naranja = el mejor", b.x + 6, b.y + b.h - 8, { size: 10.5, color: C.ink2 });
+    if (k === "hb") D.text(ctx, "grande = más épocas · vacío = descartado", b.x + 6, b.y + b.h - 8, { size: 11, color: C.ink2 });
+    else D.text(ctx, "anillo naranja = el mejor", b.x + 6, b.y + b.h - 8, { size: 11, color: C.ink2 });
   }
   function drawB(ctx, w, h, C) {
     pB.xr = [0, S.budget]; pB.axes(ctx);
