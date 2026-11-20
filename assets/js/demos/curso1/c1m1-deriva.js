@@ -66,7 +66,7 @@ Lab.register("curso1/c1m1-deriva", function (root, api) {
     var D = api.d, k, pts = [];
     p2.axes(ctx);
     D.line(ctx, p2.x(0), p2.y(ALERTA), p2.x(11), p2.y(ALERTA), C.terracota, 1.5, [5, 4]);
-    D.text(ctx, "alerta 85 %", p2.x(11) - 4, p2.y(ALERTA) - 5, { align: "right", size: 10.5, color: C.terracotaInk, weight: 600 });
+    D.text(ctx, "alerta 85 %", p2.x(11) - 4, p2.y(ALERTA) - 5, { align: "right", size: 11, color: C.terracotaInk, weight: 600 });
     reent.forEach(function (a) { if (a + 1 <= 11) D.line(ctx, p2.x(a + 0.5), p2.box.y, p2.x(a + 0.5), p2.box.y + p2.box.h, C.oliva, 1.5, [2, 3]); });
     for (k = 0; k <= mes; k++) pts.push([p2.x(k), p2.y(acc(k))]);
     D.path(ctx, pts, C.cobalto, 2);

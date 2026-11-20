@@ -37,7 +37,8 @@ window.CURRICULUM = {
             {"n": 5, "slug": "leccion-5", "title": "Un proyecto es una película de trece escenas, y el modelo es la más corta", "blurb": "Las trece escenas del ciclo de vida con StreamFlix: del problema a la deriva.", "min": 4},
             {"n": 6, "slug": "leccion-6", "title": "No entrenes tu propio LLM: adáptalo con prompts, RAG y PEFT", "blurb": "Ciencia de Datos vs Ingeniería de IA, del predictivo al prescriptivo, RAG y las herramientas.", "min": 4},
             {"n": 7, "slug": "leccion-7", "title": "Los datos nunca llegan limpios: huecos, extremos, escalas y texto", "blurb": "NaN, outliers, StandardScaler y One-Hot: dejar la tabla lista para el modelo.", "min": 4},
-            {"n": 8, "slug": "leccion-8", "title": "La meta es generalizar: acertar con datos que el modelo nunca vio", "blurb": "Train/test, overfitting y el flujo de scikit-learn: crear → fit → predict → evaluar.", "min": 4}
+            {"n": 8, "slug": "leccion-8", "title": "La meta es generalizar: acertar con datos que el modelo nunca vio", "blurb": "Train/test, overfitting y el flujo de scikit-learn: crear → fit → predict → evaluar.", "min": 4},
+            {"n": 9, "slug": "laboratorio", "title": "Laboratorio: ¿qué clientes de Netflix van a cancelar?", "blurb": "Todo el código del módulo en un ejemplo completo: crear, explorar, limpiar, repartir, entrenar, predecir y medir, línea a línea.", "min": 75}
           ]
         },
         {

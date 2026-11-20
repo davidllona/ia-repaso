@@ -1,0 +1,1877 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Laboratorio · ¿Qué clientes de Netflix van a cancelar? · Módulo 1 · Curso 1 · Cuaderno de IA</title>
+<meta name="description" content="Todo el código del módulo 1 en un ejemplo completo con Python: crear los datos de clientes de Netflix, explorarlos, limpiarlos, repartirlos en train y test, entrenar un árbol, predecir y medir, explicado línea a línea.">
+<script>var t;try{t=localStorage.getItem('cuaderno-ia:tema:v2')}catch(e){}if(t!=='light'&&t!=='dark')t=(window.matchMedia&&matchMedia('(prefers-color-scheme: light)').matches)?'light':'dark';document.documentElement.setAttribute('data-theme',t)</script>
+<link rel="stylesheet" href="../../assets/css/style.css">
+<script src="../../assets/js/curriculum.js"></script>
+<script src="../../assets/js/lab.js"></script>
+<script src="../../assets/js/app.js" defer></script>
+</head>
+<body data-root="../../" data-course="1" data-module="1" data-lesson="9">
+<main>
+<div class="page">
+
+<header class="hero leccion">
+  <div class="hero-grid">
+    <div>
+      <p class="eyebrow">Curso 1 · Módulo 1 · Laboratorio</p>
+      <h1>Laboratorio: ¿qué clientes de Netflix van a cancelar?</h1>
+      <p class="lead">Vamos a predecir qué clientes cancelan de principio a fin con Python: crear los datos, mirarlos, limpiarlos, repartirlos, entrenar, predecir y medir.</p>
+      <p class="meta-line"><span class="read-time" data-render="read-time"></span><a href="../modulo-1.html">Índice del módulo</a> · <a href="#completo">Ir al código completo</a> · <a href="#chuleta">Ir a la chuleta</a></p>
+    </div>
+    <div class="hero-tile" aria-hidden="true"></div>
+  </div>
+</header>
+
+<section>
+<h2 id="mapa">Lo que vamos a hacer</h2>
+<p>Nueve pasos. El primero es un calentamiento con la regla de la lección 1. Del 2 al 9 es <strong>un solo programa</strong>: cada paso usa lo que dejó el anterior, con los mismos 8 clientes de Netflix. Los nueve pasos se leen en unos 35 minutos; «Más código del módulo», al final, es para consultar cuando lo necesites.</p>
+<ol class="lab-mapa">
+  <li><a href="#paso-1">Calentamiento: la regla a mano y la regla aprendida</a></li>
+  <li><a href="#paso-2">Crear la tabla de clientes</a></li>
+  <li><a href="#paso-3">Mirar los datos antes de tocar nada</a></li>
+  <li><a href="#paso-4">Separar pistas y respuesta, y repartir en train y test</a></li>
+  <li><a href="#paso-5">Limpiar y preparar: rellenar huecos, escalar y One-Hot</a></li>
+  <li><a href="#paso-6">Entrenar el árbol</a></li>
+  <li><a href="#paso-7">Predecir a los clientes del examen</a></li>
+  <li><a href="#paso-8">Medir: accuracy y matriz de confusión</a></li>
+  <li><a href="#paso-9">Usar el modelo con clientes nuevos</a></li>
+</ol>
+<ul class="flow">
+  <li class="a">DATOS<small>pasos 2 y 3</small></li>
+  <li class="d">REPARTIR Y LIMPIAR<small>pasos 4 y 5</small></li>
+  <li class="b">ENTRENAR<small>paso 6</small></li>
+  <li class="c">PREDECIR Y MEDIR<small>pasos 7, 8 y 9</small></li>
+</ul>
+<div class="callout regla">
+  <span class="lbl">Cómo leer cada paso</span>
+  <p>Arriba, el código. Debajo, una fila por línea: <strong>qué hace</strong>, <strong>por qué</strong> hace falta y, en las difíciles, <strong>cómo se lee</strong> en voz alta. Toca una fila y se ilumina su línea en el código. Al final, la salida real y cómo leer cada número.</p>
+</div>
+</section>
+
+<section>
+<h2 id="antes">Antes de empezar: las piezas</h2>
+<p><strong>Python</strong> es un lenguaje de programación: escribes órdenes, una por línea, y el ordenador las ejecuta de arriba abajo.</p>
+<p>Python trae lo básico. Para tablas, cálculos o Machine Learning se usan <strong>librerías</strong>: código que otras personas ya escribieron y empaquetaron para que lo reutilices. Se instalan aparte (con <code>pip install</code>; en Google Colab ya vienen). Una librería grande se ordena en cajones, llamados <strong>módulos</strong>, y dentro de cada cajón están las piezas: funciones y clases (moldes para fabricar objetos, como un modelo).</p>
+<ul class="flow">
+  <li class="a">LIBRERÍA<small>sklearn</small></li>
+  <li class="d">CAJÓN (MÓDULO)<small>tree</small></li>
+  <li class="b">PIEZA<small>DecisionTreeClassifier</small></li>
+</ul>
+<p><code>import</code> trae una librería a tu programa. Hasta que no la importas, Python no conoce sus piezas y da el error <code>NameError</code>. Hay tres formas:</p>
+<ul>
+  <li><code>import pandas as pd</code> → trae la librería entera con un apodo. Luego se usa <code>pd.DataFrame(…)</code>.</li>
+  <li><code>from sklearn.tree import DecisionTreeClassifier</code> → trae solo una pieza de un cajón. Luego se usa sin prefijo: <code>DecisionTreeClassifier(…)</code>.</li>
+  <li><code>import re</code> → la librería entera, sin apodo: <code>re.findall(…)</code>.</li>
+</ul>
+<div class="callout analogia">
+  <span class="lbl">Analogía</span>
+  <p>Una librería es una caja de herramientas. <code>import pandas as pd</code> es traerte la caja entera y ponerle una etiqueta corta. <code>from … import …</code> es abrir un cajón y sacar solo el martillo.</p>
+</div>
+<h3 id="piezas-python">Python en catorce piezas</h3>
+<dl class="chuleta">
+  <div><dt style="text-transform:none">Variable ( = )</dt><dd>Un nombre que guarda un valor. <code>edad = 30</code> se lee «guarda 30 con el nombre edad». El <code>=</code> de Python no es «igual»: es «guarda».</dd></div>
+  <div><dt style="text-transform:none"># comentario</dt><dd>Lo que va detrás de <code>#</code> lo ignora Python: son notas para quien lee.</dd></div>
+  <div><dt style="text-transform:none">Lista [ ]</dt><dd>Varios valores en orden, entre corchetes: <code>[5, 37, 22]</code>. Una lista de listas es una tabla: <code>[[2], [5]]</code>.</dd></div>
+  <div><dt style="text-transform:none">Corchetes para elegir</dt><dd>Detrás de un nombre, los corchetes eligen. <code>lista[0]</code> = el primero (se cuenta desde 0). <code>df["Plan"]</code> = la columna Plan. <code>[:3]</code> = los tres primeros; <code>[-1]</code> = el último.</dd></div>
+  <div><dt style="text-transform:none">Diccionario { : }</dt><dd>Parejas <code>nombre: valor</code> entre llaves: <code>{"Edad": [23, 41]}</code>. Se consulta por el nombre: <code>datos["Edad"]</code>.</dd></div>
+  <div><dt style="text-transform:none">Tupla ( , )</dt><dd>Como una lista, pero con paréntesis y sin poder cambiarla: <code>(8, 4)</code>. Es lo que devuelve <code>shape</code>.</dd></div>
+  <div><dt style="text-transform:none">Función y llamada</dt><dd><code>print(x)</code> llama a la función <code>print</code> con el dato <code>x</code>. Lo que va entre paréntesis son los <strong>argumentos</strong>: los datos que recibe.</dd></div>
+  <div><dt style="text-transform:none">Argumento con nombre</dt><dd><code>nombre=valor</code> dentro del paréntesis: <code>test_size=0.25</code>. Cambia un ajuste concreto y da igual el orden en que los escribas.</dd></div>
+  <div><dt style="text-transform:none">Método ( . )</dt><dd><code>objeto.orden()</code>: una función que pertenece a un objeto. <code>df.head(3)</code> se lee «df, dame tus 3 primeras filas». Se pueden encadenar: <code>df.isna().sum()</code>.</dd></div>
+  <div><dt style="text-transform:none">Atributo</dt><dd><code>objeto.dato</code>, sin paréntesis: un valor guardado, no una orden. <code>df.shape</code>. En scikit-learn, si acaba en guion bajo (<code>tree_</code>, <code>mean_</code>) es algo aprendido en <code>fit</code>.</dd></div>
+  <div><dt style="text-transform:none">def … return</dt><dd><code>def</code> crea tu propia función (una receta con nombre). <code>return</code> es lo que devuelve.</dd></div>
+  <div><dt style="text-transform:none">if … else</dt><dd>«Si… si no…». Las líneas de dentro solo se ejecutan si la condición es verdad. Comparaciones: <code>&gt;</code> mayor, <code>&lt;</code> menor, <code>==</code> igual, <code>in</code> «está dentro de».</dd></div>
+  <div><dt style="text-transform:none">Sangría</dt><dd>Los 4 espacios al principio de una línea dicen «esto va dentro» del <code>def</code>, <code>if</code> o <code>for</code> de arriba. En Python es obligatoria.</dd></div>
+  <div><dt style="text-transform:none">True · False · None · NaN</dt><dd><code>True</code>/<code>False</code>: verdadero y falso (cuentan como 1 y 0 al sumar). <code>None</code>: «nada», el hueco de texto. <code>np.nan</code>: el hueco de número.</dd></div>
+</dl>
+<h3 id="piezas-librerias">Las librerías y sus piezas (ejemplo de Netflix)</h3>
+<dl class="chuleta">
+  <div><dt style="text-transform:none">NumPy (np)</dt><dd>La librería de los números: tablas de números rápidas («arrays») y cuentas con ellas. Nombre de «Numerical Python»; todo el mundo la importa con el apodo <code>np</code>. <em>Aquí: np.nan, el hueco de número.</em></dd></div>
+  <div><dt style="text-transform:none">pandas (pd)</dt><dd>La librería de las tablas: como un Excel dentro de Python. Apodo <code>pd</code>. <em>Aquí: la tabla de clientes.</em></dd></div>
+  <div><dt style="text-transform:none">DataFrame</dt><dd>La tabla de pandas: filas numeradas (el índice) y columnas con nombre. Se suele llamar <code>df</code>. <em>pd.DataFrame(datos) la fabrica.</em></dd></div>
+  <div><dt style="text-transform:none">head · shape · isna · value_counts · drop</dt><dd>Preguntas y órdenes de un DataFrame: primeras filas, tamaño, huecos, recuento de cada valor, quitar columnas. <em>Pasos 3 y 4.</em></dd></div>
+  <div><dt style="text-transform:none">scikit-learn (sklearn)</dt><dd>La librería de Machine Learning de Python: algoritmos, preparación de datos y medidas ya programados. Al importar se escribe <code>sklearn</code>, su nombre corto («sci» de ciencia + «kit» + «learn»). Está ordenada en cajones llamados <strong>módulos</strong>. <em>from sklearn.tree import …</em></dd></div>
+  <div><dt style="text-transform:none">sklearn.tree · DecisionTreeClassifier</dt><dd>El cajón de los árboles y su árbol de decisión que clasifica: hace preguntas del tipo «¿horas ≤ 11?». <em>Pasos 1 y 6.</em></dd></div>
+  <div><dt style="text-transform:none">sklearn.model_selection · train_test_split</dt><dd>El cajón para elegir y probar modelos, y su función que reparte los datos en entrenamiento y examen. <em>Paso 4.</em></dd></div>
+  <div><dt style="text-transform:none">sklearn.impute · SimpleImputer</dt><dd>El rellenador de huecos: con la mediana, la media o el valor más repetido. <em>Paso 5.</em></dd></div>
+  <div><dt style="text-transform:none">sklearn.preprocessing · StandardScaler</dt><dd>Pone cada columna de números en la misma escala: (valor − media) / desviación. <em>Paso 5.</em></dd></div>
+  <div><dt style="text-transform:none">OneHotEncoder</dt><dd>Convierte una columna de texto en una columna de 0 y 1 por cada categoría. Del mismo cajón <code>preprocessing</code>. <em>Plan → Plan_Basic, Plan_Premium, Plan_Standard.</em></dd></div>
+  <div><dt style="text-transform:none">sklearn.pipeline · Pipeline</dt><dd>Una tubería: encadena pasos para aplicarlos siempre en el mismo orden. <em>Rellenar → escalar.</em></dd></div>
+  <div><dt style="text-transform:none">sklearn.compose · ColumnTransformer</dt><dd>Aplica una tubería distinta a cada grupo de columnas y vuelve a juntar la tabla. <em>Números por un lado, texto por otro.</em></dd></div>
+  <div><dt style="text-transform:none">fit</dt><dd>«Ajustar»: aprender de los datos. En un modelo, aprende sus parámetros; en un preparador, aprende medianas, medias… <em>Siempre solo con train.</em></dd></div>
+  <div><dt style="text-transform:none">transform · fit_transform</dt><dd><code>transform</code> aplica lo aprendido; <code>fit_transform</code> aprende y aplica de una vez. <em>fit_transform con train; transform con test.</em></dd></div>
+  <div><dt style="text-transform:none">predict</dt><dd>«Predecir»: dar una respuesta para cada fila nueva. Solo funciona después de <code>fit</code>. <em>Pasos 7 y 9.</em></dd></div>
+  <div><dt style="text-transform:none">sklearn.metrics · accuracy_score · confusion_matrix</dt><dd>El cajón de las medidas: la parte de aciertos y la tabla de aciertos y errores por tipo. <em>Paso 8.</em></dd></div>
+  <div><dt style="text-transform:none">random_state</dt><dd>Fija el azar: con el mismo número, el mismo resultado siempre. El número es cualquiera (0, 42…). <em>Para que te salga lo mismo que aquí.</em></dd></div>
+  <div><dt style="text-transform:none">print</dt><dd>Escribe en pantalla. Con varias cosas separadas por comas, las escribe seguidas con un espacio. <em>print("nota:", 0.9)</em></dd></div>
+</dl>
+<h3 id="piezas-mas">Las que salen en «Más código del módulo»</h3>
+<dl class="chuleta">
+  <div><dt style="text-transform:none">for</dt><dd>Repite un bloque para cada elemento: <code>for x in lista:</code> se lee «para cada x de la lista…».</dd></div>
+  <div><dt style="text-transform:none">Lista o diccionario con for dentro</dt><dd><code>[p.lower() for p in palabras]</code>: crea una lista nueva aplicando algo a cada elemento.</dd></div>
+  <div><dt style="text-transform:none">f"…" (f-string)</dt><dd>Texto con huecos entre llaves que se rellenan con valores: <code>f"z = {z:.2f}"</code>. <code>:.2f</code> = 2 decimales.</dd></div>
+  <div><dt style="text-transform:none">lambda</dt><dd>Una función de una línea y sin nombre: <code>lambda s: s.mode()[0]</code>.</dd></div>
+  <div><dt style="text-transform:none">try … except</dt><dd>«Intenta esto; si falla con este error, haz esto otro» en vez de pararte.</dd></div>
+  <div><dt style="text-transform:none">with open(…) as f</dt><dd>Abre un fichero, lo llama <code>f</code> y lo cierra solo al acabar el bloque.</dd></div>
+  <div><dt style="text-transform:none">enumerate · zip · len</dt><dd>Numerar elementos; recorrer dos listas a la vez por parejas; contar cuántos hay.</dd></div>
+  <div><dt style="text-transform:none">collections.Counter</dt><dd>Un contador de Python: cuántas veces aparece cada cosa.</dd></div>
+  <div><dt style="text-transform:none">re</dt><dd>Expresiones regulares: buscar patrones dentro de un texto.</dd></div>
+  <div><dt style="text-transform:none">sqlite3 · SQL</dt><dd>Una base de datos pequeña que viene con Python, y el idioma (SQL) para preguntarle.</dd></div>
+  <div><dt style="text-transform:none">pickle · os</dt><dd>Guardar un objeto en un fichero y recuperarlo; hablar con el sistema de ficheros.</dd></div>
+  <div><dt style="text-transform:none">NLTK</dt><dd>Librería clásica de lenguaje: tokens, bigramas, frecuencias. Se instala con pip install nltk.</dd></div>
+  <div><dt style="text-transform:none">np.random.default_rng</dt><dd>Generador de números aleatorios con semilla (para repetir siempre lo mismo).</dd></div>
+  <div><dt style="text-transform:none">np.polyfit · np.polyval</dt><dd>Ajustar una curva de un grado dado a unos puntos, y calcularla en otros.</dd></div>
+  <div><dt style="text-transform:none">np.linalg.norm · @</dt><dd>La longitud de una lista de números; multiplicar posición a posición y sumar.</dd></div>
+  <div><dt style="text-transform:none">pd.to_datetime · groupby · agg</dt><dd>Convertir texto en fechas; agrupar filas; calcular un resumen por grupo.</dd></div>
+  <div><dt style="text-transform:none">load_breast_cancer</dt><dd>Carga un dataset real de 569 tumores que viene dentro de scikit-learn (cajón datasets).</dd></div>
+  <div><dt style="text-transform:none">SVC · LogisticRegression</dt><dd>Otros dos clasificadores (módulos 3 y 2). Misma interfaz: crear, fit, predict.</dd></div>
+  <div><dt style="text-transform:none">predict_proba</dt><dd>En vez de la clase, la probabilidad de cada clase.</dd></div>
+  <div><dt style="text-transform:none">NotFittedError</dt><dd>El error de usar un modelo antes de entrenarlo.</dd></div>
+  <div><dt style="text-transform:none">cross_val_score · GridSearchCV</dt><dd>Validación cruzada (varios exámenes rotando) y búsqueda de los mejores hiperparámetros.</dd></div>
+  <div><dt style="text-transform:none">make_pipeline</dt><dd>Crea un Pipeline sin tener que poner nombre a cada paso.</dd></div>
+  <div><dt style="text-transform:none">TfidfVectorizer · cosine_similarity</dt><dd>Convertir textos en números según sus palabras; medir cuánto se parecen dos listas de números.</dd></div>
+</dl>
+</section>
+
+<section class="lab-paso" id="paso-1">
+<h2><span class="paso-n">1</span>Calentamiento: la regla a mano y la regla aprendida</h2>
+<p><strong>Para qué:</strong> ver en 17 líneas la idea de la <a href="leccion-1.html">lección 1</a>. Arriba, una regla que escribe una persona. Abajo, un algoritmo que encuentra solo el umbral 18,5 con los ocho clientes de la lección. Este paso va aparte: en el paso 2 empieza el ejemplo grande.</p>
+<article class="snippet" data-lang="python">
+  <header>
+    <h3>Reglas a mano frente a un modelo que aprende la regla</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Comparar las dos formas de la lección 1. En la de arriba, el 20 lo pone una persona a ojo. En la de abajo nadie escribe el 18,5: lo encuentra <code>fit</code>.</p>
+  </header>
+  <pre class="code"><code>from sklearn.tree import DecisionTreeClassifier
+
+# --- Programación tradicional: las reglas las escribimos nosotros ---
+def cancela_por_reglas(dias_sin_entrar):
+    if dias_sin_entrar &gt; 20:
+        return 1
+    return 0
+
+# --- Machine Learning: damos ejemplos y el algoritmo encuentra la regla ---
+X = [[2], [5], [8], [12], [25], [31], [40], [55]]   # días sin entrar
+y = [0, 0, 0, 0, 1, 1, 1, 1]                        # 0 = se queda, 1 = cancela
+
+modelo = DecisionTreeClassifier(max_depth=1, random_state=42)
+modelo.fit(X, y)
+
+print("Umbral aprendido:", modelo.tree_.threshold[0])
+print("Predicciones:", modelo.predict([[10], [28]]))</code></pre>
+  <details class="linea-a-linea" open>
+    <summary>Línea por línea</summary>
+    <p class="hint">Toca o pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+      <tbody>
+        <tr data-lines="1"><td><code>from sklearn.tree import DecisionTreeClassifier</code></td><td>Trae una pieza ya programada. <code>sklearn</code> es scikit-learn, la librería de Machine Learning. <code>tree</code> («árbol») es su cajón de árboles. <code>DecisionTreeClassifier</code> es el árbol de decisión que clasifica. <span class="por-que">Python, recién abierto, no sabe qué es un árbol de decisión. Sin esta línea, la línea 13 daría <code>NameError</code> («no conozco ese nombre»).</span> <span class="se-lee">de la librería sklearn, cajón tree, tráeme el árbol de decisión que clasifica</span></td></tr>
+        <tr data-lines="3"><td><code># --- Programación tradicional ... ---</code></td><td>Un comentario. Todo lo que va detrás de <code>#</code> lo ignora Python. <span class="por-que">Es una nota para quien lee: aquí empieza la forma clásica.</span></td></tr>
+        <tr data-lines="4"><td><code>def cancela_por_reglas(dias_sin_entrar):</code></td><td><code>def</code> crea una <strong>función</strong>: una receta con nombre que puedes usar cuando quieras. Se llama <code>cancela_por_reglas</code> y recibe un dato, <code>dias_sin_entrar</code>. Los dos puntos abren su contenido, que va con sangría (4 espacios a la izquierda). <span class="por-que">Es la forma clásica de la lección 1: la regla la escribe una persona. Está para comparar; el programa no la llega a usar.</span> <span class="se-lee">define una receta llamada cancela_por_reglas que recibe los días sin entrar de un cliente</span></td></tr>
+        <tr data-lines="5"><td><code>if dias_sin_entrar &gt; 20:</code></td><td><code>if</code> significa «si». Comprueba si los días son más de 20. Solo si es verdad se ejecuta la línea de debajo, que va más metida. <span class="por-que">Es la regla en sí. El 20 lo ha puesto una persona a ojo: justo el problema de la lección 1.</span> <span class="se-lee">si el cliente lleva más de 20 días sin entrar…</span></td></tr>
+        <tr data-lines="6"><td><code>return 1</code></td><td><code>return</code> significa «devuelve». La receta termina aquí y entrega un 1, que significa «cancela». <span class="se-lee">…entonces responde 1: cancela</span></td></tr>
+        <tr data-lines="7"><td><code>return 0</code></td><td>Si el <code>if</code> no se cumplió, Python llega aquí y devuelve 0: «se queda». <span class="por-que">No hace falta escribir «si no» (<code>else</code>): si el <code>if</code> se cumplió, el <code>return 1</code> ya terminó la receta y esta línea no llega a ejecutarse.</span> <span class="se-lee">en cualquier otro caso, responde 0: se queda</span></td></tr>
+        <tr data-lines="9"><td><code># --- Machine Learning ... ---</code></td><td>Otro comentario: aquí empieza la forma nueva.</td></tr>
+        <tr data-lines="10"><td><code>X = [[2], [5], [8], [12], [25], [31], [40], [55]]</code></td><td>Guarda en <code>X</code> las pistas de los ocho clientes: sus días sin entrar. Los corchetes <code>[ ]</code> crean una <strong>lista</strong>. Aquí hay listas dentro de una lista: una por cliente. <span class="por-que">scikit-learn siempre espera una <strong>tabla</strong> (filas × columnas), aunque solo haya una columna. Por eso cada cliente va en su propia lista: <code>[2]</code> es «una fila con un dato». Con <code>[2, 5, 8…]</code> daría error.</span> <span class="se-lee">X es una tabla de 8 filas y 1 columna: 2 días, 5 días, 8 días…</span></td></tr>
+        <tr data-lines="11"><td><code>y = [0, 0, 0, 0, 1, 1, 1, 1]</code></td><td>Las respuestas correctas, en el mismo orden que <code>X</code>: los cuatro primeros se quedaron (0) y los cuatro últimos cancelaron (1). <span class="por-que">Los modelos solo entienden números; por eso «no» y «sí» se escriben 0 y 1. Sin <code>y</code> el modelo no tendría con qué compararse y no podría aprender.</span> <span class="se-lee">el de 2 días se quedó, el de 5 se quedó… el de 55 canceló</span></td></tr>
+        <tr data-lines="13"><td><code>modelo = DecisionTreeClassifier(max_depth=1, random_state=42)</code></td><td>Fabrica un árbol nuevo, todavía vacío, y lo guarda con el nombre <code>modelo</code>. Dentro del paréntesis van ajustes con nombre: <code>nombre=valor</code>. <span class="por-que"><code>max_depth=1</code> («profundidad máxima 1») le deja hacer una sola pregunta: un solo umbral, como en la lección. <code>random_state=42</code> fija el azar para que a ti te salga lo mismo que aquí; 42 es un número cualquiera. Los dos los eliges tú: son hiperparámetros (<a href="leccion-2.html#parametros">lección 2</a>).</span> <span class="se-lee">crea un árbol de decisión que solo pueda hacer una pregunta y que use siempre el mismo azar</span></td></tr>
+        <tr data-lines="14"><td><code>modelo.fit(X, y)</code></td><td><strong>Aquí aprende.</strong> <code>fit</code> («ajustar») recibe las pistas y las respuestas, prueba umbrales y se queda con el que menos falla. El punto de <code>modelo.fit</code> significa «modelo, haz esto». <span class="por-que">Es la tabla de errores que hiciste a mano en la lección 1. Antes de esta línea el modelo no sabe nada: si le pidieras una predicción, daría error.</span> <span class="se-lee">modelo, mira estos 8 clientes con sus respuestas y busca la mejor regla</span></td></tr>
+        <tr data-lines="16"><td><code>print("Umbral aprendido:", modelo.tree_.threshold[0])</code></td><td><code>print</code> escribe en pantalla lo que va entre paréntesis. <code>modelo.tree_</code> es el árbol ya entrenado; <code>.threshold</code> («umbral») es su lista de umbrales; <code>[0]</code> pide el primero (en Python se cuenta desde 0). <span class="por-que">Queremos ver el parámetro que encontró. El guion bajo final de <code>tree_</code> es una costumbre de scikit-learn: «esto solo existe después de <code>fit</code>».</span> <span class="se-lee">escribe «Umbral aprendido:» y, al lado, el primer umbral del árbol</span></td></tr>
+        <tr data-lines="17"><td><code>print("Predicciones:", modelo.predict([[10], [28]]))</code></td><td><code>predict</code> («predecir») aplica la regla aprendida a dos clientes nuevos: uno con 10 días y otro con 28. Van con dobles corchetes porque es una tabla de 2 filas, igual que <code>X</code>. <span class="por-que">Para esto se entrena: para responder con clientes que el modelo nunca vio. Predecir no cambia el modelo; solo lo usa.</span> <span class="se-lee">¿qué harán un cliente con 10 días y otro con 28? escríbelo</span></td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>Umbral aprendido: 18.5
+Predicciones: [0 1]</pre>
+    <p><strong>Cómo leerlo.</strong> <code>18.5</code> es el umbral que encontró <code>fit</code>, el mismo que te salió a mano (Python escribe los decimales con punto). <code>[0 1]</code> es una respuesta por cliente nuevo, en el orden en que los diste: el de 10 días → 0 (se queda), porque 10 no pasa de 18,5; el de 28 días → 1 (cancela).</p>
+  </div>
+</article>
+</section>
+
+<section class="lab-paso" id="paso-2">
+<h2><span class="paso-n">2</span>Crear la tabla de clientes</h2>
+<p><strong>Para qué:</strong> tener los datos en una tabla, que es como trabaja todo el Machine Learning. Son 8 clientes de Netflix con tres pistas (edad, plan y horas al mes) y la respuesta (si canceló). Conecta con la <a href="leccion-2.html#piezas-rapidas">lección 2</a>: filas, columnas, X e y. A partir de aquí, cada paso usa lo que dejó el anterior.</p>
+<article class="snippet" data-lang="python">
+  <header>
+    <h3>Crear la tabla de clientes</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Escribir a mano una tabla pequeña con dos huecos a propósito (una edad y un plan que faltan), para aprender a tratarlos en el paso 5.</p>
+  </header>
+  <pre class="code"><code>import numpy as np
+import pandas as pd
+
+datos = {
+    "Edad": [23, 41, 32, 27, np.nan, 55, 38, 29],
+    "Plan": ["Basic", "Premium", "Standard", "Basic", "Standard", "Premium", None, "Basic"],
+    "HorasMes": [5, 37, 22, 3, 18, 41, 25, 4],
+    "Cancelado": [1, 0, 0, 1, 0, 0, 0, 1],
+}
+df = pd.DataFrame(datos)</code></pre>
+  <details class="linea-a-linea" open>
+    <summary>Línea por línea</summary>
+    <p class="hint">Toca o pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+      <tbody>
+        <tr data-lines="1"><td><code>import numpy as np</code></td><td>Trae la librería <strong>NumPy</strong> (la de los números) y le pone el apodo <code>np</code>. <span class="por-que">Aquí la necesitamos para una sola cosa: <code>np.nan</code>, la forma de escribir «este dato falta». El apodo es una costumbre de todo el mundo: así se escribe <code>np.algo</code> en vez de <code>numpy.algo</code>.</span> <span class="se-lee">trae numpy y, desde ahora, llámalo np</span></td></tr>
+        <tr data-lines="2"><td><code>import pandas as pd</code></td><td>Trae <strong>Pandas</strong>, la librería de las tablas, con el apodo <code>pd</code>. <span class="por-que">Python solo no tiene tablas con nombres de columna. Pandas sí: es como tener un Excel dentro de Python.</span> <span class="se-lee">trae pandas y llámalo pd</span></td></tr>
+        <tr data-lines="4"><td><code>datos = {</code></td><td>Empieza un <strong>diccionario</strong>: llaves <code>{ }</code> con parejas <code>nombre: valor</code>. Aquí cada pareja es «nombre de columna: lista con sus 8 valores». <span class="por-que">Es la forma más cómoda de escribir una tabla a mano, columna a columna.</span> <span class="se-lee">datos es una libreta con cuatro apartados: Edad, Plan, HorasMes y Cancelado</span></td></tr>
+        <tr data-lines="5"><td><code>"Edad": [23, 41, 32, 27, np.nan, 55, 38, 29],</code></td><td>La columna Edad: un número por cliente. El quinto es <code>np.nan</code> («not a number», no es un número): ese cliente no dijo su edad. <span class="por-que">En la vida real siempre faltan datos. Un hueco no es un 0: nadie tiene 0 años. Si pusieras 0, el modelo creería que hay un bebé abonado.</span> <span class="se-lee">Edad: 23, 41, 32, 27, no se sabe, 55, 38 y 29</span></td></tr>
+        <tr data-lines="6"><td><code>"Plan": ["Basic", ..., None, "Basic"],</code></td><td>La columna Plan, con texto (entre comillas). El séptimo es <code>None</code> («nada»): el hueco de texto. <span class="por-que">El modelo solo entiende números: el texto y sus huecos habrá que arreglarlos en el paso 5.</span></td></tr>
+        <tr data-lines="7"><td><code>"HorasMes": [5, 37, 22, 3, 18, 41, 25, 4],</code></td><td>Horas que ve cada cliente al mes. Completa, sin huecos. <span class="por-que">Será la pista clave: fíjate en que los que cancelan (filas 0, 3 y 7) ven 5, 3 y 4 horas.</span></td></tr>
+        <tr data-lines="8"><td><code>"Cancelado": [1, 0, 0, 1, 0, 0, 0, 1],</code></td><td>La respuesta, el <strong>target</strong> (<code>y</code>): 1 = canceló, 0 = se quedó. <span class="por-que">Es lo que el modelo debe aprender a adivinar. Como tenemos la respuesta, esto es aprendizaje <strong>supervisado</strong> (<a href="leccion-3.html">lección 3</a>).</span></td></tr>
+        <tr data-lines="9"><td><code>}</code></td><td>Cierra el diccionario. <span class="por-que">Toda llave que se abre tiene que cerrarse; si no, Python da <code>SyntaxError</code> (error de escritura).</span></td></tr>
+        <tr data-lines="10"><td><code>df = pd.DataFrame(datos)</code></td><td>Convierte el diccionario en un <strong>DataFrame</strong>, la tabla de Pandas. Cada nombre pasa a ser una columna y cada posición de las listas, una fila. <span class="por-que">Un diccionario no sabe contar huecos ni repartir filas; un DataFrame sí. Se llama <code>df</code> por costumbre (de <em>DataFrame</em>).</span> <span class="se-lee">con estos datos, fabrica una tabla de Pandas y llámala df</span></td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>   Edad      Plan  HorasMes  Cancelado
+0  23.0     Basic         5          1
+1  41.0   Premium        37          0
+2  32.0  Standard        22          0
+3  27.0     Basic         3          1
+4   NaN  Standard        18          0
+5  55.0   Premium        41          0
+6  38.0       NaN        25          0
+7  29.0     Basic         4          1</pre>
+    <p><strong>Ojo:</strong> este paso no tiene ningún <code>print</code>, así que <strong>no escribe nada</strong>. Arriba tienes cómo es <code>df</code> por dentro: es lo que verías si añadieras <code>print(df)</code>. <strong>Cómo leerlo:</strong> la columna de la izquierda (0 a 7) es el <em>índice</em>, el número de fila que pone Pandas. <code>NaN</code> marca los dos huecos (Pandas muestra igual el de número y el de texto). La edad sale con <code>.0</code> porque, al haber un <code>NaN</code>, Pandas guarda la columna con decimales.</p>
+  </div>
+</article>
+</section>
+
+<section class="lab-paso" id="paso-3">
+<h2><span class="paso-n">3</span>Mirar los datos antes de tocar nada</h2>
+<p><strong>Para qué:</strong> antes de entrenar, hacerle a la tabla cuatro preguntas: cómo es, cuánto mide, qué le falta y cuántos cancelan. Es la escena «explorar los datos» del ciclo de vida (<a href="leccion-5.html#por-fechas">lección 5</a>). Usa el <code>df</code> del paso 2.</p>
+<article class="snippet" data-lang="python">
+  <header>
+    <h3>Mirar los datos antes de tocar nada</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Comprobar que la tabla es la que crees, contar los huecos que habrá que rellenar y ver si hay muchos más «se queda» que «cancela».</p>
+  </header>
+  <pre class="code"><code>print(df.head(3))
+print(df.shape)
+print(df.isna().sum())
+print(df["Cancelado"].value_counts(normalize=True))</code></pre>
+  <details class="linea-a-linea" open>
+    <summary>Línea por línea</summary>
+    <p class="hint">Toca o pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+      <tbody>
+        <tr data-lines="1"><td><code>print(df.head(3))</code></td><td><code>head</code> («cabeza») devuelve las 3 primeras filas; <code>print</code> las escribe. <span class="por-que">Con miles de filas no puedes mirarlas todas. Un vistazo al principio confirma que las columnas se han leído bien.</span> <span class="se-lee">enséñame las 3 primeras filas de df</span></td></tr>
+        <tr data-lines="2"><td><code>print(df.shape)</code></td><td><code>shape</code> («forma») dice cuántas filas y columnas tiene la tabla, escrito <code>(filas, columnas)</code>. Va sin paréntesis porque es un dato guardado, no una orden. <span class="por-que">Es la primera comprobación de cualquier proyecto: ¿tengo los datos que creía tener?</span> <span class="se-lee">¿cuántas filas y cuántas columnas tiene df?</span></td></tr>
+        <tr data-lines="3"><td><code>print(df.isna().sum())</code></td><td>Dos órdenes encadenadas con puntos. <code>isna()</code> («is NA»: ¿está vacío?) pone <code>True</code> en cada celda vacía y <code>False</code> en las demás. <code>sum()</code> suma por columnas, y <code>True</code> cuenta como 1. <span class="por-que">Así sabes cuántos huecos hay que rellenar en cada columna antes de entrenar.</span> <span class="se-lee">marca cada hueco y cuenta cuántos hay en cada columna</span></td></tr>
+        <tr data-lines="4"><td><code>print(df["Cancelado"].value_counts(normalize=True))</code></td><td><code>df["Cancelado"]</code> coge una sola columna: los corchetes detrás de un nombre sirven para elegir. <code>value_counts()</code> cuenta cuántas veces sale cada valor. <code>normalize=True</code> lo da como proporción (de 0 a 1) en vez de como número de clientes. <span class="por-que">Si casi nadie cancelara (por ejemplo, un 2 %), un modelo que dijera siempre «se queda» acertaría el 98 % sin aprender nada. Hay que saberlo antes de medir (clases desequilibradas, <a href="leccion-7.html#dos-ultimos">lección 7</a>).</span> <span class="se-lee">de la columna Cancelado, ¿qué parte son ceros y qué parte son unos?</span></td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>   Edad      Plan  HorasMes  Cancelado
+0  23.0     Basic         5          1
+1  41.0   Premium        37          0
+2  32.0  Standard        22          0
+(8, 4)
+Edad         1
+Plan         1
+HorasMes     0
+Cancelado    0
+dtype: int64
+Cancelado
+0    0.625
+1    0.375
+Name: proportion, dtype: float64</pre>
+    <p><strong>Cómo leerlo, bloque a bloque.</strong> 1) Las 3 primeras filas: todo en su sitio. 2) <code>(8, 4)</code>: 8 clientes y 4 columnas. 3) Falta 1 dato en <code>Edad</code> y 1 en <code>Plan</code>; la línea <code>dtype: int64</code> solo dice que esos recuentos son números enteros. 4) <code>0.625</code> = el 62,5 % se quedó (5 de 8) y <code>0.375</code> = el 37,5 % canceló (3 de 8). Está algo desequilibrado, pero no mucho. <code>Name: proportion</code> es el nombre que Pandas da a esa columna de proporciones.</p>
+  </div>
+</article>
+</section>
+
+<section class="lab-paso" id="paso-4">
+<h2><span class="paso-n">4</span>Separar pistas y respuesta, y repartir en train y test</h2>
+<p><strong>Para qué:</strong> separar las pistas (<code>X</code>) de la respuesta (<code>y</code>) y guardar unos clientes para el examen final. Es la <a href="leccion-8.html#repartir">lección 8</a>: los apuntes (train) y el examen (test). Se hace <strong>antes</strong> de limpiar, para que el examen no se cuele en lo que aprendemos al limpiar.</p>
+<article class="snippet" data-lang="python">
+  <header>
+    <h3>Separar X e y y repartir en train y test</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Quitar la respuesta de las pistas y repartir los 8 clientes en 6 para entrenar y 2 para el examen, con la misma mezcla de cancelados en los dos montones.</p>
+  </header>
+  <pre class="code"><code>from sklearn.model_selection import train_test_split
+
+X = df.drop(columns=["Cancelado"])
+y = df["Cancelado"]
+
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y, test_size=0.25, stratify=y, random_state=42
+)
+
+print(X_train.shape, X_test.shape)
+print("train:", y_train.value_counts().to_dict())
+print("test :", y_test.value_counts().to_dict())</code></pre>
+  <details class="linea-a-linea" open>
+    <summary>Línea por línea</summary>
+    <p class="hint">Toca o pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+      <tbody>
+        <tr data-lines="1"><td><code>from sklearn.model_selection import train_test_split</code></td><td>Del cajón <code>model_selection</code> («elegir y probar modelos») de scikit-learn trae la función <code>train_test_split</code> («partir en entrenamiento y prueba»). <span class="por-que">Repartir a mano, al azar y sin equivocarse, es pesado. Esta función lo hace en una línea.</span> <span class="se-lee">de sklearn, cajón model_selection, tráeme la función que reparte en train y test</span></td></tr>
+        <tr data-lines="3"><td><code>X = df.drop(columns=["Cancelado"])</code></td><td><code>drop</code> significa «tirar». Devuelve una copia de la tabla sin la columna <code>Cancelado</code>. Esa copia son las pistas: <code>X</code>. <span class="por-que">La respuesta nunca va entre las pistas: si se la das, el modelo «acierta» copiando (data leakage, <a href="leccion-2.html">lección 2</a>). <code>df</code> no cambia: <code>drop</code> devuelve una tabla nueva.</span> <span class="se-lee">X es df sin la columna Cancelado</span></td></tr>
+        <tr data-lines="4"><td><code>y = df["Cancelado"]</code></td><td>Coge solo la columna <code>Cancelado</code>: la respuesta, <code>y</code>. <span class="por-que"><code>fit</code> necesita las pistas y la respuesta por separado.</span> <span class="se-lee">y es la columna Cancelado</span></td></tr>
+        <tr data-lines="6-8"><td><code>X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.25, stratify=y, random_state=42)</code></td><td>Baraja los clientes y los reparte en dos montones. Devuelve 4 cosas y las guardamos a la vez en 4 nombres, separados por comas. El orden es siempre ese: <code>X_train, X_test, y_train, y_test</code>. La orden ocupa 3 líneas porque es larga: mientras un paréntesis siga abierto, Python sigue leyendo. <span class="por-que"><code>test_size=0.25</code>: el 25 % (2 de 8) va al examen. <code>stratify=y</code>: que los dos montones tengan la misma proporción de cancelados que el total. <code>random_state=42</code>: barajar siempre igual. Sin examen aparte no sabrías si el modelo generaliza o solo memoriza.</span> <span class="se-lee">reparte X e y: un 25 % para el examen, con la misma mezcla de cancelados en los dos montones y barajando siempre igual</span></td></tr>
+        <tr data-lines="10"><td><code>print(X_train.shape, X_test.shape)</code></td><td>Escribe el tamaño de los dos montones de pistas. <span class="por-que">Comprobar que el reparto es el que pediste.</span></td></tr>
+        <tr data-lines="11"><td><code>print("train:", y_train.value_counts().to_dict())</code></td><td>Cuenta cuántos 0 y cuántos 1 hay entre las respuestas de train. <code>to_dict()</code> lo convierte en un diccionario <code>{valor: cuántos}</code>, que se lee mejor. <span class="por-que">Para ver que <code>stratify</code> ha hecho su trabajo.</span> <span class="se-lee">en train, ¿cuántos se quedaron y cuántos cancelaron?</span></td></tr>
+        <tr data-lines="12"><td><code>print("test :", y_test.value_counts().to_dict())</code></td><td>Lo mismo con las respuestas del examen.</td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>(6, 3) (2, 3)
+train: {0: 4, 1: 2}
+test : {0: 1, 1: 1}</pre>
+    <p><strong>Cómo leerlo.</strong> <code>(6, 3) (2, 3)</code>: 6 clientes para estudiar y 2 para el examen, cada uno con 3 pistas (Edad, Plan, HorasMes). <code>train: {0: 4, 1: 2}</code> = 4 se quedaron y 2 cancelaron; <code>test: {0: 1, 1: 1}</code> = uno de cada. Con solo 8 clientes, <code>stratify</code> no puede clavar el 37,5 % en un montón de 2: hace lo más parecido posible. En el paso 7 verás qué dos clientes han caído en el examen.</p>
+  </div>
+</article>
+</section>
+
+<section class="lab-paso" id="paso-5">
+<h2><span class="paso-n">5</span>Limpiar y preparar: rellenar huecos, escalar y One-Hot</h2>
+<p><strong>Para qué:</strong> dejar la tabla como la necesita el modelo: sin huecos, con los números en la misma escala y con el texto convertido en columnas de 0 y 1. Es la <a href="leccion-7.html">lección 7</a> entera en una pieza. Usa <code>X_train</code> y <code>X_test</code> del paso 4.</p>
+<article class="snippet" data-lang="python">
+  <header>
+    <h3>Preparar los datos con ColumnTransformer</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Rellenar los huecos, escalar los números y aplicar One-Hot al plan, aprendiendo cómo hacerlo <strong>solo de train</strong> y aplicándolo igual a test.</p>
+  </header>
+  <pre class="code"><code>from sklearn.compose import ColumnTransformer
+from sklearn.impute import SimpleImputer
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import OneHotEncoder, StandardScaler
+
+numericas = ["Edad", "HorasMes"]
+categoricas = ["Plan"]
+
+pre_num = Pipeline([
+    ("imputar", SimpleImputer(strategy="median")),
+    ("escalar", StandardScaler()),
+])
+pre_cat = Pipeline([
+    ("imputar", SimpleImputer(strategy="most_frequent")),
+    ("onehot", OneHotEncoder(handle_unknown="ignore", sparse_output=False)),
+])
+preprocesador = ColumnTransformer([
+    ("num", pre_num, numericas),
+    ("cat", pre_cat, categoricas),
+])
+
+X_train_listo = preprocesador.fit_transform(X_train)
+X_test_listo = preprocesador.transform(X_test)
+
+print(preprocesador.get_feature_names_out())
+print(X_train_listo.round(2))
+print(X_test_listo.shape)</code></pre>
+  <details class="linea-a-linea" open>
+    <summary>Línea por línea</summary>
+    <p class="hint">Toca o pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+      <tbody>
+        <tr data-lines="1"><td><code>from sklearn.compose import ColumnTransformer</code></td><td>Trae <code>ColumnTransformer</code> («transformador por columnas»), del cajón <code>compose</code> («componer»). <span class="por-que">Los números y el texto se arreglan de forma distinta. Esta pieza separa los dos grupos, trata cada uno y vuelve a juntar la tabla.</span></td></tr>
+        <tr data-lines="2"><td><code>from sklearn.impute import SimpleImputer</code></td><td>Trae <code>SimpleImputer</code> («rellenador simple»), del cajón <code>impute</code>. <em>Imputar</em> es rellenar un hueco con un valor razonable. <span class="por-que">El modelo no acepta huecos: con un <code>NaN</code>, <code>fit</code> da error.</span></td></tr>
+        <tr data-lines="3"><td><code>from sklearn.pipeline import Pipeline</code></td><td>Trae <code>Pipeline</code> («tubería»): encadena pasos para que los datos pasen por todos, en orden. <span class="por-que">Así no te olvidas de ningún paso ni los aplicas en otro orden en test.</span></td></tr>
+        <tr data-lines="4"><td><code>from sklearn.preprocessing import OneHotEncoder, StandardScaler</code></td><td>Del cajón <code>preprocessing</code> («preprocesado») trae dos piezas: <code>StandardScaler</code>, que pone los números en la misma escala, y <code>OneHotEncoder</code>, que convierte el texto en columnas de 0 y 1. <span class="por-que">Sin escalar, la columna de números más grandes mandaría; sin One-Hot, el modelo no sabría qué hacer con «Premium».</span> <span class="se-lee">de preprocessing, tráeme el que convierte texto en columnas 0/1 y el que iguala escalas</span></td></tr>
+        <tr data-lines="6"><td><code>numericas = ["Edad", "HorasMes"]</code></td><td>Una lista con los nombres de las columnas de números. <span class="por-que"><code>ColumnTransformer</code> necesita saber a qué columnas aplicar cada tratamiento.</span></td></tr>
+        <tr data-lines="7"><td><code>categoricas = ["Plan"]</code></td><td>Una lista con las columnas de texto (categorías).</td></tr>
+        <tr data-lines="9-12"><td><code>pre_num = Pipeline([("imputar", SimpleImputer(strategy="median")), ("escalar", StandardScaler())])</code></td><td>Tubería para los números, con dos pasos en orden. Cada paso es una pareja entre paréntesis: <code>(nombre que eliges tú, pieza)</code>. Primero rellena con la <strong>mediana</strong> (<code>strategy="median"</code>); después escala. <span class="por-que">Se rellena antes de escalar porque el escalador no sabe hacer cuentas con huecos. La mediana (el valor del medio) no se deja arrastrar por un valor extremo; la media sí (mira <a href="#frag-3">«Media frente a mediana»</a>).</span> <span class="se-lee">para los números: primero tapa cada hueco con la mediana de su columna; después ponlos todos en la misma escala</span></td></tr>
+        <tr data-lines="13-16"><td><code>pre_cat = Pipeline([("imputar", SimpleImputer(strategy="most_frequent")), ("onehot", OneHotEncoder(handle_unknown="ignore", sparse_output=False))])</code></td><td>Tubería para el texto: rellena con el valor más repetido (<code>most_frequent</code>) y después aplica One-Hot. <span class="por-que"><code>handle_unknown="ignore"</code>: si un día llega un plan que no vio al entrenar, pone sus columnas a 0 en vez de dar error. <code>sparse_output=False</code>: devuelve una tabla normal que se puede imprimir (si no, la guarda comprimida).</span> <span class="se-lee">para el texto: tapa cada hueco con el plan más común; después crea una columna de 0 y 1 por cada plan</span></td></tr>
+        <tr data-lines="17-20"><td><code>preprocesador = ColumnTransformer([("num", pre_num, numericas), ("cat", pre_cat, categoricas)])</code></td><td>Junta las dos tuberías. Cada trío dice <code>(nombre, tubería, columnas)</code>: «num» aplica <code>pre_num</code> a Edad y HorasMes, y «cat» aplica <code>pre_cat</code> a Plan. <span class="por-que">Así hay una sola pieza que prepara la tabla entera de una vez. Los nombres <code>num</code> y <code>cat</code> saldrán delante de cada columna nueva.</span> <span class="se-lee">a las columnas de números, pásales la tubería de números; a la de texto, la tubería de texto</span></td></tr>
+        <tr data-lines="22"><td><code>X_train_listo = preprocesador.fit_transform(X_train)</code></td><td><code>fit_transform</code> hace dos cosas seguidas. <code>fit</code> aprende de train: la mediana de cada columna, su media y su desviación, qué planes existen. <code>transform</code> aplica esos arreglos a train. <span class="por-que">Lo que se aprende al preparar se aprende <strong>solo de train</strong>. Si se aprendiera también de test, el examen se colaría en los apuntes (fuga de datos).</span> <span class="se-lee">aprende de los clientes de train cómo arreglar los datos, y arréglalos</span></td></tr>
+        <tr data-lines="23"><td><code>X_test_listo = preprocesador.transform(X_test)</code></td><td>Solo <code>transform</code>: aplica a test los arreglos aprendidos de train, sin aprender nada nuevo. <span class="por-que">Test se trata igual que train y con los números de train. Nunca se hace <code>fit</code> con test.</span> <span class="se-lee">arregla a los clientes de test con lo que aprendiste de train</span></td></tr>
+        <tr data-lines="25"><td><code>print(preprocesador.get_feature_names_out())</code></td><td>Escribe los nombres de las columnas que salen. <span class="por-que">Tras el One-Hot ya no hay 3 columnas sino 5; así sabes qué es cada una.</span></td></tr>
+        <tr data-lines="26"><td><code>print(X_train_listo.round(2))</code></td><td>Escribe la tabla de train ya lista, con 2 decimales (<code>round(2)</code>). <span class="por-que">Sin redondear verías números con 16 decimales. Redondear solo cambia lo que se ve, no los datos.</span></td></tr>
+        <tr data-lines="27"><td><code>print(X_test_listo.shape)</code></td><td>Escribe la forma de la tabla de test ya lista. <span class="por-que">Para comprobar que test tiene las mismas 5 columnas que train.</span></td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>['num__Edad' 'num__HorasMes' 'cat__Plan_Basic' 'cat__Plan_Premium'
+ 'cat__Plan_Standard']
+[[-0.85 -1.19  1.    0.    0.  ]
+ [-0.24  0.32  0.    0.    1.  ]
+ [ 1.61  1.59  0.    1.    0.  ]
+ [-1.26 -1.28  1.    0.    0.  ]
+ [-0.24 -0.01  0.    0.    1.  ]
+ [ 0.99  0.58  1.    0.    0.  ]]
+(2, 5)</pre>
+    <p><strong>Cómo leerlo.</strong> Primero, las 5 columnas nuevas: <code>num__Edad</code> y <code>num__HorasMes</code> son los números escalados; <code>cat__Plan_Basic</code>, <code>_Premium</code> y <code>_Standard</code> son el One-Hot del plan. Después, los 6 clientes de train, en el orden barajado (son los clientes 7, 2, 1, 3, 4 y 6). Primera fila, <code>[-0.85 -1.19 1. 0. 0.]</code>: edad algo por debajo de la media, horas bastante por debajo, plan Basic. Un número escalado dice cuántas desviaciones está por encima (+) o por debajo (−) de la media de train. Mira los dos huecos: la quinta fila (cliente 4, sin edad) tiene Edad <code>-0.24</code>, que es la mediana de train (32 años) escalada; la sexta (cliente 6, sin plan) tiene <code>Plan_Basic = 1</code>, el plan más repetido en train. Al final, <code>(2, 5)</code>: los 2 clientes de test con las mismas 5 columnas.</p>
+  </div>
+</article>
+</section>
+
+<section class="lab-paso" id="paso-6">
+<h2><span class="paso-n">6</span>Entrenar el árbol</h2>
+<p><strong>Para qué:</strong> que el modelo encuentre solo su regla, como en la <a href="leccion-1.html#numeros">lección 1</a>, pero ahora con tres pistas en vez de una. Es el <code>fit</code> del flujo de scikit-learn (<a href="leccion-8.html#flujo">lección 8</a>). Usa <code>X_train_listo</code> del paso 5 e <code>y_train</code> del paso 4.</p>
+<article class="snippet" data-lang="python">
+  <header>
+    <h3>Entrenar un árbol de una pregunta</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Crear el modelo, entrenarlo con los 6 clientes de train y mirar qué pregunta ha aprendido: qué columna mira y dónde pone la frontera.</p>
+  </header>
+  <pre class="code"><code>from sklearn.tree import DecisionTreeClassifier
+
+arbol = DecisionTreeClassifier(max_depth=1, random_state=42)
+arbol.fit(X_train_listo, y_train)
+
+nombres = preprocesador.get_feature_names_out()
+print("Columna que mira:", nombres[arbol.tree_.feature[0]])
+print("Umbral aprendido:", round(arbol.tree_.threshold[0], 2))</code></pre>
+  <details class="linea-a-linea" open>
+    <summary>Línea por línea</summary>
+    <p class="hint">Toca o pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+      <tbody>
+        <tr data-lines="1"><td><code>from sklearn.tree import DecisionTreeClassifier</code></td><td>Trae el mismo árbol del paso 1. <span class="por-que">Si ejecutas todo seguido ya estaría importado. Lo repetimos para que el paso se entienda solo: importar dos veces no hace daño.</span></td></tr>
+        <tr data-lines="3"><td><code>arbol = DecisionTreeClassifier(max_depth=1, random_state=42)</code></td><td>Fabrica un árbol vacío que solo puede hacer una pregunta y lo llama <code>arbol</code>. <span class="por-que">Una sola pregunta se puede leer y comprobar a mano. Con muchas preguntas y solo 6 clientes, se aprendería a cada cliente de memoria (sobreajuste, <a href="leccion-8.html#diagnostico">lección 8</a>).</span> <span class="se-lee">crea un árbol de una sola pregunta, con el azar fijo</span></td></tr>
+        <tr data-lines="4"><td><code>arbol.fit(X_train_listo, y_train)</code></td><td>Entrena. El árbol prueba cada columna y cada umbral posible y se queda con la pregunta que mejor separa a los que cancelan de los que se quedan. <span class="por-que">Se entrena con <code>X_train_listo</code>, no con <code>X_train</code>: la tabla original tiene huecos y texto, y <code>fit</code> daría error.</span> <span class="se-lee">árbol, mira a estos 6 clientes con sus respuestas y busca la pregunta que mejor los separa</span></td></tr>
+        <tr data-lines="6"><td><code>nombres = preprocesador.get_feature_names_out()</code></td><td>Guarda la lista de los 5 nombres de columna del paso 5. <span class="por-que">El árbol solo sabe números de columna (0, 1, 2…). Con esta lista los traducimos a nombres.</span></td></tr>
+        <tr data-lines="7"><td><code>print("Columna que mira:", nombres[arbol.tree_.feature[0]])</code></td><td><code>arbol.tree_.feature</code> es la lista de columnas que usa cada pregunta del árbol; <code>[0]</code> es la primera (y única). Ese número, metido en <code>nombres[…]</code>, da el nombre de la columna. <span class="por-que">Queremos saber en qué se fija el modelo, no solo que acierta.</span> <span class="se-lee">¿en qué columna se fija la primera pregunta del árbol? dime su nombre</span></td></tr>
+        <tr data-lines="8"><td><code>print("Umbral aprendido:", round(arbol.tree_.threshold[0], 2))</code></td><td>El umbral de esa pregunta. <code>round(número, 2)</code> lo redondea a 2 decimales. <span class="por-que">Es el parámetro que ha aprendido: el número que nadie ha escrito.</span> <span class="se-lee">¿y en qué valor pone la frontera?</span></td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>Columna que mira: num__HorasMes
+Umbral aprendido: -0.6</pre>
+    <p><strong>Cómo leerlo.</strong> El árbol ha decidido mirar las <strong>horas al mes</strong>, no la edad ni el plan. El umbral <code>-0.6</code> está en la escala del paso 5, no en horas. Para pasarlo a horas se deshace el escalado: media de train (18,17 h) + (−0,6 × desviación de train, 11,88 h) ≈ <strong>11 horas</strong>. Es justo el punto medio entre las 4 h del cancelado que más ve y las 18 h del que se queda y menos ve. La regla aprendida se lee así: «si ve 11 horas al mes o menos, cancela». Como en la lección 1, nadie escribió ese 11.</p>
+  </div>
+</article>
+</section>
+
+<section class="lab-paso" id="paso-7">
+<h2><span class="paso-n">7</span>Predecir a los clientes del examen</h2>
+<p><strong>Para qué:</strong> usar el modelo con los 2 clientes que guardamos para el examen y que nunca vio. Es el <code>predict</code> de la <a href="leccion-8.html#flujo">lección 8</a>. Usa <code>arbol</code> del paso 6 y <code>X_test_listo</code> del paso 5.</p>
+<article class="snippet" data-lang="python">
+  <header>
+    <h3>Predecir con predict</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Pedir al árbol una respuesta para cada cliente de test y ponerla al lado de la respuesta real.</p>
+  </header>
+  <pre class="code"><code>y_pred = arbol.predict(X_test_listo)
+
+print("Clientes de test:", X_test.index.tolist())
+print("Real    :", y_test.tolist())
+print("Predicho:", y_pred.tolist())</code></pre>
+  <details class="linea-a-linea" open>
+    <summary>Línea por línea</summary>
+    <p class="hint">Toca o pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+      <tbody>
+        <tr data-lines="1"><td><code>y_pred = arbol.predict(X_test_listo)</code></td><td>Pide al árbol una respuesta para cada cliente de test y guarda la lista en <code>y_pred</code> (<em>pred</em> de predicción). <span class="por-que">Es el examen: clientes que el árbol no vio al entrenar. Se le dan las pistas ya preparadas, igual que en <code>fit</code>.</span> <span class="se-lee">árbol, ¿qué crees que harán los clientes del examen?</span></td></tr>
+        <tr data-lines="3"><td><code>print("Clientes de test:", X_test.index.tolist())</code></td><td><code>index</code> es la columna de números de fila de la tabla. <code>tolist()</code> la convierte en una lista normal de Python. <span class="por-que">Para saber qué clientes de la tabla del paso 2 han caído en el examen.</span></td></tr>
+        <tr data-lines="4"><td><code>print("Real    :", y_test.tolist())</code></td><td>Las respuestas reales de esos clientes, como lista. <span class="por-que">Para compararlas a ojo con las predichas.</span></td></tr>
+        <tr data-lines="5"><td><code>print("Predicho:", y_pred.tolist())</code></td><td>Lo que ha dicho el árbol, en el mismo orden. <span class="por-que"><code>y_pred</code> ya es un array de NumPy; <code>tolist()</code> lo escribe con comas, igual que la línea anterior.</span></td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>Clientes de test: [5, 0]
+Real    : [0, 1]
+Predicho: [0, 1]</pre>
+    <p><strong>Cómo leerlo.</strong> En el examen han caído los clientes 5 y 0. El 5 (55 años, Premium, 41 h) se quedó (0) y el árbol dice 0: 41 h está muy por encima de 11 h. El 0 (23 años, Basic, 5 h) canceló (1) y el árbol dice 1: 5 h está por debajo de 11 h. Los dos, bien.</p>
+  </div>
+</article>
+</section>
+
+<section class="lab-paso" id="paso-8">
+<h2><span class="paso-n">8</span>Medir: accuracy y matriz de confusión</h2>
+<p><strong>Para qué:</strong> ponerle nota al modelo y ver qué tipo de errores comete. Es la parte «evaluar» de la <a href="leccion-8.html#evaluar">lección 8</a>. Usa <code>y_pred</code> del paso 7.</p>
+<article class="snippet" data-lang="python">
+  <header>
+    <h3>Medir con accuracy_score y confusion_matrix</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Calcular la nota en train y en test (si se parecen, no memoriza) y la matriz de confusión del examen.</p>
+  </header>
+  <pre class="code"><code>from sklearn.metrics import accuracy_score, confusion_matrix
+
+nota_train = accuracy_score(y_train, arbol.predict(X_train_listo))
+nota_test = accuracy_score(y_test, y_pred)
+print("accuracy en train:", nota_train)
+print("accuracy en test :", nota_test)
+print(confusion_matrix(y_test, y_pred))</code></pre>
+  <details class="linea-a-linea" open>
+    <summary>Línea por línea</summary>
+    <p class="hint">Toca o pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+      <tbody>
+        <tr data-lines="1"><td><code>from sklearn.metrics import accuracy_score, confusion_matrix</code></td><td>Del cajón <code>metrics</code> («medidas») trae dos funciones: <code>accuracy_score</code> (qué parte acierta) y <code>confusion_matrix</code> (aciertos y errores por tipo). <span class="por-que">Medir a mano es fácil con 2 clientes, pero no con 2 millones.</span> <span class="se-lee">de sklearn, cajón metrics, tráeme la nota de aciertos y la matriz de confusión</span></td></tr>
+        <tr data-lines="3"><td><code>nota_train = accuracy_score(y_train, arbol.predict(X_train_listo))</code></td><td>Predice a los clientes de train y lo compara con sus respuestas reales. Devuelve la parte que acierta, de 0 a 1. <span class="por-que">Es la nota con los apuntes delante. Sola dice poco, pero comparada con la de test dice si el modelo memoriza.</span> <span class="se-lee">¿qué parte de los clientes de train acierta el árbol?</span></td></tr>
+        <tr data-lines="4"><td><code>nota_test = accuracy_score(y_test, y_pred)</code></td><td>La nota del examen: compara las respuestas reales de test con las del paso 7. <span class="por-que">Es la nota que importa: dice cómo le irá con clientes nuevos.</span> <span class="se-lee">¿qué parte de los clientes del examen acierta?</span></td></tr>
+        <tr data-lines="5-6"><td><code>print("accuracy en train:", nota_train) · print("accuracy en test :", ...)</code></td><td>Escribe las dos notas, una debajo de otra.</td></tr>
+        <tr data-lines="7"><td><code>print(confusion_matrix(y_test, y_pred))</code></td><td>Escribe una tabla de 2 × 2: las filas son lo real y las columnas, lo predicho. La diagonal (de arriba a la izquierda a abajo a la derecha) son los aciertos. <span class="por-que">La accuracy no dice <em>qué</em> error comete. La matriz sí: no es lo mismo no avisar de un cliente que se va que avisar de más.</span> <span class="se-lee">cuenta cuántos se quedaron y se predijo «se queda», cuántos se quedaron y se predijo «cancela», y así con las cuatro casillas</span></td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>accuracy en train: 1.0
+accuracy en test : 1.0
+[[1 0]
+ [0 1]]</pre>
+    <p><strong>Cómo leerlo.</strong> <code>1.0</code> = 100 % en train y 100 % en test: acierta todo. Las dos notas son iguales, así que no hay sobreajuste. La matriz se lee fila a fila. Fila 1 (los que se quedaron de verdad): 1 predicho «se queda» y 0 predichos «cancela». Fila 2 (los que cancelaron de verdad): 0 predichos «se queda» y 1 predicho «cancela». Ceros fuera de la diagonal = ningún error.</p>
+    <p><strong>Ojo, en serio:</strong> un 100 % con 2 clientes de examen no demuestra nada. Con un solo fallo bajaría al 50 %. Con datos reales lo normal es menos, y es lo honesto. Mira el mismo flujo con 171 pacientes de examen en <a href="#frag-19">«El flujo completo con datos reales»</a>.</p>
+  </div>
+</article>
+</section>
+
+<section class="lab-paso" id="paso-9">
+<h2><span class="paso-n">9</span>Usar el modelo con clientes nuevos</h2>
+<p><strong>Para qué:</strong> lo que hará el modelo cada día cuando esté funcionando: recibir clientes que acaban de llegar, con sus huecos, y decir quién se va. Es la escena del despliegue del ciclo de vida (<a href="leccion-5.html#escenas">lección 5</a>). Usa <code>preprocesador</code> del paso 5 y <code>arbol</code> del paso 6.</p>
+<article class="snippet" data-lang="python">
+  <header>
+    <h3>Preparar y predecir clientes nuevos</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Ver que los clientes nuevos pasan por el mismo preprocesado que train (huecos incluidos) antes de llegar al árbol.</p>
+  </header>
+  <pre class="code"><code>nuevos = pd.DataFrame({
+    "Edad": [30, np.nan],
+    "Plan": ["Premium", None],
+    "HorasMes": [6, 30],
+})
+nuevos_listos = preprocesador.transform(nuevos)
+
+print(nuevos_listos.round(2))
+print("¿Cancelan?", arbol.predict(nuevos_listos).tolist())</code></pre>
+  <details class="linea-a-linea" open>
+    <summary>Línea por línea</summary>
+    <p class="hint">Toca o pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+      <tbody>
+        <tr data-lines="1-5"><td><code>nuevos = pd.DataFrame({"Edad": [30, np.nan], "Plan": ["Premium", None], "HorasMes": [6, 30]})</code></td><td>Dos clientes que acaban de llegar, con las mismas 3 columnas que <code>X</code>. El primero: 30 años, Premium, 6 horas. El segundo no dio ni su edad ni su plan, y ve 30 horas. Esta vez el diccionario va escrito directamente dentro de <code>pd.DataFrame(…)</code>. <span class="por-que">Las columnas deben llamarse igual que en train: el preprocesador las busca por su nombre.</span> <span class="se-lee">fabrica una tabla con dos clientes nuevos: uno de 30 años, Premium y 6 horas, y otro sin edad ni plan que ve 30 horas</span></td></tr>
+        <tr data-lines="6"><td><code>nuevos_listos = preprocesador.transform(nuevos)</code></td><td>Les aplica los mismos arreglos de train: rellenar, escalar y One-Hot. <span class="por-que">Solo <code>transform</code>, nunca <code>fit</code>: el preprocesador ya aprendió de train. Si no los preparas igual, el árbol recibiría números en otra escala y su umbral −0,6 no significaría nada.</span> <span class="se-lee">prepara a los clientes nuevos exactamente igual que preparaste a los de train</span></td></tr>
+        <tr data-lines="8"><td><code>print(nuevos_listos.round(2))</code></td><td>Escribe cómo han quedado, con 2 decimales. <span class="por-que">Para ver con tus ojos cómo se han rellenado los huecos.</span></td></tr>
+        <tr data-lines="9"><td><code>print("¿Cancelan?", arbol.predict(nuevos_listos).tolist())</code></td><td>Pide la predicción y la escribe como lista. <span class="por-que">Es para lo que se construyó todo: decidir a quién hay que cuidar antes de que se vaya.</span> <span class="se-lee">árbol, ¿cancelarán estos dos?</span></td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>[[-0.65 -1.02  0.    1.    0.  ]
+ [-0.24  1.    1.    0.    0.  ]]
+¿Cancelan? [1, 0]</pre>
+    <p><strong>Cómo leerlo.</strong> Primera fila: edad −0,65, horas −1,02 (6 h, muy por debajo de la media) y el One-Hot <code>0 1 0</code> = Premium. Segunda fila: la edad vacía se ha rellenado con la mediana de train (32 años → −0,24), el plan vacío con Basic (<code>1 0 0</code>) y sus 30 horas salen +1. Predicción <code>[1, 0]</code>: el primero cancelará (6 h está por debajo de 11 h) aunque pague Premium, porque el árbol solo mira las horas. El segundo se queda (30 h). Esto es el modelo trabajando.</p>
+  </div>
+</article>
+</section>
+
+<section>
+<h2 id="completo">El código completo</h2>
+<p>Los nueve pasos seguidos, para copiarlo y ejecutarlo de una vez. Pulsa <strong>Copiar</strong> y pégalo en una celda de <a href="https://colab.research.google.com">Google Colab</a> o de Jupyter, o guárdalo como <code>clientes.py</code> y ejecuta <code>python clientes.py</code> en una terminal. Lo hemos ejecutado con scikit-learn 1.9, pandas 3.0 y NumPy 2.5: la salida es la de cada paso, una detrás de otra.</p>
+<pre class="code"><code>from sklearn.tree import DecisionTreeClassifier
+
+# --- Programación tradicional: las reglas las escribimos nosotros ---
+def cancela_por_reglas(dias_sin_entrar):
+    if dias_sin_entrar &gt; 20:
+        return 1
+    return 0
+
+# --- Machine Learning: damos ejemplos y el algoritmo encuentra la regla ---
+X = [[2], [5], [8], [12], [25], [31], [40], [55]]   # días sin entrar
+y = [0, 0, 0, 0, 1, 1, 1, 1]                        # 0 = se queda, 1 = cancela
+
+modelo = DecisionTreeClassifier(max_depth=1, random_state=42)
+modelo.fit(X, y)
+
+print("Umbral aprendido:", modelo.tree_.threshold[0])
+print("Predicciones:", modelo.predict([[10], [28]]))
+
+import numpy as np
+import pandas as pd
+
+datos = {
+    "Edad": [23, 41, 32, 27, np.nan, 55, 38, 29],
+    "Plan": ["Basic", "Premium", "Standard", "Basic", "Standard", "Premium", None, "Basic"],
+    "HorasMes": [5, 37, 22, 3, 18, 41, 25, 4],
+    "Cancelado": [1, 0, 0, 1, 0, 0, 0, 1],
+}
+df = pd.DataFrame(datos)
+
+print(df.head(3))
+print(df.shape)
+print(df.isna().sum())
+print(df["Cancelado"].value_counts(normalize=True))
+
+from sklearn.model_selection import train_test_split
+
+X = df.drop(columns=["Cancelado"])
+y = df["Cancelado"]
+
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y, test_size=0.25, stratify=y, random_state=42
+)
+
+print(X_train.shape, X_test.shape)
+print("train:", y_train.value_counts().to_dict())
+print("test :", y_test.value_counts().to_dict())
+
+from sklearn.compose import ColumnTransformer
+from sklearn.impute import SimpleImputer
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import OneHotEncoder, StandardScaler
+
+numericas = ["Edad", "HorasMes"]
+categoricas = ["Plan"]
+
+pre_num = Pipeline([
+    ("imputar", SimpleImputer(strategy="median")),
+    ("escalar", StandardScaler()),
+])
+pre_cat = Pipeline([
+    ("imputar", SimpleImputer(strategy="most_frequent")),
+    ("onehot", OneHotEncoder(handle_unknown="ignore", sparse_output=False)),
+])
+preprocesador = ColumnTransformer([
+    ("num", pre_num, numericas),
+    ("cat", pre_cat, categoricas),
+])
+
+X_train_listo = preprocesador.fit_transform(X_train)
+X_test_listo = preprocesador.transform(X_test)
+
+print(preprocesador.get_feature_names_out())
+print(X_train_listo.round(2))
+print(X_test_listo.shape)
+
+from sklearn.tree import DecisionTreeClassifier
+
+arbol = DecisionTreeClassifier(max_depth=1, random_state=42)
+arbol.fit(X_train_listo, y_train)
+
+nombres = preprocesador.get_feature_names_out()
+print("Columna que mira:", nombres[arbol.tree_.feature[0]])
+print("Umbral aprendido:", round(arbol.tree_.threshold[0], 2))
+
+y_pred = arbol.predict(X_test_listo)
+
+print("Clientes de test:", X_test.index.tolist())
+print("Real    :", y_test.tolist())
+print("Predicho:", y_pred.tolist())
+
+from sklearn.metrics import accuracy_score, confusion_matrix
+
+nota_train = accuracy_score(y_train, arbol.predict(X_train_listo))
+nota_test = accuracy_score(y_test, y_pred)
+print("accuracy en train:", nota_train)
+print("accuracy en test :", nota_test)
+print(confusion_matrix(y_test, y_pred))
+
+nuevos = pd.DataFrame({
+    "Edad": [30, np.nan],
+    "Plan": ["Premium", None],
+    "HorasMes": [6, 30],
+})
+nuevos_listos = preprocesador.transform(nuevos)
+
+print(nuevos_listos.round(2))
+print("¿Cancelan?", arbol.predict(nuevos_listos).tolist())</code></pre>
+<div class="callout ojo">
+  <span class="lbl">Ojo</span>
+  <p>Los imports están repartidos por los pasos para que cada uno se entienda solo. En un programa «de verdad» se suelen poner todos arriba del todo; el resultado es el mismo.</p>
+</div>
+</section>
+
+<section>
+<h2 id="mas-codigo">Más código del módulo</h2>
+<p>Los fragmentos de las lecciones que no caben en el ejemplo de clientes, con su número de siempre (los fragmentos 1, 2, 6 y 7 son ya los pasos 1 a 5 del ejemplo). Cada uno funciona solo (o dice de cuál depende) y está explicado igual que los pasos.</p>
+<ul>
+  <li><strong>Para entender mejor los pasos del ejemplo</strong>: <a href="#frag-3">Fragmento 3 · Media frente a mediana con un valor extremo</a>, <a href="#frag-4">Fragmento 4 · Qué hace el escalador por dentro</a>, <a href="#frag-5">Fragmento 5 · Feature engineering: de la fecha a la estación</a>, <a href="#frag-8">Fragmento 8 · Ver el sobreajuste con números</a>.</li>
+  <li><strong>El mismo flujo con datos reales</strong>: <a href="#frag-19">Fragmento 19 · El flujo completo con datos reales</a>, <a href="#frag-20">Fragmento 20 · Crear no es entrenar: hiperparámetros, parámetros y predict_proba</a>, <a href="#frag-21">Fragmento 21 · Validación cruzada y búsqueda de hiperparámetros con GridSearchCV</a>, <a href="#frag-22">Fragmento 22 · Guardar y cargar un modelo con pickle</a>.</li>
+  <li><strong>StreamFlix: limpiar, explorar y separar por fechas</strong>: <a href="#frag-10">Fragmento 10 · StreamFlix: limpiar la edad y crear features con Pandas</a>, <a href="#frag-11">Fragmento 11 · Explorar y separar por fechas</a>.</li>
+  <li><strong>Técnicas: anomalías, secuencias, recomendadores y deriva</strong>: <a href="#frag-9">Fragmento 9 · Anomalías por desviación y minería de secuencias</a>, <a href="#frag-12">Fragmento 12 · Recomendador content-based y collaborative con el coseno</a>, <a href="#frag-13">Fragmento 13 · Monitorización: deriva de datos y reentrenamiento</a>.</li>
+  <li><strong>Herramientas: RAG, SQL, tensores y lenguaje</strong>: <a href="#frag-14">Fragmento 14 · RAG a mano: buscar el documento antes de generar</a>, <a href="#frag-15">Fragmento 15 · SQL con sqlite3 y paso a Pandas</a>, <a href="#frag-16">Fragmento 16 · Tensores con NumPy: del número a las carátulas</a>, <a href="#frag-17">Fragmento 17 · Tokenización, sentimiento y entidades a mano</a>, <a href="#frag-18">Fragmento 18 · Lo mismo con NLTK</a>.</li>
+</ul>
+<h3 id="mas-preparar">Para entender mejor los pasos del ejemplo</h3>
+<p>Lo que pasa por dentro de los pasos 5 y 6.</p>
+<article class="snippet" data-lang="python" id="frag-3">
+  <header>
+    <h3>Fragmento 3 · Media frente a mediana con un valor extremo</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Ver por qué, al rellenar huecos o resumir datos con un valor extremo, la mediana es más fiable que la media. Es la razón del <code>strategy="median"</code> del <a href="#paso-5">paso 5</a>.</p>
+  </header>
+  <p class="hint"><strong>De la <a href="leccion-7.html">lección 7</a>.</strong> </p>
+  <pre class="code"><code>import numpy as np
+
+taquilla = np.array([20000, 22000, 23000, 25000, 900000])   # € de 4 películas pequeñas y un gran estreno
+
+print("Media  :", taquilla.mean())
+print("Mediana:", np.median(taquilla))</code></pre>
+  <details class="linea-a-linea" open>
+    <summary>Línea por línea</summary>
+    <p class="hint">Toca o pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+      <tbody>
+        <tr data-lines="1"><td><code>import numpy as np</code></td><td>Trae NumPy con su apodo <code>np</code>. <span class="por-que">Necesitamos sus funciones de media y mediana.</span></td></tr>
+        <tr data-lines="3"><td><code>taquilla = np.array([20000, 22000, 23000, 25000, 900000])</code></td><td>Crea un <strong>array</strong> de NumPy (una lista de números con superpoderes de cálculo) con la taquilla de 5 películas: 4 pequeñas y un gran estreno. <span class="por-que">El 900.000 es el valor extremo (outlier) que lo descoloca todo.</span> <span class="se-lee">taquilla son estos cinco números: cuatro de unos 20.000 € y uno de 900.000 €</span></td></tr>
+        <tr data-lines="5"><td><code>print("Media  :", taquilla.mean())</code></td><td><code>.mean()</code> calcula la media: suma todo y divide entre cuántos hay. <span class="por-que">Para ver cuánto la arrastra el gran estreno.</span></td></tr>
+        <tr data-lines="6"><td><code>print("Mediana:", np.median(taquilla))</code></td><td><code>np.median</code> ordena los valores y coge el del medio. <span class="por-que">La mediana no mira lo lejos que está el extremo, solo el orden: por eso no se deja arrastrar.</span> <span class="se-lee">ordena las taquillas y dime la que queda en el centro</span></td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>Media  : 198000.0
+Mediana: 23000.0</pre>
+    <p>La media (198.000 €) está arrastrada por el gran estreno y no se parece a ninguna película de la lista. La mediana (23.000 €) representa a una película típica. Por eso, para tapar un hueco, se usa la mediana.</p>
+  </div>
+</article>
+<article class="snippet" data-lang="python" id="frag-4">
+  <header>
+    <h3>Fragmento 4 · Qué hace el escalador por dentro</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Comprobar que <code>StandardScaler</code> (el del <a href="#paso-5">paso 5</a>) solo aplica la fórmula z = (x − media) / desviación, calculándola a mano y con scikit-learn.</p>
+  </header>
+  <p class="hint"><strong>De la <a href="leccion-7.html">lección 7</a>.</strong> </p>
+  <pre class="code"><code>import numpy as np
+from sklearn.preprocessing import StandardScaler
+
+edades = np.array([[20], [30], [40]])
+
+# A mano: (x - media) / desviación típica
+manual = (edades - edades.mean()) / edades.std()
+
+# Con scikit-learn
+escalador = StandardScaler()
+auto = escalador.fit_transform(edades)
+
+print("media  :", escalador.mean_)
+print("desv.  :", escalador.scale_.round(3))
+print("manual :", manual.ravel().round(3))
+print("sklearn:", auto.ravel().round(3))</code></pre>
+  <details class="linea-a-linea" open>
+    <summary>Línea por línea</summary>
+    <p class="hint">Toca o pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+      <tbody>
+        <tr data-lines="1-2"><td><code>import numpy as np · from sklearn.preprocessing import StandardScaler</code></td><td>Trae NumPy y, del cajón <code>preprocessing</code> de scikit-learn, el escalador. <span class="por-que">Vamos a hacer la misma cuenta de las dos maneras y comparar.</span></td></tr>
+        <tr data-lines="4"><td><code>edades = np.array([[20], [30], [40]])</code></td><td>Tres edades como tabla de 3 filas y 1 columna (dobles corchetes). <span class="por-que">El escalador de scikit-learn exige forma de tabla, como <code>fit</code>.</span></td></tr>
+        <tr data-lines="6"><td><code># A mano: (x - media) / desviación típica</code></td><td>Comentario: la fórmula que vamos a escribir.</td></tr>
+        <tr data-lines="7"><td><code>manual = (edades - edades.mean()) / edades.std()</code></td><td>A cada edad le resta la media (30) y divide entre la desviación típica (<code>.std()</code>, 8,165). NumPy hace la cuenta con las tres a la vez. <span class="por-que">Así ves que escalar no es magia: es una resta y una división.</span> <span class="se-lee">a cada edad réstale la media y divide el resultado entre la desviación</span></td></tr>
+        <tr data-lines="9-11"><td><code>escalador = StandardScaler() · auto = escalador.fit_transform(edades)</code></td><td>Crea el escalador; <code>fit</code> aprende la media y la desviación, y <code>transform</code> aplica la fórmula. <span class="por-que">Es lo que pasa dentro de la tubería de números del paso 5.</span></td></tr>
+        <tr data-lines="13-14"><td><code>print("media  :", escalador.mean_) · print("desv.  :", escalador.scale_.round(3))</code></td><td>Muestra lo que aprendió: <code>mean_</code> (la media) y <code>scale_</code> (la desviación). Llevan guion bajo porque salen de <code>fit</code>. <span class="por-que">Para comprobar que aprendió lo mismo que calculamos a mano.</span></td></tr>
+        <tr data-lines="15-16"><td><code>print("manual :", manual.ravel().round(3)) · print("sklearn:", ...)</code></td><td><code>ravel()</code> aplana la tabla de 3×1 en una fila, que se lee mejor; <code>round(3)</code> deja 3 decimales. <span class="por-que">Poner los dos resultados uno encima de otro deja ver que son idénticos.</span></td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>media  : [30.]
+desv.  : [8.165]
+manual : [-1.225  0.     1.225]
+sklearn: [-1.225  0.     1.225]</pre>
+    <p>Media 30 y desviación 8,165. Los dos métodos dan −1,225 · 0 · 1,225: el de 20 años está 1,2 desviaciones por debajo, el de 30 justo en la media y el de 40, 1,2 por encima.</p>
+  </div>
+</article>
+<article class="snippet" data-lang="python" id="frag-5">
+  <header>
+    <h3>Fragmento 5 · Feature engineering: de la fecha a la estación</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Crear una columna más útil (la estación) a partir de otra casi inútil para el modelo (la fecha exacta). Las estaciones son las del hemisferio sur, como en el proyecto de lluvia de Australia del curso.</p>
+  </header>
+  <p class="hint"><strong>De la <a href="leccion-7.html">lección 7</a>.</strong> </p>
+  <pre class="code"><code>import pandas as pd
+
+fechas = pd.DataFrame({
+    "Fecha": pd.to_datetime(["2026-01-15", "2026-04-10", "2026-07-22", "2026-10-05"])
+})
+
+def estacion(mes):
+    if mes in (12, 1, 2):
+        return "Summer"
+    if mes in (3, 4, 5):
+        return "Autumn"
+    if mes in (6, 7, 8):
+        return "Winter"
+    return "Spring"
+
+fechas["Mes"] = fechas["Fecha"].dt.month
+fechas["Estacion"] = fechas["Mes"].apply(estacion)
+print(fechas)</code></pre>
+  <details class="linea-a-linea" open>
+    <summary>Línea por línea</summary>
+    <p class="hint">Toca o pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+      <tbody>
+        <tr data-lines="1"><td><code>import pandas as pd</code></td><td>Trae Pandas con el apodo <code>pd</code>. <span class="por-que">Vamos a trabajar con una tabla de fechas.</span></td></tr>
+        <tr data-lines="3-5"><td><code>fechas = pd.DataFrame({"Fecha": pd.to_datetime([...])})</code></td><td>Una tabla con una columna de 4 fechas. <code>pd.to_datetime</code> convierte el texto «2026-01-15» en una fecha de verdad. <span class="por-que">Como texto, Pandas no sabe sacar el mes; como fecha, sí.</span> <span class="se-lee">haz una tabla con una columna Fecha que contenga estas cuatro fechas</span></td></tr>
+        <tr data-lines="7"><td><code>def estacion(mes):</code></td><td>Crea una función que recibe un número de mes y devuelve su estación. <span class="por-que">La usaremos en la línea 17 para cada fila.</span></td></tr>
+        <tr data-lines="8-9"><td><code>if mes in (12, 1, 2): return "Summer"</code></td><td><code>in</code> pregunta «¿está dentro de?». Si el mes es 12, 1 o 2, devuelve verano. <span class="por-que">En el hemisferio sur, diciembre, enero y febrero son verano.</span> <span class="se-lee">si el mes es diciembre, enero o febrero, responde «verano»</span></td></tr>
+        <tr data-lines="10-13"><td><code>if mes in (3, 4, 5): ... if mes in (6, 7, 8): ...</code></td><td>Lo mismo para otoño (3, 4, 5) e invierno (6, 7, 8). <span class="por-que">Cada <code>return</code> termina la función: en cuanto una condición se cumple, no se miran las siguientes.</span></td></tr>
+        <tr data-lines="14"><td><code>return "Spring"</code></td><td>Si no era ninguno de los anteriores (9, 10 u 11), es primavera. <span class="por-que">Sin esta línea, para esos meses la función devolvería <code>None</code>.</span></td></tr>
+        <tr data-lines="16"><td><code>fechas["Mes"] = fechas["Fecha"].dt.month</code></td><td>Crea la columna <code>Mes</code>. <code>.dt</code> da acceso a las partes de una fecha y <code>.month</code> es el mes. <span class="por-que">Asignar a <code>fechas["Mes"]</code> una columna que no existe la crea.</span> <span class="se-lee">la nueva columna Mes es el mes de cada fecha</span></td></tr>
+        <tr data-lines="17"><td><code>fechas["Estacion"] = fechas["Mes"].apply(estacion)</code></td><td><code>apply</code> aplica la función <code>estacion</code> a cada valor de la columna, uno a uno. <span class="por-que">Así no hace falta escribir un bucle a mano.</span> <span class="se-lee">para cada mes, calcula su estación y guárdala en la columna Estacion</span></td></tr>
+        <tr data-lines="18"><td><code>print(fechas)</code></td><td>Escribe la tabla final.</td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>       Fecha  Mes Estacion
+0 2026-01-15    1   Summer
+1 2026-04-10    4   Autumn
+2 2026-07-22    7   Winter
+3 2026-10-05   10   Spring</pre>
+    <p>Cada fecha tiene ya su mes y su estación. Después se usaría <code>Estacion</code> (con One-Hot) como pista y se tiraría la fecha exacta, que el modelo no sabría aprovechar.</p>
+  </div>
+</article>
+<article class="snippet" data-lang="python" id="frag-8">
+  <header>
+    <h3>Fragmento 8 · Ver el sobreajuste con números</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Comprobar que al subir la complejidad el error en train baja siempre, pero el de test, a partir de cierto punto, se dispara. Es el porqué del <code>max_depth=1</code> del <a href="#paso-6">paso 6</a>.</p>
+  </header>
+  <p class="hint"><strong>De la <a href="leccion-8.html">lección 8</a>.</strong> </p>
+  <pre class="code"><code>import numpy as np
+
+rng = np.random.default_rng(42)
+
+def verdad(x):
+    return 0.8 * np.sin(2.4 * x) + 0.25 * x
+
+# 20 puntos para entrenar y 200 para probar, con ruido
+x_train = rng.uniform(-1, 1, 20)
+y_train = verdad(x_train) + rng.normal(0, 0.2, 20)
+x_test = rng.uniform(-1, 1, 200)
+y_test = verdad(x_test) + rng.normal(0, 0.2, 200)
+
+for grado in (1, 3, 12):
+    coef = np.polyfit(x_train, y_train, grado)
+    error_train = np.mean((np.polyval(coef, x_train) - y_train) ** 2)
+    error_test = np.mean((np.polyval(coef, x_test) - y_test) ** 2)
+    print(f"grado {grado:2d} | error train = {error_train:.3f} | error test = {error_test:.3f}")</code></pre>
+  <details class="linea-a-linea" open>
+    <summary>Línea por línea</summary>
+    <p class="hint">Toca o pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+      <tbody>
+        <tr data-lines="1"><td><code>import numpy as np</code></td><td>Trae NumPy. <span class="por-que">Vamos a generar datos y ajustar curvas.</span></td></tr>
+        <tr data-lines="3"><td><code>rng = np.random.default_rng(42)</code></td><td>Crea un generador de números aleatorios con semilla 42 (<em>rng</em> = random number generator). <span class="por-que">Con semilla fija, los «aleatorios» salen siempre iguales y tú obtienes la misma salida.</span> <span class="se-lee">prepara un dado que, con la semilla 42, saque siempre la misma serie</span></td></tr>
+        <tr data-lines="5-6"><td><code>def verdad(x): return 0.8 * np.sin(2.4 * x) + 0.25 * x</code></td><td>La curva «real» que los datos siguen (una onda suave). En la vida real no la conocerías. <span class="por-que">Así sabemos qué debería aprender un buen modelo.</span></td></tr>
+        <tr data-lines="8"><td><code># 20 puntos para entrenar y 200 para probar, con ruido</code></td><td>Comentario.</td></tr>
+        <tr data-lines="9-10"><td><code>x_train = rng.uniform(-1, 1, 20) · y_train = verdad(x_train) + rng.normal(0, 0.2, 20)</code></td><td>20 valores de x al azar entre −1 y 1 (<code>uniform</code>), y su y: la curva real más un poco de ruido (<code>normal</code>, con desviación 0,2). <span class="por-que">El ruido imita los datos reales: nunca caen exactos sobre la curva.</span> <span class="se-lee">elige 20 puntos al azar y súbeles o bájales un poquito al azar</span></td></tr>
+        <tr data-lines="11-12"><td><code>x_test = ... · y_test = ...</code></td><td>Lo mismo con 200 puntos nuevos: el examen. <span class="por-que">El examen tiene que ser con puntos que el ajuste no ha visto.</span></td></tr>
+        <tr data-lines="14"><td><code>for grado in (1, 3, 12):</code></td><td><code>for</code> repite el bloque de debajo una vez por cada valor: primero con 1, luego con 3 y luego con 12. <span class="por-que">Para comparar tres complejidades con el mismo código.</span> <span class="se-lee">haz lo siguiente con grado 1, luego con grado 3 y luego con grado 12</span></td></tr>
+        <tr data-lines="15"><td><code>coef = np.polyfit(x_train, y_train, grado)</code></td><td>Ajusta un polinomio (una curva) del grado pedido a los 20 puntos de train. Grado 1 = recta; grado 12 = curva con muchísimas vueltas. <span class="por-que">El grado es el hiperparámetro de complejidad.</span> <span class="se-lee">busca la curva de este grado que mejor pase por los puntos de train</span></td></tr>
+        <tr data-lines="16-17"><td><code>error_train = np.mean((np.polyval(coef, x_train) - y_train) ** 2) · error_test = ...</code></td><td><code>polyval</code> calcula la curva en cada x. Se resta el valor real, se eleva al cuadrado (<code>** 2</code>) y se hace la media: el error cuadrático medio. <span class="por-que">Se eleva al cuadrado para que los errores hacia arriba y hacia abajo no se anulen.</span> <span class="se-lee">mide cuánto se equivoca la curva, de media, con los apuntes y con el examen</span></td></tr>
+        <tr data-lines="18"><td><code>print(f"grado {grado:2d} | error train = {error_train:.3f} | ...")</code></td><td>Una <strong>f-string</strong> (<code>f"…"</code>): mete los valores entre llaves dentro del texto. <code>:2d</code> = entero ocupando 2 huecos; <code>:.3f</code> = 3 decimales. <span class="por-que">Deja la salida alineada en columnas.</span></td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>grado  1 | error train = 0.039 | error test = 0.089
+grado  3 | error train = 0.018 | error test = 0.054
+grado 12 | error train = 0.007 | error test = 11.306</pre>
+    <p>Con grado 12 el error de train es el más bajo (0,007) pero el de test es enorme (≈ 11): ha memorizado los 20 puntos, ruido incluido. El grado 3 es el mejor en test. Puede salir un aviso <code>RankWarning</code> con grado 12: es NumPy diciendo que el ajuste es inestable.</p>
+  </div>
+</article>
+<h3 id="mas-real">El mismo flujo con datos reales</h3>
+<p>Pacientes de cáncer de mama, el dataset que viene dentro de scikit-learn.</p>
+<article class="snippet" data-lang="python" id="frag-19">
+  <header>
+    <h3>Fragmento 19 · El flujo completo con datos reales</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> El mismo patrón del ejemplo de Netflix (datos → X e y → train/test → preparar → crear → <code>fit</code> → <code>predict</code> → medir) con un dataset real que viene dentro de scikit-learn: 569 tumores de mama. Aquí el modelo es un SVC en vez de un árbol.</p>
+  </header>
+  <p class="hint"><strong>De la <a href="leccion-3.html">lección 3</a>.</strong> Es aprendizaje supervisado: cada tumor viene con su diagnóstico.</p>
+  <pre class="code"><code>from sklearn.datasets import load_breast_cancer
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
+from sklearn.svm import SVC
+from sklearn.metrics import accuracy_score, confusion_matrix
+
+# 1. Datos: X (30 medidas de cada tumor) e y (0 = maligno, 1 = benigno)
+datos = load_breast_cancer()
+X, y = datos.data, datos.target
+print("X:", X.shape, "| y:", y.shape, "| clases:", datos.target_names.tolist())
+print("primeras 3 features:", datos.feature_names[:3].tolist())
+print("malignos:", (y == 0).sum(), "| benignos:", (y == 1).sum())
+
+# 2. Train / test
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y, test_size=0.3, stratify=y, random_state=42)
+print("train:", X_train.shape, "| test:", X_test.shape)
+
+# 3. Preprocesar: el escalador aprende SOLO de train
+escalador = StandardScaler()
+X_train_e = escalador.fit_transform(X_train)
+X_test_e = escalador.transform(X_test)
+
+# 4. Crear, entrenar y predecir
+clf = SVC(C=1.0, kernel="rbf", gamma="scale")
+clf.fit(X_train_e, y_train)
+y_pred = clf.predict(X_test_e)
+
+# 5. Evaluar
+print("y_test:", y_test[:10])
+print("y_pred:", y_pred[:10])
+print("accuracy:", round(accuracy_score(y_test, y_pred), 3))
+print(confusion_matrix(y_test, y_pred))</code></pre>
+  <details class="linea-a-linea" open>
+    <summary>Línea por línea</summary>
+    <p class="hint">Toca o pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+      <tbody>
+        <tr data-lines="1"><td><code>from sklearn.datasets import load_breast_cancer</code></td><td>Del cajón <code>datasets</code> trae la función que carga el dataset de cáncer de mama. <span class="por-que">Viene dentro de la librería: no hay que descargar nada.</span></td></tr>
+        <tr data-lines="2-3"><td><code>train_test_split · StandardScaler</code></td><td>Las mismas piezas de los pasos 4 y 5.</td></tr>
+        <tr data-lines="4"><td><code>from sklearn.svm import SVC</code></td><td>Trae <code>SVC</code> (<em>Support Vector Classifier</em>), otro algoritmo de clasificación que traza una frontera entre clases. Lo verás en el módulo 3. <span class="por-que">Para ver que el flujo es el mismo con cualquier algoritmo.</span></td></tr>
+        <tr data-lines="5"><td><code>from sklearn.metrics import accuracy_score, confusion_matrix</code></td><td>Las medidas del paso 8.</td></tr>
+        <tr data-lines="7"><td><code># 1. Datos: ...</code></td><td>Comentario: qué hay en X e y.</td></tr>
+        <tr data-lines="8"><td><code>datos = load_breast_cancer()</code></td><td>Carga el dataset. Devuelve un paquete con varias cosas dentro: los datos, las respuestas, los nombres… <span class="por-que">Se accede a cada cosa con un punto: <code>datos.data</code>, <code>datos.target</code>.</span></td></tr>
+        <tr data-lines="9"><td><code>X, y = datos.data, datos.target</code></td><td>Guarda dos cosas a la vez: las 30 medidas de cada tumor en <code>X</code> y la respuesta (0 = maligno, 1 = benigno) en <code>y</code>. <span class="por-que">Es el mismo reparto pistas/respuesta del paso 4.</span> <span class="se-lee">X son las medidas e y el diagnóstico</span></td></tr>
+        <tr data-lines="10"><td><code>print("X:", X.shape, "| y:", y.shape, "| clases:", ...)</code></td><td>Tamaño de X e y y nombre de las dos clases. <code>tolist()</code> convierte en lista normal. <span class="por-que">Comprobar que hay los datos que esperas, como en el paso 3.</span></td></tr>
+        <tr data-lines="11"><td><code>print("primeras 3 features:", datos.feature_names[:3].tolist())</code></td><td><code>[:3]</code> es un <strong>corte</strong>: «desde el principio hasta antes de la posición 3», o sea, los 3 primeros. <span class="por-que">Para ver qué tipo de medidas son.</span> <span class="se-lee">dame los nombres de las tres primeras columnas</span></td></tr>
+        <tr data-lines="12"><td><code>print("malignos:", (y == 0).sum(), ...)</code></td><td><code>y == 0</code> pone <code>True</code> donde la respuesta es 0; <code>.sum()</code> cuenta los <code>True</code>. <span class="por-que">Ver el equilibrio de clases.</span> <span class="se-lee">¿cuántos tumores son malignos y cuántos benignos?</span></td></tr>
+        <tr data-lines="14-17"><td><code>X_train, X_test, ... = train_test_split(X, y, test_size=0.3, stratify=y, random_state=42) · print(...)</code></td><td>Reparte: 70 % para entrenar y 30 % para el examen, con la misma mezcla de clases. <span class="por-que">Igual que el paso 4, con <code>test_size=0.3</code>.</span></td></tr>
+        <tr data-lines="19-22"><td><code>escalador = StandardScaler() · X_train_e = escalador.fit_transform(X_train) · X_test_e = escalador.transform(X_test)</code></td><td>Escala: aprende media y desviación de train y las aplica a train y a test (la <code>_e</code> es de «escalado»). <span class="por-que">El escalador aprende solo de train, como el preprocesador del paso 5.</span></td></tr>
+        <tr data-lines="24-27"><td><code>clf = SVC(...) · clf.fit(X_train_e, y_train) · y_pred = clf.predict(X_test_e)</code></td><td>Crear, entrenar y predecir: los pasos 6 y 7. <code>clf</code> es una abreviatura habitual de <em>classifier</em>. <span class="por-que">Cambia el algoritmo, pero las órdenes son las mismas.</span> <span class="se-lee">crea el clasificador, entrénalo con train y predice el examen</span></td></tr>
+        <tr data-lines="29-31"><td><code># 5. Evaluar · print("y_test:", y_test[:10]) · print("y_pred:", y_pred[:10])</code></td><td>Las 10 primeras respuestas reales y las 10 predichas, una encima de otra. <span class="por-que">Comparar a ojo antes de medir.</span></td></tr>
+        <tr data-lines="32-33"><td><code>print("accuracy:", round(accuracy_score(y_test, y_pred), 3)) · print(confusion_matrix(y_test, y_pred))</code></td><td>La nota y la matriz de confusión, como en el paso 8.</td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>X: (569, 30) | y: (569,) | clases: ['malignant', 'benign']
+primeras 3 features: ['mean radius', 'mean texture', 'mean perimeter']
+malignos: 212 | benignos: 357
+train: (398, 30) | test: (171, 30)
+y_test: [0 1 1 0 0 0 1 0 1 0]
+y_pred: [0 1 1 0 0 0 1 0 1 0]
+accuracy: 0.977
+[[ 62   2]
+ [  2 105]]</pre>
+    <p>Acierta 167 de 171 tumores: accuracy 0,977. La matriz <code>[[62, 2], [2, 105]]</code> se lee así: de los 64 malignos (fila 0) detecta 62 y confunde 2 con benignos (el error grave: enfermo → «sano»); de los 107 benignos acierta 105 y asusta a 2 (sano → «enfermo»).</p>
+  </div>
+</article>
+<article class="snippet" data-lang="python" id="frag-20">
+  <header>
+    <h3>Fragmento 20 · Crear no es entrenar: hiperparámetros, parámetros y predict_proba</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Ver con código la diferencia entre lo que configuras tú (hiperparámetros) y lo que aprende el modelo (parámetros), qué pasa si llamas a <code>predict</code> antes de <code>fit</code>, y que cambiar de algoritmo solo cambia una línea. Repite el reparto de <a href="#frag-19">«El flujo completo con datos reales»</a>.</p>
+  </header>
+  <p class="hint"><strong>De la <a href="leccion-2.html">lección 2</a>.</strong> Hiperparámetro = lo pones tú al crear; parámetro = sale de <code>fit</code>.</p>
+  <pre class="code"><code>from sklearn.datasets import load_breast_cancer
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
+from sklearn.svm import SVC
+from sklearn.linear_model import LogisticRegression
+from sklearn.exceptions import NotFittedError
+
+datos = load_breast_cancer()
+X_train, X_test, y_train, y_test = train_test_split(
+    datos.data, datos.target, test_size=0.3, stratify=datos.target, random_state=42)
+escalador = StandardScaler().fit(X_train)
+X_train_e, X_test_e = escalador.transform(X_train), escalador.transform(X_test)
+
+# CREAR un modelo no es ENTRENARLO
+clf = SVC(C=1.0, gamma="scale")
+print("hiperparámetros (los eliges tú):", {k: clf.get_params()[k] for k in ("C", "kernel", "gamma")})
+try:
+    clf.predict(X_test_e[:1])
+except NotFittedError:
+    print("predict antes de fit -&gt; NotFittedError")
+
+clf.fit(X_train_e, y_train)
+print("parámetros aprendidos: vectores de soporte =", clf.support_vectors_.shape[0],
+      "| intercepto =", clf.intercept_.round(3))
+
+# predict da la clase; el resto de métodos dan más información
+paciente = X_test_e[:1]
+print("SVC predict:", clf.predict(paciente), "(0 = maligno, 1 = benigno)")
+
+# Otro algoritmo, la MISMA interfaz: solo cambia la línea que crea el modelo
+logistica = LogisticRegression(max_iter=1000).fit(X_train_e, y_train)
+print("Logística predict      :", logistica.predict(paciente))
+print("Logística predict_proba:", logistica.predict_proba(paciente).round(3), "[P(maligno), P(benigno)]")</code></pre>
+  <details class="linea-a-linea" open>
+    <summary>Línea por línea</summary>
+    <p class="hint">Toca o pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+      <tbody>
+        <tr data-lines="1-6"><td><code>from sklearn... import ...</code></td><td>Las piezas de antes más <code>LogisticRegression</code> (regresión logística, módulo 2) y <code>NotFittedError</code>, el error que da scikit-learn cuando usas un modelo sin entrenar. <span class="por-que">Necesitamos el nombre del error para poder «atraparlo» en la línea 19.</span></td></tr>
+        <tr data-lines="8-10"><td><code>datos = load_breast_cancer() · X_train, ... = train_test_split(...)</code></td><td>Carga los datos y repite el reparto 70/30. <span class="por-que">Con el mismo <code>random_state</code>, el reparto es idéntico al del fragmento anterior.</span></td></tr>
+        <tr data-lines="11"><td><code>escalador = StandardScaler().fit(X_train)</code></td><td>Crea el escalador y, en la misma línea, lo ajusta con train (las órdenes se pueden encadenar con puntos). <span class="por-que">Ahorra una línea; hace lo mismo que crear y luego <code>fit</code>.</span></td></tr>
+        <tr data-lines="12"><td><code>X_train_e, X_test_e = escalador.transform(X_train), escalador.transform(X_test)</code></td><td>Escala los dos conjuntos y guarda los dos resultados a la vez. <span class="se-lee">escala train y escala test, y guárdalos en X_train_e y X_test_e</span></td></tr>
+        <tr data-lines="14-15"><td><code># CREAR un modelo no es ENTRENARLO · clf = SVC(C=1.0, gamma="scale")</code></td><td>Crea el modelo con dos hiperparámetros elegidos por ti. Hasta aquí no ha aprendido nada. <span class="por-que"><code>C</code> y <code>gamma</code> controlan la forma de la frontera; los verás en el módulo 3.</span></td></tr>
+        <tr data-lines="16"><td><code>print("hiperparámetros ...", {k: clf.get_params()[k] for k in ("C", "kernel", "gamma")})</code></td><td><code>get_params()</code> devuelve todos los hiperparámetros. Las llaves con <code>for</code> dentro construyen un diccionario solo con tres de ellos. <span class="por-que">Son los números que <strong>tú</strong> fijas antes de entrenar.</span> <span class="se-lee">para cada nombre entre C, kernel y gamma, apunta su valor</span></td></tr>
+        <tr data-lines="17-20"><td><code>try: clf.predict(X_test_e[:1]) except NotFittedError: print(...)</code></td><td><code>try</code> («intenta») ejecuta una línea que puede fallar; si falla con <code>NotFittedError</code>, en vez de pararse el programa, se ejecuta lo de <code>except</code> («excepto si…»). <span class="por-que">Para ver el error sin que el programa se detenga.</span> <span class="se-lee">intenta predecir con el modelo sin entrenar; si se queja de que falta fit, escribe ese aviso</span></td></tr>
+        <tr data-lines="22"><td><code>clf.fit(X_train_e, y_train)</code></td><td>Ahora sí: entrena.</td></tr>
+        <tr data-lines="23-24"><td><code>print("parámetros aprendidos: ...", clf.support_vectors_.shape[0], ... clf.intercept_.round(3))</code></td><td>Tras <code>fit</code> aparecen atributos con guion bajo: los <strong>parámetros aprendidos</strong>. Los vectores de soporte son los tumores que el SVC usa para trazar su frontera; <code>intercept_</code> es un número de la fórmula de esa frontera. <span class="por-que">Nadie los escribió: salieron de los datos.</span></td></tr>
+        <tr data-lines="26-28"><td><code>paciente = X_test_e[:1] · print("SVC predict:", clf.predict(paciente), ...)</code></td><td>Toma el primer paciente de test. <code>[:1]</code> («hasta antes de la posición 1») mantiene la forma de tabla de 1 fila, que es la que pide <code>predict</code>. <span class="por-que">Con <code>[0]</code> saldría una fila suelta, sin forma de tabla, y <code>predict</code> daría error.</span> <span class="se-lee">del examen, coge solo al primer paciente, en forma de tabla</span></td></tr>
+        <tr data-lines="30-31"><td><code>logistica = LogisticRegression(max_iter=1000).fit(X_train_e, y_train)</code></td><td>Otro algoritmo con <strong>la misma interfaz</strong>: crear, <code>fit</code>, <code>predict</code>. <code>max_iter=1000</code> le da hasta 1.000 vueltas para terminar de ajustar. <span class="por-que">Con las vueltas por defecto (100) podría avisar de que no ha terminado.</span></td></tr>
+        <tr data-lines="32"><td><code>print("Logística predict      :", logistica.predict(paciente))</code></td><td>La clase que predice la logística.</td></tr>
+        <tr data-lines="33"><td><code>print("Logística predict_proba:", logistica.predict_proba(paciente).round(3), ...)</code></td><td><code>predict_proba</code> devuelve la <strong>probabilidad de cada clase</strong> (columna 0 = maligno, columna 1 = benigno), no solo la clase. <span class="por-que">Saber «96 % seguro» o «51 % seguro» cambia mucho la decisión.</span> <span class="se-lee">¿con qué probabilidad es maligno y con cuál benigno?</span></td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>hiperparámetros (los eliges tú): {'C': 1.0, 'kernel': 'rbf', 'gamma': 'scale'}
+predict antes de fit -&gt; NotFittedError
+parámetros aprendidos: vectores de soporte = 91 | intercepto = [-0.192]
+SVC predict: [0] (0 = maligno, 1 = benigno)
+Logística predict      : [0]
+Logística predict_proba: [[0.968 0.032]] [P(maligno), P(benigno)]</pre>
+    <p>Los hiperparámetros son <code>C=1.0, kernel='rbf', gamma='scale'</code>. Antes de <code>fit</code>, <code>predict</code> falla con <code>NotFittedError</code>. Después, el modelo ha aprendido 91 vectores de soporte y un intercepto de −0,192. El primer paciente de test es maligno (0) y los dos modelos aciertan; la logística además da probabilidades: 96,8 % maligno y 3,2 % benigno. (<code>SVC</code> también puede darlas con <code>probability=True</code>, pero en scikit-learn 1.9 esa opción está marcada como obsoleta.)</p>
+  </div>
+</article>
+<article class="snippet" data-lang="python" id="frag-21">
+  <header>
+    <h3>Fragmento 21 · Validación cruzada y búsqueda de hiperparámetros con GridSearchCV</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Medir un modelo con varias pruebas rotando el bloque de validación, y probar de forma ordenada combinaciones de hiperparámetros para quedarse con la mejor. Repite el reparto de <a href="#frag-19">«El flujo completo con datos reales»</a>.</p>
+  </header>
+  <p class="hint"><strong>De la <a href="leccion-8.html">lección 8</a>.</strong> </p>
+  <pre class="code"><code>from sklearn.datasets import load_breast_cancer
+from sklearn.model_selection import train_test_split, cross_val_score, GridSearchCV
+from sklearn.pipeline import make_pipeline
+from sklearn.preprocessing import StandardScaler
+from sklearn.svm import SVC
+
+datos = load_breast_cancer()
+X_train, X_test, y_train, y_test = train_test_split(
+    datos.data, datos.target, test_size=0.3, stratify=datos.target, random_state=42)
+
+# El pipeline mete el escalador DENTRO de la validación: se reajusta en cada vuelta
+modelo = make_pipeline(StandardScaler(), SVC())
+
+# Validación cruzada: varias pruebas rotando el bloque de validación
+for k in (4, 5):
+    notas = cross_val_score(modelo, X_train, y_train, cv=k)
+    print(f"cv={k}: notas = {notas.round(3)} | media = {notas.mean():.3f}")
+
+# Hyperparameter tuning: probar combinaciones de C y gamma
+rejilla = {"svc__C": [0.1, 1, 10], "svc__gamma": [0.001, 0.01, 0.1]}
+busqueda = GridSearchCV(modelo, rejilla, cv=5)
+busqueda.fit(X_train, y_train)
+
+print("combinaciones probadas:", len(busqueda.cv_results_["params"]))
+for p, nota in zip(busqueda.cv_results_["params"], busqueda.cv_results_["mean_test_score"]):
+    print(p, round(nota, 3))
+print("mejor:", busqueda.best_params_, "-&gt;", round(busqueda.best_score_, 3))
+print("nota final en test:", round(busqueda.score(X_test, y_test), 3))</code></pre>
+  <details class="linea-a-linea" open>
+    <summary>Línea por línea</summary>
+    <p class="hint">Toca o pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+      <tbody>
+        <tr data-lines="1-5"><td><code>from sklearn... import ... cross_val_score, GridSearchCV · make_pipeline</code></td><td>Trae, además de lo conocido, <code>cross_val_score</code> (validación cruzada), <code>GridSearchCV</code> (búsqueda en rejilla) y <code>make_pipeline</code> (una forma corta de crear un <code>Pipeline</code> sin poner nombres a los pasos).</td></tr>
+        <tr data-lines="7-9"><td><code>datos = load_breast_cancer() · X_train, ... = train_test_split(...)</code></td><td>El mismo reparto 70/30 de siempre.</td></tr>
+        <tr data-lines="11-12"><td><code>modelo = make_pipeline(StandardScaler(), SVC())</code></td><td>Una tubería: primero escalar, después el SVC. <span class="por-que">Al validar, el escalador se vuelve a ajustar en cada vuelta solo con el trozo de entrenamiento de esa vuelta. Así no hay fuga de datos.</span> <span class="se-lee">el modelo es: escalar y luego clasificar con un SVC</span></td></tr>
+        <tr data-lines="14-15"><td><code># Validación cruzada ... · for k in (4, 5):</code></td><td>Repite el bloque dos veces: con 4 bloques y con 5.</td></tr>
+        <tr data-lines="16"><td><code>notas = cross_val_score(modelo, X_train, y_train, cv=k)</code></td><td>Parte train en <code>k</code> bloques. Entrena <code>k</code> veces, cada vez dejando un bloque fuera para examinar, y devuelve las <code>k</code> notas. <span class="por-que">Una sola nota puede ser suerte; varias dicen si el modelo es estable.</span> <span class="se-lee">parte train en k trozos y examina k veces, cada vez con un trozo distinto</span></td></tr>
+        <tr data-lines="17"><td><code>print(f"cv={k}: notas = {notas.round(3)} | media = {notas.mean():.3f}")</code></td><td>Escribe las notas y su media.</td></tr>
+        <tr data-lines="19-20"><td><code>rejilla = {"svc__C": [0.1, 1, 10], "svc__gamma": [0.001, 0.01, 0.1]}</code></td><td>Un diccionario con los valores a probar de cada hiperparámetro: 3 × 3 = 9 combinaciones. <code>svc__C</code> (con dos guiones bajos) significa «el <code>C</code> del paso llamado <code>svc</code>». <span class="por-que"><code>make_pipeline</code> llama a cada paso por el nombre de su clase en minúsculas.</span> <span class="se-lee">prueba C con 0,1, 1 y 10, y gamma con 0,001, 0,01 y 0,1</span></td></tr>
+        <tr data-lines="21-22"><td><code>busqueda = GridSearchCV(modelo, rejilla, cv=5) · busqueda.fit(X_train, y_train)</code></td><td>Para cada combinación hace una validación cruzada de 5 bloques; al final se queda con la mejor y la reentrena con todo train. <span class="por-que">Probar a mano 9 combinaciones × 5 bloques = 45 entrenamientos sería larguísimo.</span></td></tr>
+        <tr data-lines="24"><td><code>print("combinaciones probadas:", len(busqueda.cv_results_["params"]))</code></td><td><code>len</code> cuenta cuántos elementos hay. <code>cv_results_</code> guarda los resultados de la búsqueda.</td></tr>
+        <tr data-lines="25-26"><td><code>for p, nota in zip(busqueda.cv_results_["params"], busqueda.cv_results_["mean_test_score"]): print(p, round(nota, 3))</code></td><td><code>zip</code> recorre dos listas a la vez, por parejas: cada combinación con su nota media. <span class="por-que">Para ver cuánto cambia la nota con los hiperparámetros.</span> <span class="se-lee">para cada combinación y su nota, escríbelas juntas</span></td></tr>
+        <tr data-lines="27"><td><code>print("mejor:", busqueda.best_params_, "-&gt;", round(busqueda.best_score_, 3))</code></td><td>La mejor combinación y su nota de validación.</td></tr>
+        <tr data-lines="28"><td><code>print("nota final en test:", round(busqueda.score(X_test, y_test), 3))</code></td><td><code>score</code> predice test y devuelve la accuracy. <span class="por-que">El examen se hace una sola vez, al final, con el modelo ya elegido.</span></td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>cv=4: notas = [0.98 0.97 0.97 0.97] | media = 0.972
+cv=5: notas = [0.975 0.988 0.962 0.949 0.975] | media = 0.970
+combinaciones probadas: 9
+{'svc__C': 0.1, 'svc__gamma': 0.001} 0.703
+{'svc__C': 0.1, 'svc__gamma': 0.01} 0.942
+{'svc__C': 0.1, 'svc__gamma': 0.1} 0.932
+{'svc__C': 1, 'svc__gamma': 0.001} 0.952
+{'svc__C': 1, 'svc__gamma': 0.01} 0.972
+{'svc__C': 1, 'svc__gamma': 0.1} 0.955
+{'svc__C': 10, 'svc__gamma': 0.001} 0.98
+{'svc__C': 10, 'svc__gamma': 0.01} 0.975
+{'svc__C': 10, 'svc__gamma': 0.1} 0.952
+mejor: {'svc__C': 10, 'svc__gamma': 0.001} -&gt; 0.98
+nota final en test: 0.971</pre>
+    <p>Con 4 bloques la media es 0,972 y con 5, 0,970: el modelo es estable. La rejilla va de 0,703 (<code>C=0.1, gamma=0.001</code>) a 0,980 (<code>C=10, gamma=0.001</code>). La mejor saca 0,971 en test, algo menos que el SVC por defecto (0,977): con 171 pacientes eso es un solo paciente, así que no es ni mejora ni empeoramiento real. Lo verás despacio en el módulo 5.</p>
+  </div>
+</article>
+<article class="snippet" data-lang="python" id="frag-22">
+  <header>
+    <h3>Fragmento 22 · Guardar y cargar un modelo con pickle</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Guardar el modelo ya entrenado en un fichero (<code>modelo.pkl</code>) para usarlo otro día, o desde otro programa, sin volver a entrenar. <em>To pickle</em> es «conservar en vinagre».</p>
+  </header>
+  <p class="hint"><strong>De la <a href="leccion-8.html">lección 8</a>.</strong> </p>
+  <pre class="code"><code>import os
+import pickle
+from sklearn.datasets import load_breast_cancer
+from sklearn.model_selection import train_test_split
+from sklearn.pipeline import make_pipeline
+from sklearn.preprocessing import StandardScaler
+from sklearn.svm import SVC
+
+datos = load_breast_cancer()
+X_train, X_test, y_train, y_test = train_test_split(
+    datos.data, datos.target, test_size=0.3, stratify=datos.target, random_state=42)
+
+modelo = make_pipeline(StandardScaler(), SVC(C=10, gamma=0.001)).fit(X_train, y_train)
+
+# --- Hoy: guardar el modelo ya entrenado en un fichero ---
+with open("modelo.pkl", "wb") as f:
+    pickle.dump(modelo, f)
+print("¿existe modelo.pkl?", os.path.exists("modelo.pkl"))
+
+# --- Otro día (otro programa): cargarlo y usarlo SIN volver a entrenar ---
+with open("modelo.pkl", "rb") as f:
+    cargado = pickle.load(f)
+
+iguales = (cargado.predict(X_test) == modelo.predict(X_test)).all()
+print("¿mismas predicciones que el original?", iguales)
+print("accuracy del modelo cargado:", round(cargado.score(X_test, y_test), 3))
+os.remove("modelo.pkl")        # limpieza de este ejemplo</code></pre>
+  <details class="linea-a-linea" open>
+    <summary>Línea por línea</summary>
+    <p class="hint">Toca o pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+      <tbody>
+        <tr data-lines="1-2"><td><code>import os · import pickle</code></td><td><code>os</code> habla con el sistema operativo (ficheros y carpetas); <code>pickle</code> convierte un objeto de Python en un fichero y al revés. Las dos vienen con Python.</td></tr>
+        <tr data-lines="3-7"><td><code>from sklearn... import ...</code></td><td>Las piezas conocidas.</td></tr>
+        <tr data-lines="9-11"><td><code>datos = load_breast_cancer() · X_train, ... = train_test_split(...)</code></td><td>El reparto 70/30 de siempre.</td></tr>
+        <tr data-lines="13"><td><code>modelo = make_pipeline(StandardScaler(), SVC(C=10, gamma=0.001)).fit(X_train, y_train)</code></td><td>Crea y entrena la tubería con los mejores hiperparámetros del fragmento anterior.</td></tr>
+        <tr data-lines="15"><td><code># --- Hoy: guardar ... ---</code></td><td>Comentario.</td></tr>
+        <tr data-lines="16-17"><td><code>with open("modelo.pkl", "wb") as f: pickle.dump(modelo, f)</code></td><td><code>open</code> abre (o crea) un fichero; <code>"wb"</code> = escribir (<em>write</em>) en binario. <code>with … as f</code> lo llama <code>f</code> y lo cierra solo al acabar el bloque. <code>pickle.dump</code> vuelca el modelo dentro. <span class="por-que">Sin <code>with</code> tendrías que acordarte de cerrar el fichero.</span> <span class="se-lee">abre modelo.pkl para escribir, llámalo f, mete el modelo dentro y ciérralo</span></td></tr>
+        <tr data-lines="18"><td><code>print("¿existe modelo.pkl?", os.path.exists("modelo.pkl"))</code></td><td><code>os.path.exists</code> responde <code>True</code> si el fichero existe.</td></tr>
+        <tr data-lines="20-22"><td><code>with open("modelo.pkl", "rb") as f: cargado = pickle.load(f)</code></td><td>Abre el fichero para leer (<code>"rb"</code>, <em>read</em> en binario) y <code>pickle.load</code> reconstruye el modelo. <span class="por-que">Esto lo haría otro programa, otro día.</span> <span class="se-lee">abre modelo.pkl para leer y saca de dentro el modelo</span></td></tr>
+        <tr data-lines="24"><td><code>iguales = (cargado.predict(X_test) == modelo.predict(X_test)).all()</code></td><td>Compara una a una las predicciones de los dos modelos; <code>.all()</code> responde <code>True</code> solo si coinciden todas. <span class="por-que">Prueba de que se ha guardado bien.</span> <span class="se-lee">¿el cargado y el original dicen lo mismo con todos los pacientes?</span></td></tr>
+        <tr data-lines="25-26"><td><code>print(...) · print("accuracy del modelo cargado:", round(cargado.score(X_test, y_test), 3))</code></td><td>Escribe la comprobación y la nota del modelo cargado.</td></tr>
+        <tr data-lines="27"><td><code>os.remove("modelo.pkl")</code></td><td>Borra el fichero. <span class="por-que">Solo para no dejar basura con este ejemplo.</span></td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>¿existe modelo.pkl? True
+¿mismas predicciones que el original? True
+accuracy del modelo cargado: 0.971</pre>
+    <p>El fichero existe, el modelo cargado predice exactamente lo mismo y su accuracy es 0,971. Dos avisos: el fichero depende de las versiones de Python y scikit-learn con que se creó, y <strong>nunca cargues con <code>pickle.load</code> un fichero de alguien que no conozcas</strong>: al cargarlo puede ejecutar código.</p>
+  </div>
+</article>
+<h3 id="mas-streamflix">StreamFlix: limpiar, explorar y separar por fechas</h3>
+<p>El proyecto de la lección 5.</p>
+<article class="snippet" data-lang="python" id="frag-10">
+  <header>
+    <h3>Fragmento 10 · StreamFlix: limpiar la edad y crear features con Pandas</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Dos escenas del ciclo de vida con datos de juguete: arreglar una columna sucia (<code>25, 34, vacío, «treinta», 450</code>) y convertir la lista de películas vistas en <em>una fila por usuario</em>.</p>
+  </header>
+  <p class="hint"><strong>De la <a href="leccion-5.html">lección 5</a>.</strong> </p>
+  <pre class="code"><code>import numpy as np
+import pandas as pd
+
+# --- 1. Limpiar: la columna EDAD de los usuarios, tal como llega ---
+usuarios = pd.DataFrame({
+    "usuario": ["U1", "U2", "U3", "U4", "U5"],
+    "edad": ["25", "34", None, "treinta", "450"],
+})
+usuarios["edad"] = pd.to_numeric(usuarios["edad"], errors="coerce")
+usuarios.loc[(usuarios["edad"] &lt; 16) | (usuarios["edad"] &gt; 100), "edad"] = np.nan
+usuarios["edad"] = usuarios["edad"].fillna(usuarios["edad"].median())
+print(usuarios["edad"].tolist())
+
+# --- 2. Feature engineering: de los visionados a una fila por usuario ---
+visionados = pd.DataFrame({
+    "usuario": ["U1", "U1", "U1", "U2", "U2", "U3"],
+    "fecha":   ["2026-01-10", "2026-02-15", "2026-03-30", "2026-01-20", "2026-03-05", "2026-02-01"],
+    "genero":  ["Acción", "Comedia", "Comedia", "Drama", "Drama", "Terror"],
+    "minutos": [120.0, 90.0, 90.0, 150.0, 110.0, 95.0],
+})
+visionados["fecha"] = pd.to_datetime(visionados["fecha"])
+
+features = visionados.groupby("usuario").agg(
+    minutos_medios=("minutos", "mean"),
+    n_pelis=("minutos", "size"),
+    genero_fav=("genero", lambda s: s.mode()[0]),
+)
+dias = visionados.sort_values("fecha").groupby("usuario")["fecha"].apply(lambda s: s.diff().dt.days.mean())
+features["dias_entre_pelis"] = dias
+print(features.round(1))</code></pre>
+  <details class="linea-a-linea" open>
+    <summary>Línea por línea</summary>
+    <p class="hint">Toca o pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+      <tbody>
+        <tr data-lines="1-2"><td><code>import numpy as np · import pandas as pd</code></td><td>NumPy (para <code>np.nan</code>) y Pandas.</td></tr>
+        <tr data-lines="4"><td><code># --- 1. Limpiar ... ---</code></td><td>Comentario.</td></tr>
+        <tr data-lines="5-8"><td><code>usuarios = pd.DataFrame({"usuario": [...], "edad": ["25", "34", None, "treinta", "450"]})</code></td><td>Una tabla de 5 usuarios con la edad tal como llega: como texto, con un hueco, una palabra y una edad imposible. <span class="por-que">Así llegan los datos de verdad.</span></td></tr>
+        <tr data-lines="9"><td><code>usuarios["edad"] = pd.to_numeric(usuarios["edad"], errors="coerce")</code></td><td><code>to_numeric</code> convierte el texto en números. <code>errors="coerce"</code> («forzar»): lo que no se pueda convertir («treinta») se vuelve <code>NaN</code> en vez de dar error. <span class="por-que">Sin <code>coerce</code>, la palabra «treinta» pararía el programa.</span> <span class="se-lee">convierte las edades en números y, lo que no sea un número, déjalo como hueco</span></td></tr>
+        <tr data-lines="10"><td><code>usuarios.loc[(usuarios["edad"] &lt; 16) | (usuarios["edad"] &gt; 100), "edad"] = np.nan</code></td><td><code>.loc[filas, columna]</code> elige casillas. Las filas son las que cumplen la condición; <code>|</code> significa «o». A esas casillas se les pone <code>np.nan</code>. <span class="por-que">Una edad de 450 es un error de tecleo: mejor un hueco que un dato falso.</span> <span class="se-lee">si la edad es menor de 16 o mayor de 100, bórrala</span></td></tr>
+        <tr data-lines="11"><td><code>usuarios["edad"] = usuarios["edad"].fillna(usuarios["edad"].median())</code></td><td><code>fillna</code> («rellena los NA») tapa cada hueco con la mediana de las edades válidas. <span class="por-que">Es lo que hace el <code>SimpleImputer</code> del paso 5, escrito a mano.</span> <span class="se-lee">tapa cada hueco de edad con la mediana de las edades que sí valen</span></td></tr>
+        <tr data-lines="12"><td><code>print(usuarios["edad"].tolist())</code></td><td>Escribe la columna como lista.</td></tr>
+        <tr data-lines="14"><td><code># --- 2. Feature engineering ... ---</code></td><td>Comentario.</td></tr>
+        <tr data-lines="15-20"><td><code>visionados = pd.DataFrame({...})</code></td><td>Una tabla con 6 películas vistas: quién, cuándo, de qué género y cuántos minutos. <span class="por-que">El modelo necesita una fila por usuario, pero los datos llegan como una fila por película.</span></td></tr>
+        <tr data-lines="21"><td><code>visionados["fecha"] = pd.to_datetime(visionados["fecha"])</code></td><td>Convierte las fechas de texto en fechas de verdad. <span class="por-que">Para poder restarlas en la línea 28.</span></td></tr>
+        <tr data-lines="23-27"><td><code>features = visionados.groupby("usuario").agg(minutos_medios=("minutos", "mean"), n_pelis=..., genero_fav=...)</code></td><td><code>groupby</code> agrupa las filas por usuario; <code>agg</code> («agregar») calcula un resumen por grupo. Cada línea dice <code>nombre_nuevo=(columna, cálculo)</code>: media de minutos, cuántas películas (<code>size</code>) y el género más repetido. <span class="por-que"><code>lambda s: s.mode()[0]</code> es una función de una línea, sin nombre: «coge el valor más repetido (<code>mode</code>) y quédate con el primero».</span> <span class="se-lee">agrupa por usuario y, para cada uno, calcula sus minutos medios, cuántas películas ha visto y su género favorito</span></td></tr>
+        <tr data-lines="28"><td><code>dias = visionados.sort_values("fecha").groupby("usuario")["fecha"].apply(lambda s: s.diff().dt.days.mean())</code></td><td>Ordena por fecha, agrupa por usuario y, para cada uno, calcula los días entre una película y la siguiente (<code>diff</code>) y su media. <span class="por-que">Una cadena larga se lee de izquierda a derecha, punto a punto.</span> <span class="se-lee">para cada usuario, ¿cuántos días pasan de media entre una película y la siguiente?</span></td></tr>
+        <tr data-lines="29-30"><td><code>features["dias_entre_pelis"] = dias · print(features.round(1))</code></td><td>Añade esa columna y escribe la tabla con 1 decimal.</td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>[25.0, 34.0, 29.5, 29.5, 29.5]
+         minutos_medios  n_pelis genero_fav  dias_entre_pelis
+usuario                                                      
+U1                100.0        3    Comedia              39.5
+U2                130.0        2      Drama              44.0
+U3                 95.0        1     Terror               NaN</pre>
+    <p>Las edades quedan <code>[25.0, 34.0, 29.5, 29.5, 29.5]</code>: «treinta», el hueco y el 450 se han sustituido por la mediana de las dos válidas. U1 ve de media 100 minutos por película ((120 + 90 + 90) / 3), prefiere la comedia y espera 39,5 días entre películas. U3 solo vio una, así que no hay «días entre pelis»: sale <code>NaN</code>, un hueco legítimo que habría que tratar después.</p>
+  </div>
+</article>
+<article class="snippet" data-lang="python" id="frag-11">
+  <header>
+    <h3>Fragmento 11 · Explorar y separar por fechas</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Dos ideas del ciclo de vida: explorar los datos buscando patrones («quien ve <em>Harry Potter 1</em> ve la segunda enseguida») y separar train y test <strong>por fecha</strong>, no al azar, cuando el tiempo importa.</p>
+  </header>
+  <p class="hint"><strong>De la <a href="leccion-5.html">lección 5</a>.</strong> </p>
+  <pre class="code"><code>import pandas as pd
+
+visionados = pd.DataFrame({
+    "usuario":  ["U1", "U1", "U1", "U1", "U2", "U2", "U3", "U3", "U4", "U4", "U5"],
+    "fecha":    ["2026-01-10", "2026-01-14", "2026-02-12", "2026-04-02",
+                 "2026-01-25", "2026-02-02", "2026-02-10", "2026-03-20",
+                 "2026-03-03", "2026-03-06", "2026-03-15"],
+    "pelicula": ["Harry Potter 1", "Harry Potter 2", "Harry Potter 3", "Harry Potter 4",
+                 "Harry Potter 1", "Harry Potter 2", "Titanic", "Shrek",
+                 "Harry Potter 1", "Harry Potter 2", "Toy Story"],
+})
+visionados["fecha"] = pd.to_datetime(visionados["fecha"])
+
+# --- EDA: ¿quien ve Harry Potter 1 ve la segunda enseguida? ---
+hp1 = visionados[visionados["pelicula"] == "Harry Potter 1"].set_index("usuario")["fecha"]
+hp2 = visionados[visionados["pelicula"] == "Harry Potter 2"].set_index("usuario")["fecha"]
+espera = (hp2 - hp1).dropna().dt.days
+print("Días entre la 1 y la 2:", espera.to_dict())
+print("Con la 2 en 7 días o menos:", (espera &lt;= 7).sum(), "de", len(hp1), "usuarios que vieron la 1")
+
+# --- Separar train/test por fechas (nunca al azar) ---
+corte = pd.Timestamp("2026-04-01")
+train = visionados[visionados["fecha"] &lt; corte]
+test = visionados[visionados["fecha"] &gt;= corte]
+print("train:", len(train), "visionados | hasta", train["fecha"].max().date())
+print("test :", len(test), "visionado  | desde", test["fecha"].min().date())
+print(test[["usuario", "pelicula"]].to_string(index=False))</code></pre>
+  <details class="linea-a-linea" open>
+    <summary>Línea por línea</summary>
+    <p class="hint">Toca o pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+      <tbody>
+        <tr data-lines="1"><td><code>import pandas as pd</code></td><td>Trae Pandas.</td></tr>
+        <tr data-lines="3-11"><td><code>visionados = pd.DataFrame({"usuario": [...], "fecha": [...], "pelicula": [...]})</code></td><td>Una tabla con 11 visionados: quién, cuándo y qué película. Las listas largas se pueden partir en varias líneas. <span class="por-que">Mientras un corchete siga abierto, Python sigue leyendo.</span></td></tr>
+        <tr data-lines="12"><td><code>visionados["fecha"] = pd.to_datetime(visionados["fecha"])</code></td><td>Texto → fecha. <span class="por-que">Para poder restar y comparar fechas.</span></td></tr>
+        <tr data-lines="14"><td><code># --- EDA ... ---</code></td><td>Comentario. EDA = análisis exploratorio de datos.</td></tr>
+        <tr data-lines="15"><td><code>hp1 = visionados[visionados["pelicula"] == "Harry Potter 1"].set_index("usuario")["fecha"]</code></td><td>Se lee en tres trozos: 1) quédate con las filas de <em>Harry Potter 1</em>; 2) pon el usuario como índice; 3) coge la columna fecha. <span class="por-que">Con el usuario como índice, Pandas puede emparejar luego las fechas de cada persona.</span> <span class="se-lee">para cada usuario que vio Harry Potter 1, ¿cuándo la vio?</span></td></tr>
+        <tr data-lines="16"><td><code>hp2 = ...</code></td><td>Lo mismo con <em>Harry Potter 2</em>.</td></tr>
+        <tr data-lines="17"><td><code>espera = (hp2 - hp1).dropna().dt.days</code></td><td>Resta las fechas usuario a usuario. <code>dropna()</code> quita a quien no vio las dos. <code>.dt.days</code> pasa el resultado a días. <span class="por-que">Pandas empareja por el índice: resta la fecha de U1 con la de U1, la de U2 con la de U2…</span> <span class="se-lee">¿cuántos días pasan entre la 1 y la 2 para cada usuario que vio las dos?</span></td></tr>
+        <tr data-lines="18-19"><td><code>print("Días entre la 1 y la 2:", espera.to_dict()) · print("Con la 2 en 7 días o menos:", (espera &lt;= 7).sum(), ...)</code></td><td>Escribe las esperas y cuenta cuántas son de 7 días o menos. <code>len(hp1)</code> cuenta cuántos vieron la primera.</td></tr>
+        <tr data-lines="21"><td><code># --- Separar train/test por fechas ---</code></td><td>Comentario.</td></tr>
+        <tr data-lines="22"><td><code>corte = pd.Timestamp("2026-04-01")</code></td><td>Una fecha concreta que hará de frontera. <span class="por-que">Lo anterior será el pasado (train) y lo posterior, el futuro (test).</span></td></tr>
+        <tr data-lines="23-24"><td><code>train = visionados[visionados["fecha"] &lt; corte] · test = visionados[visionados["fecha"] &gt;= corte]</code></td><td>Filtra las filas: antes del corte → train; desde el corte → test. <span class="por-que">Si se repartiera al azar, el modelo «vería el futuro» al entrenar.</span> <span class="se-lee">train es todo lo de antes del 1 de abril; test, lo del 1 de abril en adelante</span></td></tr>
+        <tr data-lines="25-26"><td><code>print("train:", len(train), ... train["fecha"].max().date()) · print("test :", ...)</code></td><td>Cuántos visionados hay en cada parte y su fecha límite. <code>.date()</code> quita la hora.</td></tr>
+        <tr data-lines="27"><td><code>print(test[["usuario", "pelicula"]].to_string(index=False))</code></td><td>Con dobles corchetes se eligen varias columnas. <code>to_string(index=False)</code> escribe la tabla sin la columna de índice.</td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>Días entre la 1 y la 2: {'U1': 4, 'U2': 8, 'U4': 3}
+Con la 2 en 7 días o menos: 2 de 3 usuarios que vieron la 1
+train: 10 visionados | hasta 2026-03-20
+test : 1 visionado  | desde 2026-04-02
+usuario       pelicula
+     U1 Harry Potter 4</pre>
+    <p>De los tres que vieron <em>Harry Potter 1</em>, dos vieron la segunda en 7 días o menos: un patrón fuerte que merece usarse en un recomendador. El corte por fecha deja 10 visionados para entrenar (hasta el 20 de marzo) y 1 para probar: <em>Harry Potter 4</em>, de abril.</p>
+  </div>
+</article>
+<h3 id="mas-tecnicas">Técnicas: anomalías, secuencias, recomendadores y deriva</h3>
+<p>De las lecciones 4 y 5.</p>
+<article class="snippet" data-lang="python" id="frag-9">
+  <header>
+    <h3>Fragmento 9 · Anomalías por desviación y minería de secuencias</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Dos técnicas de la lección 4: detectar una cifra que se sale de lo normal midiéndola en desviaciones (la puntuación z) y descubrir en qué pantalla se van los espectadores contando qué pantalla sigue a cuál.</p>
+  </header>
+  <p class="hint"><strong>De la <a href="leccion-4.html">lección 4</a>.</strong> </p>
+  <pre class="code"><code>import numpy as np
+from collections import Counter
+
+# --- Anomalías: ¿esta cifra se sale de lo normal? ---
+historial = np.array([80, 82, 81, 83, 80, 82, 81, 79, 82, 81])   # espectadores en la sesión de las 20:00, 10 días normales
+media = historial.mean()
+desviacion = historial.std()
+print(f"normal: media = {media:.1f} espectadores, desviación = {desviacion:.2f}")
+
+for hoy in (83, 85, 147):
+    z = (hoy - media) / desviacion
+    estado = "ANOMALÍA" if abs(z) &gt; 3 else "normal"
+    print(f"hoy {hoy:3d} espectadores -&gt; z = {z:6.2f} -&gt; {estado}")
+
+# --- Minería de secuencias: ¿en qué paso se van los espectadores? ---
+sesiones = [
+    ["Inicio", "Serie", "Tráiler", "Episodio 1", "Episodio 2", "Final"],
+    ["Inicio", "Serie", "Episodio 1", "Episodio 2", "Final"],
+    ["Inicio", "Serie", "Pago extra", "Abandona"],
+    ["Inicio", "Serie", "Tráiler", "Pago extra", "Abandona"],
+    ["Inicio", "Serie", "Pago extra", "Abandona"],
+    ["Inicio", "Serie", "Tráiler", "Episodio 1", "Episodio 2", "Final"],
+]
+transiciones = Counter()
+for sesion in sesiones:
+    for origen, destino in zip(sesion, sesion[1:]):
+        transiciones[(origen, destino)] += 1
+
+for (origen, destino), n in transiciones.most_common(4):
+    print(f"{origen} -&gt; {destino}: {n}")
+abandonos = Counter(s[-2] for s in sesiones if s[-1] == "Abandona")
+print("Última pantalla antes de abandonar:", dict(abandonos))</code></pre>
+  <details class="linea-a-linea" open>
+    <summary>Línea por línea</summary>
+    <p class="hint">Toca o pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+      <tbody>
+        <tr data-lines="1-2"><td><code>import numpy as np · from collections import Counter</code></td><td>NumPy y <code>Counter</code> («contador»), del módulo <code>collections</code> que viene con Python: cuenta cuántas veces aparece cada cosa.</td></tr>
+        <tr data-lines="4"><td><code># --- Anomalías ... ---</code></td><td>Comentario.</td></tr>
+        <tr data-lines="5"><td><code>historial = np.array([80, 82, 81, ...])</code></td><td>Espectadores de la sesión de las 20:00 en 10 días normales. <span class="por-que">Es «lo normal» con lo que comparar.</span></td></tr>
+        <tr data-lines="6-7"><td><code>media = historial.mean() · desviacion = historial.std()</code></td><td>La media y la desviación típica (cuánto se separan los días de la media).</td></tr>
+        <tr data-lines="8"><td><code>print(f"normal: media = {media:.1f} espectadores, desviación = {desviacion:.2f}")</code></td><td>f-string: mete los valores en el texto con 1 y 2 decimales.</td></tr>
+        <tr data-lines="10"><td><code>for hoy in (83, 85, 147):</code></td><td>Repite el bloque para tres días nuevos. <span class="se-lee">para cada una de estas tres cifras de hoy…</span></td></tr>
+        <tr data-lines="11"><td><code>z = (hoy - media) / desviacion</code></td><td>La puntuación z: cuántas desviaciones se separa hoy de la media. <span class="por-que">Así 3 personas de más pesan distinto en un cine muy estable que en uno muy variable.</span></td></tr>
+        <tr data-lines="12"><td><code>estado = "ANOMALÍA" if abs(z) &gt; 3 else "normal"</code></td><td>Un <code>if</code> en una línea: vale «ANOMALÍA» si se cumple la condición y «normal» si no. <code>abs</code> quita el signo. <span class="por-que">Por arriba o por abajo, lo raro es alejarse mucho.</span> <span class="se-lee">si hoy se aleja más de 3 desviaciones de lo normal, por arriba o por abajo, es una anomalía; si no, es normal</span></td></tr>
+        <tr data-lines="13"><td><code>print(f"hoy {hoy:3d} espectadores -&gt; z = {z:6.2f} -&gt; {estado}")</code></td><td>Escribe cada día alineado.</td></tr>
+        <tr data-lines="15"><td><code># --- Minería de secuencias ... ---</code></td><td>Comentario.</td></tr>
+        <tr data-lines="16-23"><td><code>sesiones = [["Inicio", "Serie", ...], ...]</code></td><td>Seis recorridos de usuarios por la plataforma: listas dentro de una lista.</td></tr>
+        <tr data-lines="24"><td><code>transiciones = Counter()</code></td><td>Un contador vacío. <span class="por-que">Aquí se irá apuntando cada «de esta pantalla a esta otra».</span></td></tr>
+        <tr data-lines="25-27"><td><code>for sesion in sesiones: for origen, destino in zip(sesion, sesion[1:]): transiciones[(origen, destino)] += 1</code></td><td>Dos bucles, uno dentro de otro. <code>zip(sesion, sesion[1:])</code> empareja cada pantalla con la siguiente. <code>+= 1</code> suma uno a esa pareja. <span class="por-que"><code>sesion[1:]</code> es la misma lista sin el primero: al ponerla al lado de la original, cada pantalla queda junto a la que viene después.</span> <span class="se-lee">para cada sesión, y para cada pantalla y la que la sigue, suma 1 a esa pareja</span></td></tr>
+        <tr data-lines="29-30"><td><code>for (origen, destino), n in transiciones.most_common(4): print(...)</code></td><td><code>most_common(4)</code> da las 4 parejas más repetidas.</td></tr>
+        <tr data-lines="31"><td><code>abandonos = Counter(s[-2] for s in sesiones if s[-1] == "Abandona")</code></td><td><code>s[-1]</code> es la última pantalla y <code>s[-2]</code>, la penúltima (los negativos cuentan desde el final). Cuenta la penúltima de las sesiones que acaban en «Abandona». <span class="por-que">Dice en qué pantalla estaba la gente justo antes de irse.</span> <span class="se-lee">en las sesiones que terminan en abandono, ¿cuál fue la pantalla anterior?</span></td></tr>
+        <tr data-lines="32"><td><code>print("Última pantalla antes de abandonar:", dict(abandonos))</code></td><td>Lo escribe como diccionario.</td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>normal: media = 81.1 espectadores, desviación = 1.14
+hoy  83 espectadores -&gt; z =   1.67 -&gt; normal
+hoy  85 espectadores -&gt; z =   3.43 -&gt; ANOMALÍA
+hoy 147 espectadores -&gt; z =  58.02 -&gt; ANOMALÍA
+Inicio -&gt; Serie: 6
+Serie -&gt; Tráiler: 3
+Episodio 1 -&gt; Episodio 2: 3
+Episodio 2 -&gt; Final: 3
+Última pantalla antes de abandonar: {'Pago extra': 3}</pre>
+    <p>Con 83 espectadores, z = 1,67: normal. Con 85 parece poca diferencia, pero en una sesión que siempre está entre 79 y 83 son 3,43 desviaciones: anomalía. Con 147, z = 58: algo rarísimo (un estreno o un error del contador). Las tres sesiones que acaban en «Abandona» lo hacen justo después de «Pago extra»: un problema en un punto concreto del recorrido.</p>
+  </div>
+</article>
+<article class="snippet" data-lang="python" id="frag-12">
+  <header>
+    <h3>Fragmento 12 · Recomendador content-based y collaborative con el coseno</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Construir a mano los dos tipos de recomendador sobre una tabla usuario × película, ver qué recomienda cada uno y combinarlos en un híbrido.</p>
+  </header>
+  <p class="hint"><strong>De la <a href="leccion-5.html">lección 5</a>.</strong> </p>
+  <pre class="code"><code>import numpy as np
+import pandas as pd
+
+peliculas = ["Matrix", "E.T.", "Indiana Jones", "Iron Man", "Thor", "Shrek"]
+usuarios = ["David", "B", "C", "D"]
+
+# Matriz usuario x película: 1 = la ha visto
+vistas = pd.DataFrame(
+    [[1, 1, 1, 0, 0, 0],      # David
+     [1, 1, 1, 0, 1, 0],      # B: lo mismo que David y además Thor
+     [0, 0, 0, 0, 0, 1],      # C: solo Shrek
+     [1, 1, 0, 1, 0, 0]],     # D: Matrix, E.T. e Iron Man
+    index=usuarios, columns=peliculas)
+
+# Características de cada película: [Acción, Ciencia ficción, Aventura, Superhéroes, Comedia]
+rasgos = pd.DataFrame(
+    [[1, 1, 0, 0, 0],   # Matrix
+     [0, 1, 0, 0, 0],   # E.T.
+     [1, 0, 1, 0, 0],   # Indiana Jones
+     [1, 1, 0, 1, 0],   # Iron Man
+     [1, 1, 0, 1, 0],   # Thor
+     [0, 0, 0, 0, 1]],  # Shrek
+    index=peliculas, columns=["Acción", "Ciencia ficción", "Aventura", "Superhéroes", "Comedia"])
+
+def coseno(a, b):
+    return a @ b / (np.linalg.norm(a) * np.linalg.norm(b))
+
+# --- Content-based: "te gusta X -&gt; cosas parecidas a X" ---
+perfil = rasgos.loc[vistas.loc["David"] == 1].mean()      # gustos medios de David
+content = rasgos.apply(lambda fila: coseno(perfil.values, fila.values), axis=1)
+
+# --- Collaborative: "personas parecidas a ti también vieron..." ---
+yo = vistas.loc["David"].values
+parecido = vistas.apply(lambda fila: coseno(yo, fila.values), axis=1).drop("David")
+collab = (vistas.drop("David").T * parecido).T.sum()
+
+nuevas = vistas.loc["David"] == 0                          # solo lo que aún no ha visto
+print("Parecido de David con los demás:", parecido.round(2).to_dict())
+tabla = pd.DataFrame({"content": content[nuevas], "collab": collab[nuevas]}).round(2)
+tabla["collab_norm"] = (tabla["collab"] / tabla["collab"].max()).round(2)
+tabla["hibrido"] = (0.5 * tabla["content"] + 0.5 * tabla["collab_norm"]).round(2)
+print(tabla.sort_values("hibrido", ascending=False))</code></pre>
+  <details class="linea-a-linea" open>
+    <summary>Línea por línea</summary>
+    <p class="hint">Toca o pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+      <tbody>
+        <tr data-lines="1-2"><td><code>import numpy as np · import pandas as pd</code></td><td>NumPy y Pandas.</td></tr>
+        <tr data-lines="4-5"><td><code>peliculas = [...] · usuarios = [...]</code></td><td>Los nombres de 6 películas y 4 usuarios.</td></tr>
+        <tr data-lines="7-13"><td><code>vistas = pd.DataFrame([[1, 1, 1, 0, 0, 0], ...], index=usuarios, columns=peliculas)</code></td><td>Tabla usuario × película: 1 = la ha visto. <code>index</code> pone nombre a las filas y <code>columns</code>, a las columnas. <span class="por-que">Con nombres, luego se puede pedir <code>vistas.loc["David"]</code> en vez de «la fila 0».</span></td></tr>
+        <tr data-lines="15-23"><td><code>rasgos = pd.DataFrame([[1, 1, 0, 0, 0], ...], index=peliculas, columns=[...])</code></td><td>Tabla película × rasgo: 1 = tiene ese rasgo (Acción, Ciencia ficción…). <span class="por-que">El content-based recomienda por parecido de rasgos.</span></td></tr>
+        <tr data-lines="25-26"><td><code>def coseno(a, b): return a @ b / (np.linalg.norm(a) * np.linalg.norm(b))</code></td><td>La similitud del coseno. <code>a @ b</code> multiplica posición a posición y suma; <code>np.linalg.norm</code> mide la longitud de cada lista de números. <span class="por-que">Da 1 si dos gustos apuntan igual y 0 si no tienen nada en común.</span> <span class="se-lee">suma de los productos, dividida entre el tamaño de a por el tamaño de b</span></td></tr>
+        <tr data-lines="28"><td><code># --- Content-based ... ---</code></td><td>Comentario.</td></tr>
+        <tr data-lines="29"><td><code>perfil = rasgos.loc[vistas.loc["David"] == 1].mean()</code></td><td>Coge los rasgos de las películas que David ha visto y hace la media: su perfil de gustos. <span class="se-lee">de las películas que David vio, ¿qué rasgos tienen, de media?</span></td></tr>
+        <tr data-lines="30"><td><code>content = rasgos.apply(lambda fila: coseno(perfil.values, fila.values), axis=1)</code></td><td>Para cada película, el coseno entre su fila de rasgos y el perfil de David. <code>axis=1</code> = «fila a fila» (<code>axis=0</code> sería columna a columna). <code>.values</code> saca los números sin los nombres. <span class="por-que">Puntúa cada película por lo que se parece a sus gustos.</span> <span class="se-lee">para cada película, ¿cuánto se parecen sus rasgos a los gustos de David?</span></td></tr>
+        <tr data-lines="32"><td><code># --- Collaborative ... ---</code></td><td>Comentario.</td></tr>
+        <tr data-lines="33-34"><td><code>yo = vistas.loc["David"].values · parecido = vistas.apply(lambda fila: coseno(yo, fila.values), axis=1).drop("David")</code></td><td>El coseno entre lo que vio David y lo que vio cada usuario. <code>drop("David")</code> quita la comparación consigo mismo. <span class="se-lee">¿cuánto se parece cada usuario a David?</span></td></tr>
+        <tr data-lines="35"><td><code>collab = (vistas.drop("David").T * parecido).T.sum()</code></td><td><code>.T</code> gira la tabla (filas ↔ columnas) para multiplicar cada usuario por su parecido; se vuelve a girar y se suma por película. <span class="por-que">Lo que vieron los usuarios más parecidos pesa más.</span> <span class="se-lee">suma, para cada película, las vistas de los demás pesadas por lo que se parecen a David</span></td></tr>
+        <tr data-lines="37"><td><code>nuevas = vistas.loc["David"] == 0</code></td><td>Marca con <code>True</code> las películas que David no ha visto. <span class="por-que">Solo tiene sentido recomendar lo que no ha visto.</span></td></tr>
+        <tr data-lines="38"><td><code>print("Parecido de David con los demás:", parecido.round(2).to_dict())</code></td><td>Escribe los parecidos.</td></tr>
+        <tr data-lines="39"><td><code>tabla = pd.DataFrame({"content": content[nuevas], "collab": collab[nuevas]}).round(2)</code></td><td>Una tabla con las dos puntuaciones, solo para las películas nuevas.</td></tr>
+        <tr data-lines="40"><td><code>tabla["collab_norm"] = (tabla["collab"] / tabla["collab"].max()).round(2)</code></td><td>Divide entre el máximo para que collab vaya de 0 a 1, como content. <span class="por-que">Para mezclar dos notas, deben estar en la misma escala.</span></td></tr>
+        <tr data-lines="41"><td><code>tabla["hibrido"] = (0.5 * tabla["content"] + 0.5 * tabla["collab_norm"]).round(2)</code></td><td>El híbrido: mitad de una nota y mitad de la otra. <span class="se-lee">la nota híbrida es la media de las dos notas</span></td></tr>
+        <tr data-lines="42"><td><code>print(tabla.sort_values("hibrido", ascending=False))</code></td><td>Ordena por la nota híbrida de mayor a menor (<code>ascending=False</code> = no ascendente).</td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>Parecido de David con los demás: {'B': 0.87, 'C': 0.0, 'D': 0.67}
+          content  collab  collab_norm  hibrido
+Thor         0.77    0.87         1.00     0.88
+Iron Man     0.77    0.67         0.77     0.77
+Shrek        0.00    0.00         0.00     0.00</pre>
+    <p>David se parece 0,87 a B, 0,67 a D y 0 a C. El content-based da 0,77 a <em>Iron Man</em> y a <em>Thor</em>: sus rasgos son idénticos y no puede desempatar. El collaborative sí: B, muy parecido a David, vio <em>Thor</em>. El híbrido recomienda <em>Thor</em> (0,88). <em>Shrek</em> sale con 0: no se parece a nada de lo que vio David ni lo vio nadie parecido a él.</p>
+  </div>
+</article>
+<article class="snippet" data-lang="python" id="frag-13">
+  <header>
+    <h3>Fragmento 13 · Monitorización: deriva de datos y reentrenamiento</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Simular lo que pasa tras poner un modelo en producción: los hábitos cambian mes a mes, el modelo congelado empeora y reentrenarlo con datos recientes lo arregla.</p>
+  </header>
+  <p class="hint"><strong>De la <a href="leccion-5.html">lección 5</a>.</strong> </p>
+  <pre class="code"><code>import numpy as np
+from sklearn.tree import DecisionTreeClassifier
+
+rng = np.random.default_rng(7)
+
+def clientes_del_mes(umbral_real, n=400):
+    """Días sin entrar de n clientes y si cancelaron. Cancelar = pasar del umbral (con un 5 % de ruido)."""
+    dias = rng.uniform(0, 60, n)
+    cancela = (dias &gt; umbral_real).astype(int)
+    ruido = rng.random(n) &lt; 0.05
+    return dias.reshape(-1, 1), np.where(ruido, 1 - cancela, cancela)
+
+# Los hábitos cambian: cada mes la gente cancela con menos días sin entrar
+umbrales = [20, 20, 18, 15, 12, 10]
+meses = [clientes_del_mes(u) for u in umbrales]
+
+# Mes 0: entrenamos y lo ponemos en producción
+modelo = DecisionTreeClassifier(max_depth=1, random_state=0).fit(*meses[0])
+print(f"Entrenado en el mes 0: umbral aprendido = {modelo.tree_.threshold[0]:.1f} días")
+
+# Monitorización: con el modelo congelado, ¿cuánto acierta cada mes?
+for mes, (X, y) in enumerate(meses):
+    print(f"mes {mes}: accuracy = {modelo.score(X, y):.3f}")
+
+# Reentrenamiento con los datos recientes (meses 4 y 5)
+X_rec = np.vstack([meses[4][0], meses[5][0]])
+y_rec = np.concatenate([meses[4][1], meses[5][1]])
+nuevo = DecisionTreeClassifier(max_depth=1, random_state=0).fit(X_rec, y_rec)
+X6, y6 = clientes_del_mes(10)
+print(f"Reentrenado: umbral = {nuevo.tree_.threshold[0]:.1f} días")
+print(f"mes 6, modelo viejo = {modelo.score(X6, y6):.3f} | modelo nuevo = {nuevo.score(X6, y6):.3f}")</code></pre>
+  <details class="linea-a-linea" open>
+    <summary>Línea por línea</summary>
+    <p class="hint">Toca o pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+      <tbody>
+        <tr data-lines="1-2"><td><code>import numpy as np · from sklearn.tree import DecisionTreeClassifier</code></td><td>NumPy y el árbol del paso 1.</td></tr>
+        <tr data-lines="4"><td><code>rng = np.random.default_rng(7)</code></td><td>Generador de aleatorios con semilla 7. <span class="por-que">Para que la simulación salga siempre igual.</span></td></tr>
+        <tr data-lines="6-7"><td><code>def clientes_del_mes(umbral_real, n=400): """..."""</code></td><td>Una función que fabrica los clientes de un mes. <code>n=400</code> es un valor por defecto: si no dices cuántos, son 400. El texto entre triples comillas es su descripción.</td></tr>
+        <tr data-lines="8"><td><code>dias = rng.uniform(0, 60, n)</code></td><td>Días sin entrar al azar entre 0 y 60 para cada cliente.</td></tr>
+        <tr data-lines="9"><td><code>cancela = (dias &gt; umbral_real).astype(int)</code></td><td>Compara cada cliente con el umbral real de ese mes: <code>True</code>/<code>False</code>, que <code>astype(int)</code> convierte en 1/0. <span class="se-lee">cancela el que pase del umbral de este mes</span></td></tr>
+        <tr data-lines="10"><td><code>ruido = rng.random(n) &lt; 0.05</code></td><td>Marca al azar un 5 % de clientes. <span class="por-que">Esos harán lo contrario de lo esperado, como en la vida real.</span></td></tr>
+        <tr data-lines="11"><td><code>return dias.reshape(-1, 1), np.where(ruido, 1 - cancela, cancela)</code></td><td><code>reshape(-1, 1)</code> pone los días en forma de tabla de 1 columna (el −1 significa «las filas que hagan falta»). <code>np.where</code> elige: donde hay ruido, lo contrario; si no, lo normal. <span class="por-que">scikit-learn pide X en forma de tabla.</span> <span class="se-lee">devuelve los días como tabla y, como respuesta, lo contrario para los marcados con ruido</span></td></tr>
+        <tr data-lines="13-15"><td><code>umbrales = [20, 20, 18, 15, 12, 10] · meses = [clientes_del_mes(u) for u in umbrales]</code></td><td>Seis meses, cada uno con un umbral real más bajo. Los corchetes con <code>for</code> dentro crean una lista llamando a la función una vez por umbral. <span class="se-lee">fabrica los clientes de cada mes con su umbral</span></td></tr>
+        <tr data-lines="17-18"><td><code>modelo = DecisionTreeClassifier(max_depth=1, random_state=0).fit(*meses[0])</code></td><td>Crea y entrena el árbol con el mes 0. El asterisco de <code>*meses[0]</code> «desempaqueta» la pareja (X, y) en dos argumentos.</td></tr>
+        <tr data-lines="19"><td><code>print(f"Entrenado en el mes 0: umbral aprendido = ...")</code></td><td>El umbral aprendido, con 1 decimal.</td></tr>
+        <tr data-lines="21-23"><td><code>for mes, (X, y) in enumerate(meses): print(f"mes {mes}: accuracy = {modelo.score(X, y):.3f}")</code></td><td><code>enumerate</code> numera los elementos (0, 1, 2…). <code>score</code> predice y devuelve la accuracy. <span class="por-que">Monitorizar es justo esto: medir cada mes sin tocar el modelo.</span> <span class="se-lee">para cada mes, con su número, mide cuánto acierta el modelo congelado</span></td></tr>
+        <tr data-lines="25-27"><td><code>X_rec = np.vstack([...]) · y_rec = np.concatenate([...])</code></td><td><code>vstack</code> apila tablas una encima de otra; <code>concatenate</code> pega listas. Junta los meses 4 y 5. <span class="por-que">Para reentrenar con lo más reciente.</span></td></tr>
+        <tr data-lines="28"><td><code>nuevo = DecisionTreeClassifier(max_depth=1, random_state=0).fit(X_rec, y_rec)</code></td><td>Reentrena un árbol nuevo con esos datos.</td></tr>
+        <tr data-lines="29"><td><code>X6, y6 = clientes_del_mes(10)</code></td><td>Fabrica el mes 6, que ninguno de los dos modelos ha visto.</td></tr>
+        <tr data-lines="30-31"><td><code>print(...) · print(f"mes 6, modelo viejo = ... | modelo nuevo = ...")</code></td><td>Compara los dos modelos en el mes 6.</td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>Entrenado en el mes 0: umbral aprendido = 20.1 días
+mes 0: accuracy = 0.958
+mes 1: accuracy = 0.958
+mes 2: accuracy = 0.915
+mes 3: accuracy = 0.877
+mes 4: accuracy = 0.828
+mes 5: accuracy = 0.760
+Reentrenado: umbral = 12.0 días
+mes 6, modelo viejo = 0.790 | modelo nuevo = 0.912</pre>
+    <p>El modelo del mes 0 acierta un 95,8 % y se mantiene en el mes 1. Después se degrada sin que el código cambie: 91,5 %, 87,7 %, 82,8 % y 76,0 % en el mes 5. Es la <strong>deriva</strong>: el mundo cambió y el modelo no. Reentrenado, el umbral baja a 12,0 días y en el mes 6 acierta un 91,2 % frente al 79,0 % del viejo.</p>
+  </div>
+</article>
+<h3 id="mas-herramientas">Herramientas: RAG, SQL, tensores y lenguaje</h3>
+<p>De la lección 6.</p>
+<article class="snippet" data-lang="python" id="frag-14">
+  <header>
+    <h3>Fragmento 14 · RAG a mano: buscar el documento antes de generar</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Las dos mitades de RAG: <em>retrieval</em> (buscar el documento más parecido a la pregunta) y <em>augmented generation</em> (pegarlo en el prompt). No hay ningún LLM aquí: construimos el prompt que recibiría.</p>
+  </header>
+  <p class="hint"><strong>De la <a href="leccion-6.html">lección 6</a>.</strong> </p>
+  <pre class="code"><code>from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.metrics.pairwise import cosine_similarity
+
+documentos = [
+    "Vacaciones: cada empleado tiene 23 días laborables de vacaciones al año. Se solicitan con 15 días de antelación.",
+    "Teletrabajo: se puede trabajar desde casa dos días a la semana, previa aprobación del responsable.",
+    "Gastos de viaje: los billetes de tren se reembolsan completos; los hoteles hasta 90 euros por noche.",
+    "Baja médica: hay que avisar a recursos humanos el mismo día y entregar el parte en 72 horas.",
+    "Formación: cada persona dispone de 40 horas de formación pagada al año.",
+]
+pregunta = "¿Cuántos días de vacaciones tengo?"
+
+# 1. RETRIEVAL: buscar el documento más parecido a la pregunta
+vectorizador = TfidfVectorizer(strip_accents="unicode", lowercase=True)
+matriz = vectorizador.fit_transform(documentos)
+v_pregunta = vectorizador.transform([pregunta])
+similitud = cosine_similarity(v_pregunta, matriz).ravel()
+
+for i, s in enumerate(similitud):
+    print(f"documento {i}: similitud = {s:.3f}")
+mejor = similitud.argmax()
+print("Elegido:", documentos[mejor][:40] + "...")
+
+# 2. AUGMENTED GENERATION: pegar el documento en el prompt que recibiría el LLM
+prompt = (
+    "Responde SOLO con la información del contexto.\n"
+    f"Contexto: {documentos[mejor]}\n"
+    f"Pregunta: {pregunta}"
+)
+print()
+print(prompt)</code></pre>
+  <details class="linea-a-linea" open>
+    <summary>Línea por línea</summary>
+    <p class="hint">Toca o pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+      <tbody>
+        <tr data-lines="1"><td><code>from sklearn.feature_extraction.text import TfidfVectorizer</code></td><td>Trae <code>TfidfVectorizer</code>: convierte textos en números. Cada palabra pesa más cuanto más sale en ese texto y menos en los demás (TF-IDF). <span class="por-que">Para comparar textos hay que convertirlos en números.</span></td></tr>
+        <tr data-lines="2"><td><code>from sklearn.metrics.pairwise import cosine_similarity</code></td><td>La similitud del coseno ya programada.</td></tr>
+        <tr data-lines="4-10"><td><code>documentos = ["Vacaciones: ...", ...]</code></td><td>Cinco documentos de normas de una empresa. <span class="por-que">Es la «biblioteca» donde buscar.</span></td></tr>
+        <tr data-lines="11"><td><code>pregunta = "¿Cuántos días de vacaciones tengo?"</code></td><td>La pregunta del usuario.</td></tr>
+        <tr data-lines="13"><td><code># 1. RETRIEVAL ...</code></td><td>Comentario.</td></tr>
+        <tr data-lines="14"><td><code>vectorizador = TfidfVectorizer(strip_accents="unicode", lowercase=True)</code></td><td>Crea el vectorizador: quita tildes y pasa a minúsculas. <span class="por-que">«Vacaciones» y «vacaciones» deben contar como la misma palabra.</span></td></tr>
+        <tr data-lines="15"><td><code>matriz = vectorizador.fit_transform(documentos)</code></td><td>Aprende el vocabulario de los documentos y los convierte en números.</td></tr>
+        <tr data-lines="16"><td><code>v_pregunta = vectorizador.transform([pregunta])</code></td><td>Convierte la pregunta con el mismo vocabulario. Va entre corchetes porque espera una lista de textos. <span class="por-que">Solo <code>transform</code>: pregunta y documentos deben medirse con la misma regla.</span></td></tr>
+        <tr data-lines="17"><td><code>similitud = cosine_similarity(v_pregunta, matriz).ravel()</code></td><td>Parecido de la pregunta con cada documento; <code>ravel()</code> lo deja en una fila. <span class="se-lee">¿cuánto se parece la pregunta a cada documento?</span></td></tr>
+        <tr data-lines="19-20"><td><code>for i, s in enumerate(similitud): print(...)</code></td><td>Escribe cada documento con su número y su parecido.</td></tr>
+        <tr data-lines="21"><td><code>mejor = similitud.argmax()</code></td><td><code>argmax</code> da la <em>posición</em> del valor más alto, no el valor. <span class="por-que">Necesitamos saber qué documento es.</span></td></tr>
+        <tr data-lines="22"><td><code>print("Elegido:", documentos[mejor][:40] + "...")</code></td><td>Escribe los 40 primeros caracteres del elegido (<code>[:40]</code>).</td></tr>
+        <tr data-lines="24"><td><code># 2. AUGMENTED GENERATION ...</code></td><td>Comentario.</td></tr>
+        <tr data-lines="25-29"><td><code>prompt = ("Responde SOLO ...\n" f"Contexto: {documentos[mejor]}\n" f"Pregunta: {pregunta}")</code></td><td>Monta el prompt. Textos seguidos dentro de un paréntesis se pegan solos. <code>\n</code> es un salto de línea. <span class="por-que">El LLM respondería leyendo el documento, no de memoria.</span> <span class="se-lee">el prompt dice: responde solo con el contexto; aquí va el documento; y aquí, la pregunta</span></td></tr>
+        <tr data-lines="30-31"><td><code>print() · print(prompt)</code></td><td>Una línea en blanco y el prompt final.</td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>documento 0: similitud = 0.668
+documento 1: similitud = 0.124
+documento 2: similitud = 0.145
+documento 3: similitud = 0.000
+documento 4: similitud = 0.176
+Elegido: Vacaciones: cada empleado tiene 23 días ...
+
+Responde SOLO con la información del contexto.
+Contexto: Vacaciones: cada empleado tiene 23 días laborables de vacaciones al año. Se solicitan con 15 días de antelación.
+Pregunta: ¿Cuántos días de vacaciones tengo?</pre>
+    <p>El documento 0 («Vacaciones») sale con 0,668 y los demás con menos de 0,18: la búsqueda funciona. El prompt final ya lleva la respuesta en el contexto. Ningún parámetro de ningún modelo ha cambiado: si mañana las vacaciones pasan a 25 días, basta con editar el documento.</p>
+  </div>
+</article>
+<article class="snippet" data-lang="python" id="frag-15">
+  <header>
+    <h3>Fragmento 15 · SQL con sqlite3 y paso a Pandas</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Guardar datos en dos tablas relacionadas, preguntar «usuarios de Madrid que han visto más de 1.000 minutos» en SQL y recibir el resultado como DataFrame. SQLite viene con Python.</p>
+  </header>
+  <p class="hint"><strong>De la <a href="leccion-6.html">lección 6</a>.</strong> </p>
+  <pre class="code"><code>import sqlite3
+import pandas as pd
+
+conn = sqlite3.connect(":memory:")          # una base de datos temporal, solo en memoria
+cur = conn.cursor()
+
+cur.execute("CREATE TABLE usuarios (id INTEGER PRIMARY KEY, nombre TEXT, ciudad TEXT)")
+cur.execute("CREATE TABLE visionados (id INTEGER PRIMARY KEY, usuario_id INTEGER, minutos REAL)")
+cur.executemany("INSERT INTO usuarios VALUES (?, ?, ?)", [
+    (1, "Lucía", "Madrid"), (2, "Marco", "Madrid"), (3, "Irene", "Valencia"), (4, "Pablo", "Madrid")])
+cur.executemany("INSERT INTO visionados VALUES (?, ?, ?)", [
+    (1, 1, 700), (2, 1, 450), (3, 2, 300), (4, 2, 250), (5, 3, 1500), (6, 4, 1200), (7, 4, 80)])
+
+consulta = """
+SELECT u.nombre, u.ciudad, SUM(v.minutos) AS minutos_vistos
+FROM usuarios AS u
+JOIN visionados AS v ON v.usuario_id = u.id
+WHERE u.ciudad = 'Madrid'
+GROUP BY u.id
+HAVING SUM(v.minutos) &gt; 1000
+ORDER BY minutos_vistos DESC
+"""
+df = pd.read_sql_query(consulta, conn)
+print(df)
+print(df["minutos_vistos"].mean())
+conn.close()</code></pre>
+  <details class="linea-a-linea" open>
+    <summary>Línea por línea</summary>
+    <p class="hint">Toca o pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+      <tbody>
+        <tr data-lines="1-2"><td><code>import sqlite3 · import pandas as pd</code></td><td><code>sqlite3</code> es una base de datos pequeña que viene con Python. SQL es el idioma para preguntar a las bases de datos.</td></tr>
+        <tr data-lines="4"><td><code>conn = sqlite3.connect(":memory:")</code></td><td>Abre una conexión a una base de datos temporal, solo en memoria. <span class="por-que">Para el ejemplo no hace falta un fichero.</span></td></tr>
+        <tr data-lines="5"><td><code>cur = conn.cursor()</code></td><td>Un <em>cursor</em>: el objeto que envía órdenes SQL.</td></tr>
+        <tr data-lines="7-8"><td><code>cur.execute("CREATE TABLE usuarios (...)") · cur.execute("CREATE TABLE visionados (...)")</code></td><td>Crea dos tablas. <code>INTEGER</code> = entero, <code>TEXT</code> = texto, <code>REAL</code> = decimal; <code>PRIMARY KEY</code> = identificador único.</td></tr>
+        <tr data-lines="9-12"><td><code>cur.executemany("INSERT INTO usuarios VALUES (?, ?, ?)", [...]) · ...</code></td><td>Inserta muchas filas de golpe. Cada <code>?</code> se rellena con un valor de cada tupla. <span class="por-que">Los <code>?</code> evitan pegar texto a mano dentro del SQL, que da errores.</span></td></tr>
+        <tr data-lines="14-22"><td><code>consulta = """ SELECT ... FROM ... JOIN ... WHERE ... GROUP BY ... HAVING ... ORDER BY ... """</code></td><td>La consulta, entre triples comillas para poder escribirla en varias líneas. <code>JOIN</code> une cada visionado con su usuario; <code>WHERE</code> filtra Madrid; <code>GROUP BY</code> agrupa por usuario; <code>HAVING</code> filtra los grupos de más de 1.000 minutos; <code>ORDER BY … DESC</code> ordena de mayor a menor. <span class="se-lee">dame nombre, ciudad y total de minutos de los usuarios de Madrid que pasan de 1.000 minutos, de más a menos</span></td></tr>
+        <tr data-lines="23"><td><code>df = pd.read_sql_query(consulta, conn)</code></td><td>Ejecuta la consulta y devuelve el resultado como DataFrame. <span class="por-que">SQL filtra; Pandas sigue con el análisis.</span></td></tr>
+        <tr data-lines="24-25"><td><code>print(df) · print(df["minutos_vistos"].mean())</code></td><td>La tabla y la media de minutos.</td></tr>
+        <tr data-lines="26"><td><code>conn.close()</code></td><td>Cierra la conexión. <span class="por-que">Buena costumbre: liberar la base de datos al terminar.</span></td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>  nombre  ciudad  minutos_vistos
+0  Pablo  Madrid          1280.0
+1  Lucía  Madrid          1150.0
+1215.0</pre>
+    <p>Solo Pablo (1.200 + 80 = 1.280) y Lucía (700 + 450 = 1.150) cumplen las dos condiciones. Marco, de Madrid, vio 550 y no llega; Irene vio 1.500 pero es de Valencia. La media de los dos es 1.215 minutos.</p>
+  </div>
+</article>
+<article class="snippet" data-lang="python" id="frag-16">
+  <header>
+    <h3>Fragmento 16 · Tensores con NumPy: del número a las carátulas</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Ver que un tensor es solo un montón de números con más o menos dimensiones, y qué significan <code>ndim</code> y <code>shape</code>.</p>
+  </header>
+  <p class="hint"><strong>De la <a href="leccion-6.html">lección 6</a>.</strong> </p>
+  <pre class="code"><code>import numpy as np
+
+escalar = np.array(5)                                   # un número
+vector = np.array([5, 10, 15, 20])                      # una fila de números
+matriz = np.array([[1, 2, 3], [4, 5, 6], [7, 8, 9]])    # una tabla
+caratula = np.zeros((4, 4, 3))                          # alto x ancho x canales (R, G, B)
+lote = np.zeros((32, 28, 28, 3))                        # 32 carátulas de 28 x 28 en color
+
+for nombre, t in [("escalar", escalar), ("vector", vector), ("matriz", matriz),
+                  ("caratula", caratula), ("lote", lote)]:
+    print(f"{nombre:8s} ndim = {t.ndim} | shape = {t.shape} | elementos = {t.size}")
+
+print(vector * 2, vector.mean())                        # NumPy opera sobre todos a la vez
+print(matriz[1, 2], matriz.sum(axis=0), matriz.T[0])</code></pre>
+  <details class="linea-a-linea" open>
+    <summary>Línea por línea</summary>
+    <p class="hint">Toca o pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+      <tbody>
+        <tr data-lines="1"><td><code>import numpy as np</code></td><td>Trae NumPy.</td></tr>
+        <tr data-lines="3"><td><code>escalar = np.array(5)</code></td><td>Un solo número: 0 dimensiones.</td></tr>
+        <tr data-lines="4"><td><code>vector = np.array([5, 10, 15, 20])</code></td><td>Una fila de números: 1 dimensión.</td></tr>
+        <tr data-lines="5"><td><code>matriz = np.array([[1, 2, 3], [4, 5, 6], [7, 8, 9]])</code></td><td>Una tabla: 2 dimensiones (filas y columnas).</td></tr>
+        <tr data-lines="6"><td><code>caratula = np.zeros((4, 4, 3))</code></td><td><code>np.zeros</code> crea un tensor lleno de ceros con la forma pedida: 4 de alto × 4 de ancho × 3 colores (rojo, verde, azul). <span class="por-que">Una imagen en color es así: 3 dimensiones.</span></td></tr>
+        <tr data-lines="7"><td><code>lote = np.zeros((32, 28, 28, 3))</code></td><td>32 carátulas de 28 × 28 en color: 4 dimensiones. <span class="por-que">Las redes neuronales reciben las imágenes por lotes.</span></td></tr>
+        <tr data-lines="9-11"><td><code>for nombre, t in [("escalar", escalar), ...]: print(f"{nombre:8s} ndim = {t.ndim} | shape = {t.shape} | elementos = {t.size}")</code></td><td>Recorre las 5 parejas (nombre, tensor). <code>ndim</code> = cuántas dimensiones; <code>shape</code> = tamaño de cada una; <code>size</code> = cuántos números hay en total. <span class="se-lee">para cada tensor, dime cuántas dimensiones tiene, cuánto mide cada una y cuántos números guarda</span></td></tr>
+        <tr data-lines="13"><td><code>print(vector * 2, vector.mean())</code></td><td>Multiplica todos por 2 de una vez y calcula la media. <span class="por-que">Con NumPy no hace falta un bucle: opera con todos a la vez.</span></td></tr>
+        <tr data-lines="14"><td><code>print(matriz[1, 2], matriz.sum(axis=0), matriz.T[0])</code></td><td><code>[1, 2]</code> = fila 1, columna 2 (contando desde 0). <code>sum(axis=0)</code> suma hacia abajo, por columnas. <code>.T</code> traspone (filas ↔ columnas) y <code>[0]</code> coge su primera fila. <span class="se-lee">dame la casilla de la segunda fila y tercera columna, la suma de cada columna y la primera columna</span></td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>escalar  ndim = 0 | shape = () | elementos = 1
+vector   ndim = 1 | shape = (4,) | elementos = 4
+matriz   ndim = 2 | shape = (3, 3) | elementos = 9
+caratula ndim = 3 | shape = (4, 4, 3) | elementos = 48
+lote     ndim = 4 | shape = (32, 28, 28, 3) | elementos = 75264
+[10 20 30 40] 12.5
+6 [12 15 18] [1 4 7]</pre>
+    <p>El escalar tiene <code>shape = ()</code>, el vector <code>(4,)</code>, la matriz <code>(3, 3)</code>, la carátula <code>(4, 4, 3)</code> y el lote <code>(32, 28, 28, 3)</code>, con 32 × 28 × 28 × 3 = 75.264 números. <code>matriz[1, 2]</code> es 6; las sumas por columna son 12, 15 y 18; y <code>[1 4 7]</code> es la primera columna.</p>
+  </div>
+</article>
+<article class="snippet" data-lang="python" id="frag-17">
+  <header>
+    <h3>Fragmento 17 · Tokenización, sentimiento y entidades a mano</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Lo que hacen las librerías de lenguaje, escrito desde cero: trocear un texto en tokens, puntuar el sentimiento de una reseña de cine con un diccionario y reconocer entidades.</p>
+  </header>
+  <p class="hint"><strong>De la <a href="leccion-6.html">lección 6</a>.</strong> </p>
+  <pre class="code"><code>import re
+
+def tokenizar(texto):
+    """Trocea un texto en palabras (tokens), quitando la puntuación."""
+    return re.findall(r"\w+", texto)
+
+print(tokenizar("Me encanta Toy Story"))
+print(tokenizar("¡La película ha sido increíble, repetiría!"))
+
+# --- Análisis de sentimiento "de diccionario" ---
+POSITIVAS = {"increíble", "espectacular", "genial", "bueno", "rápido"}
+NEGATIVAS = {"horrible", "lento", "malo", "decepcionante", "aburrido"}
+
+def sentimiento(texto):
+    palabras = [p.lower() for p in tokenizar(texto)]
+    puntos = sum(p in POSITIVAS for p in palabras) - sum(p in NEGATIVAS for p in palabras)
+    return "POSITIVO" if puntos &gt; 0 else "NEGATIVO" if puntos &lt; 0 else "NEUTRO"
+
+for frase in ["La película ha sido increíble",
+              "Este final es espectacular",
+              "El guion es lento y el final es horrible",
+              "No es nada bueno"]:
+    print(f"{sentimiento(frase):9s} &lt;- {frase}")
+
+# --- Reconocimiento de entidades (NER) con un diccionario ---
+ENTIDADES = {"Netflix": "ORGANIZACIÓN", "Corea": "LUGAR", "Madrid": "LUGAR"}
+for palabra in tokenizar("Netflix grabó una serie nueva en Corea"):
+    if palabra in ENTIDADES:
+        print(f"{palabra} -&gt; {ENTIDADES[palabra]}")</code></pre>
+  <details class="linea-a-linea" open>
+    <summary>Línea por línea</summary>
+    <p class="hint">Toca o pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+      <tbody>
+        <tr data-lines="1"><td><code>import re</code></td><td><code>re</code> (expresiones regulares) busca patrones dentro de un texto. Viene con Python.</td></tr>
+        <tr data-lines="3-5"><td><code>def tokenizar(texto): """...""" return re.findall(r"\w+", texto)</code></td><td><code>re.findall</code> devuelve todos los trozos que encajan con el patrón. <code>\w+</code> = «una o más letras o cifras seguidas». La <code>r</code> delante del texto pide que la barra se lea tal cual. <span class="por-que">Así la puntuación (¡ , !) se queda fuera.</span> <span class="se-lee">devuelve todas las palabras del texto, sin signos</span></td></tr>
+        <tr data-lines="7-8"><td><code>print(tokenizar("Me encanta Toy Story")) · print(tokenizar(...))</code></td><td>Prueba la función con dos frases.</td></tr>
+        <tr data-lines="10"><td><code># --- Análisis de sentimiento ... ---</code></td><td>Comentario.</td></tr>
+        <tr data-lines="11-12"><td><code>POSITIVAS = {"increíble", ...} · NEGATIVAS = {"horrible", ...}</code></td><td>Dos <strong>conjuntos</strong> (llaves sin «:»): colecciones sin repetidos donde preguntar «¿está?» es muy rápido. <span class="por-que">Las mayúsculas indican que no van a cambiar (costumbre).</span></td></tr>
+        <tr data-lines="14"><td><code>def sentimiento(texto):</code></td><td>Función que puntúa una frase.</td></tr>
+        <tr data-lines="15"><td><code>palabras = [p.lower() for p in tokenizar(texto)]</code></td><td>Trocea y pasa cada palabra a minúsculas. <span class="se-lee">para cada palabra de la frase, apúntala en minúsculas</span></td></tr>
+        <tr data-lines="16"><td><code>puntos = sum(p in POSITIVAS for p in palabras) - sum(p in NEGATIVAS for p in palabras)</code></td><td>Cuenta las palabras positivas y resta las negativas (<code>True</code> cuenta como 1). <span class="se-lee">puntos = cuántas palabras buenas menos cuántas malas</span></td></tr>
+        <tr data-lines="17"><td><code>return "POSITIVO" if puntos &gt; 0 else "NEGATIVO" if puntos &lt; 0 else "NEUTRO"</code></td><td>Dos <code>if</code> en una línea, encadenados. <span class="se-lee">si los puntos pasan de 0, positivo; si bajan de 0, negativo; si no, neutro</span></td></tr>
+        <tr data-lines="19-23"><td><code>for frase in [...]: print(f"{sentimiento(frase):9s} &lt;- {frase}")</code></td><td>Puntúa cuatro reseñas. <code>:9s</code> ocupa 9 huecos para alinear.</td></tr>
+        <tr data-lines="25"><td><code># --- NER ... ---</code></td><td>Comentario. NER = reconocimiento de entidades (nombres de empresas, lugares…).</td></tr>
+        <tr data-lines="26"><td><code>ENTIDADES = {"Netflix": "ORGANIZACIÓN", ...}</code></td><td>Un diccionario palabra → tipo de entidad.</td></tr>
+        <tr data-lines="27-29"><td><code>for palabra in tokenizar(...): if palabra in ENTIDADES: print(...)</code></td><td>Recorre las palabras y, si una está en el diccionario, escribe su tipo. <span class="se-lee">para cada palabra de la frase, si es una entidad conocida, di de qué tipo es</span></td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>['Me', 'encanta', 'Toy', 'Story']
+['La', 'película', 'ha', 'sido', 'increíble', 'repetiría']
+POSITIVO  &lt;- La película ha sido increíble
+POSITIVO  &lt;- Este final es espectacular
+NEGATIVO  &lt;- El guion es lento y el final es horrible
+POSITIVO  &lt;- No es nada bueno
+Netflix -&gt; ORGANIZACIÓN
+Corea -&gt; LUGAR</pre>
+    <p>Las dos primeras reseñas salen POSITIVO y la tercera NEGATIVO («lento» y «horrible»: −2). Pero «No es nada bueno» sale POSITIVO, y está mal: el diccionario ve «bueno» y no entiende el «no». Es el límite de este enfoque. El NER encuentra «Netflix» y «Corea» solo porque ya estaban en el diccionario.</p>
+  </div>
+</article>
+<article class="snippet" data-lang="python" id="frag-18">
+  <header>
+    <h3>Fragmento 18 · Lo mismo con NLTK</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Ver que una librería de lenguaje de verdad hace el trabajo del fragmento anterior en una línea, y dos extras: los bigramas (parejas de palabras seguidas) y las frecuencias. Necesita <code>pip install nltk</code>.</p>
+  </header>
+  <p class="hint"><strong>De la <a href="leccion-6.html">lección 6</a>.</strong> </p>
+  <pre class="code"><code>from nltk.tokenize import wordpunct_tokenize
+from nltk import bigrams, FreqDist
+
+texto = "¡La película ha sido increíble, repetiría!"
+tokens = wordpunct_tokenize(texto)
+print(tokens)
+
+palabras = [t.lower() for t in tokens if t.isalpha()]
+print(palabras)
+print(list(bigrams(["no", "es", "nada", "bueno"])))
+
+frecuencias = FreqDist(wordpunct_tokenize("el actor es bueno y el guion es bueno"))
+print(frecuencias.most_common(3))</code></pre>
+  <details class="linea-a-linea" open>
+    <summary>Línea por línea</summary>
+    <p class="hint">Toca o pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
+      <tbody>
+        <tr data-lines="1"><td><code>from nltk.tokenize import wordpunct_tokenize</code></td><td>NLTK (<em>Natural Language Toolkit</em>) es una librería clásica de lenguaje. <code>wordpunct_tokenize</code> trocea en palabras y signos.</td></tr>
+        <tr data-lines="2"><td><code>from nltk import bigrams, FreqDist</code></td><td><code>bigrams</code> hace parejas de palabras seguidas; <code>FreqDist</code> cuenta frecuencias.</td></tr>
+        <tr data-lines="4-6"><td><code>texto = "..." · tokens = wordpunct_tokenize(texto) · print(tokens)</code></td><td>Trocea la reseña y escribe los tokens. <span class="por-que">Aquí los signos sí salen como tokens.</span></td></tr>
+        <tr data-lines="8"><td><code>palabras = [t.lower() for t in tokens if t.isalpha()]</code></td><td>Se queda solo con los tokens que son letras (<code>isalpha</code>) y los pasa a minúsculas. <span class="se-lee">de los tokens, quédate con los que son palabras y escríbelos en minúsculas</span></td></tr>
+        <tr data-lines="9"><td><code>print(palabras)</code></td><td>Las palabras limpias.</td></tr>
+        <tr data-lines="10"><td><code>print(list(bigrams(["no", "es", "nada", "bueno"])))</code></td><td>Las parejas seguidas. <code>list</code> las convierte en lista para poder verlas. <span class="por-que">Con bigramas, «nada bueno» se ve junto: el «no» deja de perderse.</span></td></tr>
+        <tr data-lines="12-13"><td><code>frecuencias = FreqDist(wordpunct_tokenize("...")) · print(frecuencias.most_common(3))</code></td><td>Cuenta cada palabra y escribe las 3 más repetidas.</td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>['¡', 'La', 'película', 'ha', 'sido', 'increíble', ',', 'repetiría', '!']
+['la', 'película', 'ha', 'sido', 'increíble', 'repetiría']
+[('no', 'es'), ('es', 'nada'), ('nada', 'bueno')]
+[('el', 2), ('es', 2), ('bueno', 2)]</pre>
+    <p>Los tokens incluyen «¡», «,» y «!»; al filtrar quedan las seis palabras. Los bigramas son (no, es), (es, nada), (nada, bueno). «el», «es» y «bueno» salen dos veces. La función más famosa, <code>nltk.word_tokenize</code>, necesita descargar datos antes; <code>wordpunct_tokenize</code> funciona sin internet.</p>
+  </div>
+</article>
+</section>
+
+<section>
+<h2 id="chuleta">Chuleta del laboratorio</h2>
+<dl class="chuleta">
+  <div><dt style="text-transform:none">pd.DataFrame(datos)</dt><dd>Crea una tabla a partir de un diccionario.</dd></div>
+  <div><dt style="text-transform:none">df.head · shape · isna().sum()</dt><dd>Primeras filas, tamaño y huecos por columna.</dd></div>
+  <div><dt style="text-transform:none">value_counts(normalize=True)</dt><dd>Proporción de cada valor de una columna.</dd></div>
+  <div><dt style="text-transform:none">df.drop(columns=[…])</dt><dd>Copia de la tabla sin esas columnas: así se saca X.</dd></div>
+  <div><dt style="text-transform:none">train_test_split</dt><dd>Reparte en train y test (test_size, stratify, random_state).</dd></div>
+  <div><dt style="text-transform:none">SimpleImputer</dt><dd>Rellena huecos (median, most_frequent).</dd></div>
+  <div><dt style="text-transform:none">StandardScaler</dt><dd>Misma escala: (x − media) / desviación.</dd></div>
+  <div><dt style="text-transform:none">OneHotEncoder</dt><dd>Texto → columnas de 0 y 1.</dd></div>
+  <div><dt style="text-transform:none">Pipeline · ColumnTransformer</dt><dd>Encadenar pasos; tratar cada grupo de columnas a su manera.</dd></div>
+  <div><dt style="text-transform:none">fit · transform · fit_transform</dt><dd>Aprender (solo de train) · aplicar · las dos cosas.</dd></div>
+  <div><dt style="text-transform:none">DecisionTreeClassifier(max_depth=1)</dt><dd>Árbol de una sola pregunta.</dd></div>
+  <div><dt style="text-transform:none">predict</dt><dd>Una respuesta por fila nueva.</dd></div>
+  <div><dt style="text-transform:none">accuracy_score · confusion_matrix</dt><dd>Parte de aciertos · aciertos y errores por tipo.</dd></div>
+</dl>
+</section>
+
+<div class="resumen">
+  <h2 class="sin-num sin-toc">En tres líneas</h2>
+  <ul>
+    <li>Datos en una tabla → separar X e y → repartir train/test → preparar (aprendiendo solo de train) → <code>fit</code> → <code>predict</code> → medir.</li>
+    <li>Lo que se aprende al preparar o al entrenar se aprende solo de train; test y los clientes nuevos solo reciben <code>transform</code> y <code>predict</code>.</li>
+    <li>Cambiar de algoritmo es cambiar una línea: la interfaz de scikit-learn es siempre la misma.</li>
+  </ul>
+</div>
+
+</div>
+</main>
+</body>
+</html>

@@ -17,7 +17,7 @@ Lab.register("curso1/c1m1-features-target", function (root, api) {
   function box(ctx, D, C, x, y, bw, bh, titulo, sub, fill, stroke, subColor) {
     D.rect(ctx, x, y, bw, bh, fill, stroke, 1.5);
     D.text(ctx, titulo, x + bw / 2, y + bh / 2 - 3, { size: 11, align: "center", weight: 600, color: C.ink });
-    D.text(ctx, sub, x + bw / 2, y + bh / 2 + 12, { size: 10, align: "center", mono: true, color: subColor });
+    D.text(ctx, sub, x + bw / 2, y + bh / 2 + 12, { size: 11, align: "center", mono: true, color: subColor });
   }
   function draw(ctx, w, h, C) {
     var D = api.d, cx = w / 2;
