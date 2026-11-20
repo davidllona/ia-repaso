@@ -20,28 +20,73 @@
     <div>
       <p class="eyebrow">Curso 2 · Módulo 3 · Lección 8 de 8</p>
       <h1>Una CNN se entrena como cualquier red, y por dentro se ven los bordes</h1>
-      <p class="lead">Mismo ciclo de siempre: predicción, pérdida, retropropagación y optimizador. La única novedad es que cada peso del filtro suma gradientes de todas las posiciones. Y dentro de una CNN entrenada se ven los bordes.</p>
-      <p class="meta-line"><span class="read-time" data-render="read-time"></span><a href="../modulo-3.html">Índice del módulo</a></p>
+      <p class="lead">El mismo ciclo de siempre, una sola novedad con los pesos compartidos, cómo evitar que memorice y qué se ve dentro de una CNN entrenada.</p>
+      <p class="meta-line"><span class="read-time" data-render="read-time"></span><a href="../modulo-3.html">Índice del módulo</a> · <a href="#chuleta">Ir a la chuleta</a></p>
     </div>
     <div class="hero-tile" aria-hidden="true"></div>
   </div>
 </header>
 <details class="predice">
-  <summary>Un peso del filtro se usa en 3 posiciones de la imagen. Al retropropagar, ¿recibe el gradiente de una sola posición, la media de las tres o la suma?<span class="hint"></span></summary>
+  <summary>Un peso del filtro se usa en 3 posiciones de la imagen. Al corregirlo, ¿cuenta lo que pasó en una sola posición, la media de las tres o la suma?<span class="hint"></span></summary>
   <div>
-    <p><strong>La suma.</strong> Ese peso influyó en la pérdida desde las tres posiciones, así que su gradiente total es la suma de lo que le toca en cada una. En una <code>Dense</code> cada peso se usa una sola vez; aquí, muchas. Keras lo hace solo.</p>
+    <p><strong>La suma.</strong> Ese peso influyó en el error desde las tres posiciones, así que su corrección suma lo que le toca en cada una. Keras lo hace solo.</p>
   </div>
 </details>
 
 <section>
-<h2 id="idea">Nada nuevo que aprender para entrenarla</h2>
-<p>Una CNN se entrena con <strong>el mismo ciclo que cualquier red</strong>: paso hacia delante, pérdida, retropropagación y optimizador (Adam…). En <code>compile</code>, <code>sparse_categorical_crossentropy</code> si las etiquetas son enteros y <code>categorical_crossentropy</code> si van en one-hot; <code>fit</code> recorre épocas y lotes. Se ajustan a la vez los filtros, los biases y las <code>Dense</code>.</p>
-<p>También se sobreajusta. La señal es la de siempre: train muy alto y validación claramente menor. Ayudan el <em>data augmentation</em> (el mismo póster girado, volteado o más oscuro), <code>Dropout</code>, una red más pequeña, el <em>early stopping</em> y partir de una CNN ya entrenada (<a href="../modulo-5.html">módulo 5</a>).</p>
-<p>En Keras 3 se escribe <code>keras.Input(shape=(28, 28, 1))</code> como primera capa y después <code>Conv2D(16, (5, 5), activation="relu")</code>, <code>MaxPooling2D(2)</code>, <code>Flatten()</code> y <code>Dense</code>. El <code>input_shape=</code> del laboratorio clásico sigue funcionando, pero da un aviso.</p>
-<div class="callout ojo">
-  <span class="lbl">Errores típicos</span>
-  <p>Olvidar el eje de canales (<code>X.reshape(-1, 28, 28, 1)</code>); poner los canales delante; no normalizar igual en train y en test; operar con <code>uint8</code>; poner una <code>Dense</code> sin <code>Flatten</code>; encoger tanto el mapa que el filtro ya no cabe. Lee siempre el <code>summary()</code>.</p>
+<h2 id="idea">1 · El mismo ciclo de siempre</h2>
+<p>Una CNN se entrena exactamente como las redes de los módulos 1 y 2:</p>
+<ul class="flow">
+  <li class="a">Predecir<small>la imagen pasa por la red</small></li>
+  <li class="d">Medir el error<small>la pérdida</small></li>
+  <li class="b">Retropropagar<small>cuánto culpa tiene cada peso</small></li>
+  <li class="c">Corregir<small>el optimizador, p. ej. Adam</small></li>
+</ul>
+<p>En Keras, <code>compile</code> elige el optimizador, la <strong>pérdida</strong> (el número que mide el error) y las notas que quieres ver. <code>fit</code> entrena: da varias vueltas a los datos, llamadas <strong>épocas</strong>, en lotes. Se corrigen a la vez los filtros, sus sesgos y las capas densas.</p>
+<table>
+  <thead><tr><th>Si las clases van como…</th><th>Pérdida</th></tr></thead>
+  <tbody>
+    <tr><td>Un número: 0, 1, 2</td><td><code>sparse_categorical_crossentropy</code></td></tr>
+    <tr><td>One-hot: [0, 1, 0]</td><td><code>categorical_crossentropy</code></td></tr>
+  </tbody>
+</table>
+<p><strong>One-hot</strong> es escribir la clase como una fila de ceros con un 1 en su sitio: «terror» = [0, 1, 0].</p>
+</section>
+
+<section>
+<h2 id="numeros">2 · La novedad: un peso compartido suma sus correcciones</h2>
+<p>El <strong>gradiente</strong> de un peso dice cuánto cambia el error si mueves un poco ese peso. En una capa densa cada peso se usa una vez. En un filtro, el mismo peso se usa en muchas posiciones, y su gradiente es <strong>la suma</strong> de todas.</p>
+<div class="anim-pasos" data-titulo="Un filtro de 2 pesos sobre 4 fotogramas">
+  <div class="paso"><p><strong>1.</strong> El brillo de 4 fotogramas seguidos y un filtro de 2 pesos, w₁ y w₂. Caben 3 posiciones.</p><span class="grande">x = [1, 3, 2, 4]</span></div>
+  <div class="paso"><p><strong>2.</strong> Para simplificar, el error es la suma de las 3 salidas.</p><span class="grande">(w₁·1 + w₂·3) + (w₁·3 + w₂·2) + (w₁·2 + w₂·4)</span></div>
+  <div class="paso"><p><strong>3.</strong> w₁ multiplica a 1, a 3 y a 2.</p><span class="grande">gradiente de w₁ = 1 + 3 + 2 = 6</span></div>
+  <div class="paso"><p><strong>4.</strong> w₂ multiplica a 3, a 2 y a 4.</p><span class="grande">gradiente de w₂ = 3 + 2 + 4 = 9</span></div>
 </div>
+</section>
+
+<section>
+<h2 id="sobreajuste">3 · También puede memorizar</h2>
+<p>La señal es la de siempre: mucha nota con los datos de entrenar y bastante menos con datos nuevos (la <strong>validación</strong>). Remedios:</p>
+<table>
+  <thead><tr><th>Remedio</th><th>Qué hace</th></tr></thead>
+  <tbody>
+    <tr><td><em>Data augmentation</em></td><td>Variantes de cada póster: girado, volteado, más oscuro.</td></tr>
+    <tr><td><code>Dropout</code></td><td>Al entrenar, apaga al azar parte de las neuronas.</td></tr>
+    <tr><td><em>Early stopping</em></td><td>Para cuando la validación deja de mejorar.</td></tr>
+    <tr><td>Transfer learning</td><td>Partir de una CNN ya entrenada (<a href="../modulo-5.html">módulo 5</a>).</td></tr>
+  </tbody>
+</table>
+<div class="anim-pasos" data-titulo="Dropout(0.5), paso a paso">
+  <div class="paso"><p><strong>1.</strong> Cuatro salidas de una capa.</p><span class="grande">[0,2 · 0,6 · 0,4 · 0,8]</span></div>
+  <div class="paso"><p><strong>2.</strong> Se apaga la mitad al azar. Máscara: 1 = sigue, 0 = apagada.</p><span class="grande">[1, 0, 1, 0]</span></div>
+  <div class="paso"><p><strong>3.</strong> Las que siguen se multiplican por 2 para que la media no baje.</p><span class="grande">[0,4 · 0 · 0,8 · 0]</span></div>
+  <div class="paso"><p><strong>4.</strong> Al predecir no se apaga nada.</p><span class="grande">todas encendidas</span></div>
+</div>
+</section>
+
+<section>
+<h2 id="dentro">4 · Por dentro se ven los bordes</h2>
+<p>Esta CNN diminuta (723 parámetros) aprendió a distinguir tres iconos del reproductor: ■ detener, ● grabar y ✕ cerrar. Sus pesos son los reales de Keras; la página solo hace las cuentas.</p>
 </section>
 
 <figure class="demo" data-demo="curso2/c2m3-que-aprende" data-titulo="Los mapas de características de una CNN entrenada">
@@ -50,31 +95,48 @@
 </figure>
 
 <section>
-<h2 id="numeros">Con números: el gradiente de un peso compartido</h2>
-<div class="callout ejemplo">
-  <span class="lbl">Ejemplo numérico (en 1D)</span>
-  <p>El brillo de 4 fotogramas seguidos, \( x = [1, 3, 2, 4] \), y un filtro de 2 pesos \( [w_1, w_2] \). Hay 3 posiciones y la pérdida es \( L = y_1 + y_2 + y_3 \).</p>
-  <ol class="pasos">
-    <li>\( w_1 \) multiplica a 1, 3 y 2: \( \partial L/\partial w_1 = 1 + 3 + 2 = \) <span class="res">6</span>.</li>
-    <li>\( w_2 \) multiplica a 3, 2 y 4: \( \partial L/\partial w_2 = 3 + 2 + 4 = \) <span class="res">9</span>.</li>
-    <li>Y <code>Dropout(0.5)</code> sobre <code>[0,2, 0,6, 0,4, 0,8]</code> con la máscara <code>[1, 0, 1, 0]</code>: los supervivientes se multiplican por 2 → <span class="res">[0,4, 0, 0,8, 0]</span>.</li>
-  </ol>
-</div>
+<h2 id="errores-tipicos">5 · Errores típicos</h2>
+<table>
+  <thead><tr><th>Error</th><th>Arreglo</th></tr></thead>
+  <tbody>
+    <tr><td>Falta el canal: <code>(N, 28, 28)</code></td><td>Dar forma <code>(N, 28, 28, 1)</code></td></tr>
+    <tr><td>Canal delante: <code>(N, 1, 28, 28)</code></td><td>Ponerlo al final</td></tr>
+    <tr><td>Píxeles de 0 a 255</td><td>Pasar a decimales y dividir entre 255</td></tr>
+    <tr><td>Densa sin <code>Flatten</code></td><td>Poner <code>Flatten</code> antes</td></tr>
+    <tr><td>Mapa que encoge hasta 0</td><td>Contar formas antes; usar <code>"same"</code></td></tr>
+  </tbody>
+</table>
+<p>En Keras 3 la red empieza con <code>keras.Input(shape=(28, 28, 1))</code>. El <code>input_shape=</code> de los cursos antiguos funciona, pero da un aviso. Lee siempre el <code>summary()</code>.</p>
 </section>
 
 <details class="predice">
-  <summary>Dos píxeles guardados como <code>uint8</code> (enteros de 0 a 255): sumas 200 + 100. ¿Qué devuelve NumPy: 300, 255 o otra cosa?<span class="hint"></span></summary>
+  <summary>Dos píxeles guardados como <code>uint8</code> (enteros de 0 a 255): sumas 200 + 100. ¿Qué devuelve NumPy: 300, 255 u otra cosa?<span class="hint"></span></summary>
   <div>
-    <p><strong>44.</strong> El tipo <code>uint8</code> no cabe por encima de 255 y vuelve a empezar desde 0 (300 − 256 = 44), sin ningún error. Por eso se convierte a <code>float32</code> <em>antes</em> de operar: <code>.astype("float32") / 255</code>.</p>
+    <p><strong>44.</strong> <code>uint8</code> no pasa de 255 y vuelve a empezar desde 0 (300 − 256 = 44), sin avisar. Por eso se pasa a decimales <em>antes</em> de operar.</p>
   </div>
 </details>
+
+<section>
+<h2 id="chuleta">Chuleta para repasar</h2>
+<dl class="chuleta">
+  <div><dt>Pérdida</dt><dd>El número que mide cuánto se equivoca la red.</dd></div>
+  <div><dt>Época</dt><dd>Una vuelta completa a los datos de entrenamiento.</dd></div>
+  <div><dt>One-hot</dt><dd>La clase como fila de ceros con un 1. <em>terror = [0, 1, 0].</em></dd></div>
+  <div><dt><code>sparse_categorical_crossentropy</code></dt><dd>Pérdida para clases escritas como números 0, 1, 2…</dd></div>
+  <div><dt>Gradiente</dt><dd>Cuánto cambia el error al mover un peso. <em>Compartido: la suma de sus posiciones.</em></dd></div>
+  <div><dt>Validación</dt><dd>Datos apartados para ver si memoriza.</dd></div>
+  <div><dt><code>Dropout</code></dt><dd>Apaga neuronas al azar al entrenar. <em>[0,2, 0,6, 0,4, 0,8] → [0,4, 0, 0,8, 0].</em></dd></div>
+  <div><dt>Data augmentation</dt><dd>Variantes de cada imagen para que vea más.</dd></div>
+  <div><dt><code>uint8</code></dt><dd>Enteros de 0 a 255; se desbordan sin avisar. <em>200 + 100 = 44.</em></dd></div>
+</dl>
+</section>
 
 <div class="resumen">
   <h2 class="sin-num sin-toc">En tres líneas</h2>
   <ul>
     <li>Se entrena con el ciclo de siempre; un peso compartido recibe la suma de sus gradientes.</li>
-    <li>Contra el overfitting: más datos, augmentation, Dropout, early stopping, transfer learning.</li>
-    <li>En Keras 3: <code>Input</code> + Conv2D/Pooling + Flatten + Dense, y comprueba formas y tipos.</li>
+    <li>Contra la memorización: augmentation, Dropout, early stopping, transfer learning.</li>
+    <li>En Keras 3: <code>Input</code> + Conv2D/Pooling + Flatten + Dense, y revisa formas y tipos.</li>
   </ul>
 </div>
 <section class="quiz mini">
@@ -83,35 +145,35 @@
  "titulo": "¿Lo tienes?",
  "preguntas": [
   {
-   "q": "Pasas a un modelo de Keras (con el formato por defecto, <code>channels_last</code>) y con <code>Input(28, 28, 1)</code> un lote de forma <code>(5, 1, 28, 28)</code>, y da error. ¿Por qué?",
+   "q": "Tu modelo de Keras empieza con <code>Input(28, 28, 1)</code> y le pasas un lote de forma <code>(5, 1, 28, 28)</code>. Da error. ¿Por qué?",
    "opciones": [
-    "Porque Keras no admite imágenes en blanco y negro.",
+    "Porque Keras no admite imágenes en gris.",
     "Porque el lote debe tener al menos 32 imágenes.",
-    "Porque faltan los pesos del filtro: hay que compilar antes de predecir.",
-    "Porque Keras espera el eje de canales al final, <code>(lote, alto, ancho, canales)</code>: aquí el último eje vale 28 y la capa esperaba 1."
+    "Porque hay que compilar antes de predecir.",
+    "Porque Keras espera el canal al final, (lote, alto, ancho, canales): aquí el último número vale 28 y esperaba 1."
    ],
    "correcta": 3,
-   "porque": "Con <code>channels_last</code> el formato es (lote, alto, ancho, canales) y el modelo se construyó con 1 canal en el último eje. El lote de entrada tiene el canal delante (estilo <code>channels_first</code>), así que no cuadra. Se arregla con <code>X.reshape(-1, 28, 28, 1)</code> o, si hubiera que mover el eje, <code>np.moveaxis(X, 1, -1)</code>. Las imágenes en gris están perfectamente admitidas (es 1 canal), un lote puede tener cualquier tamaño, y los pesos se crean al construir el modelo; compilar no es necesario para predecir."
+   "porque": "Keras usa (lote, alto, ancho, canales). El lote trae el canal delante, como hace otra librería (PyTorch), así que no encaja. Se arregla dándole forma (5, 28, 28, 1). El gris es 1 canal, un lote puede tener cualquier tamaño y para predecir no hace falta compilar."
   },
   {
-   "q": "Tus etiquetas son enteros (0 = comedia, 1 = terror, 2 = animación) y la última capa es <code>Dense(3, softmax)</code>. ¿Qué pérdida pones en <code>compile</code>?",
+   "q": "Tus clases son números (0 = comedia, 1 = terror, 2 = animación) y la última capa es una densa de 3 con softmax. ¿Qué pérdida pones en <code>compile</code>?",
    "opciones": [
     "categorical_crossentropy",
     "sparse_categorical_crossentropy",
     "mse"
    ],
    "correcta": 1,
-   "porque": "La versión «sparse» acepta etiquetas enteras. categorical_crossentropy espera one-hot ([0, 1, 0]); con enteros daría error de formas. mse es para regresión."
+   "porque": "La versión «sparse» acepta las clases como números. categorical_crossentropy espera one-hot ([0, 1, 0]); con números daría error de formas. mse es para predecir cantidades, no clases."
   },
   {
-   "q": "Una red con <code>Dropout(0.5)</code> hace una predicción con <code>model.predict</code>. ¿Cuántas neuronas apaga?",
+   "q": "Una red con <code>Dropout(0.5)</code> hace una predicción. ¿Cuántas neuronas apaga?",
    "opciones": [
     "La mitad, igual que al entrenar",
-    "Ninguna: Dropout solo actúa durante el entrenamiento",
+    "Ninguna: Dropout solo actúa al entrenar",
     "Todas las de la capa siguiente"
    ],
    "correcta": 1,
-   "porque": "Dropout apaga neuronas al azar solo al entrenar, para que la red no dependa de unas pocas. En evaluación y en predicción se usan todas."
+   "porque": "Dropout apaga neuronas al azar solo al entrenar, para que la red no dependa de unas pocas. Al evaluar y al predecir se usan todas."
   }
  ]
 }
@@ -156,7 +218,7 @@
 
 <p class="pregunta">Hemos hablado de bordes, esquinas y partes. ¿Se puede <em>ver</em> algo así dentro de una red de verdad?</p>
 
-<p>El siguiente experimento usa una CNN pequeñísima: <code>Conv2D(4, 3×3)</code> → pooling → <code>Conv2D(8, 3×3)</code> → pooling → <code>Flatten</code> → <code>Dense(3)</code>, con <strong>723 parámetros</strong>. La entrené con Keras (es el fragmento 9 del código, con 900 imágenes sintéticas de 16×16 de cuadrados, círculos y cruces en posiciones aleatorias; imagina que son los iconos de un reproductor de vídeo: ■ detener, ● grabar y ✕ cerrar) y exporté sus pesos a la página. <strong>Los pesos están precalculados</strong>; lo que sucede en vivo es la pasada hacia delante, calculada en JavaScript (convolución, ReLU, pooling, Flatten y softmax) con los pesos reales de Keras. No se reentrena en la página.</p>
+<p>El siguiente experimento usa una CNN pequeñísima: <code>Conv2D(4, 3×3)</code> → pooling → <code>Conv2D(8, 3×3)</code> → pooling → <code>Flatten</code> → <code>Dense(3)</code>, con <strong>723 parámetros</strong>. La entrené con Keras (es el <a href="laboratorio.html#paso-5">ejemplo del Laboratorio</a>, pasos 5 a 7, con 900 imágenes sintéticas de 16×16 de cuadrados, círculos y cruces en posiciones aleatorias; imagina que son los iconos de un reproductor de vídeo: ■ detener, ● grabar y ✕ cerrar) y exporté sus pesos a la página. <strong>Los pesos están precalculados</strong>; lo que sucede en vivo es la pasada hacia delante, calculada en JavaScript (convolución, ReLU, pooling, Flatten y softmax) con los pesos reales de Keras. No se reentrena en la página.</p>
 
 <div class="callout recuerda">
   <span class="lbl">Experimento de arriba: «Los mapas de características de una CNN entrenada», con todo detalle</span>
@@ -195,16 +257,9 @@
 </div>
 
 <h3>Cómo se carga MNIST en el curso (requiere internet)</h3>
-<p>El laboratorio original usa MNIST, 60 000 dígitos de entrenamiento y 10 000 de prueba, de 28×28 píxeles en gris, que se descargan con Keras. <strong>En este entorno no hay internet</strong>, así que aquí no se ha ejecutado; las líneas del curso son estas:</p>
-<pre class="ascii">from keras.datasets import mnist
-from keras.utils import to_categorical
-
-(X_train, y_train), (X_test, y_test) = mnist.load_data()   # descarga la primera vez
-X_train = X_train.reshape(X_train.shape[0], 28, 28, 1).astype("float32") / 255   # (60000, 28, 28, 1)
-X_test  = X_test.reshape(X_test.shape[0], 28, 28, 1).astype("float32") / 255     # (10000, 28, 28, 1)
-y_train = to_categorical(y_train)   # etiquetas en one-hot: 3 -> [0,0,0,1,0,0,0,0,0,0]
-y_test  = to_categorical(y_test)</pre>
-<p>En los fragmentos 7 y 10 hacemos lo mismo con los dígitos de scikit-learn (<code>load_digits</code>, 1 797 imágenes de 8×8), que vienen incluidos en la librería y no necesitan descarga.</p>
+<p>El laboratorio original usa MNIST, 60 000 dígitos de entrenamiento y 10 000 de prueba, de 28×28 píxeles en gris, que se descargan con Keras. <strong>En este entorno no hay internet</strong>, así que aquí no se ha ejecutado; las líneas del curso son seis.</p>
+<p>Esas líneas (cargar MNIST, darle el eje de canales, normalizar y pasar las etiquetas a one-hot) están en el <a href="laboratorio.html#frag-mnist">Laboratorio</a>, explicadas una a una.</p>
+<p>En los fragmentos <a href="laboratorio.html#frag-7">7</a> y <a href="laboratorio.html#frag-10">10</a> hacemos lo mismo con los dígitos de scikit-learn (<code>load_digits</code>, 1 797 imágenes de 8×8), que vienen incluidos en la librería y no necesitan descarga.</p>
 
 <h2 id="errores">Errores típicos y cómo reconocerlos</h2>
 
@@ -220,7 +275,7 @@ y_test  = to_categorical(y_test)</pre>
     <tr><td>Etiquetas y pérdida que no casan</td><td>Error de formas al compilar o ajustar.</td><td><code>sparse_categorical_crossentropy</code> con enteros; <code>categorical_crossentropy</code> con one-hot.</td></tr>
   </tbody>
 </table>
-<p>El fragmento 11 reproduce varios de estos errores y muestra los mensajes reales de Keras.</p>
+<p>El <a href="laboratorio.html#frag-11">fragmento 11</a> reproduce varios de estos errores y muestra los mensajes reales de Keras.</p>
 
 <h2 id="resumen-modulo">Resumen del módulo completo</h2>
 <ul>
@@ -239,406 +294,12 @@ y_test  = to_categorical(y_test)</pre>
   </div>
 </details>
 
-<section>
+<section class="ir-lab">
 <h2 class="sin-num">Código</h2>
-<p class="codigo-intro">El fragmento 9 continúa el 8 (en la <a href="leccion-4.html">lección 4</a>): usa sus funciones <code>hacer_formas</code> y <code>modelo_cnn</code>.</p>
-<!-- ---------- Fragmento 7 ---------- -->
-<article class="snippet" data-lang="python">
-  <header>
-    <h3>7 · Entrenar una CNN con los dígitos de scikit-learn (8×8)</h3>
-    <p class="para-que"><strong>Para qué sirve</strong> El ciclo completo de Keras con una CNN pequeña: preparar las imágenes (normalizar y añadir el canal), dividir en entrenamiento y test, construir, compilar, entrenar, evaluar y predecir. Usa <code>load_digits</code>, 1 797 imágenes de dígitos de 8×8 que vienen incluidas en scikit-learn (el MNIST original, de 28×28, necesita descargarse de internet).</p>
-  </header>
-  <pre class="code"><code>import numpy as np
-import keras
-from keras import layers
-from sklearn.datasets import load_digits
-from sklearn.model_selection import train_test_split
-
-keras.utils.set_random_seed(42)
-
-digitos = load_digits()
-X = digitos.images.astype("float32") / 16.0      # (1797, 8, 8), valores 0..16 -&gt; 0..1
-X = X.reshape(-1, 8, 8, 1)                       # añadimos el canal: (1797, 8, 8, 1)
-y = digitos.target
-
-X_train, X_test, y_train, y_test = train_test_split(
-    X, y, test_size=0.2, stratify=y, random_state=42
-)
-print("X_train:", X_train.shape, "| X_test:", X_test.shape)
-print("Rango de píxeles:", X_train.min(), "-", X_train.max())
-
-modelo = keras.Sequential([
-    keras.Input(shape=(8, 8, 1)),
-    layers.Conv2D(8, (3, 3), padding="same", activation="relu"),
-    layers.MaxPooling2D((2, 2)),
-    layers.Conv2D(16, (3, 3), padding="same", activation="relu"),
-    layers.MaxPooling2D((2, 2)),
-    layers.Flatten(),
-    layers.Dense(10, activation="softmax"),
-])
-modelo.compile(optimizer="adam", loss="sparse_categorical_crossentropy", metrics=["accuracy"])
-print("Parámetros:", modelo.count_params())
-
-historia = modelo.fit(X_train, y_train, epochs=30, batch_size=32,
-                      validation_split=0.1, verbose=0)
-print("Precisión en train (última época): %.3f" % historia.history["accuracy"][-1])
-print("Precisión en validación (última época): %.3f" % historia.history["val_accuracy"][-1])
-
-perdida, acc = modelo.evaluate(X_test, y_test, verbose=0)
-print("Precisión en test: %.3f" % acc)
-
-probas = modelo.predict(X_test[:3], verbose=0)
-print("Predicción de las 3 primeras:", probas.argmax(axis=1), "| reales:", y_test[:3])</code></pre>
-  <details class="linea-a-linea" open>
-    <summary>Línea por línea</summary>
-    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
-    <table class="lineas">
-      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
-      <tbody>
-        <tr data-lines="1-5"><td><code>import …</code></td><td>NumPy; Keras y sus capas; <code>load_digits</code>, el conjunto de dígitos incluido en scikit-learn; y <code>train_test_split</code>, que reparte los datos en entrenamiento y test.</td></tr>
-        <tr data-lines="7"><td><code>keras.utils.set_random_seed(42)</code></td><td>Fija la semilla del azar de Python, NumPy y Keras, para que los pesos iniciales y el barajado sean los mismos en cada ejecución.</td></tr>
-        <tr data-lines="9"><td><code>digitos = load_digits()</code></td><td>Carga el conjunto: 1 797 imágenes de 8×8 píxeles con su etiqueta (0-9).</td></tr>
-        <tr data-lines="10"><td><code>X = digitos.images.astype("float32") / 16.0</code></td><td>Toma las imágenes (forma <code>(1797, 8, 8)</code>, valores de 0 a 16), las pasa a <code>float32</code> y las <strong>normaliza</strong> dividiendo entre 16 para dejarlas entre 0 y 1.</td></tr>
-        <tr data-lines="11"><td><code>X = X.reshape(-1, 8, 8, 1)</code></td><td>Añade el <strong>eje de canales</strong>: <code>(1797, 8, 8, 1)</code>. El <code>-1</code> significa «calcula tú cuántas imágenes hay».</td></tr>
-        <tr data-lines="12"><td><code>y = digitos.target</code></td><td>Las etiquetas: un número entero de 0 a 9 por imagen.</td></tr>
-        <tr data-lines="14-16"><td><code>X_train, X_test, y_train, y_test = train_test_split( … )</code></td><td>Reparte los datos: <code>test_size=0.2</code> deja un 20 % para el test; <code>stratify=y</code> mantiene la proporción de cada dígito en los dos grupos; <code>random_state=42</code> hace el reparto reproducible. Las líneas 14-16 son una sola llamada partida en varias líneas.</td></tr>
-        <tr data-lines="17"><td><code>print("X_train:", …)</code></td><td>Muestra las formas: <code>(1437, 8, 8, 1)</code> y <code>(360, 8, 8, 1)</code>, es decir 1 437 imágenes de entrenamiento y 360 de test.</td></tr>
-        <tr data-lines="18"><td><code>print("Rango de píxeles:", …)</code></td><td>Comprueba que ya van de 0.0 a 1.0.</td></tr>
-        <tr data-lines="20"><td><code>modelo = keras.Sequential([</code></td><td>Abre el modelo secuencial.</td></tr>
-        <tr data-lines="21"><td><code>keras.Input(shape=(8, 8, 1)),</code></td><td>Forma de la entrada: imágenes 8×8 con 1 canal.</td></tr>
-        <tr data-lines="22"><td><code>layers.Conv2D(8, (3, 3), padding="same", activation="relu"),</code></td><td>8 filtros de 3×3 con <code>same</code>: el tamaño se mantiene (8×8×8).</td></tr>
-        <tr data-lines="23"><td><code>layers.MaxPooling2D((2, 2)),</code></td><td>Pooling 2×2: 8×8 → 4×4.</td></tr>
-        <tr data-lines="24"><td><code>layers.Conv2D(16, (3, 3), padding="same", activation="relu"),</code></td><td>16 filtros de 3×3 sobre los 8 mapas anteriores (4×4×16).</td></tr>
-        <tr data-lines="25"><td><code>layers.MaxPooling2D((2, 2)),</code></td><td>Pooling 2×2: 4×4 → 2×2. Quedan 2×2×16.</td></tr>
-        <tr data-lines="26"><td><code>layers.Flatten(),</code></td><td>Desenrolla a \(2\cdot 2\cdot 16 = 64\) números.</td></tr>
-        <tr data-lines="27"><td><code>layers.Dense(10, activation="softmax"),</code></td><td>10 neuronas con softmax: la probabilidad de cada dígito.</td></tr>
-        <tr data-lines="28"><td><code>])</code></td><td>Cierra el modelo.</td></tr>
-        <tr data-lines="29"><td><code>modelo.compile(optimizer="adam", loss="sparse_categorical_crossentropy", metrics=["accuracy"])</code></td><td>Prepara el entrenamiento: el optimizador Adam, la pérdida «entropía cruzada categórica» y la métrica de precisión. Se usa la versión <code>sparse</code> porque las etiquetas son números enteros (0-9); si fueran vectores one-hot sería <code>categorical_crossentropy</code>.</td></tr>
-        <tr data-lines="30"><td><code>print("Parámetros:", modelo.count_params())</code></td><td>Cuenta los parámetros: \(80 + 1\,168 + 650 = 1\,898\) (convolución 1, convolución 2 y capa densa).</td></tr>
-        <tr data-lines="32-33"><td><code>historia = modelo.fit(X_train, y_train, epochs=30, batch_size=32, validation_split=0.1, verbose=0)</code></td><td><strong>Entrena</strong> 30 épocas con lotes de 32 imágenes. <code>validation_split=0.1</code> aparta el 10 % del entrenamiento para vigilar el sobreajuste; <code>verbose=0</code> silencia el progreso. Devuelve un objeto con el historial (<code>historia</code>).</td></tr>
-        <tr data-lines="34"><td><code>print("Precisión en train …" % historia.history["accuracy"][-1])</code></td><td>Lee del historial la precisión de entrenamiento en la <em>última</em> época (<code>[-1]</code>). <code>%.3f</code> la muestra con tres decimales.</td></tr>
-        <tr data-lines="35"><td><code>print("Precisión en validación …" % historia.history["val_accuracy"][-1])</code></td><td>Lo mismo con la precisión sobre el 10 % apartado.</td></tr>
-        <tr data-lines="37"><td><code>perdida, acc = modelo.evaluate(X_test, y_test, verbose=0)</code></td><td>Evalúa con el <strong>test</strong>, que el modelo no ha visto: devuelve la pérdida y la precisión.</td></tr>
-        <tr data-lines="38"><td><code>print("Precisión en test: %.3f" % acc)</code></td><td>Muestra la precisión en test.</td></tr>
-        <tr data-lines="40"><td><code>probas = modelo.predict(X_test[:3], verbose=0)</code></td><td>Predice las 3 primeras imágenes de test: para cada una, 10 probabilidades.</td></tr>
-        <tr data-lines="41"><td><code>print("Predicción de las 3 primeras:", probas.argmax(axis=1), …)</code></td><td><code>argmax(axis=1)</code> elige la posición de la probabilidad más alta de cada fila (el dígito predicho) y la imprime junto a los dígitos reales.</td></tr>
-      </tbody>
-    </table>
-  </details>
-  <div class="salida">
-    <strong>Salida esperada</strong>
-    <pre>X_train: (1437, 8, 8, 1) | X_test: (360, 8, 8, 1)
-Rango de píxeles: 0.0 - 1.0
-Parámetros: 1898
-Precisión en train (última época): 0.969
-Precisión en validación (última época): 0.931
-Precisión en test: 0.928
-Predicción de las 3 primeras: [5 2 1] | reales: [5 2 8]</pre>
-    <p>El modelo, con solo <strong>1 898 parámetros</strong>, acierta el <strong>92,8 %</strong> de las 360 imágenes de test (el azar sería 10 %). Compara las tres cifras: 0,969 en entrenamiento, 0,931 en validación y 0,928 en test. Que el test se parezca a la validación es buena señal; que entrenamiento sea algo mayor es un poco de sobreajuste, normal con tan pocas imágenes. En las tres primeras predicciones acierta dos (5 y 2) y falla la tercera: predice un 1 donde había un 8. Con solo 8×8 píxeles hasta un humano duda con algunos dígitos. Los resultados dependen de la semilla y de la versión de Keras; si ejecutas con otra, verás cifras parecidas, no necesariamente idénticas.</p>
-  </div>
-</article>
-
-<!-- ---------- Fragmento 9 ---------- -->
-<article class="snippet" data-lang="python">
-  <header>
-    <h3>9 · Mirar dentro de la CNN: filtros aprendidos y mapas de características</h3>
-    <p class="para-que"><strong>Para qué sirve</strong> Entrenar la CNN de 723 parámetros del fragmento 8 con 900 imágenes y abrirla: leer los pesos de un filtro, construir un segundo modelo que se detiene a mitad de red para obtener los <em>feature maps</em>, y comprobar cuántos ceros deja ReLU. Es el modelo cuyos pesos se usan en el experimento «Qué aprende cada capa». <em>Este fragmento continúa el 8</em>: necesita las funciones <code>hacer_formas</code> y <code>modelo_cnn</code> (ejecuta antes las líneas 1-41 del fragmento 8) y los imports de arriba.</p>
-  </header>
-  <pre class="code"><code>X_train, y_train = hacer_formas(900, 1, 3.0)
-X_test, y_test = hacer_formas(600, 3, 3.0)
-nombres = ["cuadrado", "círculo", "cruz"]
-
-keras.utils.set_random_seed(0)
-modelo = modelo_cnn()
-modelo.compile(optimizer="adam", loss="sparse_categorical_crossentropy", metrics=["accuracy"])
-modelo.fit(X_train, y_train, epochs=40, batch_size=32, verbose=0)
-print("Precisión en test: %.3f" % modelo.evaluate(X_test, y_test, verbose=0)[1])
-
-# 1) Los filtros aprendidos son simplemente pesos
-pesos, sesgos = modelo.layers[0].get_weights()
-print("Pesos de la capa 1:", pesos.shape, "| sesgos:", sesgos.shape)
-print("Filtro 0 (3x3):")
-print(pesos[:, :, 0, 0].round(2))
-
-# 2) Los mapas de características: un modelo que se detiene a mitad de red
-extractor = keras.Model(inputs=modelo.inputs,
-                        outputs=[modelo.layers[0].output, modelo.layers[2].output])
-mapas1, mapas2 = extractor.predict(X_test[:1], verbose=0)
-print("Mapas capa 1:", mapas1.shape, "| mapas capa 2:", mapas2.shape)
-
-# 3) ReLU deja muchos ceros en los mapas
-print("Fracción de ceros en cada mapa de la capa 1:", (mapas1[0] == 0).mean(axis=(0, 1)).round(2))</code></pre>
-  <details class="linea-a-linea" open>
-    <summary>Línea por línea</summary>
-    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
-    <table class="lineas">
-      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
-      <tbody>
-        <tr data-lines="1"><td><code>X_train, y_train = hacer_formas(900, 1, 3.0)</code></td><td>900 imágenes de entrenamiento con figuras repartidas (dispersión 3). Usa la función del fragmento 8.</td></tr>
-        <tr data-lines="2"><td><code>X_test, y_test = hacer_formas(600, 3, 3.0)</code></td><td>600 imágenes de test nuevas (otra semilla).</td></tr>
-        <tr data-lines="3"><td><code>nombres = ["cuadrado", "círculo", "cruz"]</code></td><td>Los nombres de las tres clases (0, 1 y 2), para leer mejor.</td></tr>
-        <tr data-lines="5"><td><code>keras.utils.set_random_seed(0)</code></td><td>Fija la semilla.</td></tr>
-        <tr data-lines="6"><td><code>modelo = modelo_cnn()</code></td><td>Crea la CNN del fragmento 8 (Conv 4 → pool → Conv 8 → pool → Flatten → Dense 3).</td></tr>
-        <tr data-lines="7"><td><code>modelo.compile(…)</code></td><td>Configura el entrenamiento.</td></tr>
-        <tr data-lines="8"><td><code>modelo.fit(X_train, y_train, epochs=40, batch_size=32, verbose=0)</code></td><td>Entrena 40 épocas en silencio.</td></tr>
-        <tr data-lines="9"><td><code>print("Precisión en test: %.3f" % modelo.evaluate(…)[1])</code></td><td>Evalúa con las imágenes de test.</td></tr>
-        <tr data-lines="11"><td><code># 1) Los filtros aprendidos …</code></td><td>Comentario: la primera parte, leer los filtros.</td></tr>
-        <tr data-lines="12"><td><code>pesos, sesgos = modelo.layers[0].get_weights()</code></td><td><code>modelo.layers[0]</code> es la primera capa (la <code>Conv2D</code> de 4 filtros; <code>Input</code> no cuenta). <code>get_weights()</code> devuelve sus dos arrays: los pesos y los sesgos.</td></tr>
-        <tr data-lines="13"><td><code>print("Pesos de la capa 1:", pesos.shape, …)</code></td><td>Muestra las formas: <code>(3, 3, 1, 4)</code> = alto 3, ancho 3, 1 canal de entrada y 4 filtros; y 4 sesgos.</td></tr>
-        <tr data-lines="14"><td><code>print("Filtro 0 (3x3):")</code></td><td>Un título.</td></tr>
-        <tr data-lines="15"><td><code>print(pesos[:, :, 0, 0].round(2))</code></td><td>Extrae el filtro 0 (todas las filas y columnas, el canal 0 y el filtro 0) y lo redondea a dos decimales. Es una matriz 3×3 de números normales: los que la red ha aprendido.</td></tr>
-        <tr data-lines="17"><td><code># 2) Los mapas de características …</code></td><td>Comentario: la segunda parte, mirar a mitad de red.</td></tr>
-        <tr data-lines="18-19"><td><code>extractor = keras.Model(inputs=modelo.inputs, outputs=[ … ])</code></td><td>Construye un <strong>modelo nuevo que comparte las mismas capas</strong>, con la misma entrada pero con dos salidas: la de la primera capa (<code>layers[0]</code>, primera <code>Conv2D</code>) y la de la tercera (<code>layers[2]</code>, la segunda <code>Conv2D</code>; la 1 es el primer pooling). No se entrena nada.</td></tr>
-        <tr data-lines="20"><td><code>mapas1, mapas2 = extractor.predict(X_test[:1], verbose=0)</code></td><td>Pasa la primera imagen de test por el extractor: devuelve los mapas de las dos capas.</td></tr>
-        <tr data-lines="21"><td><code>print("Mapas capa 1:", mapas1.shape, …)</code></td><td>Muestra las formas: <code>(1, 16, 16, 4)</code> y <code>(1, 8, 8, 8)</code> = 1 imagen, tamaño del mapa y número de mapas.</td></tr>
-        <tr data-lines="23"><td><code># 3) ReLU deja muchos ceros …</code></td><td>Comentario: la tercera parte.</td></tr>
-        <tr data-lines="24"><td><code>print("Fracción de ceros …", (mapas1[0] == 0).mean(axis=(0, 1)).round(2))</code></td><td><code>mapas1[0] == 0</code> marca con <code>True</code> los píxeles que valen cero; <code>.mean(axis=(0, 1))</code> promedia sobre alto y ancho, dando la fracción de ceros de cada uno de los 4 mapas.</td></tr>
-      </tbody>
-    </table>
-  </details>
-  <div class="salida">
-    <strong>Salida esperada</strong>
-    <pre>Precisión en test: 0.998
-Pesos de la capa 1: (3, 3, 1, 4) | sesgos: (4,)
-Filtro 0 (3x3):
-[[-0.3  -0.05  0.4 ]
- [-0.2   0.07  0.3 ]
- [ 0.42  0.08 -0.72]]
-Mapas capa 1: (1, 16, 16, 4) | mapas capa 2: (1, 8, 8, 8)
-Fracción de ceros en cada mapa de la capa 1: [0.83 0.12 0.76 0.7 ]</pre>
-    <p>La red acierta el 99,8 % en test (600 imágenes de figuras desplazadas). La capa 1 tiene pesos de forma <code>(3, 3, 1, 4)</code>: 36 pesos + 4 sesgos = 40 parámetros, y los 9 números del filtro 0 son lo único que lo define: mezclan valores positivos y negativos (de −0,72 a 0,42) y no forman un Sobel «limpio». La red no busca filtros bonitos para una persona, sino los que mejor le sirvan para clasificar. Los mapas tienen forma <code>(1, 16, 16, 4)</code> y <code>(1, 8, 8, 8)</code>. Una aclaración: en Python los filtros se numeran desde 0, mientras que el experimento «Qué aprende cada capa» los llama filtro 1 a 4. Y en la última línea ves el efecto de ReLU: en los mapas 0, 2 y 3 hay entre un 70 % y un 83 % de ceros (esos filtros se activan en pocos lugares) y en el 1 solo un 12 %.</p>
-  </div>
-</article>
-
-<h2 class="sin-num" id="resto">Código: el resto del módulo</h2>
-<p class="codigo-intro">Dos fragmentos más del módulo: el 10 reproduce el laboratorio clásico de MNIST con dígitos agrandados, y el 13 entrena la CNN de las notas de la <a href="leccion-7.html">lección 7</a> (sus cuentas están en el fragmento 12). Los dos son independientes.</p>
-<!-- ---------- Fragmento 10 ---------- -->
-<article class="snippet" data-lang="python">
-  <header>
-    <h3>10 · La CNN del laboratorio clásico (estilo MNIST), con dígitos agrandados</h3>
-    <p class="para-que"><strong>Para qué sirve</strong> Reproducir el flujo del laboratorio de MNIST: cargar los datos, <em>convertir las etiquetas a one-hot con <code>to_categorical</code></em>, definir la CNN en una función, entrenar con datos de validación y calcular el error. Como no hay internet para bajar MNIST (60 000 imágenes de 28×28), se usan los 1 797 dígitos de scikit-learn <em>agrandados a 28×28</em> para que la arquitectura sea exactamente la del curso. Con MNIST real las cifras serían otras (en general mejores, porque hay 60 000 imágenes de entrenamiento en lugar de 1 437), pero aquí no se pueden medir.</p>
-  </header>
-  <pre class="code"><code>import numpy as np
-import keras
-from keras import layers
-from keras.utils import to_categorical
-from sklearn.datasets import load_digits
-from sklearn.model_selection import train_test_split
-
-# --- Datos: el laboratorio original usa MNIST (60 000 imágenes de 28x28):
-#     (X_train, y_train), (X_test, y_test) = keras.datasets.mnist.load_data()
-#     Aquí no hay internet, así que usamos los dígitos de scikit-learn (8x8) agrandados a 28x28.
-digitos = load_digits()
-X = digitos.images.astype("float32") / 16.0
-X = np.array(keras.ops.image.resize(X.reshape(-1, 8, 8, 1), (28, 28)))     # (1797, 28, 28, 1)
-y = digitos.target
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, stratify=y, random_state=42)
-
-y_train = to_categorical(y_train)          # 3 -&gt; [0, 0, 0, 1, 0, 0, 0, 0, 0, 0]
-y_test = to_categorical(y_test)
-num_clases = y_test.shape[1]
-print("X_train:", X_train.shape, "| y_train:", y_train.shape)
-
-def modelo_convolucional():
-    modelo = keras.Sequential([
-        keras.Input(shape=(28, 28, 1)),
-        layers.Conv2D(16, (5, 5), strides=(1, 1), activation="relu"),
-        layers.MaxPooling2D(pool_size=(2, 2), strides=(2, 2)),
-        layers.Conv2D(32, (5, 5), activation="relu"),
-        layers.MaxPooling2D(pool_size=(2, 2), strides=(2, 2)),
-        layers.Flatten(),
-        layers.Dense(100, activation="relu"),
-        layers.Dense(num_clases, activation="softmax"),
-    ])
-    modelo.compile(optimizer="adam", loss="categorical_crossentropy", metrics=["accuracy"])
-    return modelo
-
-keras.utils.set_random_seed(1)
-modelo = modelo_convolucional()
-modelo.fit(X_train, y_train, validation_data=(X_test, y_test), epochs=6, batch_size=64, verbose=2)
-
-perdida, precision = modelo.evaluate(X_test, y_test, verbose=0)
-print(f"Precisión en test: {precision:.3f} | error: {100 - precision * 100:.1f} %")</code></pre>
-  <details class="linea-a-linea" open>
-    <summary>Línea por línea</summary>
-    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
-    <table class="lineas">
-      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
-      <tbody>
-        <tr data-lines="1-6"><td><code>import …</code></td><td>NumPy, Keras, sus capas, <code>to_categorical</code> (convierte etiquetas a one-hot), <code>load_digits</code> y <code>train_test_split</code>.</td></tr>
-        <tr data-lines="8-10"><td><code># --- Datos: …</code></td><td>Comentarios que explican la sustitución: el laboratorio original carga MNIST con <code>keras.datasets.mnist.load_data()</code>, que necesita internet; aquí usamos los dígitos de scikit-learn.</td></tr>
-        <tr data-lines="11-12"><td><code>digitos = load_digits() / X = …/ 16.0</code></td><td>Carga los 1 797 dígitos de 8×8 y normaliza sus píxeles a 0-1.</td></tr>
-        <tr data-lines="13"><td><code>X = np.array(keras.ops.image.resize(X.reshape(-1, 8, 8, 1), (28, 28)))</code></td><td>Añade el eje de canales y <strong>agranda</strong> cada imagen de 8×8 a 28×28 interpolando (<code>keras.ops.image.resize</code>). Después lo convierte en un array de NumPy. Forma final: <code>(1797, 28, 28, 1)</code>.</td></tr>
-        <tr data-lines="14"><td><code>y = digitos.target</code></td><td>Las etiquetas como enteros 0-9.</td></tr>
-        <tr data-lines="15"><td><code>X_train, X_test, y_train, y_test = train_test_split(…)</code></td><td>Reparte 80 % entrenamiento y 20 % test, con la proporción de cada dígito conservada y reproducible.</td></tr>
-        <tr data-lines="17-18"><td><code>y_train = to_categorical(y_train) / y_test = …</code></td><td>Convierte cada etiqueta en un vector <strong>one-hot</strong> de 10 posiciones, con un 1 en la posición de la clase y ceros en el resto (el comentario muestra un ejemplo con el 3). Necesario porque usaremos <code>categorical_crossentropy</code>.</td></tr>
-        <tr data-lines="19"><td><code>num_clases = y_test.shape[1]</code></td><td>El número de clases es la longitud del vector one-hot: 10.</td></tr>
-        <tr data-lines="20"><td><code>print("X_train:", X_train.shape, …)</code></td><td>Comprueba las formas: <code>(1437, 28, 28, 1)</code> y <code>(1437, 10)</code>.</td></tr>
-        <tr data-lines="22"><td><code>def modelo_convolucional():</code></td><td>Una función que construye y devuelve el modelo compilado; es el patrón del laboratorio.</td></tr>
-        <tr data-lines="23-32"><td><code>modelo = keras.Sequential([ … ])</code></td><td>La CNN del fragmento 6: Input 28×28×1, <code>Conv2D(16, 5×5)</code> con <code>strides=(1, 1)</code> escrito explícito, pooling 2×2, <code>Conv2D(32, 5×5)</code>, pooling, Flatten, Dense(100) y Dense(<code>num_clases</code>) con softmax.</td></tr>
-        <tr data-lines="33"><td><code>modelo.compile(optimizer="adam", loss="categorical_crossentropy", metrics=["accuracy"])</code></td><td>Adam, pérdida <code>categorical_crossentropy</code> (la que va con etiquetas one-hot; la <code>sparse_…</code> es para enteros) y precisión.</td></tr>
-        <tr data-lines="34"><td><code>return modelo</code></td><td>Devuelve el modelo ya compilado.</td></tr>
-        <tr data-lines="36"><td><code>keras.utils.set_random_seed(1)</code></td><td>Fija la semilla.</td></tr>
-        <tr data-lines="37"><td><code>modelo = modelo_convolucional()</code></td><td>Construye el modelo llamando a la función.</td></tr>
-        <tr data-lines="38"><td><code>modelo.fit(X_train, y_train, validation_data=(X_test, y_test), epochs=6, batch_size=64, verbose=2)</code></td><td>Entrena 6 épocas con lotes de 64. <code>validation_data</code> evalúa tras cada época con el conjunto de test, y <code>verbose=2</code> imprime una línea por época: <code>accuracy</code> y <code>loss</code> son del entrenamiento; <code>val_accuracy</code> y <code>val_loss</code>, de validación.</td></tr>
-        <tr data-lines="40"><td><code>perdida, precision = modelo.evaluate(X_test, y_test, verbose=0)</code></td><td>Evalúa por última vez en test.</td></tr>
-        <tr data-lines="41"><td><code>print(f"Precisión en test: … | error: {100 - precision * 100:.1f} %")</code></td><td>Muestra la precisión y el <em>error</em> (100 % menos la precisión), que es lo que da el laboratorio original.</td></tr>
-      </tbody>
-    </table>
-  </details>
-  <div class="salida">
-    <strong>Salida esperada</strong>
-    <pre style="white-space:pre">X_train: (1437, 28, 28, 1) | y_train: (1437, 10)
-Epoch 1/6
-23/23 - 2s - 76ms/step - accuracy: 0.4405 - loss: 1.8584 - val_accuracy: 0.8389 - val_loss: 1.0043
-Epoch 2/6
-23/23 - 0s - 21ms/step - accuracy: 0.8392 - loss: 0.5981 - val_accuracy: 0.8833 - val_loss: 0.3311
-Epoch 3/6
-23/23 - 1s - 25ms/step - accuracy: 0.9074 - loss: 0.2982 - val_accuracy: 0.9361 - val_loss: 0.2292
-Epoch 4/6
-23/23 - 0s - 15ms/step - accuracy: 0.9346 - loss: 0.2161 - val_accuracy: 0.9389 - val_loss: 0.2006
-Epoch 5/6
-23/23 - 1s - 32ms/step - accuracy: 0.9464 - loss: 0.1592 - val_accuracy: 0.9556 - val_loss: 0.1571
-Epoch 6/6
-23/23 - 0s - 18ms/step - accuracy: 0.9603 - loss: 0.1214 - val_accuracy: 0.9583 - val_loss: 0.1262
-Precisión en test: 0.958 | error: 4.2 %</pre>
-    <p>En seis épocas la precisión de entrenamiento sube de 0,44 a 0,96 y la de validación de 0,84 a 0,96, con <strong>error en test de un 4,2 %</strong>. La pérdida baja de forma continua (1,86 → 0,12). Son las curvas que querrás ver siempre: ambas precisiones suben juntas. Las cifras de <code>ms/step</code> y los segundos de cada época (<code>2s</code>, <code>0s</code>…) dependen de tu ordenador y cambian de una ejecución a otra; el resto de cifras debería salir igual con la misma versión de Keras. Otro detalle: el laboratorio usa el conjunto de test como <code>validation_data</code>; para tomar decisiones (cuándo parar, qué hiperparámetros elegir) conviene separar un tercer conjunto, o el «error final» deja de ser una medida limpia. Con MNIST real la red del laboratorio daría otras cifras: no he podido medirlo sin internet.</p>
-  </div>
-</article>
-
-<!-- ---------- Fragmento 13 ---------- -->
-<article class="snippet" data-lang="python">
-  <header>
-    <h3>13 · Entrenar la CNN de las notas con un conjunto de imágenes RGB sintético</h3>
-    <p class="para-que"><strong>Para qué sirve</strong> Entrenar de verdad la CNN del fragmento anterior con un conjunto sintético de imágenes de color: cada imagen es ruido con <em>un</em> canal encendido (rojo, verde o azul) y la red debe decir cuál. Se puede ejecutar sin internet. Enseña <code>create_rgb_dataset</code>, <code>to_categorical</code>, <code>categorical_crossentropy</code>, <code>fit</code> con <code>validation_split</code>, <code>summary()</code> y <code>predict</code> sobre una imagen.</p>
-  </header>
-  <pre class="code"><code>import numpy as np
-import keras
-from keras import layers
-from keras.utils import to_categorical
-
-keras.utils.set_random_seed(42)
-
-def create_rgb_dataset(number_samples=180, height=100, width=100):
-    """Imágenes de ruido; cada una tiene un canal 'encendido': 0 = rojo, 1 = verde, 2 = azul."""
-    X = np.random.uniform(0, 0.25, size=(number_samples, height, width, 3))   # ruido de fondo
-    y = np.random.randint(0, 3, size=number_samples)                         # clase de cada imagen
-    for i in range(number_samples):
-        X[i, :, :, y[i]] += 0.65                                             # refuerza el canal de su clase
-    X = np.clip(X, 0, 1).astype("float32")
-    return X, to_categorical(y, num_classes=3)
-
-np.random.seed(42)
-X, y = create_rgb_dataset(number_samples=180, height=100, width=100)
-print("X:", X.shape, "| y:", y.shape, "| rango:", X.min().round(2), "-", X.max().round(2))
-print("Imágenes de cada clase (rojo, verde, azul):", y.sum(axis=0).astype(int))
-
-model = keras.Sequential([
-    keras.Input(shape=(100, 100, 3)),
-    layers.Conv2D(16, (3, 3), strides=(1, 1), padding="valid"),
-    layers.ReLU(),
-    layers.MaxPooling2D(pool_size=(2, 2), strides=(2, 2)),
-    layers.Conv2D(32, (3, 3), strides=(1, 1), padding="valid"),
-    layers.ReLU(),
-    layers.MaxPooling2D(pool_size=(2, 2), strides=(2, 2)),
-    layers.Flatten(),
-    layers.Dense(100, activation="relu"),
-    layers.Dense(3, activation="softmax"),
-])
-model.compile(optimizer="adam", loss="categorical_crossentropy", metrics=["accuracy"])
-model.summary()
-
-model.fit(X, y, epochs=5, batch_size=16, validation_split=0.2, verbose=2)
-
-nombres = ["rojo", "verde", "azul"]
-probas = model.predict(X[:1], verbose=0)[0]
-print("Probabilidades [rojo, verde, azul]:", probas.round(3))
-print("Clase predicha:", nombres[probas.argmax()], "| clase real:", nombres[y[0].argmax()])</code></pre>
-  <details class="linea-a-linea" open>
-    <summary>Línea por línea</summary>
-    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
-    <table class="lineas">
-      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
-      <tbody>
-        <tr data-lines="1-4"><td><code>import …</code></td><td>NumPy, Keras, sus capas y <code>to_categorical</code>, que convierte etiquetas enteras en vectores one-hot.</td></tr>
-        <tr data-lines="6"><td><code>keras.utils.set_random_seed(42)</code></td><td>Fija la semilla de Python, NumPy y Keras: los pesos iniciales de la red serán siempre los mismos.</td></tr>
-        <tr data-lines="8-9"><td><code>def create_rgb_dataset(number_samples=180, height=100, width=100): """…"""</code></td><td>Función que fabrica el conjunto. Los tres argumentos tienen valor por defecto: 180 imágenes de 100×100. La línea 9 es la descripción.</td></tr>
-        <tr data-lines="10"><td><code>X = np.random.uniform(0, 0.25, size=(number_samples, height, width, 3))</code></td><td>Crea el ruido de fondo: un array de forma <code>(180, 100, 100, 3)</code> (imágenes, alto, ancho, canales RGB) con números aleatorios uniformes entre 0 y 0,25: todos los píxeles empiezan casi negros.</td></tr>
-        <tr data-lines="11"><td><code>y = np.random.randint(0, 3, size=number_samples)</code></td><td>Elige al azar la clase de cada imagen: 0, 1 o 2 (el límite superior, 3, no se incluye).</td></tr>
-        <tr data-lines="12-13"><td><code>for i in range(number_samples): X[i, :, :, y[i]] += 0.65</code></td><td>Para cada imagen <code>i</code>, suma 0,65 a <strong>todos</strong> los píxeles (<code>:, :</code>) de <strong>un solo canal</strong> (<code>y[i]</code>): el canal 0 (rojo), 1 (verde) o 2 (azul) según su clase. Ese canal queda en 0,65-0,9 y los otros dos siguen en 0-0,25: la imagen sale «teñida» de rojo, verde o azul.</td></tr>
-        <tr data-lines="14"><td><code>X = np.clip(X, 0, 1).astype("float32")</code></td><td>Limita los valores a 0-1 (aquí el máximo es 0,9, así que no corta nada: es una red de seguridad) y los pasa a <code>float32</code>, el tipo que usa Keras (ocupa la mitad de memoria que el <code>float64</code> de NumPy).</td></tr>
-        <tr data-lines="15"><td><code>return X, to_categorical(y, num_classes=3)</code></td><td>Devuelve las imágenes y las etiquetas en <strong>one-hot</strong> con 3 clases: la clase 1 pasa a <code>[0, 1, 0]</code>.</td></tr>
-        <tr data-lines="17"><td><code>np.random.seed(42)</code></td><td>Vuelve a fijar la semilla de NumPy justo antes de crear los datos, para que las imágenes sean siempre las mismas.</td></tr>
-        <tr data-lines="18"><td><code>X, y = create_rgb_dataset(number_samples=180, height=100, width=100)</code></td><td>Crea el conjunto: 180 imágenes de 100×100×3 y sus 180 etiquetas.</td></tr>
-        <tr data-lines="19"><td><code>print("X:", X.shape, "| y:", y.shape, "| rango:", …)</code></td><td>Comprueba las formas, <code>(180, 100, 100, 3)</code> y <code>(180, 3)</code>, y el rango de valores (de 0,0 a 0,9).</td></tr>
-        <tr data-lines="20"><td><code>print("Imágenes de cada clase …", y.sum(axis=0).astype(int))</code></td><td>Suma la matriz one-hot por columnas: cuántas imágenes hay de cada clase (61, 61 y 58; reparto casi equilibrado).</td></tr>
-        <tr data-lines="22"><td><code>model = keras.Sequential([</code></td><td>Abre el modelo secuencial.</td></tr>
-        <tr data-lines="23"><td><code>keras.Input(shape=(100, 100, 3)),</code></td><td>Forma de la entrada: 100×100 con 3 canales.</td></tr>
-        <tr data-lines="24"><td><code>layers.Conv2D(16, (3, 3), strides=(1, 1), padding="valid"),</code></td><td>16 filtros de 3×3, paso 1, sin padding: el mapa pasa a 98×98×16. Sin activación incluida: solo la parte lineal (convolución + sesgo).</td></tr>
-        <tr data-lines="25"><td><code>layers.ReLU(),</code></td><td>La activación ReLU como capa aparte. Hace lo mismo que <code>activation="relu"</code> dentro de la convolución (lo comprobamos en el fragmento 12). No cambia la forma ni tiene parámetros.</td></tr>
-        <tr data-lines="26"><td><code>layers.MaxPooling2D(pool_size=(2, 2), strides=(2, 2)),</code></td><td>Max pooling 2×2 con stride 2: 98×98 → 49×49.</td></tr>
-        <tr data-lines="27"><td><code>layers.Conv2D(32, (3, 3), strides=(1, 1), padding="valid"),</code></td><td>32 filtros de 3×3 sobre los 16 mapas: 47×47×32.</td></tr>
-        <tr data-lines="28"><td><code>layers.ReLU(),</code></td><td>Otra ReLU aparte.</td></tr>
-        <tr data-lines="29"><td><code>layers.MaxPooling2D(pool_size=(2, 2), strides=(2, 2)),</code></td><td>Otro pooling: 47×47 → 23×23 (se pierde la última fila y columna).</td></tr>
-        <tr data-lines="30"><td><code>layers.Flatten(),</code></td><td>Desenrolla 23×23×32 en 16 928 números. No aprende nada: solo reorganiza.</td></tr>
-        <tr data-lines="31"><td><code>layers.Dense(100, activation="relu"),</code></td><td>Capa densa de 100 neuronas con ReLU.</td></tr>
-        <tr data-lines="32"><td><code>layers.Dense(3, activation="softmax"),</code></td><td>Capa de salida: 3 neuronas con softmax = 3 probabilidades que suman 1 (rojo, verde, azul).</td></tr>
-        <tr data-lines="33"><td><code>])</code></td><td>Cierra el modelo.</td></tr>
-        <tr data-lines="34"><td><code>model.compile(optimizer="adam", loss="categorical_crossentropy", metrics=["accuracy"])</code></td><td>Adam como optimizador, <code>categorical_crossentropy</code> como pérdida (la que va con etiquetas one-hot) y la precisión como métrica.</td></tr>
-        <tr data-lines="35"><td><code>model.summary()</code></td><td>Imprime formas y parámetros por capa; deben ser los del fragmento 12.</td></tr>
-        <tr data-lines="37"><td><code>model.fit(X, y, epochs=5, batch_size=16, validation_split=0.2, verbose=2)</code></td><td>Entrena 5 épocas con lotes de 16. <code>validation_split=0.2</code> aparta el <strong>último 20 %</strong> de los datos (36 imágenes) para validar, sin barajar, y entrena con las otras 144: son 144 / 16 = 9 pasos por época (el «9/9» de la salida). <code>verbose=2</code> imprime una línea por época.</td></tr>
-        <tr data-lines="39"><td><code>nombres = ["rojo", "verde", "azul"]</code></td><td>Los nombres de las tres clases, en el orden de las etiquetas.</td></tr>
-        <tr data-lines="40"><td><code>probas = model.predict(X[:1], verbose=0)[0]</code></td><td>Predice la <em>primera</em> imagen (<code>X[:1]</code> mantiene la dimensión de lote: forma <code>(1, 100, 100, 3)</code>) y <code>[0]</code> se queda con sus 3 probabilidades.</td></tr>
-        <tr data-lines="41"><td><code>print("Probabilidades [rojo, verde, azul]:", probas.round(3))</code></td><td>Imprime las tres probabilidades con tres decimales.</td></tr>
-        <tr data-lines="42"><td><code>print("Clase predicha:", nombres[probas.argmax()], "| clase real:", nombres[y[0].argmax()])</code></td><td><code>argmax</code> elige la posición de la probabilidad más alta; en <code>y[0]</code> (one-hot) es la clase real. Imprime las dos para compararlas.</td></tr>
-      </tbody>
-    </table>
-  </details>
-  <div class="salida">
-    <strong>Salida esperada</strong>
-    <pre style="white-space:pre">X: (180, 100, 100, 3) | y: (180, 3) | rango: 0.0 - 0.9
-Imágenes de cada clase (rojo, verde, azul): [61 61 58]
-Model: "sequential"
-┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━┓
-┃ Layer (type)                    ┃ Output Shape           ┃       Param # ┃
-┡━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━┩
-│ conv2d (Conv2D)                 │ (None, 98, 98, 16)     │           448 │
-├─────────────────────────────────┼────────────────────────┼───────────────┤
-│ re_lu (ReLU)                    │ (None, 98, 98, 16)     │             0 │
-├─────────────────────────────────┼────────────────────────┼───────────────┤
-│ max_pooling2d (MaxPooling2D)    │ (None, 49, 49, 16)     │             0 │
-├─────────────────────────────────┼────────────────────────┼───────────────┤
-│ conv2d_1 (Conv2D)               │ (None, 47, 47, 32)     │         4,640 │
-├─────────────────────────────────┼────────────────────────┼───────────────┤
-│ re_lu_1 (ReLU)                  │ (None, 47, 47, 32)     │             0 │
-├─────────────────────────────────┼────────────────────────┼───────────────┤
-│ max_pooling2d_1 (MaxPooling2D)  │ (None, 23, 23, 32)     │             0 │
-├─────────────────────────────────┼────────────────────────┼───────────────┤
-│ flatten (Flatten)               │ (None, 16928)          │             0 │
-├─────────────────────────────────┼────────────────────────┼───────────────┤
-│ dense (Dense)                   │ (None, 100)            │     1,692,900 │
-├─────────────────────────────────┼────────────────────────┼───────────────┤
-│ dense_1 (Dense)                 │ (None, 3)              │           303 │
-└─────────────────────────────────┴────────────────────────┴───────────────┘
- Total params: 1,698,291 (6.48 MB)
- Trainable params: 1,698,291 (6.48 MB)
- Non-trainable params: 0 (0.00 B)
-Epoch 1/5
-9/9 - 7s - 747ms/step - accuracy: 0.8681 - loss: 0.2639 - val_accuracy: 1.0000 - val_loss: 7.7413e-04
-Epoch 2/5
-9/9 - 1s - 114ms/step - accuracy: 1.0000 - loss: 1.1754e-04 - val_accuracy: 1.0000 - val_loss: 8.0135e-07
-Epoch 3/5
-9/9 - 0s - 55ms/step - accuracy: 1.0000 - loss: 1.8544e-07 - val_accuracy: 1.0000 - val_loss: 0.0000e+00
-Epoch 4/5
-9/9 - 1s - 63ms/step - accuracy: 1.0000 - loss: 0.0000e+00 - val_accuracy: 1.0000 - val_loss: 0.0000e+00
-Epoch 5/5
-9/9 - 1s - 74ms/step - accuracy: 1.0000 - loss: 0.0000e+00 - val_accuracy: 1.0000 - val_loss: 0.0000e+00
-Probabilidades [rojo, verde, azul]: [0. 1. 0.]
-Clase predicha: verde | clase real: verde</pre>
-    <p>Es una tarea <strong>trivial a propósito</strong>: basta con ver qué canal está encendido. Por eso la red lo aprende enseguida: tras la primera época ya acierta el 100 % de la validación (en entrenamiento, 0,868 en esa época, porque empieza desde cero), y desde la segunda época todo es 1,0000; la pérdida baja de 0,26 a casi 0 (<code>0.0000e+00</code> quiere decir «por debajo de la precisión del número»). El <code>summary()</code> repite las formas y el total de 1 698 291 parámetros de la cuenta a mano. La predicción de la primera imagen es <code>[0, 1, 0]</code>: «verde», que es su clase real. Cuidado con sacar conclusiones: una validación de 36 imágenes de un problema tan fácil demuestra que el montaje funciona, no que la red reconozca géneros de película. Los <code>ms/step</code> y los segundos por época cambian en cada ordenador; el resto de cifras debería salir igual con la misma versión de Keras.</p>
-  </div>
-</article>
-
+<a class="lab-card" href="laboratorio.html#paso-5"><span class="lc-ico" aria-hidden="true">🧪</span>
+  <span><strong>Ver el código de esta lección en el Laboratorio</strong>
+  <span>Pasos 5, 6 y 7 · Entrenar la CNN, examinarla con el test y abrirla para ver sus filtros y mapas.</span></span></a>
+<p>Los fragmentos 7, 10 y 13 (otras tres CNN entrenadas: dígitos 8×8, el laboratorio clásico estilo MNIST y la CNN de las notas) y la carga de MNIST están en <a href="laboratorio.html#frag-l8">«Más código del módulo»</a>.</p>
 </section>
 
 </div>

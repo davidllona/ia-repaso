@@ -40,7 +40,7 @@ Lab.register("curso2/c2m3-constructor-cnn", function (root, api) {
 
   var view = api.view(root, { aspect: 2.4, minH: 150, maxH: 300, label: "Parámetros de cada capa de la red, en barras horizontales" });
   var tbl = api.table(root, ["Capa (tipo)", "Output shape", "Param #", "% del total"]);
-  (function () { var t = root.querySelector("table.lab-table"), w = api.el("div", { style: { overflowX: "auto" } }); t.style.minWidth = "520px"; t.parentNode.insertBefore(w, t); w.appendChild(t); })();
+  (function () { var t = root.querySelector("table.lab-table"), w = api.el("div", { style: { overflowX: "auto" } }); t.parentNode.insertBefore(w, t); w.appendChild(t); })();
   var out = api.readout(root), ui = api.controls(root);
   var inSel = ui.select({ label: "Imagen de entrada", options: [["a", "28×28×1 (dígito en gris)"], ["b", "32×32×3 (miniatura de póster)"], ["c", "64×64×3"], ["d", "224×224×3 (fotograma)"], ["e", "100×100×3 (póster, la CNN de las notas)"]], value: inKey, onChange: function (v) { inKey = v; msg = ""; update(); } });
   ui.select({ label: "Conv2D · filtros", options: [8, 16, 32, 64, 128].map(function (n) { return [n, String(n)]; }), value: cfg.filters, onChange: function (v) { cfg.filters = +v; } });
@@ -76,17 +76,21 @@ Lab.register("curso2/c2m3-constructor-cnn", function (root, api) {
     if (!items.length) { D.text(ctx, "Añade capas con los botones de abajo", w / 2, h / 2, { size: 13, align: "center", color: C.muted }); return; }
     for (i = 0; i < items.length; i++) {
       var y = top + i * rowH, nm = items[i].name.split(" ")[0], bw = (w - labW - 70) * items[i].params / mx;
-      D.text(ctx, nm, labW - 8, y + rowH / 2 + 4, { size: Math.min(12, rowH * 0.55), align: "right", mono: true, color: C.ink2 });
+      D.text(ctx, nm, labW - 8, y + rowH / 2 + 4, { size: Math.max(11, Math.min(12, rowH * 0.55)), align: "right", mono: true, color: C.ink2 });
       D.rect(ctx, labW, y + rowH * 0.15, Math.max(items[i].params ? 2 : 0, bw), rowH * 0.7, items[i].params === mx ? C.terracota : C.cobalto);
-      D.text(ctx, items[i].params ? fmtN(items[i].params) : "0", labW + Math.max(2, bw) + 6, y + rowH / 2 + 4, { size: Math.min(12, rowH * 0.55), mono: true, color: items[i].params ? C.ink : C.muted });
+      D.text(ctx, items[i].params ? fmtN(items[i].params) : "0", labW + Math.max(2, bw) + 6, y + rowH / 2 + 4, { size: Math.max(11, Math.min(12, rowH * 0.55)), mono: true, color: items[i].params ? C.ink : C.muted });
     }
   });
   function update() {
     var r = run(); rows = r.rows;
     view.redraw();
+    var narrow = root.clientWidth < 520;   /* en el móvil: nombres cortos, formas sin espacios y sin la columna % */
     tbl.set(rows.map(function (x) {
-      return [x.name, x.shape, fmtN(x.params), r.total ? (x.params ? (100 * x.params / r.total).toFixed(1) + " %" : "—") : "—"];
+      var nm = narrow ? x.name.split(" ")[0].replace("max_pooling2d", "maxpool").replace("input_layer", "entrada") : x.name;
+      var sh = narrow ? String(x.shape).replace(/None, /, "").replace(/, /g, ",") : x.shape;
+      return [nm, sh, fmtN(x.params), r.total ? (x.params ? (100 * x.params / r.total).toFixed(1) + " %" : "—") : "—"];
     }).concat([["<b>Total</b>", "", "<b>" + fmtN(r.total) + "</b>", ""]]));
+    root.querySelectorAll("table.lab-table tr > :nth-child(4)").forEach(function (c) { c.style.display = narrow ? "none" : ""; });
     var kb = r.total * 4 / 1024;
     out.set("Parámetros totales: <b>" + fmtN(r.total) + "</b> (≈ " + (kb >= 1024 ? (kb / 1024).toFixed(1) + " MB" : kb.toFixed(1) + " KB") + " en float32)" +
       (msg ? "<br><span class='bad'>No se ha podido añadir: " + msg + "</span>" : "") +

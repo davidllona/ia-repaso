@@ -83,7 +83,7 @@ Lab.register("curso2/c2m3-convolucion-paso", function (root, api) {
     D.text(ctx, "Fotograma " + N + "×" + N + " (toca un píxel)", w / 2, 14, { size: 11, align: "center", weight: 600, color: C.ink2 });
     for (i = 0; i < N; i++) for (j = 0; j < N; j++) {
       D.rect(ctx, g.x0 + j * g.s, g.y0 + i * g.s, g.s, g.s, gray(img[i][j]), C.line, 1);
-      D.text(ctx, String(img[i][j]), g.x0 + (j + 0.5) * g.s, g.y0 + (i + 0.5) * g.s + 4, { size: Math.min(15, g.s * 0.42), align: "center", mono: true, color: img[i][j] > 4 ? "#111" : "#f3f3f3" });
+      D.text(ctx, String(img[i][j]), g.x0 + (j + 0.5) * g.s, g.y0 + (i + 0.5) * g.s + 4, { size: Math.max(11, Math.min(15, g.s * 0.42)), align: "center", mono: true, color: img[i][j] > 4 ? "#111" : "#f3f3f3" });
     }
     D.rect(ctx, g.x0 + wnd.j * g.s, g.y0 + wnd.i * g.s, 3 * g.s, 3 * g.s, null, C.terracota, 3.5);
   }
@@ -95,10 +95,10 @@ Lab.register("curso2/c2m3-convolucion-paso", function (root, api) {
       var p = c.terms[a * 3 + b], x = g.x0 + b * g.s, y = g.y0 + a * g.s;
       D.rect(ctx, x, y, g.s, g.s, p > 0 ? C.cobaltoWash : p < 0 ? C.terracotaWash : C.paper, C.line, 1);
       if (big) {
-        D.text(ctx, img[wnd.i + a][wnd.j + b] + "×" + fmt(filt[a][b]), x + g.s / 2, y + g.s * 0.36, { size: Math.min(12, g.s * 0.22), align: "center", mono: true, color: C.muted });
+        D.text(ctx, img[wnd.i + a][wnd.j + b] + "×" + fmt(filt[a][b]), x + g.s / 2, y + g.s * 0.36, { size: Math.max(11, Math.min(12, g.s * 0.22)), align: "center", mono: true, color: C.muted });
         D.text(ctx, fmt(p), x + g.s / 2, y + g.s * 0.74, { size: Math.min(17, g.s * 0.32), align: "center", mono: true, weight: 600, color: p > 0 ? C.cobaltoInk : p < 0 ? C.terracotaInk : C.muted });
       } else {
-        D.text(ctx, fmt(p), x + g.s / 2, y + g.s / 2 + 4, { size: Math.min(14, g.s * 0.4), align: "center", mono: true, weight: 600, color: p > 0 ? C.cobaltoInk : p < 0 ? C.terracotaInk : C.muted });
+        D.text(ctx, fmt(p), x + g.s / 2, y + g.s / 2 + 4, { size: Math.max(11, Math.min(14, g.s * 0.4)), align: "center", mono: true, weight: 600, color: p > 0 ? C.cobaltoInk : p < 0 ? C.terracotaInk : C.muted });
       }
     }
     D.rect(ctx, g.x0, g.y0, 3 * g.s, 3 * g.s, null, C.ink, 1.5);
@@ -113,7 +113,7 @@ Lab.register("curso2/c2m3-convolucion-paso", function (root, api) {
       if (k <= pos) {
         var c = calc(i, j), v = c.out;
         D.rect(ctx, x, y, g.s, g.s, v > 0 ? C.cobaltoWash : v < 0 ? C.terracotaWash : C.paper, C.line, 1);
-        D.text(ctx, fmt(v), x + g.s / 2, y + g.s / 2 + 4, { size: Math.min(15, g.s * 0.36), align: "center", mono: true, weight: 600, color: v > 0 ? C.cobaltoInk : v < 0 ? C.terracotaInk : C.muted });
+        D.text(ctx, fmt(v), x + g.s / 2, y + g.s / 2 + 4, { size: Math.max(11, Math.min(15, g.s * 0.36)), align: "center", mono: true, weight: 600, color: v > 0 ? C.cobaltoInk : v < 0 ? C.terracotaInk : C.muted });
       } else {
         D.rect(ctx, x, y, g.s, g.s, C.surface, C.line, 1);
         D.text(ctx, "?", x + g.s / 2, y + g.s / 2 + 4, { size: 13, align: "center", color: C.muted });

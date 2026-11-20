@@ -12,8 +12,8 @@ Lab.register("curso2/c2m3-campo-receptivo", function (root, api) {
     return rows;
   }
   var view = api.view(root, { aspect: 1.5, minH: 250, maxH: 340, label: "Fotograma de 28 por 28 con cuadrados concéntricos: la zona que ve una neurona de cada capa" });
-  var tbl = api.table(root, ["Capa", "Mapa", "Campo receptivo", "Salto"]);
-  (function () { var t = root.querySelector("table.lab-table"), w = api.el("div", { style: { overflowX: "auto" } }); t.style.minWidth = "440px"; t.parentNode.insertBefore(w, t); w.appendChild(t); })();
+  var tbl = api.table(root, ["Capa", "Mapa", "Campo", "Salto"]);
+  (function () { var t = root.querySelector("table.lab-table"), w = api.el("div", { style: { overflowX: "auto" } }); t.parentNode.insertBefore(w, t); w.appendChild(t); })();
   var ui = api.controls(root), out = api.readout(root);
   ui.button("+ Conv 3×3", function () { if (stack.length < 8) stack.push({ t: "c", k: 3 }); update(); }, "primary");
   ui.button("+ Conv 5×5", function () { if (stack.length < 8) stack.push({ t: "c", k: 5 }); update(); }, "primary");

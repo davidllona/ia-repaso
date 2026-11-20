@@ -65,7 +65,7 @@ Lab.register("curso2/c2m3-stride-padding", function (root, api) {
     for (i = 0; i < m; i++) for (j = 0; j < m; j++) {
       var k = i * m + j, x = g.x0 + j * g.sz, y = g.y0 + i * g.sz;
       D.rect(ctx, x, y, g.sz, g.sz, k <= pos ? C.oliva : C.surface, C.line, 1);
-      if (k <= pos && g.sz >= 18) D.text(ctx, String(k + 1), x + g.sz / 2, y + g.sz / 2 + 4, { size: Math.min(12, g.sz * 0.4), align: "center", mono: true, color: C.paper });
+      if (k <= pos && g.sz >= 24) D.text(ctx, String(k + 1), x + g.sz / 2, y + g.sz / 2 + 4, { size: Math.max(11, Math.min(12, g.sz * 0.4)), align: "center", mono: true, color: C.paper });
     }
     D.rect(ctx, g.x0 + (pos % m) * g.sz, g.y0 + Math.floor(pos / m) * g.sz, g.sz, g.sz, null, C.terracota, 3);
   });

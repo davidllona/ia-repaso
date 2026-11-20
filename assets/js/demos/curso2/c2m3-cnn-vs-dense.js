@@ -22,18 +22,20 @@ Lab.register("curso2/c2m3-cnn-vs-dense", function (root, api) {
 
   view.draw(function (ctx, w, h, C) {
     var D = api.d, c = counts(), left = 10, right = 14, axisY = h - 24, plotW = w - left - right;
-    var items = [["Densa: Flatten → Dense(" + U + ") → Dense(10)", c.dense, C.terracota], ["CNN con Flatten", c.cnn, C.cobalto], ["CNN con GlobalAveragePooling2D", c.cnnGap, C.oliva]];
+    var narrow = w < 420;
+    var items = [[narrow ? "Densa (Dense " + U + ")" : "Densa: Flatten → Dense(" + U + ") → Dense(10)", c.dense, C.terracota], ["CNN con Flatten", c.cnn, C.cobalto], [narrow ? "CNN + pooling global" : "CNN con GlobalAveragePooling2D", c.cnnGap, C.oliva]];
     var lo = 3, hi = 9;
     function X(v) { return left + (Math.log10(v) - lo) / (hi - lo) * plotW; }
     var rowH = (axisY - 6) / 3, i, t;
     for (t = lo; t <= hi; t++) {
       D.line(ctx, X(Math.pow(10, t)), 4, X(Math.pow(10, t)), axisY, C.line, 1);
+      if (narrow && (t - lo) % 2) continue;
       var lab = t === 3 ? "1k" : t === 4 ? "10k" : t === 5 ? "100k" : t === 6 ? "1M" : t === 7 ? "10M" : t === 8 ? "100M" : "1000M";
-      D.text(ctx, lab, X(Math.pow(10, t)), axisY + 14, { size: 10, align: t === hi ? "right" : t === lo ? "left" : "center", mono: true, color: C.muted });
+      D.text(ctx, lab, X(Math.pow(10, t)), axisY + 14, { size: 11, align: t === hi ? "right" : t === lo ? "left" : "center", mono: true, color: C.muted });
     }
     for (i = 0; i < 3; i++) {
       var y = 4 + i * rowH, bx = X(items[i][1]);
-      D.text(ctx, items[i][0] + " · " + fmtN(items[i][1]), left + 2, y + 13, { size: Math.min(12, Math.max(10, w / 34)), weight: 600, color: C.ink });
+      D.text(ctx, items[i][0] + " · " + fmtN(items[i][1]), left + 2, y + 13, { size: Math.min(12, Math.max(11, w / 34)), weight: 600, color: C.ink });
       D.rect(ctx, left, y + 20, Math.max(2, bx - left), rowH - 30, items[i][2]);
     }
     D.line(ctx, left, axisY, w - right, axisY, C.ink, 1.2);

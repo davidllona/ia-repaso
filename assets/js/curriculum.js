@@ -183,7 +183,8 @@ window.CURRICULUM = {
             {"n": 5, "slug": "leccion-5", "title": "El tamaño de salida sale de una fórmula: ⌊(n + 2p − f)/s⌋ + 1", "blurb": "Stride (cuánto salta la ventana), padding (el marco de ceros), valid frente a same y la cuenta que sale en todos los exámenes.", "min": 3},
             {"n": 6, "slug": "leccion-6", "title": "Apilando capas la red ve más imagen, y el pooling la resume", "blurb": "Mapas de características, de bordes a objetos, el campo receptivo y el max/average pooling, que no tiene pesos.", "min": 3},
             {"n": 7, "slug": "leccion-7", "title": "Flatten y Dense deciden, y las formas se cuentan capa a capa", "blurb": "Flatten no aprende, softmax decide el género, la arquitectura típica y la CNN de las notas: de 100×100×3 a 1 698 291 parámetros.", "min": 3},
-            {"n": 8, "slug": "leccion-8", "title": "Una CNN se entrena como cualquier red, y por dentro se ven los bordes", "blurb": "El mismo ciclo de siempre, el gradiente de un peso compartido, overfitting, una CNN real por dentro, Conv2D en Keras 3 y los errores típicos.", "min": 3}
+            {"n": 8, "slug": "leccion-8", "title": "Una CNN se entrena como cualquier red, y por dentro se ven los bordes", "blurb": "El mismo ciclo de siempre, el gradiente de un peso compartido, overfitting, una CNN real por dentro, Conv2D en Keras 3 y los errores típicos.", "min": 3},
+            {"n": 9, "slug": "laboratorio", "title": "Laboratorio: una CNN que reconoce los iconos del reproductor", "blurb": "Todo el código del módulo en un ejemplo completo, línea a línea: fabricar iconos, convolucionar a mano, contar formas y parámetros, construir, entrenar, examinar y abrir una CNN en Keras, y compararla con una red densa.", "min": 85}
           ]
         },
         {

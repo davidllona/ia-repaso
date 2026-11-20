@@ -115,7 +115,7 @@ Lab.register("curso2/c2m3-que-aprende", function (root, api) {
         ctx.fillRect(kx + b * ks, ky + a * ks, ks, ks);
       }
       D.rect(ctx, kx, ky, 3 * ks, 3 * ks, null, C.ink, 1);
-      D.text(ctx, "filtro " + (f + 1), x + L.mw / 2, ky + 3 * ks + 12, { size: 10, align: "center", color: C.muted });
+      D.text(ctx, "filtro " + (f + 1), x + L.mw / 2, ky + 3 * ks + 12, { size: 11, align: "center", color: C.muted });
     }
   });
   v3.draw(function (ctx, w, h, C) {
@@ -124,7 +124,7 @@ Lab.register("curso2/c2m3-que-aprende", function (root, api) {
     for (f = 0; f < 8; f++) {
       var r = Math.floor(f / 4), c = f % 4, x = L.x0 + c * (L.mw + L.gap), y = L.hdr + r * (L.mw + 16);
       drawMap(ctx, C, res.c2[f], x, y, L.mw, mx);
-      D.text(ctx, "filtro " + (f + 1), x + L.mw / 2, y + L.mw + 11, { size: 10, align: "center", color: C.muted });
+      D.text(ctx, "filtro " + (f + 1), x + L.mw / 2, y + L.mw + 11, { size: 11, align: "center", color: C.muted });
     }
   });
   v1.pointer({

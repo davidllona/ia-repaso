@@ -43,7 +43,7 @@ Lab.register("curso2/c2m3-pooling", function (root, api) {
     for (i = 0; i < c; i++) for (j = 0; j < c; j++) {
       var v = val(i, j); if (v === null) { api.d.rect(ctx, g.x0 + j * g.sz, g.y0 + i * g.sz, g.sz, g.sz, C.surface, C.line, 1); api.d.text(ctx, "?", g.x0 + (j + .5) * g.sz, g.y0 + (i + .5) * g.sz + 4, { size: 12, align: "center", color: C.muted }); continue; }
       api.d.rect(ctx, g.x0 + j * g.sz, g.y0 + i * g.sz, g.sz, g.sz, gray(v), C.line, 1);
-      api.d.text(ctx, fmt(v), g.x0 + (j + .5) * g.sz, g.y0 + (i + .5) * g.sz + 4, { size: Math.min(14, g.sz * 0.38), align: "center", mono: true, color: v > 4 ? "#111" : "#f3f3f3" });
+      api.d.text(ctx, fmt(v), g.x0 + (j + .5) * g.sz, g.y0 + (i + .5) * g.sz + 4, { size: Math.max(11, Math.min(14, g.sz * 0.38)), align: "center", mono: true, color: v > 4 ? "#111" : "#f3f3f3" });
     }
   }
   load("texto"); fix();
