@@ -149,7 +149,8 @@ window.CURRICULUM = {
             {"n": 5, "slug": "leccion-5", "title": "Aprender es bajar la cuesta a pasos pequeños", "blurb": "Derivadas, regla de la cadena, gradient descent y el learning rate.", "min": 3},
             {"n": 6, "slug": "leccion-6", "title": "Backpropagation reparte la culpa hacia atrás, batch a batch", "blurb": "Backpropagation en la red 2-2-1, una iteración completa, y época, batch e iteración.", "min": 3},
             {"n": 7, "slug": "leccion-7", "title": "Cómo dar el paso: optimizadores y gradientes que se apagan", "blurb": "SGD, Momentum, RMSprop y Adam, y por qué el gradiente se desvanece o explota en redes profundas.", "min": 3},
-            {"n": 8, "slug": "leccion-8", "title": "El tamaño justo: capacidad para aprender, frenos para no memorizar", "blurb": "Aproximación universal, neuronas ReLU como bisagras, y L2, dropout y early stopping contra el sobreajuste.", "min": 3}
+            {"n": 8, "slug": "leccion-8", "title": "El tamaño justo: capacidad para aprender, frenos para no memorizar", "blurb": "Aproximación universal, neuronas ReLU como bisagras, y L2, dropout y early stopping contra el sobreajuste.", "min": 3},
+            {"n": 9, "slug": "laboratorio", "title": "Laboratorio: la red de Netflix, de una neurona a Keras", "blurb": "Todo el código del módulo en un ejemplo completo, línea a línea: neurona, activaciones, forward pass, pérdidas, gradient descent, backpropagation, optimizadores, frenos contra el sobreajuste y la red entrenada con Keras.", "min": 55}
           ]
         },
         {

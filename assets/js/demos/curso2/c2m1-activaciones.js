@@ -24,8 +24,8 @@ Lab.register("curso2/c2m1-activaciones", function (root, api) {
   row.appendChild(colA); row.appendChild(colB); root.appendChild(row);
   var v1 = api.view(colA, { aspect: 1.15, minH: 230, maxH: 400, drag: !coarse, label: "Función de activación f(z) con el punto z elegido" });
   var v2 = api.view(colB, { aspect: 1.15, minH: 230, maxH: 400, drag: !coarse, label: "Derivada f'(z) con la zona de saturación sombreada" });
-  var po1 = { xr: [-8, 8], yr: [-0.25, 1.25], xticks: 8, yticks: 6, xlabel: "z", ylabel: "f(z)", pad: { l: 46, r: 12, t: 12, b: 36 }, xfmt: function (v) { return Math.round(v); } };
-  var po2 = { xr: [-8, 8], yr: [-0.05, 0.3], xticks: 8, yticks: 7, xlabel: "z", ylabel: "f′(z)", pad: { l: 46, r: 12, t: 12, b: 36 }, xfmt: function (v) { return Math.round(v); } };
+  var po1 = { xr: [-8, 8], yr: [-0.25, 1.25], xticks: 8, yticks: 6, xlabel: "z", ylabel: "f(z)", pad: { l: 58, r: 12, t: 12, b: 36 }, xfmt: function (v) { return Math.round(v); } };
+  var po2 = { xr: [-8, 8], yr: [-0.05, 0.3], xticks: 8, yticks: 7, xlabel: "z", ylabel: "f′(z)", pad: { l: 58, r: 12, t: 12, b: 36 }, xfmt: function (v) { return Math.round(v); } };
   var p1 = api.plot(v1, po1), p2 = api.plot(v2, po2);
 
   var ui = api.controls(root), out = api.readout(root);

@@ -23,7 +23,7 @@ Lab.register("curso2/c2m1-neurona", function (root, api) {
   var plot = api.plot(view, { xr: [-3, 3], yr: [-3, 3], xticks: 6, yticks: 6, xlabel: "x₁ · gusto por el género", ylabel: "x₂ · duración", pad: { l: 46, r: 12, t: 12, b: 36 },
     xfmt: function (v) { return +v.toFixed(1); }, yfmt: function (v) { return +v.toFixed(1); } });
   var view2 = api.view(colB, { aspect: 1.0, minH: 250, maxH: 440, label: "Función de activación con el punto z actual" });
-  var po2 = { xr: [-6, 6], yr: [-0.25, 1.25], xticks: 6, yticks: 4, xlabel: "z (suma ponderada)", ylabel: "a = f(z) · ganas", pad: { l: 46, r: 12, t: 12, b: 36 },
+  var po2 = { xr: [-6, 6], yr: [-0.25, 1.25], xticks: 6, yticks: 4, xlabel: "z (suma ponderada)", ylabel: "a = f(z) · ganas", pad: { l: 60, r: 12, t: 12, b: 36 },
     xfmt: function (v) { return Math.round(v); } };
   var plot2 = api.plot(view2, po2);
 

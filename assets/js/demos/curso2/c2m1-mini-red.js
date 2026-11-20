@@ -104,7 +104,7 @@ Lab.register("curso2/c2m1-mini-red", function (root, api) {
   var row = api.el("div", { class: "lab-row" }), colA = api.el("div"), colB = api.el("div");
   row.appendChild(colA); row.appendChild(colB); root.appendChild(row);
   var view = api.view(colA, { aspect: 1.0, minH: 260, maxH: 440, label: "Frontera de decisión de la red sobre los usuarios de entrenamiento y de test" });
-  var plot = api.plot(view, { xr: [-HM, HM], yr: [-HM, HM], xticks: 4, yticks: 4, xlabel: "gusto por la acción", ylabel: "gusto por el romance", pad: { l: 38, r: 8, t: 8, b: 34 }, xfmt: function (v) { return +v.toFixed(1); }, yfmt: function (v) { return +v.toFixed(1); } });
+  var plot = api.plot(view, { xr: [-HM, HM], yr: [-HM, HM], xticks: 4, yticks: 4, xlabel: "gusto por la acción", ylabel: "gusto por el romance", pad: { l: 50, r: 24, t: 8, b: 34 }, xfmt: function (v) { return +v.toFixed(1); }, yfmt: function (v) { return +v.toFixed(1); } });
   var viewN = api.view(colB, { aspect: 1.5, minH: 170, maxH: 280, label: "Esquema de la red con el color de cada conexión según el signo del peso" });
   var viewL = api.view(colB, { aspect: 2.3, minH: 130, maxH: 200, label: "Pérdida de entrenamiento y de test durante el entrenamiento" });
   var plotL = api.plot(viewL, { xr: [0, 100], yr: [0, 1], xticks: 4, yticks: 2, xlabel: "pasos de entrenamiento", pad: { l: 40, r: 10, t: 22, b: 32 }, xfmt: function (v) { return Math.round(v); } });
@@ -170,10 +170,10 @@ Lab.register("curso2/c2m1-mini-red", function (root, api) {
     }
     var rr = Math.max(3.5, Math.min(8, (h - 28) / (Math.max.apply(null, sz) * 2.6)));
     for (l = 0; l < nl; l++) pos[l].forEach(function (q) { D.circle(ctx, q[0], q[1], rr, l === 0 ? C.paper : l === nl - 1 ? C.terracotaWash : C.cobaltoWash, C.ink, 1.3); });
-    D.text(ctx, "entrada", colx(0), h - 6, { size: 10, align: "center", color: C.muted });
-    D.text(ctx, "salida", colx(nl - 1), h - 6, { size: 10, align: "center", color: C.muted });
-    if (nl > 2) D.text(ctx, S.layers + " capa" + (S.layers > 1 ? "s" : "") + " oculta" + (S.layers > 1 ? "s" : "") + " de " + S.width, w / 2, h - 6, { size: 10, align: "center", color: C.muted });
-    else D.text(ctx, "sin capas ocultas: una sola neurona", w / 2, h - 6, { size: 10, align: "center", color: C.muted });
+    D.text(ctx, "entrada", colx(0), h - 6, { size: 11, align: "center", color: C.muted });
+    D.text(ctx, "salida", colx(nl - 1), h - 6, { size: 11, align: "center", color: C.muted });
+    if (nl > 2) D.text(ctx, S.layers + " capa" + (S.layers > 1 ? "s" : "") + " oculta" + (S.layers > 1 ? "s" : "") + " de " + S.width, w / 2, h - 6, { size: 11, align: "center", color: C.muted });
+    else D.text(ctx, "sin capas ocultas: una sola neurona", w / 2, h - 6, { size: 11, align: "center", color: C.muted });
   }
   function drawLoss(ctx, w, h, C) {
     var H = S.hist, xmax = Math.max(100, H[H.length - 1][0]), ymax = Math.max(0.8, Math.min(2, Math.ceil(Math.max(H[0][1], H[0][2]) * 5) / 5));

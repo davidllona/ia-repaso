@@ -26,10 +26,10 @@ Lab.register("curso2/c2m1-softmax", function (root, api) {
     panels.forEach(function (pn, k) {
       var x0 = k * pw;
       if (k > 0) D.line(ctx, x0, 8, x0, h - 8, C.line, 1, [3, 3]);
-      D.text(ctx, pn.t, x0 + pw / 2, 18, { size: Math.min(13, pw / 9), weight: 600, align: "center", color: C.ink });
+      D.text(ctx, pn.t, x0 + pw / 2, 18, { size: Math.max(11, Math.min(13, pw / 9)), weight: 600, align: "center", color: C.ink });
       if (w > 520) D.text(ctx, pn.sub, x0 + pw / 2, 33, { size: 11, align: "center", color: C.muted });
     });
-    var bw = Math.min(40, pw / 5), mid = top + ph / 2, fs = pw < 150 ? 9.5 : 11;
+    var bw = Math.min(40, pw / 5), mid = top + ph / 2, fs = 11;
     for (i = 0; i < 3; i++) {
       var cx1 = pw * 0.5 + (i - 1) * pw * 0.34, cx2 = pw + cx1, cx3 = 2 * pw + cx1;
       var isC = i === S.cls;
@@ -49,7 +49,7 @@ Lab.register("curso2/c2m1-softmax", function (root, api) {
       D.rect(ctx, cx3 - bw / 2, gh >= 0 ? mid - gh : mid, bw, Math.abs(gh), g[i] < 0 ? C.oliva : C.terracota, C.ink, 1.2);
       D.text(ctx, g[i].toFixed(3), cx3, gh >= 0 ? mid - gh - 5 : mid - gh + 14, { size: fs, mono: true, weight: 600, align: "center" });
       // nombres
-      [cx1, cx2, cx3].forEach(function (cx) { D.text(ctx, NAMES[i], cx, h - 7, { size: Math.min(12, pw / 9, pw * 0.34 / 3.7), align: "center", weight: isC ? 700 : 400, color: isC ? C.olivaInk : C.ink2 }); });
+      [cx1, cx2, cx3].forEach(function (cx) { D.text(ctx, pw < 150 ? ["acc.", "com.", "terr."][i] : NAMES[i], cx, h - 7, { size: pw < 150 ? 11 : Math.min(12, pw / 9, pw * 0.34 / 3.7), align: "center", weight: isC ? 700 : 400, color: isC ? C.olivaInk : C.ink2 }); });
     }
   }
 
