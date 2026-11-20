@@ -1,4 +1,4 @@
-/* Experimento: contador de parámetros de un Transformer. Las fórmulas son exactas (coinciden con model.summary() de los fragmentos 12 y 15).
+/* Experimento: contador de parámetros de un Transformer. Las fórmulas son exactas (coinciden con model.summary() de los pasos 8 y 10 del laboratorio).
    Muestra dónde viven los parámetros, que el número de cabezas no los cambia si key_dim = d_model / h, y qué pasa con key_dim = d_model. */
 Lab.register("curso3/c3m3-contador-params", function (root, api) {
   var D = api.d;
@@ -24,7 +24,7 @@ Lab.register("curso3/c3m3-contador-params", function (root, api) {
     return { rows: rows, mha: mha, ffn: ffn, ln: ln, inp: inp, out: out, total: total, kd: kd };
   }
   var view = api.view(root, { aspect: 5.5, minH: 70, maxH: 100, label: "Barra apilada con el reparto de parámetros entre entrada, atención, feed-forward, LayerNorm y salida" });
-  var tab = api.table(root, ["Pieza (forma / ajuste)", "Parámetros"]);
+  var tab = api.table(root, ["Pieza", "Parámetros"]);
   var ui = api.controls(root), out = api.readout(root);
   out.el.style.fontSize = "clamp(.72rem, 2.7vw, .84rem)";
   var C0 = api.colors();
@@ -51,12 +51,13 @@ Lab.register("curso3/c3m3-contador-params", function (root, api) {
     if (S.d % S.h !== 0 && !S.bad) { /* key_dim = floor(d/h): aviso en el readout */ }
     R = calc(); view.redraw();
     tab.set(R.rows.map(function (r) { return [r[0] + "<br><small>" + r[1] + "</small>", g(r[2]) + (r[3] >= 1 && r[3] <= 3 ? " × " + S.nb : "")]; }).concat([["<b>Total</b>", "<b>" + g(R.total) + "</b>"]]));
+    Array.prototype.forEach.call(tab.el.querySelectorAll("td:first-child,th:first-child"), function (c) { c.style.whiteSpace = "normal"; });
     var ok = S.tipo === "texto" && S.d === 32 && S.h === 2 && S.ff === 64 && S.nb === 2 && S.vocab === 31 && S.maxlen === 16 && !S.bad;
     var ok2 = S.tipo === "serie" && S.d === 32 && S.h === 4 && S.ff === 64 && S.nb === 2 && !S.bad;
     out.set("Una capa de atención: <b>" + g(R.mha) + "</b> = 4·d² + 4·d = 4·" + S.d + "² + 4·" + S.d + (S.bad ? " … pero con key_dim = d_model son <b>" + g(R.mha) + "</b>: " + n(R.mha / (4 * S.d * S.d + 4 * S.d), 1) + " × más" : "") + "<br>" +
       "Un bloque: " + g(R.mha) + " + " + g(R.ffn) + " + " + g(R.ln) + " = <b>" + g(R.mha + R.ffn + R.ln) + "</b>; × " + S.nb + " bloques = <b>" + g(S.nb * (R.mha + R.ffn + R.ln)) + "</b>.<br>" +
       (S.d % S.h !== 0 && !S.bad ? "<span class='bad'>d_model no es múltiplo de h: key_dim = ⌊d/h⌋ = " + R.kd + " y se pierden números al concatenar.</span> " : "") +
-      (ok ? "<span class='good'>Coincide con el model.summary() del fragmento 15: 19.615.</span>" : (ok2 ? "<span class='good'>Coincide con el model.summary() del fragmento 12: 17.185.</span>" : "Cambia el número de cabezas con d_model fijo: el total no se mueve.")));
+      (ok ? "<span class='good'>Coincide con el model.summary() del paso 10 del laboratorio: 19.615.</span>" : (ok2 ? "<span class='good'>Coincide con el model.summary() del paso 8 del laboratorio: 17.185.</span>" : "Cambia el número de cabezas con d_model fijo: el total no se mueve.")));
   }
   update();
 });

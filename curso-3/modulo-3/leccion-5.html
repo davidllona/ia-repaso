@@ -20,8 +20,8 @@
     <div>
       <p class="eyebrow">Curso 3 · Módulo 3 · Lección 5 de 8</p>
       <h1>Sin posición, «Woody salva a Buzz» y «Buzz salva a Woody» son lo mismo</h1>
-      <p class="lead">La fórmula de la atención compara contenidos, pero no sabe dónde está cada token. Para que el orden cuente, a cada token se le suma un vector que dice en qué lugar está.</p>
-      <p class="meta-line"><span class="read-time" data-render="read-time"></span><a href="../modulo-3.html">Índice del módulo</a></p>
+      <p class="lead">La atención compara contenidos, pero no sabe dónde está cada palabra. Para que el orden cuente, a cada palabra se le suma un vector que dice en qué lugar está.</p>
+      <p class="meta-line"><span class="read-time" data-render="read-time"></span><a href="../modulo-3.html">Índice del módulo</a> · <a href="#chuleta">Ir a la chuleta</a></p>
     </div>
     <div class="hero-tile" aria-hidden="true"></div>
   </div>
@@ -30,16 +30,40 @@
 <details class="predice">
   <summary>Un modelo con atención pero sin posición recibe «Woody salva a Buzz» y «Buzz salva a Woody». ¿Le salen números distintos?<span class="hint"></span></summary>
   <div>
-    <p>No. La self-attention es <strong>equivariante a permutaciones</strong>: si barajas los tokens, la salida sale barajada igual, con los mismos números. Para la capa, la frase es un conjunto. Es como ver la temporada 3 antes que la 1 y que te diera igual.</p>
+    <p>No. Si barajas las palabras, la salida sale barajada igual, con los mismos números. Para la capa, la frase es una bolsa de palabras. Es como ver la temporada 3 antes que la 1 y que te diera igual.</p>
   </div>
 </details>
 
 <section>
-<h2 id="idea">Sumar un reloj a cada token</h2>
-<p>La solución es <strong>inyectar la posición en el propio vector</strong>: a cada token se le suma (no se concatena) un vector de \(d_{model}\) números que depende de su lugar. La versión del artículo original usa senos y cosenos:</p>
+<h2 id="orden">1 · La atención no ve el orden</h2>
+<p>En la fórmula de la atención solo aparecen los contenidos: nada dice «yo voy primero». Si cambias el orden de las palabras, cada una recibe exactamente la misma mezcla, solo que en otro sitio. Esto se llama <strong>equivarianza a permutaciones</strong> (permutar = cambiar el orden).</p>
+<div class="anim-pasos" data-titulo="Barajar la entrada solo baraja la salida">
+  <div class="paso"><p><strong>1.</strong> Entran tres palabras y salen tres mezclas.</p><span class="grande">Woody · salva · Buzz → A · B · C</span></div>
+  <div class="paso"><p><strong>2.</strong> Das la vuelta a la frase.</p><span class="grande">Buzz · salva · Woody</span></div>
+  <div class="paso"><p><strong>3.</strong> Cada palabra sigue viendo lo mismo: las mismas mezclas, en otro orden.</p><span class="grande">→ C · B · A</span></div>
+  <div class="paso"><p><strong>4.</strong> Quién salva a quién se ha perdido. El laboratorio lo comprueba: <code>True</code> sin posición.</p></div>
+</div>
+</section>
+
+<section>
+<h2 id="idea">2 · Sumar la posición a cada palabra</h2>
+<p>La solución es meter la posición dentro del propio vector: a cada palabra se le <strong>suma</strong> un vector que depende de su lugar. Se suma, no se pega al lado, para que el vector siga teniendo \(d_{model}\) números.</p>
+<ul class="flow">
+  <li class="a">«Buzz»<small>vector de la palabra</small></li>
+  <li class="d">+ posición 3<small>vector del lugar</small></li>
+  <li class="b">«Buzz en 3.º»<small>mismo tamaño</small></li>
+</ul>
+</section>
+
+<section>
+<h2 id="relojes">3 · Relojes de senos y cosenos</h2>
+<p>El seno y el coseno son ondas que suben y bajan entre −1 y 1, una y otra vez. Juntos marcan un punto que gira, como la punta de una manecilla.</p>
 <div class="formula">\[ PE(pos,\,2i) = \sin\!\left(\frac{pos}{10000^{2i/d_{model}}}\right), \qquad PE(pos,\,2i+1) = \cos\!\left(\frac{pos}{10000^{2i/d_{model}}}\right) \]</div>
-<p>\(pos\) es la posición (0, 1, 2…) e \(i\) numera las parejas de dimensiones. Cada pareja \((\sin, \cos)\) es una <strong>manecilla de reloj</strong>: la primera da una vuelta cada 6,3 posiciones y las siguientes, cada vez más despacio. Como «temporada y capítulo»: el capítulo cambia rápido, la temporada despacio, y juntos identifican el episodio.</p>
-<p>Ventajas: no hay nada que aprender, sirve para cualquier longitud y, como \(\sin a \sin b + \cos a \cos b = \cos(a-b)\), el producto escalar de dos posiciones <strong>solo depende de su distancia</strong>. La alternativa de BERT y GPT-2 es una tabla <code>Embedding(max_posiciones, d_model)</code> aprendida: rinde igual, pero no pasa de la longitud reservada y añade parámetros.</p>
+<p>\(PE\) es el vector de posición; \(pos\), la posición (0, 1, 2…); \(i\) numera las parejas (seno, coseno). Cada pareja es una <strong>manecilla</strong>: la primera da una vuelta cada 6,3 posiciones y las siguientes, cada vez más despacio.</p>
+<div class="callout analogia">
+  <span class="lbl">Analogía</span>
+  <p>«Temporada y capítulo»: el capítulo cambia rápido, la temporada despacio, y juntos identifican el episodio.</p>
+</div>
 </section>
 
 <figure class="demo" data-demo="curso3/c3m3-posicional" data-titulo="Relojes de posición y la similitud entre posiciones">
@@ -48,37 +72,71 @@
 </figure>
 
 <section>
-<h2 id="numeros">Con números: \(d_{model} = 4\)</h2>
-<div class="callout ejemplo">
-  <span class="lbl">Ejemplo numérico</span>
-  <p>Dos parejas. Para \(i = 0\) el divisor es \(10000^0 = 1\); para \(i = 1\), \(10000^{2/4} = 100\).</p>
-  <table>
-    <thead><tr><th>p</th><th>sen p</th><th>cos p</th><th>sen(p/100)</th></tr></thead>
-    <tbody>
-      <tr><td>0</td><td>0</td><td>1</td><td>0</td></tr>
-      <tr><td>1</td><td>0,841</td><td>0,540</td><td>0,010</td></tr>
-      <tr><td>2</td><td>0,909</td><td>−0,416</td><td>0,020</td></tr>
-      <tr><td>3</td><td>0,141</td><td>−0,990</td><td>0,030</td></tr>
-    </tbody>
-  </table>
-  <p>Aquí p = pos. La cuarta dimensión, cos(p/100), vale 1 en la posición 0 y 1,000 en las tres siguientes: casi no se mueve.</p>
-  <p>La pareja rápida distingue posiciones vecinas; la lenta, «principio» de «final» en secuencias largas.</p>
+<h2 id="numeros">4 · Con números: vectores de 4</h2>
+<p>Con \(d_{model} = 4\) hay dos parejas. La rápida divide la posición entre 1; la lenta, entre \(10000^{2/4} = 100\).</p>
+<div class="anim-pasos" data-titulo="El vector de posición, posición a posición">
+  <div class="paso"><p><strong>Posición 0.</strong> sen 0, cos 0, sen 0, cos 0.</p><span class="grande">(0; 1; 0; 1)</span></div>
+  <div class="paso"><p><strong>Posición 1.</strong> sen 1, cos 1, sen 0,01, cos 0,01.</p><span class="grande">(0,841; 0,540; 0,010; 1,000)</span></div>
+  <div class="paso"><p><strong>Posición 2.</strong></p><span class="grande">(0,909; −0,416; 0,020; 1,000)</span></div>
+  <div class="paso"><p><strong>Posición 3.</strong></p><span class="grande">(0,141; −0,990; 0,030; 1,000)</span></div>
+  <div class="paso"><p><strong>Lectura.</strong> La pareja rápida distingue vecinas; la lenta casi no se mueve, y en frases largas distingue «principio» de «final».</p></div>
 </div>
 </section>
 
+<section>
+<h2 id="distancia">5 · Solo cuenta la distancia</h2>
+<p>El parecido entre dos posiciones se mide con el producto escalar (lección 2). Con senos y cosenos, solo depende de <strong>cuánto se separan</strong>, no de dónde estén. Con vectores de 16:</p>
+<table>
+  <thead><tr><th style="min-width:7.4em;overflow-wrap:normal">Posiciones</th><th style="min-width:6.7em;overflow-wrap:normal">Distancia</th><th style="min-width:6.0em;overflow-wrap:normal">Parecido</th></tr></thead>
+  <tbody>
+    <tr><td>5 y 8</td><td>3</td><td>5,543</td></tr>
+    <tr><td>20 y 23</td><td>3</td><td>5,543</td></tr>
+    <tr><td>40 y 43</td><td>3</td><td>5,543</td></tr>
+    <tr><td>5 y 15</td><td>10</td><td>3,646</td></tr>
+  </tbody>
+</table>
+</section>
+
+<section>
+<h2 id="aprendidas">6 · O que la red aprenda las posiciones</h2>
+<p>La otra opción, la de BERT y GPT-2, es un <code>Embedding</code>: una tabla con un vector por posición que se aprende como cualquier otro peso.</p>
+<table>
+  <thead><tr><th></th><th style="min-width:5.4em;overflow-wrap:normal">Senos y cosenos</th><th style="min-width:7.4em;overflow-wrap:normal">Aprendidas</th></tr></thead>
+  <tbody>
+    <tr><td>Parámetros</td><td>0</td><td>posiciones × d</td></tr>
+    <tr><td>Frases más largas</td><td>Sí</td><td>No pasa del máximo</td></tr>
+    <tr><td>Resultado</td><td colspan="2">Parecido en la práctica</td></tr>
+  </tbody>
+</table>
+</section>
+
 <details class="predice">
-  <summary>Calculas \(PE(5)\cdot PE(8)\) y \(PE(20)\cdot PE(23)\) con la fórmula sinusoidal. ¿Salen iguales o distintos?<span class="hint"></span></summary>
+  <summary>Calculas el parecido de las posiciones 5 y 8, y el de las posiciones 20 y 23, con senos y cosenos. ¿Salen iguales o distintos?<span class="hint"></span></summary>
   <div>
-    <p><strong>Iguales</strong>: los dos están a distancia 3, y el producto es \(\sum_i \cos(\omega_i\cdot 3)\), que no depende de dónde empiezas. El fragmento 9 lo comprueba: 5.543 en las posiciones 5, 20 y 40.</p>
+    <p><strong>Iguales</strong>: las dos parejas están a distancia 3, y el parecido solo depende de la distancia. El laboratorio lo comprueba: 5,543 en las posiciones 5, 20 y 40.</p>
   </div>
 </details>
+
+<section>
+<h2 id="chuleta">Chuleta para repasar</h2>
+<dl class="chuleta">
+  <div><dt>Equivarianza a permutaciones</dt><dd>Barajar la entrada solo baraja la salida. <em>Woody y Buzz intercambiados, mismos números.</em></dd></div>
+  <div><dt>Codificación posicional</dt><dd>Un vector que dice el lugar y se suma a la palabra. <em>«Buzz» + posición 3.</em></dd></div>
+  <div><dt>Sumar, no concatenar</dt><dd>El vector conserva su tamaño. <em>Sigue teniendo d_model números.</em></dd></div>
+  <div><dt>Seno y coseno</dt><dd>Ondas entre −1 y 1; juntas, una manecilla que gira. <em>sen 1 = 0,841.</em></dd></div>
+  <div><dt>Pareja rápida y lenta</dt><dd>Una vuelta cada 6,3 posiciones, o muchísimo más despacio. <em>Capítulo y temporada.</em></dd></div>
+  <div><dt>Solo la distancia</dt><dd>El parecido entre dos posiciones depende de cuánto se separan. <em>5,543 a distancia 3.</em></dd></div>
+  <div><dt>Posiciones aprendidas</dt><dd>Una tabla Embedding con un vector por posición. <em>BERT y GPT-2.</em></dd></div>
+  <div><dt>Embedding</dt><dd>Tabla que da un vector para cada número entero. <em>50 posiciones × 16 = 800 parámetros.</em></dd></div>
+</dl>
+</section>
 
 <div class="resumen">
   <h2 class="sin-num sin-toc">En tres líneas</h2>
   <ul>
-    <li>La atención sola no ve el orden: permutar la entrada solo permuta la salida.</li>
-    <li>Se suma a cada token un vector de posición: sinusoidal (relojes) o aprendido (<code>Embedding</code>).</li>
-    <li>Con senos y cosenos, la similitud entre dos posiciones solo depende de su distancia.</li>
+    <li>La atención sola no ve el orden: barajar la entrada solo baraja la salida.</li>
+    <li>Se suma a cada palabra un vector de posición: senos y cosenos (relojes) o aprendido (<code>Embedding</code>).</li>
+    <li>Con senos y cosenos, el parecido entre dos posiciones solo depende de su distancia.</li>
   </ul>
 </div>
 
@@ -88,37 +146,37 @@
  "titulo": "¿Lo tienes?",
  "preguntas": [
   {
-   "q": "Un modelo con atención pero sin codificación posicional recibe «Woody salva a Buzz» y «Buzz salva a Woody», con los mismos embeddings. ¿Qué pasa?",
+   "q": "Un modelo con atención pero sin posición recibe «Woody salva a Buzz» y «Buzz salva a Woody», con los mismos vectores de palabra. ¿Qué pasa?",
    "opciones": [
     "Da salidas totalmente distintas porque ve el orden",
-    "No distingue el orden: la salida de cada token es la misma, solo permutada, así que las dos frases son indistinguibles para el modelo",
+    "No distingue el orden: la salida de cada palabra es la misma, solo cambiada de sitio, así que las dos frases le parecen iguales",
     "Falla con un error de forma",
     "Solo distingue el orden si usa varias cabezas"
    ],
    "correcta": 1,
-   "porque": "La atención compara tokens por su contenido; permutar la entrada permuta la salida de la misma forma (equivarianza a permutaciones). Sin una señal de posición, que se suma al embedding, el conjunto de vectores es el mismo en ambas frases. Las cabezas adicionales no arreglan eso."
+   "porque": "La atención compara palabras por su contenido; barajar la entrada baraja la salida del mismo modo. Sin una señal de posición sumada a cada palabra, las dos frases tienen los mismos vectores. Más cabezas no lo arreglan."
   },
   {
-   "q": "¿Por qué la codificación posicional se <em>suma</em> al embedding en lugar de concatenarse?",
+   "q": "¿Por qué el vector de posición se <em>suma</em> al de la palabra en lugar de pegarse al lado?",
    "opciones": [
     "Porque sumar es más rápido de entrenar",
-    "Para que el vector conserve \\(d_{model}\\) números y la red separe «qué» y «dónde» con sus matrices",
+    "Para que el vector conserve \\(d_{model}\\) números y la red separe «qué» y «dónde» con sus tablas",
     "Porque Keras no permite concatenar",
     "Para que las posiciones no se aprendan"
    ],
    "correcta": 1,
-   "porque": "Sumar no cambia el tamaño del vector, así que todas las capas siguientes siguen funcionando igual. Por eso el vector de posición debe tener exactamente \\(d_{model}\\) números."
+   "porque": "Sumar no cambia el tamaño del vector, así que todas las capas siguientes funcionan igual. Por eso el vector de posición debe tener exactamente \\(d_{model}\\) números."
   },
   {
-   "q": "¿Qué ventaja tiene la codificación sinusoidal frente a una tabla <code>Embedding</code> de posiciones?",
+   "q": "¿Qué ventaja tienen los senos y cosenos frente a una tabla <code>Embedding</code> de posiciones?",
    "opciones": [
-    "Acierta siempre más",
-    "No tiene parámetros y funciona con secuencias más largas que las del entrenamiento",
-    "Solo sirve para series temporales",
-    "Permite quitar la máscara causal"
+    "Aciertan siempre más",
+    "No tienen parámetros y funcionan con frases más largas que las del entrenamiento",
+    "Solo sirven para series temporales",
+    "Permiten quitar la máscara causal"
    ],
    "correcta": 1,
-   "porque": "La tabla aprendida está limitada a la longitud máxima que reservaste y añade <code>max_posiciones × d_model</code> parámetros. La sinusoidal es una fórmula: vale para cualquier posición. En la práctica, las dos rinden parecido."
+   "porque": "La tabla aprendida no pasa de la longitud máxima que reservaste y añade posiciones × d_model parámetros. Los senos y cosenos son una fórmula: valen para cualquier posición. En la práctica, las dos rinden parecido."
   }
  ]
 }
@@ -130,7 +188,7 @@
   <div class="prof-body">
 <h2 id="posicion">Codificación posicional</h2>
 <p class="pregunta">La atención compara tokens con tokens, pero en ninguna parte de la fórmula aparece <em>dónde</em> está cada uno. ¿«Woody salva a Buzz» y «Buzz salva a Woody» son lo mismo para ella? (Mismas palabras, historia distinta; igual que ver la temporada 3 antes que la 1.)</p>
-<p>Casi. La self-attention es <strong>equivariante a permutaciones</strong>: si mezclas el orden de los tokens de entrada, las salidas salen mezcladas del mismo modo, con exactamente los mismos números. Para la capa, la frase es un <em>conjunto</em>, no una secuencia. El fragmento 9 lo comprueba: al barajar los tokens, la salida es la salida original barajada igual. La solución es <strong>inyectar la posición en los propios vectores</strong>: a cada token se le suma un vector que depende de en qué lugar está.</p>
+<p>Casi. La self-attention es <strong>equivariante a permutaciones</strong>: si mezclas el orden de los tokens de entrada, las salidas salen mezcladas del mismo modo, con exactamente los mismos números. Para la capa, la frase es un <em>conjunto</em>, no una secuencia. El <a href="laboratorio.html#fragmento-9">paso 6 del laboratorio</a> lo comprueba: al barajar los tokens, la salida es la salida original barajada igual. La solución es <strong>inyectar la posición en los propios vectores</strong>: a cada token se le suma un vector que depende de en qué lugar está.</p>
 
 <h3>Codificación sinusoidal</h3>
 <p>La del artículo original usa senos y cosenos de distintas frecuencias. Para la posición \(pos\) y las dimensiones \(2i\) y \(2i+1\) del vector:</p>
@@ -155,7 +213,7 @@
 <h3>Por qué senos y cosenos</h3>
 <ul>
   <li><strong>No hay nada que aprender</strong> y funciona con cualquier longitud (incluso mayor que las vistas en el entrenamiento).</li>
-  <li><strong>La distancia queda codificada.</strong> Como \(\sin a\,\sin b + \cos a\,\cos b = \cos(a - b)\), el producto escalar de dos posiciones es \(PE(p)\cdot PE(p+k) = \sum_i \cos(\omega_i k)\): depende <em>solo de la distancia \(k\)</em>, no de dónde estén. El fragmento 9 lo comprueba con números (5.543 a distancia 3 en las posiciones 5, 20 y 40) y el experimento de abajo lo dibuja.</li>
+  <li><strong>La distancia queda codificada.</strong> Como \(\sin a\,\sin b + \cos a\,\cos b = \cos(a - b)\), el producto escalar de dos posiciones es \(PE(p)\cdot PE(p+k) = \sum_i \cos(\omega_i k)\): depende <em>solo de la distancia \(k\)</em>, no de dónde estén. El <a href="laboratorio.html#fragmento-9">paso 6 del laboratorio</a> lo comprueba con números (5.543 a distancia 3 en las posiciones 5, 20 y 40) y el experimento de abajo lo dibuja.</li>
   <li>Moverse \(k\) posiciones equivale a <strong>girar</strong> cada manecilla un ángulo fijo, y una rotación es una operación lineal: la red puede aprender a «mirar k posiciones atrás» con una matriz.</li>
 </ul>
 
@@ -166,7 +224,7 @@
 </div>
 
 <h3>Posiciones aprendidas</h3>
-<p>La alternativa, usada por BERT y por GPT-2, es una tabla <code>Embedding(max_posiciones, d_model)</code>: cada posición tiene su vector, que se entrena como cualquier otro peso (es lo que hace el <code>TokenAndPositionEmbedding</code> del fragmento 15 y del Curso 2). Rinde igual de bien en la práctica, pero está limitada a la longitud máxima que reservaste y añade <code>max_posiciones × d_model</code> parámetros (800 en el fragmento 9). Hoy muchos modelos usan variantes que codifican posiciones <em>relativas</em> (RoPE, ALiBi) directamente dentro de la atención; la idea de fondo es la misma.</p>
+<p>La alternativa, usada por BERT y por GPT-2, es una tabla <code>Embedding(max_posiciones, d_model)</code>: cada posición tiene su vector, que se entrena como cualquier otro peso (es lo que hace el <code>TokenAndPositionEmbedding</code> del <a href="laboratorio.html#fragmento-15">paso 10 del laboratorio</a> y del Curso 2). Rinde igual de bien en la práctica, pero está limitada a la longitud máxima que reservaste y añade <code>max_posiciones × d_model</code> parámetros (800 en el paso 6 del laboratorio). Hoy muchos modelos usan variantes que codifican posiciones <em>relativas</em> (RoPE, ALiBi) directamente dentro de la atención; la idea de fondo es la misma.</p>
 <div class="callout ojo">
   <span class="lbl">Ojo</span>
   <p>La posición se <strong>suma</strong> al embedding del token (no se concatena): así el tamaño del vector no cambia y la red puede separar «qué» de «dónde» con sus propias matrices. Por eso el vector de posición debe tener exactamente \(d_{model}\) números. Y también hace falta en series temporales: el Transformer no sabe que el valor de la posición 47 es «el último» si no se lo dices.</p>
@@ -174,86 +232,11 @@
   </div>
 </details>
 
-<section>
+<section class="ir-lab">
 <h2 class="sin-num">Código</h2>
-<p class="codigo-intro">El fragmento 9 usa <code>mha</code> y <code>x</code> del fragmento 7 (<a href="leccion-4.html">lección 4</a>).</p>
-<!-- ---------- Fragmento 9 ---------- -->
-<article class="snippet" data-lang="python">
-  <header>
-    <h3>9 · Codificación posicional: la fórmula, su propiedad y el problema del orden</h3>
-    <p class="para-que"><strong>Para qué sirve</strong> Programar la codificación sinusoidal, comprobar que el producto escalar entre dos posiciones solo depende de su distancia y demostrar que sin posición la atención no distingue el orden de los tokens. Usa <code>mha</code> y <code>x</code> del fragmento 7.</p>
-  </header>
-  <pre class="code"><code>def codificacion_posicional(n, d):
-    pos = np.arange(n)[:, None]
-    i = np.arange(d // 2)[None, :]
-    ang = pos / 10000 ** (2 * i / d)
-    pe = np.zeros((n, d))
-    pe[:, 0::2], pe[:, 1::2] = np.sin(ang), np.cos(ang)
-    return pe
-
-pe = codificacion_posicional(50, 16)
-print("PE[0, :6] =", pe[0, :6].round(3))
-print("PE[1, :6] =", pe[1, :6].round(3))
-for a, b in ((5, 8), (20, 23), (40, 43), (5, 15)):
-    print(f"PE[{a}]·PE[{b}] = {pe[a] @ pe[b]:.3f}   (distancia {b - a})")
-
-perm = np.array([3, 0, 5, 1, 4, 2])
-y1 = mha(x, x).numpy()
-y2 = mha(x[:, perm], x[:, perm]).numpy()
-print("sin posición: salida(desordenado) == salida(ordenado)[perm] -&gt;", np.allclose(y2, y1[:, perm], atol=1e-5))
-
-pe6 = codificacion_posicional(6, 32)
-y1 = mha(x + pe6, x + pe6).numpy()
-y2 = mha(x[:, perm] + pe6, x[:, perm] + pe6).numpy()
-print("con posición: salida(desordenado) == salida(ordenado)[perm] -&gt;", np.allclose(y2, y1[:, perm], atol=1e-5))
-
-tabla = layers.Embedding(input_dim=50, output_dim=16)
-tabla.build((None,))
-print("posiciones aprendidas, parámetros:", tabla.count_params(), "= 50 * 16")</code></pre>
-  <details class="linea-a-linea" open>
-    <summary>Línea por línea</summary>
-    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
-    <table class="lineas">
-      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
-      <tbody>
-        <tr data-lines="1"><td><code>def codificacion_posicional(n, d):</code></td><td>Función que devuelve la tabla \(PE\) de <code>n</code> posiciones y <code>d</code> dimensiones.</td></tr>
-        <tr data-lines="2"><td><code>pos = np.arange(n)[:, None]</code></td><td>Las posiciones 0…n-1 como columna (forma <code>(n, 1)</code>).</td></tr>
-        <tr data-lines="3"><td><code>i = np.arange(d // 2)[None, :]</code></td><td>El índice \(i\) de cada pareja, como fila (forma <code>(1, d/2)</code>). <code>//</code> es la división entera.</td></tr>
-        <tr data-lines="4"><td><code>ang = pos / 10000 ** (2 * i / d)</code></td><td>El ángulo \(pos/10000^{2i/d}\) para cada posición y cada pareja. Una columna dividida por una fila da una matriz <code>(n, d/2)</code> (el «broadcasting» de NumPy).</td></tr>
-        <tr data-lines="5"><td><code>pe = np.zeros((n, d))</code></td><td>Tabla vacía (de ceros) donde escribir.</td></tr>
-        <tr data-lines="6"><td><code>pe[:, 0::2], pe[:, 1::2] = np.sin(ang), np.cos(ang)</code></td><td>Escribe el seno en las columnas pares (<code>0::2</code> = 0, 2, 4…) y el coseno en las impares (<code>1::2</code>).</td></tr>
-        <tr data-lines="7"><td><code>return pe</code></td><td>Devuelve la tabla.</td></tr>
-        <tr data-lines="9"><td><code>pe = codificacion_posicional(50, 16)</code></td><td>50 posiciones, vectores de 16 números.</td></tr>
-        <tr data-lines="10-11"><td><code>print("PE[0, :6] =", ...); print("PE[1, :6] =", ...)</code></td><td>Los 6 primeros números de las posiciones 0 y 1: la posición 0 es siempre (0, 1, 0, 1, …) y la 1 ya es distinta.</td></tr>
-        <tr data-lines="12-13"><td><code>for a, b in (...): print(f"PE[{a}]·PE[{b}] = ...")</code></td><td>Para cuatro parejas de posiciones, calcula el producto escalar <code>pe[a] @ pe[b]</code> y la distancia entre ellas.</td></tr>
-        <tr data-lines="15"><td><code>perm = np.array([3, 0, 5, 1, 4, 2])</code></td><td>Una permutación: el nuevo orden de los 6 tokens.</td></tr>
-        <tr data-lines="16"><td><code>y1 = mha(x, x).numpy()</code></td><td>Salida de la atención con los tokens en su orden original (sin ninguna información de posición).</td></tr>
-        <tr data-lines="17"><td><code>y2 = mha(x[:, perm], x[:, perm]).numpy()</code></td><td>Salida al barajar los tokens de entrada con <code>perm</code> (<code>x[:, perm]</code> reordena la dimensión de los tokens).</td></tr>
-        <tr data-lines="18"><td><code>print("sin posición: ...", np.allclose(y2, y1[:, perm], atol=1e-5))</code></td><td>¿Es <code>y2</code> la salida original reordenada igual? Si sí, la capa es «ciega» al orden.</td></tr>
-        <tr data-lines="20"><td><code>pe6 = codificacion_posicional(6, 32)</code></td><td>La tabla de posiciones para 6 tokens y 32 dimensiones (el tamaño de nuestros vectores).</td></tr>
-        <tr data-lines="21"><td><code>y1 = mha(x + pe6, x + pe6).numpy()</code></td><td>Atención con la posición sumada, en orden original.</td></tr>
-        <tr data-lines="22"><td><code>y2 = mha(x[:, perm] + pe6, x[:, perm] + pe6).numpy()</code></td><td>Primero se baraja y <em>después</em> se suma la posición: los tokens reordenados reciben la posición del lugar donde han caído.</td></tr>
-        <tr data-lines="23"><td><code>print("con posición: ...", np.allclose(...))</code></td><td>Misma comprobación que antes.</td></tr>
-        <tr data-lines="25"><td><code>tabla = layers.Embedding(input_dim=50, output_dim=16)</code></td><td>La alternativa aprendida: una tabla de 50 posiciones con 16 números cada una.</td></tr>
-        <tr data-lines="26"><td><code>tabla.build((None,))</code></td><td>Crea sus pesos sin darle datos (<code>None</code> = tamaño de lote cualquiera).</td></tr>
-        <tr data-lines="27"><td><code>print("posiciones aprendidas, parámetros:", ...)</code></td><td>Cuenta sus parámetros: 50 × 16.</td></tr>
-      </tbody>
-    </table>
-  </details>
-  <div class="salida">
-    <strong>Salida esperada</strong>
-    <pre>PE[0, :6] = [0. 1. 0. 1. 0. 1.]
-PE[1, :6] = [0.841 0.54  0.311 0.95  0.1   0.995]
-PE[5]·PE[8] = 5.543   (distancia 3)
-PE[20]·PE[23] = 5.543   (distancia 3)
-PE[40]·PE[43] = 5.543   (distancia 3)
-PE[5]·PE[15] = 3.646   (distancia 10)
-sin posición: salida(desordenado) == salida(ordenado)[perm] -&gt; True
-con posición: salida(desordenado) == salida(ordenado)[perm] -&gt; False
-posiciones aprendidas, parámetros: 800 = 50 * 16</pre>
-    <p>Los productos escalares a distancia 3 valen <strong>5,543</strong> en las posiciones 5, 20 y 40 (siempre lo mismo), y a distancia 10 valen 3,646: la similitud depende solo de la distancia. Sin posición, desordenar los tokens solo desordena la salida igual (<code>True</code>): la capa no sabe qué orden tenían. Con posición sumada, al cambiar el orden la salida ya no es la original reordenada (<code>False</code>): ahora el orden importa. La tabla aprendida cuesta 800 parámetros.</p>
-  </div>
-</article>
+<a class="lab-card" href="laboratorio.html#paso-6"><span class="lc-ico" aria-hidden="true">🧪</span>
+  <span><strong>Ver el código de esta lección en el Laboratorio</strong>
+  <span>Paso 6 · Codificación posicional: la fórmula, el parecido que solo depende de la distancia y la prueba de que sin posición se pierde el orden.</span></span></a>
 </section>
 
 </div>

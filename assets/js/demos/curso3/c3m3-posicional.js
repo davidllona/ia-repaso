@@ -24,10 +24,10 @@ Lab.register("curso3/c3m3-posicional", function (root, api) {
         var cx = cw * (i + 0.5), cy = h / 2 - 4, a = cfg[0] * om(i);
         if (!cfg[2]) { D.circle(ctx, cx, cy, r, C.surface, C.ink2, 1.3); for (var t = 0; t < 12; t++) { var tt = t * Math.PI / 6; D.line(ctx, cx + Math.sin(tt) * r * 0.86, cy - Math.cos(tt) * r * 0.86, cx + Math.sin(tt) * r, cy - Math.cos(tt) * r, C.line, 1); } }
         D.arrow(ctx, cx, cy, cx + Math.sin(a) * r * (cfg[2] ? 0.7 : 0.92), cy - Math.cos(a) * r * (cfg[2] ? 0.7 : 0.92), cfg[1], cfg[2] ? 2 : 2.4);
-        if (!cfg[2]) D.text(ctx, "ω=" + (om(i) >= 0.01 ? n(om(i), 2) : om(i).toExponential(0).replace("e-", "e−")), cx, cy + r + 14, { size: 10, align: "center", color: C.muted, mono: true });
+        if (!cfg[2]) D.text(ctx, "ω=" + (om(i) >= 0.01 ? n(om(i), 2) : om(i).toExponential(0).replace("e-", "e−")), cx, cy + r + 14, { size: 11, align: "center", color: C.muted, mono: true });
       }
     });
-    D.text(ctx, "pareja i = 0 (rápida) → pareja " + (m - 1) + " (lenta)", w / 2, 11, { size: 10.5, align: "center", color: C.ink2 });
+    D.text(ctx, "pareja i = 0 (rápida) → pareja " + (m - 1) + " (lenta)", w / 2, 11, { size: 11, align: "center", color: C.ink2 });
   });
   view2.draw(function (ctx, w, h, C) {
     plot.axes(ctx); var k, m = S.d / 2;

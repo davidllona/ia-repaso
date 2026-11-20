@@ -85,7 +85,7 @@ Lab.register("curso3/c3m3-atencion-manual", function (root, api) {
   });
   view2.draw(function (ctx, w, h, C) {
     var L = 74, T = 22, cw = Math.min((w - L - 6) / N, 74), ch = Math.min((h - T - 4) / N, 44), i, j;
-    for (j = 0; j < N; j++) D.text(ctx, TOK[j], L + cw * (j + 0.5), T - 7, { size: 10.5, align: "center", weight: 600 });
+    for (j = 0; j < N; j++) D.text(ctx, TOK[j], L + cw * (j + 0.5), T - 7, { size: 11, align: "center", weight: 600 });
     for (i = 0; i < N; i++) {
       D.text(ctx, TOK[i], L - 8, T + ch * (i + 0.5) + 4, { size: 11, align: "right", weight: i === S.q ? 700 : 500, color: i === S.q ? C.terracotaInk : C.ink });
       for (j = 0; j < N; j++) {

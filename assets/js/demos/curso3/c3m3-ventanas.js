@@ -22,7 +22,7 @@ Lab.register("curso3/c3m3-ventanas", function (root, api) {
   var sh = ui.slider({ label: "Horizonte (cuántos pasos adelante)", min: 1, max: 20, step: 1, value: S.h, onInput: function (v) { S.h = v; fix(); } });
   var ss = ui.slider({ label: "Paso entre ventanas (sequence_stride)", min: 1, max: 10, step: 1, value: S.s, onInput: function (v) { S.s = v; fix(); } });
   var sk = ui.slider({ label: "Ventana nº", min: 0, max: 100, step: 1, value: S.k, onInput: function (v) { S.k = v; update(); } });
-  var plot = api.plot(view, { xr: [0, N], yr: [-2, 3.2], xticks: 8, yticks: 4, xlabel: "instante t", pad: { l: 34, r: 8, t: 24, b: 36 }, xfmt: function (v) { return Math.round(v); } });
+  var plot = api.plot(view, { xr: [0, N], yr: [-2, 3.2], xticks: 8, yticks: 4, xlabel: "instante t", pad: { l: 34, r: 16, t: 24, b: 36 }, xfmt: function (v) { return Math.round(v); } });
 
   function totalStarts() { var a = 0; return Math.floor((N - S.w - S.h) / S.s) + 1; }
   function fix() {
@@ -48,7 +48,7 @@ Lab.register("curso3/c3m3-ventanas", function (root, api) {
       D.circle(ctx, plot.x(ty), plot.y(serie[ty]), 6, C.terracota, C.ink, 2);
     }
     ctx.restore();
-    D.text(ctx, "audiencia (inventada)", b.x + 4, b.y + 12, { size: 10, color: C.muted });
+    D.text(ctx, "audiencia (inventada)", b.x + 4, b.y + 12, { size: 11, color: C.muted });
     segs.forEach(function (sg) { D.text(ctx, sg[2], (plot.x(sg[0]) + plot.x(sg[1])) / 2, b.y - 7, { size: 11, align: "center", weight: 600, color: C.ink2 }); });
   }
   function update() {

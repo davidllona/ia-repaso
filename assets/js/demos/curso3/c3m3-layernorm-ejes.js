@@ -18,11 +18,12 @@ Lab.register("curso3/c3m3-layernorm-ejes", function (root, api) {
     var va = v.reduce(function (a, x) { return a + (x - m) * (x - m); }, 0) / v.length;
     return { v: v, m: m, va: va, sd: Math.sqrt(va) };
   }
-  var view = api.view(root, { aspect: 2.1, minH: 200, maxH: 300, drag: false, label: "Tensor de 3 usuarios, 4 títulos vistos por cada uno y 5 números por título; las casillas resaltadas son las que entran en la media y la desviación" });
+  var narrow = (root.clientWidth || window.innerWidth) < 560;
+  var view = api.view(root, { aspect: narrow ? 2.6 : 2.1, minH: narrow ? 120 : 200, maxH: 300, drag: false, label: "Tensor de 3 usuarios, 4 títulos vistos por cada uno y 5 números por título; las casillas resaltadas son las que entran en la media y la desviación" });
   var ui = api.controls(root), out = api.readout(root);
   out.el.style.fontSize = "clamp(.72rem, 2.7vw, .84rem)";
   ui.segmented({ label: "Normalización", value: "ln", options: [["ln", "LayerNorm (por token)"], ["bn", "BatchNorm (por rasgo)"]], onChange: function (v) { S.mode = v; update(); } });
-  function geom(w, h) { var gap = 12, cell = Math.max(14, Math.min(40, Math.floor((w - 2 * gap - 8) / (B * F)), Math.floor((h - 44) / T))); var gw = cell * F; var x0 = (w - (gw * B + gap * (B - 1))) / 2; return { cell: cell, gap: gap, gw: gw, x0: x0, y0: 30 }; }
+  function geom(w, h) { var gap = 12, cell = Math.max(14, Math.min(40, Math.floor((w - 2 * gap - 8) / (B * F)), Math.floor((h - 38) / T))); var gw = cell * F; var x0 = (w - (gw * B + gap * (B - 1))) / 2; return { cell: cell, gap: gap, gw: gw, x0: x0, y0: 30 }; }
   view.draw(function (ctx, w, h, C) {
     var g = geom(w, h), cells = set(), key = {}; cells.forEach(function (q) { key[q.join(",")] = 1; });
     for (b = 0; b < B; b++) {
@@ -31,7 +32,7 @@ Lab.register("curso3/c3m3-layernorm-ejes", function (root, api) {
       for (t = 0; t < T; t++) for (f = 0; f < F; f++) {
         var x = gx + f * g.cell, y = g.y0 + t * g.cell, sel = key[[b, t, f].join(",")], me = (b === S.b && t === S.t && (S.mode === "ln" || f === S.f));
         D.rect(ctx, x, y, g.cell, g.cell, sel ? C.terracotaWash : C.surface, C.line, 1);
-        D.text(ctx, String(X[b][t][f]), x + g.cell / 2, y + g.cell / 2 + 4, { size: g.cell >= 26 ? 12 : 10, mono: true, align: "center", color: sel ? C.terracotaInk : C.ink, weight: sel ? 700 : 400 });
+        D.text(ctx, String(X[b][t][f]), x + g.cell / 2, y + g.cell / 2 + 4, { size: g.cell >= 26 ? 12 : 11, mono: true, align: "center", color: sel ? C.terracotaInk : C.ink, weight: sel ? 700 : 400 });
         if (S.mode === "bn" ? (b === S.b && t === S.t && f === S.f) : (b === S.b && t === S.t && f === S.f)) D.rect(ctx, x + 1, y + 1, g.cell - 2, g.cell - 2, null, C.terracota, 2.5);
       }
       D.rect(ctx, gx, g.y0, g.gw, g.cell * T, null, C.ink, 1.2);

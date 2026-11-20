@@ -20,58 +20,99 @@
     <div>
       <p class="eyebrow">Curso 3 · Módulo 3 · Lección 7 de 8</p>
       <h1>En una serie, cada valor entra por una Dense, y la línea base puede ganar</h1>
-      <p class="lead">Para una serie, el «token» de cada instante es un número. Una Dense lo convierte en vector y el resto del Transformer no cambia. Pero ojo: en nuestra serie, una regresión lineal predice un poco mejor.</p>
-      <p class="meta-line"><span class="read-time" data-render="read-time"></span><a href="../modulo-3.html">Índice del módulo</a></p>
+      <p class="lead">En una serie, la «palabra» de cada día es un número. Una capa Dense lo convierte en vector y el resto del Transformer no cambia. Pero ojo: en nuestra serie, una regresión lineal predice un poco mejor.</p>
+      <p class="meta-line"><span class="read-time" data-render="read-time"></span><a href="../modulo-3.html">Índice del módulo</a> · <a href="#chuleta">Ir a la chuleta</a></p>
     </div>
     <div class="hero-tile" aria-hidden="true"></div>
   </div>
 </header>
 
 <details class="predice">
-  <summary>Para la serie de audiencia del módulo, a 10 pasos vista: ¿quién predice mejor en test, un Transformer de 17.185 parámetros o una regresión lineal sobre la ventana?<span class="hint"></span></summary>
+  <summary>Para la serie de audiencia del módulo, a 10 días vista: ¿quién predice mejor en el examen final, un Transformer de 17.185 parámetros o una regresión lineal sobre la ventana?<span class="hint"></span></summary>
   <div>
-    <p>La <strong>regresión lineal</strong>, por poco: MAE 0,158 frente a 0,172. Una suma de senos con ruido es justo lo que una combinación lineal de los valores pasados predice bien; no hay nada «no lineal» que descubrir.</p>
+    <p>La <strong>regresión lineal</strong>, por poco: error medio 0,158 frente a 0,172. Una suma de ondas con ruido es justo lo que una suma ponderada de los días pasados predice bien.</p>
   </div>
 </details>
 
 <section>
-<h2 id="idea">El mismo tronco, otra entrada y otra cabeza</h2>
-<p>En texto, <code>Embedding</code> busca el vector de un id. Un valor de una serie ya es un número: no hay nada que buscar. Su equivalente es una <code>Dense(d_model)</code>, la misma para todos los instantes. Después todo es igual: posición, bloques y una lectura final.</p>
+<h2 id="idea">1 · Un número no se busca: se proyecta</h2>
+<p>En texto, un <code>Embedding</code> busca en una tabla el vector de cada palabra (lección 5). Un valor de audiencia ya es un número: no hay nada que buscar. En su lugar se usa una <code>Dense(32)</code>, la misma para los 48 días, que convierte cada número en un vector de 32. Después, todo igual:</p>
 <ul class="flow vertical">
-  <li class="a">(lote, 48, 1)<small>48 valores de audiencia</small></li>
+  <li class="a">(lote, 48, 1)<small>48 días de audiencia</small></li>
   <li class="d">Dense(32) + posición<small>(lote, 48, 32)</small></li>
-  <li class="b">TransformerBlock × 2<small>los instantes se miran entre sí</small></li>
+  <li class="b">2 bloques Transformer<small>los días se miran entre sí</small></li>
   <li>GlobalAveragePooling1D<small>(lote, 32): media de los 48</small></li>
   <li class="c">Dense(1)<small>la predicción</small></li>
 </ul>
-<p><strong>Regresión</strong> (cuánta audiencia habrá): <code>Dense(1)</code> <em>sin activación</em>, pérdida <code>"mse"</code> y el MAE como métrica legible. En lugar de la media de los 48 vectores podrías quedarte con el último instante o usar <code>Flatten</code>.</p>
-<p><strong>Clasificación</strong> (qué tipo de curva es: oleada lenta, oleada rápida o pico viral): solo cambian la cabeza, <code>Dense(3, activation="softmax")</code>, y la pérdida, <code>sparse_categorical_crossentropy</code>. Con 2.000 señales ruidosas y un solo bloque, el acierto en test es del <strong>99,5 %</strong>. El pico es un buen caso para la atención: aparece en cualquier lugar y un solo token «enciende» a los demás.</p>
 </section>
 
 <section>
-<h2 id="numeros">Con números: el test de la serie</h2>
-<div class="callout ejemplo">
-  <span class="lbl">Ejemplo numérico</span>
-  <p>MAE en el trozo final de la serie (unidades normalizadas), predicción a 10 pasos:</p>
-  <table>
-    <thead><tr><th>Método</th><th>MAE</th></tr></thead>
-    <tbody>
-      <tr><td>Repetir el último valor</td><td>0,928</td></tr>
-      <tr><td>Transformer (17.185 parámetros)</td><td>0,172</td></tr>
-      <tr><td>Regresión lineal sobre la ventana</td><td class="res">0,158</td></tr>
-      <tr><td>Suelo por el ruido</td><td>≈ 0,14</td></tr>
-    </tbody>
-  </table>
-  <p>El suelo sale del ruido: desviación 0,15 → ≈ 0,12 de error medio en unidades originales; dividido entre la desviación de train (0,861), ≈ 0,14. El Transformer aprendió las dos ondas, pero no hacía falta un modelo grande.</p>
+<h2 id="resumir">2 · Resumir la ventana en un vector</h2>
+<p>Tras los bloques hay 48 vectores, pero queremos <strong>un</strong> número. Primero se resumen en uno:</p>
+<table>
+  <thead><tr><th style="min-width:4.7em;overflow-wrap:normal">Opción</th><th style="min-width:3.3em;overflow-wrap:normal">Qué hace</th></tr></thead>
+  <tbody>
+    <tr><td><code>GlobalAveragePooling1D</code></td><td>Media de los 48 vectores. Sin parámetros.</td></tr>
+    <tr><td>El último día</td><td>Se queda con el vector del día 48.</td></tr>
+    <tr><td><code>Flatten</code></td><td>Los pone todos en fila: 48 × 32 números.</td></tr>
+  </tbody>
+</table>
+</section>
+
+<section>
+<h2 id="regresion">3 · Regresión: predecir un número</h2>
+<p>Predecir una cantidad se llama <strong>regresión</strong>. La salida es una <code>Dense(1)</code> <strong>sin activación</strong>: una neurona que puede dar cualquier número.</p>
+<p>Para aprender, la red baja una <strong>pérdida</strong>: un número que mide cuánto se equivoca. Aquí, el <strong>MSE</strong> (media del error al cuadrado). Para leer el resultado se usa el MAE (error medio sin signo), en las mismas unidades que la serie.</p>
+</section>
+
+<section>
+<h2 id="numeros">4 · Con números: el examen de la serie</h2>
+<div class="anim-pasos" data-titulo="Error medio en test, a 10 días vista (unidades normalizadas)">
+  <div class="paso"><p><strong>1.</strong> Repetir el último valor: en 10 días la onda ha cambiado mucho.</p><span class="grande">0,928</span></div>
+  <div class="paso"><p><strong>2.</strong> El Transformer, tras 20 pasadas por los datos, aprende las dos ondas.</p><span class="grande">0,172</span></div>
+  <div class="paso"><p><strong>3.</strong> Una regresión lineal: cada día pasado multiplicado por un peso, y todo sumado.</p><span class="grande">0,158</span></div>
+  <div class="paso"><p><strong>4.</strong> El suelo: el ruido no se puede predecir. Desviación 0,15 → ≈ 0,12 de error medio; entre 0,861 (la desviación de train), ≈ 0,14.</p><span class="grande">≈ 0,14</span></div>
+  <div class="paso"><p><strong>5.</strong> El Transformer aprendió, pero no hacía falta un modelo grande.</p></div>
+</div>
+</section>
+
+<figure class="demo" data-demo="curso3/c3m3-lineas-base" data-titulo="Dos líneas base sobre el examen de la serie">
+  <div class="haz">Mueve «Ventana de test nº» y compara el punto gris (repetir el último) y el verde (regresión lineal) con el naranja (el valor real). Luego cambia el horizonte.</div>
+  <div class="observa">El gris falla en cuanto la onda sube o baja; el verde casi siempre acierta. Con horizonte 1, repetir el último ya no es tan malo.</div>
+</figure>
+
+<section>
+<h2 id="clasificar">5 · Clasificar curvas: solo cambia el final</h2>
+<p>Si quieres una <strong>categoría</strong> (qué tipo de curva de audiencia es), cambian la última capa y la pérdida: <code>Dense(3, activation="softmax")</code>, que da 3 porcentajes, y la entropía cruzada (<code>sparse_categorical_crossentropy</code>), la pérdida para elegir entre clases numeradas 0, 1, 2.</p>
+<div class="anim-pasos" data-titulo="2.000 curvas ruidosas de 64 días, un solo bloque">
+  <div class="paso"><p><strong>Oleada lenta.</strong> Una onda suave.</p><span class="grande">acierto 0,99</span></div>
+  <div class="paso"><p><strong>Oleada rápida.</strong> Una onda que sube y baja más veces.</p><span class="grande">acierto 0,99</span></div>
+  <div class="paso"><p><strong>Pico viral.</strong> Un solo día enorme, en cualquier sitio. Un día «enciende» a los demás: ideal para la atención.</p><span class="grande">acierto 1,00</span></div>
+  <div class="paso"><p><strong>Total en test.</strong></p><span class="grande">99,5 %</span></div>
 </div>
 </section>
 
 <details class="predice">
-  <summary>Escribes la posición como <code>x + self.pe[: ops.shape(x)[1]]</code>, con <code>self.pe</code> un array de NumPy. ¿Falla al construir el modelo o al llamar a <code>fit</code>?<span class="hint"></span></summary>
+  <summary>La capa de posición corta una tabla de NumPy con el largo de la ventana. Al construir el modelo funciona. ¿Y al entrenar?<span class="hint"></span></summary>
   <div>
-    <p>Al construir funciona (el tamaño es 48), pero <code>fit</code> falla con <code>TypeError: slice indices must be integers…</code>: al trazar el entrenamiento la longitud es desconocida y NumPy no sabe cortar con un tensor. Se arregla con <code>pe = ops.convert_to_tensor(self.pe)</code> antes de cortar.</p>
+    <p>Falla con <code>TypeError: slice indices must be integers…</code>: al entrenar, TensorFlow prepara las cuentas sin saber aún el largo, y NumPy no sabe cortar con eso. Se arregla convirtiendo la tabla antes en tensor (<code>ops.convert_to_tensor</code>).</p>
   </div>
 </details>
+
+<section>
+<h2 id="chuleta">Chuleta para repasar</h2>
+<dl class="chuleta">
+  <div><dt>Dense como embedding</dt><dd>Convierte cada valor en un vector de d números. <em>1 → 32 por día.</em></dd></div>
+  <div><dt><code>GlobalAveragePooling1D</code></dt><dd>Media de todos los pasos. <em>(lote, 48, 32) → (lote, 32).</em></dd></div>
+  <div><dt>Regresión</dt><dd>Predecir una cantidad. <em>Audiencia dentro de 10 días.</em></dd></div>
+  <div><dt>Sin activación</dt><dd>La salida puede ser cualquier número. <em>Dense(1).</em></dd></div>
+  <div><dt>Pérdida</dt><dd>Número que mide el error y que el entrenamiento baja. <em>MSE en regresión.</em></dd></div>
+  <div><dt>MSE y MAE</dt><dd>Media del error al cuadrado, y sin signo. <em>MAE del Transformer: 0,172.</em></dd></div>
+  <div><dt>Regresión lineal</dt><dd>Suma ponderada de los días pasados. <em>0,158: ganó.</em></dd></div>
+  <div><dt>Suelo de ruido</dt><dd>Error que nadie puede bajar. <em>≈ 0,14 normalizado.</em></dd></div>
+  <div><dt>Clasificación</dt><dd>Elegir una categoría: softmax y entropía cruzada. <em>99,5 % con tres tipos de curva.</em></dd></div>
+</dl>
+</section>
 
 <div class="resumen">
   <h2 class="sin-num sin-toc">En tres líneas</h2>
@@ -88,37 +129,37 @@
  "titulo": "¿Lo tienes?",
  "preguntas": [
   {
-   "q": "Pasas de un Transformer que predice el siguiente valor de una serie de audiencia (regresión) a otro que clasifica curvas de audiencia en 3 tipos. ¿Qué cambias en el código?",
+   "q": "Pasas de un Transformer que predice la audiencia (regresión) a otro que clasifica curvas de audiencia en 3 tipos. ¿Qué cambias en el código?",
    "opciones": [
     "Los bloques Transformer y el número de cabezas",
-    "Solo la cabeza final y la pérdida: <code>Dense(1)</code> sin activación con <code>mse</code> pasa a <code>Dense(3, activation='softmax')</code> con entropía cruzada",
+    "Solo la última capa y la pérdida: <code>Dense(1)</code> sin activación con <code>mse</code> pasa a <code>Dense(3, activation='softmax')</code> con entropía cruzada",
     "La codificación posicional, que no sirve para clasificar",
     "El tamaño de d_model, que debe ser igual al número de clases"
    ],
    "correcta": 1,
-   "porque": "El tronco (embedding, posición, bloques, pooling) es el mismo; lo que cambia es qué se pide al final. En regresión la salida es un número sin acotar (una neurona sin activación, MSE); en clasificación son probabilidades que suman 1 (softmax) con entropía cruzada. d_model no tiene relación con el número de clases."
+   "porque": "El tronco (Dense de entrada, posición, bloques, media) es el mismo; cambia lo que se pide al final. En regresión, un número cualquiera (una neurona sin activación, MSE); en clasificación, porcentajes que suman 1 (softmax) con entropía cruzada."
   },
   {
    "q": "¿Qué hace <code>GlobalAveragePooling1D</code> en el modelo de la serie?",
    "opciones": [
-    "Normaliza cada instante",
+    "Normaliza cada día",
     "Hace la media de los 48 vectores y deja uno solo de 32 números por ejemplo",
-    "Elige el instante con más atención",
+    "Elige el día con más atención",
     "Suma la codificación posicional"
    ],
    "correcta": 1,
-   "porque": "Pasa de (lote, 48, 32) a (lote, 32): resume la ventana entera en un vector sin añadir parámetros, para que la <code>Dense(1)</code> final dé una sola predicción."
+   "porque": "Pasa de (lote, 48, 32) a (lote, 32): resume la ventana entera en un vector, sin parámetros, para que la <code>Dense(1)</code> final dé una sola predicción."
   },
   {
-   "q": "Tu Transformer da MAE 0,172 y una regresión lineal sobre la ventana 0,158 en la misma serie. ¿Qué concluyes?",
+   "q": "Tu Transformer da un error medio de 0,172 y una regresión lineal 0,158 en la misma serie. ¿Qué concluyes?",
    "opciones": [
     "Que el Transformer está mal programado",
-    "Que hay que entrenar 1.000 épocas más",
-    "Que para esta serie no hace falta un modelo grande: no hay patrones no lineales que justifiquen el Transformer",
+    "Que hay que entrenar 1.000 pasadas más",
+    "Que para esta serie no hace falta un modelo grande: no hay patrones complicados que lo justifiquen",
     "Que el MAE no sirve para series"
    ],
    "correcta": 2,
-   "porque": "Una suma de senos con ruido es lineal en los valores pasados. Un Transformer brilla con interacciones complejas, muchas variables, dependencias largas y mucho dato; si no supera la línea base, no compensa."
+   "porque": "Una suma de ondas con ruido se predice bien con una suma ponderada de los días pasados. Un Transformer brilla con interacciones complejas, muchas variables, dependencias largas y muchos datos; si no supera la línea base, no compensa."
   }
  ]
 }
@@ -126,7 +167,7 @@
 </section>
 
 <details class="profundizar">
-  <summary><span>Profundizar: la explicación completa<small>La proyección lineal y el esquema de formas, las tres formas de resumir la ventana, el resultado del fragmento 12 frente a las líneas base, el error real de la posición con NumPy, la clasificación de tres tipos de señal y las variantes (varias variables, varios pasos, series largas).</small></span></summary>
+  <summary><span>Profundizar: la explicación completa<small>La proyección lineal y el esquema de formas, las tres formas de resumir la ventana, el resultado del laboratorio frente a las líneas base, el error real de la posición con NumPy, la clasificación de tres tipos de señal y las variantes (varias variables, varios pasos, series largas).</small></span></summary>
   <div class="prof-body">
 <h2 id="series">Un Transformer para series temporales</h2>
 <p class="pregunta">Un Transformer se inventó para palabras. ¿Qué cambia cuando los «tokens» son simples números, como la audiencia de cada día de una plataforma?</p>
@@ -147,7 +188,7 @@
   <li>Quedarse con <strong>el último instante</strong> (<code>x[:, -1]</code>): el que más sabe del final de la ventana, que es lo que de verdad importa al predecir; con una máscara causal es lo más natural.</li>
   <li><code>Flatten</code> + <code>Dense</code>: conserva la posición de cada instante, pero añade \(48\cdot 32\) entradas a la capa final.</li>
 </ul>
-<p>El fragmento 12 entrena el modelo de arriba (17.185 parámetros) durante 20 épocas con la serie del módulo y compara tres cosas en el <em>test</em>, el trozo final de la serie que nunca vio. El resultado es instructivo:</p>
+<p>El <a href="laboratorio.html#fragmento-12">paso 8 del laboratorio</a> entrena el modelo de arriba (17.185 parámetros) durante 20 épocas con la serie del módulo y compara tres cosas en el <em>test</em>, el trozo final de la serie que nunca vio. El resultado es instructivo:</p>
 <ul>
   <li>«Repetir el último valor» da un MAE de <strong>0,928</strong> (en unidades normalizadas): a 10 pasos de distancia, la serie ha cambiado mucho.</li>
   <li>El Transformer baja a <strong>0,172</strong>: ha aprendido las dos ondas.</li>
@@ -159,11 +200,11 @@
 </div>
 <div class="callout ojo">
   <span class="lbl">Ojo: el primer intento falla</span>
-  <p>Si escribes la capa de posición «a la manera de NumPy», <code>return x + self.pe[: ops.shape(x)[1]]</code> con <code>self.pe</code> un array de NumPy, la construcción del modelo funciona (en ese momento el tamaño es 48), pero al llamar a <code>fit</code> falla con <code>TypeError: slice indices must be integers or None or have an __index__ method</code>. El motivo: durante el entrenamiento, TensorFlow traza la función con una longitud de ventana <em>desconocida</em> (<code>None</code>), así que <code>ops.shape(x)[1]</code> es un tensor y NumPy no sabe cortar con un tensor. La solución es convertir la tabla en tensor antes de cortar: <code>pe = ops.convert_to_tensor(self.pe)</code> y <code>x + pe[: ops.shape(x)[1]]</code>, que es lo que hace el fragmento 11.</p>
+  <p>Si escribes la capa de posición «a la manera de NumPy», <code>return x + self.pe[: ops.shape(x)[1]]</code> con <code>self.pe</code> un array de NumPy, la construcción del modelo funciona (en ese momento el tamaño es 48), pero al llamar a <code>fit</code> falla con <code>TypeError: slice indices must be integers or None or have an __index__ method</code>. El motivo: durante el entrenamiento, TensorFlow traza la función con una longitud de ventana <em>desconocida</em> (<code>None</code>), así que <code>ops.shape(x)[1]</code> es un tensor y NumPy no sabe cortar con un tensor. La solución es convertir la tabla en tensor antes de cortar: <code>pe = ops.convert_to_tensor(self.pe)</code> y <code>x + pe[: ops.shape(x)[1]]</code>, que es lo que hace el <a href="laboratorio.html#fragmento-11">paso 7 del laboratorio</a>.</p>
 </div>
 
 <h3>Clasificación: decir de qué tipo es una señal</h3>
-<p>Si en vez de un número queremos una <strong>categoría</strong> (¿qué tipo de curva de audiencia es?), cambia solo el final: <code>Dense(n_clases, activation="softmax")</code> y la pérdida <code>sparse_categorical_crossentropy</code> (las etiquetas son enteros 0, 1, 2). El fragmento 13 fabrica 2.000 señales de 64 puntos de tres tipos —seno lento, seno rápido y un pico en una posición aleatoria; imagina tres formas de curva de audiencia: oleada lenta, oleada rápida y pico viral de un día— todas con ruido de desviación 0,5 (comparable a la amplitud, así que no es trivial). Con un solo bloque Transformer el acierto en test es de <strong>99,5 %</strong>, con los tres tipos en torno al 99–100 %. El pico es un buen ejemplo de por qué sirve la atención: aparece en cualquier posición y un solo token puede «encender» a los demás.</p>
+<p>Si en vez de un número queremos una <strong>categoría</strong> (¿qué tipo de curva de audiencia es?), cambia solo el final: <code>Dense(n_clases, activation="softmax")</code> y la pérdida <code>sparse_categorical_crossentropy</code> (las etiquetas son enteros 0, 1, 2). Un fragmento de <a href="laboratorio.html#fragmento-13">«Más código» del laboratorio</a> fabrica 2.000 señales de 64 puntos de tres tipos —seno lento, seno rápido y un pico en una posición aleatoria; imagina tres formas de curva de audiencia: oleada lenta, oleada rápida y pico viral de un día— todas con ruido de desviación 0,5 (comparable a la amplitud, así que no es trivial). Con un solo bloque Transformer el acierto en test es de <strong>99,5 %</strong>, con los tres tipos en torno al 99–100 %. El pico es un buen ejemplo de por qué sirve la atención: aparece en cualquier posición y un solo token puede «encender» a los demás.</p>
 <div class="callout analogia">
   <span class="lbl">Variantes que conviene conocer</span>
   <p><strong>Varias variables</strong> (audiencia, minutos vistos, nota media): la entrada pasa a ser <code>(lote, pasos, 3)</code> y no cambia nada más. <strong>Predecir varios pasos a la vez</strong>: <code>Dense(h)</code> al final y un objetivo de \(h\) valores. <strong>Series muy largas</strong>: troceas en parches (como los Vision Transformers) para que \(n^2\) no se dispare.</p>
@@ -171,172 +212,11 @@
   </div>
 </details>
 
-<section>
+<section class="ir-lab">
 <h2 class="sin-num">Código</h2>
-<p class="codigo-intro">El fragmento 12 usa <code>VENTANA</code>, <code>ds_train</code>, <code>ds_val</code>, <code>ds_test</code>, <code>trozos</code> y <code>a_dataset</code> del fragmento 2 (<a href="leccion-1.html">lección 1</a>), y los dos usan las capas del fragmento 11 (<a href="leccion-6.html">lección 6</a>).</p>
-<!-- ---------- Fragmento 12 ---------- -->
-<article class="snippet" data-lang="python">
-  <header>
-    <h3>12 · Transformer para predecir una serie temporal (regresión)</h3>
-    <p class="para-que"><strong>Para qué sirve</strong> Construir con la API funcional un modelo <code>Dense → posición → 2 bloques → pooling → Dense(1)</code>, entrenarlo con los lotes de la serie y compararlo con las líneas base «repetir el último valor» y «regresión lineal». Usa <code>VENTANA</code>, <code>ds_train</code>, <code>ds_val</code>, <code>ds_test</code>, <code>trozos</code>, <code>a_dataset</code> (fragmento 2) y las capas del 11.</p>
-  </header>
-  <pre class="code"><code>from sklearn.linear_model import Ridge
-
-keras.utils.set_random_seed(0)
-D_MODEL, CABEZAS, FF = 32, 4, 64
-
-entradas = keras.Input(shape=(VENTANA, 1))
-x = layers.Dense(D_MODEL)(entradas)
-x = PositionalEncoding(VENTANA, D_MODEL)(x)
-for _ in range(2):
-    x = TransformerBlock(D_MODEL, CABEZAS, FF)(x)
-x = layers.GlobalAveragePooling1D()(x)
-salidas = layers.Dense(1)(x)
-modelo = keras.Model(entradas, salidas)
-modelo.compile(optimizer=keras.optimizers.Adam(1e-3), loss="mse", metrics=["mae"])
-print("parámetros:", modelo.count_params())
-
-hist = modelo.fit(ds_train, validation_data=ds_val, epochs=20, verbose=0)
-for e in (0, 4, 9, 19):
-    print(f"época {e + 1:2d}  loss={hist.history['loss'][e]:.3f}  val_mae={hist.history['val_mae'][e]:.3f}")
-
-def juntar(ds):
-    return (np.concatenate([xb.numpy() for xb, _ in ds]), np.concatenate([yb.numpy() for _, yb in ds]))
-
-x_tr, y_tr = juntar(a_dataset(trozos["train"]))
-x_te, y_te = juntar(ds_test)
-lineal = Ridge(alpha=1.0).fit(x_tr[:, :, 0], y_tr)
-
-print("MAE en test (unidades normalizadas):")
-print("  repetir el último valor :", round(float(np.abs(x_te[:, -1, 0] - y_te).mean()), 3))
-print("  regresión lineal (Ridge):", round(float(np.abs(lineal.predict(x_te[:, :, 0]) - y_te).mean()), 3))
-print("  Transformer             :", round(float(np.abs(modelo.predict(x_te, verbose=0)[:, 0] - y_te).mean()), 3))</code></pre>
-  <details class="linea-a-linea" open>
-    <summary>Línea por línea</summary>
-    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
-    <table class="lineas">
-      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
-      <tbody>
-        <tr data-lines="1"><td><code>from sklearn.linear_model import Ridge</code></td><td>Importa la regresión lineal con regularización de Scikit-learn (Curso 1), que usaremos como línea base.</td></tr>
-        <tr data-lines="3"><td><code>keras.utils.set_random_seed(0)</code></td><td>Semillas fijas para que el entrenamiento sea reproducible.</td></tr>
-        <tr data-lines="4"><td><code>D_MODEL, CABEZAS, FF = 32, 4, 64</code></td><td>Hiperparámetros del modelo: tamaño de los vectores, cabezas y ancho de la FFN.</td></tr>
-        <tr data-lines="6"><td><code>entradas = keras.Input(shape=(VENTANA, 1))</code></td><td>La entrada de la API funcional: ventanas de 48 pasos con 1 rasgo (el tamaño de lote se deja sin fijar).</td></tr>
-        <tr data-lines="7"><td><code>x = layers.Dense(D_MODEL)(entradas)</code></td><td>Proyección lineal de cada valor a un vector de 32 números (sustituye al <code>Embedding</code> del texto). Se aplica a cada instante por separado: salida <code>(lote, 48, 32)</code>.</td></tr>
-        <tr data-lines="8"><td><code>x = PositionalEncoding(VENTANA, D_MODEL)(x)</code></td><td>Suma la codificación posicional.</td></tr>
-        <tr data-lines="9-10"><td><code>for _ in range(2): x = TransformerBlock(D_MODEL, CABEZAS, FF)(x)</code></td><td>Apila dos bloques (cada uno con sus propios pesos); la forma no cambia.</td></tr>
-        <tr data-lines="11"><td><code>x = layers.GlobalAveragePooling1D()(x)</code></td><td>Hace la media de los 48 vectores y deja uno solo por ejemplo: <code>(lote, 32)</code>.</td></tr>
-        <tr data-lines="12"><td><code>salidas = layers.Dense(1)(x)</code></td><td>Capa final con una neurona <strong>sin activación</strong>: es regresión, la salida puede ser cualquier número.</td></tr>
-        <tr data-lines="13"><td><code>modelo = keras.Model(entradas, salidas)</code></td><td>Une entrada y salida en un modelo.</td></tr>
-        <tr data-lines="14"><td><code>modelo.compile(optimizer=keras.optimizers.Adam(1e-3), loss="mse", metrics=["mae"])</code></td><td>Optimizador Adam con tasa de aprendizaje 0,001; error cuadrático medio como pérdida y MAE como métrica legible.</td></tr>
-        <tr data-lines="15"><td><code>print("parámetros:", modelo.count_params())</code></td><td>Total de parámetros del modelo.</td></tr>
-        <tr data-lines="17"><td><code>hist = modelo.fit(ds_train, validation_data=ds_val, epochs=20, verbose=0)</code></td><td>Entrena 20 épocas (pasadas completas por los datos) con el dataset de lotes y evalúa cada época en validación. <code>verbose=0</code> no imprime el progreso. Devuelve el historial. (Keras avisa de que <code>shuffle</code> se ignora con un <code>Dataset</code>: ya barajamos las ventanas al crearlo.)</td></tr>
-        <tr data-lines="18-19"><td><code>for e in (0, 4, 9, 19): print(f"época ...")</code></td><td>Imprime la pérdida de entrenamiento y el MAE de validación en las épocas 1, 5, 10 y 20 (los índices empiezan en 0).</td></tr>
-        <tr data-lines="21-22"><td><code>def juntar(ds): return (...)</code></td><td>Función que recorre un dataset de lotes y devuelve dos arrays: todas las entradas y todos los objetivos.</td></tr>
-        <tr data-lines="24"><td><code>x_tr, y_tr = juntar(a_dataset(trozos["train"]))</code></td><td>Las ventanas de entrenamiento como arrays (sin barajar), para ajustar el modelo lineal.</td></tr>
-        <tr data-lines="25"><td><code>x_te, y_te = juntar(ds_test)</code></td><td>Las ventanas de test.</td></tr>
-        <tr data-lines="26"><td><code>lineal = Ridge(alpha=1.0).fit(x_tr[:, :, 0], y_tr)</code></td><td>Ajusta una regresión lineal con las 48 columnas de cada ventana como features (<code>[:, :, 0]</code> quita el eje del rasgo) y el objetivo como target.</td></tr>
-        <tr data-lines="28"><td><code>print("MAE en test (unidades normalizadas):")</code></td><td>Cabecera de la comparación.</td></tr>
-        <tr data-lines="29"><td><code>print("  repetir el último valor :", ...)</code></td><td>MAE de la persistencia en test.</td></tr>
-        <tr data-lines="30"><td><code>print("  regresión lineal (Ridge):", ...)</code></td><td>MAE del modelo lineal (<code>predict</code> da sus predicciones).</td></tr>
-        <tr data-lines="31"><td><code>print("  Transformer             :", ...)</code></td><td>MAE del Transformer: <code>modelo.predict(x_te)</code> devuelve una columna <code>(ejemplos, 1)</code>; <code>[:, 0]</code> la pasa a vector.</td></tr>
-      </tbody>
-    </table>
-  </details>
-  <div class="salida">
-    <strong>Salida esperada</strong>
-    <pre>parámetros: 17185
-época  1  loss=0.579  val_mae=0.455
-época  5  loss=0.062  val_mae=0.162
-época 10  loss=0.050  val_mae=0.177
-época 20  loss=0.042  val_mae=0.172
-MAE en test (unidades normalizadas):
-  repetir el último valor : 0.928
-  regresión lineal (Ridge): 0.158
-  Transformer             : 0.172</pre>
-    <p>El modelo tiene 17.185 parámetros. La pérdida cae de 0,579 a 0,042 y el MAE de validación baja de 0,455 a 0,162 en 5 épocas y luego oscila (0,177 · 0,172): ya no mejora, está en el suelo de ruido. En test: repetir el último valor da 0,928; el Transformer, <strong>0,172</strong>; la regresión lineal, <strong>0,158</strong>. El Transformer aprende lo esencial, pero en una serie hecha de senos y ruido no supera a una línea recta en el espacio de las ventanas. El mínimo teórico por el ruido ronda 0,14.</p>
-  </div>
-</article>
-
-<!-- ---------- Fragmento 13 ---------- -->
-<article class="snippet" data-lang="python">
-  <header>
-    <h3>13 · Transformer para clasificar señales</h3>
-    <p class="para-que"><strong>Para qué sirve</strong> Cambiar solo la cabeza final (<code>softmax</code>) y la pérdida para clasificar series en tres tipos: seno lento, seno rápido y pico en posición aleatoria. Usa las capas del fragmento 11.</p>
-  </header>
-  <pre class="code"><code>def crear_senales(n, largo=64, semilla=0):
-    rng = np.random.default_rng(semilla)
-    t = np.linspace(0, 1, largo)
-    etiquetas = rng.integers(0, 3, n)
-    X = np.zeros((n, largo), dtype="float32")
-    for i, c in enumerate(etiquetas):
-        if c == 0:
-            X[i] = np.sin(2 * np.pi * 2 * t + rng.uniform(0, 6.28))
-        elif c == 1:
-            X[i] = np.sin(2 * np.pi * 5 * t + rng.uniform(0, 6.28))
-        else:
-            X[i] = 1.5 * np.exp(-((t - rng.uniform(0.15, 0.85)) ** 2) / (2 * 0.04 ** 2))
-        X[i] += rng.normal(0, 0.5, largo)
-    return X[..., None], etiquetas
-
-Xs_tr, ys_tr = crear_senales(2000, semilla=1)
-Xs_te, ys_te = crear_senales(600, semilla=2)
-print("señales:", Xs_tr.shape, " clases:", np.bincount(ys_tr))
-
-keras.utils.set_random_seed(0)
-entradas = keras.Input(shape=(64, 1))
-h = layers.Dense(32)(entradas)
-h = PositionalEncoding(64, 32)(h)
-h = TransformerBlock(32, 4, 64)(h)
-h = layers.GlobalAveragePooling1D()(h)
-salidas = layers.Dense(3, activation="softmax")(h)
-clasificador = keras.Model(entradas, salidas)
-clasificador.compile(optimizer=keras.optimizers.Adam(1e-3), loss="sparse_categorical_crossentropy", metrics=["accuracy"])
-clasificador.fit(Xs_tr, ys_tr, epochs=30, batch_size=64, validation_split=0.15, verbose=0)
-
-pred = clasificador.predict(Xs_te, verbose=0).argmax(axis=1)
-print("precisión en test:", round(float((pred == ys_te).mean()), 3))
-for c, nombre in enumerate(["seno lento", "seno rápido", "pico"]):
-    print(f"  {nombre:&lt;12} acierto {(pred[ys_te == c] == c).mean():.2f}")</code></pre>
-  <details class="linea-a-linea" open>
-    <summary>Línea por línea</summary>
-    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
-    <table class="lineas">
-      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
-      <tbody>
-        <tr data-lines="1-3"><td><code>def crear_senales(n, largo=64, semilla=0): rng = ...; t = ...</code></td><td>Función que fabrica <code>n</code> señales de <code>largo</code> puntos. <code>np.linspace(0, 1, largo)</code> es el eje del tiempo de 0 a 1.</td></tr>
-        <tr data-lines="4"><td><code>etiquetas = rng.integers(0, 3, n)</code></td><td>Una clase al azar (0, 1 o 2) para cada señal.</td></tr>
-        <tr data-lines="5"><td><code>X = np.zeros((n, largo), dtype="float32")</code></td><td>Matriz vacía donde guardar las señales.</td></tr>
-        <tr data-lines="6"><td><code>for i, c in enumerate(etiquetas):</code></td><td>Recorre las señales; <code>enumerate</code> da el índice <code>i</code> y la clase <code>c</code>.</td></tr>
-        <tr data-lines="7-8"><td><code>if c == 0: X[i] = np.sin(2 * np.pi * 2 * t + fase)</code></td><td>Clase 0: un seno con 2 ciclos en la ventana y una <strong>fase</strong> (punto de partida) aleatoria.</td></tr>
-        <tr data-lines="9-10"><td><code>elif c == 1: ...</code></td><td>Clase 1: un seno con 5 ciclos.</td></tr>
-        <tr data-lines="11-12"><td><code>else: X[i] = 1.5 * np.exp(-(...))</code></td><td>Clase 2: un pico (una campana de Gauss de altura 1,5 y anchura 0,04) en una posición aleatoria entre 0,15 y 0,85.</td></tr>
-        <tr data-lines="13"><td><code>X[i] += rng.normal(0, 0.5, largo)</code></td><td>Ruido de desviación 0,5 sumado a todas las señales (comparable a su amplitud).</td></tr>
-        <tr data-lines="14"><td><code>return X[..., None], etiquetas</code></td><td>Devuelve las señales con el eje de rasgos añadido y las etiquetas.</td></tr>
-        <tr data-lines="16-17"><td><code>Xs_tr, ys_tr = crear_senales(2000, semilla=1); Xs_te, ... (600, semilla=2)</code></td><td>2.000 señales para entrenar y 600 para probar, con semillas distintas.</td></tr>
-        <tr data-lines="18"><td><code>print("señales:", Xs_tr.shape, " clases:", np.bincount(ys_tr))</code></td><td><code>np.bincount</code> cuenta cuántas señales hay de cada clase (para ver que no hay desequilibrio).</td></tr>
-        <tr data-lines="20"><td><code>keras.utils.set_random_seed(0)</code></td><td>Semilla fija.</td></tr>
-        <tr data-lines="21-24"><td><code>entradas = keras.Input(...); h = Dense(32)(...); h = PositionalEncoding(...)(h); h = TransformerBlock(...)(h)</code></td><td>Igual que en el fragmento 12 pero con ventana de 64 y un solo bloque.</td></tr>
-        <tr data-lines="25"><td><code>h = layers.GlobalAveragePooling1D()(h)</code></td><td>Resume los 64 instantes en un vector de 32 números.</td></tr>
-        <tr data-lines="26"><td><code>salidas = layers.Dense(3, activation="softmax")(h)</code></td><td>Tres neuronas con <strong>softmax</strong>: una probabilidad por clase (suman 1).</td></tr>
-        <tr data-lines="27"><td><code>clasificador = keras.Model(entradas, salidas)</code></td><td>Crea el modelo.</td></tr>
-        <tr data-lines="28"><td><code>clasificador.compile(..., loss="sparse_categorical_crossentropy", metrics=["accuracy"])</code></td><td>Pérdida de entropía cruzada para etiquetas enteras (<em>sparse</em> = 0, 1, 2 en lugar de one-hot) y el acierto como métrica.</td></tr>
-        <tr data-lines="29"><td><code>clasificador.fit(Xs_tr, ys_tr, epochs=30, batch_size=64, validation_split=0.15, verbose=0)</code></td><td>Entrena 30 épocas con lotes de 64 y reserva el último 15 % de los datos para validar. Aquí los datos son independientes entre sí (no es una serie continua), así que no hay problema con barajar.</td></tr>
-        <tr data-lines="31"><td><code>pred = clasificador.predict(Xs_te, verbose=0).argmax(axis=1)</code></td><td><code>predict</code> da 3 probabilidades por señal; <code>argmax(axis=1)</code> elige la clase más probable.</td></tr>
-        <tr data-lines="32"><td><code>print("precisión en test:", ...)</code></td><td>La proporción de aciertos (<code>pred == ys_te</code> da verdadero/falso y <code>.mean()</code> su proporción).</td></tr>
-        <tr data-lines="33-34"><td><code>for c, nombre in enumerate([...]): print(f"  {nombre:<12} acierto ...")</code></td><td>Acierto por clase: de las señales de esa clase, qué proporción se clasificó bien.</td></tr>
-      </tbody>
-    </table>
-  </details>
-  <div class="salida">
-    <strong>Salida esperada</strong>
-    <pre>señales: (2000, 64, 1)  clases: [648 652 700]
-precisión en test: 0.995
-  seno lento   acierto 0.99
-  seno rápido  acierto 0.99
-  pico         acierto 1.00</pre>
-    <p>Las clases están equilibradas (648, 652 y 700). Con un solo bloque Transformer el acierto en test es de <strong>99,5 %</strong> y las tres clases quedan en torno al 99–100 %. Es un ejemplo de juguete (el ruido no es tan grande como para confundirlas), pero muestra que el esqueleto sirve igual para regresión o clasificación: solo cambian la última capa y la pérdida.</p>
-  </div>
-</article>
+<a class="lab-card" href="laboratorio.html#paso-8"><span class="lc-ico" aria-hidden="true">🧪</span>
+  <span><strong>Ver el código de esta lección en el Laboratorio</strong>
+  <span>Paso 8 · Un Transformer que predice la serie, frente a las dos líneas base. El clasificador de curvas está en «Más código».</span></span></a>
 </section>
 
 </div>

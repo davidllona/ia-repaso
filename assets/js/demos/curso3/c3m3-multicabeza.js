@@ -26,7 +26,7 @@ Lab.register("curso3/c3m3-multicabeza", function (root, api) {
   }
   var MAPS = HEADS.map(attn);
   var narrow = (root.clientWidth || window.innerWidth) < 560;
-  var view = api.view(root, { aspect: narrow ? 0.85 : 3.0, minH: narrow ? 400 : 250, maxH: narrow ? 470 : 300, drag: false, label: "Mapas de atención de varias cabezas sobre el subtítulo «la niña pequeña ve una película»" });
+  var view = api.view(root, { aspect: narrow ? 0.85 : 3.0, minH: narrow ? 430 : 250, maxH: narrow ? 480 : 300, drag: false, label: "Mapas de atención de varias cabezas sobre el subtítulo «la niña pequeña ve una película»" });
   var ui = api.controls(root), out = api.readout(root);
   out.el.style.fontSize = "clamp(.7rem, 2.6vw, .82rem)";
   ui.segmented({ label: "Número de cabezas h", value: 4, options: [[1, "1"], [2, "2"], [3, "3"], [4, "4"]], onChange: function (v) { S.h = v; update(); } });
@@ -40,7 +40,7 @@ Lab.register("curso3/c3m3-multicabeza", function (root, api) {
   }
   view.draw(function (ctx, w, h, C) {
     var g = layout(w, h), k, i, j;
-    D.text(ctx, TOK.map(function (t, a) { return (a + 1) + " " + t; }).join(w < 420 ? "  " : "   "), w / 2, 12, { size: w < 420 ? 9.5 : 11, align: "center", color: C.ink2, mono: true });
+    D.text(ctx, TOK.map(function (t, a) { return (a + 1) + " " + t; }).join(w < 420 ? "  " : "   "), w / 2, 12, { size: 11, align: "center", color: C.ink2, mono: true });
     for (k = 0; k < S.h; k++) {
       var cx = g.x0 + (k % g.cols) * (g.mw + g.gap), cy = g.top + 18 + Math.floor(k / g.cols) * (g.mw + 20 + g.gap), A = MAPS[k];
       D.text(ctx, "Cabeza " + (k + 1) + ": " + HEADS[k].name, cx + g.mw / 2, cy - 6, { size: 11, align: "center", weight: 600, color: C.ink });
@@ -48,12 +48,12 @@ Lab.register("curso3/c3m3-multicabeza", function (root, api) {
         var x = cx + j * g.cell, y = cy + i * g.cell, v = A[i][j];
         D.rect(ctx, x, y, g.cell, g.cell, C.surface, C.line, 1);
         ctx.save(); ctx.globalAlpha = Math.min(1, 0.05 + v * 0.95); ctx.fillStyle = C.cobalto; ctx.fillRect(x + 1, y + 1, g.cell - 2, g.cell - 2); ctx.restore();
-        if (g.cell >= 22) D.text(ctx, String(Math.round(v * 100)), x + g.cell / 2, y + g.cell / 2 + 3.5, { size: 9.5, mono: true, align: "center", color: v > 0.5 ? C.paper : C.ink });
+        if (g.cell >= 22) D.text(ctx, String(Math.round(v * 100)), x + g.cell / 2, y + g.cell / 2 + 3.5, { size: 11, mono: true, align: "center", color: v > 0.5 ? C.paper : C.ink });
       }
-      for (i = 0; i < N; i++) { D.text(ctx, String(i + 1), cx - 4, cy + i * g.cell + g.cell / 2 + 4, { size: 9.5, align: "right", color: i === S.q ? C.terracotaInk : C.muted, weight: i === S.q ? 700 : 400 }); D.text(ctx, String(i + 1), cx + i * g.cell + g.cell / 2, cy + N * g.cell + 11, { size: 9.5, align: "center", color: C.muted }); }
+      for (i = 0; i < N; i++) { D.text(ctx, String(i + 1), cx - 4, cy + i * g.cell + g.cell / 2 + 4, { size: 11, align: "right", color: i === S.q ? C.terracotaInk : C.muted, weight: i === S.q ? 700 : 400 }); D.text(ctx, String(i + 1), cx + i * g.cell + g.cell / 2, cy + N * g.cell + 11, { size: 11, align: "center", color: C.muted }); }
       D.rect(ctx, cx, cy + S.q * g.cell, g.mw, g.cell, null, C.terracota, 2.5);
     }
-    D.text(ctx, "casillas = peso en %; fila naranja = el token que consulta", w / 2, h - 5, { size: 10, align: "center", color: C.muted });
+    D.text(ctx, "casillas = peso en %; fila naranja = el token que consulta", w / 2, h - 5, { size: 11, align: "center", color: C.muted });
   });
   view.pointer({ down: function (px, py) {
     var g = layout(view.w, view.h), k, cx, cy;

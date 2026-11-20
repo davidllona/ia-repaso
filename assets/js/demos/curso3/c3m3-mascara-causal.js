@@ -25,12 +25,12 @@ Lab.register("curso3/c3m3-mascara-causal", function (root, api) {
   view.draw(function (ctx, w, h, C) {
     var g = geom(w, h), a, b, bx = g.L + g.c * N + 18, bw = Math.max(40, w - bx - 10), mx = 0.0001;
     for (a = 0; a < N; a++) mx = Math.max(mx, Math.abs(R1.O[a] - R0.O[a]));
-    if (g.c >= 44) D.text(ctx, "claves →", g.L, 11, { size: 10.5, color: C.muted });
+    if (g.c >= 44) D.text(ctx, "claves →", g.L, 11, { size: 11, color: C.muted });
     for (b = 0; b < N; b++) {
       if (g.c >= 44) D.text(ctx, TOK[b], g.L + g.c * (b + 0.5), g.T - 8, { size: 11, align: "center", weight: b === S.t ? 700 : 500, color: b === S.t ? C.terracotaInk : C.ink });
-      else { ctx.save(); ctx.translate(g.L + g.c * (b + 0.5), g.T - 5); ctx.rotate(-Math.PI / 4); D.text(ctx, TOK[b], 0, 0, { size: 10.5, align: "left", weight: b === S.t ? 700 : 500, color: b === S.t ? C.terracotaInk : C.ink }); ctx.restore(); }
+      else { ctx.save(); ctx.translate(g.L + g.c * (b + 0.5), g.T - 5); ctx.rotate(-Math.PI / 4); D.text(ctx, TOK[b], 0, 0, { size: 11, align: "left", weight: b === S.t ? 700 : 500, color: b === S.t ? C.terracotaInk : C.ink }); ctx.restore(); }
     }
-    D.text(ctx, w < 500 ? "cambio" : "cambio de la salida", bx, 11, { size: 10.5, color: C.muted });
+    D.text(ctx, w < 500 ? "cambio" : "cambio de la salida", bx, 11, { size: 11, color: C.muted });
     for (a = 0; a < N; a++) {
       D.text(ctx, TOK[a], g.L - 6, g.T + g.c * (a + 0.5) + 4, { size: 11, align: "right", weight: a === S.t ? 700 : 500, color: a === S.t ? C.terracotaInk : C.ink });
       for (b = 0; b < N; b++) {
@@ -38,11 +38,11 @@ Lab.register("curso3/c3m3-mascara-causal", function (root, api) {
         D.rect(ctx, x, y, g.c, g.c, C.surface, C.line, 1);
         if (S.mask && b > a) { D.line(ctx, x + 5, y + g.c - 5, x + g.c - 5, y + 5, C.line, 1); continue; }
         ctx.save(); ctx.globalAlpha = Math.min(1, 0.06 + v * 0.94); ctx.fillStyle = C.cobalto; ctx.fillRect(x + 1, y + 1, g.c - 2, g.c - 2); ctx.restore();
-        if (g.c >= 30) D.text(ctx, n(v, 2), x + g.c / 2, y + g.c / 2 + 4, { size: g.c >= 44 ? 11 : 9.5, mono: true, align: "center", color: v > 0.5 ? C.paper : C.ink });
+        if (g.c >= 30) D.text(ctx, n(v, 2), x + g.c / 2, y + g.c / 2 + 4, { size: 11, mono: true, align: "center", color: v > 0.5 ? C.paper : C.ink });
       }
       var dv = Math.abs(R1.O[a] - R0.O[a]), len = dv / mx * (bw - 34);
       D.rect(ctx, bx, g.T + g.c * a + g.c * 0.25, Math.max(dv > 1e-9 ? 2 : 0, len), g.c * 0.5, dv > 1e-9 ? C.terracota : C.line);
-      D.text(ctx, dv > 1e-9 ? n(dv, 2) : "0", bx + Math.max(4, len) + 4, g.T + g.c * (a + 0.5) + 4, { size: 10.5, mono: true, color: C.ink2 });
+      D.text(ctx, dv > 1e-9 ? n(dv, 2) : "0", bx + Math.max(4, len) + 4, g.T + g.c * (a + 0.5) + 4, { size: 11, mono: true, color: C.ink2 });
     }
     D.rect(ctx, g.L, g.T, g.c * N, g.c * N, null, C.ink, 1.5);
   });

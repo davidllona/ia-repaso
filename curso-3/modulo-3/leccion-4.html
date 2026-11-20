@@ -20,26 +20,60 @@
     <div>
       <p class="eyebrow">Curso 3 · Módulo 3 · Lección 4 de 8</p>
       <h1>Varias cabezas miran a cosas distintas por el mismo precio</h1>
-      <p class="lead">Una sola atención da un único reparto por token. Con varias cabezas, cada una con sus matrices, el modelo mira a la vez «quién hace la acción», «a qué nombre describe este adjetivo» y «qué va justo antes».</p>
-      <p class="meta-line"><span class="read-time" data-render="read-time"></span><a href="../modulo-3.html">Índice del módulo</a></p>
+      <p class="lead">Una sola atención da un único reparto por palabra. Con varias cabezas, el modelo mira a la vez «quién hace la acción», «a quién describe este adjetivo» y «qué va justo antes».</p>
+      <p class="meta-line"><span class="read-time" data-render="read-time"></span><a href="../modulo-3.html">Índice del módulo</a> · <a href="#chuleta">Ir a la chuleta</a></p>
     </div>
     <div class="hero-tile" aria-hidden="true"></div>
   </div>
 </header>
 
 <details class="predice">
-  <summary>Una capa con \(d_{model} = 32\) pasa de 1 cabeza de tamaño 32 a 4 cabezas de tamaño 8. ¿Sus parámetros se multiplican por 4, se quedan igual o se dividen entre 4?<span class="hint"></span></summary>
+  <summary>Una capa con vectores de 32 números pasa de 1 cabeza de tamaño 32 a 4 cabezas de tamaño 8. ¿Sus parámetros se multiplican por 4, se quedan igual o se dividen entre 4?<span class="hint"></span></summary>
   <div>
-    <p>Se quedan <strong>igual: 4.224</strong>. Las 4 cabezas de 8 se reparten el mismo ancho que 1 de 32, así que las matrices totales tienen el mismo tamaño. Las cabezas salen «gratis».</p>
+    <p>Se quedan <strong>igual: 4.224</strong>. Las 4 cabezas de 8 se reparten el mismo ancho que 1 de 32. Las cabezas salen «gratis».</p>
   </div>
 </details>
 
 <section>
-<h2 id="idea">Repetir, concatenar y mezclar</h2>
-<p>Cada cabeza \(i\) calcula su propia atención con sus matrices \(W_Q^{(i)}, W_K^{(i)}, W_V^{(i)}\), de tamaño \(d_{model} \to d_k\). Se <strong>concatenan</strong> las \(h\) salidas, \((n, h\cdot d_k)\), y una última matriz \(W_O\) las mezcla y devuelve la forma original \((n, d_{model})\).</p>
+<h2 id="una-cabeza">1 · Una cabeza da un solo reparto</h2>
+<p>Piensa en el subtítulo «la niña pequeña ve una película». Cada palabra necesita mirar varias cosas a la vez:</p>
+<table>
+  <thead><tr><th style="min-width:5.4em;overflow-wrap:normal">Palabra</th><th style="min-width:6.0em;overflow-wrap:normal">Pregunta</th><th style="min-width:3.3em;overflow-wrap:normal">Mira a</th></tr></thead>
+  <tbody>
+    <tr><td>pequeña</td><td>¿a quién describo?</td><td>niña</td></tr>
+    <tr><td>ve</td><td>¿quién mira?</td><td>niña</td></tr>
+    <tr><td>ve</td><td>¿qué se ve?</td><td>película</td></tr>
+  </tbody>
+</table>
+<p>Una atención (lección 2) da <strong>un</strong> reparto por palabra. Con una sola, «ve» tendría que elegir entre «niña» y «película».</p>
+</section>
+
+<section>
+<h2 id="idea">2 · Repetir, juntar y mezclar</h2>
+<p>La solución: hacer la atención varias veces a la vez, cada una con sus propias tablas \(W_Q, W_K, W_V\). Cada repetición es una <strong>cabeza</strong>. Luego se <strong>concatenan</strong> (se ponen en fila, una detrás de otra) y una última tabla, \(W_O\), las mezcla.</p>
 <div class="formula">\[ \operatorname{MultiHead}(X) = \operatorname{Concat}(\text{cabeza}_1,\dots,\text{cabeza}_h)\,W_O \]</div>
-<p>Lo habitual es \(d_k = d_{model}/h\): 8 cabezas de 8 cuestan lo mismo que 1 de 64. Es como buscar en Netflix con varios filtros a la vez (género, actor, año): cada filtro mira una cosa distinta de la misma ficha. Nadie programa qué mira cada cabeza: lo descubre el entrenamiento.</p>
-<p>En Keras todo esto es <code>layers.MultiHeadAttention(num_heads=4, key_dim=8)</code>, y en self-attention se llama con la misma entrada dos veces: <code>mha(x, x)</code>. Con <code>return_attention_scores=True</code> devuelve también los pesos, de forma <code>(lote, cabezas, n, n)</code>. Ojo: <code>key_dim</code> es el tamaño <strong>de cada cabeza</strong>, no el total.</p>
+<div class="anim-pasos" data-titulo="6 palabras de 32 números, con 4 cabezas">
+  <div class="paso"><p><strong>1.</strong> Entran 6 palabras de 32 números (\(d_{model} = 32\)).</p><span class="grande">(6, 32)</span></div>
+  <div class="paso"><p><strong>2.</strong> Cada cabeza trabaja con 32 / 4 = 8 números (\(d_k = 8\)) y saca su propia mezcla.</p><span class="grande">4 × (6, 8)</span></div>
+  <div class="paso"><p><strong>3.</strong> Se ponen en fila: 4 × 8 = 32.</p><span class="grande">(6, 32)</span></div>
+  <div class="paso"><p><strong>4.</strong> \(W_O\) mezcla lo que vio cada cabeza y devuelve la forma de la entrada.</p><span class="grande">(6, 32)</span></div>
+</div>
+<div class="callout analogia">
+  <span class="lbl">Analogía</span>
+  <p>Buscar en Netflix con varios filtros a la vez (género, actor, año): cada filtro mira una cosa distinta de la misma ficha. Nadie programa qué mira cada cabeza: lo descubre el entrenamiento.</p>
+</div>
+</section>
+
+<section>
+<h2 id="numeros">3 · Las cabezas salen gratis</h2>
+<p>Un <strong>parámetro</strong> es un número que la red aprende. Cada tabla de pesos lleva además un <strong>sesgo</strong>: un número que se suma por cada salida.</p>
+<div class="anim-pasos" data-titulo="Parámetros con d_model = 32 y 4 cabezas de 8">
+  <div class="paso"><p><strong>1.</strong> Tabla de Q: 32 entradas × 32 salidas (4 cabezas × 8), más 32 sesgos.</p><span class="grande">32 · 32 + 32 = 1.056</span></div>
+  <div class="paso"><p><strong>2.</strong> Igual para K y para V.</p><span class="grande">3 × 1.056 = 3.168</span></div>
+  <div class="paso"><p><strong>3.</strong> La tabla de mezcla \(W_O\).</p><span class="grande">+ 1.056</span></div>
+  <div class="paso"><p><strong>4.</strong> Total: \(4d^2 + 4d\).</p><span class="grande">4.224</span></div>
+  <div class="paso"><p><strong>5.</strong> Con 2 cabezas de 16 o 8 de 4, el mismo ancho total: el mismo número.</p><span class="grande">otra vez 4.224</span></div>
+</div>
 </section>
 
 <figure class="demo" data-demo="curso3/c3m3-multicabeza" data-titulo="Cabezas que miran a cosas distintas">
@@ -48,32 +82,57 @@
 </figure>
 
 <section>
-<h2 id="numeros">Con números: contar parámetros</h2>
-<div class="callout ejemplo">
-  <span class="lbl">Ejemplo numérico</span>
-  <p>\(d_{model} = 32\), \(h = 4\), \(d_k = 8\).</p>
-  <ol class="pasos">
-    <li>Proyección de Q: \(32 \times 32\) pesos (4 cabezas × 8) + 32 sesgos = 1.056. Igual para K y V: \(3 \times 1056 = 3168\).</li>
-    <li>Salida \(W_O\): \(32 \times 32 + 32 = 1056\).</li>
-    <li>Total: \(3168 + 1056 = \mathbf{4224} = 4\cdot 32^2 + 4\cdot 32\).</li>
-    <li>Con 2 cabezas de 16 o 8 de 4: otra vez 4.224.</li>
-  </ol>
+<h2 id="keras">4 · En Keras: una sola capa</h2>
+<p>Keras lo hace todo con la capa <code>MultiHeadAttention</code>. Se crea diciendo cuántas cabezas y de qué tamaño, y se usa pasando la misma entrada dos veces (self-attention):</p>
+<table>
+  <thead><tr><th style="min-width:6.0em;overflow-wrap:normal">Lo que escribes</th><th style="min-width:6.7em;overflow-wrap:normal">Qué significa</th></tr></thead>
+  <tbody>
+    <tr><td><code>num_heads=4</code></td><td>4 cabezas</td></tr>
+    <tr><td><code>key_dim=8</code></td><td>Tamaño de <strong>cada</strong> cabeza</td></tr>
+    <tr><td><code>mha(x, x)</code></td><td>Preguntas y etiquetas salen de x</td></tr>
+    <tr><td><code>return_attention_scores=True</code></td><td>Devuelve también los pesos</td></tr>
+  </tbody>
+</table>
+<p>Los pesos salen con forma (lote, cabezas, n, n). El <strong>lote</strong> es el grupo de ejemplos que se procesan juntos.</p>
+</section>
+
+<section>
+<h2 id="key-dim">5 · El error típico de key_dim</h2>
+<div class="callout ojo">
+  <span class="lbl">Ojo</span>
+  <p>Muchos tutoriales ponen <code>key_dim</code> igual al tamaño total (32). Funciona, pero cada cabeza trabaja con 32 en vez de 8 y la capa pasa de 4.224 a <strong>16.800</strong> parámetros, casi 4 veces más. La regla segura: <code>key_dim = d_model // num_heads</code> (la división entera: 32 // 4 = 8).</p>
 </div>
 </section>
 
 <details class="predice">
-  <summary>Copias de un tutorial <code>MultiHeadAttention(num_heads=4, key_dim=32)</code> con \(d_{model} = 32\). ¿Funciona? ¿Cuántos parámetros tiene?<span class="hint"></span></summary>
+  <summary>Copias de un tutorial <code>MultiHeadAttention(num_heads=4, key_dim=32)</code> con vectores de 32 números. ¿Funciona? ¿Cuántos parámetros tiene?<span class="hint"></span></summary>
   <div>
-    <p>Funciona, pero cada cabeza proyecta a 32 en lugar de a 8: la capa pasa de 4.224 a <strong>16.800</strong> parámetros, casi 4 veces más. La regla segura es <code>key_dim = d_model // num_heads</code>.</p>
+    <p>Funciona, pero cada cabeza trabaja con 32 en lugar de 8: la capa pasa de 4.224 a <strong>16.800</strong> parámetros.</p>
   </div>
 </details>
+
+<section>
+<h2 id="chuleta">Chuleta para repasar</h2>
+<dl class="chuleta">
+  <div><dt>Cabeza</dt><dd>Una atención con sus propias tablas Q, K y V. <em>Una mira el sustantivo; otra, el verbo.</em></dd></div>
+  <div><dt>Concatenar</dt><dd>Poner vectores en fila. <em>4 cabezas de 8 → 32 números.</em></dd></div>
+  <div><dt>WO</dt><dd>La tabla que mezcla las cabezas y devuelve la forma de entrada. <em>(6, 32) → (6, 32).</em></dd></div>
+  <div><dt>d_model y d_k</dt><dd>Números por palabra, y por cabeza. <em>32 y 32 / 4 = 8.</em></dd></div>
+  <div><dt>Parámetro</dt><dd>Un número que la red aprende. <em>Pesos y sesgos.</em></dd></div>
+  <div><dt>Sesgo</dt><dd>Un número que se suma a cada salida de una tabla. <em>32 por proyección.</em></dd></div>
+  <div><dt>Parámetros de la capa</dt><dd>4d² + 4d, con cualquier número de cabezas. <em>d = 32 → 4.224.</em></dd></div>
+  <div><dt>Lote</dt><dd>Grupo de ejemplos que se procesan juntos. <em>Primera medida de cada forma.</em></dd></div>
+  <div><dt><code>MultiHeadAttention</code></dt><dd>La capa de Keras. <em>Se usa así: mha(x, x).</em></dd></div>
+  <div><dt><code>key_dim</code></dt><dd>Tamaño de cada cabeza: d_model // num_heads. <em>Con 32 en vez de 8: 16.800 parámetros.</em></dd></div>
+</dl>
+</section>
 
 <div class="resumen">
   <h2 class="sin-num sin-toc">En tres líneas</h2>
   <ul>
-    <li>\(h\) atenciones en paralelo, cada una con sus matrices; se concatenan y \(W_O\) las mezcla.</li>
+    <li>\(h\) atenciones a la vez, cada una con sus tablas; se concatenan y \(W_O\) las mezcla.</li>
     <li>Parámetros \(4d^2 + 4d\), sin importar cuántas cabezas haya.</li>
-    <li><code>MultiHeadAttention(num_heads, key_dim=d_model // num_heads)</code> y se llama <code>mha(x, x)</code>.</li>
+    <li><code>MultiHeadAttention(num_heads, key_dim=d_model // num_heads)</code>, y se usa como <code>mha(x, x)</code>.</li>
   </ul>
 </div>
 
@@ -83,7 +142,7 @@
  "titulo": "¿Lo tienes?",
  "preguntas": [
   {
-   "q": "Con <code>d_model = 64</code>, 8 cabezas y <code>key_dim = 8</code>, ¿cuántos parámetros tiene <code>MultiHeadAttention</code> (con sesgos)?",
+   "q": "Con vectores de 64 números (<code>d_model = 64</code>), 8 cabezas y <code>key_dim = 8</code>, ¿cuántos parámetros tiene <code>MultiHeadAttention</code>, contando los sesgos?",
    "opciones": [
     "16.640",
     "16.384",
@@ -91,29 +150,29 @@
     "33.280"
    ],
    "correcta": 0,
-   "porque": "Hay cuatro proyecciones (Q, K, V y la de salida), cada una con 64·64 pesos y 64 sesgos: 4·64² + 4·64 = 16.384 + 256 = 16.640. 16.384 es olvidar los sesgos; 4.160 es una sola proyección. Y el número de cabezas no cambia el total mientras key_dim · cabezas = d_model."
+   "porque": "Hay cuatro tablas (Q, K, V y la de salida), cada una con 64·64 pesos y 64 sesgos: 4·64² + 4·64 = 16.384 + 256 = 16.640. 16.384 es olvidar los sesgos; 4.160 es una sola tabla. Y el número de cabezas no cambia el total mientras key_dim · cabezas = d_model."
   },
   {
    "q": "Lees <code>layers.MultiHeadAttention(num_heads=4, key_dim=32)</code> en un modelo con <code>d_model = 32</code>. ¿Qué tiene de raro?",
    "opciones": [
     "Da un error de forma",
-    "Nada: key_dim es el tamaño total de la clave",
+    "Nada: key_dim es el tamaño total",
     "Keras ignora tres de las cuatro cabezas",
     "<code>key_dim</code> es por cabeza: cada una trabajaría con 32 y la capa tendría 16.800 parámetros en vez de 4.224; lo habitual es <code>d_model // num_heads</code> = 8"
    ],
    "correcta": 3,
-   "porque": "En Keras <code>key_dim</code> es el tamaño de Q y K <em>de cada cabeza</em>, no el total. Con 4 cabezas de 32 se proyecta a 128 números y luego se vuelve a 32: funciona, pero con casi cuatro veces más parámetros (16.800 frente a 4.224) y sin que cada cabeza sea «una porción» de d_model."
+   "porque": "En Keras <code>key_dim</code> es el tamaño <em>de cada cabeza</em>. Con 4 cabezas de 32 se trabaja con 128 números y luego se vuelve a 32: funciona, pero con casi cuatro veces más parámetros."
   },
   {
-   "q": "¿Para qué sirve la matriz \\(W_O\\) al final de la atención multi-cabeza?",
+   "q": "¿Para qué sirve la tabla \\(W_O\\) al final de la atención multi-cabeza?",
    "opciones": [
     "Para aplicar la máscara causal",
-    "Para mezclar las salidas concatenadas de las cabezas y devolver la forma \\((n, d_{model})\\)",
+    "Para mezclar las salidas puestas en fila de las cabezas y devolver la forma \\((n, d_{model})\\)",
     "Para dividir entre \\(\\sqrt{d_k}\\)",
     "Para elegir la mejor cabeza y descartar las demás"
    ],
    "correcta": 1,
-   "porque": "Tras concatenar, cada token tiene \\(h \\cdot d_k\\) números que vienen de cabezas distintas. \\(W_O\\) los combina y deja la forma de la entrada, imprescindible para poder sumar la conexión residual del bloque."
+   "porque": "Tras concatenar, cada palabra tiene números que vienen de cabezas distintas. \\(W_O\\) los combina y deja la forma de la entrada, imprescindible para sumar la conexión residual del bloque (lección 6)."
   }
  ]
 }
@@ -142,7 +201,7 @@
 
 <div class="callout ejemplo">
   <span class="lbl">Ejemplo numérico: contar parámetros</span>
-  <p>\(d_{model} = 32\), \(h = 4\), \(d_k = 8\) (es la capa del fragmento 7).</p>
+  <p>\(d_{model} = 32\), \(h = 4\), \(d_k = 8\) (es la capa del <a href="laboratorio.html#fragmento-7">paso 5 del laboratorio</a>).</p>
   <ol class="pasos">
     <li>Una proyección de Q: matriz \(32 \times 32\) (4 cabezas × 8) más 32 sesgos = \(32\cdot 32 + 32 = 1056\). Igual para K y para V: \(3 \times 1056 = 3168\).</li>
     <li>La proyección de salida \(W_O\): \(32 \times 32 + 32 = 1056\).</li>
@@ -175,129 +234,15 @@
   <span class="lbl">Ojo</span>
   <p><code>key_dim</code> es el tamaño <strong>por cabeza</strong>. Muchos tutoriales ponen <code>key_dim=embed_dim</code> y funciona, pero con 4 cabezas y \(d_{model}=32\) la capa pasa de 4.224 a <strong>16.800 parámetros</strong> (casi 4 veces más), porque cada cabeza proyecta a 32 en lugar de a 8. La regla segura es <code>key_dim = d_model // num_heads</code>, y que <code>d_model</code> sea múltiplo de <code>num_heads</code> (si no, la división se redondea y la concatenación ya no devuelve exactamente \(d_{model}\) números).</p>
 </div>
-<p>En el fragmento 8 verás la prueba definitiva de que la capa no tiene magia: se sacan sus pesos, se rehacen las cuentas con NumPy y la salida coincide.</p>
+<p>En <a href="laboratorio.html#fragmento-8">«Más código» del laboratorio</a> verás la prueba definitiva de que la capa no tiene magia: se sacan sus pesos, se rehacen las cuentas con NumPy y la salida coincide.</p>
   </div>
 </details>
 
-<section>
+<section class="ir-lab">
 <h2 class="sin-num">Código</h2>
-<p class="codigo-intro">El fragmento 8 usa <code>mha</code>, <code>x</code> y <code>salida</code> del 7 y la función <code>atencion</code> del fragmento 4 (<a href="leccion-2.html">lección 2</a>).</p>
-<!-- ---------- Fragmento 7 ---------- -->
-<article class="snippet" data-lang="python">
-  <header>
-    <h3>7 · La capa <code>MultiHeadAttention</code> de Keras: formas, pesos y parámetros</h3>
-    <p class="para-que"><strong>Para qué sirve</strong> Usar la capa real: ver qué forma tienen la entrada, la salida y los pesos de atención, contar sus parámetros con la fórmula y comprobar el efecto de <code>use_causal_mask=True</code>.</p>
-  </header>
-  <pre class="code"><code>import keras
-from keras import layers
-
-keras.utils.set_random_seed(0)
-x = np.random.default_rng(0).normal(size=(2, 6, 32)).astype("float32")
-
-mha = layers.MultiHeadAttention(num_heads=4, key_dim=8)
-salida, pesos = mha(x, x, return_attention_scores=True)
-print("entrada :", x.shape, "(lote, tokens, d_model)")
-print("salida  :", salida.shape)
-print("pesos   :", pesos.shape, "(lote, cabezas, tokens, tokens)")
-print("suma de una fila de pesos:", float(pesos[0, 0, 0].numpy().sum()))
-print("parámetros:", mha.count_params(), "= 4*(32*32+32) =", 4 * (32 * 32 + 32))
-print("kernel de query:", mha.query_dense.kernel.shape, " kernel de salida:", mha.output_dense.kernel.shape)
-
-_, pesos_c = mha(x, x, return_attention_scores=True, use_causal_mask=True)
-print("cabeza 0, ejemplo 0, con máscara causal:\n", pesos_c[0, 0].numpy().round(2))</code></pre>
-  <details class="linea-a-linea" open>
-    <summary>Línea por línea</summary>
-    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
-    <table class="lineas">
-      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
-      <tbody>
-        <tr data-lines="1-2"><td><code>import keras; from keras import layers</code></td><td>Importa Keras y su módulo de capas (<code>layers.Dense</code>, <code>layers.MultiHeadAttention</code>…).</td></tr>
-        <tr data-lines="4"><td><code>keras.utils.set_random_seed(0)</code></td><td>Fija a la vez las semillas de Python, NumPy y del backend de Keras: la capa empezará siempre con los mismos pesos.</td></tr>
-        <tr data-lines="5"><td><code>x = np.random.default_rng(0).normal(size=(2, 6, 32)).astype("float32")</code></td><td>Una entrada inventada: 2 ejemplos, 6 tokens por ejemplo, 32 números por token. Es la forma <code>(lote, tokens, d_model)</code>.</td></tr>
-        <tr data-lines="7"><td><code>mha = layers.MultiHeadAttention(num_heads=4, key_dim=8)</code></td><td>Crea la capa con 4 cabezas de tamaño 8 (4 × 8 = 32 = \(d_{model}\)). Todavía no tiene pesos: se crean al llamarla por primera vez.</td></tr>
-        <tr data-lines="8"><td><code>salida, pesos = mha(x, x, return_attention_scores=True)</code></td><td>Llama a la capa como una función con <code>query=x</code> y <code>value=x</code> (self-attention). <code>return_attention_scores=True</code> hace que devuelva además los pesos de atención.</td></tr>
-        <tr data-lines="9-10"><td><code>print("entrada :", ...); print("salida  :", ...)</code></td><td>La salida tiene la misma forma que la entrada.</td></tr>
-        <tr data-lines="11"><td><code>print("pesos   :", pesos.shape, ...)</code></td><td>Los pesos son <code>(lote, cabezas, tokens, tokens)</code>: un mapa 6×6 por cabeza y por ejemplo.</td></tr>
-        <tr data-lines="12"><td><code>print("suma de una fila de pesos:", ...)</code></td><td>Toma la fila 0 de la cabeza 0 del ejemplo 0 y comprueba que suma 1.</td></tr>
-        <tr data-lines="13"><td><code>print("parámetros:", mha.count_params(), ...)</code></td><td><code>count_params()</code> cuenta todos los números entrenables; se compara con la fórmula \(4d^2 + 4d\) del texto.</td></tr>
-        <tr data-lines="14"><td><code>print("kernel de query:", mha.query_dense.kernel.shape, ...)</code></td><td>La capa por dentro: <code>query_dense</code> es la proyección de Q. Su <code>kernel</code> (matriz de pesos) tiene forma <code>(32, 4, 8)</code>: de 32 números a 4 cabezas × 8. La de salida es <code>(4, 8, 32)</code>.</td></tr>
-        <tr data-lines="16"><td><code>_, pesos_c = mha(x, x, return_attention_scores=True, use_causal_mask=True)</code></td><td>La misma llamada, pidiendo la máscara causal. El guion bajo <code>_</code> descarta la salida, que ahora no nos interesa.</td></tr>
-        <tr data-lines="17"><td><code>print("cabeza 0, ejemplo 0, con máscara causal:\n", ...)</code></td><td>Muestra el mapa de atención 6×6 de la cabeza 0.</td></tr>
-      </tbody>
-    </table>
-  </details>
-  <div class="salida">
-    <strong>Salida esperada</strong>
-    <pre>entrada : (2, 6, 32) (lote, tokens, d_model)
-salida  : (2, 6, 32)
-pesos   : (2, 4, 6, 6) (lote, cabezas, tokens, tokens)
-suma de una fila de pesos: 1.0
-parámetros: 4224 = 4*(32*32+32) = 4224
-kernel de query: (32, 4, 8)  kernel de salida: (4, 8, 32)
-cabeza 0, ejemplo 0, con máscara causal:
- [[1.   0.   0.   0.   0.   0.  ]
- [0.7  0.3  0.   0.   0.   0.  ]
- [0.19 0.35 0.47 0.   0.   0.  ]
- [0.32 0.53 0.04 0.12 0.   0.  ]
- [0.05 0.06 0.19 0.34 0.35 0.  ]
- [0.12 0.05 0.05 0.23 0.11 0.44]]</pre>
-    <p>La salida conserva la forma <code>(2, 6, 32)</code>, y los pesos son <code>(2, 4, 6, 6)</code>. Los parámetros son 4.224, justo \(4\cdot(32\cdot 32 + 32)\); y los <em>kernels</em> son <code>(32, 4, 8)</code> y <code>(4, 8, 32)</code>. Con máscara causal el mapa es triangular: la primera fila es <code>[1, 0, 0, …]</code> (solo se mira a sí mismo) y la última tiene pesos en las seis posiciones.</p>
-  </div>
-</article>
-
-<!-- ---------- Fragmento 8 ---------- -->
-<article class="snippet" data-lang="python">
-  <header>
-    <h3>8 · Rehacer <code>MultiHeadAttention</code> a mano con sus propios pesos</h3>
-    <p class="para-que"><strong>Para qué sirve</strong> Demostrar que la capa no hace magia: sacar sus matrices, calcular cabeza por cabeza con la función <code>atencion</code>, concatenar, aplicar \(W_O\) y comprobar que el resultado coincide. Usa <code>mha</code>, <code>x</code> y <code>salida</code> del fragmento 7 y <code>atencion</code> del 4.</p>
-  </header>
-  <pre class="code"><code>Wq, bq = mha.query_dense.kernel.numpy(), mha.query_dense.bias.numpy()
-Wk, bk = mha.key_dense.kernel.numpy(), mha.key_dense.bias.numpy()
-Wv, bv = mha.value_dense.kernel.numpy(), mha.value_dense.bias.numpy()
-Wo, bo = mha.output_dense.kernel.numpy(), mha.output_dense.bias.numpy()
-
-xe = x[0]
-cabezas = []
-for h in range(4):
-    Qh = xe @ Wq[:, h, :] + bq[h]
-    Kh = xe @ Wk[:, h, :] + bk[h]
-    Vh = xe @ Wv[:, h, :] + bv[h]
-    Oh, _ = atencion(Qh, Kh, Vh)
-    cabezas.append(Oh)
-
-concat = np.concatenate(cabezas, axis=-1)
-manual = concat @ Wo.reshape(32, 32) + bo
-print("cada cabeza:", cabezas[0].shape, " concatenadas:", concat.shape)
-print("¿coincide con la capa de Keras?", np.allclose(manual, salida[0].numpy(), atol=1e-5))</code></pre>
-  <details class="linea-a-linea" open>
-    <summary>Línea por línea</summary>
-    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
-    <table class="lineas">
-      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
-      <tbody>
-        <tr data-lines="1-3"><td><code>Wq, bq = mha.query_dense.kernel.numpy(), ...bias.numpy()</code> (y K, V)</td><td>Extrae de cada proyección su matriz de pesos (<code>kernel</code>) y su vector de sesgos (<code>bias</code>) como arrays de NumPy. Q, K y V tienen kernel de forma <code>(32, 4, 8)</code> y sesgo <code>(4, 8)</code>.</td></tr>
-        <tr data-lines="4"><td><code>Wo, bo = mha.output_dense.kernel.numpy(), ...</code></td><td>La proyección de salida \(W_O\), de forma <code>(4, 8, 32)</code>, y su sesgo <code>(32,)</code>.</td></tr>
-        <tr data-lines="6"><td><code>xe = x[0]</code></td><td>Trabajamos con el primer ejemplo: una matriz de 6 tokens × 32.</td></tr>
-        <tr data-lines="7"><td><code>cabezas = []</code></td><td>Aquí se guardarán las 4 salidas.</td></tr>
-        <tr data-lines="8"><td><code>for h in range(4):</code></td><td>Un bucle por cabeza.</td></tr>
-        <tr data-lines="9"><td><code>Qh = xe @ Wq[:, h, :] + bq[h]</code></td><td>\(Q_h = X W_Q^{(h)} + b\): se toma de <code>Wq</code> la porción de la cabeza <code>h</code> (todas las filas, la cabeza h, todas las columnas = matriz 32×8), se multiplica y se suma el sesgo. Resultado 6×8.</td></tr>
-        <tr data-lines="10-11"><td><code>Kh = ...; Vh = ...</code></td><td>Lo mismo para las claves y los valores.</td></tr>
-        <tr data-lines="12"><td><code>Oh, _ = atencion(Qh, Kh, Vh)</code></td><td>La atención de esta cabeza, con nuestra función del fragmento 4 (con \(d_k = 8\), así que divide entre \(\sqrt{8}\)).</td></tr>
-        <tr data-lines="13"><td><code>cabezas.append(Oh)</code></td><td>Guarda la salida (6×8).</td></tr>
-        <tr data-lines="15"><td><code>concat = np.concatenate(cabezas, axis=-1)</code></td><td>Pega las 4 salidas una al lado de otra: 6 × (4·8) = 6 × 32.</td></tr>
-        <tr data-lines="16"><td><code>manual = concat @ Wo.reshape(32, 32) + bo</code></td><td>Aplica \(W_O\): <code>reshape(32, 32)</code> aplana el kernel <code>(4, 8, 32)</code> en una matriz 32×32 (las 4 cabezas apiladas) y se multiplica por la concatenación.</td></tr>
-        <tr data-lines="17"><td><code>print("cada cabeza:", ..., " concatenadas:", ...)</code></td><td>Formas intermedias: <code>(6, 8)</code> por cabeza y <code>(6, 32)</code> juntas.</td></tr>
-        <tr data-lines="18"><td><code>print("¿coincide con la capa de Keras?", np.allclose(...))</code></td><td>Compara nuestro resultado con la salida de la capa para el primer ejemplo, con tolerancia de 0,00001.</td></tr>
-      </tbody>
-    </table>
-  </details>
-  <div class="salida">
-    <strong>Salida esperada</strong>
-    <pre>cada cabeza: (6, 8)  concatenadas: (6, 32)
-¿coincide con la capa de Keras? True</pre>
-    <p>Cada cabeza produce una matriz de 6 tokens × 8 números y al concatenar las cuatro salen 6 × 32. Y la comprobación da <code>True</code>: lo que hace <code>MultiHeadAttention</code> es exactamente esto, una proyección por cabeza, la atención escalada, la concatenación y \(W_O\).</p>
-  </div>
-</article>
+<a class="lab-card" href="laboratorio.html#paso-5"><span class="lc-ico" aria-hidden="true">🧪</span>
+  <span><strong>Ver el código de esta lección en el Laboratorio</strong>
+  <span>Paso 5 · La capa MultiHeadAttention de Keras: formas, pesos y parámetros. Rehacerla a mano con sus propios pesos está en «Más código».</span></span></a>
 </section>
 
 </div>

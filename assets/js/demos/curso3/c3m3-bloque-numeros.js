@@ -66,12 +66,12 @@ Lab.register("curso3/c3m3-bloque-numeros", function (root, api) {
     var M = ST[S.step][1], cell = Math.max(22, Math.min(54, (w - 80) / DM, (h - 30) / N)), x0 = (w - cell * DM) / 2 + 24, y0 = 24, i, j;
     D.text(ctx, S.step + ". " + ST[S.step][0] + "  " + ST[S.step][2].replace(/ tras.*/, ""), w / 2, 14, { size: 11.5, align: "center", weight: 700 });
     for (i = 0; i < N; i++) {
-      D.text(ctx, "peli " + (i + 1), x0 - 6, y0 + i * cell + cell / 2 + 4, { size: 10.5, align: "right", color: C.muted });
+      D.text(ctx, "peli " + (i + 1), x0 - 6, y0 + i * cell + cell / 2 + 4, { size: 11, align: "right", color: C.muted });
       for (j = 0; j < DM; j++) {
         var v = M[i][j], x = x0 + j * cell, y = y0 + i * cell;
         D.rect(ctx, x, y, cell, cell, C.surface, C.line, 1);
         ctx.save(); ctx.globalAlpha = Math.min(0.55, Math.abs(v) / 4); ctx.fillStyle = v >= 0 ? C.cobalto : C.terracota; ctx.fillRect(x + 1, y + 1, cell - 2, cell - 2); ctx.restore();
-        D.text(ctx, n(v, 2), x + cell / 2, y + cell / 2 + 4, { size: cell >= 40 ? 12 : 10.5, mono: true, align: "center" });
+        D.text(ctx, n(v, 2), x + cell / 2, y + cell / 2 + 4, { size: cell >= 40 ? 12 : 11, mono: true, align: "center" });
       }
     }
     D.rect(ctx, x0, y0, cell * DM, cell * N, null, C.ink, 1.3);
@@ -80,15 +80,15 @@ Lab.register("curso3/c3m3-bloque-numeros", function (root, api) {
     var cell = Math.min(34, (h - 44) / N, (w - 80) / (2 * N)), gap = 34, x0 = (w - (2 * N * cell + gap)) / 2, h2, i, j;
     for (h2 = 0; h2 < H; h2++) {
       var cx = x0 + h2 * (N * cell + gap);
-      D.text(ctx, "Cabeza " + (h2 + 1) + (S.pre ? "" : "") + "", cx + N * cell / 2, 12, { size: 10.5, align: "center", weight: 600 });
+      D.text(ctx, "Cabeza " + (h2 + 1) + (S.pre ? "" : "") + "", cx + N * cell / 2, 12, { size: 11, align: "center", weight: 600 });
       for (i = 0; i < N; i++) for (j = 0; j < N; j++) {
         var v = ST.maps[h2][i][j], x = cx + j * cell, y = 20 + i * cell;
         D.rect(ctx, x, y, cell, cell, C.surface, C.line, 1);
         ctx.save(); ctx.globalAlpha = Math.min(1, 0.05 + v * 0.95); ctx.fillStyle = C.cobalto; ctx.fillRect(x + 1, y + 1, cell - 2, cell - 2); ctx.restore();
-        if (cell >= 22) D.text(ctx, String(Math.round(v * 100)), x + cell / 2, y + cell / 2 + 3.5, { size: 9.5, mono: true, align: "center", color: v > 0.5 ? C.paper : C.ink });
+        if (cell >= 22) D.text(ctx, String(Math.round(v * 100)), x + cell / 2, y + cell / 2 + 3.5, { size: 11, mono: true, align: "center", color: v > 0.5 ? C.paper : C.ink });
       }
     }
-    D.text(ctx, "filas = película que consulta · casillas = peso en %", w / 2, h - 6, { size: 10, align: "center", color: C.muted });
+    D.text(ctx, "filas = película que consulta · casillas = peso en %", w / 2, h - 6, { size: 11, align: "center", color: C.muted });
   });
   function update() {
     view.redraw(); view2.redraw();

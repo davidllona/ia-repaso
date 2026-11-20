@@ -1,4 +1,4 @@
-/* Experimento: el mini-GPT del fragmento 15 funcionando en tu navegador. Los pesos (≈19.600 números) se entrenaron en Python/Keras
+/* Experimento: el mini-GPT del paso 10 del laboratorio funcionando en tu navegador. Los pesos (≈19.600 números) se entrenaron en Python/Keras
    con el texto sintético del módulo y se han exportado a este archivo; el recorrido hacia delante (embedding + 2 bloques Transformer causales +
    Dense) está reescrito en JavaScript y reproduce los logits de Keras. Cada clic elige el siguiente token con temperatura y top-k. */
 Lab.register("curso3/c3m3-generacion", function (root, api) {

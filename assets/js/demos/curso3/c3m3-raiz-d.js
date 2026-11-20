@@ -34,11 +34,11 @@ Lab.register("curso3/c3m3-raiz-d", function (root, api) {
     var p = weights(), L = 34, B = 26, T = 12, bw = (w - L - 10) / NK, i, bi = 0;
     for (i = 0; i < NK; i++) if (p[i] > p[bi]) bi = i;
     D.line(ctx, L, h - B, w - 8, h - B, C.ink, 1.2);
-    [0, 0.5, 1].forEach(function (v) { var y = h - B - v * (h - B - T); D.line(ctx, L, y, w - 8, y, C.line, 1); D.text(ctx, n(v, 1), L - 5, y + 4, { size: 10, align: "right", color: C.muted, mono: true }); });
+    [0, 0.5, 1].forEach(function (v) { var y = h - B - v * (h - B - T); D.line(ctx, L, y, w - 8, y, C.line, 1); D.text(ctx, n(v, 1), L - 5, y + 4, { size: 11, align: "right", color: C.muted, mono: true }); });
     for (i = 0; i < NK; i++) {
       var hh = p[i] * (h - B - T), x = L + bw * i + bw * 0.15;
       D.rect(ctx, x, h - B - hh, bw * 0.7, hh, i === bi ? C.terracota : C.cobalto);
-      D.text(ctx, n(p[i], 2), x + bw * 0.35, Math.max(T + 8, h - B - hh - 4), { size: 10.5, align: "center", mono: true, color: C.ink });
+      D.text(ctx, n(p[i], 2), x + bw * 0.35, Math.max(T + 8, h - B - hh - 4), { size: 11, align: "center", mono: true, color: C.ink });
       D.text(ctx, "k" + (i + 1), x + bw * 0.35, h - B + 14, { size: 11, align: "center", color: C.muted });
     }
   });
