@@ -31,7 +31,8 @@ Lab.register("curso3/c3m4-schedule", function (root, api) {
     ctx.restore();
     var lx = pl.x(0.52);
     D.text(ctx, "Lineal", lx, pl.y(0.93), { size: 12, weight: 700, color: C.cobaltoInk }); D.text(ctx, "Coseno", lx, pl.y(0.85), { size: 12, weight: 700, color: C.terracotaInk });
-    D.text(ctx, "trazo grueso = el elegido · puntos = imágenes de abajo", lx, pl.y(0.77), { size: 10, color: C.muted });
+    if (pl.box.w < 420) { D.text(ctx, "grueso = el elegido", lx, pl.y(0.77), { size: 11, color: C.muted }); D.text(ctx, "puntos = fila de abajo", lx, pl.y(0.70), { size: 11, color: C.muted }); }
+    else D.text(ctx, "trazo grueso = el elegido · puntos = imágenes de abajo", lx, pl.y(0.77), { size: 11, color: C.muted });
   }
   function drawStrip(ctx, w, h, C) {
     var cv = curves(), a = cv[S.kind], n = FR.length, g = 8, size = Math.min(h - 18, (w - g * (n + 1)) / n), x0 = (w - (size * n + g * (n - 1))) / 2;
@@ -42,7 +43,7 @@ Lab.register("curso3/c3m4-schedule", function (root, api) {
         var x0v = 2 * DIG[i] / 16 - 1, xt = Math.sqrt(ab) * x0v + Math.sqrt(1 - ab) * EPS[i];
         ctx.save(); ctx.globalAlpha = M.clamp((xt + 1) / 2, 0, 1); ctx.fillStyle = C.ink; ctx.fillRect(xx + (i % 8) * c, y0 + Math.floor(i / 8) * c, c + 0.4, c + 0.4); ctx.restore();
       }
-      D.text(ctx, "t/T=" + String(fr).replace(".", ","), xx + size / 2, y0 + size + 13, { size: 10, mono: true, align: "center", color: C.ink2 });
+      D.text(ctx, (size < 62 && k > 0 ? "" : "t/T=") + String(fr).replace(".", ","), xx + size / 2, y0 + size + 13, { size: 11, mono: true, align: "center", color: C.ink2 });
     });
   }
   function firstBelow(a, th) { for (var i = 0; i < a.length; i++) if (a[i] < th) return i + 1; return null; }

@@ -46,7 +46,7 @@ Lab.register("curso3/c3m4-interpolacion", function (root, api) {
       D.circle(ctx, X(A[0]), Y(A[1]), 7, C.cobalto, C.paper, 2); D.circle(ctx, X(B[0]), Y(B[1]), 7, C.oliva, C.paper, 2);
       D.text(ctx, "A = " + S.a, X(A[0]) + (X(A[0]) > w * 0.5 ? -12 : 12), Y(A[1]) + (Y(A[1]) > h * 0.5 ? -10 : 18), { size: 12, weight: 700, color: C.cobaltoInk, align: X(A[0]) > w * 0.5 ? "right" : "left" });
       D.text(ctx, "B = " + S.b, X(B[0]) + (X(B[0]) > w * 0.5 ? -12 : 12), Y(B[1]) + (Y(B[1]) > h * 0.5 ? -10 : 18), { size: 12, weight: 700, color: C.olivaInk, align: X(B[0]) > w * 0.5 ? "right" : "left" });
-      D.text(ctx, "puntos grises = 300 dígitos codificados", pad.l + 6, pad.t + 14, { size: 10, color: C.muted });
+      D.text(ctx, "puntos grises = 300 dígitos codificados", pad.l + 6, pad.t + 14, { size: 11, color: C.muted });
     }
     function drawStrip(ctx, w, h, C) {
       var g = 4, lab = 14, rowH = (h - 2 * lab - 12) / 2, size = Math.min(rowH, (w - g * (NS + 1)) / NS), x0 = (w - (size * NS + g * (NS - 1))) / 2, k;

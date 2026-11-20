@@ -37,7 +37,7 @@ Lab.register("curso3/c3m4-kl-perdida", function (root, api) {
     ctx.save(); ctx.globalAlpha = 0.55; ctx.beginPath(); ctx.moveTo(gx(XR[0]), base); pts.forEach(function (p) { ctx.lineTo(p[0], p[1]); }); ctx.lineTo(gx(XR[1]), base); ctx.closePath(); ctx.fillStyle = C.terracotaWash; ctx.fill(); ctx.restore();
     D.path(ctx, pts, C.terracota, 2.5);
     D.line(ctx, l, base, l + plotW, base, C.ink, 1.5);
-    for (var t = -4; t <= 4; t += 2) { D.line(ctx, gx(t), base, gx(t), base + 4, C.ink, 1); D.text(ctx, String(t).replace("-", "−"), gx(t), base + 15, { size: 10, mono: true, color: C.muted, align: "center" }); }
+    for (var t = -4; t <= 4; t += 2) { D.line(ctx, gx(t), base, gx(t), base + 4, C.ink, 1); D.text(ctx, String(t).replace("-", "−"), gx(t), base + 15, { size: 11, mono: true, color: C.muted, align: "center" }); }
     // dato x
     D.line(ctx, gx(S.x), base, gx(S.x), y0 + 8, C.oliva, 2.5);
     D.circle(ctx, gx(S.x), y0 + 8, 5, C.oliva, C.paper, 1.5);

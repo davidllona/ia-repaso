@@ -35,7 +35,7 @@ Lab.register("curso3/c3m4-reparametrizacion", function (root, api) {
       D.line(ctx, g.l, yBase, g.l + g.w, yBase, C.ink, 1.5);
       for (var t = -4; t <= 4; t += 2) {
         D.line(ctx, gx(g, t), yBase, gx(g, t), yBase + 4, C.ink, 1);
-        D.text(ctx, String(t).replace("-", "−"), gx(g, t), yBase + 15, { size: 10, mono: true, color: C.muted, align: "center" });
+        D.text(ctx, String(t).replace("-", "−"), gx(g, t), yBase + 15, { size: 11, mono: true, color: C.muted, align: "center" });
       }
       D.text(ctx, lab, g.l + 2, yBase - g.hh - 6, { size: 12, weight: 600, color: col });
     }

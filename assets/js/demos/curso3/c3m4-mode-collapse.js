@@ -69,14 +69,14 @@ Lab.register("curso3/c3m4-mode-collapse", function (root, api) {
       ctx.globalAlpha = 0.75; meas.pts.forEach(function (q) { D.circle(ctx, pl.x(q[0]), pl.y(q[1]), 2.3, C.terracota); });
       ctx.restore();
       D.text(ctx, "paso " + S.step, pl.box.x + 6, pl.box.y + 15, { size: 12, weight: 700, mono: true, color: C.ink });
-      D.text(ctx, "azul = pelis reales · naranja = pelis falsas", pl.box.x + 6, pl.box.y + pl.box.h - 7, { size: 10, color: C.muted });
+      D.text(ctx, pl.box.w < 320 ? "azul = reales · naranja = falsas" : "azul = pelis reales · naranja = pelis falsas", pl.box.x + 6, pl.box.y + pl.box.h - 7, { size: 11, color: C.muted });
     }
     var pl2 = api.plot(view2, { xr: [0, MAXS], yr: [0, K], pad: { l: 30, r: 14, t: 8, b: 36 }, xticks: 3, yticks: 2, xlabel: "pasos de entrenamiento", xfmt: function (v) { return Math.round(v); }, yfmt: function (v) { return Math.round(v); } });
     function draw2(ctx, w, h, C) {
       pl2.axes(ctx); ctx.save(); pl2.clip(ctx);
       var pts = S.hist.map(function (q) { return [pl2.x(q[0]), pl2.y(q[1])]; });
       if (pts.length > 1) D.path(ctx, pts, C.oliva, 2.6); if (pts.length) { var l = pts[pts.length - 1]; D.circle(ctx, l[0], l[1], 4, C.oliva, C.paper, 1.5); }
-      ctx.restore(); D.text(ctx, "géneros (modas) cubiertos, de 8", pl2.box.x + 6, pl2.box.y + 13, { size: 10, weight: 600, color: C.olivaInk });
+      ctx.restore(); D.text(ctx, "géneros (modas) cubiertos, de 8", pl2.box.x + 6, pl2.box.y + 13, { size: 11, weight: 600, color: C.olivaInk });
     }
     function f(v, k) { return v.toFixed(k === undefined ? 2 : k).replace(".", ","); }
     function update() {

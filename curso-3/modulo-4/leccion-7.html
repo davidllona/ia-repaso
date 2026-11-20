@@ -20,69 +20,106 @@
     <div>
       <p class="eyebrow">Curso 3 · Módulo 4 · Lección 7 de 8</p>
       <h1>GAN: un falsificador y un crítico que se entrenan por turnos</h1>
-      <p class="lead">Un falsificador de pósters (el generador) y un crítico que los revisa (el discriminador). Nadie le dice al falsificador cómo es el póster de Matrix: aprende solo para engañar.</p>
-      <p class="meta-line"><span class="read-time" data-render="read-time"></span><a href="../modulo-4.html">Índice del módulo</a></p>
+      <p class="lead">Un falsificador de pósters y un crítico que los revisa. Nadie le dice al falsificador cómo es el póster de Matrix: aprende solo, a base de intentar engañar al crítico.</p>
+      <p class="meta-line"><span class="read-time" data-render="read-time"></span><a href="../modulo-4.html">Índice del módulo</a> · <a href="#chuleta">Ir a la chuleta</a></p>
     </div>
     <div class="hero-tile" aria-hidden="true"></div>
   </div>
 </header>
+
 <details class="predice">
-  <summary>Al principio el crítico pilla todos los pósters falsos: \( D(G(z)) \approx 0{,}01 \). Con la pérdida original \( \log(1 - D(G(z))) \), ¿el falsificador aprende rápido o casi nada?<span class="hint"></span></summary>
+  <summary>Al principio el crítico pilla todos los pósters falsos: les da un 0,01 de «real». Con la pérdida original del juego, ¿el falsificador aprende rápido o casi nada?<span class="hint"></span></summary>
   <div>
-    <p><strong>Casi nada.</strong> El gradiente respecto al logit es \( -p = -0{,}01 \): justo cuando peor lo hace, menos señal recibe. Por eso se usa la pérdida <strong>no saturante</strong> \( -\log D(G(z)) \), cuyo gradiente es \( -(1-p) = -0{,}99 \).</p>
+    <p><strong>Casi nada.</strong> Su gradiente vale −0,01: justo cuando peor lo hace, menos señal recibe. Por eso se usa otra pérdida, la <strong>no saturante</strong>, cuyo gradiente ahí vale −0,99. Lo ves en el paso 4.</p>
   </div>
 </details>
 
 <section>
-<h2 id="idea">Dos redes con objetivos opuestos</h2>
+<h2 id="idea">1 · Un falsificador y un crítico</h2>
+<p>Una <strong>GAN</strong> (red generativa adversaria) son dos redes que compiten:</p>
 <ul class="flow">
-  <li class="d">z ~ N(0, I)<small>ruido</small></li>
-  <li class="b">GENERADOR G<small>fabrica G(z)</small></li>
+  <li class="d">ruido z<small>números al azar</small></li>
+  <li class="b">GENERADOR G<small>fabrica un póster falso</small></li>
   <li class="b">DISCRIMINADOR D<small>¿real o falso?</small></li>
-  <li class="c">D(x) ∈ (0, 1)<small>prob. de «real»</small></li>
+  <li class="c">de 0 a 1<small>probabilidad de «real»</small></li>
 </ul>
-<p>D es un clasificador binario: quiere dar 1 a los pósters reales y 0 a los falsos. G quiere que D diga 1 a sus falsos. Es un juego <strong>minimax</strong> cuyo equilibrio llega cuando G imita tan bien que D acierta la mitad: \( D = 0{,}5 \) en todas partes.</p>
-<p>No hay una sola pérdida, así que se entrena <strong>por turnos</strong>: un paso de D (reales → 1, falsos → 0, solo se tocan los pesos de D) y un paso de G (sus falsos → 1, el gradiente atraviesa D pero solo se tocan los pesos de G). En Keras se sobrescribe <code>train_step</code> con <strong>dos optimizadores y dos <code>GradientTape</code></strong>, con Adam y <code>beta_1=0.5</code>.</p>
-<p>Ojo: las pérdidas de una GAN <strong>no son un termómetro</strong>. Se evalúa mirando muestras o con métricas como FID.</p>
+<p>El <strong>generador</strong> (G) es el falsificador: convierte ruido en pósters. El <strong>discriminador</strong> (D) es el crítico: un clasificador binario, que elige entre dos opciones. Quiere dar 1 a los pósters reales y 0 a los falsos. G quiere que D diga 1 a sus falsos.</p>
+</section>
+
+<section>
+<h2 id="numeros">2 · Con números: el marcador del juego</h2>
+<p>Es un juego <strong>minimax</strong>: hay un marcador que D quiere subir y G quiere bajar.</p>
+<div class="formula">\[ V = \ln D(\text{real}) + \ln\big(1 - D(\text{falso})\big) \]</div>
+<div class="anim-pasos" data-titulo="El marcador según lo bueno que sea el crítico">
+  <div class="paso"><p><strong>1. D bueno.</strong> Da 0,9 al póster de Matrix y 0,2 al falso.</p><span class="grande">ln 0,9 + ln 0,8 = −0,3285</span></div>
+  <div class="paso"><p><strong>2. D indeciso.</strong> G imita tan bien que D da 0,5 a todo. Es el <strong>equilibrio</strong>.</p><span class="grande">2 · ln 0,5 = −1,3863</span></div>
+  <div class="paso"><p><strong>3. Las pérdidas en el equilibrio.</strong> La de D suma dos errores de 0,693; la de G es uno.</p><span class="grande">D 1,386 · G 0,693</span></div>
+  <div class="paso"><p><strong>4. El mejor crítico posible.</strong> Donde hay 3 pósters oficiales por cada falso (0,3 y 0,1), responde:</p><span class="grande">0,3 / (0,3 + 0,1) = 0,75</span></div>
+</div>
+</section>
+
+<section>
+<h2 id="turnos">3 · Se entrenan por turnos</h2>
+<p>No hay una sola pérdida que bajar, así que se entrenan por turnos, una y otra vez:</p>
+<div class="anim-pasos" data-titulo="Un paso de entrenamiento de la GAN">
+  <div class="paso"><p><strong>1.</strong> G fabrica un lote de pósters falsos a partir de ruido.</p><span class="grande">ruido → G → falsos</span></div>
+  <div class="paso"><p><strong>2. Turno de D.</strong> Aprende: reales → 1, falsos → 0. Solo cambian los pesos de D.</p><span class="grande">D mejora</span></div>
+  <div class="paso"><p><strong>3. Turno de G.</strong> Fabrica otro lote y quiere que D diga 1. El gradiente atraviesa D, pero solo cambian los pesos de G.</p><span class="grande">G mejora</span></div>
+  <div class="paso"><p><strong>4. En Keras.</strong> Un <code>train_step</code> propio con dos optimizadores (uno por red) y dos «cintas» (<code>GradientTape</code>, la grabadora de cuentas que calcula gradientes).</p><span class="grande">2 optimizadores · 2 cintas</span></div>
+</div>
 </section>
 
 <figure class="demo" data-demo="curso3/c3m4-duelo-gan" data-titulo="Duelo G contra D sobre una distribución 1D (entrena en tu navegador)">
   <div class="haz">x es la duración de una peli. Pulsa «Entrenar / pausa» con «Una campana» y «Equilibrado». Luego prueba «D abruma a G» y «G demasiado rápido».</div>
-  <div class="observa">En el equilibrado la curva naranja se acerca a la azul y D se aplana hacia 0,5. Con G demasiado rápido, el generador colapsa a casi un solo punto.</div>
-</figure>
-
-<figure class="demo" data-demo="curso3/c3m4-perdidas-gan" data-titulo="Pérdida saturante contra no saturante">
-  <div class="haz">Mueve el logit del crítico o pulsa «El crítico lo huele».</div>
-  <div class="observa">Con p cerca de 0 la línea azul (saturante) es casi plana y la naranja (no saturante) vale casi −1.</div>
+  <div class="observa">En el equilibrado, la curva naranja se acerca a la azul y D se aplana hacia 0,5. Con G demasiado rápido, el generador colapsa a casi un solo punto.</div>
 </figure>
 
 <section>
-<h2 id="numeros">Con números: el marcador del juego</h2>
-<div class="callout ejemplo">
-  <span class="lbl">Ejemplo numérico</span>
-  <p>El marcador es \( V = \ln D(\text{real}) + \ln(1 - D(\text{falso})) \). D quiere subirlo; G, bajarlo.</p>
-  <ol class="pasos">
-    <li>D bueno: 0,9 al póster de Matrix y 0,2 al falso: \( \ln 0{,}9 + \ln 0{,}8 = -0{,}1054 - 0{,}2231 = -0{,}3285 \).</li>
-    <li>D indeciso, 0,5 a todo: \( 2\ln 0{,}5 = \) <strong>−1,3863</strong>, el equilibrio.</li>
-    <li>Allí la pérdida de D es 1,386 y la de G, \( \ln 2 = \) 0,693.</li>
-  </ol>
-  <p>Donde hay 3 pósters oficiales por cada falso (densidades 0,3 y 0,1), el mejor D responde \( 0{,}3/0{,}4 = 0{,}75 \).</p>
-</div>
+<h2 id="no-saturante">4 · La pérdida que no se apaga</h2>
+<p>Con la pérdida original, G recibe muy poca señal cuando D lo pilla. La pérdida <strong>no saturante</strong> cambia la pregunta: en vez de «que D no acierte», «que D diga real». Da el mismo equilibrio y mucha más señal al principio.</p>
+<table>
+  <thead><tr><th>D da al falso</th><th>Gradiente original</th><th>No saturante</th></tr></thead>
+  <tbody>
+    <tr><td>0,01</td><td>−0,010</td><td class="res">−0,990</td></tr>
+    <tr><td>0,50</td><td>−0,500</td><td>−0,500</td></tr>
+    <tr><td>0,90</td><td>−0,900</td><td>−0,100</td></tr>
+  </tbody>
+</table>
 </section>
+
+<figure class="demo" data-demo="curso3/c3m4-perdidas-gan" data-titulo="Pérdida saturante contra no saturante">
+  <div class="haz">Mueve el logit del crítico (su puntuación antes de pasarla a probabilidad) o pulsa «El crítico lo huele».</div>
+  <div class="observa">Con p cerca de 0, la línea azul (saturante) es casi plana y la naranja (no saturante) vale casi −1.</div>
+</figure>
 
 <details class="predice">
   <summary>Entrenas tu GAN y las pérdidas se quedan clavadas en 1,39 (D) y 0,69 (G). ¿El generador es bueno?<span class="hint"></span></summary>
   <div>
-    <p><strong>No lo sabes.</strong> Esos valores salen siempre que D está indeciso, y eso puede pasar con un G excelente o con uno malo. Hay que mirar las muestras y medir aparte (FID, Inception Score o la distancia a datos reales).</p>
+    <p><strong>No lo sabes.</strong> Esos valores salen siempre que D está indeciso, con un G excelente o con uno malo. Las pérdidas de una GAN no son un termómetro: hay que mirar las muestras y medir aparte, por ejemplo con la distancia a datos reales o con el <strong>FID</strong> (una nota que compara imágenes reales y generadas; cuanto más baja, mejor).</p>
   </div>
 </details>
+
+<section>
+<h2 id="chuleta">Chuleta para repasar</h2>
+<dl class="chuleta">
+  <div><dt>GAN</dt><dd>Dos redes que compiten: una falsifica y otra critica. <em>Red generativa adversaria.</em></dd></div>
+  <div><dt>Generador</dt><dd>Convierte ruido en datos falsos. <em>El falsificador de pósters.</em></dd></div>
+  <div><dt>Discriminador</dt><dd>Clasificador que dice «real» o «falso». <em>El crítico.</em></dd></div>
+  <div><dt>Minimax</dt><dd>Juego con un marcador que uno sube y el otro baja. <em>D sube, G baja.</em></dd></div>
+  <div><dt>Equilibrio</dt><dd>D da 0,5 a todo: ya no distingue. <em>Pérdidas 1,386 y 0,693.</em></dd></div>
+  <div><dt>Entrenar por turnos</dt><dd>Un paso de D y un paso de G, cada uno con sus pesos. <em>Dos optimizadores y dos cintas.</em></dd></div>
+  <div><dt><code>GradientTape</code></dt><dd>La «cinta» que graba las cuentas para calcular gradientes. <em>Una por red.</em></dd></div>
+  <div><dt>No saturante</dt><dd>G pide «que D diga real». <em>Gradiente −0,99 donde la original da −0,01.</em></dd></div>
+  <div><dt>FID</dt><dd>Nota que compara imágenes reales y generadas. <em>Más baja, mejor.</em></dd></div>
+</dl>
+</section>
 
 <div class="resumen">
   <h2 class="sin-num sin-toc">En tres líneas</h2>
   <ul>
-    <li>G falsifica desde ruido; D clasifica real o falso. Equilibrio: D = 0,5, pérdidas 1,386 y 0,693.</li>
-    <li>G usa la pérdida no saturante \( -\log D(G(z)) \): gradiente −0,99 donde la original da −0,01.</li>
-    <li>Entrenamiento alterno: dos optimizadores y dos cintas, cada uno solo con los pesos de su red.</li>
+    <li>G falsifica desde ruido; D dice real o falso. En el equilibrio D da 0,5 y las pérdidas valen 1,386 y 0,693.</li>
+    <li>G usa la pérdida no saturante: gradiente −0,99 donde la original da −0,01.</li>
+    <li>Se entrenan por turnos, con dos optimizadores y dos cintas; las pérdidas no dicen si G es bueno.</li>
   </ul>
 </div>
 
@@ -92,7 +129,7 @@
  "titulo": "¿Lo tienes?",
  "preguntas": [
   {
-   "q": "Si el falsificador de pósters (el generador de una GAN) fuese <strong>perfecto</strong> (p<sub>g</sub> = p<sub>data</sub>), ¿qué haría el discriminador óptimo (el crítico) y cuánto valdría la suma de sus dos entropías cruzadas?",
+   "q": "Si el falsificador (el generador) fuese <strong>perfecto</strong>, ¿qué haría el mejor crítico posible y cuánto valdría su pérdida (la suma de sus dos errores)?",
    "opciones": [
     "Diría 1 a todo y la pérdida valdría 0.",
     "Diría 0,5 a todo y la pérdida valdría 0,693.",
@@ -100,29 +137,29 @@
     "Diría 0,5 a todo y la pérdida valdría 2 ln 2 = 1,386."
    ],
    "correcta": 3,
-   "porque": "El discriminador óptimo es D* = p<sub>data</sub>/(p<sub>data</sub> + p<sub>g</sub>); con p<sub>g</sub> = p<sub>data</sub> da 0,5 en todas partes. Cada entropía cruzada vale −ln 0,5 = 0,693 y se suman las dos: 1,386. En el fragmento 15 la GAN se queda cerca (d_loss 1,388 y g_loss 0,696 al final). La respuesta de 0,693 es solo una mitad."
+   "porque": "Si los falsos son indistinguibles, lo mejor que puede hacer D es decir 0,5 a todo. Cada error vale −ln 0,5 = 0,693 y se suman dos: 1,386. En el Laboratorio (paso 9) la GAN acaba cerca: 1,388 y 0,696. El 0,693 es solo una mitad."
   },
   {
-   "q": "Cuando el crítico D tiene muy claro que un póster es falso (D(G(z)) = 0,01), ¿qué gradiente respecto al logit recibe G con la pérdida minimax y con la no saturante?",
+   "q": "El crítico tiene muy claro que un póster es falso (le da 0,01 de «real»). ¿Qué gradiente recibe G con la pérdida original y con la no saturante?",
    "opciones": [
-    "−0,010 con la minimax (casi nada) y −0,990 con la no saturante.",
-    "−0,990 con la minimax y −0,010 con la no saturante.",
+    "−0,010 con la original (casi nada) y −0,990 con la no saturante.",
+    "−0,990 con la original y −0,010 con la no saturante.",
     "−0,500 con las dos.",
-    "0 con la minimax y +0,990 con la no saturante."
+    "0 con la original y +0,990 con la no saturante."
    ],
    "correcta": 0,
-   "porque": "La derivada de ln(1 − p) respecto al logit es −p, y la de −ln p es −(1 − p). Con p = 0,01 salen −0,010 y −0,990 (fragmento 13). Con la minimax el generador casi no aprende justo cuando va peor; con la no saturante recibe la señal más fuerte. Por eso se usa la segunda."
+   "porque": "Con la original, G casi no aprende justo cuando va peor; con la no saturante recibe la señal más fuerte. Por eso se usa la segunda (fragmento 13 del Laboratorio)."
   },
   {
-   "q": "En el paso de G del <code>train_step</code>, ¿qué pesos se actualizan?",
+   "q": "En el turno de G, ¿qué pesos se cambian?",
    "opciones": [
     "Los de G y los de D, porque el gradiente pasa por las dos.",
     "Solo los de D.",
     "Solo los de G, aunque el gradiente atraviese D para llegar a G.",
-    "Ninguno: el paso de G solo mide la pérdida."
+    "Ninguno: el turno de G solo mide el error."
    ],
    "correcta": 2,
-   "porque": "La cinta ve G y D, pero se piden gradientes solo de <code>generador.trainable_weights</code>. En el paso de D pasa lo contrario: los falsos se generan fuera de la cinta y solo se actualiza D."
+   "porque": "La cinta graba G y D, pero solo se piden gradientes de los pesos de G. En el turno de D pasa lo contrario: los falsos se fabrican fuera de la cinta y solo cambia D."
   }
  ]
 }
@@ -161,7 +198,7 @@
 <div class="callout ejemplo">
   <span class="lbl">Ejemplo numérico</span>
   <table>
-    <thead><tr><th>Situación</th><th>Cuentas</th><th>V</th></tr></thead>
+    <thead><tr><th style="white-space:nowrap">Situación</th><th>Cuentas</th><th>V</th></tr></thead>
     <tbody>
       <tr><td>D bastante bueno: da 0,9 al póster oficial de Matrix y 0,2 a un póster falso</td><td>\( \ln 0{,}9 + \ln(1 - 0{,}2) = -0{,}1054 - 0{,}2231 \)</td><td>−0,3285</td></tr>
       <tr><td>D indeciso: da 0,5 a todos los pósters</td><td>\( \ln 0{,}5 + \ln 0{,}5 = -0{,}6931 - 0{,}6931 \)</td><td class="res">−1,3863 = −2 ln 2</td></tr>
@@ -255,185 +292,14 @@
   </div>
 </details>
 
-<section>
+<section class="ir-lab">
 <h2 class="sin-num">Código</h2>
-<!-- ---------- Fragmento 14 ---------- -->
-<article class="snippet" data-lang="python">
-  <header>
-    <h3>14 · Generador y discriminador de una GAN sobre las dos lunas</h3>
-    <p class="para-que"><strong>Para qué sirve</strong> Construir las dos redes de una GAN con <code>Sequential</code> y ver sus formas: G convierte 8 números de ruido en un punto 2D; D convierte un punto 2D en un <em>logit</em> (un número, sin sigmoide).</p>
-  </header>
-  <pre class="code"><code>import numpy as np
-import keras
-from keras import layers, ops
-from sklearn.datasets import make_moons
-
-keras.utils.set_random_seed(0)
-X, _ = make_moons(4000, noise=0.1, random_state=0)
-X = ((X - X.mean(0)) / X.std(0)).astype("float32")
-
-LATENTE = 8
-
-def crear_generador():
-    return keras.Sequential([
-        keras.Input(shape=(LATENTE,)),
-        layers.Dense(64, activation="relu"),
-        layers.Dense(64, activation="relu"),
-        layers.Dense(2),
-    ], name="generador")
-
-def crear_discriminador():
-    return keras.Sequential([
-        keras.Input(shape=(2,)),
-        layers.Dense(64, activation="leaky_relu"),
-        layers.Dense(64, activation="leaky_relu"),
-        layers.Dense(1),                  # logit: sin sigmoide, la aplica la pérdida
-    ], name="discriminador")
-
-G, D = crear_generador(), crear_discriminador()
-print("parámetros G:", G.count_params(), "| parámetros D:", D.count_params())
-
-z = keras.random.normal((5, LATENTE), seed=1)
-falsos = G(z)
-print("ruido z:", z.shape, "-&gt; muestras falsas:", falsos.shape)
-print("D(logit) sobre reales:", np.round(ops.convert_to_numpy(D(X[:3])).ravel(), 2))
-print("D(logit) sobre falsos:", np.round(ops.convert_to_numpy(D(falsos)).ravel(), 2))</code></pre>
-  <details class="linea-a-linea" open>
-    <summary>Línea por línea</summary>
-    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
-    <table class="lineas">
-      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
-      <tbody>
-        <tr data-lines="1-4"><td><code>import numpy as np</code>, <code>keras</code>, <code>layers, ops</code>, <code>make_moons</code></td><td>Las librerías de siempre y el generador de dos lunas.</td></tr>
-        <tr data-lines="6"><td><code>keras.utils.set_random_seed(0)</code></td><td>Semilla global.</td></tr>
-        <tr data-lines="7-8"><td><code>X, _ = make_moons(…)</code> y la normalización</td><td>Los mismos 4 000 puntos y la misma normalización del fragmento 11. Son los datos <em>reales</em>.</td></tr>
-        <tr data-lines="10"><td><code>LATENTE = 8</code></td><td>La dimensión del ruido que recibe G: 8 números al azar por muestra.</td></tr>
-        <tr data-lines="12-18"><td><code>def crear_generador(): return keras.Sequential([...])</code></td><td>G: entrada de 8 números, dos capas ocultas de 64 neuronas con ReLU y una salida lineal de 2 (las coordenadas x e y del punto). Sin activación final porque los datos están normalizados y pueden ser negativos.</td></tr>
-        <tr data-lines="20-26"><td><code>def crear_discriminador(): return keras.Sequential([...])</code></td><td>D: entrada de 2 números, dos capas ocultas de 64 con <code>leaky_relu</code> (como ReLU pero deja pasar una pequeña pendiente en los negativos, para que nunca se «apague» del todo) y una neurona final <strong>sin sigmoide</strong>: el logit. La sigmoide la aplicará la pérdida (<code>from_logits=True</code>), que es más estable numéricamente.</td></tr>
-        <tr data-lines="28-29"><td><code>G, D = crear_generador(), crear_discriminador()</code> y <code>print</code></td><td>Crea las dos redes y cuenta sus parámetros: G 8·64+64 + 64·64+64 + 64·2+2 = 4 866; D 2·64+64 + 64·64+64 + 64+1 = 4 417.</td></tr>
-        <tr data-lines="31-33"><td><code>z = keras.random.normal((5, LATENTE), seed=1)</code>, <code>falsos = G(z)</code></td><td>Cinco vectores de ruido y las cinco muestras falsas que produce G (aún sin entrenar).</td></tr>
-        <tr data-lines="34-35"><td><code>print("D(logit) …", np.round(ops.convert_to_numpy(D(…)).ravel(), 2))</code></td><td>Los logits que da D a tres puntos reales y a los cinco falsos. <code>.ravel()</code> aplana el resultado a una lista y <code>np.round(…, 2)</code> redondea.</td></tr>
-      </tbody>
-    </table>
-  </details>
-  <div class="salida">
-    <strong>Salida esperada</strong>
-    <pre>parámetros G: 4866 | parámetros D: 4417
-ruido z: (5, 8) -&gt; muestras falsas: (5, 2)
-D(logit) sobre reales: [0.23 0.2  0.12]
-D(logit) sobre falsos: [0.02 0.09 0.05 0.04 0.03]</pre>
-    <p>G tiene 4 866 parámetros y D 4 417. El ruido de forma (5, 8) se convierte en cinco puntos de forma (5, 2). Antes de entrenar, D da logits muy cercanos a 0 (entre 0,02 y 0,23) tanto a lo real como a lo falso: aún no distingue nada, equivale a «50 %» (la sigmoide de 0 es 0,5).</p>
-  </div>
-</article>
-
-<!-- ---------- Fragmento 15 ---------- -->
-<article class="snippet" data-lang="python">
-  <header>
-    <h3>15 · Entrenar la GAN: dos optimizadores y dos cintas</h3>
-    <p class="para-que"><strong>Para qué sirve</strong> El entrenamiento alternante completo. Usa <code>G</code>, <code>D</code>, <code>X</code>, <code>LATENTE</code>, <code>keras</code>, <code>ops</code> y <code>np</code> del fragmento 14.</p>
-  </header>
-  <pre class="code"><code>import tensorflow as tf
-
-bce = keras.losses.BinaryCrossentropy(from_logits=True)
-
-
-class GAN(keras.Model):
-    def __init__(self, generador, discriminador, latente, **kwargs):
-        super().__init__(**kwargs)
-        self.generador = generador
-        self.discriminador = discriminador
-        self.latente = latente
-        self.semilla = keras.random.SeedGenerator(3)
-        self.d_tracker = keras.metrics.Mean(name="d_loss")
-        self.g_tracker = keras.metrics.Mean(name="g_loss")
-
-    def compile(self, d_optimizer, g_optimizer):
-        super().compile()
-        self.d_optimizer = d_optimizer
-        self.g_optimizer = g_optimizer
-
-    @property
-    def metrics(self):
-        return [self.d_tracker, self.g_tracker]
-
-    def train_step(self, reales):
-        n = ops.shape(reales)[0]
-
-        # 1) Entrenar D: reales -&gt; 1, falsos -&gt; 0 (G no se toca)
-        z = keras.random.normal((n, self.latente), seed=self.semilla)
-        falsos = self.generador(z)
-        with tf.GradientTape() as tape:
-            d_loss = bce(ops.ones((n, 1)), self.discriminador(reales)) + \
-                     bce(ops.zeros((n, 1)), self.discriminador(falsos))
-        grads = tape.gradient(d_loss, self.discriminador.trainable_weights)
-        self.d_optimizer.apply_gradients(zip(grads, self.discriminador.trainable_weights))
-
-        # 2) Entrenar G: que D diga "real" sobre sus falsos (D no se toca)
-        z = keras.random.normal((n, self.latente), seed=self.semilla)
-        with tf.GradientTape() as tape:
-            g_loss = bce(ops.ones((n, 1)), self.discriminador(self.generador(z)))
-        grads = tape.gradient(g_loss, self.generador.trainable_weights)
-        self.g_optimizer.apply_gradients(zip(grads, self.generador.trainable_weights))
-
-        self.d_tracker.update_state(d_loss)
-        self.g_tracker.update_state(g_loss)
-        return {"d_loss": self.d_tracker.result(), "g_loss": self.g_tracker.result()}
-
-
-gan = GAN(G, D, LATENTE)
-gan.compile(keras.optimizers.Adam(2e-3, beta_1=0.5), keras.optimizers.Adam(2e-3, beta_1=0.5))
-hist = gan.fit(X, epochs=129, batch_size=128, verbose=0)          # 129 epochs x 32 lotes = 4128 pasos
-
-print("epoch |  d_loss | g_loss")
-for e in (0, 19, 59, 128):
-    print(f"{e + 1:5d} | {hist.history['d_loss'][e]:7.3f} | {hist.history['g_loss'][e]:6.3f}")
-
-falsos = ops.convert_to_numpy(G(keras.random.normal((1000, LATENTE), seed=2)))
-d = np.sqrt(((falsos[:, None, :] - X[None, :3000, :]) ** 2).sum(-1)).min(axis=1)
-print("distancia media al dato real más cercano:", round(float(d.mean()), 3), "(la difusión del fragmento 12: 0.026)")</code></pre>
-  <details class="linea-a-linea" open>
-    <summary>Línea por línea</summary>
-    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
-    <table class="lineas">
-      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
-      <tbody>
-        <tr data-lines="1"><td><code>import tensorflow as tf</code></td><td>Para <code>GradientTape</code>.</td></tr>
-        <tr data-lines="3"><td><code>bce = keras.losses.BinaryCrossentropy(from_logits=True)</code></td><td>La entropía cruzada binaria. Con <code>from_logits=True</code> espera logits (sin sigmoide) y aplica la sigmoide internamente.</td></tr>
-        <tr data-lines="6"><td><code>class GAN(keras.Model):</code></td><td>Modelo propio, como el VAE.</td></tr>
-        <tr data-lines="7-11"><td><code>def __init__(self, generador, discriminador, latente, **kwargs)</code></td><td>Guarda las dos redes y el tamaño del ruido.</td></tr>
-        <tr data-lines="12"><td><code>self.semilla = keras.random.SeedGenerator(3)</code></td><td>Generador de semillas para el ruido de cada paso.</td></tr>
-        <tr data-lines="13-14"><td><code>self.d_tracker = …</code> y <code>self.g_tracker = …</code></td><td>Promediadores de las dos pérdidas.</td></tr>
-        <tr data-lines="16-19"><td><code>def compile(self, d_optimizer, g_optimizer):</code></td><td>Se sobrescribe <code>compile</code> para recibir <strong>dos</strong> optimizadores, uno por red. <code>super().compile()</code> sin argumentos deja que Keras haga su configuración interna.</td></tr>
-        <tr data-lines="21-23"><td><code>@property def metrics(self)</code></td><td>Registra los dos promediadores.</td></tr>
-        <tr data-lines="25-26"><td><code>def train_step(self, reales):</code> y <code>n = …</code></td><td>Cada lote son puntos reales; <code>n</code> es su tamaño.</td></tr>
-        <tr data-lines="28-30"><td><code>z = keras.random.normal(…)</code> y <code>falsos = self.generador(z)</code></td><td>Paso 1 (D): se fabrican <code>n</code> falsos. Esta llamada está <strong>fuera</strong> de la cinta, así que ninguna cuenta de G se graba: G no recibirá gradientes en este paso.</td></tr>
-        <tr data-lines="31-33"><td><code>with tf.GradientTape() as tape: d_loss = bce(ones, D(reales)) + bce(zeros, D(falsos))</code></td><td>La pérdida de D: los reales deben salir 1 (<code>ops.ones</code>) y los falsos 0 (<code>ops.zeros</code>); se suman los dos errores. La barra invertida <code>\</code> continúa la línea.</td></tr>
-        <tr data-lines="34-35"><td><code>grads = tape.gradient(d_loss, self.discriminador.trainable_weights)</code> y <code>apply_gradients</code></td><td>Los gradientes se piden <strong>solo</strong> respecto a los pesos de D y solo se actualiza D con su propio optimizador.</td></tr>
-        <tr data-lines="37-38"><td><code>z = keras.random.normal(…)</code></td><td>Paso 2 (G): ruido nuevo.</td></tr>
-        <tr data-lines="39-40"><td><code>with tf.GradientTape() as tape: g_loss = bce(ones, D(G(z)))</code></td><td>La pérdida de G (la no saturante): se evalúa a D con las muestras falsas pero <strong>etiquetadas como reales</strong> (<code>ops.ones</code>). G gana si D se equivoca. Aquí la cinta sí graba G, y el gradiente pasa por D hacia G.</td></tr>
-        <tr data-lines="41-42"><td><code>grads = tape.gradient(g_loss, self.generador.trainable_weights)</code> y <code>apply_gradients</code></td><td>Los gradientes se piden solo respecto a los pesos de G, y solo G se actualiza (D queda congelada porque su optimizador no se llama).</td></tr>
-        <tr data-lines="44-46"><td><code>self.d_tracker.update_state(d_loss)</code>, el de G y <code>return {…}</code></td><td>Apunta las dos pérdidas y las devuelve.</td></tr>
-        <tr data-lines="49-50"><td><code>gan = GAN(G, D, LATENTE)</code> y <code>gan.compile(…Adam(2e-3, beta_1=0.5), …)</code></td><td>Crea la GAN con dos Adam de learning rate 0,002. <code>beta_1=0.5</code> (en vez de 0,9) es la costumbre de DCGAN: da menos inercia al optimizador, y en un juego donde el objetivo se mueve, menos inercia ayuda.</td></tr>
-        <tr data-lines="51"><td><code>hist = gan.fit(X, epochs=129, batch_size=128, verbose=0)</code></td><td>Entrena 129 epochs: 4 000/128 son 32 lotes por epoch (31 completos y uno de 32 puntos), en total 4 128 pasos. El comentario lo resume.</td></tr>
-        <tr data-lines="53-55"><td><code>print("epoch | …")</code> + <code>for e in (0, 19, 59, 128): print(f"…")</code></td><td>Imprime las dos pérdidas en los epochs 1, 20, 60 y 129.</td></tr>
-        <tr data-lines="57"><td><code>falsos = ops.convert_to_numpy(G(keras.random.normal((1000, LATENTE), seed=2)))</code></td><td>Genera 1 000 puntos falsos con la G entrenada.</td></tr>
-        <tr data-lines="58"><td><code>d = np.sqrt(((falsos[:, None, :] - X[None, :3000, :]) ** 2).sum(-1)).min(axis=1)</code></td><td>Distancia de cada punto generado al dato real más cercano de los 3 000 primeros (broadcasting, como en fragmentos anteriores).</td></tr>
-        <tr data-lines="59"><td><code>print("distancia media …", round(float(d.mean()), 3), …)</code></td><td>La media de esas distancias, para compararla con la difusión sobre los mismos datos.</td></tr>
-      </tbody>
-    </table>
-  </details>
-  <div class="salida">
-    <strong>Salida esperada</strong>
-    <pre>epoch |  d_loss | g_loss
-    1 |   1.217 |  0.803
-   20 |   1.372 |  0.706
-   60 |   1.350 |  0.761
-  129 |   1.388 |  0.696
-distancia media al dato real más cercano: 0.023 (la difusión del fragmento 12: 0.026)</pre>
-    <p>Las dos pérdidas se quedan cerca del equilibrio teórico: <code>d_loss</code> ≈ 2 ln 2 = 1,386 (D no distingue: 0,693 por cada mitad) y <code>g_loss</code> ≈ ln 2 = 0,693. Termina en 1,388 y 0,696. Por el camino las pérdidas <em>suben y bajan</em> (1,217/0,803 al principio, 1,372/0,706, 1,350/0,761): eso es la pelea entre las dos redes, no un fallo. La distancia al dato real más cercano es 0,023, la misma que alcanzaba la difusión (0,026) y que tienen los datos reales nuevos (0,024).</p>
-  </div>
-</article>
-
+<a class="lab-card" href="laboratorio.html#paso-8"><span class="lc-ico" aria-hidden="true">🧪</span>
+  <span><strong>Ver el código de esta lección en el Laboratorio</strong>
+  <span>Paso 8 · Montar el generador y el discriminador, y paso 9 · entrenarlos por turnos con dos optimizadores y dos cintas.</span></span></a>
+<a class="lab-card" href="laboratorio.html#fragmento-13"><span class="lc-ico" aria-hidden="true">🧪</span>
+  <span><strong>Y en «Más código»</strong>
+  <span>Fragmento 13 · Los gradientes de la pérdida original frente a la no saturante, calculados con TensorFlow.</span></span></a>
 </section>
 
 </div>

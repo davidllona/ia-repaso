@@ -86,7 +86,7 @@ Lab.register("curso3/c3m4-espacio-latente", function (root, api) {
       ctx.restore();
       var px = pl.x(S.z[0]), py = pl.y(S.z[1]);
       D.circle(ctx, px, py, 8, null, C.paper, 4.5); D.circle(ctx, px, py, 8, null, C.ink, 2.2); D.circle(ctx, px, py, 2.2, C.ink);
-      D.text(ctx, "cada cifra = un título del catálogo · zona rosada = hueco", bx.x + 4, bx.y + bx.h - 6, { size: 10, color: C.muted });
+      D.text(ctx, bx.w < 380 ? "cifra = título · rosa = hueco" : "cada cifra = un título del catálogo · zona rosada = hueco", bx.x + 4, bx.y + bx.h - 6, { size: 11, color: C.muted });
     }
     function drawImgView(ctx, w, h, C) { drawImg(ctx, decode(S.z, S.model), 4, 4, Math.min(w, h) - 8, C); }
     function drawStrip(ctx, w, h, C) {

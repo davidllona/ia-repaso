@@ -85,7 +85,7 @@ Lab.register("curso3/c3m4-duelo-gan", function (root, api) {
       D.path(ctx, pts, C.oliva, 2.6, [7, 4]);
       D.line(ctx, pl.x(-5), pl.y(0.6), pl.x(5), pl.y(0.6), C.muted, 1, [2, 4]);
       ctx.restore();
-      var b = pl.box; D.text(ctx, "D = 1", b.x + b.w + 4, b.y + 4, { size: 10, color: C.olivaInk, mono: true }); D.text(ctx, "0,5", b.x + b.w + 4, pl.y(0.6) + 4, { size: 10, color: C.olivaInk, mono: true }); D.text(ctx, "0", b.x + b.w + 4, b.y + b.h, { size: 10, color: C.olivaInk, mono: true });
+      var b = pl.box; D.text(ctx, "1", b.x + b.w + 4, b.y + 4, { size: 11, color: C.olivaInk, mono: true }); D.text(ctx, "0,5", b.x + b.w + 3, pl.y(0.6) + 4, { size: 11, color: C.olivaInk, mono: true }); D.text(ctx, "0", b.x + b.w + 4, b.y + b.h, { size: 11, color: C.olivaInk, mono: true });
       D.text(ctx, "— pelis reales", b.x + 6, b.y + 14, { size: 11, weight: 700, color: C.cobaltoInk });
       D.text(ctx, "— pelis falsas (G)", b.x + 6, b.y + 28, { size: 11, weight: 700, color: C.terracotaInk });
       D.text(ctx, "- - crítico D(x) (derecha)", b.x + 6, b.y + 42, { size: 11, weight: 700, color: C.olivaInk });
@@ -97,7 +97,7 @@ Lab.register("curso3/c3m4-duelo-gan", function (root, api) {
       D.line(ctx, pl2.x(0), pl2.y(1.386), pl2.x(MAXS), pl2.y(1.386), C.cobalto, 1, [3, 4]); D.line(ctx, pl2.x(0), pl2.y(0.693), pl2.x(MAXS), pl2.y(0.693), C.terracota, 1, [3, 4]);
       [[1, C.cobalto], [2, C.terracota]].forEach(function (cc) { var pts = S.hist.map(function (q) { return [pl2.x(q[0]), pl2.y(Math.min(2.4, q[cc[0]]))]; }); if (pts.length > 1) D.path(ctx, pts, cc[1], 1.8); });
       ctx.restore();
-      D.text(ctx, "D (azul) · G (naranja) · equilibrio: 1,386 y 0,693", pl2.box.x + 4, pl2.box.y + 12, { size: 10, color: C.muted });
+      D.text(ctx, pl2.box.w < 340 ? "D azul · G naranja · rayas = equilibrio" : "D (azul) · G (naranja) · equilibrio: 1,386 y 0,693", pl2.box.x + 4, pl2.box.y + 12, { size: 11, color: C.muted });
     }
     function f(v, k) { return v.toFixed(k === undefined ? 2 : k).replace(".", ",").replace("-", "−"); }
     function update() {
