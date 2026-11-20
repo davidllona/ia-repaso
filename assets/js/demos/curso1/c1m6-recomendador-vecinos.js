@@ -46,7 +46,7 @@ Lab.register("curso1/c1m6-recomendador-vecinos", function (root, api) {
     var genreCol = [C.terracota, C.marker, C.oliva, C.cobalto, C.muted];
     for (var g = 0; g < 5; g++) {
       D.rect(ctx, left + g * 3 * cw + 1, 4, 3 * cw - 2, 15, genreCol[g]);
-      D.text(ctx, w < 480 ? GEN[g].slice(0, 3) : GEN[g], left + g * 3 * cw + 1.5 * cw, 15.5, { size: 10, align: "center", weight: 700, color: g === 1 ? C.ink : C.paper });
+      D.text(ctx, w < 480 ? GEN[g].slice(0, 3) : GEN[g], left + g * 3 * cw + 1.5 * cw, 15.5, { size: 11, align: "center", weight: 700, color: g === 1 ? C.ink : C.paper });
     }
     for (q = 0; q < T; q++) D.text(ctx, String(q + 1), left + q * cw + cw / 2, 28, { size: Math.min(11, cw * 0.6), align: "center", weight: 600, color: C.muted, mono: true });
     var rows = [[user, "tú · #" + user]].concat(r.nb.slice(0, 5).map(function (p) { return [p[1], "#" + p[1] + " · " + p[0].toFixed(2)]; }));
@@ -63,7 +63,7 @@ Lab.register("curso1/c1m6-recomendador-vecinos", function (root, api) {
     var y0 = top + 6 * rh + 12, bh = h - y0 - 8, mx = 0;
     for (q = 0; q < T; q++) mx = Math.max(mx, r.score[q]);
     D.text(ctx, "puntuación", 4, y0 + bh * 0.55, { size: 11, weight: 600, color: C.ink2 });
-    D.text(ctx, "(✓ = ya visto)", 4, y0 + bh * 0.55 + 14, { size: 10, color: C.muted });
+    D.text(ctx, "(✓ = ya visto)", 4, y0 + bh * 0.55 + 14, { size: 11, color: C.muted });
     for (q = 0; q < T; q++) {
       var xq = left + q * cw, sc = r.score[q];
       if (sc < 0) { D.text(ctx, "✓", xq + cw / 2, y0 + bh - 4, { size: 11, align: "center", color: C.muted }); continue; }

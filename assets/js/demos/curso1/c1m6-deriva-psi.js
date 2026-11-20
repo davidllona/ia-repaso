@@ -75,7 +75,7 @@ Lab.register("curso1/c1m6-deriva-psi", function (root, api) {
       var cx = P.x(b + 0.5);
       D.rect(ctx, cx - bw, P.y(base[b]), bw, P.y(0) - P.y(base[b]), C.cobalto);
       D.rect(ctx, cx, P.y(ahora[b]), bw, P.y(0) - P.y(ahora[b]), C.terracota);
-      D.text(ctx, ETQ[b], cx, P.y(0) + 14, { size: 10.5, align: "center", color: C.muted, mono: true });
+      D.text(ctx, ETQ[b], cx, P.y(0) + 14, { size: 11, align: "center", color: C.muted, mono: true });
     }
     var v = psi(base, ahora), col = v < 0.10 ? C.oliva : v < 0.25 ? C.marker : C.terracota;
     D.text(ctx, "PSI = " + v.toFixed(2), w - 12, 15, { size: 13, weight: 700, align: "right", color: col === C.marker ? C.ink : col });

@@ -20,45 +20,77 @@
     <div>
       <p class="eyebrow">Curso 1 · Módulo 6 · Lección 5 de 8</p>
       <h1>El umbral no es 0,5: lo deciden los euros</h1>
-      <p class="lead">El modelo da una probabilidad; el umbral sale del coste de cada error: 15 / (15 + 60) = 0,20.</p>
-      <p class="meta-line"><span class="read-time" data-render="read-time"></span><a href="../modulo-6.html">Índice del módulo</a></p>
+      <p class="lead">El modelo da una probabilidad; tú decides a partir de cuánto avisas. Aprendes a sacar ese corte del coste de cada error: 15 / (15 + 60) = 0,20.</p>
+      <p class="meta-line"><span class="read-time" data-render="read-time"></span><a href="../modulo-6.html">Índice del módulo</a> · <a href="#chuleta">Ir a la chuleta</a></p>
     </div>
     <div class="hero-tile" aria-hidden="true"></div>
   </div>
 </header>
 
 <details class="predice">
-  <summary>El modelo dice: «este usuario cancelará con un 31 % de probabilidad». Con el umbral de siempre (50 %) no le avisas. ¿Le ofrecerías el descuento?<span class="hint"></span></summary>
+  <summary>El modelo dice: «este usuario cancelará con un 31 % de probabilidad». Con el corte de siempre (50 %) no le avisas. ¿Le ofrecerías el descuento?<span class="hint"></span></summary>
   <div>
-    <p>Sí, si perderlo cuesta mucho más que el descuento. Avisar cuesta 0,69 × 15 € = 10,35 € de media; no avisar, 0,31 × 60 € = 18,60 €. Avisar sale más barato aunque sea más probable que se quede.</p>
+    <p>Sí, si perderlo cuesta mucho más que el descuento. Avisar cuesta, de media, 0,69 × 15 € = 10,35 €. No avisar, 0,31 × 60 € = 18,60 €. Avisar sale más barato aunque lo más probable sea que se quede.</p>
   </div>
 </details>
 
 <section>
-<h2 id="idea">El modelo da una probabilidad; el umbral lo pone el negocio</h2>
-<p>Primero se elige el modelo, y se elige bien: tres candidatos (regresión logística, KNN y Random Forest) con el mismo Pipeline, ajustados con <code>GridSearchCV</code> y validación cruzada <strong>sobre el train</strong>. Gana la logística, la más sencilla (ROC-AUC 0,841 en validación, 0,853 en el test). El ROC-AUC mide si el modelo <em>ordena</em> bien: es la probabilidad de que, tomando un usuario que cancela y otro que no, el que cancela reciba más probabilidad.</p>
-<p>Pero un orden no es una decisión. <code>predict()</code> convierte la probabilidad en sí/no con un umbral de 0,5, que es la mitad matemática, no la mitad <em>económica</em>. Piensa en el aviso de «ya está el nuevo capítulo»: avisar de más es un fastidio pequeño; enterarte tarde, con spoiler, es un fastidio grande. Por eso la app avisa aunque no esté muy segura.</p>
-<p>Con los costes de StreamFlix (falsa alarma, 15 €; cliente perdido, 60 €), conviene avisar cuando \( (1-p)\cdot 15 &lt; p\cdot 60 \), es decir:</p>
-<div class="formula">\[ \text{umbral} = \frac{C_{FP}}{C_{FP} + C_{FN}} = \frac{15}{75} = 0{,}20 \]</div>
-<p>Cuanto más caro es el falso negativo, más bajo el umbral. Y se fija con la fórmula, no buscando el mínimo en el test.</p>
+<h2 id="elegir">1 · Primero se elige el modelo, sin tocar el examen</h2>
+<p>Se prueban tres candidatos con la misma preparación: regresión logística, KNN (copia a los vecinos más parecidos) y Random Forest. Para elegir se usa la <strong>validación cruzada</strong>: el train se parte en 5 trozos y cada trozo hace de examen una vez. El test sigue guardado.</p>
+<p>La nota es el <strong>ROC-AUC</strong>: si coges al azar un usuario que cancela y otro que no, la probabilidad de que el modelo ponga más riesgo al que cancela. 0,5 es adivinar; 1, ordenar perfecto.</p>
+<table>
+  <thead><tr><th>Modelo</th><th>ROC-AUC (validación)</th></tr></thead>
+  <tbody>
+    <tr><td><strong>Regresión logística</strong></td><td class="res">0,841</td></tr>
+    <tr><td>Random Forest</td><td>0,834</td></tr>
+    <tr><td>KNN</td><td>0,823</td></tr>
+  </tbody>
+</table>
+<p>Gana el más sencillo. En el test, mirado una vez, saca 0,853.</p>
+</section>
+
+<section>
+<h2 id="idea">2 · Una probabilidad no es una decisión</h2>
+<p>El modelo da una <strong>probabilidad</strong>: un número entre 0 y 1. Para decidir hay que cortar: «avisa si pasa de X». Ese corte es el <strong>umbral</strong>. Por defecto, <code>predict()</code> corta en 0,5: la mitad matemática, no la mitad económica.</p>
+<ul class="flow">
+  <li class="a">MODELO<small>probabilidad 0,31</small></li>
+  <li class="d">UMBRAL<small>¿0,31 pasa el corte?</small></li>
+  <li class="c">DECISIÓN<small>descuento sí / no</small></li>
+</ul>
+<div class="callout analogia">
+  <span class="lbl">Analogía</span>
+  <p>El aviso de «ya está el nuevo capítulo». Avisar de más es un fastidio pequeño. Enterarte tarde, con spoiler, es un fastidio grande. Por eso la app avisa aunque no esté muy segura.</p>
+</div>
+</section>
+
+<section>
+<h2 id="formula">3 · El corte sale de los costes</h2>
+<p>Una <strong>falsa alarma</strong> (descuento a quien no se iba) cuesta 15 €. Un <strong>cliente perdido</strong> sin aviso, 60 €. ¿Desde qué probabilidad compensa avisar?</p>
+<div class="anim-pasos" data-titulo="De dónde sale el 0,20">
+  <div class="paso"><p><strong>1. Si avisas</strong> y se iba a quedar (pasa con 1 − p), pierdes 15 €.</p><span class="grande">coste de avisar = (1 − p) × 15</span></div>
+  <div class="paso"><p><strong>2. Si no avisas</strong> y se va (pasa con p), pierdes 60 €.</p><span class="grande">coste de callar = p × 60</span></div>
+  <div class="paso"><p><strong>3. Avisa</strong> cuando callar cuesta más que avisar.</p><span class="grande">p × 60 &gt; (1 − p) × 15</span></div>
+  <div class="paso"><p><strong>4. Despeja p.</strong> Coste de la falsa alarma entre la suma de los dos costes.</p><span class="grande">p &gt; 15 / (15 + 60) = 0,20</span></div>
+</div>
+<div class="formula">\[ \frac{C_{FP}}{C_{FP} + C_{FN}} = \frac{15}{75} = 0{,}20 \]</div>
+<p>Ese es el umbral. \( C_{FP} \) es el coste de la falsa alarma; \( C_{FN} \), el del cliente perdido. Cuanto más caro el cliente, más bajo el corte. Se fija con la fórmula, no buscando el mínimo en el test.</p>
 </section>
 
 <figure class="demo" data-demo="curso1/c1m6-umbral-euros" data-titulo="El umbral por euros: arrastra la línea y mira la factura">
   <div class="haz">Mueve el umbral y lee TP, FP, FN y el coste. Después cambia el coste de una cancelación perdida.</div>
-  <div class="observa">El mínimo de la curva cae cerca de \( C_{FP}/(C_{FP}+C_{FN}) \) y se mueve a la izquierda si perder un cliente sale más caro.</div>
+  <div class="observa">El mínimo de la curva cae cerca de 15 / (15 + 60) = 0,20 y se mueve a la izquierda si perder un cliente sale más caro.</div>
 </figure>
 
 <section>
-<h2 id="numeros">Con números: la factura de 1.000 usuarios</h2>
-<div class="callout ejemplo">
-  <span class="lbl">Ejemplo numérico: coste = FP × 15 € + FN × 60 €</span>
-  <ol class="pasos">
-    <li><strong>Umbral 0,50:</strong> 18 FP × 15 + 141 FN × 60 = 270 + 8.460 = <span class="res">8.730 €</span>. Casi todo es gente que se va sin aviso.</li>
-    <li><strong>Umbral 0,20:</strong> 221 FP × 15 + 53 FN × 60 = 3.315 + 3.180 = <span class="res">6.495 €</span>. Un 26 % menos.</li>
-    <li><strong>Referencias:</strong> no hacer nada, 16.680 €; descuento a todos, 10.830 €; el 0,35 «a ojo», 7.260 €.</li>
-  </ol>
-  <p>Mismo modelo, misma probabilidad: solo cambia dónde cortas. Bajar el umbral sube el recall (0,49 → 0,81) y baja la precision (0,88 → 0,50).</p>
+<h2 id="numeros">4 · Con números: la factura de 1.000 usuarios</h2>
+<p>Mismo modelo, mismas probabilidades. Solo cambia dónde cortas. Factura = falsas alarmas × 15 € + clientes perdidos × 60 €.</p>
+<div class="anim-pasos" data-titulo="La factura con cada corte">
+  <div class="paso"><p><strong>Corte 0,50.</strong> 18 falsas alarmas y 141 clientes perdidos. Casi todo es gente que se va sin aviso.</p><span class="grande">270 + 8.460 = 8.730 €</span></div>
+  <div class="paso"><p><strong>Corte 0,35</strong> «a ojo». 56 falsas alarmas y 107 perdidos.</p><span class="grande">840 + 6.420 = 7.260 €</span></div>
+  <div class="paso"><p><strong>Corte 0,20</strong>, el de la fórmula. 221 falsas alarmas y 53 perdidos.</p><span class="grande">3.315 + 3.180 = 6.495 €</span></div>
+  <div class="paso"><p><strong>Comparación.</strong> No hacer nada: 16.680 €. Descuento a todos: 10.830 €.</p><span class="grande">6.495 € es la más barata</span></div>
 </div>
+<p>Bajar el corte avisa a más gente: el recall sube (0,49 → 0,81) y la precision baja (0,88 → 0,50). Los euros dicen dónde parar.</p>
 </section>
 
 <details class="predice">
@@ -68,11 +100,25 @@
   </div>
 </details>
 
+<section>
+<h2 id="chuleta">Chuleta para repasar</h2>
+<dl class="chuleta">
+  <div><dt>Probabilidad</dt><dd>Lo que da el modelo, entre 0 y 1. <em>0,31 = 31 % de cancelar.</em></dd></div>
+  <div><dt>Umbral</dt><dd>El corte: avisas si la probabilidad lo pasa. <em>0,20.</em></dd></div>
+  <div><dt>Validación cruzada</dt><dd>Partir el train en trozos y examinar con cada uno. <em>5 trozos.</em></dd></div>
+  <div><dt>ROC-AUC</dt><dd>Lo bien que ordena el riesgo. 0,5 = azar. <em>0,853.</em></dd></div>
+  <div><dt>Falsa alarma (FP)</dt><dd>Avisas y no se iba. <em>15 € de descuento regalado.</em></dd></div>
+  <div><dt>Cliente perdido (FN)</dt><dd>Se va sin aviso. <em>60 € de margen.</em></dd></div>
+  <div><dt>Umbral por costes</dt><dd>Coste FP / (coste FP + coste FN). <em>15 / 75 = 0,20.</em></dd></div>
+  <div><dt>Factura</dt><dd>FP × 15 € + FN × 60 €. <em>6.495 € con 0,20.</em></dd></div>
+</dl>
+</section>
+
 <div class="resumen">
   <h2 class="sin-num sin-toc">En tres líneas</h2>
   <ul>
-    <li>El modelo se elige por validación cruzada sobre el train; el test se mira una vez.</li>
-    <li>El 0,5 es una convención: el umbral sale de los costes, \( C_{FP}/(C_{FP}+C_{FN}) \).</li>
+    <li>El modelo se elige por validación cruzada con el train; el test se mira una vez.</li>
+    <li>El 0,5 es una costumbre: el umbral sale de los costes, coste FP / (coste FP + coste FN).</li>
     <li>Bajar el umbral sube el recall y baja la precision; los euros dicen dónde parar.</li>
   </ul>
 </div>
@@ -83,7 +129,7 @@
  "titulo": "¿Lo tienes?",
  "preguntas": [
   {
-   "q": "Matriz de confusión de la regresión logística: TP = 300, FP = 154, FN = 110, TN = 436. ¿Cuánto vale la <strong>precision</strong>?",
+   "q": "Tabla de aciertos y fallos de la regresión logística: 300 cancelaciones avisadas (TP), 154 falsas alarmas (FP), 110 cancelaciones perdidas (FN) y 436 tranquilos bien dichos (TN). ¿Cuánto vale la <strong>precision</strong> (de los avisos, cuántos aciertan)?",
    "opciones": [
     "0,732",
     "0,736",
@@ -91,10 +137,10 @@
     "0,661"
    ],
    "correcta": 3,
-   "porque": "Precision = TP / (TP + FP) = 300 / (300 + 154) = 300 / 454 = 0,661: de cada 100 avisos, 66 eran bajas reales. 0,732 es el recall (300 / 410), 0,736 el accuracy ((300 + 436) / 1.000) y 0,694 el F1."
+   "porque": "Precision = TP / (TP + FP) = 300 / (300 + 154) = 300 / 454 = 0,661: de cada 100 avisos, 66 eran bajas reales. 0,732 es el recall (300 / 410), 0,736 el accuracy ((300 + 436) / 1.000) y 0,694 el F1, la media de precision y recall."
   },
   {
-   "q": "Un descuento innecesario (FP) cuesta 15 € y una baja que se escapa (FN) cuesta 60 €. ¿Qué umbral teórico minimiza el coste, \\(C_{FP}/(C_{FP}+C_{FN})\\), si las probabilidades están calibradas?",
+   "q": "Un descuento regalado cuesta 15 € y una baja que se escapa cuesta 60 €. ¿Qué umbral sale de la fórmula coste FP / (coste FP + coste FN)?",
    "opciones": [
     "0,15",
     "0,20",
@@ -102,23 +148,23 @@
     "0,80"
    ],
    "correcta": 1,
-   "porque": "Se avisa cuando la probabilidad p cumple p · 60 &gt; (1 − p) · 15, es decir p &gt; 15 / (15 + 60) = 0,20. Como perder un cliente cuesta 4 veces más que un descuento, conviene avisar aunque la probabilidad sea baja. El 0,5 por defecto solo sería óptimo si los dos errores costaran lo mismo."
+   "porque": "Se avisa cuando p · 60 &gt; (1 − p) · 15, es decir, p &gt; 15 / (15 + 60) = 0,20. Perder un cliente cuesta 4 veces más que un descuento, así que conviene avisar aunque la probabilidad sea baja. El 0,5 solo sería lo mejor si los dos errores costaran lo mismo."
   },
   {
    "q": "En el código, <code>(y_prob_logistic &gt;= 0.35).astype(int)</code> hace…",
    "opciones": [
-    "Marcar con 1 a los usuarios con probabilidad de cancelar ≥ 0,35: se avisa a más gente que con 0,5, sube el recall y baja la precision",
+    "Marcar con 1 a los usuarios con probabilidad de cancelar de 0,35 o más: se avisa a más gente que con 0,5, sube el recall y baja la precision",
     "Entrenar un modelo nuevo con el 35 % de los datos",
     "Eliminar las probabilidades menores de 0,35",
     "Calcular el ROC-AUC con umbral 0,35"
    ],
    "correcta": 0,
-   "porque": "La comparación da True/False para cada usuario y <code>astype(int)</code> lo convierte en 1/0. Es lo mismo que hace <code>predict</code>, pero con 0,35 en lugar de 0,5. En la ejecución real el recall sube de 0,73 a 0,86 y la precision baja de 0,66 a 0,57. El ROC-AUC no depende de ningún umbral."
+   "porque": "La comparación da verdadero o falso para cada usuario, y <code>astype(int)</code> lo convierte en 1 o 0. Es lo que hace <code>predict</code>, pero cortando en 0,35 en vez de 0,5. En la ejecución real el recall sube de 0,73 a 0,86 y la precision baja de 0,66 a 0,57. El ROC-AUC no depende de ningún corte."
   },
   {
    "q": "¿Con qué se elige el ganador entre logística, KNN y Random Forest?",
    "opciones": [
-    "Con la tabla del test",
+    "Con la nota del test",
     "Con validación cruzada sobre el train",
     "Con el modelo más complejo"
    ],
@@ -445,117 +491,14 @@
   </div>
 </details>
 
-<section>
+<section class="ir-lab">
 <h2 class="sin-num">Código</h2>
-<p class="codigo-intro">El fragmento 14 sigue al 13 (cuaderno B) y el 30 usa las probabilidades del 29 (cuaderno C).</p>
-<article class="snippet" data-lang="python">
-  <header>
-    <h3>14 · Cambiar el umbral de decisión a 0,35</h3>
-    <p class="para-que"><strong>Para qué sirve</strong> Muestra que el 0,5 de <code>predict</code> es una elección, no una ley: con las mismas probabilidades, un umbral más bajo avisa a más usuarios (más recall, menos precision).</p>
-  </header>
-  <pre class="code"><code>threshold = 0.35
-y_pred_threshold = (y_prob_logistic &gt;= threshold).astype(int)
-print(classification_report(y_test_class, y_pred_threshold))
-print(confusion_matrix(y_test_class, y_pred_threshold))</code></pre>
-  <details class="linea-a-linea">
-    <summary>Línea por línea</summary>
-    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
-    <table class="lineas">
-      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
-      <tbody>
-        <tr data-lines="1"><td><code>threshold = 0.35</code></td><td>Guarda el umbral en una variable: 0,35 en lugar de 0,5.</td></tr>
-        <tr data-lines="2"><td><code>y_pred_threshold = (y_prob_logistic &gt;= threshold).astype(int)</code></td><td><code>y_prob_logistic &gt;= threshold</code> compara cada probabilidad con 0,35 y da True/False; <code>.astype(int)</code> lo pasa a 1/0. Es lo mismo que hacía <code>predict</code>, pero con otro punto de corte.</td></tr>
-        <tr data-lines="3"><td><code>print(classification_report(y_test_class, y_pred_threshold))</code></td><td>Informe de clasificación con las nuevas predicciones.</td></tr>
-        <tr data-lines="4"><td><code>print(confusion_matrix(y_test_class, y_pred_threshold))</code></td><td><strong>Línea añadida por mí:</strong> la matriz de confusión con el umbral 0,35.</td></tr>
-      </tbody>
-    </table>
-  </details>
-  <div class="salida">
-    <strong>Salida esperada</strong>
-    <pre>              precision    recall  f1-score   support
-
-           0       0.85      0.55      0.67       590
-           1       0.57      0.86      0.69       410
-
-    accuracy                           0.68      1000
-   macro avg       0.71      0.71      0.68      1000
-weighted avg       0.73      0.68      0.68      1000
-
-[[327 263]
- [ 59 351]]</pre>
-    <p>Al bajar el umbral de 0,5 a 0,35 el <strong>recall de «cancela» sube de 0,73 a 0,86</strong> (la matriz pasa a [[327, 263], [59, 351]]: los FN bajan de 110 a 59), pero la <strong>precision cae de 0,66 a 0,57</strong> (los FP suben de 154 a 263) y la accuracy baja de 0,74 a 0,68. Es el dilema de siempre: <em>no hay umbral gratis</em>. Cuál conviene lo decide el coste de cada error, no la estadística.</p>
-  </div>
-</article>
-<article class="snippet" data-lang="python">
-  <header>
-    <h3>30 · Elegir el umbral con euros</h3>
-    <p class="para-que"><strong>Para qué sirve</strong> Asigna un coste en euros a cada tipo de error, recorre varios umbrales y calcula el coste total de cada uno, para comparar con la fórmula teórica y con las alternativas «no hacer nada» y «descuento a todos».</p>
-  </header>
-  <pre class="code"><code>COSTE_FP = 15   # € de descuento regalado a alguien que no pensaba irse
-COSTE_FN = 60   # € de margen que se pierden cuando un cliente se va sin avisar
-
-filas = []
-for umbral in (0.10, 0.20, 0.30, 0.35, 0.40, 0.50, 0.60, 0.70):
-    pred_u = (prob &gt;= umbral).astype(int)
-    tn, fp, fn, tp = confusion_matrix(y_test, pred_u).ravel()
-    filas.append({"umbral": umbral, "TP": tp, "FP": fp, "FN": fn,
-                  "precision": tp / (tp + fp), "recall": tp / (tp + fn),
-                  "coste_€": fp * COSTE_FP + fn * COSTE_FN})
-tabla = pd.DataFrame(filas).set_index("umbral")
-print(tabla.round(3))
-
-mejor_umbral = tabla["coste_€"].idxmin()
-print("umbral con menor coste en la tabla:", mejor_umbral)
-print("umbral teórico COSTE_FP / (COSTE_FP + COSTE_FN):", round(COSTE_FP / (COSTE_FP + COSTE_FN), 2))
-print("no hacer nada:", int(y_test.sum()) * COSTE_FN, "€ | descuento a todos:", int((y_test == 0).sum()) * COSTE_FP, "€")
-
-rejilla = np.linspace(0.01, 0.99, 99)
-costes = [int(((prob &gt;= t) &amp; (y_test == 0)).sum()) * COSTE_FP + int(((prob &lt; t) &amp; (y_test == 1)).sum()) * COSTE_FN for t in rejilla]
-print("mínimo con rejilla fina (mirando el test):", round(rejilla[int(np.argmin(costes))], 2), "-&gt;", min(costes), "€")</code></pre>
-  <details class="linea-a-linea">
-    <summary>Línea por línea</summary>
-    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
-    <table class="lineas">
-      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
-      <tbody>
-        <tr data-lines="1"><td><code>COSTE_FP = 15   # € de descuento regalado a alguien que no p…</code></td><td>Coste de un falso positivo: 15 € de descuento regalado. Las constantes se escriben en mayúsculas por convención.</td></tr>
-        <tr data-lines="2"><td><code>COSTE_FN = 60   # € de margen que se pierden cuando un clien…</code></td><td>Coste de un falso negativo: 60 € de margen perdido.</td></tr>
-        <tr data-lines="4"><td><code>filas = []</code></td><td>Lista vacía para las filas de la tabla.</td></tr>
-        <tr data-lines="5"><td><code>for umbral in (0.10, 0.20, 0.30, 0.35, 0.40, 0.50, 0.60, 0.7…</code></td><td>Recorre ocho umbrales.</td></tr>
-        <tr data-lines="6"><td><code>pred_u = (prob &gt;= umbral).astype(int)</code></td><td>Decisión con ese umbral: 1 si <code>prob &gt;= umbral</code> (<code>astype(int)</code> convierte el booleano en 0/1).</td></tr>
-        <tr data-lines="7"><td><code>tn, fp, fn, tp = confusion_matrix(y_test, pred_u).ravel()</code></td><td>Matriz de confusión con esa decisión, aplanada.</td></tr>
-        <tr data-lines="8-10"><td><code>filas.append({"umbral": umbral, "TP": tp, "FP": fp, "FN": fn, …</code></td><td>Guarda una fila: el umbral, TP, FP, FN, precision y recall calculados a mano, y el <strong>coste</strong> = FP × 15 + FN × 60.</td></tr>
-        <tr data-lines="11"><td><code>tabla = pd.DataFrame(filas).set_index("umbral")</code></td><td>Convierte la lista en tabla con el umbral como índice.</td></tr>
-        <tr data-lines="12"><td><code>print(tabla.round(3))</code></td><td>Imprime la tabla con tres decimales.</td></tr>
-        <tr data-lines="14"><td><code>mejor_umbral = tabla["coste_€"].idxmin()</code></td><td><code>idxmin()</code> devuelve el índice (el umbral) de la fila con menor coste.</td></tr>
-        <tr data-lines="15"><td><code>print("umbral con menor coste en la tabla:", mejor_umbral)</code></td><td>Lo imprime.</td></tr>
-        <tr data-lines="16"><td><code>print("umbral teórico COSTE_FP / (COSTE_FP + COSTE_FN):", ro…</code></td><td>El umbral teórico <code>C_FP / (C_FP + C_FN)</code>, para comparar.</td></tr>
-        <tr data-lines="17"><td><code>print("no hacer nada:", int(y_test.sum()) * COSTE_FN, "€ | d…</code></td><td>Las dos alternativas triviales: no avisar a nadie (se pierden todas las cancelaciones × 60 €) y dar descuento a todos (todos los que se quedan × 15 €).</td></tr>
-        <tr data-lines="19"><td><code>rejilla = np.linspace(0.01, 0.99, 99)</code></td><td>Una rejilla fina de 99 umbrales equiespaciados entre 0,01 y 0,99 (<code>np.linspace</code>).</td></tr>
-        <tr data-lines="20"><td><code>costes = [int(((prob &gt;= t) &amp; (y_test == 0)).sum()) * COSTE_F…</code></td><td>El coste de cada umbral de la rejilla, con una comprensión de lista: usa operaciones lógicas sobre arrays (<code>&amp;</code> es «y» elemento a elemento).</td></tr>
-        <tr data-lines="21"><td><code>print("mínimo con rejilla fina (mirando el test):", round(re…</code></td><td>El umbral de la rejilla con menor coste (<code>np.argmin</code>) y ese coste. Ojo: mirando el test.</td></tr>
-      </tbody>
-    </table>
-  </details>
-  <div class="salida">
-    <strong>Salida esperada</strong>
-    <pre>         TP   FP   FN  precision  recall  coste_€
-umbral                                           
-0.10    264  475   14      0.357   0.950     7965
-0.20    225  221   53      0.504   0.809     6495
-0.30    180   96   98      0.652   0.647     7320
-0.35    171   56  107      0.753   0.615     7260
-0.40    151   34  127      0.816   0.543     8130
-0.50    137   18  141      0.884   0.493     8730
-0.60    126   11  152      0.920   0.453     9285
-0.70    113    9  165      0.926   0.406    10035
-umbral con menor coste en la tabla: 0.2
-umbral teórico COSTE_FP / (COSTE_FP + COSTE_FN): 0.2
-no hacer nada: 16680 € | descuento a todos: 10830 €
-mínimo con rejilla fina (mirando el test): 0.18 -&gt; 6075 €</pre>
-    <p>El coste mínimo de la tabla está en el umbral <strong>0,20: 6.495 €</strong> (con el 0,50 por defecto son 8.730 €, y con el 0,35 de los apuntes, 7.260 €). El umbral teórico es también 0,20. No hacer nada costaría <strong>16.680 €</strong> y dar descuento a todos, <strong>10.830 €</strong>. La rejilla fina (que mira el test) da como mínimo <strong>0,18 con 6.075 €</strong>, 420 € menos que el 0,20: una ganancia que en buena parte es ruido de esta muestra, por lo que el umbral teórico sigue siendo la mejor elección.</p>
-  </div>
-</article>
+<a class="lab-card" href="laboratorio.html#paso-4"><span class="lc-ico" aria-hidden="true">🧪</span>
+  <span><strong>Ver el código de esta lección en el Laboratorio</strong>
+  <span>Pasos 4 y 5 · Comparar tres modelos con validación cruzada, evaluar al ganador y elegir el umbral con euros.</span></span></a>
+<a class="lab-card" href="laboratorio.html#frag-13"><span class="lc-ico" aria-hidden="true">🧪</span>
+  <span><strong>Y el código de tus apuntes</strong>
+  <span>Fragmentos 13 a 16 · Regresión logística, el umbral a 0,35, KNN y Random Forest con GridSearchCV.</span></span></a>
 </section>
 
 </div>

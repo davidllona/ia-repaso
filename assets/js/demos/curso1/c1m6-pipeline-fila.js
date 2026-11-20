@@ -17,6 +17,9 @@ Lab.register("curso1/c1m6-pipeline-fila", function (root, api) {
   ui.button("◀ Etapa anterior", function () { stage = Math.max(0, stage - 1); update(); });
   ui.button("Etapa siguiente ▶", function () { stage = Math.min(4, stage + 1); update(); }, "primary");
   var tbl = api.table(root, ["Variable", "Crudo", "Imputer", "Scaler / One-Hot", "Peso", "Aporte al logit"]);
+  /* En pantallas estrechas, una tabla de 3 columnas: la variable, su valor crudo y lo que pasa en la etapa actual */
+  var tblM = api.table(root, ["Variable", "Crudo", "Ahora"]);
+  window.addEventListener("resize", function () { update(); });
   var out = api.readout(root);
 
   function fmt(v, k) { return (v < 0 ? "−" : (k === "+" ? "+" : "")) + Math.abs(v).toFixed(2); }
@@ -52,15 +55,15 @@ Lab.register("curso1/c1m6-pipeline-fila", function (root, api) {
       var words = STAGES[i][1].split(" "), narrow = bw < 80;
       var l1 = narrow && words.length > 1 ? words.slice(0, Math.ceil(words.length / 2)).join(" ") : STAGES[i][1];
       var l2 = narrow && words.length > 1 ? words.slice(Math.ceil(words.length / 2)).join(" ") : "";
-      D.text(ctx, l1, x + bw / 2, h - (l2 ? 26 : 16), { size: narrow ? 10 : 11.5, weight: 600, align: "center", color: col });
-      if (l2) D.text(ctx, l2, x + bw / 2, h - 12, { size: 10, weight: 600, align: "center", color: col });
+      D.text(ctx, l1, x + bw / 2, h - (l2 ? 26 : 16), { size: narrow ? 11 : 11.5, weight: 600, align: "center", color: col });
+      if (l2) D.text(ctx, l2, x + bw / 2, h - 12, { size: 11, weight: 600, align: "center", color: col });
       if (i < n - 1) D.text(ctx, "›", x + bw + gap / 2, h / 2 + 5, { size: 15, align: "center", color: C.muted });
     }
   }
 
   function update() {
     view.redraw();
-    var r = compute(), f = P.filas[rowIdx], body = [];
+    var r = compute(), f = P.filas[rowIdx], body = [], bodyM = [];
     r.rows.forEach(function (q) {
       var raw = q.raw === null ? "<span class='bad'><b>NaN</b></span>" : (q.cat ? q.raw : q.raw.toFixed(1));
       var imp = stage >= 1 ? (q.imputed ? "<span class='good'><b>" + (q.cat ? q.filled : q.filled.toFixed(1)) + "</b></span> <small>(" + (q.cat ? "más frecuente" : "mediana") + ")</small>" : (q.cat ? q.filled : q.filled.toFixed(1))) : "·";
@@ -68,8 +71,18 @@ Lab.register("curso1/c1m6-pipeline-fila", function (root, api) {
       if (stage >= 2) sc = q.cat ? "[" + q.hot.join(", ") + "]<br><small>" + q.cats.join(" · ") + "</small>" : "(" + q.filled.toFixed(1) + " − " + q.mu.toFixed(1) + ") / " + q.sd.toFixed(1) + " = <b>" + fmt(q.z) + "</b>";
       if (stage >= 3) { w = fmt(q.w, "+") + (q.cat ? "<br><small>de " + q.name + "_" + q.wname + "</small>" : ""); ap = "<b>" + fmt(q.a, "+") + "</b>" + (q.cat ? "" : "<br><small>" + fmt(q.w) + " × " + fmt(q.z) + "</small>"); }
       body.push([q.name, raw, imp, sc, w, ap]);
+      var fv = q.cat ? q.filled : q.filled.toFixed(1), corto = "·";
+      if (stage === 1) corto = q.imputed ? "<span class='good'><b>" + fv + "</b></span>" : fv;
+      if (stage === 2) corto = q.cat ? "[" + q.hot.join(", ") + "]" : "<b>" + fmt(q.z) + "</b>";
+      if (stage === 3) corto = fmt(q.w, "+");
+      if (stage === 4) corto = "<b>" + fmt(q.a, "+") + "</b>";
+      bodyM.push([q.name, raw, corto]);
     });
+    var narrow = root.clientWidth < 560;
+    tbl.el.style.display = narrow ? "none" : "";
+    tblM.el.style.display = narrow ? "" : "none";
     tbl.set(body);
+    tblM.set(bodyM);
     var hn = r.rows.filter(function (q) { return q.imputed; }).map(function (q) { return q.name; });
     var msgs = [
       "<b>Fila cruda.</b> Esto es lo que entra al Pipeline tal como está en la tabla. " + (hn.length ? "Los huecos (<span class='bad'>NaN</span>) en <b>" + hn.join(", ") + "</b> harían fallar a la regresión logística." : "Esta fila no tiene huecos; borra HorasMes con el botón para ver al Imputer trabajar."),

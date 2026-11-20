@@ -61,11 +61,11 @@ Lab.register("curso1/c1m6-pca-tsne", function (root, api) {
       var v = DATA.var[k] * 100; cum += v; pts.push([plot2.x(k + 1), plot2.y(cum)]);
       var bw = b.w / 10 * 0.6, x = plot2.x(k + 1) - bw / 2;
       D.rect(ctx, x, plot2.y(v), bw, b.y + b.h - plot2.y(v), k < 2 ? C.terracota : C.muted);
-      if (v >= 3) D.text(ctx, v.toFixed(0), plot2.x(k + 1), plot2.y(v) - 3, { size: 10, align: "center", color: C.ink2, mono: true });
+      if (v >= 3) D.text(ctx, v.toFixed(0), plot2.x(k + 1), plot2.y(v) - 3, { size: 11, align: "center", color: C.ink2, mono: true });
     }
     D.path(ctx, pts, C.cobalto, 2.2);
     pts.forEach(function (p) { D.circle(ctx, p[0], p[1], 3, C.cobalto); });
-    D.text(ctx, "acumulada", plot2.x(8.2), plot2.y(100 * 0.78) - 8, { size: 10.5, color: C.cobaltoInk, weight: 600, align: "center" });
+    D.text(ctx, "acumulada", plot2.x(8.2), plot2.y(100 * 0.78) - 8, { size: 11, color: C.cobaltoInk, weight: 600, align: "center" });
   }
   function update() {
     view.redraw(); view2.redraw();

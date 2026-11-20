@@ -47,8 +47,8 @@ Lab.register("curso1/c1m6-baseline-accuracy", function (root, api) {
     for (k = 0; k < rows.length; k++) {
       var yy = by + k * 54;
       D.text(ctx, rows[k][0], 10, yy + 10, { size: 12, weight: 600, color: C.ink });
-      D.text(ctx, "baseline", 10, yy + 26, { size: 10, color: C.muted });
-      D.text(ctx, "modelo", 10, yy + 42, { size: 10, color: C.muted });
+      D.text(ctx, "baseline", 10, yy + 26, { size: 11, color: C.muted });
+      D.text(ctx, "modelo", 10, yy + 42, { size: 11, color: C.muted });
       bar(ctx, 76, yy + 14, bw * 0.78, rows[k][1], C.muted, "", C, rows[k][3]);
       bar(ctx, 76, yy + 32, bw * 0.78, rows[k][2], C.oliva, "", C, rows[k][4]);
     }

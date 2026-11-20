@@ -76,9 +76,11 @@ Lab.register("curso1/c1m6-umbral-euros", function (root, api) {
     D.circle(ctx, p2.x(best.t), p2.y(best.c), 6, C.oliva, C.paper, 2);
     var cur = cost(thr);
     D.circle(ctx, p2.x(thr), p2.y(cur), 6.5, C.terracota, C.paper, 2);
-    D.text(ctx, "descuento a todos", b.x + 6, b.y + 13, { size: 10.5, color: C.muted });
-    D.text(ctx, "no hacer nada", b.x + b.w - 6, b.y + 13, { size: 10.5, color: C.muted, align: "right" });
-    D.text(ctx, "mínimo: " + best.t.toFixed(2), Math.min(Math.max(p2.x(best.t), b.x + 46), b.x + b.w - 46), b.y + b.h - 8, { size: 10.5, weight: 600, color: C.olivaInk, align: "center" });
+    if (w >= 480) {   /* en móvil no caben sin pisar la curva; el cuadro de texto ya da las dos cifras */
+      D.text(ctx, "descuento a todos", b.x + 6, b.y + 13, { size: 11, color: C.muted });
+      D.text(ctx, "no hacer nada", b.x + b.w - 6, b.y + 13, { size: 11, color: C.muted, align: "right" });
+    }
+    D.text(ctx, "mínimo: " + best.t.toFixed(2), Math.min(Math.max(p2.x(best.t), b.x + 46), b.x + b.w - 46), b.y + b.h - 8, { size: 11, weight: 600, color: C.olivaInk, align: "center" });
   }
 
   function update() {

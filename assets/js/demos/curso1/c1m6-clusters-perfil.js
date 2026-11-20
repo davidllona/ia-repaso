@@ -36,10 +36,10 @@ Lab.register("curso1/c1m6-clusters-perfil", function (root, api) {
       D.rect(ctx, padL, y0, w - padL - padR, ph, C.surface, C.line, 1);
       D.text(ctx, title, padL, y0 - 5, { size: 11, weight: 600, color: C.ink2 });
       for (i = 0; i < vals.length; i++) {
-        var hh = (vals[i] - lo) / (hi - lo) * ph, x = padL + i * bw + bw * 0.2, on = i === K - 2;
+        var hh = (vals[i] - lo) / (hi - lo) * ph * 0.78, x = padL + i * bw + bw * 0.2, on = i === K - 2;
         D.rect(ctx, x, y0 + ph - hh, bw * 0.6, hh, on ? color : C.muted);
-        D.text(ctx, fmt(vals[i]), x + bw * 0.3, y0 + ph - hh - 3, { size: 10.5, align: "center", color: C.ink, mono: true, weight: on ? 700 : 400 });
-        if (i === best) D.text(ctx, "★", x + bw * 0.3, y0 + 12, { size: 12, align: "center", color: C.ink });
+        D.text(ctx, fmt(vals[i]), x + bw * 0.3, y0 + ph - hh - 3, { size: 11, align: "center", color: C.ink, mono: true, weight: on ? 700 : 400 });
+        if (i === best) D.text(ctx, "★", x + bw * 0.3, y0 + ph - Math.max(hh / 2, 8) + 5, { size: 13, align: "center", color: C.paper });
       }
     }
     panel(top, sils, 0, 0.3, "Silhouette (más alto = mejor)", bestS, C.oliva, function (v) { return v.toFixed(3); });

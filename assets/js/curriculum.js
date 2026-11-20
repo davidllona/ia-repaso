@@ -115,14 +115,15 @@ window.CURRICULUM = {
           summary: "Todo el curso en un único flujo: el proyecto de lluvia en Australia y un caso completo de plataforma de streaming con clasificación, regresión, clusters y recomendación.",
           tags: ["Pipeline", "ColumnTransformer", "GridSearchCV", "Matriz de confusión", "Feature importance", "StreamFlix"],
           lessons: [
-            {"n": 1, "slug": "leccion-1", "title": "«Retener clientes» no es un problema de ML hasta que lo traduces", "blurb": "Antes del código: decisión, target, datos del momento de decidir y coste de cada error.", "min": 3},
-            {"n": 2, "slug": "leccion-2", "title": "Si el dato aún no existe el día de predecir, es un spoiler", "blurb": "La fuga temporal: una columna del futuro da notas de 10 en el laboratorio y falla en la vida real.", "min": 3},
-            {"n": 3, "slug": "leccion-3", "title": "Un 84 % de aciertos no vale nada hasta compararlo con el modelo tonto", "blurb": "El baseline y la trampa del accuracy: con clases desequilibradas, predecir siempre «no» ya acierta mucho.", "min": 3},
-            {"n": 4, "slug": "leccion-4", "title": "Primero se reparte, después se prepara: el Pipeline lo garantiza", "blurb": "Imputar, escalar y One-Hot aprenden de los datos: que lo aprendan solo del train, dentro de un Pipeline.", "min": 3},
-            {"n": 5, "slug": "leccion-5", "title": "El umbral no es 0,5: lo deciden los euros", "blurb": "El modelo da una probabilidad; el umbral sale del coste de cada error: 15 / (15 + 60) = 0,20.", "min": 3},
-            {"n": 6, "slug": "leccion-6", "title": "Una media esconde dónde falla el modelo", "blurb": "MAE, RMSE y R² frente a un baseline, y partir los errores por grupos para ver lo que la media esconde.", "min": 3},
-            {"n": 7, "slug": "leccion-7", "title": "Sin etiquetas, el algoritmo agrupa y tú pones el nombre", "blurb": "K-Means, DBSCAN, PCA, t-SNE y un recomendador por vecinos: todo es medir parecidos entre usuarios.", "min": 3},
-            {"n": 8, "slug": "leccion-8", "title": "El modelo empieza a envejecer el día que sale", "blurb": "En producción el mundo cambia: vigila entradas, salidas y euros, porque el ROC-AUC puede no enterarse.", "min": 3}
+            {"n": 1, "slug": "leccion-1", "title": "«Retener clientes» no es un problema de ML hasta que lo traduces", "blurb": "Antes del código: decisión, target, datos del momento de decidir y coste de cada error.", "min": 4},
+            {"n": 2, "slug": "leccion-2", "title": "Si el dato aún no existe el día de predecir, es un spoiler", "blurb": "La fuga temporal: una columna del futuro da notas de 10 en el laboratorio y falla en la vida real.", "min": 4},
+            {"n": 3, "slug": "leccion-3", "title": "Un 84 % de aciertos no vale nada hasta compararlo con el modelo tonto", "blurb": "El baseline y la trampa del accuracy: con clases desequilibradas, predecir siempre «no» ya acierta mucho.", "min": 4},
+            {"n": 4, "slug": "leccion-4", "title": "Primero se reparte, después se prepara: el Pipeline lo garantiza", "blurb": "Imputar, escalar y One-Hot aprenden de los datos: que lo aprendan solo del train, dentro de un Pipeline.", "min": 4},
+            {"n": 5, "slug": "leccion-5", "title": "El umbral no es 0,5: lo deciden los euros", "blurb": "El modelo da una probabilidad; el umbral sale del coste de cada error: 15 / (15 + 60) = 0,20.", "min": 4},
+            {"n": 6, "slug": "leccion-6", "title": "Una media esconde dónde falla el modelo", "blurb": "MAE, RMSE y R² frente a un baseline, y partir los errores por grupos para ver lo que la media esconde.", "min": 4},
+            {"n": 7, "slug": "leccion-7", "title": "Sin etiquetas, el algoritmo agrupa y tú pones el nombre", "blurb": "K-Means, DBSCAN, PCA, t-SNE y un recomendador por vecinos: todo es medir parecidos entre usuarios.", "min": 4},
+            {"n": 8, "slug": "leccion-8", "title": "El modelo empieza a envejecer el día que sale", "blurb": "En producción el mundo cambia: vigila entradas, salidas y euros, porque el ROC-AUC puede no enterarse.", "min": 4},
+            {"n": 9, "slug": "laboratorio", "title": "Laboratorio: el proyecto completo de StreamFlix", "blurb": "Un proyecto entero en Python con 5.000 usuarios, en 12 pasos y línea a línea: fuga, baseline, Pipeline, umbral en euros, errores, regresión, grupos, anomalías, mapas, recomendador y deriva (unos 70 min). Debajo, los otros 23 fragmentos del módulo para consultar.", "min": 70}
           ]
         }
       ]

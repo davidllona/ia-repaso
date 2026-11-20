@@ -34,7 +34,7 @@ Lab.register("curso1/c1m6-regresion-errores", function (root, api) {
     D.circle(ctx, plot.x(R.real[VICTIM]), plot.y(p[VICTIM]), 8, null, C.terracota, 2.5);
     ctx.restore();
     D.line(ctx, plot.x(3), plot.y(93), plot.x(9), plot.y(93), C.ink, 1.5, [4, 3]);
-    D.text(ctx, "predicción perfecta (predicha = real)", plot.x(10), plot.y(93) + 4, { size: 10.5, color: C.ink2, align: "left" });
+    D.text(ctx, "predicción perfecta (predicha = real)", plot.x(10), plot.y(93) + 4, { size: 11, color: C.ink2, align: "left" });
   }
   function draw2(ctx, w, h, C) {
     var D = api.d, s = stats(preds()), b = plot2.box, bw = b.w / 4, k;
@@ -43,10 +43,10 @@ Lab.register("curso1/c1m6-regresion-errores", function (root, api) {
     for (k = 0; k < 4; k++) {
       var hh = s.tr[k] / plot2.yr[1] * b.h;
       D.rect(ctx, b.x + k * bw + bw * 0.2, b.y + b.h - hh, bw * 0.6, hh, C.terracota);
-      D.text(ctx, s.tr[k].toFixed(1), b.x + k * bw + bw / 2, b.y + b.h - hh - 4, { size: 10.5, align: "center", color: C.ink, mono: true });
-      D.text(ctx, TR[k][2], b.x + k * bw + bw / 2, b.y + b.h + 14, { size: 10.5, align: "center", color: C.muted });
+      D.text(ctx, s.tr[k].toFixed(1), b.x + k * bw + bw / 2, b.y + b.h - hh - 4, { size: 11, align: "center", color: C.ink, mono: true });
+      D.text(ctx, TR[k][2], b.x + k * bw + bw / 2, b.y + b.h + 14, { size: 11, align: "center", color: C.muted });
     }
-    D.text(ctx, "MAE por tramo (h)", b.x + 6, b.y + 12, { size: 10.5, color: C.ink2, weight: 600 });
+    D.text(ctx, "MAE por tramo (h)", b.x + 6, b.y + 12, { size: 11, color: C.ink2, weight: 600 });
   }
   function update() {
     view.redraw(); view2.redraw();

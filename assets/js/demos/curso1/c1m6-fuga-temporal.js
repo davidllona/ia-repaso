@@ -52,7 +52,7 @@ Lab.register("curso1/c1m6-fuga-temporal", function (root, api) {
     D.line(ctx, xn, b.y + 22, xn, b.y + b.h, C.ink, 2.4);
     D.text(ctx, "ahora", xn, b.y + 33, { size: 11, weight: 700, align: "center", color: C.ink });
     ctx.save(); ctx.globalAlpha = 0.16; D.rect(ctx, xn, b.y + 22, plot.x(48) - xn, b.h - 22, C.ink); ctx.restore();
-    D.text(ctx, "futuro: no existe todavía", Math.min((xn + plot.x(48)) / 2, b.x + b.w - 70), b.y + b.h - 10, { size: 10.5, align: "center", color: C.ink2 });
+    D.text(ctx, "futuro: no existe todavía", Math.min((xn + plot.x(48)) / 2, b.x + b.w - 70), b.y + b.h - 10, { size: 11, align: "center", color: C.ink2 });
   }
   function update() {
     view.redraw();
