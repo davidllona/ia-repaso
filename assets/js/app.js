@@ -89,11 +89,11 @@
   function effectiveTheme() {
     var t = document.documentElement.getAttribute("data-theme");
     if (t) return t;
-    return window.matchMedia && matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+    return "dark";
   }
   function setTheme(t) {
     document.documentElement.setAttribute("data-theme", t);
-    store.set("cuaderno-ia:tema", t);
+    store.set("cuaderno-ia:tema:v2", t);
     window.dispatchEvent(new Event("lab:theme"));
   }
   if (window.matchMedia) {
