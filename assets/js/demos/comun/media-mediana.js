@@ -26,10 +26,10 @@ Lab.register("comun/media-mediana", function (root, api) {
     });
     // Mediana: línea continua cobalto que sube hasta arriba, con su etiqueta encima de todos los puntos
     D.line(ctx, X(med), 26, X(med), y0 + 8, C.cobalto, 3);
-    D.text(ctx, "mediana " + med.toFixed(1), X(med), 16, { size: 12, align: X(med) > w - 130 ? "right" : "center", color: C.cobaltoInk, weight: 600 });
+    D.text(ctx, "mediana " + med.toFixed(1), X(med), 16, { size: 12, align: X(med) > w - 70 ? "right" : (X(med) < 70 ? "left" : "center"), color: C.cobaltoInk, weight: 600 });
     // Media: línea de puntos terracota que baja por debajo del eje, con su etiqueta abajo
     D.line(ctx, X(mean), y0 - 6, X(mean), y0 + 46, C.terracota, 3, [6, 3]);
-    D.text(ctx, "media " + mean.toFixed(1), X(mean), y0 + 62, { size: 12, align: X(mean) > w - 120 ? "right" : "center", color: C.terracotaInk, weight: 600 });
+    D.text(ctx, "media " + mean.toFixed(1), X(mean), y0 + 62, { size: 12, align: X(mean) > w - 70 ? "right" : (X(mean) < 70 ? "left" : "center"), color: C.terracotaInk, weight: 600 });
   }
   function update() {
     var vals = data(), mean = M.mean(vals), med = M.median(vals);
