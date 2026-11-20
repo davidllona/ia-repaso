@@ -21,7 +21,7 @@
       <p class="eyebrow">Curso 3 · Módulo 2 · Lección 7 de 8</p>
       <h1>La convolución transpuesta agranda estampando el kernel como un sello</h1>
       <p class="lead">Cada número de la entrada estampa el kernel multiplicado por él; donde los sellos se solapan, la tinta se suma. Así un 2×2 se convierte en un 4×4.</p>
-      <p class="meta-line"><span class="read-time" data-render="read-time"></span><a href="../modulo-2.html">Índice del módulo</a></p>
+      <p class="meta-line"><span class="read-time" data-render="read-time"></span><a href="../modulo-2.html">Índice del módulo</a> · <a href="#chuleta">Ir a la chuleta</a></p>
     </div>
     <div class="hero-tile" aria-hidden="true"></div>
   </div>
@@ -34,42 +34,116 @@
 </details>
 
 <section>
-<h2 id="idea">Cada número deja su sello</h2>
-<p>Un autoencoder que comprime un póster y lo reconstruye, o una red que colorea una película antigua, necesitan <strong>agrandar</strong> mapas. La transpuesta lo hace con pesos que se aprenden.</p>
-<p>Imagina un sello de goma con el dibujo del kernel. Cada número de la entrada es una almohadilla de tinta: estampa el sello con intensidad proporcional a su valor, en su propio sitio. Donde dos estampas se solapan, <strong>la tinta se suma</strong>. La convolución normal <em>junta</em> muchas casillas en una; la transpuesta <em>reparte</em> una casilla en muchas.</p>
-<p>El <strong>stride es la separación entre sellos</strong>. El último sello empieza en \( (n-1)s \) y ocupa \( k \) casillas:</p>
-<div class="formula">\[ n_{\text{salida}} = (n-1)\cdot s - 2p + k + \text{output\_padding} \]</div>
-<p>Con <code>padding="same"</code> se recorta a \( n\cdot s \): con stride 2, duplica exacto. Hay otras dos miradas equivalentes: multiplicar por la matriz \( C^{T} \) de la convolución (de ahí el nombre) y una convolución normal con ceros intercalados. Ojo: <strong>no es la inversa</strong>, solo recupera el tamaño.</p>
+<h2 id="para-que">1 · A veces hay que agrandar</h2>
+<p>Las convoluciones <strong>encogen</strong>. Pero un <strong>autoencoder</strong> (comprime un póster en pocos números y lo redibuja) o una red que colorea una película antigua necesitan el camino de vuelta.</p>
+<p>La <strong>convolución transpuesta</strong> agranda un mapa con un <strong>kernel</strong> (otra forma de llamar al filtro) cuyos pesos se aprenden.</p>
 </section>
 
-<figure class="demo" data-demo="curso3/c3m2-convt-sellos" data-titulo="Sello a sello: cómo se construye la salida de una transpuesta">
-  <div class="haz">Pulsa «Colocar sellos» y toca una casilla de la salida. Después pasa <em>s</em> a 2 y repite.</div>
-  <div class="observa">La casilla (1,1) suma cuatro productos: 5 + 8 + 6 + 4 = 23. Con s = 2 los sellos se separan y la salida mide 5×5.</div>
+<section>
+<h2 id="idea">2 · Cada número deja su sello</h2>
+<p>Imagina un sello de goma con el dibujo del kernel. Cada número de la entrada lo estampa, en su sitio, con más o menos tinta según su valor. Donde dos estampas se solapan, <strong>la tinta se suma</strong>.</p>
+<figure class="figura">
+  <svg viewBox="0 0 640 250" role="img" aria-label="El 1 estampa 1, 2, 3 en las casillas 0 a 2; el 2 estampa 2, 4, 6 en las casillas 1 a 3; la suma da 1, 4, 7, 6">
+    <text x="20" y="62" font-size="20">sello del 1</text>
+    <text x="20" y="132" font-size="20">sello del 2</text>
+    <text x="20" y="212" font-size="20" font-weight="600">suma</text>
+    <g>
+      <rect x="200" y="30" width="80" height="50" class="fill-b"/><rect x="280" y="30" width="80" height="50" class="fill-b"/><rect x="360" y="30" width="80" height="50" class="fill-b"/><rect x="440" y="30" width="80" height="50" class="fill-a"/>
+      <rect x="200" y="100" width="80" height="50" class="fill-a"/><rect x="280" y="100" width="80" height="50" class="fill-b"/><rect x="360" y="100" width="80" height="50" class="fill-b"/><rect x="440" y="100" width="80" height="50" class="fill-b"/>
+      <rect x="200" y="180" width="320" height="50" class="fill-d"/>
+    </g>
+    <g class="stroke" opacity="0.4">
+      <line x1="280" y1="30" x2="280" y2="230"/><line x1="360" y1="30" x2="360" y2="230"/><line x1="440" y1="30" x2="440" y2="230"/>
+    </g>
+    <g font-size="24" text-anchor="middle" class="mono">
+      <text x="240" y="63">1</text><text x="320" y="63">2</text><text x="400" y="63">3</text><text x="480" y="63">0</text>
+      <text x="240" y="133">0</text><text x="320" y="133">2</text><text x="400" y="133">4</text><text x="480" y="133">6</text>
+      <text x="240" y="213">1</text><text x="320" y="213">4</text><text x="400" y="213">7</text><text x="480" y="213">6</text>
+    </g>
+  </svg>
+  <figcaption>Entrada [1, 2], kernel [1, 2, 3]. De 2 números salen 4.</figcaption>
 </figure>
+<p>La convolución normal <em>junta</em> muchas casillas en una. La transpuesta <em>reparte</em> una casilla en muchas.</p>
+</section>
 
 <section>
-<h2 id="numeros">Con números: stride 2</h2>
-<div class="callout ejemplo">
-  <span class="lbl">Ejemplo numérico: transpuesta 1D, stride 2</span>
-  <ol class="pasos">
-    <li><strong>Sello del 1</strong> en las posiciones 0 a 2: \( [1,2,3,0,0] \).</li>
-    <li><strong>Sello del 2</strong> desde \( 1\cdot s=2 \): \( [0,0,2,4,6] \).</li>
-    <li><strong>Suma:</strong> solo la posición 2 recibe dos sellos (\( 3+2 \)): <span class="res">[1, 2, 5, 4, 6]</span>. Tamaño \( (2-1)\cdot2+3=5 \).</li>
-  </ol>
+<h2 id="dos-d">3 · En 2D: de 2×2 a 4×4</h2>
+<p>Entrada \( \begin{smallmatrix}1&2\\3&4\end{smallmatrix} \), kernel 3×3 con los números del 1 al 9. Cuatro sellos de 3×3: la salida mide 4×4.</p>
+<div class="anim-pasos" data-titulo="La casilla (1, 1) de la salida">
+  <div class="paso"><p><strong>1.</strong> El sello del 1 pone ahí el centro del kernel, el 5.</p><span class="grande">1 · 5 = 5</span></div>
+  <div class="paso"><p><strong>2.</strong> El sello del 2 (una columna a la derecha) pone ahí un 4.</p><span class="grande">2 · 4 = 8</span></div>
+  <div class="paso"><p><strong>3.</strong> El sello del 3 (una fila abajo) pone un 2.</p><span class="grande">3 · 2 = 6</span></div>
+  <div class="paso"><p><strong>4.</strong> El sello del 4 pone su esquina, un 1.</p><span class="grande">4 · 1 = 4</span></div>
+  <div class="paso"><p><strong>5.</strong> Cuatro sellos se solapan aquí. Se suma la tinta:</p><span class="grande">5 + 8 + 6 + 4 = 23</span></div>
+</div>
+<figure class="demo" data-demo="curso3/c3m2-convt-sellos" data-titulo="Sello a sello: cómo se construye la salida de una transpuesta">
+  <div class="haz">Pulsa «Colocar sellos» y toca una casilla de la salida. Después pasa <em>s</em> a 2 y repite.</div>
+  <div class="observa">La casilla (1,1) suma 5 + 8 + 6 + 4 = 23. Con s = 2 los sellos se separan y la salida mide 5×5.</div>
+</figure>
+</section>
+
+<section>
+<h2 id="numeros">4 · El stride es la separación entre sellos</h2>
+<p>El <strong>stride</strong> (el salto) ahora dice cuántas casillas hay entre un sello y el siguiente. Con stride 2 los sellos se separan y la salida crece más.</p>
+<div class="anim-pasos" data-titulo="Entrada [1, 2], kernel [1, 2, 3], stride 2">
+  <div class="paso"><p><strong>1.</strong> El 1 estampa desde la casilla 0.</p><span class="grande">[1, 2, 3, 0, 0]</span></div>
+  <div class="paso"><p><strong>2.</strong> El 2 estampa desde la casilla 2 (1 · stride).</p><span class="grande">[0, 0, 2, 4, 6]</span></div>
+  <div class="paso"><p><strong>3.</strong> Solo la casilla 2 recibe dos sellos: 3 + 2.</p><span class="grande">[1, 2, 5, 4, 6]</span></div>
 </div>
 </section>
 
+<section>
+<h2 id="formula">5 · Cuánto mide la salida</h2>
+<p>El último sello empieza en la casilla \( (n-1)\cdot s \) y ocupa \( k \) casillas. Con \( n \) números de entrada, kernel \( k \), stride \( s \) y marco \( p \):</p>
+<div class="formula">\[ n_{\text{salida}} = (n-1)\cdot s - 2p + k \]</div>
+<p>Con <code>padding="same"</code> Keras recorta lo justo para que salga \( n\cdot s \): con stride 2, el doble exacto.</p>
 <figure class="demo" data-demo="curso3/c3m2-tamano-transpuesta" data-titulo="¿Cuánto mide la salida de una transpuesta?">
   <div class="haz">Con k = 3, s = 2 y valid, prueba n = 7 y luego n = 8. Activa «Añadir output_padding».</div>
   <div class="observa">7 y 8 bajan los dos a 3, y la vuelta siempre da 7; output_padding = 1 recupera el 8.</div>
 </figure>
+</section>
+
+<section>
+<h2 id="vuelta">6 · Ida y vuelta: output_padding</h2>
+<p>La convolución redondea hacia abajo: dos tamaños distintos pueden acabar igual, y la transpuesta no sabe de cuál venía.</p>
+<div class="anim-pasos" data-titulo="De 8 a 3, y de vuelta">
+  <div class="paso"><p><strong>1.</strong> Convolución k = 3, s = 2 sobre 7 y sobre 8:</p><span class="grande">7 → 3 · 8 → 3</span></div>
+  <div class="paso"><p><strong>2.</strong> Transpuesta sobre 3:</p><span class="grande">(3 − 1)·2 + 3 = 7</span></div>
+  <div class="paso"><p><strong>3.</strong> Si venías de 8, falta una casilla. Se pide con <code>output_padding=1</code>:</p><span class="grande">7 + 1 = 8</span></div>
+</div>
+</section>
+
+<section>
+<h2 id="matriz">7 · Por qué se llama «transpuesta»</h2>
+<p>Una convolución equivale a multiplicar por una tabla de pesos, \( C \). La transpuesta usa esa tabla girada sobre su diagonal, \( C^{T} \).</p>
+<div class="callout ojo">
+  <span class="lbl">Ojo</span>
+  <p>No es la inversa: recupera el <strong>tamaño</strong>, no los valores. Por eso no conviene llamarla «deconvolución».</p>
+</div>
+</section>
 
 <details class="predice">
   <summary>Con \( C=\begin{pmatrix}1&2&3&0\\0&1&2&3\end{pmatrix} \), la convolución de \( x=[1,2,3,4] \) da \( [14,20] \). Si aplicas \( C^{T} \) a \( [14,20] \), ¿recuperas \( [1,2,3,4] \)?<span class="hint"></span></summary>
   <div>
-    <p><strong>No.</strong> Sale \( [14,48,82,60] \): cuatro números, pero no los originales. Transponer no es invertir: la transpuesta garantiza el <strong>tamaño</strong>, y los valores los pone el kernel que se aprende. Por eso no conviene llamarla «deconvolución».</p>
+    <p><strong>No.</strong> Sale \( [14,48,82,60] \): el tamaño sí, los valores no.</p>
   </div>
 </details>
+
+<section>
+<h2 id="chuleta">Chuleta para repasar</h2>
+<dl class="chuleta">
+  <div><dt>Kernel</dt><dd>Otra forma de llamar al filtro: la tablita de pesos.</dd></div>
+  <div><dt>Convolución transpuesta</dt><dd>Agranda un mapa estampando el kernel. Sus pesos se aprenden.</dd></div>
+  <div><dt>Sello</dt><dd>El kernel multiplicado por un número de la entrada. <em>2 · [1, 2, 3] = [2, 4, 6].</em></dd></div>
+  <div><dt>Solape</dt><dd>Donde caen varios sellos, se suman. <em>5 + 8 + 6 + 4 = 23.</em></dd></div>
+  <div><dt>Stride</dt><dd>La separación entre sellos.</dd></div>
+  <div><dt>Tamaño (valid)</dt><dd>(n − 1)·s − 2p + k. <em>(7 − 1)·2 + 3 = 15.</em></dd></div>
+  <div><dt>Tamaño (same)</dt><dd>n · s. <em>Con stride 2, el doble.</em></dd></div>
+  <div><dt><code>output_padding</code></dt><dd>Casillas extra para volver al tamaño exacto. <em>7 + 1 = 8.</em></dd></div>
+  <div><dt>Matriz transpuesta</dt><dd>La tabla de la convolución girada sobre su diagonal: de ahí el nombre.</dd></div>
+  <div><dt>No es la inversa</dt><dd>Recupera el tamaño, no los valores.</dd></div>
+</dl>
+</section>
 
 <div class="resumen">
   <h2 class="sin-num sin-toc">En tres líneas</h2>
@@ -310,175 +384,12 @@
   </div>
 </details>
 
-<section>
+<section class="ir-lab">
 <h2 class="sin-num">Código</h2>
-<!-- ---------- Fragmento 16 ---------- -->
-<article class="snippet" data-lang="python">
-  <header>
-    <h3>16 · La convolución transpuesta a mano: cada número «estampa» el kernel</h3>
-    <p class="para-que"><strong>Para qué sirve</strong> Calcular a mano, con bucles, una convolución transpuesta de una entrada 2×2 con un kernel 3×3 (cada número de la entrada estampa el kernel multiplicado por él, y los sellos se suman donde se solapan) y comprobar que <code>Conv2DTranspose</code> de Keras da <em>exactamente</em> lo mismo.</p>
-  </header>
-  <pre class="code"><code>import numpy as np
-import keras
-from keras import layers
-
-entrada = np.array([[1, 2],
-                    [3, 4]], dtype="float32")
-kernel = np.array([[1, 2, 3],
-                   [4, 5, 6],
-                   [7, 8, 9]], dtype="float32")
-
-# --- A mano: cada número de la entrada "estampa" el kernel multiplicado por él ---
-salida = np.zeros((4, 4), dtype="float32")
-for i in range(2):
-    for j in range(2):
-        sello = entrada[i, j] * kernel
-        print(f"sello de entrada[{i},{j}] = {entrada[i, j]:.0f}  (filas {i}-{i + 2}, columnas {j}-{j + 2}):")
-        print(sello.astype(int))
-        salida[i:i + 3, j:j + 3] += sello
-print("SUMA de los 4 sellos:")
-print(salida.astype(int))
-
-# --- Lo mismo con Keras: Conv2DTranspose con ese mismo kernel ---
-capa = layers.Conv2DTranspose(1, 3, strides=1, padding="valid", use_bias=False)
-capa.build((None, 2, 2, 1))
-capa.set_weights([kernel.reshape(3, 3, 1, 1)])
-keras_sal = capa(entrada.reshape(1, 2, 2, 1)).numpy()[0, :, :, 0]
-print("forma de la salida de Keras:", keras_sal.shape)
-print("Keras == a mano:", np.array_equal(keras_sal, salida))
-print("forma del kernel guardado en la capa:", capa.kernel.shape, "(alto, ancho, filtros_salida, canales_entrada)")</code></pre>
-  <details class="linea-a-linea" open>
-    <summary>Línea por línea</summary>
-    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
-    <table class="lineas">
-      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
-      <tbody>
-        <tr data-lines="1-3"><td><code>import numpy as np / import keras / from keras import layers</code></td><td>NumPy, Keras 3 y sus capas.</td></tr>
-        <tr data-lines="5-6"><td><code>entrada = np.array([[1, 2], [3, 4]], dtype="float32")</code></td><td>La entrada: un mapa de 2×2 con los números 1, 2, 3, 4.</td></tr>
-        <tr data-lines="7-9"><td><code>kernel = np.array([[1, 2, 3], [4, 5, 6], [7, 8, 9]], dtype="float32")</code></td><td>El kernel 3×3 con los números 1 a 9 (fáciles de seguir). En una red real estos pesos se aprenden.</td></tr>
-        <tr data-lines="11"><td><code># --- A mano: …</code></td><td>Comentario: idea de los sellos.</td></tr>
-        <tr data-lines="12"><td><code>salida = np.zeros((4, 4), dtype="float32")</code></td><td>Lienzo de salida de 4×4 (\((2-1)\cdot1+3=4\)), vacío de momento.</td></tr>
-        <tr data-lines="13-14"><td><code>for i in range(2): for j in range(2):</code></td><td>Recorre las 4 posiciones de la entrada (fila <code>i</code>, columna <code>j</code>).</td></tr>
-        <tr data-lines="15"><td><code>sello = entrada[i, j] * kernel</code></td><td>El «sello»: el kernel entero multiplicado por el número de esa posición. Es el corazón de la transpuesta.</td></tr>
-        <tr data-lines="16-17"><td><code>print(f"sello de entrada[{i},{j}] = …") / print(sello.astype(int))</code></td><td>Imprime qué número estampa (con su rango de filas y columnas) y el sello resultante.</td></tr>
-        <tr data-lines="18"><td><code>salida[i:i + 3, j:j + 3] += sello</code></td><td>Pega el sello en el lienzo con su esquina superior izquierda en <code>(i, j)</code> y <strong>suma</strong> (<code>+=</code>) a lo que ya hubiera. Con stride 1, el siguiente sello cae un píxel más a la derecha o abajo, y se solapan.</td></tr>
-        <tr data-lines="19-20"><td><code>print("SUMA de los 4 sellos:") / print(salida.astype(int))</code></td><td>El resultado final de la operación hecha a mano.</td></tr>
-        <tr data-lines="22"><td><code># --- Lo mismo con Keras …</code></td><td>Comentario: ahora la capa real.</td></tr>
-        <tr data-lines="23"><td><code>capa = layers.Conv2DTranspose(1, 3, strides=1, padding="valid", use_bias=False)</code></td><td>Una transpuesta con 1 filtro de 3×3, stride 1, sin padding (<code>valid</code>) y sin sesgo (para que los números sean los de la cuenta a mano).</td></tr>
-        <tr data-lines="24"><td><code>capa.build((None, 2, 2, 1))</code></td><td>Crea sus pesos para entradas de 2×2×1.</td></tr>
-        <tr data-lines="25"><td><code>capa.set_weights([kernel.reshape(3, 3, 1, 1)])</code></td><td>Mete nuestro kernel en la capa. Keras guarda el kernel de una transpuesta con forma <code>(alto, ancho, filtros_de_salida, canales_de_entrada)</code>: <strong>los dos últimos ejes están intercambiados</strong> respecto a <code>Conv2D</code>.</td></tr>
-        <tr data-lines="26"><td><code>keras_sal = capa(entrada.reshape(1, 2, 2, 1)).numpy()[0, :, :, 0]</code></td><td>Pasa la entrada (con forma de lote <code>(1, 2, 2, 1)</code>) por la capa y se queda con el mapa 4×4.</td></tr>
-        <tr data-lines="27-28"><td><code>print("forma de la salida de Keras:", …) / print("Keras == a mano:", …)</code></td><td>Comprueba la forma y que Keras da el mismo resultado exacto que los bucles.</td></tr>
-        <tr data-lines="29"><td><code>print("forma del kernel guardado en la capa:", capa.kernel.shape, …)</code></td><td>Muestra la forma del kernel almacenado: <code>(3, 3, 1, 1)</code>.</td></tr>
-      </tbody>
-    </table>
-  </details>
-  <div class="salida">
-    <strong>Salida esperada</strong>
-    <pre style="white-space:pre">sello de entrada[0,0] = 1  (filas 0-2, columnas 0-2):
-[[1 2 3]
- [4 5 6]
- [7 8 9]]
-sello de entrada[0,1] = 2  (filas 0-2, columnas 1-3):
-[[ 2  4  6]
- [ 8 10 12]
- [14 16 18]]
-sello de entrada[1,0] = 3  (filas 1-3, columnas 0-2):
-[[ 3  6  9]
- [12 15 18]
- [21 24 27]]
-sello de entrada[1,1] = 4  (filas 1-3, columnas 1-3):
-[[ 4  8 12]
- [16 20 24]
- [28 32 36]]
-SUMA de los 4 sellos:
-[[ 1  4  7  6]
- [ 7 23 33 24]
- [19 53 63 42]
- [21 52 59 36]]
-forma de la salida de Keras: (4, 4)
-Keras == a mano: True
-forma del kernel guardado en la capa: (3, 3, 1, 1) (alto, ancho, filtros_salida, canales_entrada)</pre>
-    <p>Los cuatro sellos son el kernel por 1, por 2, por 3 y por 4, colocados en las esquinas (0,0), (0,1), (1,0) y (1,1). Mira la casilla (1,1), que recibe los cuatro sellos: del sello de 1 le toca el <code>5</code> (centro del kernel) \(\cdot1\); del de 2, el <code>4</code>\(\cdot2=8\); del de 3, el <code>2</code>\(\cdot3=6\); del de 4, el <code>1</code>\(\cdot4=4\). Total \(5+8+6+4=23\). La esquina (0,0) solo la toca el primer sello (\(1\cdot1=1\)) y la (3,3) solo el cuarto (\(9\cdot4=36\)). La salida es 4×4, <strong>mayor</strong> que la entrada, y Keras coincide (<code>True</code>).</p>
-  </div>
-</article>
-
-<!-- ---------- Fragmento 18 ---------- -->
-<article class="snippet" data-lang="python">
-  <header>
-    <h3>18 · Tamaño de la salida de la transpuesta y por qué existe output_padding</h3>
-    <p class="para-que"><strong>Para qué sirve</strong> Comprobar con Keras la fórmula del tamaño de la salida de <code>Conv2DTranspose</code> (con <code>valid</code> y <code>same</code>) y ver el caso que obliga a usar <code>output_padding</code>: varias entradas distintas dan la misma salida de una convolución.</p>
-  </header>
-  <pre class="code"><code>import numpy as np
-from keras import layers
-
-def forma(capa, n):
-    return capa(np.zeros((1, n, n, 1), dtype="float32")).shape[1]
-
-k, s = 3, 2
-print("--- ida y vuelta: Conv2D(k=3, s=2, valid) y luego Conv2DTranspose(k=3, s=2) ---")
-print(" n_in | conv | transpuesta | output_padding necesario | con él, Keras da")
-for n_in in (6, 7, 8, 9):
-    conv = (n_in - k) // s + 1                                  # fórmula de la convolución
-    vuelta = (conv - 1) * s + k                                 # fórmula de la transpuesta
-    assert forma(layers.Conv2D(1, k, strides=s), n_in) == conv
-    assert forma(layers.Conv2DTranspose(1, k, strides=s), conv) == vuelta
-    falta = n_in - vuelta                                       # lo que se perdió por el redondeo
-    con_op = forma(layers.Conv2DTranspose(1, k, strides=s, output_padding=falta or None), conv)
-    print(f"{n_in:5d} | {conv:4d} | {vuelta:11d} | {falta:24d} | {con_op:16d}")
-
-print("--- padding='same': la salida es siempre n * stride ---")
-for n, s2 in ((4, 2), (7, 2), (5, 3)):
-    print(f"n={n}, stride={s2}, k=3 -&gt;", forma(layers.Conv2DTranspose(1, 3, strides=s2, padding="same"), n))
-
-print("--- fórmula general (padding valid): (n-1)*s + k + output_padding ---")
-for n, kk, ss, op in ((5, 3, 1, 0), (5, 3, 2, 0), (5, 4, 2, 0), (5, 5, 3, 1)):
-    teoria = (n - 1) * ss + kk + op
-    real = forma(layers.Conv2DTranspose(1, kk, strides=ss, output_padding=op or None), n)
-    print(f"n={n}, k={kk}, s={ss}, output_padding={op}: fórmula={teoria}, Keras={real}")</code></pre>
-  <details class="linea-a-linea" open>
-    <summary>Línea por línea</summary>
-    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
-    <table class="lineas">
-      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
-      <tbody>
-        <tr data-lines="1-2"><td><code>import numpy as np / from keras import layers</code></td><td>NumPy y las capas de Keras.</td></tr>
-        <tr data-lines="4-5"><td><code>def forma(capa, n): return capa(np.zeros((1, n, n, 1), …)).shape[1]</code></td><td>Función auxiliar: pasa una imagen de ceros de n×n por la capa y devuelve el lado de la salida.</td></tr>
-        <tr data-lines="7"><td><code>k, s = 3, 2</code></td><td>Kernel 3×3 y stride 2 para toda la primera prueba.</td></tr>
-        <tr data-lines="8-9"><td><code>print("--- ida y vuelta … ") / print(" n_in | conv | …")</code></td><td>Título y cabecera de la primera tabla.</td></tr>
-        <tr data-lines="10"><td><code>for n_in in (6, 7, 8, 9):</code></td><td>Cuatro tamaños de entrada: de 6×6 a 9×9.</td></tr>
-        <tr data-lines="11"><td><code>conv = (n_in - k) // s + 1</code></td><td>Lado tras una <code>Conv2D</code> (k=3, s=2, valid): el suelo de \((n-k)/s\), más 1.</td></tr>
-        <tr data-lines="12"><td><code>vuelta = (conv - 1) * s + k</code></td><td>Lado tras la <code>Conv2DTranspose</code> que intenta deshacerlo: \((n-1)\,s+k\).</td></tr>
-        <tr data-lines="13-14"><td><code>assert forma(…Conv2D…) == conv / assert forma(…Conv2DTranspose…) == vuelta</code></td><td><code>assert</code> comprueba que las dos fórmulas coinciden con lo que calcula Keras; si no, el programa se detendría con un error.</td></tr>
-        <tr data-lines="15"><td><code>falta = n_in - vuelta</code></td><td>Cuántos píxeles faltan para recuperar el tamaño original: el <code>output_padding</code> necesario.</td></tr>
-        <tr data-lines="16"><td><code>con_op = forma(layers.Conv2DTranspose(1, k, strides=s, output_padding=falta or None), conv)</code></td><td>Crea la transpuesta con ese <code>output_padding</code> (si <code>falta</code> es 0 se pasa <code>None</code>) y mide el lado que da.</td></tr>
-        <tr data-lines="17"><td><code>print(f"{n_in:5d} | {conv:4d} | …")</code></td><td>Una fila de la tabla.</td></tr>
-        <tr data-lines="19-21"><td><code>print("--- padding='same' …") / for n, s2 in ((4, 2), (7, 2), (5, 3)): print(…)</code></td><td>Con <code>padding=\"same\"</code> la salida mide siempre <code>n × stride</code>, sea cual sea el kernel.</td></tr>
-        <tr data-lines="23-27"><td><code>for n, kk, ss, op in (…): teoria = (n - 1) * ss + kk + op; real = forma(…); print(…)</code></td><td>Prueba la fórmula general con cuatro combinaciones de entrada, kernel, stride y <code>output_padding</code>, y la compara con Keras.</td></tr>
-      </tbody>
-    </table>
-  </details>
-  <div class="salida">
-    <strong>Salida esperada</strong>
-    <pre style="white-space:pre">--- ida y vuelta: Conv2D(k=3, s=2, valid) y luego Conv2DTranspose(k=3, s=2) ---
- n_in | conv | transpuesta | output_padding necesario | con él, Keras da
-    6 |    2 |           5 |                        1 |                6
-    7 |    3 |           7 |                        0 |                7
-    8 |    3 |           7 |                        1 |                8
-    9 |    4 |           9 |                        0 |                9
---- padding='same': la salida es siempre n * stride ---
-n=4, stride=2, k=3 -&gt; 8
-n=7, stride=2, k=3 -&gt; 14
-n=5, stride=3, k=3 -&gt; 15
---- fórmula general (padding valid): (n-1)*s + k + output_padding ---
-n=5, k=3, s=1, output_padding=0: fórmula=7, Keras=7
-n=5, k=3, s=2, output_padding=0: fórmula=11, Keras=11
-n=5, k=4, s=2, output_padding=0: fórmula=12, Keras=12
-n=5, k=5, s=3, output_padding=1: fórmula=18, Keras=18</pre>
-    <p>En la primera tabla, mira las filas <strong>7 y 8</strong>: las dos entradas, 7 y 8, dan una convolución de lado 3 (\(\lfloor(7-3)/2\rfloor+1=3\) y \(\lfloor(8-3)/2\rfloor+1=3\)). La transpuesta solo ve un 3, no sabe de cuál venía, y devuelve siempre \((3-1)\cdot2+3=7\). Para recuperar 8 hay que decírselo con <code>output_padding=1</code> (columna «output_padding necesario»; con él Keras da 8). Con 6 ocurre lo mismo (da 5, necesita 1). En 7 y 9 no hace falta. Con <code>same</code> la salida es <code>n × stride</code> (4→8, 7→14, 5→15), y la fórmula general \((n-1)s+k+\text{output\_padding}\) coincide con Keras en los cuatro casos.</p>
-  </div>
-</article>
-
+<a class="lab-card" href="laboratorio.html#paso-8"><span class="lc-ico" aria-hidden="true">🧪</span>
+  <span><strong>Ver el código de esta lección en el Laboratorio</strong>
+  <span>Paso 8 · La transpuesta a mano, sello a sello, y comprobada con Conv2DTranspose, línea a línea.</span></span></a>
+<p>Los fragmentos 18 (tamaño de salida y <code>output_padding</code>) y 17 (la matriz \( C^{T} \)) están en <a href="laboratorio.html#frag-l7">«Más código del módulo»</a>.</p>
 </section>
 
 </div>

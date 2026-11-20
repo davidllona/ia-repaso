@@ -27,15 +27,15 @@ Lab.register("curso3/c3m2-tamano-transpuesta", function (root, api) {
 
   view.draw(function (ctx, w, h, C) {
     var D = api.d, R = calc(), x0 = 8, rowH = (h - 16) / 3;
-    if (!R.ok) { D.text(ctx, "El kernel (" + st.k + ") no cabe en la entrada (" + st.n + "): no hay salida.", w / 2, h / 2, { size: 13, weight: 600, align: "center", color: C.terracotaInk }); return; }
+    if (!R.ok) { D.text(ctx, "El kernel (" + st.k + ") no cabe en la entrada (" + st.n + "): no hay salida.", w / 2, h / 2, { size: Math.max(11, 13), weight: 600, align: "center", color: C.terracotaInk }); return; }
     var maxN = Math.max(R.n, R.t, 8), cw = Math.min(30, (w - 16) / maxN), i;
     function strip(row, count, label, fillFn, markFn) {
       var y = 6 + row * rowH + 18, ch = Math.min(cw, rowH - 26);
-      D.text(ctx, label, x0, y - 6, { size: Math.min(11.5, w / 34), weight: 600, color: C.ink2 });
+      D.text(ctx, label, x0, y - 6, { size: Math.max(11, Math.min(11.5, w / 34)), weight: 600, color: C.ink2 });
       for (i = 0; i < count; i++) {
         var x = x0 + i * cw;
         D.rect(ctx, x, y, cw, ch, fillFn(i), C.line, 1);
-        if (cw >= 16) D.text(ctx, String(i + 1), x + cw / 2, y + ch / 2 + 4, { size: Math.min(10, cw * 0.38), align: "center", mono: true, color: C.muted });
+        if (cw >= 16) D.text(ctx, String(i + 1), x + cw / 2, y + ch / 2 + 4, { size: Math.max(11, Math.min(10, cw * 0.38)), align: "center", mono: true, color: C.muted });
         if (markFn) markFn(i, x, y, ch);
       }
       return { y: y, ch: ch };
@@ -46,10 +46,10 @@ Lab.register("curso3/c3m2-tamano-transpuesta", function (root, api) {
         D.line(ctx, x + 3, y + 3, x + cw - 3, y + ch - 3, C.terracota, 2); D.line(ctx, x + cw - 3, y + 3, x + 3, y + ch - 3, C.terracota, 2);
       }
     });
-    if (st.pad === "valid" && R.lost > 0) D.text(ctx, R.lost + " casilla(s) que ninguna ventana mira", x0 + R.used * cw + (R.lost * cw) / 2, s1.y + s1.ch + 12, { size: Math.min(10, w / 36), align: "center", color: C.terracotaInk });
+    if (st.pad === "valid" && R.lost > 0) D.text(ctx, R.lost + " casilla(s) que ninguna ventana mira", x0 + R.used * cw + (R.lost * cw) / 2, s1.y + s1.ch + 12, { size: Math.max(11, Math.min(10, w / 36)), align: "center", color: C.terracotaInk });
     /* 2) tras la convolución */
     strip(1, R.m, "Tras Conv2D(k=" + R.k + ", s=" + R.s + ", " + st.pad + "): m = " + R.m, function () { return C.oliva; }, function (i, x, y, ch) {
-      D.text(ctx, String(i + 1), x + cw / 2, y + ch / 2 + 4, { size: Math.min(10, cw * 0.38), align: "center", mono: true, color: C.paper });
+      D.text(ctx, String(i + 1), x + cw / 2, y + ch / 2 + 4, { size: Math.max(11, Math.min(10, cw * 0.38)), align: "center", mono: true, color: C.paper });
     });
     /* 3) tras la transpuesta */
     var s3 = strip(2, R.t, "Tras Conv2DTranspose(k=" + R.k + ", s=" + R.s + ", " + st.pad + (R.op ? ", output_padding=" + R.op : "") + "): " + R.t, function (i) {
@@ -59,7 +59,7 @@ Lab.register("curso3/c3m2-tamano-transpuesta", function (root, api) {
     D.rect(ctx, x0, s3.y - 1, R.n * cw, s3.ch + 2, null, C.ink, 2);
     if (R.t < R.n) {
       for (i = R.t; i < R.n; i++) D.rect(ctx, x0 + i * cw, s3.y, cw, s3.ch, null, C.terracota, 1.5);
-      D.text(ctx, "faltan " + (R.n - R.t), x0 + R.t * cw + ((R.n - R.t) * cw) / 2, s3.y + s3.ch + 12, { size: Math.min(10.5, w / 34), align: "center", color: C.terracotaInk, weight: 600 });
+      D.text(ctx, "faltan " + (R.n - R.t), x0 + R.t * cw + ((R.n - R.t) * cw) / 2, s3.y + s3.ch + 12, { size: Math.max(11, Math.min(10.5, w / 34)), align: "center", color: C.terracotaInk, weight: 600 });
     }
   });
 

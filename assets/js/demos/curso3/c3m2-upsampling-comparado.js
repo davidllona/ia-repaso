@@ -63,13 +63,13 @@ Lab.register("curso3/c3m2-upsampling-comparado", function (root, api) {
   function paint(view, data, title, vmax, editable) {
     view.draw(function (ctx, w, h, C) {
       var D = api.d, n = data.length, g = geom(w, h, n), i, j;
-      D.text(ctx, title, w / 2, 14, { size: Math.min(11, w / 22), weight: 600, align: "center", color: C.ink2 });
+      D.text(ctx, title, w / 2, 14, { size: Math.max(11, Math.min(11, w / 22)), weight: 600, align: "center", color: C.ink2 });
       for (i = 0; i < n; i++) for (j = 0; j < n; j++) {
         var v = data[i][j], x = g.x + j * g.sz, y = g.y + i * g.sz, t = Math.max(0, Math.min(1, v / vmax));
         D.rect(ctx, x, y, g.sz, g.sz, C.surface);
         ctx.save(); ctx.globalAlpha = 0.06 + 0.94 * t; D.rect(ctx, x, y, g.sz, g.sz, C.cobalto); ctx.restore();
         D.rect(ctx, x, y, g.sz, g.sz, null, C.line, 0.5);
-        if (g.sz >= 24) D.text(ctx, (Math.abs(v - Math.round(v)) < 0.005 ? String(Math.round(v)) : v.toFixed(1)), x + g.sz / 2, y + g.sz / 2 + 4, { size: Math.min(12, g.sz * 0.36), align: "center", mono: true, weight: 600, color: t > 0.55 ? C.paper : C.ink });
+        if (g.sz >= 24) D.text(ctx, (Math.abs(v - Math.round(v)) < 0.005 ? String(Math.round(v)) : v.toFixed(1)), x + g.sz / 2, y + g.sz / 2 + 4, { size: Math.max(11, Math.min(12, g.sz * 0.36)), align: "center", mono: true, weight: 600, color: t > 0.55 ? C.paper : C.ink });
       }
       D.rect(ctx, g.x, g.y, g.sz * n, g.sz * n, null, C.ink, 1.5);
     });

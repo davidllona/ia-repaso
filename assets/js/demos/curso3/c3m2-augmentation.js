@@ -86,7 +86,7 @@ Lab.register("curso3/c3m2-augmentation", function (root, api) {
     return list;
   }
 
-  var view = api.view(root, { aspect: 1.25, minH: 300, maxH: 600, label: "Doce versiones de un mismo póster tras aplicar transformaciones" });
+  var view = api.view(root, { aspect: 1.25, minH: 440, maxH: 600, label: "Doce versiones de un mismo póster tras aplicar transformaciones" });
   var ui = api.controls(root), out = api.readout(root);
   ui.segmented({ label: "Qué ver", options: [["ext", "Cada transformación al máximo"], ["rnd", "12 sorteos aleatorios"]], value: st.mode, onChange: function (v) { st.mode = v; update(); } });
   ui.slider({ label: "Giro ± (grados)", min: 0, max: 90, step: 5, value: st.rot, onInput: function (v) { st.rot = v; update(); } });
@@ -102,7 +102,7 @@ Lab.register("curso3/c3m2-augmentation", function (root, api) {
   var tmp = document.createElement("canvas"); tmp.width = N; tmp.height = N;
   var tctx = tmp.getContext("2d");
   view.draw(function (ctx, w, h, C) {
-    var D = api.d, tiles = st.mode === "ext" ? extremes() : randoms(), cols = 4, rows = 3;
+    var D = api.d, tiles = st.mode === "ext" ? extremes() : randoms(), cols = w < 480 ? 3 : 4, rows = 12 / cols;
     var tw = Math.min(w / cols, (h - 6) / rows - 15), gx = (w - tw * cols) / 2 + 0;
     var cellW = w / cols, cellH = (h - 4) / rows;
     tiles.forEach(function (T, k) {
@@ -113,7 +113,7 @@ Lab.register("curso3/c3m2-augmentation", function (root, api) {
       var s = tw - 6, x0 = c * cellW + (cellW - s) / 2;
       ctx.save(); ctx.imageSmoothingEnabled = false; ctx.drawImage(tmp, x0, py, s, s); ctx.restore();
       D.rect(ctx, x0, py, s, s, null, k === 0 ? C.terracota : C.ink, k === 0 ? 2 : 1);
-      D.text(ctx, T.label, c * cellW + cellW / 2, py + s + 12, { size: Math.min(10.5, cellW / 9.4), align: "center", mono: true, color: C.ink2 });
+      D.text(ctx, T.label, c * cellW + cellW / 2, py + s + 12, { size: Math.max(11, Math.min(12, cellW / 9.4)), align: "center", mono: true, color: C.ink2 });
     });
   });
 

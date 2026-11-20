@@ -21,50 +21,113 @@
       <p class="eyebrow">Curso 3 · Módulo 2 · Lección 4 de 8</p>
       <h1>Un atajo y = x + F(x) deja pasar el gradiente por cientos de capas</h1>
       <p class="lead">El montador no vuelve a rodar la película: parte de la versión anterior y marca solo los cambios. Un bloque residual hace lo mismo, y así el gradiente llega entero hasta la primera capa.</p>
-      <p class="meta-line"><span class="read-time" data-render="read-time"></span><a href="../modulo-2.html">Índice del módulo</a></p>
+      <p class="meta-line"><span class="read-time" data-render="read-time"></span><a href="../modulo-2.html">Índice del módulo</a> · <a href="#chuleta">Ir a la chuleta</a></p>
     </div>
     <div class="hero-tile" aria-hidden="true"></div>
   </div>
 </header>
 <details class="predice">
-  <summary>En 2015, una red plana de 56 capas daba más error que una de 20, <em>incluso en entrenamiento</em>. ¿Es sobreajuste?<span class="hint"></span></summary>
+  <summary>En 2015, una red de 56 capas daba más error que una de 20, <em>incluso con los datos de entrenamiento</em>. ¿Es sobreajuste?<span class="hint"></span></summary>
   <div>
-    <p><strong>No.</strong> Con sobreajuste el error de entrenamiento baja; aquí subía. La red grande podría imitar a la pequeña (bastaría con que sus capas sobrantes no hicieran nada), pero el optimizador no lo encontraba. Parte del motivo: el <strong>gradiente se desvanece</strong> al cruzar tantas capas.</p>
+    <p><strong>No.</strong> Sobreajustar es memorizar: el error de entrenamiento baja mucho. Aquí subía. La red grande podría imitar a la pequeña (bastaría con que sus capas sobrantes no hicieran nada), pero el entrenamiento no lo conseguía.</p>
   </div>
 </details>
 
 <section>
-<h2 id="idea">Aprender solo lo que cambia</h2>
-<p>Al retropropagar, el gradiente es como un mensaje que pasa de boca en boca por una fila de amigos (las capas): cada uno lo multiplica por un factor. Si ese factor es menor que 1, tras muchas capas el mensaje se queda en nada y las primeras capas no aprenden.</p>
-<p>Un <strong>bloque residual</strong> no calcula \( y=H(x) \) entero, sino</p>
-<div class="formula">\[ y = x + F(x) \qquad\qquad \frac{\partial y}{\partial x} = 1 + F'(x) \]</div>
-<p>Es el montador de la película: conserva la versión anterior (\( x \)) y añade solo la corrección \( F(x) \). Si lo mejor es no cambiar nada, basta con llevar \( F \) a 0. Y ese «+1» de la derivada es una autopista por la que el gradiente baja sin encogerse.</p>
-<p>En Keras el atajo es <code>layers.Add()([x, F])</code>. Las dos ramas deben tener <strong>la misma forma</strong>; si el bloque reduce con stride 2 o cambia de canales, el atajo pasa por una <strong>convolución 1×1 con ese stride</strong> (la proyección).</p>
+<h2 id="degradacion">1 · El problema: más capas, peor resultado</h2>
+<p>Tras VGG, la idea obvia era apilar más capas. Pero pasadas unas 20, las redes <strong>planas</strong> (capas una detrás de otra, sin más) empeoraban. Se le llamó <strong>degradación</strong>.</p>
+<p>Parte del motivo está en cómo aprende la red. Lo vemos con un mensaje que pasa de boca en boca.</p>
 </section>
 
-<figure class="demo" data-demo="curso3/c3m2-bloque-residual" data-titulo="El mensaje de boca en boca: gradiente en cada capa, red plana frente a red con atajos">
-  <div class="haz">Deja la profundidad en 20 y compara las dos curvas. Luego súbela a 60.</div>
-  <div class="observa">En la red plana el gradiente de las primeras capas cae muchos órdenes de magnitud; con atajos se mantiene.</div>
-</figure>
+<section>
+<h2 id="idea">2 · El gradiente, de boca en boca</h2>
+<p>Al entrenar, la red mide su error al final y manda hacia atrás una señal: el <strong>gradiente</strong>. A cada peso le dice cuánto y hacia dónde corregirse. Ese viaje hacia atrás se llama <strong>retropropagación</strong>.</p>
+<p>Cada capa por la que pasa multiplica la señal por un factor, como amigos en fila que repiten el mensaje cada vez más bajito. Si el factor es menor que 1, el mensaje se apaga.</p>
+<div class="anim-pasos" data-titulo="20 amigos en fila">
+  <div class="paso"><p><strong>1.</strong> Red plana: cada capa multiplica la señal por 0,5.</p><span class="grande">1 → 0,5 → 0,25 → 0,125…</span></div>
+  <div class="paso"><p><strong>2.</strong> Tras 10 capas:</p><span class="grande">0,5¹⁰ ≈ 0,001</span></div>
+  <div class="paso"><p><strong>3.</strong> Tras 20 capas, una millonésima. Las primeras capas casi no aprenden.</p><span class="grande">0,5²⁰ ≈ 0,00000095</span></div>
+  <div class="paso"><p><strong>4.</strong> Si en cambio cada capa multiplicara por 1,05:</p><span class="grande">1,05²⁰ ≈ 2,65</span></div>
+  <div class="paso"><p><strong>5.</strong> El mensaje llega entero. Ese 1,05 es justo lo que consigue un atajo.</p><span class="grande">≈ 1 + algo</span></div>
+</div>
+</section>
 
 <section>
-<h2 id="numeros">Con números: 20 amigos en fila</h2>
-<div class="callout ejemplo">
-  <span class="lbl">Ejemplo numérico: el producto de 20 factores</span>
-  <ol class="pasos">
-    <li><strong>Red plana:</strong> cada capa multiplica por 0,5. Tras 20: \( 0{,}5^{20} = \) <span class="res">\( 9{,}5\cdot10^{-7} \)</span>. Una millonésima.</li>
-    <li><strong>Con atajos:</strong> cada capa multiplica por \( 1+F'=1{,}05 \). Tras 20: \( 1{,}05^{20} = \) <span class="res">2,65</span>. El mensaje llega entero.</li>
-    <li><strong>Medido de verdad</strong> (fragmento 7, 22 capas con sigmoides): gradiente en la primera capa 3,6·10⁻¹⁴ sin atajos frente a 2,6 con ellos.</li>
-  </ol>
+<h2 id="residual">3 · El bloque residual: y = x + F(x)</h2>
+<p>Un <strong>bloque residual</strong> no intenta calcular el resultado entero. Calcula solo <strong>qué añadir</strong> a lo que ya tenía, \( F(x) \), y lo suma a la entrada \( x \):</p>
+<div class="formula">\[ y = x + F(x) \]</div>
+<figure class="figura">
+  <svg viewBox="0 0 640 230" role="img" aria-label="La entrada x entra en dos convoluciones que calculan F de x; un atajo lleva x por encima hasta un sumador; la salida es x más F de x">
+    <text x="40" y="140" font-size="24" font-weight="600">x</text>
+    <line x1="64" y1="132" x2="140" y2="132" class="stroke" stroke-width="3"/>
+    <rect x="140" y="105" width="110" height="54" class="fill-b"/>
+    <text x="195" y="140" font-size="20" text-anchor="middle">conv</text>
+    <line x1="250" y1="132" x2="300" y2="132" class="stroke" stroke-width="3"/>
+    <rect x="300" y="105" width="110" height="54" class="fill-b"/>
+    <text x="355" y="140" font-size="20" text-anchor="middle">conv</text>
+    <line x1="410" y1="132" x2="476" y2="132" class="stroke" stroke-width="3"/>
+    <text x="275" y="190" font-size="20" text-anchor="middle" class="muted">F(x): la corrección</text>
+    <path d="M100 132 V40 H500 V108" fill="none" class="stroke" stroke-width="3"/>
+    <text x="300" y="30" font-size="20" text-anchor="middle">atajo: x pasa tal cual</text>
+    <circle cx="500" cy="132" r="24" class="fill-d"/>
+    <text x="500" y="140" font-size="26" text-anchor="middle" font-weight="600">+</text>
+    <line x1="524" y1="132" x2="570" y2="132" class="stroke" stroke-width="3"/>
+    <text x="574" y="140" font-size="22">y</text>
+  </svg>
+  <figcaption>Arriba, el atajo. Abajo, las capas que aprenden solo la diferencia.</figcaption>
+</figure>
+<p>Es el montador: conserva la versión anterior (\( x \)) y marca solo los cambios. Si lo mejor es no tocar nada, basta con que \( F \) dé 0.</p>
+</section>
+
+<section>
+<h2 id="numeros">4 · El «+1» que salva el gradiente</h2>
+<p>Hacia atrás, el factor de un bloque residual es \( 1 + F' \): el 1 del atajo más lo que aporten las capas. Aunque \( F' \) sea pequeño, el factor queda cerca de 1 y la señal no se apaga.</p>
+<p>Medido de verdad con 20 capas: en la primera, el gradiente vale 3,6·10⁻¹⁴ sin atajos y 2,6 con atajos.</p>
+<figure class="demo" data-demo="curso3/c3m2-bloque-residual" data-titulo="El mensaje de boca en boca: gradiente en cada capa, red plana frente a red con atajos">
+  <div class="haz">Deja la profundidad en 20 y compara las dos curvas. Luego súbela a 60.</div>
+  <div class="observa">En la red plana el gradiente de las primeras capas se hunde; con atajos se mantiene.</div>
+</figure>
+</section>
+
+<section>
+<h2 id="keras">5 · En Keras: Add y la proyección 1×1</h2>
+<p>En Keras el atajo es la capa <code>Add</code>, que suma dos ramas. Las dos deben tener <strong>la misma forma</strong> (alto, ancho y canales). Si el bloque encoge el mapa o cambia de canales, el atajo pasa por una convolución 1×1 con el mismo salto: la <strong>proyección</strong>.</p>
+<div class="anim-pasos" data-titulo="Un bloque que encoge, con números">
+  <div class="paso"><p><strong>1.</strong> Entra un mapa de 8×8 con 8 canales.</p><span class="grande">x: (8, 8, 8)</span></div>
+  <div class="paso"><p><strong>2.</strong> La rama principal salta de 2 en 2 y usa 16 filtros.</p><span class="grande">F(x): (4, 4, 16)</span></div>
+  <div class="paso"><p><strong>3.</strong> Sumar (8, 8, 8) con (4, 4, 16) es imposible.</p><span class="grande">✗ formas distintas</span></div>
+  <div class="paso"><p><strong>4.</strong> Proyección: un 1×1 con 16 filtros y salto 2 sobre el atajo.</p><span class="grande">x: (4, 4, 16)</span></div>
+  <div class="paso"><p><strong>5.</strong> Ahora sí se suman.</p><span class="grande">Add → (4, 4, 16)</span></div>
 </div>
+</section>
+
+<section>
+<h2 id="resnet-50">6 · ResNet-50, contada</h2>
+<p><strong>ResNet</strong> (2015) apila bloques residuales. ResNet-50 tiene 1 convolución inicial, 16 bloques de 3 convoluciones y 1 densa final: \( 1+48+1=50 \) capas con pesos. Con atajos se llegó a 152 capas y más.</p>
 </section>
 
 <details class="predice">
   <summary>Comparas una red de solo dos bloques con y sin atajos. ¿La de atajos acierta claramente más?<span class="hint"></span></summary>
   <div>
-    <p><strong>No:</strong> en el fragmento 6 las dos dan 0,980. Con pocas capas el gradiente llega bien de todos modos. Los atajos no hacen magia en redes pequeñas; marcan la diferencia con 50, 101 o 152 capas.</p>
+    <p><strong>No:</strong> en el laboratorio las dos aciertan alrededor del 98 %. Con pocas capas el gradiente llega bien de todos modos. Los atajos marcan la diferencia con 50, 101 o 152 capas.</p>
   </div>
 </details>
+
+<section>
+<h2 id="chuleta">Chuleta para repasar</h2>
+<dl class="chuleta">
+  <div><dt>Red plana</dt><dd>Capas una detrás de otra, sin atajos.</dd></div>
+  <div><dt>Degradación</dt><dd>Más capas, más error incluso entrenando. No es sobreajuste.</dd></div>
+  <div><dt>Gradiente</dt><dd>La señal que dice a cada peso cuánto y hacia dónde corregirse.</dd></div>
+  <div><dt>Retropropagación</dt><dd>El viaje del gradiente desde el final hasta la primera capa.</dd></div>
+  <div><dt>Gradiente que se desvanece</dt><dd>Multiplicar muchos factores menores que 1. <em>0,5²⁰ ≈ una millonésima.</em></dd></div>
+  <div><dt>Bloque residual</dt><dd>y = x + F(x): la capa aprende solo qué añadir.</dd></div>
+  <div><dt>Atajo</dt><dd>El camino por el que x llega intacta a la suma. Hacia atrás aporta el «+1».</dd></div>
+  <div><dt><code>Add</code></dt><dd>La capa de Keras que suma dos ramas de la misma forma.</dd></div>
+  <div><dt>Proyección 1×1</dt><dd>Convolución 1×1 en el atajo para igualar tamaño y canales.</dd></div>
+  <div><dt>ResNet-50</dt><dd>1 + 16 × 3 + 1 = 50 capas con pesos.</dd></div>
+</dl>
+</section>
 
 <div class="resumen">
   <h2 class="sin-num sin-toc">En tres líneas</h2>
@@ -88,7 +151,7 @@
     "Unos 9,5·10⁻⁷ en la plana y unos 2,65 con atajos"
    ],
    "correcta": 3,
-   "porque": "Los factores se multiplican capa a capa (regla de la cadena), no se suman: 0,5²⁰ ≈ 9,5·10⁻⁷ y 1,05²⁰ ≈ 2,65. Esa es la diferencia entre una primera capa que no aprende (una millonésima del gradiente) y una que sí. Sumar (10 y 21) o quedarse con un solo factor (0,5 y 1,05) confunde la regla de la cadena con una suma."
+   "porque": "Los factores se multiplican capa a capa (así viaja el gradiente hacia atrás), no se suman: 0,5²⁰ ≈ 9,5·10⁻⁷ y 1,05²⁰ ≈ 2,65. Esa es la diferencia entre una primera capa que no aprende (una millonésima del gradiente) y una que sí. Sumar (10 y 21) o quedarse con un solo factor (0,5 y 1,05) confunde multiplicar con sumar."
   },
   {
    "q": "En un bloque residual, la rama principal reduce el mapa con stride 2 y duplica los canales. ¿Qué tiene que hacer el atajo para poder usar <code>Add()</code>?",
@@ -96,10 +159,10 @@
     "Nada: <code>Add</code> acepta formas distintas y las ajusta",
     "Pasar por una <code>Conv2D</code> 1×1 con stride 2 y el mismo número de filtros que la rama principal",
     "Pasar por un <code>MaxPooling2D</code> para igualar solo el tamaño",
-    "Sumar igualmente: el broadcasting resolverá la diferencia"
+    "Sumar igualmente: Keras repetirá los valores que falten"
    ],
    "correcta": 1,
-   "porque": "Add exige formas idénticas. La proyección 1×1 con el mismo stride reduce el tamaño espacial y con el mismo número de filtros iguala los canales, y solo cuesta (C_ent + 1)·C_sal pesos. El pooling no cambia el número de canales; el broadcasting no arregla una diferencia de tamaño espacial (daría un error de formas); y Add no ajusta nada por su cuenta."
+   "porque": "Add exige formas idénticas. La proyección 1×1 con el mismo stride reduce el alto y el ancho y con el mismo número de filtros iguala los canales, y solo cuesta (C_ent + 1)·C_sal pesos. El pooling no cambia el número de canales; repetir valores no arregla una diferencia de alto y ancho (daría un error de formas); y Add no ajusta nada por su cuenta."
   },
   {
    "q": "¿De dónde sale el «50» de ResNet-50?",
@@ -109,7 +172,7 @@
     "De 50 bloques residuales"
    ],
    "correcta": 1,
-   "porque": "Hay 3 + 4 + 6 + 3 = 16 bloques de cuello de botella con 3 convoluciones cada uno (48), más la convolución inicial y la densa final: 50 capas con pesos. Keras cuenta 177 porque también cuenta BatchNorm, ReLU, Add y padding."
+   "porque": "Hay 3 + 4 + 6 + 3 = 16 bloques de cuello de botella con 3 convoluciones cada uno (48), más la convolución inicial y la densa final: 50 capas con pesos. Keras cuenta 177 porque también cuenta capas sin pesos de convolución, como ReLU, Add o las de normalización."
   }
  ]
 }
@@ -179,169 +242,12 @@
   </div>
 </details>
 
-<section>
+<section class="ir-lab">
 <h2 class="sin-num">Código</h2>
-<!-- ---------- Fragmento 6 ---------- -->
-<article class="snippet" data-lang="python">
-  <header>
-    <h3>6 · Un bloque residual en Keras: la capa Add y el atajo de proyección</h3>
-    <p class="para-que"><strong>Para qué sirve</strong> Escribir con la API funcional un <em>bloque residual</em> de ResNet (con BatchNorm y atajo de proyección 1×1 cuando cambia la forma), ver qué capas suma <code>Add</code> y compararlo con la misma red sin atajos.</p>
-  </header>
-  <pre class="code"><code>import numpy as np
-import keras
-from keras import layers
-from sklearn.datasets import load_digits
-from sklearn.model_selection import train_test_split
-
-def bloque(x, filtros, stride=1, residual=True):
-    atajo = x
-    x = layers.Conv2D(filtros, 3, strides=stride, padding="same", use_bias=False)(x)
-    x = layers.BatchNormalization()(x)
-    x = layers.Activation("relu")(x)
-    x = layers.Conv2D(filtros, 3, padding="same", use_bias=False)(x)
-    x = layers.BatchNormalization()(x)
-    if not residual:
-        return layers.Activation("relu")(x)
-    if stride != 1 or atajo.shape[-1] != filtros:
-        atajo = layers.Conv2D(filtros, 1, strides=stride, use_bias=False)(atajo)
-        atajo = layers.BatchNormalization()(atajo)
-    x = layers.Add()([x, atajo])
-    return layers.Activation("relu")(x)
-
-def mini_resnet(residual=True):
-    entrada = keras.Input(shape=(8, 8, 1))
-    x = layers.Conv2D(8, 3, padding="same", activation="relu")(entrada)
-    x = bloque(x, 8, residual=residual)
-    x = bloque(x, 16, stride=2, residual=residual)
-    x = layers.GlobalAveragePooling2D()(x)
-    salida = layers.Dense(10, activation="softmax")(x)
-    return keras.Model(entrada, salida, name="resnet" if residual else "plana")
-
-modelo = mini_resnet()
-for capa in modelo.layers:
-    if isinstance(capa, layers.Add):
-        origenes = [t._keras_history.operation.name for t in capa.input]
-        print(f"{capa.name} suma las salidas de: {origenes} -&gt; {capa.output.shape[1:]}")
-
-digitos = load_digits()
-X = (digitos.images / 16.0).astype("float32")[..., None]
-Xtr, Xte, ytr, yte = train_test_split(X, digitos.target, test_size=0.25, random_state=0, stratify=digitos.target)
-
-for residual in (False, True):
-    keras.utils.set_random_seed(0)
-    m = mini_resnet(residual)
-    m.compile("adam", "sparse_categorical_crossentropy", metrics=["accuracy"])
-    m.fit(Xtr, ytr, epochs=25, batch_size=32, verbose=0)
-    acc = m.evaluate(Xte, yte, verbose=0)[1]
-    print(f"{m.name:8s} parámetros={m.count_params():5d}  precisión en test={acc:.3f}")</code></pre>
-  <details class="linea-a-linea" open>
-    <summary>Línea por línea</summary>
-    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
-    <table class="lineas">
-      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
-      <tbody>
-        <tr data-lines="1-3"><td><code>import numpy as np / import keras / from keras import layers</code></td><td>NumPy, Keras 3 y sus capas.</td></tr>
-        <tr data-lines="4-5"><td><code>from sklearn… load_digits / train_test_split</code></td><td>Del paquete scikit-learn: el conjunto de 1 797 dígitos 8×8 (viene instalado, no hay que descargarlo) y la función que lo parte en entrenamiento y prueba.</td></tr>
-        <tr data-lines="7"><td><code>def bloque(x, filtros, stride=1, residual=True):</code></td><td>Función que añade un bloque al tensor <code>x</code>. <code>residual=False</code> quitará el atajo para poder comparar.</td></tr>
-        <tr data-lines="8"><td><code>atajo = x</code></td><td>Guarda la entrada del bloque: es la autopista del atajo.</td></tr>
-        <tr data-lines="9-11"><td><code>Conv2D → BatchNormalization → Activation("relu")</code></td><td>Primera mitad de \(F(x)\): una 3×3 (sin sesgo, <code>use_bias=False</code>, porque la BatchNorm que viene después ya añade un desplazamiento), su normalización por lotes y ReLU. Aquí es donde se aplica el <code>stride</code> si queremos reducir.</td></tr>
-        <tr data-lines="12-13"><td><code>Conv2D → BatchNormalization</code></td><td>Segunda 3×3 con su normalización, <strong>sin ReLU todavía</strong>: se aplica después de la suma.</td></tr>
-        <tr data-lines="14-15"><td><code>if not residual: return layers.Activation("relu")(x)</code></td><td>Versión «plana»: aplica la ReLU y devuelve el resultado sin sumar la entrada.</td></tr>
-        <tr data-lines="16"><td><code>if stride != 1 or atajo.shape[-1] != filtros:</code></td><td>Comprueba si la forma de \(F(x)\) ha cambiado respecto a <code>x</code>: ¿se redujo el tamaño (stride≠1) o cambió el número de canales? Si es así no se pueden sumar tal cual.</td></tr>
-        <tr data-lines="17-18"><td><code>atajo = Conv2D(filtros, 1, strides=stride, …) → BatchNormalization</code></td><td><strong>Atajo de proyección</strong>: una convolución 1×1 con el mismo stride y los mismos canales que la rama principal, para que ambas tengan igual forma.</td></tr>
-        <tr data-lines="19"><td><code>x = layers.Add()([x, atajo])</code></td><td>Suma elemento a elemento la rama principal y el atajo: \(y = F(x) + x\). <code>Add</code> no tiene parámetros y exige formas idénticas.</td></tr>
-        <tr data-lines="20"><td><code>return layers.Activation("relu")(x)</code></td><td>ReLU sobre la suma y fin del bloque.</td></tr>
-        <tr data-lines="22"><td><code>def mini_resnet(residual=True):</code></td><td>Función que construye la red completa, con o sin atajos.</td></tr>
-        <tr data-lines="23-24"><td><code>entrada = keras.Input(…) / x = Conv2D(8, …)</code></td><td>Entrada de 8×8×1 y una convolución inicial de 8 filtros.</td></tr>
-        <tr data-lines="25-26"><td><code>x = bloque(x, 8, …) / x = bloque(x, 16, stride=2, …)</code></td><td>Dos bloques: el primero mantiene la forma (8×8×8); el segundo la reduce a 4×4 y duplica los canales a 16, así que necesita atajo de proyección.</td></tr>
-        <tr data-lines="27-28"><td><code>GlobalAveragePooling2D → Dense(10, softmax)</code></td><td>Promedia cada mapa a un número y clasifica en 10 dígitos.</td></tr>
-        <tr data-lines="29"><td><code>return keras.Model(entrada, salida, name=…)</code></td><td>Crea el modelo funcional uniendo entrada y salida; el nombre es «resnet» o «plana».</td></tr>
-        <tr data-lines="31"><td><code>modelo = mini_resnet()</code></td><td>Construye la versión con atajos.</td></tr>
-        <tr data-lines="32-33"><td><code>for capa in modelo.layers: if isinstance(capa, layers.Add):</code></td><td>Busca las capas <code>Add</code>.</td></tr>
-        <tr data-lines="34"><td><code>origenes = [t._keras_history.operation.name for t in capa.input]</code></td><td>Averigua qué capas produjeron las dos entradas de la suma. <code>_keras_history</code> es un atributo interno de Keras que guarda de dónde viene cada tensor; sirve aquí para ver el grafo.</td></tr>
-        <tr data-lines="35"><td><code>print(f"{capa.name} suma las salidas de: {origenes} -&gt; …")</code></td><td>Imprime qué suma cada <code>Add</code> y la forma resultante.</td></tr>
-        <tr data-lines="37-39"><td><code>digitos = load_digits() … train_test_split(…)</code></td><td>Carga los dígitos, los escala a 0-1 dividiendo por 16 (el máximo), añade el eje de canales con <code>[..., None]</code> y reserva el 25 % para prueba, con la misma proporción de cada dígito (<code>stratify</code>) y semilla fija.</td></tr>
-        <tr data-lines="41"><td><code>for residual in (False, True):</code></td><td>Entrena las dos versiones, primero la plana y luego la residual.</td></tr>
-        <tr data-lines="42-43"><td><code>keras.utils.set_random_seed(0) / m = mini_resnet(residual)</code></td><td>Fija las semillas para que el experimento sea reproducible y construye la red.</td></tr>
-        <tr data-lines="44-45"><td><code>m.compile(…) / m.fit(…, epochs=25, batch_size=32, verbose=0)</code></td><td>Compila con Adam y entropía cruzada para etiquetas enteras, y entrena 25 épocas sin escribir el progreso.</td></tr>
-        <tr data-lines="46-47"><td><code>acc = m.evaluate(…)[1] / print(…)</code></td><td>Mide la precisión en los datos de prueba (el segundo valor que devuelve <code>evaluate</code>) y la imprime junto con los parámetros.</td></tr>
-      </tbody>
-    </table>
-  </details>
-  <div class="salida">
-    <strong>Salida esperada</strong>
-    <pre style="white-space:pre">add suma las salidas de: ['batch_normalization_1', 'conv2d'] -&gt; (8, 8, 8)
-add_1 suma las salidas de: ['batch_normalization_3', 'batch_normalization_4'] -&gt; (4, 4, 16)
-plana    parámetros= 5050  precisión en test=0.980
-resnet   parámetros= 5242  precisión en test=0.980</pre>
-    <p>Las dos líneas del principio muestran que <code>Add</code> junta <strong>dos ramas</strong>: en el primer bloque, la salida de la BatchNorm y la salida de la convolución inicial (el atajo directo, forma 8×8×8); en el segundo, la rama principal y el <strong>atajo de proyección</strong> (la BatchNorm tras la 1×1), forma 4×4×16. Los atajos cuestan 192 parámetros extra (5 242 − 5 050): esa es la proyección. En esta red de solo dos bloques <strong>no hay ventaja visible</strong> (0,980 las dos): los atajos brillan cuando hay decenas de capas, como enseña el fragmento siguiente. Ser honesto con esto es parte de entenderlo.</p>
-  </div>
-</article>
-
-<!-- ---------- Fragmento 7 ---------- -->
-<article class="snippet" data-lang="python">
-  <header>
-    <h3>7 · Gradiente por capa: red plana frente a red con atajos</h3>
-    <p class="para-que"><strong>Para qué sirve</strong> Medir con <code>tf.GradientTape</code> cuánto gradiente llega a cada capa en una red de 22 capas con pesos, con y sin atajos. Es la demostración numérica de por qué \(y=x+F(x)\) permite entrenar redes profundas.</p>
-  </header>
-  <pre class="code"><code>import numpy as np
-import keras
-import tensorflow as tf
-from keras import layers
-
-def red(profundidad, residual):
-    entrada = keras.Input(shape=(16,))
-    x = layers.Dense(16, activation="sigmoid")(entrada)
-    for _ in range(profundidad):
-        h = layers.Dense(16, activation="sigmoid")(x)
-        x = layers.Add()([x, h]) if residual else h
-    return keras.Model(entrada, layers.Dense(1)(x))
-
-rng = np.random.default_rng(0)
-X = rng.normal(size=(64, 16)).astype("float32")
-y = rng.normal(size=(64, 1)).astype("float32")
-
-for residual in (False, True):
-    keras.utils.set_random_seed(1)
-    modelo = red(20, residual)
-    with tf.GradientTape() as cinta:
-        perdida = tf.reduce_mean(keras.losses.mean_squared_error(y, modelo(X)))
-    grads = cinta.gradient(perdida, modelo.trainable_variables)
-    normas = [float(tf.norm(g)) for g, v in zip(grads, modelo.trainable_variables)
-              if "kernel" in v.path]
-    nombre = "con atajos" if residual else "plana     "
-    print(nombre, " ".join(f"capa{i + 1:2d}={normas[i]:.1e}" for i in (0, 4, 9, 14, 19)),
-          f"| primera/última = {normas[0] / normas[19]:.1e}")</code></pre>
-  <details class="linea-a-linea" open>
-    <summary>Línea por línea</summary>
-    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
-    <table class="lineas">
-      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
-      <tbody>
-        <tr data-lines="1-4"><td><code>import numpy / keras / tensorflow / layers</code></td><td>NumPy para datos, Keras para el modelo y <code>tensorflow</code> solo para <code>GradientTape</code> (el cuaderno que graba las operaciones para derivar).</td></tr>
-        <tr data-lines="6"><td><code>def red(profundidad, residual):</code></td><td>Construye una red de <code>profundidad</code> capas ocultas, con atajos o sin ellos.</td></tr>
-        <tr data-lines="7-8"><td><code>entrada = keras.Input(shape=(16,)) / x = Dense(16, sigmoid)(entrada)</code></td><td>Entrada de 16 números y una primera capa densa de 16 neuronas con sigmoide (a propósito: es la activación que más encoge el gradiente).</td></tr>
-        <tr data-lines="9-11"><td><code>for _ in range(profundidad): h = Dense(16, …)(x); x = Add()([x, h]) if residual else h</code></td><td>Repite la capa. Si es residual, la salida es \(x+h\) (atajo); si no, es solo \(h\). La expresión <code>A if condición else B</code> elige entre las dos.</td></tr>
-        <tr data-lines="12"><td><code>return keras.Model(entrada, layers.Dense(1)(x))</code></td><td>Cierra con una neurona lineal de salida y crea el modelo.</td></tr>
-        <tr data-lines="14-16"><td><code>rng = np.random.default_rng(0) … X, y</code></td><td>Genera 64 ejemplos aleatorios de 16 números y 64 objetivos aleatorios con semilla. No importa qué aprende: solo queremos ver cómo viaja el gradiente.</td></tr>
-        <tr data-lines="18"><td><code>for residual in (False, True):</code></td><td>Mide las dos redes.</td></tr>
-        <tr data-lines="19-20"><td><code>keras.utils.set_random_seed(1) / modelo = red(20, residual)</code></td><td>Misma semilla para las dos y 20 bloques repetidos. Contando la primera densa y la de salida, la red tiene 22 matrices de pesos; el programa mira las números 1, 5, 10, 15 y 20 contando desde la entrada.</td></tr>
-        <tr data-lines="21-22"><td><code>with tf.GradientTape() as cinta: perdida = …</code></td><td>Dentro del bloque <code>with</code> la cinta graba el cálculo: pasa los datos por la red y calcula el error cuadrático medio.</td></tr>
-        <tr data-lines="23"><td><code>grads = cinta.gradient(perdida, modelo.trainable_variables)</code></td><td>Retropropagación: el gradiente de la pérdida respecto a cada variable entrenable.</td></tr>
-        <tr data-lines="24-25"><td><code>normas = [float(tf.norm(g)) … if "kernel" in v.path]</code></td><td>Para cada variable que sea un <em>kernel</em> (matriz de pesos, no sesgos) calcula la norma del gradiente: un número que dice «cuánto empuja» la pérdida a esa capa. La lista queda en orden: la capa 1 primero.</td></tr>
-        <tr data-lines="26"><td><code>nombre = "con atajos" if residual else "plana     "</code></td><td>Etiqueta para imprimir (con espacios para alinear).</td></tr>
-        <tr data-lines="27-28"><td><code>print(nombre, … capa{i+1} … | primera/última = …)</code></td><td>Imprime la norma en las capas 1, 5, 10, 15 y 20, y el cociente entre la primera y la última.</td></tr>
-      </tbody>
-    </table>
-  </details>
-  <div class="salida">
-    <strong>Salida esperada</strong>
-    <pre style="white-space:pre">plana      capa 1=3.6e-14 capa 5=1.8e-11 capa10=4.2e-08 capa15=6.7e-05 capa20=1.1e-01 | primera/última = 3.2e-13
-con atajos capa 1=2.6e+00 capa 5=2.3e+01 capa10=5.5e+01 capa15=7.2e+01 capa20=2.2e+01 | primera/última = 1.2e-01</pre>
-    <p>En la <strong>red plana</strong> el gradiente cae capa a capa: llega 1,1·10⁻¹ a la capa 20 y solo 3,6·10⁻¹⁴ a la capa 1, un factor de \(3{,}2\cdot10^{-13}\). Eso es el <strong>gradiente que se desvanece</strong>: la capa 1 prácticamente no aprende. En la <strong>red con atajos</strong> la capa 1 recibe 2,6 y la 20 recibe 22: el cociente es 0,12. El gradiente se mantiene entre 2,6 y 72 en lugar de hundirse, porque \(\partial y/\partial x=1+F'\) y ese «1» garantiza un camino directo hasta la capa 1. (Los valores exactos dependen de la semilla, pero la diferencia de más de doce órdenes de magnitud no.)</p>
-  </div>
-</article>
-
+<a class="lab-card" href="laboratorio.html#paso-4"><span class="lc-ico" aria-hidden="true">🧪</span>
+  <span><strong>Ver el código de esta lección en el Laboratorio</strong>
+  <span>Paso 4 · Un bloque residual con Add y proyección 1×1, y una mini ResNet entrenada con miniaturas, línea a línea.</span></span></a>
+<p>El fragmento 7 (el gradiente capa a capa, red plana frente a red con atajos) está en <a href="laboratorio.html#frag-7">«Más código del módulo»</a>.</p>
 </section>
 
 </div>

@@ -26,8 +26,8 @@ Lab.register("curso3/c3m2-tamano-dilatacion", function (root, api) {
   vA.draw(function (ctx, w, h, C) {
     var D = api.d, T = st.n + 2 * st.p, m = outSize(), ke = kef(), maxC = Math.max(T, m, 8), cw = Math.min(30, (w - 12) / maxC), x0 = 6, i;
     var rowH = (h - 10) / 3, ch = Math.min(cw, rowH - 24);
-    function label(t, y) { D.text(ctx, t, x0, y, { size: Math.min(11, w / 34), weight: 600, color: C.ink2 }); }
-    label("Tráiler: n = " + st.n + " s, padding p = " + st.p + " → " + T + " casillas", 14);
+    function label(t, y) { D.text(ctx, t, x0, y, { size: Math.max(11, Math.min(11, w / 34)), weight: 600, color: C.ink2 }); }
+    label(w < 460 ? ("Tráiler: n = " + st.n + ", p = " + st.p + " → " + T + " casillas") : ("Tráiler: n = " + st.n + " s, padding p = " + st.p + " → " + T + " casillas"), 14);
     var y1 = 20;
     var start = m ? st.pos * st.s : 0;
     for (i = 0; i < T; i++) {
@@ -41,23 +41,24 @@ Lab.register("curso3/c3m2-tamano-dilatacion", function (root, api) {
     label("Salida: m = " + m + " casillas", y2 - 4);
     for (i = 0; i < m; i++) {
       D.rect(ctx, x0 + i * cw, y2, cw, ch, i === st.pos ? C.oliva : C.surface, C.line, 1);
-      if (cw >= 16) D.text(ctx, String(i + 1), x0 + i * cw + cw / 2, y2 + ch / 2 + 4, { size: Math.min(10, cw * 0.38), align: "center", mono: true, color: i === st.pos ? C.paper : C.muted });
+      if (cw >= 16) D.text(ctx, String(i + 1), x0 + i * cw + cw / 2, y2 + ch / 2 + 4, { size: Math.max(11, Math.min(10, cw * 0.38)), align: "center", mono: true, color: i === st.pos ? C.paper : C.muted });
     }
-    if (!m) D.text(ctx, "el kernel dilatado no cabe", x0, y2 + 14, { size: 12, weight: 600, color: C.terracotaInk });
+    if (!m) D.text(ctx, "el kernel dilatado no cabe", x0, y2 + 14, { size: Math.max(11, 12), weight: 600, color: C.terracotaInk });
     var y3 = 20 + 2 * rowH + 8;
-    label("k_ef = k + (k − 1)(d − 1) = " + st.k + " + " + (st.k - 1) + "·" + (st.d - 1) + " = " + ke + " casillas cubiertas con solo " + st.k + " pesos", y3 + 4);
-    D.text(ctx, "● = diente del kernel (usa un peso) · casillas claras entre dientes = huecos", x0, y3 + 20, { size: Math.min(10, w / 38), color: C.muted });
+    var narrow = w < 460;
+    label(narrow ? ("k_ef = " + st.k + " + " + (st.k - 1) + "·" + (st.d - 1) + " = " + ke + " casillas con " + st.k + " pesos") : ("k_ef = k + (k − 1)(d − 1) = " + st.k + " + " + (st.k - 1) + "·" + (st.d - 1) + " = " + ke + " casillas cubiertas con solo " + st.k + " pesos"), y3 + 4);
+    D.text(ctx, narrow ? "● = peso · casillas claras = huecos" : "● = diente del kernel (usa un peso) · casillas claras entre dientes = huecos", x0, y3 + 20, { size: Math.max(11, Math.min(10, w / 38)), color: C.muted });
   });
 
   vB.draw(function (ctx, w, h, C) {
-    var D = api.d, ke = kef(), sz = Math.max(8, Math.min((w - 12) / ke, (h - 40) / ke)), x0 = (w - sz * ke) / 2, y0 = 26, i, j;
-    D.text(ctx, "Huella 2D del kernel " + st.k + "×" + st.k + " con d = " + st.d + " (" + ke + "×" + ke + ")", w / 2, 15, { size: Math.min(11, w / 30), weight: 600, align: "center", color: C.ink2 });
+    var D = api.d, ke = kef(), sz = Math.max(8, Math.min((w - 12) / ke, (h - 52) / ke)), x0 = (w - sz * ke) / 2, y0 = 26, i, j;
+    D.text(ctx, "Huella 2D del kernel " + st.k + "×" + st.k + " con d = " + st.d + " (" + ke + "×" + ke + ")", w / 2, 15, { size: Math.max(11, Math.min(11, w / 30)), weight: 600, align: "center", color: C.ink2 });
     for (i = 0; i < ke; i++) for (j = 0; j < ke; j++) {
       var tap = (i % st.d === 0) && (j % st.d === 0), x = x0 + j * sz, y = y0 + i * sz;
       D.rect(ctx, x, y, sz, sz, tap ? C.terracota : C.surface, C.line, 1);
     }
     D.rect(ctx, x0, y0, sz * ke, sz * ke, null, C.ink, 1.5);
-    D.text(ctx, st.k * st.k + " pesos reales · " + (ke * ke - st.k * st.k) + " huecos", w / 2, h - 6, { size: Math.min(10.5, w / 32), align: "center", color: C.ink2 });
+    D.text(ctx, st.k * st.k + " pesos reales · " + (ke * ke - st.k * st.k) + " huecos", w / 2, h - 6, { size: Math.max(11, Math.min(10.5, w / 32)), align: "center", color: C.ink2 });
   });
 
   function update(only) {

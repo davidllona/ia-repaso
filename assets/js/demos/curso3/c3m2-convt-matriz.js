@@ -40,11 +40,11 @@ Lab.register("curso3/c3m2-convt-matriz", function (root, api) {
   view.draw(function (ctx, w, h, C) {
     var D = api.d, V = vals(), g = L(w, h), r, c, i2, j2, sz;
     function grid(x0, y0, arr, n, cell, fill, title, highlight) {
-      D.text(ctx, title, x0 + n * cell / 2, y0 - 7, { size: 11, weight: 600, align: "center", color: C.ink2 });
+      D.text(ctx, title, x0 + n * cell / 2, y0 - 7, { size: Math.max(11, 11), weight: 600, align: "center", color: C.ink2 });
       for (i2 = 0; i2 < n; i2++) for (j2 = 0; j2 < n; j2++) {
         var x = x0 + j2 * cell, y = y0 + i2 * cell, hl = highlight && highlight[i2 * n + j2];
         D.rect(ctx, x, y, cell, cell, hl ? C.terracotaWash : fill, C.line, 1);
-        D.text(ctx, String(Math.round(arr[i2 * n + j2] * 100) / 100), x + cell / 2, y + cell / 2 + 4, { size: Math.min(14, cell * 0.38), align: "center", mono: true, weight: 600, color: C.ink });
+        D.text(ctx, String(Math.round(arr[i2 * n + j2] * 100) / 100), x + cell / 2, y + cell / 2 + 4, { size: Math.max(11, Math.min(14, cell * 0.38)), align: "center", mono: true, weight: 600, color: C.ink });
       }
     }
     var hlIn = new Array(16).fill(false), hlOut = new Array(16).fill(false);
@@ -61,23 +61,23 @@ Lab.register("curso3/c3m2-convt-matriz", function (root, api) {
     grid(xa, ya, V.a, V.an, cellA, C.cobaltoWash, inTitle, hA);
     grid(xb, yb, V.b, V.bn, cellB, C.surface, outTitle, hB);
     D.arrow(ctx, w / 2 - 14, ya + 2 * g.g - 6, w / 2 + 14, ya + 2 * g.g - 6, C.ink, 2);
-    D.text(ctx, st.mode === "conv" ? "× C" : (st.mode === "trans" ? "× Cᵀ" : "× C, × Cᵀ"), w / 2, ya + 2 * g.g + 10, { size: 11, align: "center", mono: true, weight: 600, color: C.terracotaInk });
+    D.text(ctx, st.mode === "conv" ? "× C" : (st.mode === "trans" ? "× Cᵀ" : "× C, × Cᵀ"), w / 2, ya + 2 * g.g + 10, { size: Math.max(11, 11), align: "center", mono: true, weight: 600, color: C.terracotaInk });
 
     /* matriz C (4 × 16) */
-    D.text(ctx, (w < 520 ? "Matriz C: 4 filas (y) × 16 columnas (x)" : "Matriz C (4 filas × 16 columnas): una fila por casilla de y, una columna por casilla de x"), w / 2, g.topH + 12, { size: Math.min(11, w / 38), align: "center", color: C.ink2, weight: 600 });
-    for (c = 0; c < 4; c++) D.text(ctx, "fila " + c + " de x", g.mx + (c * 4 + 2) * g.cw, g.topH + 33, { size: Math.min(9.5, g.cw * 0.42), align: "center", color: C.muted });
+    D.text(ctx, (w < 520 ? "Matriz C: 4 filas (y) × 16 columnas (x)" : "Matriz C (4 filas × 16 columnas): una fila por casilla de y, una columna por casilla de x"), w / 2, g.topH + 12, { size: Math.max(11, Math.min(11, w / 38)), align: "center", color: C.ink2, weight: 600 });
+    for (c = 0; c < 4; c++) D.text(ctx, (w < 420 ? "fila " + c : "fila " + c + " de x"), g.mx + (c * 4 + 2) * g.cw, g.topH + 33, { size: Math.max(11, Math.min(9.5, g.cw * 0.42)), align: "center", color: C.muted });
     for (r = 0; r < 4; r++) {
-      D.text(ctx, "y" + r, g.mx - 4, g.my + r * g.ch + g.ch / 2 + 4, { size: 10, align: "right", color: r === st.r ? C.terracotaInk : C.muted, mono: true, weight: r === st.r ? 700 : 400 });
+      D.text(ctx, "y" + r, g.mx - 4, g.my + r * g.ch + g.ch / 2 + 4, { size: Math.max(11, 10), align: "right", color: r === st.r ? C.terracotaInk : C.muted, mono: true, weight: r === st.r ? 700 : 400 });
       for (c = 0; c < 16; c++) {
         var v = V.C[r][c], x2 = g.mx + c * g.cw, y2 = g.my + r * g.ch;
         D.rect(ctx, x2, y2, g.cw, g.ch, v !== 0 ? (r === st.r ? C.terracotaWash : C.cobaltoWash) : C.surface, C.line, 1);
-        if (v !== 0) D.text(ctx, String(v), x2 + g.cw / 2, y2 + g.ch / 2 + 4, { size: Math.min(12, g.cw * 0.5), align: "center", mono: true, weight: 600, color: C.ink });
-        else D.text(ctx, "·", x2 + g.cw / 2, y2 + g.ch / 2 + 3, { size: 10, align: "center", color: C.muted });
+        if (v !== 0) D.text(ctx, String(v), x2 + g.cw / 2, y2 + g.ch / 2 + 4, { size: Math.max(11, Math.min(12, g.cw * 0.5)), align: "center", mono: true, weight: 600, color: C.ink });
+        else D.text(ctx, "·", x2 + g.cw / 2, y2 + g.ch / 2 + 3, { size: Math.max(11, 10), align: "center", color: C.muted });
       }
       if (r === st.r) D.rect(ctx, g.mx, g.my + r * g.ch, 16 * g.cw, g.ch, null, C.terracota, 2.5);
     }
     for (c = 1; c < 4; c++) D.line(ctx, g.mx + c * 4 * g.cw, g.my, g.mx + c * 4 * g.cw, g.my + 4 * g.ch, C.ink, 1.3);
-    D.text(ctx, (w < 520 ? "toca una fila de C · toca x o y para editar" : "toca una fila de C (o una casilla) para elegirla · toca x o y para cambiar valores"), w / 2, h - 5, { size: Math.min(10, w / 40), align: "center", color: C.muted });
+    D.text(ctx, (w < 520 ? "toca una fila de C · toca x o y para editar" : "toca una fila de C (o una casilla) para elegirla · toca x o y para cambiar valores"), w / 2, h - 5, { size: Math.max(11, Math.min(10, w / 40)), align: "center", color: C.muted });
   });
 
   view.pointer({

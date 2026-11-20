@@ -39,14 +39,14 @@ Lab.register("curso3/c3m2-tablero-ajedrez", function (root, api) {
       var D = api.d, N = c1.length, sz = Math.max(6, Math.min((w - 12) / N, (h - 50) / N)), x0 = (w - sz * N) / 2, y0 = 34, i, j, mx = 1;
       c1.forEach(function (v) { if (v > mx) mx = v; });
       mx = mx * mx;
-      D.text(ctx, title, w / 2, 14, { size: Math.min(12, w / 26), weight: 600, align: "center", color: C.ink2 });
-      D.text(ctx, sub, w / 2, 28, { size: Math.min(10.5, w / 30), align: "center", color: C.muted });
+      D.text(ctx, title, w / 2, 14, { size: Math.max(11, Math.min(12, w / 26)), weight: 600, align: "center", color: C.ink2 });
+      D.text(ctx, sub, w / 2, 28, { size: Math.max(11, Math.min(10.5, w / 30)), align: "center", color: C.muted });
       for (i = 0; i < N; i++) for (j = 0; j < N; j++) {
         var v = c1[i] * c1[j], x = x0 + j * sz, y = y0 + i * sz;
         D.rect(ctx, x, y, sz, sz, C.surface);
         if (v > 0) { ctx.save(); ctx.globalAlpha = 0.12 + 0.88 * v / mx; D.rect(ctx, x, y, sz, sz, C.cobalto); ctx.restore(); }
         D.rect(ctx, x, y, sz, sz, null, C.line, 0.5);
-        if (sz >= 17) D.text(ctx, String(v), x + sz / 2, y + sz / 2 + 4, { size: Math.min(12, sz * 0.42), align: "center", mono: true, weight: 600, color: (v / mx > 0.5) ? C.paper : C.ink });
+        if (sz >= 17) D.text(ctx, String(v), x + sz / 2, y + sz / 2 + 4, { size: Math.max(11, Math.min(12, sz * 0.42)), align: "center", mono: true, weight: 600, color: (v / mx > 0.5) ? C.paper : C.ink });
       }
       D.rect(ctx, x0, y0, sz * N, sz * N, null, C.ink, 1.5);
     });

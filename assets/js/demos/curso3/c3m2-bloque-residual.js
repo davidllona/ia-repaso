@@ -47,8 +47,8 @@ Lab.register("curso3/c3m2-bloque-residual", function (root, api) {
     }
     curve(P, C.terracota); curve(R, C.oliva);
     ctx.restore();
-    D.text(ctx, "Red plana", plot.x(1) + 6, plot.y(mn) - 8, { size: 11, weight: 600, color: C.terracotaInk });
-    D.text(ctx, "Red con atajos (ResNet)", plot.x(Math.max(st.L, 2)) - 6, plot.y(mx) + 14, { size: 11, weight: 600, align: "right", color: C.olivaInk });
+    D.text(ctx, "Red plana", plot.x(1) + 6, plot.y(mn) - 8, { size: Math.max(11, 11), weight: 600, color: C.terracotaInk });
+    D.text(ctx, "Red con atajos (ResNet)", plot.x(Math.max(st.L, 2)) - 6, plot.y(mx) + 14, { size: Math.max(11, 11), weight: 600, align: "right", color: C.olivaInk });
   });
 
   function lg(v) { var a = Math.abs(v); return a > 0 ? Math.log10(a) : -Infinity; }

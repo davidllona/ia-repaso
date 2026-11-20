@@ -63,29 +63,30 @@ Lab.register("curso3/c3m2-contador-arquitecturas", function (root, api) {
 
   view.draw(function (ctx, w, h, C) {
     var D = api.d, R = build(), top = 34, bot = 6;
-    if (!R.ok) { D.text(ctx, "Con esa imagen las capas no caben: sube el tamaño.", w / 2, h / 2, { size: 13, weight: 600, align: "center", color: C.terracotaInk }); return; }
+    if (!R.ok) { D.text(ctx, "Con esa imagen las capas no caben: sube el tamaño.", w / 2, h / 2, { size: Math.max(11, 13), weight: 600, align: "center", color: C.terracotaInk }); return; }
     var n = R.rows.length, rh = Math.min(22, (h - top - bot) / n), wide = w >= 560, lw = wide ? 200 : Math.min(112, w * 0.32), cw = (w - lw - 10) / 2 - 4, i;
     var maxP = 1, maxA = 1;
     R.rows.forEach(function (r) { if (r.params > maxP) maxP = r.params; if (r.act > maxA) maxA = r.act; });
     var fs = Math.min(10.5, rh * 0.7);
-    D.text(ctx, wide ? "capa · forma de su salida" : "capa", 4, 14, { size: 10.5, weight: 600, color: C.ink2 });
-    D.text(ctx, "Parámetros", lw + cw / 2, 14, { size: Math.min(11, w / 30), weight: 600, align: "center", color: C.cobaltoInk });
-    D.text(ctx, (wide ? "Valores en el mapa de salida" : "Valores de salida"), lw + cw + 8 + cw / 2, 14, { size: Math.min(11, w / 30), weight: 600, align: "center", color: C.terracotaInk });
-    D.text(ctx, "(cada barra, a su escala)", lw + cw / 2, 27, { size: 9.5, align: "center", color: C.muted });
-    D.text(ctx, "(cada barra, a su escala)", lw + cw + 8 + cw / 2, 27, { size: 9.5, align: "center", color: C.muted });
+    function lab(v) { if (wide) return fmt(v); if (v >= 1e6) return (v / 1e6).toFixed(1).replace(".", ",") + " M"; if (v >= 1e4) return Math.round(v / 1e3) + " k"; return fmt(v); }
+    D.text(ctx, wide ? "capa · forma de su salida" : "capa", 4, 14, { size: Math.max(11, 10.5), weight: 600, color: C.ink2 });
+    D.text(ctx, "Parámetros", lw + cw / 2, 14, { size: Math.max(11, Math.min(11, w / 30)), weight: 600, align: "center", color: C.cobaltoInk });
+    D.text(ctx, (wide ? "Valores en el mapa de salida" : "Valores de salida"), lw + cw + 8 + cw / 2, 14, { size: Math.max(11, Math.min(11, w / 30)), weight: 600, align: "center", color: C.terracotaInk });
+    D.text(ctx, wide ? "(cada barra, a su escala)" : "(a su escala)", lw + cw / 2, 27, { size: Math.max(11, 9.5), align: "center", color: C.muted });
+    D.text(ctx, wide ? "(cada barra, a su escala)" : "(a su escala)", lw + cw + 8 + cw / 2, 27, { size: Math.max(11, 9.5), align: "center", color: C.muted });
     R.rows.forEach(function (r, idx) {
       var y = top + idx * rh;
       if (idx % 2 === 0) D.rect(ctx, 0, y, w, rh, C.paper2 || C.paper);
-      D.text(ctx, r.name, 4, y + rh / 2 + fs * 0.35, { size: fs, color: C.ink, weight: r.kind === "conv" || r.kind === "fc" ? 600 : 400 });
-      if (wide) D.text(ctx, r.shape, 112, y + rh / 2 + fs * 0.35, { size: Math.min(fs, 10), mono: true, color: C.muted });
-      var bw = Math.max(0, r.params / maxP * (cw - 56));
+      D.text(ctx, r.name, 4, y + rh / 2 + fs * 0.35, { size: Math.max(11, fs), color: C.ink, weight: r.kind === "conv" || r.kind === "fc" ? 600 : 400 });
+      if (wide) D.text(ctx, r.shape, 112, y + rh / 2 + fs * 0.35, { size: Math.max(11, Math.min(fs, 10)), mono: true, color: C.muted });
+      var room = wide ? 56 : 50, bw = Math.max(0, r.params / maxP * (cw - room));
       if (r.params > 0) {
         D.rect(ctx, lw, y + 2, Math.max(1.5, bw), rh - 4, r.kind === "fc" ? C.terracota : C.cobalto);
-        D.text(ctx, fmt(r.params), lw + Math.max(1.5, bw) + 3, y + rh / 2 + fs * 0.35, { size: Math.min(fs, 9.5), mono: true, color: C.ink2 });
-      } else D.text(ctx, "0", lw + 2, y + rh / 2 + fs * 0.35, { size: Math.min(fs, 9.5), mono: true, color: C.muted });
-      var ax = lw + cw + 8, aw = Math.max(1.5, r.act / maxA * (cw - 56));
+        D.text(ctx, lab(r.params), lw + Math.max(1.5, bw) + 3, y + rh / 2 + fs * 0.35, { size: Math.max(11, Math.min(fs, 9.5)), mono: true, color: C.ink2 });
+      } else D.text(ctx, "0", lw + 2, y + rh / 2 + fs * 0.35, { size: Math.max(11, Math.min(fs, 9.5)), mono: true, color: C.muted });
+      var ax = lw + cw + 8, aw = Math.max(1.5, r.act / maxA * (cw - room));
       D.rect(ctx, ax, y + 2, aw, rh - 4, C.oliva);
-      D.text(ctx, fmt(r.act), ax + aw + 3, y + rh / 2 + fs * 0.35, { size: Math.min(fs, 9.5), mono: true, color: C.ink2 });
+      D.text(ctx, lab(r.act), ax + aw + 3, y + rh / 2 + fs * 0.35, { size: Math.max(11, Math.min(fs, 9.5)), mono: true, color: C.ink2 });
     });
   });
 

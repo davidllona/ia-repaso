@@ -28,8 +28,8 @@ Lab.register("curso3/c3m2-preproceso", function (root, api) {
     R.forEach(function (row, k) {
       var y = top + k * rh, bad = k === 4;
       if (k % 2 === 0) D.rect(ctx, 0, y, w, rh, C.paper2 || C.paper);
-      D.text(ctx, row.name, 6, y + rh * 0.42, { size: fs, weight: 600, color: bad ? C.terracotaInk : C.ink });
-      D.text(ctx, row.note, 6, y + rh * 0.78, { size: fs * 0.88, color: C.muted });
+      D.text(ctx, row.name, 6, y + rh * 0.42, { size: Math.max(11, fs), weight: 600, color: bad ? C.terracotaInk : C.ink });
+      D.text(ctx, row.note, 6, y + rh * 0.78, { size: Math.max(11, fs * 0.88), color: C.muted });
       /* tres barras (una por canal), eje cero en el centro del bloque */
       var bx = lw + 10, bw = w - bx - 8, zero = bx + bw / 2, half = bw / 2 - 40, bh = Math.max(5, (rh - 8) / 3);
       D.line(ctx, zero, y + 3, zero, y + rh - 3, C.muted, 1);
@@ -39,7 +39,7 @@ Lab.register("curso3/c3m2-preproceso", function (root, api) {
         D.rect(ctx, Math.min(zero, zero + len), yy, Math.max(1.5, Math.abs(len)), bh - 1.5, col);
         var txt = row.lab[c] + " " + (Math.abs(v) < 10 && row.range === 1 ? v.toFixed(3) : v.toFixed(1));
         var right = len >= 0;
-        D.text(ctx, txt, right ? zero + len + 4 : zero + len - 4, yy + bh - 3, { size: Math.min(9.5, bh * 0.95), mono: true, color: C.ink2, align: right ? "left" : "right" });
+        D.text(ctx, txt, right ? zero + len + 4 : zero + len - 4, yy + bh - 3, { size: Math.max(11, Math.min(9.5, bh * 0.95)), mono: true, color: C.ink2, align: right ? "left" : "right" });
       });
     });
   });

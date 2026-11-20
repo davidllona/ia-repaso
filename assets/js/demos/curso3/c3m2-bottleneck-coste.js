@@ -44,17 +44,17 @@ Lab.register("curso3/c3m2-bottleneck-coste", function (root, api) {
   view.draw(function (ctx, w, h, C) {
     var D = api.d, V = variants(), a = V.list[0], b = V.list[1];
     var pad = 8, labW = Math.min(150, w * 0.36), bw = w - labW - pad - 70, fs = Math.min(11.5, w / 34);
-    D.text(ctx, V.title, pad, 15, { size: fs, weight: 600, color: C.ink2 });
+    D.text(ctx, V.title, pad, 15, { size: Math.max(11, fs), weight: 600, color: C.ink2 });
     function group(y0, title, key, ratioTxt) {
-      D.text(ctx, title, pad, y0, { size: fs, weight: 600, color: C.cobaltoInk });
+      D.text(ctx, title, pad, y0, { size: Math.max(11, fs), weight: 600, color: C.cobaltoInk });
       var mx = Math.max(a[key], b[key]), rowH = Math.min(30, (h - 60) / 4), i;
       [a, b].forEach(function (v, idx) {
         var y = y0 + 6 + idx * (rowH + 4), len = Math.max(2, v[key] / mx * bw);
-        D.text(ctx, v.name, pad, y + rowH / 2 + 4, { size: Math.min(10.5, w / 36), color: C.ink });
+        D.text(ctx, v.name, pad, y + rowH / 2 + 4, { size: Math.max(11, Math.min(10.5, w / 36)), color: C.ink });
         D.rect(ctx, labW, y, len, rowH, idx === 0 ? C.terracota : C.oliva);
-        D.text(ctx, fmt(v[key]), labW + len + 4, y + rowH / 2 + 4, { size: Math.min(10.5, w / 36), mono: true, color: C.ink2 });
+        D.text(ctx, fmt(v[key]), labW + len + 4, y + rowH / 2 + 4, { size: Math.max(11, Math.min(10.5, w / 36)), mono: true, color: C.ink2 });
       });
-      D.text(ctx, ratioTxt, w - pad, y0, { size: fs, weight: 700, align: "right", color: C.terracotaInk, mono: true });
+      D.text(ctx, ratioTxt, w - pad, y0, { size: Math.max(11, fs), weight: 700, align: "right", color: C.terracotaInk, mono: true });
     }
     var rp = a.params / b.params, rm = a.mults / b.mults;
     group(36, "Parámetros", "params", "÷ " + rp.toFixed(1));

@@ -44,34 +44,34 @@ Lab.register("curso3/c3m2-congelar-capas", function (root, api) {
     var D = api.d, T = totals(), n = layers.length + 1, top = 52, rh = Math.min(20, (h - top - 8) / n), fs = Math.min(10.5, rh * 0.62), i;
     var total = T.tr + T.fr;
     /* barra resumen */
-    D.text(ctx, "Parámetros: ", 6, 14, { size: 11, weight: 600, color: C.ink2 });
+    D.text(ctx, "Parámetros: ", 6, 14, { size: Math.max(11, 11), weight: 600, color: C.ink2 });
     var bx = 6, bw = w - 12;
     D.rect(ctx, bx, 20, bw, 14, C.surface, C.ink, 1);
     D.rect(ctx, bx, 20, bw * T.fr / total, 14, C.cobalto);
     D.rect(ctx, bx + bw * T.fr / total, 20, bw * T.tr / total, 14, C.terracota);
-    D.text(ctx, "congelados " + fmt(T.fr), 6, 46, { size: Math.min(10.5, w / 38), color: C.cobaltoInk, weight: 600 });
-    D.text(ctx, "entrenables " + fmt(T.tr), w - 6, 46, { size: Math.min(10.5, w / 38), color: C.terracotaInk, weight: 600, align: "right" });
+    D.text(ctx, "congelados " + fmt(T.fr), 6, 46, { size: Math.max(11, Math.min(10.5, w / 38)), color: C.cobaltoInk, weight: 600 });
+    D.text(ctx, "entrenables " + fmt(T.tr), w - 6, 46, { size: Math.max(11, Math.min(10.5, w / 38)), color: C.terracotaInk, weight: 600, align: "right" });
     geo = { top: top, rh: rh };
     var maxP = 1; layers.forEach(function (L) { if (L.params > maxP) maxP = L.params; });
     var lw = Math.min(130, w * 0.36), chipW = Math.min(76, w * 0.2), bar0 = lw + chipW + 6, barW = w - bar0 - 6;
     layers.forEach(function (L, k) {
       var y = top + k * rh, tr = !!T.set[k];
       if (k % 2 === 0) D.rect(ctx, 0, y, w, rh, C.paper2 || C.paper);
-      D.text(ctx, L.name, 6, y + rh / 2 + fs * 0.35, { size: fs, mono: true, color: L.conv ? C.ink : C.muted });
+      D.text(ctx, L.name, 6, y + rh / 2 + fs * 0.35, { size: Math.max(11, fs), mono: true, color: L.conv ? C.ink : C.muted });
       if (L.conv) {
         D.rect(ctx, lw, y + 2, chipW, rh - 4, tr ? C.terracotaWash : C.cobaltoWash, tr ? C.terracota : C.cobalto, 1);
-        D.text(ctx, tr ? "entrena" : "congelada", lw + chipW / 2, y + rh / 2 + fs * 0.35, { size: fs * 0.92, align: "center", color: tr ? C.terracotaInk : C.cobaltoInk, weight: 600 });
+        D.text(ctx, tr ? "entrena" : "congelada", lw + chipW / 2, y + rh / 2 + fs * 0.35, { size: Math.max(11, fs * 0.92), align: "center", color: tr ? C.terracotaInk : C.cobaltoInk, weight: 600 });
         var bl = Math.max(1.5, L.params / maxP * (barW - 54));
         D.rect(ctx, bar0, y + 3, bl, rh - 6, tr ? C.terracota : C.cobalto);
-        D.text(ctx, fmt(L.params), bar0 + bl + 3, y + rh / 2 + fs * 0.35, { size: Math.min(fs, 9.5), mono: true, color: C.ink2 });
+        D.text(ctx, fmt(L.params), bar0 + bl + 3, y + rh / 2 + fs * 0.35, { size: Math.max(11, Math.min(fs, 9.5)), mono: true, color: C.ink2 });
       }
     });
     var yh = top + layers.length * rh;
     D.rect(ctx, 0, yh, w, rh, C.terracotaWash);
-    D.text(ctx, "cabeza nueva", 6, yh + rh / 2 + fs * 0.35, { size: fs, weight: 600, color: C.ink });
+    D.text(ctx, "cabeza nueva", 6, yh + rh / 2 + fs * 0.35, { size: Math.max(11, fs), weight: 600, color: C.ink });
     D.rect(ctx, lw, yh + 2, chipW, rh - 4, C.terracotaWash, C.terracota, 1);
-    D.text(ctx, "entrena", lw + chipW / 2, yh + rh / 2 + fs * 0.35, { size: fs * 0.92, align: "center", color: C.terracotaInk, weight: 600 });
-    D.text(ctx, "GAP + Dense(" + CLASSES + "): " + fmt(headParams), bar0, yh + rh / 2 + fs * 0.35, { size: Math.min(fs, 9.5), mono: true, color: C.ink2 });
+    D.text(ctx, "entrena", lw + chipW / 2, yh + rh / 2 + fs * 0.35, { size: Math.max(11, fs * 0.92), align: "center", color: C.terracotaInk, weight: 600 });
+    D.text(ctx, "GAP + Dense(" + CLASSES + "): " + fmt(headParams), bar0, yh + rh / 2 + fs * 0.35, { size: Math.max(11, Math.min(fs, 9.5)), mono: true, color: C.ink2 });
   });
   view.pointer({ down: function (px, py) {
     var k = Math.floor((py - geo.top) / geo.rh);

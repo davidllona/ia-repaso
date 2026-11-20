@@ -21,59 +21,118 @@
       <p class="eyebrow">Curso 3 · Módulo 2 · Lección 6 de 8</p>
       <h1>Transfer learning: reutiliza el cuerpo que ya sabe ver y entrena solo la cabeza</h1>
       <p class="lead">Con 400 pósters de 5 géneros no se entrena una CNN desde cero, pero MobileNet ya vio 1,2 millones de fotos. Te quedas con su cuerpo y le pones tu cabeza.</p>
-      <p class="meta-line"><span class="read-time" data-render="read-time"></span><a href="../modulo-2.html">Índice del módulo</a></p>
+      <p class="meta-line"><span class="read-time" data-render="read-time"></span><a href="../modulo-2.html">Índice del módulo</a> · <a href="#chuleta">Ir a la chuleta</a></p>
     </div>
     <div class="hero-tile" aria-hidden="true"></div>
   </div>
 </header>
 <details class="predice">
-  <summary>Pones a MobileNetV2 una cabeza nueva con pesos aleatorios y entrenas <em>todo</em> desde el primer paso. ¿Qué le pasa al cuerpo preentrenado?<span class="hint"></span></summary>
+  <summary>Pones a MobileNetV2 una cabeza nueva con pesos al azar y entrenas <em>todo</em> desde el primer paso. ¿Qué le pasa al cuerpo que ya sabía ver?<span class="hint"></span></summary>
   <div>
-    <p><strong>Se estropea.</strong> La cabeza aleatoria produce al principio gradientes enormes y erráticos que bajan hasta el cuerpo y deforman lo aprendido con 1,2 millones de fotos. Por eso primero se <strong>congela</strong> el cuerpo y se entrena solo la cabeza.</p>
+    <p><strong>Se estropea.</strong> La cabeza al azar se equivoca muchísimo al principio, y esas correcciones enormes bajan hasta el cuerpo y deforman lo aprendido. Por eso primero se <strong>congela</strong> el cuerpo.</p>
   </div>
 </details>
 
 <section>
-<h2 id="idea">El cuerpo ya sabe ver</h2>
-<p>Un crítico con años de cine no empieza de cero cuando le pides opinar de series. Igual, una CNN entrenada con ImageNet ya detecta bordes, texturas y formas: eso sirve igual para pósters. Solo hay que enseñarle a <em>decidir</em> entre tus 5 géneros.</p>
-<ul class="flow">
-  <li class="a"><span>Cuerpo<small>include_top=False</small></span></li>
-  <li class="b"><span>Congelar<small>trainable = False</small></span></li>
-  <li class="c"><span>Cabeza nueva<small>GAP + Dense(5)</small></span></li>
-  <li class="d"><span>Fase 2<small>últimas capas, lr 1e-5</small></span></li>
-</ul>
-<p><strong>Fase 1 (extracción de características):</strong> cuerpo congelado, solo se entrena la cabeza con learning rate normal (1e-3). <strong>Fase 2 (ajuste fino), si hace falta:</strong> se descongelan las <em>últimas</em> capas, se <strong>recompila</strong> y se baja el learning rate a ~1e-5.</p>
-<p>Dos detalles que fallan sin avisar: dar los píxeles como los espera el modelo (su <code>preprocess_input</code>) y llamar al cuerpo con <code>training=False</code>, para que las BatchNorm no reescriban sus estadísticas con tus lotes pequeños.</p>
+<h2 id="idea">1 · El cuerpo ya sabe ver</h2>
+<p>Un crítico con años de cine no empieza de cero si le pides opinar de series. Igual, una red <strong>preentrenada</strong> (ya entrenada por otros con <strong>ImageNet</strong>, 1,2 millones de fotos) sabe detectar bordes, texturas y formas. Eso sirve igual para pósters.</p>
+<p>Reutilizar lo que otra red aprendió se llama <strong>transfer learning</strong>: aprendizaje por transferencia.</p>
 </section>
 
-<figure class="demo" data-demo="curso3/c3m2-preproceso" data-titulo="El mismo píxel de un fotograma, preparado para cada modelo">
-  <div class="haz">Deja el píxel naranja de Nemo en (200, 100, 50) y compara las filas. Luego pon los tres canales en 0 y después en 255.</div>
-  <div class="observa">Con el preprocesado equivocado, el negro y el blanco acaban casi iguales: el modelo ve una imagen plana.</div>
-</figure>
+<section>
+<h2 id="piezas">2 · Cuerpo y cabeza</h2>
+<p>Una CNN tiene un <strong>cuerpo</strong> (las convoluciones, que «ven») y una <strong>cabeza</strong> (las capas del final, que deciden entre clases). La cabeza de ImageNet elige entre 1 000 clases; tú quieres 5 géneros.</p>
+<ul class="flow">
+  <li class="a">Póster<small>96×96×3</small></li>
+  <li class="b">Cuerpo<small>MobileNetV2, congelado</small></li>
+  <li class="d">Cabeza nueva<small>media global + Dense(5)</small></li>
+</ul>
+<p>En Keras, <code>include_top=False</code> carga el modelo <strong>sin</strong> su cabeza.</p>
+</section>
 
+<section>
+<h2 id="congelar">3 · Fase 1: congelar el cuerpo</h2>
+<p><strong>Congelar</strong> una capa es prohibir que sus pesos cambien: <code>trainable = False</code>. En la fase 1 solo aprende la cabeza. Se llama <strong>extracción de características</strong>: el cuerpo solo «describe» cada póster.</p>
+<div class="anim-pasos" data-titulo="Qué se entrena en la fase 1">
+  <div class="paso"><p><strong>1.</strong> El cuerpo de MobileNetV2 deja, tras la media global, 1 280 números por póster.</p><span class="grande">1 280</span></div>
+  <div class="paso"><p><strong>2.</strong> La cabeza: una densa de 5 neuronas.</p><span class="grande">1 280 · 5 + 5 = 6 405</span></div>
+  <div class="paso"><p><strong>3.</strong> El cuerpo, congelado, no se toca:</p><span class="grande">2 257 984 quietos</span></div>
+  <div class="paso"><p><strong>4.</strong> Se entrena menos del 0,3 % de la red. Rápido, y sirve con pocos pósters.</p><span class="grande">6 405 de 2 264 389</span></div>
+</div>
+</section>
+
+<section>
+<h2 id="fase2">4 · Fase 2, si hace falta: ajuste fino</h2>
+<p>Cuando la cabeza ya funciona, se pueden <strong>descongelar las últimas capas</strong> del cuerpo para afinarlas. Es el <strong>ajuste fino</strong> (<em>fine-tuning</em>). Tres reglas:</p>
+<ol>
+  <li>Solo las <strong>últimas</strong> capas: las primeras ven bordes, que sirven para todo.</li>
+  <li><strong>Recompilar</strong> (<code>compile</code>) después de cambiar <code>trainable</code>, o Keras no se entera.</li>
+  <li><strong>Learning rate</strong> (el tamaño de cada corrección) muy bajo, unas 100 veces menor: \( 10^{-5} \).</li>
+</ol>
 <figure class="demo" data-demo="curso3/c3m2-congelar-capas" data-titulo="¿Qué capas congelar para clasificar tus pósters?">
   <div class="haz">Pulsa «Aplicar la recomendación» con distintos datos propios y parecido con ImageNet.</div>
   <div class="observa">Con todo congelado solo se entrenan 2 565 parámetros de 14 717 253.</div>
 </figure>
+</section>
 
 <section>
-<h2 id="numeros">Con números: qué se entrena y qué recibe</h2>
-<div class="callout ejemplo">
-  <span class="lbl">Ejemplo numérico: MobileNetV2 y el píxel (200, 100, 50)</span>
-  <ol class="pasos">
-    <li><strong>Cabeza:</strong> el cuerpo sale con 1 280 canales, así que <code>Dense(5)</code> tiene \( 1280\cdot5+5 = \) <span class="res">6 405</span> parámetros entrenables. Los 2 257 984 del cuerpo, congelados.</li>
-    <li><strong>MobileNetV2:</strong> \( x/127{,}5-1 \) → el rojo \( 200/127{,}5-1=0{,}5686 \).</li>
-    <li><strong>VGG16:</strong> pasa a BGR y resta la media de ImageNet → azul \( 50-103{,}939=-53{,}939 \).</li>
-  </ol>
+<h2 id="preproceso">5 · Dar los píxeles como los espera</h2>
+<p>Cada red se entrenó con los píxeles preparados a su manera. Su función <code>preprocess_input</code> repite esa preparación. Si no la usas, no hay error: simplemente aprende mal.</p>
+<div class="anim-pasos" data-titulo="El píxel naranja de Nemo: (200, 100, 50)">
+  <div class="paso"><p><strong>1. MobileNetV2:</strong> lleva 0–255 a −1…1 con \( x/127{,}5-1 \). El rojo:</p><span class="grande">200/127,5 − 1 = 0,5686</span></div>
+  <div class="paso"><p><strong>2.</strong> Los tres canales:</p><span class="grande">0,5686 · −0,2157 · −0,6078</span></div>
+  <div class="paso"><p><strong>3. VGG16:</strong> pone el azul primero (BGR) y resta la media de ImageNet. El azul:</p><span class="grande">50 − 103,939 = −53,939</span></div>
+  <div class="paso"><p><strong>4. EfficientNet:</strong> no cambia nada; escala dentro del propio modelo.</p><span class="grande">200 · 100 · 50</span></div>
 </div>
+<figure class="demo" data-demo="curso3/c3m2-preproceso" data-titulo="El mismo píxel de un fotograma, preparado para cada modelo">
+  <div class="haz">Compara las filas con (200, 100, 50). Luego pon los tres canales en 0 y después en 255.</div>
+  <div class="observa">Con el preprocesado equivocado, el negro y el blanco acaban casi iguales.</div>
+</figure>
+</section>
+
+<section>
+<h2 id="batchnorm">6 · La trampa de BatchNormalization</h2>
+<p>Muchas redes llevan capas <strong>BatchNormalization</strong>: igualan la escala de los números con medias que guardaron al entrenar con ImageNet. Con tus lotes pequeños, esas medias se estropearían.</p>
+<p>Por eso el cuerpo se llama con <code>base(x, training=False)</code>: «usa tus medias guardadas, no las recalcules».</p>
+</section>
+
+<section>
+<h2 id="experimento">7 · Con pocos datos, ¿cuánto ayuda?</h2>
+<p>Un cuerpo aprende primero a reconocer los 10 dígitos. Luego se reutiliza para decir «par o impar» con <strong>solo 30 imágenes</strong>.</p>
+<table>
+  <caption>Aciertos en 959 imágenes nuevas (media de 3 intentos)</caption>
+  <thead><tr><th>Variante</th><th>Aciertos</th></tr></thead>
+  <tbody>
+    <tr><td>Desde cero</td><td>0,775</td></tr>
+    <tr><td>Cuerpo congelado</td><td>0,823</td></tr>
+    <tr><td>Congelado + ajuste fino</td><td>0,829</td></tr>
+    <tr><td>Todo a la vez, learning rate alto</td><td>0,803</td></tr>
+  </tbody>
+</table>
 </section>
 
 <details class="predice">
-  <summary>Con 30 imágenes: desde cero da 0,775 y con el cuerpo congelado 0,823. Si descongelas <em>todo</em> con learning rate alto (1e-2), ¿mejoras?<span class="hint"></span></summary>
+  <summary>Con 30 imágenes: desde cero da 0,775 y con el cuerpo congelado 0,823. Si descongelas <em>todo</em> con learning rate alto (0,01), ¿mejoras?<span class="hint"></span></summary>
   <div>
-    <p><strong>No: baja a 0,803.</strong> Un learning rate alto sacude los pesos preentrenados. El ajuste fino cuidadoso (lr 1e-4) apenas añade (0,829). Respetar el cuerpo es lo que más ayuda.</p>
+    <p><strong>No: baja a 0,803.</strong> Correcciones grandes sacuden los pesos aprendidos. El ajuste fino con cuidado (0,0001) apenas añade (0,829). Respetar el cuerpo es lo que más ayuda.</p>
   </div>
 </details>
+
+<section>
+<h2 id="chuleta">Chuleta para repasar</h2>
+<dl class="chuleta">
+  <div><dt>Red preentrenada</dt><dd>Una red ya entrenada por otros. <em>MobileNetV2 con ImageNet.</em></dd></div>
+  <div><dt>Transfer learning</dt><dd>Reutilizar el cuerpo de una red preentrenada para tu problema.</dd></div>
+  <div><dt>Cuerpo y cabeza</dt><dd>Las convoluciones que ven, y las capas finales que deciden.</dd></div>
+  <div><dt><code>include_top=False</code></dt><dd>Cargar el modelo sin su cabeza.</dd></div>
+  <div><dt>Congelar</dt><dd><code>trainable = False</code>: sus pesos no cambian.</dd></div>
+  <div><dt>Extracción de características</dt><dd>Fase 1: cuerpo congelado, solo aprende la cabeza. <em>6 405 parámetros.</em></dd></div>
+  <div><dt>Ajuste fino</dt><dd>Fase 2: últimas capas descongeladas, recompilar, learning rate ~0,00001.</dd></div>
+  <div><dt>Learning rate</dt><dd>El tamaño de cada corrección de los pesos.</dd></div>
+  <div><dt><code>preprocess_input</code></dt><dd>Prepara los píxeles como los espera cada modelo. <em>MobileNetV2: x/127,5 − 1.</em></dd></div>
+  <div><dt>BatchNormalization</dt><dd>Capa que iguala escalas con medias guardadas. Llama al cuerpo con <code>training=False</code>.</dd></div>
+</dl>
+</section>
 
 <div class="resumen">
   <h2 class="sin-num sin-toc">En tres líneas</h2>
@@ -243,164 +302,12 @@
   </div>
 </details>
 
-<section>
+<section class="ir-lab">
 <h2 class="sin-num">Código</h2>
-<!-- ---------- Fragmento 13 ---------- -->
-<article class="snippet" data-lang="python">
-  <header>
-    <h3>13 · Transfer learning en dos fases con MobileNetV2: congelar y descongelar</h3>
-    <p class="para-que"><strong>Para qué sirve</strong> Montar el modelo de transfer learning estándar de Keras 3 (augmentation → preprocesado → cuerpo congelado → cabeza nueva), contar qué parámetros se entrenan en cada fase y demostrar el comportamiento de una <code>BatchNormalization</code> congelada.</p>
-  </header>
-  <pre class="code"><code>import numpy as np
-import keras
-from keras import layers
-
-# Offline usamos weights=None (pesos al azar). Con internet sería weights="imagenet".
-base = keras.applications.MobileNetV2(weights=None, include_top=False, input_shape=(96, 96, 3))
-base.trainable = False                                   # FASE 1: congelamos el cuerpo
-
-entrada = keras.Input(shape=(96, 96, 3))
-x = layers.RandomFlip("horizontal")(entrada)             # augmentation (solo actúa al entrenar)
-x = keras.applications.mobilenet_v2.preprocess_input(x)  # el preproceso que pide ESTE modelo
-x = base(x, training=False)                              # BatchNorm del cuerpo en modo inferencia
-x = layers.GlobalAveragePooling2D()(x)
-x = layers.Dropout(0.2)(x)
-salida = layers.Dense(5, activation="softmax")(x)
-modelo = keras.Model(entrada, salida)
-
-def resumen(titulo):
-    entrenables = sum(int(np.prod(w.shape)) for w in modelo.trainable_weights)
-    total = modelo.count_params()
-    print(f"{titulo:28s} entrenables={entrenables:&gt;9,d}  congelados={total - entrenables:&gt;9,d}")
-
-resumen("fase 1 (cuerpo congelado)")
-print("capas del cuerpo:", len(base.layers), "| de ellas BatchNormalization:",
-      sum(isinstance(c, layers.BatchNormalization) for c in base.layers))
-
-# FASE 2: descongelar solo las últimas 20 capas del cuerpo (y mantener BatchNorm congelada)
-base.trainable = True
-for capa in base.layers[:-20]:
-    capa.trainable = False
-for capa in base.layers:
-    if isinstance(capa, layers.BatchNormalization):
-        capa.trainable = False
-resumen("fase 2 (últimas 20 capas)")
-modelo.compile(keras.optimizers.Adam(1e-5), "sparse_categorical_crossentropy")   # recompilar
-
-# Comprobación: una BatchNormalization congelada NO actualiza sus estadísticas aunque entrenemos
-bn = layers.BatchNormalization()
-bn.build((None, 4))
-datos = np.random.default_rng(0).normal(5, 3, (32, 4)).astype("float32")
-bn(datos, training=True)
-antes = bn.moving_mean.numpy().copy()
-bn.trainable = False
-bn(datos, training=True)
-print("BN congelada, media móvil sin cambios:", np.array_equal(antes, bn.moving_mean.numpy()))
-print("BN congelada: salida con training=True == training=False:",
-      np.allclose(bn(datos, training=True), bn(datos, training=False)))</code></pre>
-  <details class="linea-a-linea" open>
-    <summary>Línea por línea</summary>
-    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
-    <table class="lineas">
-      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
-      <tbody>
-        <tr data-lines="1-3"><td><code>import numpy / keras / layers</code></td><td>NumPy, Keras 3 y sus capas.</td></tr>
-        <tr data-lines="5"><td><code># Offline usamos weights=None …</code></td><td>Recuerda que sin internet usamos pesos al azar; con conexión sería <code>weights=\"imagenet\"</code>.</td></tr>
-        <tr data-lines="6"><td><code>base = keras.applications.MobileNetV2(weights=None, include_top=False, input_shape=(96, 96, 3))</code></td><td>Crea el <strong>cuerpo</strong> de MobileNetV2 (sin la cabeza de 1 000 clases) para imágenes de 96×96.</td></tr>
-        <tr data-lines="7"><td><code>base.trainable = False</code></td><td><strong>Congela</strong> todo el cuerpo: sus pesos no se actualizarán al entrenar.</td></tr>
-        <tr data-lines="9"><td><code>entrada = keras.Input(shape=(96, 96, 3))</code></td><td>Entrada del modelo completo.</td></tr>
-        <tr data-lines="10"><td><code>x = layers.RandomFlip("horizontal")(entrada)</code></td><td>Augmentation como primera capa; solo actúa al entrenar.</td></tr>
-        <tr data-lines="11"><td><code>x = keras.applications.mobilenet_v2.preprocess_input(x)</code></td><td>El preprocesado que exige <em>este</em> modelo (MobileNetV2: escalar a \([-1,1]\)). Cada arquitectura tiene el suyo.</td></tr>
-        <tr data-lines="12"><td><code>x = base(x, training=False)</code></td><td>Pasa por el cuerpo con <code>training=False</code>: las capas <code>BatchNormalization</code> usan sus estadísticas guardadas y no las actualizan, aunque luego descongeles.</td></tr>
-        <tr data-lines="13-14"><td><code>GlobalAveragePooling2D → Dropout(0.2)</code></td><td>Convierte cada mapa en un número (con 1 280 mapas, un vector de 1 280) y apaga al azar el 20 % durante el entrenamiento.</td></tr>
-        <tr data-lines="15"><td><code>salida = layers.Dense(5, activation="softmax")(x)</code></td><td>La <strong>cabeza nueva</strong>: 5 clases (por ejemplo, 5 géneros de película). Es lo único con pesos nuevos.</td></tr>
-        <tr data-lines="16"><td><code>modelo = keras.Model(entrada, salida)</code></td><td>Junta todo en un modelo funcional.</td></tr>
-        <tr data-lines="18-21"><td><code>def resumen(titulo): …</code></td><td>Función auxiliar. Suma el tamaño de los pesos entrenables (<code>np.prod(w.shape)</code> multiplica las dimensiones de cada uno), calcula el total y el resto (congelados) e imprime los dos.</td></tr>
-        <tr data-lines="23"><td><code>resumen("fase 1 (cuerpo congelado)")</code></td><td>Cuenta los parámetros en la fase 1.</td></tr>
-        <tr data-lines="24-25"><td><code>print("capas del cuerpo:", len(base.layers), …)</code></td><td>Número de capas del cuerpo y cuántas son <code>BatchNormalization</code>.</td></tr>
-        <tr data-lines="27"><td><code># FASE 2: …</code></td><td>Comentario: ahora el ajuste fino.</td></tr>
-        <tr data-lines="28"><td><code>base.trainable = True</code></td><td>Descongela todo el cuerpo (de momento).</td></tr>
-        <tr data-lines="29-30"><td><code>for capa in base.layers[:-20]: capa.trainable = False</code></td><td>Vuelve a congelar todas las capas menos las <strong>últimas 20</strong> (<code>[:-20]</code> = todas salvo las 20 finales). Las primeras capas detectan bordes y texturas universales; las últimas son más específicas.</td></tr>
-        <tr data-lines="31-33"><td><code>for capa in base.layers: if isinstance(capa, BatchNormalization): capa.trainable = False</code></td><td>Y congela también <em>todas</em> las BatchNorm, la práctica recomendada en ajuste fino.</td></tr>
-        <tr data-lines="34"><td><code>resumen("fase 2 (últimas 20 capas)")</code></td><td>Cuenta de nuevo los parámetros.</td></tr>
-        <tr data-lines="35"><td><code>modelo.compile(keras.optimizers.Adam(1e-5), "sparse_categorical_crossentropy")</code></td><td><strong>Recompilar</strong> es obligatorio tras cambiar <code>trainable</code>, y el <em>learning rate</em> baja a 1e-5 para no destrozar lo aprendido.</td></tr>
-        <tr data-lines="37"><td><code># Comprobación: …</code></td><td>Comentario: demostración con una capa BatchNorm suelta.</td></tr>
-        <tr data-lines="38-39"><td><code>bn = layers.BatchNormalization() / bn.build((None, 4))</code></td><td>Crea una BatchNorm para vectores de 4 números y la construye.</td></tr>
-        <tr data-lines="40"><td><code>datos = np.random.default_rng(0).normal(5, 3, (32, 4)).astype("float32")</code></td><td>32 vectores de 4 números con media 5 y desviación 3.</td></tr>
-        <tr data-lines="41-42"><td><code>bn(datos, training=True) / antes = bn.moving_mean.numpy().copy()</code></td><td>En modo entrenamiento actualiza su media móvil. Guarda una copia de ella.</td></tr>
-        <tr data-lines="43-44"><td><code>bn.trainable = False / bn(datos, training=True)</code></td><td>La congela y vuelve a llamarla con <code>training=True</code>.</td></tr>
-        <tr data-lines="45"><td><code>print("BN congelada, media móvil sin cambios:", …)</code></td><td>Comprueba que la media móvil no cambió.</td></tr>
-        <tr data-lines="46-47"><td><code>print("BN congelada: salida con training=True == training=False:", …)</code></td><td>Y que, congelada, da la misma salida en los dos modos.</td></tr>
-      </tbody>
-    </table>
-  </details>
-  <div class="salida">
-    <strong>Salida esperada</strong>
-    <pre style="white-space:pre">fase 1 (cuerpo congelado)    entrenables=    6,405  congelados=2,257,984
-capas del cuerpo: 154 | de ellas BatchNormalization: 52
-fase 2 (últimas 20 capas)    entrenables=1,201,285  congelados=1,063,104
-BN congelada, media móvil sin cambios: True
-BN congelada: salida con training=True == training=False: True</pre>
-    <p>En la fase 1 solo se entrenan <strong>6 405</strong> parámetros (\(1280\cdot5+5\)): la cabeza nueva; los 2 257 984 del cuerpo están congelados. En la fase 2 hay 1 201 285 entrenables: la cabeza más las capas convolucionales de las últimas 20 (las BatchNorm, aunque estén dentro, siguen congeladas). El cuerpo tiene 154 capas, 52 de ellas BatchNorm. Las dos últimas líneas demuestran el detalle más traicionero del ajuste fino: una BatchNorm con <code>trainable=False</code> <strong>no actualiza su media móvil</strong> y <strong>se comporta como en inferencia</strong> aunque le pidas <code>training=True</code>. Sin eso, el primer lote de tus datos nuevos reescribiría estadísticas aprendidas con millones de imágenes.</p>
-  </div>
-</article>
-
-<!-- ---------- Fragmento 14 ---------- -->
-<article class="snippet" data-lang="python">
-  <header>
-    <h3>14 · preprocess_input: cada modelo espera los píxeles a su manera</h3>
-    <p class="para-que"><strong>Para qué sirve</strong> Calcular a mano y con las funciones de Keras el preprocesado de VGG16, ResNet50, MobileNetV2 y EfficientNet sobre un píxel naranja, y ver qué pasa con el error más frecuente: dividir entre 255 y pasárselo a VGG16.</p>
-  </header>
-  <pre class="code"><code>import numpy as np
-from keras.applications import vgg16, resnet50, mobilenet_v2, efficientnet
-
-# Una "imagen" de 1x1 píxel con un naranja: R=200, G=100, B=50 (valores 0-255, en formato RGB)
-pixel = np.array([[[[200.0, 100.0, 50.0]]]], dtype="float32")        # forma (1, 1, 1, 3)
-
-print("VGG16      :", vgg16.preprocess_input(pixel.copy()).ravel().round(3))
-print("ResNet50   :", resnet50.preprocess_input(pixel.copy()).ravel().round(3))
-print("MobileNetV2:", mobilenet_v2.preprocess_input(pixel.copy()).ravel().round(4))
-print("EfficientNet:", efficientnet.preprocess_input(pixel.copy()).ravel().round(3))
-
-# A mano: VGG16 y ResNet50 -&gt; pasar RGB a BGR y restar la media de ImageNet [B=103.939, G=116.779, R=123.68]
-a_mano_caffe = np.array([50 - 103.939, 100 - 116.779, 200 - 123.68])
-print("a mano (BGR - media):", a_mano_caffe.round(3))
-# MobileNetV2 -&gt; escalar de [0, 255] a [-1, 1]:  x / 127.5 - 1
-print("a mano (x/127.5 - 1):", (np.array([200, 100, 50]) / 127.5 - 1).round(4))
-
-# El error típico: dividir entre 255 y dárselo a un modelo que esperaba otra escala
-mal = pixel / 255.0
-print("VGG16 con x/255 (MAL):", vgg16.preprocess_input(mal.copy()).ravel().round(3))</code></pre>
-  <details class="linea-a-linea" open>
-    <summary>Línea por línea</summary>
-    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
-    <table class="lineas">
-      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
-      <tbody>
-        <tr data-lines="1-2"><td><code>import numpy as np / from keras.applications import vgg16, resnet50, mobilenet_v2, efficientnet</code></td><td>NumPy y los módulos de cada arquitectura, que contienen su función <code>preprocess_input</code>.</td></tr>
-        <tr data-lines="4-5"><td><code>pixel = np.array([[[[200.0, 100.0, 50.0]]]], dtype="float32")</code></td><td>Una «imagen» de 1×1 píxel naranja: R=200, G=100, B=50, en formato RGB y escala 0-255. La forma es <code>(1, 1, 1, 3)</code> (lote, alto, ancho, canales).</td></tr>
-        <tr data-lines="7-8"><td><code>print("VGG16 :", vgg16.preprocess_input(pixel.copy()).ravel().round(3))</code></td><td>Aplica el preprocesado de VGG16 (y en la línea 8 el de ResNet50, que es el mismo). Se usa <code>.copy()</code> porque la función puede modificar la matriz que recibe. <code>.ravel()</code> la aplana para imprimirla.</td></tr>
-        <tr data-lines="9"><td><code>print("MobileNetV2:", mobilenet_v2.preprocess_input(…))</code></td><td>Preprocesado de MobileNetV2.</td></tr>
-        <tr data-lines="10"><td><code>print("EfficientNet:", efficientnet.preprocess_input(…))</code></td><td>Preprocesado de EfficientNet: no hace nada, porque el modelo reescala por dentro.</td></tr>
-        <tr data-lines="12-14"><td><code>a_mano_caffe = np.array([50 - 103.939, 100 - 116.779, 200 - 123.68])</code></td><td>A mano: se <strong>reordenan los canales a BGR</strong> (azul primero) y a cada uno se le resta la media de ImageNet (103,939 / 116,779 / 123,68).</td></tr>
-        <tr data-lines="15-16"><td><code>(np.array([200, 100, 50]) / 127.5 - 1).round(4)</code></td><td>A mano para MobileNetV2: se lleva el rango 0-255 a \([-1,1]\) con \(x/127{,}5-1\).</td></tr>
-        <tr data-lines="18-20"><td><code>mal = pixel / 255.0 / print("VGG16 con x/255 (MAL):", …)</code></td><td>El error típico: dividir primero entre 255 y después aplicar el preprocesado de VGG16, que esperaba valores 0-255.</td></tr>
-      </tbody>
-    </table>
-  </details>
-  <div class="salida">
-    <strong>Salida esperada</strong>
-    <pre style="white-space:pre">VGG16      : [-53.939 -16.779  76.32 ]
-ResNet50   : [-53.939 -16.779  76.32 ]
-MobileNetV2: [ 0.5686 -0.2157 -0.6078]
-EfficientNet: [200. 100.  50.]
-a mano (BGR - media): [-53.939 -16.779  76.32 ]
-a mano (x/127.5 - 1): [ 0.5686 -0.2157 -0.6078]
-VGG16 con x/255 (MAL): [-103.743 -116.387 -122.896]</pre>
-    <p>VGG16 y ResNet50 dan lo mismo y coincide con la cuenta a mano: \([50-103{,}939;\ 100-116{,}779;\ 200-123{,}68]=[-53{,}939;\,-16{,}779;\,76{,}32]\). MobileNetV2 da \([0{,}5686;\,-0{,}2157;\,-0{,}6078]\), igual que \(x/127{,}5-1\). EfficientNet deja \([200, 100, 50]\). La última línea es el error: tras dividir entre 255 casi todo el rango se pierde y el píxel queda en \([-103{,}7;\,-116{,}4;\,-122{,}9]\), un valor prácticamente <strong>igual para cualquier píxel</strong> (solo restó la media). Keras no avisa: el modelo no falla, simplemente <em>ve gris uniforme</em> y rinde fatal.</p>
-  </div>
-</article>
-
+<a class="lab-card" href="laboratorio.html#paso-7"><span class="lc-ico" aria-hidden="true">🧪</span>
+  <span><strong>Ver el código de esta lección en el Laboratorio</strong>
+  <span>Paso 7 · Transfer learning con 30 imágenes: preentrenar, congelar, ajuste fino y recompilar, línea a línea.</span></span></a>
+<p>Los fragmentos 13 (MobileNetV2 en dos fases), 14 (<code>preprocess_input</code>) y 12 (qué falla sin internet) están en <a href="laboratorio.html#frag-l6">«Más código del módulo»</a>.</p>
 </section>
 
 </div>

@@ -96,20 +96,20 @@ Lab.register("curso3/c3m2-convt-sellos", function (root, api) {
   vIn.draw(function (ctx, w, h, C) {
     var D = api.d, L = inLayout(w, h), i, j, cur = null, Ls = stamps();
     if (st.t > 0) cur = Ls[st.t - 1];
-    D.text(ctx, "Entrada x (" + st.n + "×" + st.n + ")", L.a.x + L.a.sz * st.n / 2, 16, { size: 11, weight: 600, align: "center", color: C.ink2 });
-    D.text(ctx, "Kernel K (" + st.k + "×" + st.k + ")", L.b.x + L.b.sz * st.k / 2, 16, { size: 11, weight: 600, align: "center", color: C.ink2 });
+    D.text(ctx, "Entrada x (" + st.n + "×" + st.n + ")", L.a.x + L.a.sz * st.n / 2, 16, { size: Math.max(11, 11), weight: 600, align: "center", color: C.ink2 });
+    D.text(ctx, "Kernel K (" + st.k + "×" + st.k + ")", L.b.x + L.b.sz * st.k / 2, 16, { size: Math.max(11, 11), weight: 600, align: "center", color: C.ink2 });
     for (i = 0; i < st.n; i++) for (j = 0; j < st.n; j++) {
       var x = L.a.x + j * L.a.sz, y = L.a.y + i * L.a.sz, done = (i * st.n + j) < st.t, isCur = cur && cur[0] === i && cur[1] === j;
       D.rect(ctx, x, y, L.a.sz, L.a.sz, isCur ? C.terracotaWash : (done ? C.cobaltoWash : C.surface), C.line, 1);
-      D.text(ctx, String(X[i][j]), x + L.a.sz / 2, y + L.a.sz / 2 + 5, { size: Math.min(16, L.a.sz * 0.42), align: "center", mono: true, weight: 600, color: C.ink });
+      D.text(ctx, String(X[i][j]), x + L.a.sz / 2, y + L.a.sz / 2 + 5, { size: Math.max(11, Math.min(16, L.a.sz * 0.42)), align: "center", mono: true, weight: 600, color: C.ink });
     }
     if (cur) D.rect(ctx, L.a.x + cur[1] * L.a.sz, L.a.y + cur[0] * L.a.sz, L.a.sz, L.a.sz, null, C.terracota, 3);
     for (i = 0; i < st.k; i++) for (j = 0; j < st.k; j++) {
       var x2 = L.b.x + j * L.b.sz, y2 = L.b.y + i * L.b.sz;
       D.rect(ctx, x2, y2, L.b.sz, L.b.sz, C.oliva, C.paper, 1);
-      D.text(ctx, String(K[i][j]), x2 + L.b.sz / 2, y2 + L.b.sz / 2 + 5, { size: Math.min(16, L.b.sz * 0.42), align: "center", mono: true, weight: 600, color: C.paper });
+      D.text(ctx, String(K[i][j]), x2 + L.b.sz / 2, y2 + L.b.sz / 2 + 5, { size: Math.max(11, Math.min(16, L.b.sz * 0.42)), align: "center", mono: true, weight: 600, color: C.paper });
     }
-    D.text(ctx, "toca una casilla para cambiar su valor", w / 2, h - 3, { size: 10, align: "center", color: C.muted });
+    D.text(ctx, "toca una casilla para cambiar su valor", w / 2, h - 3, { size: Math.max(11, 10), align: "center", color: C.muted });
   });
   vIn.pointer({
     down: function (px, py) {
@@ -129,7 +129,7 @@ Lab.register("curso3/c3m2-convt-sellos", function (root, api) {
     var D = api.d, R = compute(st.t), g = R.g, q = outGeom(w, h).q, i, j, Ls = stamps();
     var cur = st.t > 0 ? Ls[st.t - 1] : null, maxc = 1;
     for (i = 0; i < g.E; i++) for (j = 0; j < g.E; j++) if (R.cnt[i][j] > maxc) maxc = R.cnt[i][j];
-    D.text(ctx, "Salida " + g.O + "×" + g.O + (st.pad === "same" ? " (tras recortar el borde gris)" : ""), w / 2, 16, { size: 11, weight: 600, align: "center", color: C.ink2 });
+    D.text(ctx, "Salida " + g.O + "×" + g.O + (st.pad === "same" ? " (tras recortar el borde gris)" : ""), w / 2, 16, { size: Math.max(11, 11), weight: 600, align: "center", color: C.ink2 });
     for (i = 0; i < g.E; i++) for (j = 0; j < g.E; j++) {
       var x = q.x + j * q.sz, y = q.y + i * q.sz;
       var cropped = (st.pad === "same") && (i < g.cs || i >= g.E - g.ce || j < g.cs || j >= g.E - g.ce);
@@ -145,13 +145,13 @@ Lab.register("curso3/c3m2-convt-sellos", function (root, api) {
       var big = (st.mode === "cnt") ? R.cnt[i][j] : R.sum[i][j];
       var txtCol = (st.mode === "cnt" && R.cnt[i][j] > maxc * 0.6) ? C.paper : C.ink;
       if ((st.mode === "cnt" && R.cnt[i][j] > 0) || (st.mode === "sum" && R.cnt[i][j] > 0)) {
-        D.text(ctx, String(Math.round(big * 100) / 100), x + q.sz / 2, y + q.sz / 2 + 4, { size: Math.min(15, q.sz * 0.38), align: "center", mono: true, weight: 600, color: cropped ? C.muted : txtCol });
+        D.text(ctx, String(Math.round(big * 100) / 100), x + q.sz / 2, y + q.sz / 2 + 4, { size: Math.max(11, Math.min(15, q.sz * 0.38)), align: "center", mono: true, weight: 600, color: cropped ? C.muted : txtCol });
       } else if (!cropped) {
-        D.text(ctx, "0", x + q.sz / 2, y + q.sz / 2 + 4, { size: Math.min(13, q.sz * 0.34), align: "center", mono: true, color: C.muted });
+        D.text(ctx, "0", x + q.sz / 2, y + q.sz / 2 + 4, { size: Math.max(11, Math.min(13, q.sz * 0.34)), align: "center", mono: true, color: C.muted });
       }
       if (inStamp && st.mode === "sum" && q.sz >= 30) {
         var v = X[cur[0]][cur[1]] * K[i - cur[0] * st.s][j - cur[1] * st.s];
-        D.text(ctx, (v >= 0 ? "+" : "") + v, x + q.sz - 3, y + 10, { size: Math.min(10, q.sz * 0.26), align: "right", mono: true, color: C.terracotaInk });
+        D.text(ctx, (v >= 0 ? "+" : "") + v, x + q.sz - 3, y + 10, { size: Math.max(11, Math.min(10, q.sz * 0.26)), align: "right", mono: true, color: C.terracotaInk });
       }
     }
     if (cur) D.rect(ctx, q.x + cur[1] * st.s * q.sz, q.y + cur[0] * st.s * q.sz, st.k * q.sz, st.k * q.sz, null, C.terracota, 3);
