@@ -28,7 +28,7 @@ Lab.register("curso3/c3m1-multi-perdida", function (root, api) {
     D.rect(ctx, x0, y, bw, bh, null, C.ink, 1.6);
     if (fa > 0.12) D.text(ctx, "clase " + Math.round(fa * 100) + " %", x0 + bw * fa / 2, y + bh / 2 + 4, { align: "center", size: 12, weight: 700, color: C.cobaltoInk });
     if (fa < 0.88) D.text(ctx, "valor " + Math.round((1 - fa) * 100) + " %", x0 + bw * fa + bw * (1 - fa) / 2, y + bh / 2 + 4, { align: "center", size: 12, weight: 700, color: C.terracotaInk });
-    D.text(ctx, "50 %", x0 + bw / 2, y + bh + 14, { align: "center", size: 10, color: C.muted });
+    D.text(ctx, "50 %", x0 + bw / 2, y + bh + 14, { align: "center", size: 11, color: C.muted });
     D.line(ctx, x0 + bw / 2, y - 3, x0 + bw / 2, y + bh + 3, C.muted, 1, [3, 3]);
   }
   function update() {

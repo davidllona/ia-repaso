@@ -96,10 +96,10 @@ Lab.register("curso3/c3m1-formas", function (root, api) {
         n++;
         var fill = palette[b % 3];
         D.rect(ctx, cx + jj * best.sz, cy + ii * best.sz, best.sz, best.sz, fill, C.ink, 1);
-        if (best.sz >= 17) D.text(ctx, String(n), cx + jj * best.sz + best.sz / 2, cy + ii * best.sz + best.sz / 2 + 4, { align: "center", size: best.sz >= 26 ? 12 : 10.5, mono: true, color: C.ink });
+        if (best.sz >= 17) D.text(ctx, String(n), cx + jj * best.sz + best.sz / 2, cy + ii * best.sz + best.sz / 2 + 4, { align: "center", size: best.sz >= 26 ? 12 : 11, mono: true, color: C.ink });
       }
     }
-    if (best.sz < 17) D.text(ctx, "(visualizaciones 1 a 24 mil, en orden)", w / 2, h - 6, { align: "center", size: 10.5, color: C.muted });
+    if (best.sz < 17) D.text(ctx, "(visualizaciones 1 a 24 mil, en orden)", w / 2, h - 6, { align: "center", size: 11, color: C.muted });
   }
 
   function update() {

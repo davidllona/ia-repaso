@@ -50,7 +50,7 @@ Lab.register("curso3/c3m1-compartida", function (root, api) {
       ctx.restore();
       mark(wv, y, C.paper); mark(wv, L1(wv), C.cobaltoWash); mark(wv, L2(wv), C.terracotaWash);
       var ws = wstar(); D.line(ctx, plot.x(ws), plot.box.y, plot.x(ws), plot.box.y + plot.box.h, C.oliva, 1.5, [3, 4]);
-      D.text(ctx, "mín. de la suma", plot.x(ws), plot.box.y + 12, { align: ws > 3.4 ? "right" : "left", size: 10.5, color: C.olivaInk, weight: 600 });
+      D.text(ctx, "mín. de la suma", plot.x(ws), plot.box.y + 12, { align: ws > 3.4 ? "right" : "left", size: 11, color: C.olivaInk, weight: 600 });
     } else { mark(M.clamp(S.w1, -1, 5), L1(M.clamp(S.w1, -1, 5)), C.cobaltoWash); mark(M.clamp(S.w2, -1, 5), L2(M.clamp(S.w2, -1, 5)), C.terracotaWash); }
   }
   function update() {

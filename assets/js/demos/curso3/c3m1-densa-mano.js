@@ -56,26 +56,26 @@ Lab.register("curso3/c3m1-densa-mano", function (root, api) {
     for (i = 0; i < 2; i++) for (j = 0; j < 2; j++) {
       var tt = i === j ? 0.30 : 0.70, lx = xi[i] + (xo - xi[i]) * (i === j ? 0.30 : 0.70), ly = yi[i] + (yo[j] - yi[i]) * (i === j ? 0.30 : 0.70);
       var s = "W" + (i + 1) + (j + 1) + "=" + n2(S.W[i][j], 2);
-      ctx.save(); ctx.font = "600 10.5px 'IBM Plex Mono',monospace"; var tw = ctx.measureText(s).width + 6; ctx.restore();
+      ctx.save(); ctx.font = "600 11px 'IBM Plex Mono',monospace"; var tw = ctx.measureText(s).width + 6; ctx.restore();
       D.rect(ctx, lx - tw / 2, ly - 8, tw, 15, C.surface, C.line, 1);
-      D.text(ctx, s, lx, ly + 3, { align: "center", size: 10.5, mono: true, weight: 600, color: C.ink });
+      D.text(ctx, s, lx, ly + 3, { align: "center", size: 11, mono: true, weight: 600, color: C.ink });
     }
     for (i = 0; i < 2; i++) {
       D.circle(ctx, xi[i], yi[i], r, C.paper, C.ink, 2);
       D.text(ctx, "x" + (i + 1), xi[i], yi[i] - 3, { align: "center", size: 11, weight: 700, mono: true });
-      D.text(ctx, n2(S.x[i], 1), xi[i], yi[i] + 10, { align: "center", size: 10.5, mono: true, color: C.ink2 });
-      D.text(ctx, i === 0 ? "comedias" : "acción", xi[i], i === 0 ? yi[i] - r - 6 : yi[i] + r + 14, { align: "center", size: 10, color: C.muted });
+      D.text(ctx, n2(S.x[i], 1), xi[i], yi[i] + 10, { align: "center", size: 11, mono: true, color: C.ink2 });
+      D.text(ctx, i === 0 ? "comedias" : "acción", xi[i], i === 0 ? yi[i] - r - 6 : yi[i] + r + 14, { align: "center", size: 11, color: C.muted });
     }
     for (j = 0; j < 2; j++) {
       D.circle(ctx, xo, yo[j], r + 3, C.cobaltoWash, C.ink, 2);
       D.text(ctx, "a" + (j + 1), xo, yo[j] - 3, { align: "center", size: 11, weight: 700, mono: true });
-      D.text(ctx, n2(f.a[j], 2), xo, yo[j] + 10, { align: "center", size: 10.5, mono: true });
-      D.text(ctx, "z=" + n2(f.z[j], 2) + "  b=" + n2(S.b[j], 2), xo, yo[j] + (j === 0 ? -r - 9 : r + 18), { align: "center", size: 10.5, mono: true, color: C.ink2 });
-      var xt = w * 0.88;
-      D.rect(ctx, xt - 20, yo[j] - 12, 40, 24, C.olivaWash, C.ink, 1.5);
-      D.text(ctx, "t" + (j + 1) + "=" + n2(S.t[j], 1), xt, yo[j] + 4, { align: "center", size: 10.5, mono: true, weight: 600 });
-      D.arrow(ctx, xo + r + 6, yo[j], xt - 22, yo[j], C.muted, 1.4);
-      D.text(ctx, j === 0 ? "Toy Story" : "Matrix", xt, j === 0 ? yo[j] - 18 : yo[j] + 26, { align: "center", size: 10, color: C.muted });
+      D.text(ctx, n2(f.a[j], 2), xo, yo[j] + 10, { align: "center", size: 11, mono: true });
+      D.text(ctx, "z=" + n2(f.z[j], 2) + "  b=" + n2(S.b[j], 2), xo, yo[j] + (j === 0 ? -r - 9 : r + 18), { align: "center", size: 11, mono: true, color: C.ink2 });
+      var xt = Math.min(w * 0.88, w - 27);
+      D.rect(ctx, xt - 23, yo[j] - 12, 46, 24, C.olivaWash, C.ink, 1.5);
+      D.text(ctx, "t" + (j + 1) + "=" + n2(S.t[j], 1), xt, yo[j] + 4, { align: "center", size: 11, mono: true, weight: 600 });
+      D.arrow(ctx, xo + r + 6, yo[j], xt - 25, yo[j], C.muted, 1.4);
+      D.text(ctx, j === 0 ? "Toy Story" : "Matrix", xt, j === 0 ? yo[j] - 18 : yo[j] + 26, { align: "center", size: 11, color: C.muted });
     }
     D.text(ctx, "L = " + n2(f.L, 4), w * 0.88, h * 0.5 + 4, { align: "center", size: 11.5, mono: true, weight: 700, color: C.terracotaInk });
   }
@@ -83,8 +83,8 @@ Lab.register("curso3/c3m1-densa-mano", function (root, api) {
     var H = S.hist, n = H.length, mx = Math.max.apply(null, H.concat([0.01]));
     var x0 = 38, y0 = 8, pw = w - x0 - 10, ph = h - y0 - 20;
     D.rect(ctx, x0, y0, pw, ph, C.surface, C.ink, 1.2);
-    D.text(ctx, "L", x0 - 8, y0 + 10, { align: "right", size: 10.5, color: C.muted, mono: true }); D.text(ctx, "0", x0 - 8, y0 + ph, { align: "right", size: 10.5, color: C.muted, mono: true });
-    D.text(ctx, "pasos →  (" + (n - 1) + ")", x0 + pw / 2, h - 4, { align: "center", size: 10.5, color: C.muted });
+    D.text(ctx, "L", x0 - 8, y0 + 10, { align: "right", size: 11, color: C.muted, mono: true }); D.text(ctx, "0", x0 - 8, y0 + ph, { align: "right", size: 11, color: C.muted, mono: true });
+    D.text(ctx, "pasos →  (" + (n - 1) + ")", x0 + pw / 2, h - 4, { align: "center", size: 11, color: C.muted });
     if (n > 1) D.path(ctx, H.map(function (v, k) { return [x0 + pw * k / Math.max(n - 1, 20), y0 + ph - ph * v / mx]; }), C.terracota, 2.2);
     D.circle(ctx, x0 + pw * (n - 1) / Math.max(n - 1, 20), y0 + ph - ph * H[n - 1] / mx, 3.5, C.terracota, C.paper, 1);
   }

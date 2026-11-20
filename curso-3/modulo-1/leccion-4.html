@@ -20,28 +20,48 @@
     <div>
       <p class="eyebrow">Curso 3 · Módulo 1 · Lección 4 de 8</p>
       <h1>tf.function traza una vez por firma y reutiliza el grafo</h1>
-      <p class="lead">Decorar una función con <code>@tf.function</code> la convierte en una lista de reproducción: la primera llamada la monta (traza un grafo) y las siguientes solo le dan a play. Tu código Python solo se ejecuta al montarla.</p>
-      <p class="meta-line"><span class="read-time" data-render="read-time"></span><a href="../modulo-1.html">Índice del módulo</a></p>
+      <p class="lead"><code>@tf.function</code> convierte una función en una lista de reproducción: la primera llamada la monta y las siguientes solo le dan a play. Tu código Python solo se ejecuta al montarla.</p>
+      <p class="meta-line"><span class="read-time" data-render="read-time"></span><a href="../modulo-1.html">Índice del módulo</a> · <a href="#chuleta">Ir a la chuleta</a></p>
     </div>
     <div class="hero-tile" aria-hidden="true"></div>
   </div>
 </header>
 <details class="predice">
-  <summary>Pones un <code>print</code> de Python dentro del <code>call</code> de tu modelo y entrenas 3 épocas de 4 lotes: 12 pasos. ¿Cuántas veces sale el texto?<span class="hint"></span></summary>
+  <summary>Pones un <code>print</code> de Python dentro de tu modelo y entrenas 3 épocas de 4 lotes: 12 pasos. ¿Cuántas veces sale el texto?<span class="hint"></span></summary>
   <div>
-    <p><strong>Pocas, no 12</strong> (en la versión usada, 3). Keras envuelve el paso de entrenamiento en una <code>tf.function</code>, y el código Python solo se ejecuta cuando se <strong>traza</strong>. Para ver valores en cada paso hay que usar <code>tf.print</code>, que forma parte del grafo.</p>
+    <p><strong>Pocas, no 12</strong> (en la versión usada, 3). Keras convierte el entrenamiento en grafo, y el código Python solo se ejecuta al <strong>trazar</strong>. Para ver valores en cada paso se usa <code>tf.print</code>.</p>
   </div>
 </details>
 
 <section>
-<h2 id="idea">Montar la lista una vez, reproducirla muchas</h2>
-<p>Con la ejecución inmediata (<em>eager</em>) cada operación se lanza desde Python una a una, como elegir a mano cada capítulo. Un <strong>grafo</strong> es una lista de reproducción que se encadena sola. <code>tf.function</code> hace esa conversión en tres pasos:</p>
-<ol class="pasos">
-  <li><strong>Trazado.</strong> En la primera llamada ejecuta tu Python <em>una vez</em> con tensores simbólicos (solo forma y tipo, sin números) y anota cada operación de TensorFlow en un grafo.</li>
-  <li><strong>Ejecución.</strong> Las llamadas siguientes no ejecutan Python: ejecutan el grafo, más rápido y optimizable.</li>
-  <li><strong>Caché por firma.</strong> Cada grafo vale para una <em>firma</em>: tipo y forma de los tensores y <strong>valor</strong> de los argumentos de Python. Firma nueva → trazar otra vez (<em>retracing</em>).</li>
-</ol>
-<p>De ahí sale todo lo demás: un <code>print</code> solo aparece al trazar y <code>tf.print</code> en cada llamada; pasar números de Python que cambian provoca un trazado por valor; y <strong>AutoGraph</strong> convierte tus <code>if</code> y <code>for</code> sobre tensores en <code>tf.cond</code> y <code>tf.while_loop</code>. En Keras casi nunca lo escribirás tú: <code>fit</code>, <code>predict</code> y <code>evaluate</code> ya lo usan.</p>
+<h2 id="idea">1 · Capítulo a capítulo o darle a play</h2>
+<p>Normalmente TensorFlow ejecuta cada operación en cuanto Python llega a ella: es la <strong>ejecución inmediata</strong> (<em>eager</em>), como elegir a mano cada capítulo. Es cómodo, pero Python va despacio dando órdenes una a una.</p>
+<div class="callout analogia">
+  <span class="lbl">Analogía</span>
+  <p>Un <strong>grafo</strong> es una <strong>lista de reproducción</strong>: las operaciones ya encadenadas, que TensorFlow reproduce solo, sin esperar a Python. <code>tf.function</code> convierte tu función en esa lista.</p>
+</div>
+</section>
+
+<section>
+<h2 id="trazado">2 · Montar, reproducir y guardar</h2>
+<ul class="flow">
+  <li class="a">TRAZAR<small>1.ª llamada: ejecuta tu Python una vez y anota cada operación</small></li>
+  <li class="b">REPRODUCIR<small>las siguientes: solo el grafo, sin Python</small></li>
+  <li class="d">GUARDAR POR FIRMA<small>firma nueva → trazar otra vez</small></li>
+</ul>
+<p>Al trazar, los argumentos no llevan números: son <strong>tensores simbólicos</strong>, que solo dicen su forma y su tipo. La <strong>firma</strong> de una llamada es el tipo y la forma de sus tensores y el <strong>valor</strong> de sus números de Python. Volver a trazar por una firma nueva se llama <em>retracing</em>.</p>
+</section>
+
+<section>
+<h2 id="numeros">3 · Con números: seis llamadas, cuatro trazados</h2>
+<div class="anim-pasos" data-titulo="¿Traza o reutiliza?">
+  <div class="paso"><p><strong>1.</strong> <code>f(tf.constant(1.0))</code>: decimal sin ejes. Firma nueva.</p><span class="grande">traza · total 1</span></div>
+  <div class="paso"><p><strong>2.</strong> <code>f(tf.constant(5.0))</code>: mismo tipo y forma. El número no cuenta.</p><span class="grande">reutiliza · total 1</span></div>
+  <div class="paso"><p><strong>3.</strong> <code>f(tf.constant([1., 2.]))</code>: forma (2,).</p><span class="grande">traza · total 2</span></div>
+  <div class="paso"><p><strong>4.</strong> <code>f(3)</code>: un 3 de Python. Aquí sí cuenta el valor.</p><span class="grande">traza · total 3</span></div>
+  <div class="paso"><p><strong>5.</strong> <code>f(4)</code>: otro valor de Python.</p><span class="grande">traza · total 4</span></div>
+  <div class="paso"><p><strong>6.</strong> <code>f(3)</code> otra vez: ya estaba guardado.</p><span class="grande">reutiliza · total 4</span></div>
+</div>
 </section>
 
 <figure class="demo" data-demo="curso3/c3m1-trazado" data-titulo="La caché de grafos de tf.function">
@@ -50,27 +70,50 @@
 </figure>
 
 <section>
-<h2 id="numeros">Con números: seis llamadas, cuatro trazados</h2>
-<div class="callout ejemplo">
-  <span class="lbl">Ejemplo numérico</span>
-  <ol class="pasos">
-    <li><code>f(tf.constant(1.0))</code>: primera firma (<code>float32</code>, forma <code>()</code>) → traza. Total 1.</li>
-    <li><code>f(tf.constant(5.0))</code>: misma firma → reutiliza. Total 1.</li>
-    <li><code>f(tf.constant([1., 2.]))</code>: forma <code>(2,)</code> → traza. Total 2.</li>
-    <li><code>f(3)</code>: entero de Python 3 → traza. Total 3.</li>
-    <li><code>f(4)</code>: otro valor de Python → traza. Total 4.</li>
-    <li><code>f(3)</code> otra vez: ya estaba en la caché. Total 4.</li>
-  </ol>
-  <p>Con una función que hace 100 operaciones pequeñas, el grafo da el mismo resultado (1,0201029) y es <strong>más de 3 veces más rápido</strong>.</p>
-</div>
+<h2 id="print">4 · El print solo sale al trazar</h2>
+<table>
+  <thead><tr><th>Dentro de la función</th><th>1.ª llamada</th><th>Las demás</th></tr></thead>
+  <tbody>
+    <tr><td><code>print</code> de Python</td><td>sí</td><td>no</td></tr>
+    <tr><td><code>tf.print</code></td><td>sí</td><td>sí</td></tr>
+  </tbody>
+</table>
+<p><code>tf.print</code> es una operación del grafo; <code>print</code>, no. En Keras casi nunca escribirás <code>tf.function</code>: <code>fit</code>, <code>predict</code> y <code>evaluate</code> ya lo usan.</p>
 </section>
 
 <details class="predice">
-  <summary>Llamas a una <code>tf.function</code> dentro de un bucle con <code>f(i)</code> para <code>i</code> de 0 a 9.999, con enteros de Python. ¿Irá más rápida que sin decorar?<span class="hint"></span></summary>
+  <summary>Llamas a una <code>tf.function</code> en un bucle con <code>f(i)</code> para i de 0 a 9.999, con enteros de Python. ¿Irá más rápida que sin decorar?<span class="hint"></span></summary>
   <div>
-    <p><strong>Probablemente más lenta.</strong> Cada entero distinto es una firma nueva: 10.000 trazados, y trazar es caro. Pasa <code>tf.constant(i)</code> (misma firma siempre) o fija la firma con <code>input_signature</code>. Si sospechas, cuenta con <code>f.experimental_get_tracing_count()</code>.</p>
+    <p><strong>Probablemente más lenta.</strong> Cada entero es una firma nueva: 10.000 trazados, y trazar es caro. Lo ves abajo.</p>
   </div>
 </details>
+
+<section>
+<h2 id="autograph">5 · Evitar trazar de más</h2>
+<div class="anim-pasos" data-titulo="10.000 llamadas: de 10.000 trazados a 1">
+  <div class="paso"><p><strong>1.</strong> <code>f(0)</code>, <code>f(1)</code>, <code>f(2)</code>… con enteros de Python.</p><span class="grande">10.000 firmas → 10.000 trazados</span></div>
+  <div class="paso"><p><strong>2.</strong> Pasa tensores: <code>f(tf.constant(i))</code>. Mismo tipo y forma siempre.</p><span class="grande">1 trazado</span></div>
+  <div class="paso"><p><strong>3.</strong> O fija la firma de antemano con <code>input_signature</code> (qué forma y tipo acepta).</p><span class="grande">1 trazado, y rechaza otros tipos</span></div>
+  <div class="paso"><p><strong>4.</strong> Compruébalo: <code>f.experimental_get_tracing_count()</code> cuenta los trazados.</p><span class="grande">¿1 o 10.000?</span></div>
+</div>
+<p>Y un regalo: <strong>AutoGraph</strong> convierte tus <code>if</code> y <code>for</code> sobre tensores en piezas del grafo. Con <code>for i in tf.range(n)</code>, sumar hasta 5 o hasta 100 usa un solo trazado.</p>
+</section>
+
+<section>
+<h2 id="chuleta">Chuleta para repasar</h2>
+<dl class="chuleta">
+  <div><dt>Ejecución inmediata</dt><dd>Cada operación se lanza al llegar Python a ella (eager). <em>Elegir cada capítulo a mano.</em></dd></div>
+  <div><dt>Grafo</dt><dd>Las operaciones ya encadenadas, sin Python. <em>Una lista de reproducción.</em></dd></div>
+  <div><dt>tf.function</dt><dd>Convierte una función en grafo. Se escribe como @tf.function encima del def.</dd></div>
+  <div><dt>Trazar</dt><dd>Ejecutar tu Python una vez con tensores simbólicos para montar el grafo.</dd></div>
+  <div><dt>Firma</dt><dd>Tipo y forma de los tensores + valor de los números de Python.</dd></div>
+  <div><dt>Retracing</dt><dd>Volver a trazar por una firma nueva. <em>f(3) y f(4): dos trazados.</em></dd></div>
+  <div><dt>Print y tf.print</dt><dd>El primero solo sale al trazar; el segundo, en cada llamada.</dd></div>
+  <div><dt>Input_signature</dt><dd>Fija de antemano qué tensores acepta: un solo trazado.</dd></div>
+  <div><dt>AutoGraph</dt><dd>Convierte if y for sobre tensores en piezas del grafo.</dd></div>
+  <div><dt>Contar trazados</dt><dd>f.experimental_get_tracing_count(). <em>Si crece sin parar, algo va mal.</em></dd></div>
+</dl>
+</section>
 
 <div class="resumen">
   <h2 class="sin-num sin-toc">En tres líneas</h2>
@@ -87,7 +130,7 @@
  "titulo": "¿Lo tienes?",
  "preguntas": [
   {
-   "q": "Una función con <code>@tf.function</code> contiene <code>print(\"hola\")</code> y <code>tf.print(\"hola\")</code>. La llamas 5 veces con tensores del mismo tipo y la misma forma. ¿Cuántas veces sale cada texto?",
+   "q": "Una función con <code>@tf.function</code> contiene <code>print(\"hola\")</code> y <code>tf.print(\"hola\")</code>. La llamas 5 veces con tensores del mismo tipo y forma. ¿Cuántas veces sale cada texto?",
    "opciones": [
     "Los dos salen 5 veces",
     "Los dos salen 1 vez",
@@ -95,35 +138,34 @@
     "<code>print</code> 1 vez y <code>tf.print</code> 5 veces"
    ],
    "correcta": 3,
-   "porque": "El código Python solo se ejecuta cuando la función se <strong>traza</strong> (la primera llamada con esa firma), así que el <code>print</code> sale una vez. <code>tf.print</code> es una operación del grafo y se ejecuta en cada llamada: 5 veces. Si no recuerdas esto, un <code>print</code> en <code>call</code> te hará creer que el modelo solo se ejecutó unas pocas veces."
+   "porque": "El Python solo se ejecuta al <strong>trazar</strong> (la primera llamada con esa firma): el <code>print</code> sale una vez. <code>tf.print</code> es parte del grafo y se ejecuta en cada llamada: 5 veces."
   },
   {
    "q": "¿Qué forma parte de la «firma» que decide si <code>tf.function</code> reutiliza un grafo?",
    "opciones": [
     "Solo el nombre de la función",
-    "El tipo y la forma de los tensores y el valor de los argumentos de Python",
+    "El tipo y la forma de los tensores y el valor de los números de Python",
     "El valor exacto de cada tensor",
     "La hora de la llamada"
    ],
    "correcta": 1,
-   "porque": "Con tensores importa su tipo y su forma, no sus números: <code>f(tf.constant(1.0))</code> y <code>f(tf.constant(5.0))</code> comparten grafo. Con argumentos de Python importa el valor, porque se graba dentro del grafo: <code>f(3)</code> y <code>f(4)</code> trazan dos veces."
+   "porque": "Con tensores cuentan su tipo y su forma, no sus números: <code>f(tf.constant(1.0))</code> y <code>f(tf.constant(5.0))</code> comparten grafo. Con números de Python cuenta el valor: <code>f(3)</code> y <code>f(4)</code> trazan dos veces."
   },
   {
    "q": "Dentro de una <code>tf.function</code> escribes <code>for i in tf.range(n):</code>. ¿Qué hace AutoGraph?",
    "opciones": [
     "Lo ignora y da error",
-    "Lo convierte en un bucle dentro del grafo, así que <code>suma_hasta(5)</code> y <code>suma_hasta(100)</code> comparten un solo trazado",
+    "Lo convierte en un bucle dentro del grafo: sumar hasta 5 y hasta 100 comparten un solo trazado",
     "Traza una vez por cada vuelta del bucle",
     "Lo ejecuta en Python en cada llamada"
    ],
    "correcta": 1,
-   "porque": "Cuando el bucle depende de un tensor, AutoGraph lo reescribe como <code>tf.while_loop</code> dentro del grafo. Por eso hay que usar <code>tf.range</code> (no <code>range</code>) si el límite es un tensor."
+   "porque": "Si el bucle depende de un tensor, AutoGraph lo reescribe como un bucle del grafo (<code>tf.while_loop</code>). Por eso se usa <code>tf.range</code>, no <code>range</code>, cuando el límite es un tensor."
   }
  ]
 }
 </script>
 </section>
-
 <details class="profundizar">
   <summary><span>Profundizar: la explicación completa<small>La tabla de llamadas y trazados, print frente a tf.print, el print «que desaparece» en fit, AutoGraph, input_signature, la ganancia de velocidad y los tres hábitos con tf.function.</small></span></summary>
   <div class="prof-body">
@@ -144,7 +186,7 @@
   <li><strong>Caché por firma.</strong> El grafo se guarda para una «firma»: el <em>tipo y la forma</em> de los tensores recibidos y el <em>valor</em> de los argumentos que no son tensores (un <code>int</code> de Python, por ejemplo). Si llamas con otra firma, hay que <strong>trazar otra vez</strong> y guardar otro grafo.</li>
 </ol>
 
-<p>El <a href="#frag-8">fragmento 8</a> lo hace visible con un <code>print</code> dentro de la función. Estas son las llamadas, tal como salen:</p>
+<p>El <a href="laboratorio.html#frag-8">fragmento 8</a> lo hace visible con un <code>print</code> dentro de la función. Estas son las llamadas, tal como salen:</p>
 <table>
   <thead><tr><th>Llamada</th><th>Firma</th><th>¿Traza?</th><th>Trazados hasta ahora</th></tr></thead>
   <tbody>
@@ -168,11 +210,11 @@
 
 <div class="callout ojo">
   <span class="lbl">Ojo · el <code>print</code> «que desaparece» en <code>fit</code></span>
-  <p>Keras envuelve el paso de entrenamiento en una <code>tf.function</code>, así que un <code>print</code> dentro del método <code>call</code> de tu modelo se comporta como acabamos de ver. En el <a href="leccion-7.html#frag-10">fragmento 10</a> hay 12 pasos de entrenamiento (3 épocas × 4 lotes) y el <code>print</code> aparece <strong>solo 3 veces</strong>, no 12; el número exacto depende de la versión, pero nunca será «uno por lote». En cambio, una llamada directa al modelo con datos (<code>modelo(x)</code>) se ejecuta con la ejecución inmediata: dos llamadas, dos <code>print</code>. <strong>Para depurar valores dentro de un modelo usa <code>tf.print</code> (o <code>keras.ops</code> y un <code>callback</code>)</strong>, no <code>print</code>.</p>
+  <p>Keras envuelve el paso de entrenamiento en una <code>tf.function</code>, así que un <code>print</code> dentro del método <code>call</code> de tu modelo se comporta como acabamos de ver. En el <a href="laboratorio.html#frag-10">fragmento 10</a> hay 12 pasos de entrenamiento (3 épocas × 4 lotes) y el <code>print</code> aparece <strong>solo 3 veces</strong>, no 12; el número exacto depende de la versión, pero nunca será «uno por lote». En cambio, una llamada directa al modelo con datos (<code>modelo(x)</code>) se ejecuta con la ejecución inmediata: dos llamadas, dos <code>print</code>. <strong>Para depurar valores dentro de un modelo usa <code>tf.print</code> (o <code>keras.ops</code> y un <code>callback</code>)</strong>, no <code>print</code>.</p>
 </div>
 
 <h3>AutoGraph: tus <code>if</code> y <code>for</code> dentro del grafo</h3>
-<p>Un grafo no puede «ejecutar Python», así que ¿qué pasa con un <code>if x &gt; 0:</code> cuando <code>x</code> es un tensor simbólico y no se sabe si será positivo? <strong>AutoGraph</strong> (se activa solo con <code>tf.function</code>) reescribe esos <code>if</code>, <code>while</code> y <code>for</code> a sus equivalentes de TensorFlow (<code>tf.cond</code>, <code>tf.while_loop</code>) <em>cuando la condición depende de un tensor</em>. En el <a href="#frag-9">fragmento 9</a>:</p>
+<p>Un grafo no puede «ejecutar Python», así que ¿qué pasa con un <code>if x &gt; 0:</code> cuando <code>x</code> es un tensor simbólico y no se sabe si será positivo? <strong>AutoGraph</strong> (se activa solo con <code>tf.function</code>) reescribe esos <code>if</code>, <code>while</code> y <code>for</code> a sus equivalentes de TensorFlow (<code>tf.cond</code>, <code>tf.while_loop</code>) <em>cuando la condición depende de un tensor</em>. En el <a href="laboratorio.html#frag-9">fragmento 9</a>:</p>
 <ul>
   <li>La función <code>signo</code> tiene un <code>if x &gt; 0</code> con <code>x</code> tensor y funciona: <code>signo(2.0)</code> da «positivo» y <code>signo(-2.0)</code> «no positivo» (con el mismo grafo, sin reescribir nada).</li>
   <li><code>for i in tf.range(n)</code> (con <code>tf.range</code>, no <code>range</code>) se convierte en un bucle <strong>dentro</strong> del grafo: <code>suma_hasta(5)</code> da 10 (0+1+2+3+4) y <code>suma_hasta(100)</code> da 4950, y solo hubo <strong>un trazado</strong> para los dos.</li>
@@ -187,170 +229,11 @@
   </div>
 </details>
 
-<section>
+<section class="ir-lab">
 <h2 class="sin-num">Código</h2>
-<!-- ---------- Fragmento 8 ---------- -->
-<article class="snippet" data-lang="python" id="frag-8">
-  <header>
-    <h3>8 · tf.function: trazado, caché de grafos y la diferencia entre <code>print</code> y <code>tf.print</code></h3>
-    <p class="para-que"><strong>Para qué sirve</strong> Contar los trazados de una <code>tf.function</code> y ver con tus ojos cuándo se ejecuta el <code>print</code> de Python (solo al trazar) y cuándo el <code>tf.print</code> (siempre).</p>
-  </header>
-  <pre class="code"><code>import tensorflow as tf
-
-def doblar(x):
-    print("  [Python] trazando con", x)
-    return x * 2 + 1
-
-f = tf.function(doblar)
-print(f(tf.constant(1.0)).numpy())
-print(f(tf.constant(5.0)).numpy())
-print(f(tf.constant([1.0, 2.0])).numpy())
-print(f(3).numpy())
-print(f(4).numpy())
-print(f(3).numpy())
-print("trazados:", f.experimental_get_tracing_count())
-
-@tf.function
-def cuadrado(x):
-    print("  [print] solo al trazar")
-    tf.print("  [tf.print] x =", x)
-    return x * x
-
-print(cuadrado(tf.constant(2.0)).numpy())
-print(cuadrado(tf.constant(3.0)).numpy())</code></pre>
-  <details class="linea-a-linea">
-    <summary>Línea por línea</summary>
-    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
-    <table class="lineas">
-      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
-      <tbody>
-        <tr data-lines="1"><td><code>import tensorflow as tf</code></td><td>Importa TensorFlow.</td></tr>
-        <tr data-lines="3-5"><td><code>def doblar(x): …</code></td><td>Una función normal de Python que imprime un mensaje (con el argumento que recibe) y devuelve <code>2x + 1</code>.</td></tr>
-        <tr data-lines="7"><td><code>f = tf.function(doblar)</code></td><td><code>tf.function(doblar)</code> crea la versión «compilable». Todavía no ha ejecutado nada.</td></tr>
-        <tr data-lines="8"><td><code>print(f(tf.constant(1.0)).numpy())</code></td><td>Primera llamada con un tensor escalar: <strong>traza</strong> (aparece el <code>print</code>) y calcula 2·1 + 1 = 3.</td></tr>
-        <tr data-lines="9"><td><code>print(f(tf.constant(5.0)).numpy())</code></td><td>Otro escalar <code>float32</code> (5,0): misma firma, reutiliza el grafo; no hay <code>print</code>. Resultado 11.</td></tr>
-        <tr data-lines="10"><td><code>print(f(tf.constant([1.0, 2.0])).numpy())</code></td><td>Un vector de dos elementos: forma nueva, así que <strong>traza otra vez</strong>.</td></tr>
-        <tr data-lines="11-12"><td><code>print(f(3).numpy()) …</code></td><td>Pasar los enteros de Python <code>3</code> y <code>4</code>: cada <strong>valor</strong> de Python distinto es una firma distinta, y traza cada vez.</td></tr>
-        <tr data-lines="13"><td><code>print(f(3).numpy())</code></td><td><code>f(3)</code> de nuevo: ya está en la caché, sin trazar.</td></tr>
-        <tr data-lines="14"><td><code>print("trazados:", f.experimental_get_tracing_count( …</code></td><td><code>experimental_get_tracing_count()</code> da el <strong>número de trazados</strong> hechos hasta ahora.</td></tr>
-        <tr data-lines="16-20"><td><code>@tf.function …</code></td><td>Una función decorada con <code>@tf.function</code> (la forma habitual): imprime con <code>print</code> de Python y con <code>tf.print</code>, y devuelve x al cuadrado.</td></tr>
-        <tr data-lines="22-23"><td><code>print(cuadrado(tf.constant(2.0)).numpy()) …</code></td><td>Se llama con 2,0 y con 3,0, dos tensores con la misma firma.</td></tr>
-      </tbody>
-    </table>
-  </details>
-  <div class="salida">
-    <strong>Salida esperada</strong>
-    <pre>  [Python] trazando con Tensor("x:0", shape=(), dtype=float32)
-3.0
-11.0
-  [Python] trazando con Tensor("x:0", shape=(2,), dtype=float32)
-[3. 5.]
-  [Python] trazando con 3
-7
-  [Python] trazando con 4
-9
-7
-trazados: 4
-  [print] solo al trazar
-  [tf.print] x = 2
-4.0
-  [tf.print] x = 3
-9.0</pre>
-    <p>Las líneas «<code>[Python] trazando con …</code>» aparecen cuatro veces (escalar, vector, <code>3</code> y <code>4</code>), y por eso el contador final es 4; <code>f(5.0)</code> y el segundo <code>f(3)</code> no trazan. Dentro del trazado, el argumento no es un número sino un tensor simbólico (<code>Tensor("x:0", shape=(), dtype=float32)</code>). Con <code>cuadrado</code>: la primera llamada imprime el <code>print</code> de Python <em>y</em> el <code>tf.print</code>; la segunda solo el <code>tf.print</code> (con <code>x = 3</code>), porque ya no ejecuta Python.</p>
-  </div>
-</article>
-
-<!-- ---------- Fragmento 9 ---------- -->
-<article class="snippet" data-lang="python" id="frag-9">
-  <header>
-    <h3>9 · AutoGraph, <code>input_signature</code> y la ganancia de velocidad del grafo</h3>
-    <p class="para-que"><strong>Para qué sirve</strong> Ver cómo <code>tf.function</code> convierte <code>if</code> y <code>for</code> de Python en operaciones de grafo, cómo fijar la firma con <code>input_signature</code> y comprobar que el grafo es más rápido.</p>
-  </header>
-  <pre class="code"><code>import time
-import tensorflow as tf
-
-@tf.function
-def signo(x):
-    if x &gt; 0:
-        return "positivo"
-    return "no positivo"
-print(signo(tf.constant(2.0)).numpy(), signo(tf.constant(-2.0)).numpy())
-
-@tf.function
-def suma_hasta(n):
-    s = tf.constant(0)
-    for i in tf.range(n):
-        s += i
-    return s
-print(suma_hasta(tf.constant(5)).numpy(), suma_hasta(tf.constant(100)).numpy())
-print("trazados de suma_hasta:", suma_hasta.experimental_get_tracing_count())
-
-@tf.function(input_signature=[tf.TensorSpec(shape=(None,), dtype=tf.float32)])
-def suma(x):
-    return tf.reduce_sum(x)
-print(suma(tf.constant([1., 2.])).numpy(), suma(tf.constant([1., 2., 3.])).numpy())
-print("trazados de suma:", suma.experimental_get_tracing_count())
-try:
-    suma(tf.constant([1, 2, 3]))
-except TypeError:
-    print("TypeError: un tensor int32 no encaja en la firma float32")
-
-def muchas(x):
-    for _ in range(100):
-        x = x * 1.0001 + 0.0001
-    return x
-
-muchas_grafo = tf.function(muchas)
-x0 = tf.constant(1.0)
-print("mismo resultado:", muchas(x0).numpy(), muchas_grafo(x0).numpy())
-
-def tiempo(fn):
-    fn(x0)
-    t0 = time.perf_counter()
-    for _ in range(50):
-        fn(x0)
-    return time.perf_counter() - t0
-
-print("el grafo es más de 3 veces más rápido:", tiempo(muchas) &gt; 3 * tiempo(muchas_grafo))</code></pre>
-  <details class="linea-a-linea">
-    <summary>Línea por línea</summary>
-    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
-    <table class="lineas">
-      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
-      <tbody>
-        <tr data-lines="1-2"><td><code>import time …</code></td><td>Importan <code>time</code> (para medir tiempos) y TensorFlow.</td></tr>
-        <tr data-lines="4-8"><td><code>@tf.function …</code></td><td>Función decorada con un <code>if x &gt; 0</code> donde <code>x</code> es un tensor. AutoGraph lo reescribe como una condición de TensorFlow, y devuelve un texto u otro.</td></tr>
-        <tr data-lines="9"><td><code>print(signo(tf.constant(2.0)).numpy(), signo(tf.cons …</code></td><td>La llamamos con 2,0 y con −2,0, que usan el <strong>mismo grafo</strong>. (TensorFlow devuelve los textos como <code>bytes</code>: <code>b'positivo'</code>.)</td></tr>
-        <tr data-lines="11-16"><td><code>@tf.function …</code></td><td>Una suma de 0 a n−1 con <code>for i in tf.range(n)</code>: al usar <code>tf.range</code> con un tensor, el bucle se queda <strong>dentro del grafo</strong>. <code>s += i</code> acumula.</td></tr>
-        <tr data-lines="17"><td><code>print(suma_hasta(tf.constant(5)).numpy(), suma_hasta …</code></td><td>Se llama con <code>n = 5</code> (0+1+2+3+4 = 10) y con <code>n = 100</code> (4950).</td></tr>
-        <tr data-lines="18"><td><code>print("trazados de suma_hasta:", suma_hasta.experime …</code></td><td>Cuenta los trazados: 1, el mismo grafo sirvió para ambos valores de <code>n</code>.</td></tr>
-        <tr data-lines="20-22"><td><code>@tf.function(input_signature=[tf.TensorSpec(shape=(N …</code></td><td><code>input_signature</code> declara la entrada: un <code>TensorSpec</code> de forma <code>(None,)</code> (un vector de cualquier longitud) y tipo <code>float32</code>. La función suma sus elementos.</td></tr>
-        <tr data-lines="23"><td><code>print(suma(tf.constant([1., 2.])).numpy(), suma(tf.c …</code></td><td>La llamamos con vectores de 2 y de 3 elementos.</td></tr>
-        <tr data-lines="24"><td><code>print("trazados de suma:", suma.experimental_get_tra …</code></td><td>Un único trazado: cubre todas las longitudes.</td></tr>
-        <tr data-lines="25-28"><td><code>try: …</code></td><td>Llamarla con un tensor de enteros no encaja con la firma <code>float32</code>: <code>TypeError</code>.</td></tr>
-        <tr data-lines="30-33"><td><code>def muchas(x): …</code></td><td>Una función con 100 pequeñas operaciones (el bucle de Python se ejecuta una vez, al trazar, y las 100 operaciones quedan en el grafo).</td></tr>
-        <tr data-lines="35"><td><code>muchas_grafo = tf.function(muchas)</code></td><td>Su versión en grafo.</td></tr>
-        <tr data-lines="36"><td><code>x0 = tf.constant(1.0)</code></td><td>Un escalar de prueba, <code>x0 = 1,0</code>.</td></tr>
-        <tr data-lines="37"><td><code>print("mismo resultado:", muchas(x0).numpy(), muchas …</code></td><td>Comprueba que el resultado es el mismo en las dos versiones (1,0201029).</td></tr>
-        <tr data-lines="39-44"><td><code>def tiempo(fn): …</code></td><td>Una pequeña función para medir: llama una vez para «calentar» (y trazar, si hace falta), arranca el cronómetro, llama 50 veces y devuelve los segundos transcurridos (<code>time.perf_counter()</code>).</td></tr>
-        <tr data-lines="46"><td><code>print("el grafo es más de 3 veces más rápido:", tiem …</code></td><td>Imprime si el modo inmediato tarda más de 3 veces lo que el grafo. Es un booleano (<code>True</code>/<code>False</code>), porque los milisegundos dependen del ordenador.</td></tr>
-      </tbody>
-    </table>
-  </details>
-  <div class="salida">
-    <strong>Salida esperada</strong>
-    <pre>b'positivo' b'no positivo'
-10 4950
-trazados de suma_hasta: 1
-3.0 6.0
-trazados de suma: 1
-TypeError: un tensor int32 no encaja en la firma float32
-mismo resultado: 1.0201029 1.0201029
-el grafo es más de 3 veces más rápido: True</pre>
-    <p><code>signo</code> da «positivo» y «no positivo» (como <code>bytes</code>, con la <code>b</code> delante). <code>suma_hasta</code> da 10 y 4950 con un único trazado. <code>suma</code> da 3,0 y 6,0 con un único trazado, y rechaza el <code>int32</code>. Las dos versiones de <code>muchas</code> dan el mismo número (1,0201029), y la última línea es <code>True</code>: el grafo es más de 3 veces más rápido que el modo inmediato en esta máquina.</p>
-  </div>
-</article>
-
+<a class="lab-card" href="laboratorio.html#paso-6"><span class="lc-ico" aria-hidden="true">🧪</span>
+  <span><strong>Ver el código de esta lección en el Laboratorio</strong>
+  <span>Paso 6 · tf.function: trazados, print y tf.print. AutoGraph e input_signature, en «Más código» (fragmento 9).</span></span></a>
 </section>
 
 </div>

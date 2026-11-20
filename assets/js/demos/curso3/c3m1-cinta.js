@@ -30,7 +30,7 @@ Lab.register("curso3/c3m1-cinta", function (root, api) {
 
   function draw(ctx, w, h, C) {
     var f = fw(S), g = bw(S, f), ph = S.ph;
-    var narrow = w < 480, cw = w / 5, bwid = Math.min(78, cw - (narrow ? 24 : 14)), bh = 56, ym = h * 0.40, yb = h * 0.77, ytop = h * 0.17, ybot = h * 0.63;
+    var narrow = w < 480, cw = w / 5, bwid = Math.min(78, cw - (narrow ? 14 : 14)), bh = 56, ym = h * 0.40, yb = h * 0.77, ytop = h * 0.17, ybot = h * 0.63;
     var P = {
       w: [cw * 0.5, ytop + 8, "w", S.w, C.cobaltoWash, 5, "var"], x: [cw * 0.5, ybot - 8, "x", S.x, C.paper, 4, "const"],
       m: [cw * 1.5, ym, narrow ? "m" : "m = w·x", f.m, C.cobaltoWash, 4], z: [cw * 2.5, ym, narrow ? "z" : "z = m+b", f.z, C.cobaltoWash, 3], b: [cw * 2.5, yb, "b", S.b, C.cobaltoWash, 4, "var"],
@@ -54,13 +54,13 @@ Lab.register("curso3/c3m1-cinta", function (root, api) {
       var p = P[k], hasG = bwdPh[k] && ph >= bwdPh[k], hot = (fwdPh[k] === ph && ph >= 1 && ph <= 4) || (hasG && bwdPh[k] === ph);
       var isVar = p[6] === "var";
       D.rect(ctx, p[0] - bwid / 2, p[1] - bh / 2, bwid, bh, p[4], hot ? C.terracota : C.ink, hot ? 3 : (isVar ? 2 : 1.2));
-      var fs = bwid < 62 ? 9.5 : 11;
+      var fs = 11;
       D.text(ctx, p[2], p[0], p[1] - 14, { align: "center", size: fs, weight: 700, color: C.ink, mono: true });
       var known = !fwdPh[k] || ph >= fwdPh[k] || ph >= 5;
       D.text(ctx, known ? n2(p[3]) : "?", p[0], p[1] + 2, { align: "center", size: fs + 1, mono: true, color: known ? C.ink : C.muted, weight: 600 });
       var gs = bwdPh[k] === undefined ? "" : (hasG ? "∂=" + n2(g[k]) : "∂=?");
       if (gs) D.text(ctx, narrow ? gs.replace("∂=", "∂") : gs, p[0], p[1] + 17, { align: "center", size: fs, mono: true, weight: hasG ? 700 : 400, color: hasG ? C.terracotaInk : C.muted });
-      if (isVar) D.text(ctx, "Variable", p[0], p[1] + bh / 2 + 11, { align: "center", size: 9.5, color: C.muted });
+      if (isVar) D.text(ctx, "Variable", p[0], p[1] + bh / 2 + 11, { align: "center", size: 11, color: C.muted });
     });
     D.text(ctx, ph < 1 ? "cinta vacía" : ph <= 4 ? "ida: la cinta graba " + ph + " de 4 operaciones" : "vuelta: la cinta se rebobina (flechas naranja)", w / 2, h - 6, { align: "center", size: 11, color: C.ink2, weight: 600 });
   }

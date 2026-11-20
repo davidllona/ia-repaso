@@ -57,7 +57,7 @@ Lab.register("curso3/c3m1-broadcasting", function (root, api) {
         var orig = i < origR && j < origC, v = valFn(i, j);
         D.rect(ctx, x0 + j * s, oy + i * s, s, s, orig ? color : C.surface, C.ink, orig ? 1.4 : 1);
         if (!orig) { ctx.save(); ctx.globalAlpha = 0.45; }
-        D.text(ctx, v === null ? "?" : String(v), x0 + j * s + s / 2, oy + i * s + s / 2 + 4, { align: "center", size: s >= 26 ? 12 : 10, mono: true, color: orig ? C.ink : C.muted, weight: orig ? 600 : 400 });
+        D.text(ctx, v === null ? "?" : String(v), x0 + j * s + s / 2, oy + i * s + s / 2 + 4, { align: "center", size: s >= 26 ? 12 : 11, mono: true, color: orig ? C.ink : C.muted, weight: orig ? 600 : 400 });
         if (!orig) ctx.restore();
       }
     }
@@ -78,7 +78,7 @@ Lab.register("curso3/c3m1-broadcasting", function (root, api) {
       D.text(ctx, "Resultado", x3 + matW / 2, 20, { align: "center", size: 12, weight: 700, color: C.ink });
       D.text(ctx, "imposible", x3 + matW / 2, 36, { align: "center", size: 11, mono: true, color: C.muted });
     }
-    D.text(ctx, w < 480 ? "atenuado = copia estirada" : "los números atenuados son copias: el «estirado» no gasta memoria extra", w / 2, h - 6, { align: "center", size: 10.5, color: C.muted });
+    D.text(ctx, w < 480 ? "atenuado = copia estirada" : "los números atenuados son copias: el «estirado» no gasta memoria extra", w / 2, h - 6, { align: "center", size: 11, color: C.muted });
   }
 
   function update() {

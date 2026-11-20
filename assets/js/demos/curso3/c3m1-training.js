@@ -28,29 +28,29 @@ Lab.register("curso3/c3m1-training", function (root, api) {
   function draw(ctx, w, h, C) {
     if (S.layer === "drop") {
       var m = mask(), n = 10, pad = 30, bw = (w - pad - 12) / n, y0 = h - 40, sc = (h - 90) / 2.6, i;
-      D.text(ctx, w < 480 ? "gris: voto · color: tras Dropout · training=" + (S.train ? "True" : "False") : "voto de cada crítico (gris) y tras Dropout(" + S.p.toFixed(2) + ") con training=" + (S.train ? "True" : "False"), w / 2, 16, { align: "center", size: w < 480 ? 10.5 : 11.5, weight: 600, color: C.ink2 });
+      D.text(ctx, w < 480 ? "gris: voto · color: tras Dropout · training=" + (S.train ? "True" : "False") : "voto de cada crítico (gris) y tras Dropout(" + S.p.toFixed(2) + ") con training=" + (S.train ? "True" : "False"), w / 2, 16, { align: "center", size: w < 480 ? 11 : 11.5, weight: 600, color: C.ink2 });
       D.line(ctx, pad, y0, w - 8, y0, C.ink, 1.4);
       for (i = 0; i < n; i++) {
         var x = pad + i * bw, hv = HVAL[i], ov = S.train ? (m[i] ? hv / (1 - S.p) : 0) : hv;
         D.rect(ctx, x + 2, y0 - hv * sc, bw * 0.4 - 1, hv * sc, C.line, C.muted, 1);
         if (ov > 0) D.rect(ctx, x + bw * 0.45, y0 - Math.min(ov, 2.6) * sc, bw * 0.45, Math.min(ov, 2.6) * sc, S.train ? C.terracotaWash : C.olivaWash, S.train ? C.terracota : C.oliva, 1.5);
         else D.text(ctx, "✕", x + bw * 0.67, y0 - 6, { align: "center", size: 13, weight: 700, color: C.terracotaInk });
-        D.text(ctx, String(i + 1), x + bw / 2, y0 + 14, { align: "center", size: 10, color: C.muted, mono: true });
-        if (ov > 0 && S.train && bw > 24) D.text(ctx, ov.toFixed(1), x + bw * 0.67, y0 - Math.min(ov, 2.6) * sc - 4, { align: "center", size: 9.5, mono: true, color: C.ink2 });
+        D.text(ctx, String(i + 1), x + bw / 2, y0 + 14, { align: "center", size: 11, color: C.muted, mono: true });
+        if (ov > 0 && S.train && bw > 24) D.text(ctx, ov.toFixed(1), x + bw * 0.67, y0 - Math.min(ov, 2.6) * sc - 4, { align: "center", size: 11, mono: true, color: C.ink2 });
       }
-      D.text(ctx, "crítico →", w - 8, y0 + 28, { align: "right", size: 10, color: C.muted });
+      D.text(ctx, "crítico →", w - 8, y0 + 28, { align: "right", size: 11, color: C.muted });
     } else {
       if (!S.outBN) { apply(); }
       var b = S.batch, o = S.outBN, lo = -3, hi = 10, px = 30, pw = w - px - 14;
       function X(v) { return px + (M.clamp(v, lo, hi) - lo) / (hi - lo) * pw; }
-      D.text(ctx, (w < 480 ? "capítulos vistos (arriba) y salida (abajo) · training=" : "6 usuarios: capítulos vistos (arriba) y salida de BatchNorm (abajo), training=") + (S.train ? "True" : "False"), w / 2, 16, { align: "center", size: w < 480 ? 10.5 : 11.5, weight: 600, color: C.ink2 });
+      D.text(ctx, (w < 480 ? "entrada (arriba) y salida (abajo) · training=" : "6 usuarios: capítulos vistos (arriba) y salida de BatchNorm (abajo), training=") + (S.train ? "True" : "False"), w / 2, 16, { align: "center", size: w < 480 ? 11 : 11.5, weight: 600, color: C.ink2 });
       var ya = h * 0.36, yb = h * 0.74;
       [[ya, "entrada"], [yb, "salida"]].forEach(function (r) { D.line(ctx, px, r[0], px + pw, r[0], C.ink, 1.2); });
-      var k; for (k = lo; k <= hi; k += 1) { var tx = X(k); D.line(ctx, tx, ya - 3, tx, ya + 3, C.muted, 1); D.line(ctx, tx, yb - 3, tx, yb + 3, C.muted, 1); if (k % 2 === 0) { D.text(ctx, String(k), tx, ya + 16, { align: "center", size: 9.5, color: C.muted, mono: true }); D.text(ctx, String(k), tx, yb + 16, { align: "center", size: 9.5, color: C.muted, mono: true }); } }
+      var k; for (k = lo; k <= hi; k += 1) { var tx = X(k); D.line(ctx, tx, ya - 3, tx, ya + 3, C.muted, 1); D.line(ctx, tx, yb - 3, tx, yb + 3, C.muted, 1); if (k % 2 === 0) { D.text(ctx, String(k), tx, ya + 16, { align: "center", size: 11, color: C.muted, mono: true }); D.text(ctx, String(k), tx, yb + 16, { align: "center", size: 11, color: C.muted, mono: true }); } }
       b.forEach(function (v) { D.circle(ctx, X(v), ya, 5.5, C.cobaltoWash, C.cobalto, 2); });
       o.forEach(function (v) { D.circle(ctx, X(v), yb, 5.5, C.terracotaWash, C.terracota, 2); });
-      D.line(ctx, X(M.mean(b)), ya - 12, X(M.mean(b)), ya - 4, C.cobalto, 2.5); D.text(ctx, "media " + f2(M.mean(b)), X(M.mean(b)), ya - 15, { align: "center", size: 10, color: C.cobaltoInk, weight: 600 });
-      D.line(ctx, X(M.mean(o)), yb - 12, X(M.mean(o)), yb - 4, C.terracota, 2.5); D.text(ctx, "media " + f2(M.mean(o)), X(M.mean(o)), yb - 15, { align: "center", size: 10, color: C.terracotaInk, weight: 600 });
+      D.line(ctx, X(M.mean(b)), ya - 12, X(M.mean(b)), ya - 4, C.cobalto, 2.5); D.text(ctx, "media " + f2(M.mean(b)), X(M.mean(b)), ya - 15, { align: "center", size: 11, color: C.cobaltoInk, weight: 600 });
+      D.line(ctx, X(M.mean(o)), yb - 12, X(M.mean(o)), yb - 4, C.terracota, 2.5); D.text(ctx, "media " + f2(M.mean(o)), X(M.mean(o)), yb - 15, { align: "center", size: 11, color: C.terracotaInk, weight: 600 });
     }
   }
   function update() {

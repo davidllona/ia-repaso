@@ -20,8 +20,8 @@
     <div>
       <p class="eyebrow">Curso 3 · Módulo 1 · Lección 8 de 8</p>
       <h1>Una capa propia crea sus pesos al ver los datos y se guarda como receta</h1>
-      <p class="lead">Una capa propia son cuatro métodos: <code>__init__</code> guarda los hiperparámetros, <code>build</code> crea los pesos con la primera bandeja de datos, <code>call</code> calcula y <code>get_config</code> devuelve la receta. Guardar un modelo es guardar esas recetas y los pesos.</p>
-      <p class="meta-line"><span class="read-time" data-render="read-time"></span><a href="../modulo-1.html">Índice del módulo</a></p>
+      <p class="lead">Una capa propia son cuatro recetas: guardar opciones, crear pesos, calcular y dar su receta. Guardar un modelo es guardar esas recetas y los pesos.</p>
+      <p class="meta-line"><span class="read-time" data-render="read-time"></span><a href="../modulo-1.html">Índice del módulo</a> · <a href="#chuleta">Ir a la chuleta</a></p>
     </div>
     <div class="hero-tile" aria-hidden="true"></div>
   </div>
@@ -29,20 +29,22 @@
 <details class="predice">
   <summary>Tu capa se construyó con usuarios de 2 notas. Ahora le llega un lote de usuarios con 5 notas. ¿Se adapta sola?<span class="hint"></span></summary>
   <div>
-    <p><strong>No.</strong> <code>build</code> se ejecuta <strong>una sola vez</strong>, en la primera llamada, y fijó <code>W</code> con forma <code>(2, 3)</code>. Un lote de 5 columnas da <em>«Matrix size-incompatible»</em>. En cambio, cambiar el número de filas (el tamaño del lote) no importa nunca.</p>
+    <p><strong>No.</strong> Los pesos se crean <strong>una sola vez</strong>, en la primera llamada, con forma <code>(2, 3)</code>. Con 5 columnas da error. Cambiar el tamaño del lote (las filas), en cambio, no importa nunca.</p>
   </div>
 </details>
 
 <section>
-<h2 id="idea">El molde, la masa y la receta</h2>
-<p>Una capa es un molde de galletas con la masa (los pesos) dentro. <code>__init__</code> elige el molde: guarda los <strong>hiperparámetros</strong> (nº de unidades, activación), pero no crea pesos, porque aún no sabe cuántas columnas tendrán los datos. <code>build(input_shape)</code> prepara la masa la primera vez que ve una bandeja: <code>self.add_weight(...)</code> con forma <code>(input_shape[-1], unidades)</code>. <code>call</code> hornea: <code>activación(x @ W + b)</code>, mejor con <code>keras.ops</code>. Y <code>get_config</code> devuelve un diccionario con los hiperparámetros: la <strong>receta</strong>, no la masa.</p>
-<p><code>modelo.save("modelo.keras")</code> escribe un zip con la arquitectura (los <code>get_config</code> de cada capa), los pesos y metadatos. Al cargar, Keras reconstruye cada clase <strong>por su nombre</strong>: <code>Dense</code> la conoce, pero tu <code>CapaEscala</code> solo existe en tu código. Por eso:</p>
-<ul>
-  <li>Toda pieza propia necesita <code>get_config</code> con <em>todos</em> los argumentos de <code>__init__</code>.</li>
-  <li>Keras tiene que encontrar la clase: regístrala con <code>@keras.saving.register_keras_serializable()</code> o pásala con <code>custom_objects</code>.</li>
-  <li>Keras 3: pesos en <code>algo.weights.h5</code>, SavedModel con <code>export()</code>, y <code>.h5</code> es formato antiguo.</li>
-</ul>
-<p>Después de guardar, carga y compara predicciones con <code>np.allclose</code>: es la única prueba de que todo se guardó.</p>
+<h2 id="idea">1 · Cuatro recetas: molde, masa, horno y receta</h2>
+<p>Una capa es un molde de galletas con la masa (los pesos) dentro. Tu clase hereda de <code>layers.Layer</code> y escribe cuatro métodos:</p>
+<table>
+  <thead><tr><th>Método</th><th>Cuándo</th><th>Qué hace</th></tr></thead>
+  <tbody>
+    <tr><td><code>__init__</code></td><td>Al crearla</td><td>Guarda los <strong>hiperparámetros</strong> (lo que eliges tú: nº de neuronas, activación). El molde.</td></tr>
+    <tr><td><code>build</code></td><td>1.ª llamada</td><td>Crea los pesos con <code>add_weight</code>, ya sabiendo cuántas columnas llegan. La masa.</td></tr>
+    <tr><td><code>call</code></td><td>Cada llamada</td><td>Calcula: activación(x @ W + b). El horno.</td></tr>
+    <tr><td><code>get_config</code></td><td>Al guardar</td><td>Devuelve los hiperparámetros en un diccionario. La receta, sin la masa.</td></tr>
+  </tbody>
+</table>
 </section>
 
 <figure class="demo" data-demo="curso3/c3m1-ciclo-capa" data-titulo="El ciclo de vida de una capa personalizada">
@@ -51,31 +53,84 @@
 </figure>
 
 <section>
-<h2 id="numeros">Con números: de 9 parámetros a 385</h2>
-<div class="callout ejemplo">
-  <span class="lbl">Ejemplo numérico</span>
-  <ol class="pasos">
-    <li><code>CapaDensa(3)</code> llamada con 2 columnas: <code>W</code> de <code>(2, 3)</code> y <code>b</code> de <code>(3,)</code> → 2 · 3 + 3 = <strong>9</strong> parámetros.</li>
-    <li>Llamada con 5 columnas: <code>[2, 5] @ [2, 3]</code> no se puede multiplicar → error.</li>
-    <li><code>get_config()</code> → <code>{'name': 'mi_densa', 'unidades': 3, 'activacion': 'relu'}</code>; <code>from_config</code> crea una capa nueva <strong>sin pesos</strong>.</li>
-    <li>Proyecto de las «dos lunas» (comedia o thriller según ritmo y humor): 48 + 272 + 48 + 17 = <strong>385</strong> parámetros, accuracy de test <strong>0,970</strong>, y el modelo cargado del <code>.keras</code> da las mismas predicciones.</li>
-  </ol>
+<h2 id="numeros">2 · Con números: la vida de una capa de 3 neuronas</h2>
+<div class="anim-pasos" data-titulo="CapaDensa(3), de la creación a la copia">
+  <div class="paso"><p><strong>1.</strong> Se crea con 3 neuronas y ReLU. Aún sin pesos.</p><span class="grande">built = False · 0 pesos</span></div>
+  <div class="paso"><p><strong>2.</strong> Primera llamada con 2 notas por usuario: <code>build</code> crea W y b.</p><span class="grande">W (2, 3) + b (3,) = 9 parámetros</span></div>
+  <div class="paso"><p><strong>3.</strong> Llega un lote con 5 notas: no se puede multiplicar.</p><span class="grande">[2, 5] @ [2, 3] → error</span></div>
+  <div class="paso"><p><strong>4.</strong> <code>get_config</code> da su receta, sin pesos.</p><span class="grande">unidades 3 · activación relu</span></div>
+  <div class="paso"><p><strong>5.</strong> <code>from_config</code> fabrica una copia con la receta: sin pesos, hasta que vea datos.</p><span class="grande">copia: built = False</span></div>
 </div>
 </section>
 
+<section>
+<h2 id="guardar-receta">3 · Guardar es guardar recetas y pesos</h2>
+<p><code>modelo.save("modelo.keras")</code> escribe un archivo con la arquitectura (las recetas de cada capa), los pesos y algunos datos más.</p>
+<ul class="flow">
+  <li class="a">GUARDAR<small>recetas + pesos en un .keras</small></li>
+  <li class="b">CARGAR<small>Keras lee el nombre de cada clase</small></li>
+  <li class="c">RECONSTRUIR<small>clase(receta) y le pone los pesos</small></li>
+  <li class="d">COMPROBAR<small>¿predice lo mismo? <code>np.allclose</code></small></li>
+</ul>
+<p><code>Dense</code> la conoce Keras; tu <code>CapaEscala</code> solo existe en tu código.</p>
+</section>
+
+<section>
+<h2 id="cargar">4 · Cuando cargar falla</h2>
+<table>
+  <thead><tr><th>Lo que pasa</th><th>Cómo se arregla</th></tr></thead>
+  <tbody>
+    <tr><td>«Could not locate class»: no encuentra tu clase</td><td><strong>Regístrala</strong> (apúntala en la lista de Keras con un decorador) o dásela al cargar en <code>custom_objects</code></td></tr>
+    <tr><td>Los pesos no encajan al cargar</td><td>Escribe <code>get_config</code> con <em>todos</em> los argumentos de <code>__init__</code></td></tr>
+    <tr><td>Guardar solo los pesos en «pesos.h5» da error</td><td>En Keras 3 el nombre acaba en <code>.weights.h5</code></td></tr>
+    <tr><td>Una capa <code>Lambda</code> no carga</td><td>Mejor una capa propia; o cargar en modo no seguro (<code>safe_mode</code>) si te fías del archivo</td></tr>
+  </tbody>
+</table>
+</section>
+
 <details class="predice">
-  <summary>Tu modelo lleva <code>layers.Lambda(lambda t: t ** 2)</code>. Lo guardas en <code>.keras</code> y lo cargas con <code>load_model</code>. ¿Carga?<span class="hint"></span></summary>
+  <summary>Tu modelo lleva una capa <code>Lambda</code> (una función de una línea convertida en capa). Lo guardas en <code>.keras</code> y lo cargas. ¿Carga?<span class="hint"></span></summary>
   <div>
-    <p><strong>No, por defecto.</strong> Una <code>Lambda</code> guarda la función como código, y cargarla sería ejecutar código que podría ser malicioso. Keras 3 se niega salvo <code>safe_mode=False</code>, solo si confías en el archivo. Mejor: una capa propia con <code>get_config</code>.</p>
+    <p><strong>No, por defecto.</strong> La <code>Lambda</code> guarda la función como código, y cargarla sería ejecutar código que podría ser malicioso. Keras 3 se niega salvo <code>safe_mode=False</code>.</p>
   </div>
 </details>
+
+<section>
+<h2 id="dos-lunas">5 · Todo junto: el proyecto de las dos lunas</h2>
+<p>Puntos en forma de dos lunas (comedia o thriller según ritmo y humor), con capas propias, un atajo y guardado:</p>
+<div class="anim-pasos" data-titulo="Las dos lunas, de los datos al archivo">
+  <div class="paso"><p><strong>1.</strong> 800 puntos; un cuarto se aparta para el examen final (test).</p><span class="grande">600 para entrenar · 200 de test</span></div>
+  <div class="paso"><p><strong>2.</strong> Dos capas propias de 16, un atajo y una salida sigmoide.</p><span class="grande">48 + 272 + 48 + 17 = 385</span></div>
+  <div class="paso"><p><strong>3.</strong> 40 épocas: la pérdida baja y el acierto sube.</p><span class="grande">0,388 → 0,085</span></div>
+  <div class="paso"><p><strong>4.</strong> Examen con puntos que no vio.</p><span class="grande">acierto 0,970</span></div>
+  <div class="paso"><p><strong>5.</strong> Se guarda, se carga y se compara.</p><span class="grande">mismas predicciones: True</span></div>
+</div>
+</section>
+
+<section>
+<h2 id="chuleta">Chuleta para repasar</h2>
+<dl class="chuleta">
+  <div><dt>Capa propia</dt><dd>Clase que hereda de layers.Layer con sus cuatro métodos.</dd></div>
+  <div><dt>Hiperparámetro</dt><dd>Lo que eliges tú, no la red. <em>3 neuronas, ReLU.</em></dd></div>
+  <div><dt>Build</dt><dd>Crea los pesos en la primera llamada, cuando ya sabe cuántas columnas llegan.</dd></div>
+  <div><dt>Add_weight</dt><dd>Crea un peso con su forma, su valor inicial y si se entrena.</dd></div>
+  <div><dt>Call</dt><dd>El cálculo de cada llamada. <em>activación(x @ W + b).</em></dd></div>
+  <div><dt>Get_config</dt><dd>La receta: los argumentos de __init__ en un diccionario.</dd></div>
+  <div><dt>From_config</dt><dd>Fabricar una capa con la receta. Sale sin pesos.</dd></div>
+  <div><dt>Archivo .keras</dt><dd>Recetas + pesos del modelo en un solo archivo.</dd></div>
+  <div><dt>Registrar</dt><dd>Apuntar tu clase para que load_model la encuentre sola.</dd></div>
+  <div><dt>Custom_objects</dt><dd>Darle tu clase a mano al cargar.</dd></div>
+  <div><dt>Lambda</dt><dd>Función hecha capa; por seguridad no carga por defecto.</dd></div>
+  <div><dt>Comprobar al cargar</dt><dd>Comparar predicciones con np.allclose: la única prueba de que se guardó todo.</dd></div>
+</dl>
+</section>
 
 <div class="resumen">
   <h2 class="sin-num sin-toc">En tres líneas</h2>
   <ul>
     <li><code>__init__</code> guarda hiperparámetros, <code>build</code> crea los pesos una vez, <code>call</code> calcula y <code>get_config</code> da la receta.</li>
     <li>Al cargar, Keras busca tu clase por su nombre: regístrala o usa <code>custom_objects</code>.</li>
-    <li><code>.keras</code> para guardar, <code>.weights.h5</code> para pesos, <code>export()</code> para desplegar; y compara predicciones tras cargar.</li>
+    <li><code>.keras</code> guarda el modelo entero y <code>.weights.h5</code> solo los pesos; y tras cargar, compara predicciones.</li>
   </ul>
 </div>
 
@@ -85,7 +140,7 @@
  "titulo": "¿Lo tienes?",
  "preguntas": [
   {
-   "q": "En una capa personalizada, ¿por qué los pesos se crean en <code>build(input_shape)</code> y no en <code>__init__</code>?",
+   "q": "En una capa propia, ¿por qué los pesos se crean en <code>build</code> y no en <code>__init__</code>?",
    "opciones": [
     "Porque <code>__init__</code> no puede usar <code>add_weight</code> por una norma de Python",
     "Porque la forma de los pesos depende de cuántas columnas tengan los datos, y eso solo se sabe en la primera llamada",
@@ -93,35 +148,34 @@
     "Porque <code>build</code> se ejecuta en cada lote y así se actualizan"
    ],
    "correcta": 1,
-   "porque": "Al crear la capa no se conocen los datos; <code>build</code> recibe <code>input_shape</code> y se ejecuta <strong>una sola vez</strong>, en la primera llamada, para crear <code>W</code> de forma <code>(columnas, unidades)</code>. Después los pesos se reutilizan, por eso una entrada con otro número de columnas da <em>«Matrix size-incompatible»</em>. No es una norma de Python ni se ejecuta en cada lote."
+   "porque": "Al crear la capa no se conocen los datos. <code>build</code> recibe la forma de la entrada y se ejecuta <strong>una sola vez</strong>, en la primera llamada, para crear W de forma (columnas, neuronas). Por eso luego otro número de columnas da error."
   },
   {
-   "q": "Guardas un modelo con una capa propia <code>CapaEscala</code> (que sí tiene <code>get_config</code>) y <code>load_model</code> falla con <em>«Could not locate class 'CapaEscala'»</em>. ¿Cuál es la solución correcta?",
+   "q": "Guardas un modelo con tu capa <code>CapaEscala</code> (que sí tiene <code>get_config</code>) y al cargar sale «Could not locate class 'CapaEscala'». ¿Qué haces?",
    "opciones": [
-    "Decorar la clase con <code>@keras.saving.register_keras_serializable()</code> o pasar <code>custom_objects={\"CapaEscala\": CapaEscala}</code> al cargar",
-    "Guardar el modelo con extensión <code>.h5</code>",
-    "Cambiar a <code>safe_mode=False</code> en <code>load_model</code>",
+    "Registrar la clase con <code>@keras.saving.register_keras_serializable()</code> o pasar <code>custom_objects={\"CapaEscala\": CapaEscala}</code> al cargar",
+    "Guardar con extensión <code>.h5</code>",
+    "Cargar con <code>safe_mode=False</code>",
     "Usar <code>tf.keras</code> en vez de <code>keras</code>"
    ],
    "correcta": 0,
-   "porque": "El archivo guarda el <em>nombre</em> de la clase y Keras no la encuentra: hay que registrarla o dársela en <code>custom_objects</code>. El <code>.h5</code> es un formato antiguo que no soluciona nada; <code>safe_mode=False</code> solo sirve para permitir <code>Lambda</code> con funciones de Python, que es otro problema; y <code>tf.keras</code> redirige al mismo Keras 3, con el mismo comportamiento."
+   "porque": "El archivo guarda el <em>nombre</em> de la clase y Keras no la encuentra: hay que registrarla o dársela. <code>.h5</code> es un formato antiguo; <code>safe_mode=False</code> es para <code>Lambda</code>; y <code>tf.keras</code> es el mismo Keras 3."
   },
   {
    "q": "En Keras 3 escribes <code>modelo.save_weights(\"pesos.h5\")</code>. ¿Qué pasa?",
    "opciones": [
     "Guarda los pesos sin problema",
-    "<code>ValueError</code>: el nombre debe terminar en <code>.weights.h5</code>",
+    "Error: el nombre debe terminar en <code>.weights.h5</code>",
     "Guarda un SavedModel",
     "Guarda el modelo completo en formato antiguo"
    ],
    "correcta": 1,
-   "porque": "Keras 3 exige que los archivos de solo pesos se llamen <code>algo.weights.h5</code>. Para el modelo completo se usa <code>.keras</code> y para un SavedModel de despliegue, <code>export(\"carpeta\")</code>."
+   "porque": "Keras 3 exige que los archivos de solo pesos se llamen <code>algo.weights.h5</code>. Para el modelo completo se usa <code>.keras</code> y para desplegarlo, <code>export(\"carpeta\")</code>."
   }
  ]
 }
 </script>
 </section>
-
 <details class="profundizar">
   <summary><span>Profundizar: la explicación completa<small>Los cuatro métodos, el forward y el gradiente de una Dense a mano (con su experimento), la capa en código, capas dentro de capas, pesos no entrenables, Huber, qué contiene un .keras, Lambda, get_config en subclases, export, el proyecto de las dos lunas, la tabla de errores típicos y el resumen del módulo.</small></span></summary>
   <div class="prof-body">
@@ -173,7 +227,7 @@
 </figure>
 
 <h3>La capa en código</h3>
-<p>El <a href="#frag-16">fragmento 16</a> escribe esta capa, la usa y <strong>demuestra</strong> que hace lo mismo que <code>layers.Dense</code>:</p>
+<p>El <a href="laboratorio.html#frag-16">fragmento 16</a> escribe esta capa, la usa y <strong>demuestra</strong> que hace lo mismo que <code>layers.Dense</code>:</p>
 <ul>
   <li><code>keras.activations.get(activacion)</code> convierte un texto como <code>"relu"</code> en la función. <code>add_weight</code> crea una variable de Keras con un nombre, una forma y un <em>inicializador</em> (<code>"glorot_uniform"</code> para los pesos, <code>"zeros"</code> para el sesgo, como hace <code>Dense</code>).</li>
   <li>Tras la primera llamada hay 2 pesos: <code>mi_densa/W</code> de forma <code>(2, 3)</code> y <code>mi_densa/b</code> de <code>(3,)</code> (2·3 + 3 = 9 parámetros).</li>
@@ -184,11 +238,11 @@
 
 <div class="callout ojo">
   <span class="lbl">Ojo · en <code>call</code>, <code>keras.ops</code> es lo portable</span>
-  <p>En el fragmento 16 el producto es <code>tf.matmul</code>, porque nuestro backend es TensorFlow. Si algún día quieres que la capa funcione igual con otro backend, usa <code>keras.ops.matmul</code> (el <a href="#frag-20">fragmento 20</a> lo hace). <code>keras.ops</code> trae <code>sum</code>, <code>mean</code>, <code>where</code>, <code>abs</code>, <code>square</code>, <code>matmul</code>… con los mismos nombres que NumPy.</p>
+  <p>En el fragmento 16 el producto es <code>tf.matmul</code>, porque nuestro backend es TensorFlow. Si algún día quieres que la capa funcione igual con otro backend, usa <code>keras.ops.matmul</code> (el <a href="laboratorio.html#frag-20">fragmento 20</a> lo hace). <code>keras.ops</code> trae <code>sum</code>, <code>mean</code>, <code>where</code>, <code>abs</code>, <code>square</code>, <code>matmul</code>… con los mismos nombres que NumPy.</p>
 </div>
 
 <h3>Capas dentro de capas, pesos no entrenables y pérdidas a medida</h3>
-<p>El <a href="#frag-17">fragmento 17</a> junta tres ideas en un único modelo:</p>
+<p>El <a href="laboratorio.html#frag-17">fragmento 17</a> junta tres ideas en un único modelo:</p>
 <ol class="pasos">
   <li><strong>Una capa compuesta</strong> (<code>BloqueResidual</code>): contiene dos capas <code>Dense</code> y calcula <code>x + d2(d1(x))</code>, es decir, un atajo. Sus subcapas se construyen en su <code>build</code> (<code>self.d1.build(input_shape)</code>): si una capa tiene subcapas y no defines <code>build</code>, Keras avisa al cargar el modelo de que la capa «podría no estar construida». Los pesos salen con la ruta <code>bloque/d1/kernel</code>, <code>bloque/d1/bias</code>… Con 4 unidades: 2 · (4·4 + 4) = <strong>40</strong> parámetros.</li>
   <li><strong>Un peso no entrenable</strong> (<code>Escala</code>): <code>add_weight(..., trainable=False)</code> crea una variable que el optimizador no toca, y que la capa actualiza ella misma con <code>assign_add</code> (aquí cuenta cuántas veces se la llama). Es el mismo mecanismo que usa BatchNormalization para sus medias móviles. En el <code>summary()</code>: <strong>43 entrenables y 1 no entrenable</strong>. Tras 3 épocas de 2 lotes el contador marca <strong>6</strong> (antes del <code>fit</code>, 0): una llamada por lote.</li>
@@ -223,7 +277,7 @@
   <li>Keras debe poder <strong>encontrar la clase</strong>: o la <em>registras</em> con el decorador <code>@keras.saving.register_keras_serializable(package="mi_paquete")</code> sobre la clase, o se la das al cargar con <code>custom_objects={"CapaEscala": CapaEscala}</code>.</li>
 </ul>
 
-<p>El <a href="#frag-18">fragmento 18</a> recorre todos los casos con una capa <code>CapaEscala</code> que multiplica por un factor:</p>
+<p>El <a href="laboratorio.html#frag-18">fragmento 18</a> recorre todos los casos con una capa <code>CapaEscala</code> que multiplica por un factor:</p>
 <table>
   <thead><tr><th>Qué se hace</th><th>Resultado</th><th>Por qué</th></tr></thead>
   <tbody>
@@ -239,7 +293,7 @@
   <ul>
     <li><strong><code>model.save_weights("pesos.h5")</code></strong>: da <code>ValueError: The filename must end in `.weights.h5`</code>. En Keras 3 el archivo de pesos se llama <code>algo.weights.h5</code>.</li>
     <li><strong><code>model.save("carpeta")</code></strong> (el formato SavedModel de los cursos antiguos): da <code>ValueError: Invalid filepath extension for saving. Please add either a `.keras` extension…</code>. Para obtener un SavedModel (el formato de despliegue de TensorFlow) se usa <code>modelo.export("carpeta")</code>.</li>
-    <li><strong><code>model.save("modelo.h5")</code></strong> todavía funciona, pero es el formato <em>legacy</em> (antiguo, de Keras 2): conviene usar <code>.keras</code>. Keras lo considera formato antiguo (<em>legacy</em>); el <a href="#frag-1">fragmento 1</a> comprueba que todavía se puede guardar.</li>
+    <li><strong><code>model.save("modelo.h5")</code></strong> todavía funciona, pero es el formato <em>legacy</em> (antiguo, de Keras 2): conviene usar <code>.keras</code>. Keras lo considera formato antiguo (<em>legacy</em>); el <a href="laboratorio.html#frag-1">fragmento 1</a> comprueba que todavía se puede guardar.</li>
   </ul>
 </div>
 
@@ -247,7 +301,7 @@
 <p>Una capa <code>Lambda</code> con una función de Python (<code>lambda t: t ** 2</code>) guarda esa función <strong>como código</strong>. Cargar un archivo así significaría <strong>ejecutar el código que venga dentro</strong>, y si el archivo lo ha hecho otra persona, podría ser código malicioso. Por seguridad, Keras 3 se niega por defecto: <em>«Requested the deserialization of a `Lambda` layer whose `function` is a Python lambda…»</em> (último caso del fragmento 18). Si <strong>confías</strong> en el origen del archivo, <code>load_model(ruta, safe_mode=False)</code> lo permite. Mejor: <strong>escribe una capa propia con <code>get_config</code></strong>, o registra la función con <code>register_keras_serializable</code> (en una prueba aparte, una Lambda con una función registrada cargó sin necesidad de <code>safe_mode</code>).</p>
 
 <h3>Modelos por subclases: <code>get_config</code> si <code>__init__</code> tiene argumentos</h3>
-<p>El <a href="#frag-19">fragmento 19</a> guarda un modelo por subclases <code>Mini(ocultas=5)</code> de dos maneras: sin <code>get_config</code> y con él. Sin <code>get_config</code>, Keras no sabe que el modelo se creó con <code>ocultas=5</code> y, al cargar, falla con <em>«expected 2 variables, but received 0 variables»</em> (esperaba pesos para 2 variables y no encontró nada). Con <code>get_config</code> que incluye <code>ocultas</code>, carga y las predicciones son idénticas.</p>
+<p>El <a href="laboratorio.html#frag-19">fragmento 19</a> guarda un modelo por subclases <code>Mini(ocultas=5)</code> de dos maneras: sin <code>get_config</code> y con él. Sin <code>get_config</code>, Keras no sabe que el modelo se creó con <code>ocultas=5</code> y, al cargar, falla con <em>«expected 2 variables, but received 0 variables»</em> (esperaba pesos para 2 variables y no encontró nada). Con <code>get_config</code> que incluye <code>ocultas</code>, carga y las predicciones son idénticas.</p>
 <p>Y para <strong>desplegar</strong> (llevar el modelo a otro entorno) el camino es <code>modelo.export("carpeta")</code>, que escribe un SavedModel de TensorFlow: <code>saved_model.pb</code> (el grafo), <code>variables/</code> (los pesos), <code>assets/</code> y <code>fingerprint.pb</code>. Se carga con <code>tf.saved_model.load</code> y se ejecuta con <code>.serve(x)</code>, que reproduce al modelo (las salidas coinciden). Un SavedModel exportado sirve para <em>ejecutar</em> el modelo, no para seguir entrenándolo con Keras: para eso se usa <code>.keras</code>.</p>
 
 <div class="callout regla">
@@ -259,7 +313,7 @@
 
 <p class="pregunta">¿Se puede combinar todo lo aprendido en un único modelo pequeño y comprobar que funciona de verdad? Vamos a clasificar el conjunto de las «dos lunas», un problema que ningún modelo lineal puede resolver. Imagina que cada punto es una película con dos rasgos (por ejemplo, su ritmo y su humor) y que el color dice si es comedia o thriller: las dos clases forman dos medias lunas entrelazadas y ninguna recta las separa.</p>
 
-<p>El <a href="#frag-20">fragmento 20</a> junta casi todo el módulo:</p>
+<p>El <a href="laboratorio.html#frag-20">fragmento 20</a> junta casi todo el módulo:</p>
 <ol class="pasos">
   <li><strong>Datos:</strong> <code>make_moons</code> de scikit-learn (el del Curso 1) con 800 puntos y algo de ruido; se separan 600 para entrenar y 200 para validar/testear, con <code>stratify=y</code> para que haya la misma proporción de cada clase.</li>
   <li><strong>Capa propia:</strong> la <code>CapaDensa</code> de antes, ahora registrada y escrita con <code>keras.ops</code>.</li>
@@ -316,742 +370,11 @@
   </div>
 </details>
 
-<section>
+<section class="ir-lab">
 <h2 class="sin-num">Código</h2>
-<!-- ---------- Fragmento 16 ---------- -->
-<article class="snippet" data-lang="python" id="frag-16">
-  <header>
-    <h3>16 · Una capa personalizada: <code>CapaDensa</code> con <code>build</code>, <code>add_weight</code>, <code>call</code> y <code>get_config</code></h3>
-    <p class="para-que"><strong>Para qué sirve</strong> Escribir tu propia versión de <code>Dense</code>, ver cuándo se crean sus pesos, comprobar que da lo mismo que la oficial y que sus gradientes coinciden con los calculados a mano, y recrearla desde su configuración.</p>
-  </header>
-  <pre class="code"><code>import re
-import numpy as np
-import tensorflow as tf
-import keras
-from keras import layers
-
-class CapaDensa(layers.Layer):
-    def __init__(self, unidades, activacion=None, **kwargs):
-        super().__init__(**kwargs)
-        self.unidades = unidades
-        self.activacion = keras.activations.get(activacion)
-
-    def build(self, input_shape):
-        n_in = input_shape[-1]
-        self.W = self.add_weight(name="W", shape=(n_in, self.unidades), initializer="glorot_uniform")
-        self.b = self.add_weight(name="b", shape=(self.unidades,), initializer="zeros")
-
-    def call(self, x):
-        return self.activacion(tf.matmul(x, self.W) + self.b)
-
-    def get_config(self):
-        config = super().get_config()
-        config.update({"unidades": self.unidades, "activacion": keras.activations.serialize(self.activacion)})
-        return config
-
-keras.utils.set_random_seed(4)
-capa = CapaDensa(3, activacion="relu", name="mi_densa")
-print("construida:", capa.built, "| pesos:", len(capa.weights))
-x = np.array([[1.0, 2.0], [0.5, -1.0]], dtype="float32")
-y = capa(x)
-print("construida:", capa.built, "|", [(w.path, tuple(w.shape)) for w in capa.weights])
-try:
-    capa(np.ones((2, 5), dtype="float32"))
-except tf.errors.InvalidArgumentError as e:
-    print("error:", re.search(r"Matrix size-incompatible: In\[0\]: \[\d+,\d+\], In\[1\]: \[\d+,\d+\]", str(e)).group(0))
-
-oficial = layers.Dense(3, activation="relu")
-oficial(x)
-oficial.set_weights(capa.get_weights())
-print("igual que Dense:", np.allclose(capa(x), oficial(x)))
-
-with tf.GradientTape() as tape:
-    perdida = tf.reduce_mean(capa(x) ** 2)
-gW, gb = tape.gradient(perdida, [capa.W, capa.b])
-
-W, b = capa.W.numpy(), capa.b.numpy()
-z = x @ W + b
-dz = (2 * np.maximum(z, 0) / z.size) * (z &gt; 0)
-print("gradiente de W coincide:", np.allclose(gW.numpy(), x.T @ dz))
-print("gradiente de b coincide:", np.allclose(gb.numpy(), dz.sum(axis=0)))
-
-config = capa.get_config()
-print({k: config[k] for k in ("name", "unidades", "activacion")})
-copia = CapaDensa.from_config(config)
-print("copia:", copia.unidades, "| construida:", copia.built)</code></pre>
-  <details class="linea-a-linea">
-    <summary>Línea por línea</summary>
-    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
-    <table class="lineas">
-      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
-      <tbody>
-        <tr data-lines="1-3"><td><code>import re …</code></td><td>Importan <code>re</code> (expresiones regulares, para recortar un mensaje), NumPy y TensorFlow.</td></tr>
-        <tr data-lines="4-5"><td><code>import keras …</code></td><td>Importan Keras y las capas.</td></tr>
-        <tr data-lines="7"><td><code>class CapaDensa(layers.Layer):</code></td><td>La clase hereda de <code>layers.Layer</code>.</td></tr>
-        <tr data-lines="8-11"><td><code>def __init__(self, unidades, activacion=None, **kwar …</code></td><td><code>__init__</code>: recibe las unidades y la activación, llama a <code>super().__init__(**kwargs)</code> y guarda los <strong>hiperparámetros</strong>. <code>keras.activations.get</code> convierte el nombre (<code>"relu"</code>) en la función. <strong>Aquí no se crean pesos.</strong></td></tr>
-        <tr data-lines="13"><td><code>def build(self, input_shape):</code></td><td><code>build</code> se ejecuta <strong>una vez</strong>, con la forma de los datos.</td></tr>
-        <tr data-lines="14"><td><code>n_in = input_shape[-1]</code></td><td>El número de columnas de la entrada es la última posición de la forma (<code>input_shape[-1]</code>).</td></tr>
-        <tr data-lines="15"><td><code>self.W = self.add_weight(name="W", shape=(n_in, self …</code></td><td><code>add_weight</code> crea la matriz <code>W</code> de forma <code>(n_in, unidades)</code> con inicialización <code>glorot_uniform</code> (números pequeños al azar con escala bien elegida).</td></tr>
-        <tr data-lines="16"><td><code>self.b = self.add_weight(name="b", shape=(self.unida …</code></td><td>Crea el sesgo <code>b</code>, de forma <code>(unidades,)</code>, relleno de ceros.</td></tr>
-        <tr data-lines="18-19"><td><code>def call(self, x): …</code></td><td><code>call</code> es el cálculo: <code>activacion(x @ W + b)</code>, con <code>tf.matmul</code>.</td></tr>
-        <tr data-lines="21-24"><td><code>def get_config(self): …</code></td><td><code>get_config</code>: parte de la configuración de la clase base (<code>super().get_config()</code>, que ya incluye el nombre) y le añade las <strong>unidades</strong> y la activación (<code>serialize</code> la convierte de nuevo en texto).</td></tr>
-        <tr data-lines="26"><td><code>keras.utils.set_random_seed(4)</code></td><td>Semilla para que los pesos sean reproducibles.</td></tr>
-        <tr data-lines="27"><td><code>capa = CapaDensa(3, activacion="relu", name="mi_dens …</code></td><td>Crea la capa: 3 unidades, ReLU, con nombre <code>mi_densa</code>.</td></tr>
-        <tr data-lines="28"><td><code>print("construida:", capa.built, "| pesos:", len(cap …</code></td><td>Antes de usarla: <code>built = False</code> y 0 pesos.</td></tr>
-        <tr data-lines="29"><td><code>x = np.array([[1.0, 2.0], [0.5, -1.0]], dtype="float …</code></td><td>Dos filas de dos valores.</td></tr>
-        <tr data-lines="30"><td><code>y = capa(x)</code></td><td>Primera llamada: se ejecuta <code>build</code> y luego <code>call</code>.</td></tr>
-        <tr data-lines="31"><td><code>print("construida:", capa.built, "|", [(w.path, tupl …</code></td><td>Ahora está construida y tiene dos pesos: <code>W (2, 3)</code> y <code>b (3,)</code>. <code>w.path</code> es el nombre completo.</td></tr>
-        <tr data-lines="32-35"><td><code>try: …</code></td><td>Llama con 5 columnas en lugar de 2: no encaja con <code>W</code>. El <code>except</code> captura el <code>InvalidArgumentError</code> y, con una expresión regular (<code>re.search</code>), imprime solo la parte útil del mensaje.</td></tr>
-        <tr data-lines="37"><td><code>oficial = layers.Dense(3, activation="relu")</code></td><td>Una capa <code>Dense</code> oficial con 3 neuronas ReLU.</td></tr>
-        <tr data-lines="38"><td><code>oficial(x)</code></td><td>La llama con los mismos datos para que se construya.</td></tr>
-        <tr data-lines="39"><td><code>oficial.set_weights(capa.get_weights())</code></td><td>Copia en ella los pesos de nuestra capa.</td></tr>
-        <tr data-lines="40"><td><code>print("igual que Dense:", np.allclose(capa(x), ofici …</code></td><td>Comprueba que las dos dan la misma salida.</td></tr>
-        <tr data-lines="42-44"><td><code>with tf.GradientTape() as tape: …</code></td><td>Calcula con la cinta el gradiente de la pérdida <code>mean(y²)</code> respecto a <code>W</code> y <code>b</code>.</td></tr>
-        <tr data-lines="46"><td><code>W, b = capa.W.numpy(), capa.b.numpy()</code></td><td>Los valores actuales de <code>W</code> y <code>b</code> como arrays de NumPy.</td></tr>
-        <tr data-lines="47"><td><code>z = x @ W + b</code></td><td>Recalcula a mano la suma ponderada <code>z = x·W + b</code>.</td></tr>
-        <tr data-lines="48"><td><code>dz = (2 * np.maximum(z, 0) / z.size) * (z &gt; 0)</code></td><td>Gradiente a mano respecto a <code>z</code>: la derivada de <code>mean(a²)</code> es <code>2a/N</code> (con <code>N</code> el número de elementos), multiplicada por la derivada de ReLU (1 si <code>z &gt; 0</code>, si no 0).</td></tr>
-        <tr data-lines="49"><td><code>print("gradiente de W coincide:", np.allclose(gW.num …</code></td><td>Comprueba que <code>xᵀ·dz</code> coincide con el gradiente de <code>W</code> de la cinta.</td></tr>
-        <tr data-lines="50"><td><code>print("gradiente de b coincide:", np.allclose(gb.num …</code></td><td>Y que la suma por columnas de <code>dz</code> coincide con el de <code>b</code>.</td></tr>
-        <tr data-lines="52"><td><code>config = capa.get_config()</code></td><td>Obtiene el diccionario de configuración.</td></tr>
-        <tr data-lines="53"><td><code>print({k: config[k] for k in ("name", "unidades", "a …</code></td><td>Imprime solo tres claves: el nombre, las unidades y la activación.</td></tr>
-        <tr data-lines="54"><td><code>copia = CapaDensa.from_config(config)</code></td><td><code>from_config</code> crea una capa nueva a partir de esa configuración.</td></tr>
-        <tr data-lines="55"><td><code>print("copia:", copia.unidades, "| construida:", cop …</code></td><td>Imprime sus unidades y que está <strong>sin construir</strong>.</td></tr>
-      </tbody>
-    </table>
-  </details>
-  <div class="salida">
-    <strong>Salida esperada</strong>
-    <pre>construida: False | pesos: 0
-construida: True | [('mi_densa/W', (2, 3)), ('mi_densa/b', (3,))]
-error: Matrix size-incompatible: In[0]: [2,5], In[1]: [2,3]
-igual que Dense: True
-gradiente de W coincide: True
-gradiente de b coincide: True
-{'name': 'mi_densa', 'unidades': 3, 'activacion': 'relu'}
-copia: 3 | construida: False</pre>
-    <p>Antes de la primera llamada: sin construir y sin pesos. Después: <code>mi_densa/W</code> de forma <code>(2, 3)</code> y <code>mi_densa/b</code> de <code>(3,)</code> (9 parámetros). La entrada con 5 columnas falla con <em>«Matrix size-incompatible: In[0]: [2,5], In[1]: [2,3]»</em>. Con los mismos pesos, nuestra capa y <code>Dense</code> dan lo mismo (<code>True</code>), y los gradientes de la cinta coinciden con los de la fórmula a mano (<code>True True</code>). La configuración es <code>{'name': 'mi_densa', 'unidades': 3, 'activacion': 'relu'}</code> y la copia tiene 3 unidades pero está sin construir: la configuración guarda la <em>receta</em>, no los pesos.</p>
-  </div>
-</article>
-
-<!-- ---------- Fragmento 18 ---------- -->
-<article class="snippet" data-lang="python" id="frag-18">
-  <header>
-    <h3>18 · Guardar y cargar con una capa propia: registro, <code>custom_objects</code>, pesos y <code>Lambda</code></h3>
-    <p class="para-que"><strong>Para qué sirve</strong> Ver qué ocurre al guardar un modelo con una capa propia: el error al cargarla sin registrar, las dos soluciones, el formato de solo pesos, los errores de formatos antiguos y el rechazo de <code>Lambda</code>.</p>
-  </header>
-  <pre class="code"><code>import os
-import re
-import tempfile
-import numpy as np
-import keras
-from keras import layers
-
-class CapaEscala(layers.Layer):
-    def __init__(self, factor=2.0, **kwargs):
-        super().__init__(**kwargs)
-        self.factor = factor
-
-    def call(self, x):
-        return x * self.factor
-
-    def get_config(self):
-        config = super().get_config()
-        config["factor"] = self.factor
-        return config
-
-def construir(clase):
-    entrada = keras.Input(shape=(3,), name="x")
-    return keras.Model(entrada, layers.Dense(2, name="salida")(clase(factor=3.0, name="escala")(entrada)))
-
-carpeta = tempfile.mkdtemp()
-ruta = os.path.join(carpeta, "modelo.keras")
-x = np.array([[1.0, 2.0, 3.0]], dtype="float32")
-
-modelo = construir(CapaEscala)
-modelo.save(ruta)
-try:
-    keras.models.load_model(ruta)
-except TypeError as e:
-    print("sin registrar:", re.search(r"Could not locate class '\w+'", str(e)).group(0))
-
-cargado = keras.models.load_model(ruta, custom_objects={"CapaEscala": CapaEscala})
-print("con custom_objects:", np.allclose(modelo(x), cargado(x)))
-
-Registrada = keras.saving.register_keras_serializable(package="c3m1")(CapaEscala)
-modelo.save(ruta)
-cargado = keras.models.load_model(ruta)
-print("registrada:", np.allclose(modelo(x), cargado(x)), "|", keras.saving.get_registered_name(Registrada))
-
-modelo.save_weights(os.path.join(carpeta, "pesos.weights.h5"))
-otro = construir(CapaEscala)
-otro.load_weights(os.path.join(carpeta, "pesos.weights.h5"))
-print("pesos recuperados:", np.allclose(modelo(x), otro(x)))
-
-for texto, accion in [("save_weights('pesos.h5')", lambda: modelo.save_weights(os.path.join(carpeta, "pesos.h5"))),
-                      ("save('carpeta')", lambda: modelo.save(os.path.join(carpeta, "carpeta")))]:
-    try:
-        accion()
-    except ValueError as e:
-        print(texto, "-&gt;", str(e)[:58])
-
-e = keras.Input(shape=(3,))
-lam = keras.Model(e, layers.Lambda(lambda t: t ** 2)(e))
-lam.save(ruta)
-try:
-    keras.models.load_model(ruta)
-except ValueError as err:
-    print("Lambda:", str(err)[:92])
-print("con safe_mode=False:", np.allclose(lam(x), keras.models.load_model(ruta, safe_mode=False)(x)))</code></pre>
-  <details class="linea-a-linea">
-    <summary>Línea por línea</summary>
-    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
-    <table class="lineas">
-      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
-      <tbody>
-        <tr data-lines="1-6"><td><code>import os …</code></td><td>Importan <code>os</code>, <code>re</code>, <code>tempfile</code>, NumPy, Keras y las capas.</td></tr>
-        <tr data-lines="8-11"><td><code>class CapaEscala(layers.Layer): …</code></td><td>Una capa propia <code>CapaEscala</code> que guarda un <code>factor</code> en <code>__init__</code>.</td></tr>
-        <tr data-lines="13-14"><td><code>def call(self, x): …</code></td><td><code>call</code>: multiplica la entrada por el factor. (No tiene pesos, así que no hace falta <code>build</code>.)</td></tr>
-        <tr data-lines="16-19"><td><code>def get_config(self): …</code></td><td><code>get_config</code> añade el <code>factor</code> a la configuración, para que se guarde.</td></tr>
-        <tr data-lines="21-23"><td><code>def construir(clase): …</code></td><td>Función auxiliar que construye un modelo (3 entradas → capa de la clase que le pasemos, con <code>factor=3</code> → <code>Dense(2)</code>). Así podemos reconstruir el mismo modelo varias veces.</td></tr>
-        <tr data-lines="25"><td><code>carpeta = tempfile.mkdtemp()</code></td><td>Una carpeta temporal.</td></tr>
-        <tr data-lines="26"><td><code>ruta = os.path.join(carpeta, "modelo.keras")</code></td><td>La ruta del archivo <code>modelo.keras</code> dentro de ella.</td></tr>
-        <tr data-lines="27"><td><code>x = np.array([[1.0, 2.0, 3.0]], dtype="float32")</code></td><td>Un dato de prueba: una fila con 1, 2 y 3.</td></tr>
-        <tr data-lines="29"><td><code>modelo = construir(CapaEscala)</code></td><td>Construye el modelo.</td></tr>
-        <tr data-lines="30"><td><code>modelo.save(ruta)</code></td><td>Lo guarda en formato <code>.keras</code>.</td></tr>
-        <tr data-lines="31-34"><td><code>try: …</code></td><td>Lo carga <strong>sin registrar</strong> la clase: falla con <code>TypeError</code>. Con <code>re.search</code> se imprime solo la frase «Could not locate class 'CapaEscala'».</td></tr>
-        <tr data-lines="36"><td><code>cargado = keras.models.load_model(ruta, custom_objec …</code></td><td>Lo carga con <code>custom_objects</code>, que mapea el nombre del JSON a la clase de Python.</td></tr>
-        <tr data-lines="37"><td><code>print("con custom_objects:", np.allclose(modelo(x), …</code></td><td>Comprueba que el modelo cargado da las mismas salidas que el original.</td></tr>
-        <tr data-lines="39"><td><code>Registrada = keras.saving.register_keras_serializabl …</code></td><td>Registra la clase con <code>register_keras_serializable</code> (aquí aplicado como función, en lugar de decorador). Devuelve la clase registrada.</td></tr>
-        <tr data-lines="40"><td><code>modelo.save(ruta)</code></td><td>Guarda de nuevo, ya con la clase registrada.</td></tr>
-        <tr data-lines="41"><td><code>cargado = keras.models.load_model(ruta)</code></td><td>Carga <strong>sin</strong> <code>custom_objects</code>: ahora funciona.</td></tr>
-        <tr data-lines="42"><td><code>print("registrada:", np.allclose(modelo(x), cargado( …</code></td><td>Comprueba las predicciones e imprime el nombre con el que quedó registrada: <code>paquete&gt;Clase</code>.</td></tr>
-        <tr data-lines="44"><td><code>modelo.save_weights(os.path.join(carpeta, "pesos.wei …</code></td><td>Guarda solo los <strong>pesos</strong> en un archivo que termina en <code>.weights.h5</code>.</td></tr>
-        <tr data-lines="45"><td><code>otro = construir(CapaEscala)</code></td><td>Construye otro modelo igual, sin entrenar.</td></tr>
-        <tr data-lines="46"><td><code>otro.load_weights(os.path.join(carpeta, "pesos.weigh …</code></td><td>Carga los pesos en él.</td></tr>
-        <tr data-lines="47"><td><code>print("pesos recuperados:", np.allclose(modelo(x), o …</code></td><td>Comprueba que da las mismas predicciones.</td></tr>
-        <tr data-lines="49-54"><td><code>for texto, accion in [("save_weights('pesos.h5')", l …</code></td><td>Prueba dos formas antiguas de guardar con un <code>for</code> que recorre parejas (texto, acción). Cada <code>lambda: …</code> es una función sin nombre que ejecuta una de ellas: <code>save_weights("pesos.h5")</code> y <code>save("carpeta")</code>. Ambas lanzan <code>ValueError</code> y se imprime el principio del mensaje (<code>str(e)[:58]</code> son los 58 primeros caracteres).</td></tr>
-        <tr data-lines="56"><td><code>e = keras.Input(shape=(3,))</code></td><td>Una entrada de 3 valores.</td></tr>
-        <tr data-lines="57"><td><code>lam = keras.Model(e, layers.Lambda(lambda t: t ** 2) …</code></td><td>Un modelo con una capa <code>Lambda</code> de función Python (<code>t ** 2</code>).</td></tr>
-        <tr data-lines="58"><td><code>lam.save(ruta)</code></td><td>Lo guarda.</td></tr>
-        <tr data-lines="59-62"><td><code>try: …</code></td><td>Intenta cargarlo: Keras 3 lo rechaza por seguridad con <code>ValueError</code> y se imprime el principio del mensaje.</td></tr>
-        <tr data-lines="63"><td><code>print("con safe_mode=False:", np.allclose(lam(x), ke …</code></td><td>Lo carga con <code>safe_mode=False</code> (confiando en el archivo) y comprueba que funciona.</td></tr>
-      </tbody>
-    </table>
-  </details>
-  <div class="salida">
-    <strong>Salida esperada</strong>
-    <pre>sin registrar: Could not locate class 'CapaEscala'
-con custom_objects: True
-registrada: True | c3m1&gt;CapaEscala
-pesos recuperados: True
-save_weights('pesos.h5') -&gt; The filename must end in `.weights.h5`. Received: filepath
-save('carpeta') -&gt; Invalid filepath extension for saving. Please add either a
-Lambda: Requested the deserialization of a `Lambda` layer whose `function` is a Python lambda. This 
-con safe_mode=False: True</pre>
-    <p>Sin registrar: <em>«Could not locate class 'CapaEscala'»</em>. Con <code>custom_objects</code> carga bien (<code>True</code>). Registrada, carga sola y su nombre registrado es <code>c3m1&gt;CapaEscala</code>. El archivo de pesos funciona (<code>True</code>). Los dos formatos antiguos fallan: <em>«The filename must end in `.weights.h5`»</em> y <em>«Invalid filepath extension for saving. Please add either a …»</em>. La <code>Lambda</code> con función de Python se rechaza por defecto («Requested the deserialization of a `Lambda` layer whose `function` is a Python lambda…») y con <code>safe_mode=False</code> carga (<code>True</code>).</p>
-  </div>
-</article>
-
-</section>
-
-<section>
-<h2 class="sin-num" id="resto">Código: el resto del módulo</h2>
-<p>Aquí están, juntos, todos los fragmentos que se han ido citando en el módulo. <strong>Cada uno se ha ejecutado de verdad</strong> (dos veces, con el mismo resultado) con TensorFlow 2.21.0 y Keras 3.15.1, y la salida que ves es la real, copiada tal cual. Cada fragmento es independiente: no hace falta ejecutar los anteriores. Pasa el ratón por una fila de la tabla «Línea por línea» para ver sus líneas resaltadas en el código.</p>
-<p>Dos avisos prácticos: si los ejecutas en un cuaderno verás, además de lo que aparece aquí, mensajes de TensorFlow sobre la CPU o la GPU que no son errores; y el fragmento 10 imprime con <code>print</code> dentro de <code>call</code>, algo cuyo número de repeticiones puede cambiar con la versión.</p>
-<!-- ---------- Fragmento 1 ---------- -->
-<article class="snippet" data-lang="python" id="frag-1">
-  <header>
-    <h3>1 · Versiones, <code>tf.keras</code>, tensores simbólicos y guardado antiguo: lo que cambia en Keras 3</h3>
-    <p class="para-que"><strong>Para qué sirve</strong> Ver con qué versiones se ha ejecutado todo el módulo y reproducir tres cosas que rompen el código de tutoriales antiguos: usar <code>tf.keras</code>, aplicar funciones de TensorFlow a un tensor simbólico y guardar en <code>.h5</code>.</p>
-  </header>
-  <pre class="code"><code>import os
-import tempfile
-import numpy as np
-import tensorflow as tf
-import keras
-from keras import layers, ops
-
-print("TensorFlow", tf.__version__, "| Keras", keras.__version__, "| backend:", keras.backend.backend())
-print("tf.keras es el mismo objeto que keras:", tf.keras is keras)
-print("pero sus clases son las mismas:", tf.keras.layers.Dense is keras.layers.Dense, "| versión de tf.keras:", tf.keras.__version__)
-
-entrada = keras.Input(shape=(3,))
-print(type(entrada).__name__, entrada.shape)
-
-try:
-    tf.reduce_sum(entrada, axis=-1)
-except ValueError as e:
-    print("ValueError:", str(e).split(".")[0])
-
-cuadrado = ops.square(entrada)
-suma = layers.Lambda(lambda t: ops.sum(t, axis=-1, keepdims=True), name="suma")(cuadrado)
-modelo = keras.Model(entrada, suma)
-print("con keras.ops:", modelo.predict(np.array([[1.0, -2.0, 3.0]], "float32"), verbose=0).tolist())
-
-ruta = os.path.join(tempfile.mkdtemp(), "modelo.h5")
-modelo.save(ruta)
-print("guardado en .h5 (formato antiguo):", os.path.exists(ruta))</code></pre>
-  <details class="linea-a-linea">
-    <summary>Línea por línea</summary>
-    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
-    <table class="lineas">
-      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
-      <tbody>
-        <tr data-lines="1-2"><td><code>import os …</code></td><td>Importan <code>os</code> y <code>tempfile</code>, dos módulos estándar de Python: el primero para comprobar si un archivo existe y el segundo para crear una carpeta temporal donde guardar sin ensuciar nada.</td></tr>
-        <tr data-lines="3"><td><code>import numpy as np</code></td><td>Importa NumPy como <code>np</code>, para crear los datos de prueba.</td></tr>
-        <tr data-lines="4-5"><td><code>import tensorflow as tf …</code></td><td>Importan TensorFlow como <code>tf</code> y Keras. Fíjate en que importamos las dos librerías por separado: es la forma actual.</td></tr>
-        <tr data-lines="6"><td><code>from keras import layers, ops</code></td><td>Trae <code>layers</code> (los tipos de capa) y <code>ops</code> (las operaciones de Keras, como <code>ops.sum</code>, que funcionan también sobre tensores simbólicos).</td></tr>
-        <tr data-lines="8"><td><code>print("TensorFlow", tf.__version__, "| Keras", keras …</code></td><td>Imprime la versión de TensorFlow, la de Keras y el <em>backend</em> (el motor que hace las cuentas). Es lo primero que conviene mirar cuando un código copiado falla: casi siempre depende de la versión.</td></tr>
-        <tr data-lines="9"><td><code>print("tf.keras es el mismo objeto que keras:", tf.k …</code></td><td>Compara el módulo <code>tf.keras</code> con el módulo <code>keras</code> usando <code>is</code> (¿son literalmente el mismo objeto?). Da <code>False</code>: son dos puertas distintas.</td></tr>
-        <tr data-lines="10"><td><code>print("pero sus clases son las mismas:", tf.keras.la …</code></td><td>Comprueba que <code>tf.keras.layers.Dense</code> y <code>keras.layers.Dense</code> son <strong>la misma clase</strong> (<code>True</code>) y muestra la versión de <code>tf.keras</code>: redirige al mismo Keras 3.</td></tr>
-        <tr data-lines="12"><td><code>entrada = keras.Input(shape=(3,))</code></td><td>Crea un <code>Input</code> de forma <code>(3,)</code>: un tensor <strong>simbólico</strong>, sin datos.</td></tr>
-        <tr data-lines="13"><td><code>print(type(entrada).__name__, entrada.shape)</code></td><td>Imprime su tipo (<code>KerasTensor</code>) y su forma. El <code>None</code> es el tamaño de lote aún desconocido.</td></tr>
-        <tr data-lines="15-18"><td><code>try: …</code></td><td>Intenta aplicar <code>tf.reduce_sum</code> (una función de TensorFlow) a ese tensor simbólico. Falla con <code>ValueError</code> y lo capturamos con <code>try/except</code> (probar y, si hay error, hacer otra cosa) para imprimir solo la primera frase del mensaje: <code>str(e).split(".")[0]</code> corta el texto en el primer punto.</td></tr>
-        <tr data-lines="20"><td><code>cuadrado = ops.square(entrada)</code></td><td>La solución: <code>ops.square(entrada)</code> eleva al cuadrado <strong>sí</strong> acepta un tensor simbólico.</td></tr>
-        <tr data-lines="21"><td><code>suma = layers.Lambda(lambda t: ops.sum(t, axis=-1, k …</code></td><td>Crea una capa <code>Lambda</code> (una capa hecha con una función rápida) que suma los tres elementos de cada fila. <code>keepdims=True</code> mantiene el eje: la salida queda <code>(None, 1)</code>. Se aplica a <code>cuadrado</code> con <code>(...)</code>.</td></tr>
-        <tr data-lines="22"><td><code>modelo = keras.Model(entrada, suma)</code></td><td>Une la entrada y la salida en un modelo funcional: aquí es x → x² → suma.</td></tr>
-        <tr data-lines="23"><td><code>print("con keras.ops:", modelo.predict(np.array([[1. …</code></td><td>Predice con la fila <code>[1, -2, 3]</code>. <code>predict</code> devuelve un array (lote, 1); <code>.tolist()</code> lo convierte en listas de Python para imprimirlo; <code>verbose=0</code> silencia la barra de progreso.</td></tr>
-        <tr data-lines="25"><td><code>ruta = os.path.join(tempfile.mkdtemp(), "modelo.h5")</code></td><td>Crea una ruta de archivo con extensión <code>.h5</code> dentro de la carpeta temporal.</td></tr>
-        <tr data-lines="26"><td><code>modelo.save(ruta)</code></td><td>Guarda el modelo en ese archivo: Keras 3 todavía lo acepta, pero es el formato antiguo.</td></tr>
-        <tr data-lines="27"><td><code>print("guardado en .h5 (formato antiguo):", os.path. …</code></td><td>Comprueba que el archivo existe (<code>os.path.exists</code>).</td></tr>
-      </tbody>
-    </table>
-  </details>
-  <div class="salida">
-    <strong>Salida esperada</strong>
-    <pre>TensorFlow 2.21.0 | Keras 3.15.1 | backend: tensorflow
-tf.keras es el mismo objeto que keras: False
-pero sus clases son las mismas: True | versión de tf.keras: 3.15.1
-KerasTensor (None, 3)
-ValueError: A KerasTensor cannot be used as input to a TensorFlow function
-con keras.ops: [[14.0]]
-guardado en .h5 (formato antiguo): True</pre>
-    <p>Primera línea: la versión usada en todo el módulo (TensorFlow 2.21.0, Keras 3.15.1, backend <code>tensorflow</code>). <code>tf.keras is keras</code> da <code>False</code> pero las clases son idénticas (<code>True</code>), así que <code>tf.keras</code> redirige al mismo Keras 3. El tensor simbólico es de tipo <code>KerasTensor</code> y forma <code>(None, 3)</code>. La función de TensorFlow falla con <em>«A KerasTensor cannot be used as input to a TensorFlow function»</em>; con <code>keras.ops</code> el modelo funciona: para <code>[1, −2, 3]</code> la salida es 1² + (−2)² + 3² = 1 + 4 + 9 = <strong>14</strong>. Por último, el <code>.h5</code> se guarda (<code>True</code>), aunque sea el formato antiguo.</p>
-  </div>
-</article>
-
-<!-- ---------- Fragmento 6 ---------- -->
-<article class="snippet" data-lang="python" id="frag-6">
-  <header>
-    <h3>6 · GradientTape avanzado: segunda derivada, <code>None</code>, <code>stop_gradient</code> y cinta de un solo uso</h3>
-    <p class="para-que"><strong>Para qué sirve</strong> Ver las situaciones que más confunden al derivar: derivadas de derivadas, variables que no participan, cortar el gradiente a propósito o por accidente, la derivada de ReLU y el error de reutilizar una cinta.</p>
-  </header>
-  <pre class="code"><code>import tensorflow as tf
-
-x = tf.Variable(3.0)
-
-with tf.GradientTape() as cinta_2:
-    with tf.GradientTape() as cinta_1:
-        y = x ** 3
-    dy = cinta_1.gradient(y, x)
-d2y = cinta_2.gradient(dy, x)
-print("y =", y.numpy(), "| y' =", dy.numpy(), "| y'' =", d2y.numpy())
-
-v1, v2 = tf.Variable(1.0), tf.Variable(5.0)
-with tf.GradientTape() as tape:
-    y = v1 * 2
-print("v2 no participa:", [None if g is None else float(g) for g in tape.gradient(y, [v1, v2])])
-
-with tf.GradientTape() as tape:
-    y = x ** 2 + tf.stop_gradient(x ** 3)
-print("con stop_gradient:", tape.gradient(y, x).numpy())
-
-with tf.GradientTape() as tape:
-    y = tf.cast(tf.cast(x, tf.int32), tf.float32) * 3
-print("pasando por int32:", tape.gradient(y, x))
-
-p = tf.Variable([-1.0, 2.0])
-with tf.GradientTape() as tape:
-    y = tf.reduce_sum(tf.nn.relu(p))
-print("gradiente de ReLU:", tape.gradient(y, p).numpy())
-
-with tf.GradientTape() as tape:
-    y = x ** 2
-tape.gradient(y, x)
-try:
-    tape.gradient(y, x)
-except RuntimeError as e:
-    print("RuntimeError:", e)</code></pre>
-  <details class="linea-a-linea">
-    <summary>Línea por línea</summary>
-    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
-    <table class="lineas">
-      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
-      <tbody>
-        <tr data-lines="1"><td><code>import tensorflow as tf</code></td><td>Importa TensorFlow.</td></tr>
-        <tr data-lines="3"><td><code>x = tf.Variable(3.0)</code></td><td>Variable <code>x = 3</code>.</td></tr>
-        <tr data-lines="5-10"><td><code>with tf.GradientTape() as cinta_2: …</code></td><td><strong>Cintas anidadas</strong>: la de dentro (<code>cinta_1</code>) calcula <code>y = x³</code> y su derivada <code>dy = 3x²</code>; la de fuera (<code>cinta_2</code>) graba también esa derivada y la deriva otra vez: <code>d2y = 6x</code>. Se imprimen <code>y</code>, la primera y la segunda derivada.</td></tr>
-        <tr data-lines="12"><td><code>v1, v2 = tf.Variable(1.0), tf.Variable(5.0)</code></td><td>Dos variables, <code>v1 = 1</code> y <code>v2 = 5</code>.</td></tr>
-        <tr data-lines="13-15"><td><code>with tf.GradientTape() as tape: …</code></td><td>Calcula <code>y = 2·v1</code>, que <strong>no usa</strong> <code>v2</code>. Pide el gradiente de las dos variables y lo imprime: convierte cada uno a número (<code>float(g)</code>) o deja <code>None</code> si no existe. <code>v1</code> da 2 y <code>v2</code> da <code>None</code>.</td></tr>
-        <tr data-lines="17-19"><td><code>with tf.GradientTape() as tape: …</code></td><td><code>tf.stop_gradient(x ** 3)</code> es un valor que la cinta trata como <strong>constante</strong>: solo deriva el <code>x²</code>, 2x = 6.</td></tr>
-        <tr data-lines="21-23"><td><code>with tf.GradientTape() as tape: …</code></td><td>Pasa por un <code>tf.cast</code> a <code>int32</code> y de vuelta a <code>float32</code>: convertir a entero <strong>rompe la cadena</strong> de derivadas y el gradiente es <code>None</code>.</td></tr>
-        <tr data-lines="25"><td><code>p = tf.Variable([-1.0, 2.0])</code></td><td>Variable de dos valores, <code>p = [−1, 2]</code>.</td></tr>
-        <tr data-lines="26-28"><td><code>with tf.GradientTape() as tape: …</code></td><td>Deriva la suma de <code>relu(p)</code>: ReLU deja pasar los positivos y pone a 0 los negativos, así que su derivada es 0 para −1 y 1 para 2.</td></tr>
-        <tr data-lines="30-32"><td><code>with tf.GradientTape() as tape: …</code></td><td>Una cinta normal pide su gradiente <strong>una primera vez</strong> (válido).</td></tr>
-        <tr data-lines="33-36"><td><code>try: …</code></td><td>Pedirlo una segunda vez falla con <code>RuntimeError</code>: una cinta no persistente se gasta al usarse. El <code>except</code> imprime el mensaje.</td></tr>
-      </tbody>
-    </table>
-  </details>
-  <div class="salida">
-    <strong>Salida esperada</strong>
-    <pre>y = 27.0 | y' = 27.0 | y'' = 18.0
-v2 no participa: [2.0, None]
-con stop_gradient: 6.0
-pasando por int32: None
-gradiente de ReLU: [0. 1.]
-RuntimeError: A non-persistent GradientTape can only be used to compute one set of gradients (or jacobians)</pre>
-    <p><code>y = 27</code>, <code>y' = 27</code> (3 · 3²) e <code>y'' = 18</code> (6 · 3). <code>v2</code> no participa y su gradiente es <code>None</code> (el de <code>v1</code> es 2). Con <code>stop_gradient</code> el gradiente es 6, no 33. Pasando por <code>int32</code> se pierde todo: <code>None</code>. La derivada de ReLU en <code>[−1, 2]</code> es <code>[0, 1]</code>. Y el último mensaje es el aviso de las cintas de un solo uso: <em>«A non-persistent GradientTape can only be used to compute one set of gradients»</em>.</p>
-  </div>
-</article>
-
-<!-- ---------- Fragmento 17 ---------- -->
-<article class="snippet" data-lang="python" id="frag-17">
-  <header>
-    <h3>17 · Bloque residual propio, pesos no entrenables y pérdida de Huber con <code>keras.ops</code></h3>
-    <p class="para-que"><strong>Para qué sirve</strong> Combinar en un modelo una capa que contiene otras capas, una capa con un contador no entrenable, una capa <code>Lambda</code> y una pérdida escrita a mano, y entrenarlo.</p>
-  </header>
-  <pre class="code"><code>import numpy as np
-import keras
-from keras import layers, ops
-
-@keras.saving.register_keras_serializable(package="c3m1")
-class BloqueResidual(layers.Layer):
-    def __init__(self, unidades, **kwargs):
-        super().__init__(**kwargs)
-        self.unidades = unidades
-        self.d1 = layers.Dense(unidades, activation="relu", name="d1")
-        self.d2 = layers.Dense(unidades, name="d2")
-
-    def build(self, input_shape):
-        self.d1.build(input_shape)
-        self.d2.build((input_shape[0], self.unidades))
-
-    def call(self, x):
-        return x + self.d2(self.d1(x))
-
-    def get_config(self):
-        config = super().get_config()
-        config["unidades"] = self.unidades
-        return config
-
-@keras.saving.register_keras_serializable(package="c3m1")
-class Escala(layers.Layer):
-    def build(self, input_shape):
-        self.escala = self.add_weight(name="escala", shape=(), initializer="ones", trainable=True)
-        self.llamadas = self.add_weight(name="llamadas", shape=(), initializer="zeros", trainable=False)
-
-    def call(self, x):
-        self.llamadas.assign_add(1.0)
-        return x * self.escala
-
-def huber(y_true, y_pred):
-    err = y_true - y_pred
-    pequeno = ops.abs(err) &lt;= 1.0
-    return ops.mean(ops.where(pequeno, 0.5 * err ** 2, ops.abs(err) - 0.5))
-
-keras.utils.set_random_seed(2)
-entrada = keras.Input(shape=(4,), name="entrada")
-h = BloqueResidual(4, name="bloque")(entrada)
-h = Escala(name="escala")(h)
-h = layers.Lambda(lambda t: ops.sum(t ** 2, axis=-1, keepdims=True), name="norma2")(h)
-modelo = keras.Model(entrada, layers.Dense(1, name="salida")(h), name="con_bloque")
-modelo.summary()
-print("pesos del bloque:", [w.path for w in modelo.get_layer("bloque").weights])
-print("entrenables:", len(modelo.trainable_weights), "| no entrenables:", len(modelo.non_trainable_weights))
-
-x = np.random.default_rng(1).normal(size=(64, 4)).astype("float32")
-y = np.abs(x).sum(axis=1, keepdims=True)
-modelo.compile(optimizer="adam", loss=huber)
-contador = modelo.get_layer("escala")
-print("llamadas antes del fit:", contador.llamadas.numpy())
-modelo.fit(x, y, epochs=3, batch_size=32, verbose=0)
-print("llamadas tras 3 épocas x 2 lotes:", contador.llamadas.numpy())
-
-print("huber a mano:", float(huber(ops.array([[0.0], [3.0]]), ops.array([[0.5], [0.0]]))))</code></pre>
-  <details class="linea-a-linea">
-    <summary>Línea por línea</summary>
-    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
-    <table class="lineas">
-      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
-      <tbody>
-        <tr data-lines="1-3"><td><code>import numpy as np …</code></td><td>Importan NumPy, Keras y, de Keras, las capas y <code>ops</code> (operaciones que valen con cualquier backend).</td></tr>
-        <tr data-lines="5"><td><code>@keras.saving.register_keras_serializable(package="c …</code></td><td>Decorador que <strong>registra</strong> la clase para poder guardar y cargar el modelo sin <code>custom_objects</code> (lo explica la sección de guardado).</td></tr>
-        <tr data-lines="6"><td><code>class BloqueResidual(layers.Layer):</code></td><td>Clase <code>BloqueResidual</code>, una capa.</td></tr>
-        <tr data-lines="7-8"><td><code>def __init__(self, unidades, **kwargs): …</code></td><td><code>__init__</code>: recibe las unidades y llama a <code>super().__init__(**kwargs)</code>.</td></tr>
-        <tr data-lines="9"><td><code>self.unidades = unidades</code></td><td>Guarda las unidades.</td></tr>
-        <tr data-lines="10-11"><td><code>self.d1 = layers.Dense(unidades, activation="relu", …</code></td><td>Crea las dos capas internas: una <code>Dense</code> con ReLU y otra sin activación.</td></tr>
-        <tr data-lines="13-15"><td><code>def build(self, input_shape): …</code></td><td><code>build</code>: construye explícitamente las dos subcapas, con la forma de entrada y con la de su salida (<code>(lote, unidades)</code>). Así sus pesos existen antes de guardar o cargar.</td></tr>
-        <tr data-lines="17-18"><td><code>def call(self, x): …</code></td><td><code>call</code>: <code>x + d2(d1(x))</code>: la entrada <strong>más</strong> el resultado de las dos capas (el atajo).</td></tr>
-        <tr data-lines="20-23"><td><code>def get_config(self): …</code></td><td><code>get_config</code> con las unidades, para poder recrear el bloque.</td></tr>
-        <tr data-lines="25"><td><code>@keras.saving.register_keras_serializable(package="c …</code></td><td>Registra también la siguiente clase.</td></tr>
-        <tr data-lines="26"><td><code>class Escala(layers.Layer):</code></td><td>Clase <code>Escala</code>: multiplica por un número que se aprende y cuenta sus llamadas.</td></tr>
-        <tr data-lines="27"><td><code>def build(self, input_shape):</code></td><td><code>build</code> recibe la forma pero aquí no la necesita.</td></tr>
-        <tr data-lines="28"><td><code>self.escala = self.add_weight(name="escala", shape=( …</code></td><td><code>add_weight(..., shape=(), trainable=True)</code>: un peso <strong>escalar entrenable</strong> inicializado en 1.</td></tr>
-        <tr data-lines="29"><td><code>self.llamadas = self.add_weight(name="llamadas", sha …</code></td><td>Otro escalar, <code>llamadas</code>, con <code>trainable=False</code>: el optimizador no lo toca.</td></tr>
-        <tr data-lines="31-33"><td><code>def call(self, x): …</code></td><td><code>call</code>: suma 1 al contador con <code>assign_add</code> y devuelve la entrada multiplicada por <code>escala</code>.</td></tr>
-        <tr data-lines="35-38"><td><code>def huber(y_true, y_pred): …</code></td><td>La pérdida de Huber con <code>keras.ops</code>: <code>err</code> es la diferencia; <code>pequeno</code> marca dónde <code>|err| ≤ 1</code>; <code>ops.where</code> elige <code>0,5·err²</code> donde es pequeño y <code>|err| − 0,5</code> donde no; <code>ops.mean</code> promedia.</td></tr>
-        <tr data-lines="40"><td><code>keras.utils.set_random_seed(2)</code></td><td>Semilla.</td></tr>
-        <tr data-lines="41"><td><code>entrada = keras.Input(shape=(4,), name="entrada")</code></td><td>Entrada de 4 valores.</td></tr>
-        <tr data-lines="42"><td><code>h = BloqueResidual(4, name="bloque")(entrada)</code></td><td>Aplica el bloque residual (4 unidades).</td></tr>
-        <tr data-lines="43"><td><code>h = Escala(name="escala")(h)</code></td><td>Aplica la capa <code>Escala</code>.</td></tr>
-        <tr data-lines="44"><td><code>h = layers.Lambda(lambda t: ops.sum(t ** 2, axis=-1, …</code></td><td>Una capa <code>Lambda</code> que eleva al cuadrado y suma por filas (<code>keepdims=True</code> deja la forma <code>(None, 1)</code>).</td></tr>
-        <tr data-lines="45"><td><code>modelo = keras.Model(entrada, layers.Dense(1, name=" …</code></td><td>Capa final de 1 neurona y declaración del modelo.</td></tr>
-        <tr data-lines="46"><td><code>modelo.summary()</code></td><td><code>summary()</code> del modelo.</td></tr>
-        <tr data-lines="47"><td><code>print("pesos del bloque:", [w.path for w in modelo.g …</code></td><td>Los pesos del bloque, con sus rutas (<code>bloque/d1/kernel</code>…).</td></tr>
-        <tr data-lines="48"><td><code>print("entrenables:", len(modelo.trainable_weights), …</code></td><td>Cuenta los pesos entrenables y no entrenables.</td></tr>
-        <tr data-lines="50"><td><code>x = np.random.default_rng(1).normal(size=(64, 4)).as …</code></td><td>64 filas de datos con 4 columnas.</td></tr>
-        <tr data-lines="51"><td><code>y = np.abs(x).sum(axis=1, keepdims=True)</code></td><td>El objetivo: la suma de los valores absolutos de cada fila.</td></tr>
-        <tr data-lines="52"><td><code>modelo.compile(optimizer="adam", loss=huber)</code></td><td><code>compile</code> con Adam y <strong>nuestra función</strong> <code>huber</code> como pérdida.</td></tr>
-        <tr data-lines="53"><td><code>contador = modelo.get_layer("escala")</code></td><td>Guarda en <code>contador</code> la capa <code>"escala"</code> para consultarla.</td></tr>
-        <tr data-lines="54"><td><code>print("llamadas antes del fit:", contador.llamadas.n …</code></td><td>Imprime el contador antes de entrenar.</td></tr>
-        <tr data-lines="55"><td><code>modelo.fit(x, y, epochs=3, batch_size=32, verbose=0)</code></td><td>Entrena 3 épocas con lotes de 32 (64 filas = 2 lotes por época).</td></tr>
-        <tr data-lines="56"><td><code>print("llamadas tras 3 épocas x 2 lotes:", contador. …</code></td><td>Imprime el contador tras entrenar.</td></tr>
-        <tr data-lines="58"><td><code>print("huber a mano:", float(huber(ops.array([[0.0], …</code></td><td>Calcula la pérdida de Huber con los números del ejemplo a mano (<code>y_true = [0, 3]</code>, <code>y_pred = [0,5; 0]</code>).</td></tr>
-      </tbody>
-    </table>
-  </details>
-  <div class="salida">
-    <strong>Salida esperada</strong>
-    <pre>Model: "con_bloque"
-┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━┓
-┃ Layer (type)                    ┃ Output Shape           ┃       Param # ┃
-┡━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━┩
-│ entrada (InputLayer)            │ (None, 4)              │             0 │
-├─────────────────────────────────┼────────────────────────┼───────────────┤
-│ bloque (BloqueResidual)         │ (None, 4)              │            40 │
-├─────────────────────────────────┼────────────────────────┼───────────────┤
-│ escala (Escala)                 │ (None, 4)              │             2 │
-├─────────────────────────────────┼────────────────────────┼───────────────┤
-│ norma2 (Lambda)                 │ (None, 1)              │             0 │
-├─────────────────────────────────┼────────────────────────┼───────────────┤
-│ salida (Dense)                  │ (None, 1)              │             2 │
-└─────────────────────────────────┴────────────────────────┴───────────────┘
- Total params: 44 (176.00 B)
- Trainable params: 43 (172.00 B)
- Non-trainable params: 1 (4.00 B)
-pesos del bloque: ['bloque/d1/kernel', 'bloque/d1/bias', 'bloque/d2/kernel', 'bloque/d2/bias']
-entrenables: 7 | no entrenables: 1
-llamadas antes del fit: 0.0
-llamadas tras 3 épocas x 2 lotes: 6.0
-huber a mano: 1.3125</pre>
-    <p>El <code>summary()</code> muestra <code>bloque</code> con <strong>40</strong> parámetros, <code>escala</code> con <strong>2</strong>, <code>norma2</code> (Lambda) con 0 y <code>salida</code> con 2: total 44, de los que <strong>43 se entrenan y 1 no</strong> (el contador). Los pesos del bloque son <code>d1/kernel</code>, <code>d1/bias</code>, <code>d2/kernel</code> y <code>d2/bias</code>. Hay 7 tensores entrenables y 1 no entrenable. El contador pasa de 0 a <strong>6</strong>: 3 épocas × 2 lotes de 32. Y la pérdida de Huber a mano es <strong>1,3125</strong>, el número del ejemplo.</p>
-  </div>
-</article>
-
-<!-- ---------- Fragmento 19 ---------- -->
-<article class="snippet" data-lang="python" id="frag-19">
-  <header>
-    <h3>19 · Guardar un modelo por subclases (<code>get_config</code>) y exportar un SavedModel</h3>
-    <p class="para-que"><strong>Para qué sirve</strong> Mostrar que un modelo por subclases con argumentos en <code>__init__</code> necesita <code>get_config</code> para guardarse bien, y exportar un modelo al formato SavedModel de TensorFlow.</p>
-  </header>
-  <pre class="code"><code>import contextlib
-import io
-import os
-import re
-import tempfile
-import numpy as np
-import tensorflow as tf
-import keras
-from keras import layers
-
-def definir(con_config):
-    class Mini(keras.Model):
-        def __init__(self, ocultas=4, **kwargs):
-            super().__init__(**kwargs)
-            self.ocultas = ocultas
-            self.d1 = layers.Dense(ocultas, activation="relu")
-            self.d2 = layers.Dense(1)
-
-        def call(self, x):
-            return self.d2(self.d1(x))
-
-    if con_config:
-        def get_config(self):
-            config = super(Mini, self).get_config()
-            config["ocultas"] = self.ocultas
-            return config
-        Mini.get_config = get_config
-    return Mini
-
-carpeta = tempfile.mkdtemp()
-x = np.array([[1.0, 2.0, 3.0], [0.5, -1.0, 0.0]], dtype="float32")
-keras.utils.set_random_seed(0)
-
-for con_config in (False, True):
-    Mini = definir(con_config)
-    modelo = Mini(ocultas=5, name="mini")
-    modelo(x)
-    ruta = os.path.join(carpeta, f"mini_{con_config}.keras")
-    modelo.save(ruta)
-    try:
-        cargado = keras.models.load_model(ruta, custom_objects={"Mini": Mini})
-        print(f"get_config definido={con_config}: carga bien, predicciones iguales =", np.allclose(modelo(x), cargado(x)))
-    except ValueError as e:
-        print(f"get_config definido={con_config}: ValueError -&gt;", re.search(r"expected \d+ variables, but received \d+ variables", str(e)).group(0))
-
-entrada = keras.Input(shape=(3,))
-f = keras.Model(entrada, layers.Dense(2, name="d")(entrada))
-with contextlib.redirect_stdout(io.StringIO()):
-    f.export(os.path.join(carpeta, "export"))
-print(sorted(os.listdir(os.path.join(carpeta, "export"))))
-rec = tf.saved_model.load(os.path.join(carpeta, "export"))
-print("SavedModel reproduce el modelo:", np.allclose(rec.serve(x).numpy(), f(x)))</code></pre>
-  <details class="linea-a-linea">
-    <summary>Línea por línea</summary>
-    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
-    <table class="lineas">
-      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
-      <tbody>
-        <tr data-lines="1-9"><td><code>import contextlib …</code></td><td>Importan los módulos que se van a usar: <code>contextlib</code> e <code>io</code> (para silenciar el texto que escribe <code>export</code>), <code>os</code>, <code>re</code>, <code>tempfile</code>, NumPy, TensorFlow, Keras y las capas.</td></tr>
-        <tr data-lines="11"><td><code>def definir(con_config):</code></td><td>Función <code>definir</code> que recibe un booleano (¿se define <code>get_config</code>?) y construye la clase.</td></tr>
-        <tr data-lines="12-17"><td><code>class Mini(keras.Model): …</code></td><td>Dentro, la clase <code>Mini</code> (un modelo por subclases) con un argumento <code>ocultas</code> que fija el ancho de la capa oculta, y una capa de salida de 1 neurona.</td></tr>
-        <tr data-lines="19-20"><td><code>def call(self, x): …</code></td><td><code>call</code>: pasa los datos por las dos capas.</td></tr>
-        <tr data-lines="22-27"><td><code>if con_config: …</code></td><td>Si se pide, define <code>get_config</code> (que añade <code>ocultas</code> a la configuración) y se lo asigna a la clase (<code>Mini.get_config = get_config</code>).</td></tr>
-        <tr data-lines="28"><td><code>return Mini</code></td><td>Devuelve la clase.</td></tr>
-        <tr data-lines="30"><td><code>carpeta = tempfile.mkdtemp()</code></td><td>Carpeta temporal.</td></tr>
-        <tr data-lines="31"><td><code>x = np.array([[1.0, 2.0, 3.0], [0.5, -1.0, 0.0]], dt …</code></td><td>Dos filas de datos de prueba.</td></tr>
-        <tr data-lines="32"><td><code>keras.utils.set_random_seed(0)</code></td><td>Semilla de Keras.</td></tr>
-        <tr data-lines="34"><td><code>for con_config in (False, True):</code></td><td>Repite el experimento dos veces: primero sin <code>get_config</code> (<code>False</code>) y luego con él (<code>True</code>).</td></tr>
-        <tr data-lines="35"><td><code>Mini = definir(con_config)</code></td><td>Crea la clase correspondiente.</td></tr>
-        <tr data-lines="36"><td><code>modelo = Mini(ocultas=5, name="mini")</code></td><td>La instancia con <code>ocultas=5</code>, distinto del valor por defecto (4).</td></tr>
-        <tr data-lines="37"><td><code>modelo(x)</code></td><td>Llama al modelo para construirlo.</td></tr>
-        <tr data-lines="38"><td><code>ruta = os.path.join(carpeta, f"mini_{con_config}.ker …</code></td><td>Ruta de guardado, distinta en cada caso.</td></tr>
-        <tr data-lines="39"><td><code>modelo.save(ruta)</code></td><td>Lo guarda en <code>.keras</code>.</td></tr>
-        <tr data-lines="40-44"><td><code>try: …</code></td><td>Intenta cargarlo (con <code>custom_objects</code> para que encuentre la clase). Si sale bien, comprueba que las predicciones son iguales; si falla con <code>ValueError</code>, imprime solo la frase «expected N variables, but received M variables».</td></tr>
-        <tr data-lines="46"><td><code>entrada = keras.Input(shape=(3,))</code></td><td>Una entrada de 3 valores.</td></tr>
-        <tr data-lines="47"><td><code>f = keras.Model(entrada, layers.Dense(2, name="d")(e …</code></td><td>Un modelo funcional sencillo con una capa <code>Dense(2)</code>.</td></tr>
-        <tr data-lines="48-49"><td><code>with contextlib.redirect_stdout(io.StringIO()): …</code></td><td>Exporta como SavedModel a la carpeta <code>export</code>, redirigiendo a un buffer lo que <code>export</code> imprime.</td></tr>
-        <tr data-lines="50"><td><code>print(sorted(os.listdir(os.path.join(carpeta, "expor …</code></td><td>Lista el contenido de la carpeta exportada, ordenado.</td></tr>
-        <tr data-lines="51"><td><code>rec = tf.saved_model.load(os.path.join(carpeta, "exp …</code></td><td>Carga el SavedModel con <code>tf.saved_model.load</code>.</td></tr>
-        <tr data-lines="52"><td><code>print("SavedModel reproduce el modelo:", np.allclose …</code></td><td>Llama a su función <code>serve</code> y comprueba que reproduce las salidas del modelo original.</td></tr>
-      </tbody>
-    </table>
-  </details>
-  <div class="salida">
-    <strong>Salida esperada</strong>
-    <pre>get_config definido=False: ValueError -&gt; expected 2 variables, but received 0 variables
-get_config definido=True: carga bien, predicciones iguales = True
-['assets', 'fingerprint.pb', 'saved_model.pb', 'variables']
-SavedModel reproduce el modelo: True</pre>
-    <p>Sin <code>get_config</code>: <em>«expected 2 variables, but received 0 variables»</em>: Keras no sabía con qué argumentos recrear el modelo. Con <code>get_config</code>: carga bien y las predicciones coinciden (<code>True</code>). El SavedModel exportado contiene <code>assets</code>, <code>fingerprint.pb</code>, <code>saved_model.pb</code> (el grafo) y <code>variables</code> (los pesos); al cargarlo con <code>tf.saved_model.load</code> y llamar a <code>serve</code> se reproducen las salidas del modelo.</p>
-  </div>
-</article>
-
-<!-- ---------- Fragmento 20 ---------- -->
-<article class="snippet" data-lang="python" id="frag-20">
-  <header>
-    <h3>20 · Proyecto: clasificar dos lunas con capas propias, atajo funcional, <code>tf.data</code> y guardado</h3>
-    <p class="para-que"><strong>Para qué sirve</strong> Un modelo completo que usa varias ideas del módulo: una capa propia registrada, un atajo con <code>Add</code> en la API funcional, un <code>tf.data.Dataset</code>, evaluación, predicción y guardado con comprobación.</p>
-  </header>
-  <pre class="code"><code>import os, tempfile
-import numpy as np
-import tensorflow as tf
-import keras
-from keras import layers
-from sklearn.datasets import make_moons
-from sklearn.model_selection import train_test_split
-
-@keras.saving.register_keras_serializable(package="c3m1")
-class CapaDensa(layers.Layer):
-    def __init__(self, unidades, activacion=None, **kwargs):
-        super().__init__(**kwargs)
-        self.unidades = unidades
-        self.activacion = keras.activations.get(activacion)
-
-    def build(self, input_shape):
-        self.W = self.add_weight(name="W", shape=(input_shape[-1], self.unidades), initializer="glorot_uniform")
-        self.b = self.add_weight(name="b", shape=(self.unidades,), initializer="zeros")
-
-    def call(self, x):
-        return self.activacion(keras.ops.matmul(x, self.W) + self.b)
-
-    def get_config(self):
-        config = super().get_config()
-        config.update({"unidades": self.unidades, "activacion": keras.activations.serialize(self.activacion)})
-        return config
-
-X, y = make_moons(n_samples=800, noise=0.2, random_state=0)
-X = X.astype("float32")
-X_tr, X_te, y_tr, y_te = train_test_split(X, y, test_size=0.25, random_state=0, stratify=y)
-
-keras.utils.set_random_seed(0)
-entrada = keras.Input(shape=(2,), name="puntos")
-h = CapaDensa(16, "relu", name="densa1")(entrada)
-h = CapaDensa(16, "relu", name="densa2")(h)
-h = layers.Add(name="atajo")([h, CapaDensa(16, name="proyeccion")(entrada)])
-salida = layers.Dense(1, activation="sigmoid", name="prob")(h)
-modelo = keras.Model(entrada, salida, name="lunas")
-modelo.compile(optimizer=keras.optimizers.Adam(0.02), loss="binary_crossentropy", metrics=["accuracy"])
-
-train = tf.data.Dataset.from_tensor_slices((X_tr, y_tr)).shuffle(len(X_tr), seed=0).batch(32)
-hist = modelo.fit(train, epochs=40, validation_data=(X_te, y_te), shuffle=False, verbose=0)
-print(f"época 1 : pérdida={hist.history['loss'][0]:.3f} | acc val={hist.history['val_accuracy'][0]:.3f}")
-print(f"época 40: pérdida={hist.history['loss'][-1]:.3f} | acc val={hist.history['val_accuracy'][-1]:.3f}")
-
-perdida, acc = modelo.evaluate(X_te, y_te, verbose=0)
-print(f"test: pérdida={perdida:.3f} | accuracy={acc:.3f}")
-nuevos = np.array([[0.0, 1.0], [1.0, -0.5], [-1.0, 0.0], [2.0, 0.0]], dtype="float32")
-prob = modelo.predict(nuevos, verbose=0)
-print("probabilidades:", prob.ravel().round(3), "-&gt; clases", (prob.ravel() &gt; 0.5).astype(int))
-
-ruta = os.path.join(tempfile.mkdtemp(), "lunas.keras")
-modelo.save(ruta)
-copia = keras.models.load_model(ruta)
-print("mismas predicciones tras cargar:", np.allclose(prob, copia.predict(nuevos, verbose=0)))
-print("parámetros:", modelo.count_params())</code></pre>
-  <details class="linea-a-linea">
-    <summary>Línea por línea</summary>
-    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
-    <table class="lineas">
-      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
-      <tbody>
-        <tr data-lines="1-7"><td><code>import os, tempfile …</code></td><td>Importan lo necesario: <code>os</code> y <code>tempfile</code>, NumPy, TensorFlow, Keras y capas, y dos utilidades de scikit-learn (<code>make_moons</code> para generar los datos y <code>train_test_split</code> para dividirlos).</td></tr>
-        <tr data-lines="9"><td><code>@keras.saving.register_keras_serializable(package="c …</code></td><td>Registra la clase para que se pueda guardar y cargar sin <code>custom_objects</code>.</td></tr>
-        <tr data-lines="10"><td><code>class CapaDensa(layers.Layer):</code></td><td>La capa <code>CapaDensa</code> (la del fragmento 16).</td></tr>
-        <tr data-lines="11-14"><td><code>def __init__(self, unidades, activacion=None, **kwar …</code></td><td><code>__init__</code>: guarda unidades y activación.</td></tr>
-        <tr data-lines="16-18"><td><code>def build(self, input_shape): …</code></td><td><code>build</code>: crea <code>W</code> y <code>b</code> con la forma de la entrada.</td></tr>
-        <tr data-lines="20-21"><td><code>def call(self, x): …</code></td><td><code>call</code>: igual que antes pero con <code>keras.ops.matmul</code>, que vale con cualquier backend.</td></tr>
-        <tr data-lines="23-26"><td><code>def get_config(self): …</code></td><td><code>get_config</code> con unidades y activación.</td></tr>
-        <tr data-lines="28"><td><code>X, y = make_moons(n_samples=800, noise=0.2, random_s …</code></td><td>Genera 800 puntos en forma de «dos lunas» con algo de ruido (<code>noise=0.2</code>) y una semilla.</td></tr>
-        <tr data-lines="29"><td><code>X = X.astype("float32")</code></td><td>Convierte <code>X</code> a <code>float32</code>.</td></tr>
-        <tr data-lines="30"><td><code>X_tr, X_te, y_tr, y_te = train_test_split(X, y, test …</code></td><td>Separa el 25 % para evaluar (<code>test_size=0.25</code>), manteniendo la proporción de clases (<code>stratify=y</code>).</td></tr>
-        <tr data-lines="32"><td><code>keras.utils.set_random_seed(0)</code></td><td>Semilla de Keras.</td></tr>
-        <tr data-lines="33"><td><code>entrada = keras.Input(shape=(2,), name="puntos")</code></td><td>La entrada: 2 coordenadas.</td></tr>
-        <tr data-lines="34"><td><code>h = CapaDensa(16, "relu", name="densa1")(entrada)</code></td><td>Primera capa propia: 16 neuronas ReLU.</td></tr>
-        <tr data-lines="35"><td><code>h = CapaDensa(16, "relu", name="densa2")(h)</code></td><td>Segunda capa propia, otras 16 neuronas ReLU.</td></tr>
-        <tr data-lines="36"><td><code>h = layers.Add(name="atajo")([h, CapaDensa(16, name= …</code></td><td>El <strong>atajo</strong>: <code>Add</code> suma la salida de la segunda capa y una capa de proyección (16 neuronas sin activación) aplicada a la entrada. Los dos anchos son 16, así que se pueden sumar.</td></tr>
-        <tr data-lines="37"><td><code>salida = layers.Dense(1, activation="sigmoid", name= …</code></td><td>La salida: una neurona sigmoide (probabilidad de la clase 1).</td></tr>
-        <tr data-lines="38"><td><code>modelo = keras.Model(entrada, salida, name="lunas")</code></td><td>El modelo funcional.</td></tr>
-        <tr data-lines="39"><td><code>modelo.compile(optimizer=keras.optimizers.Adam(0.02) …</code></td><td><code>compile</code> con Adam (0,02), pérdida de entropía cruzada binaria y métrica <code>accuracy</code>.</td></tr>
-        <tr data-lines="41"><td><code>train = tf.data.Dataset.from_tensor_slices((X_tr, y_ …</code></td><td>Un <code>tf.data.Dataset</code> de los datos de entrenamiento: <code>shuffle</code> los baraja y <code>batch(32)</code> los agrupa en lotes de 32.</td></tr>
-        <tr data-lines="42"><td><code>hist = modelo.fit(train, epochs=40, validation_data= …</code></td><td>Entrena 40 épocas con ese dataset, valida con el conjunto de test y guarda el historial. <code>shuffle=False</code> porque el dataset ya baraja.</td></tr>
-        <tr data-lines="43"><td><code>print(f"época 1 : pérdida={hist.history['loss'][0]:. …</code></td><td>Imprime la pérdida de entrenamiento y la accuracy de validación en la <strong>primera</strong> época.</td></tr>
-        <tr data-lines="44"><td><code>print(f"época 40: pérdida={hist.history['loss'][-1]: …</code></td><td>Y en la <strong>última</strong> (<code>[-1]</code>).</td></tr>
-        <tr data-lines="46"><td><code>perdida, acc = modelo.evaluate(X_te, y_te, verbose=0 …</code></td><td><code>evaluate</code> devuelve la pérdida y la accuracy sobre el conjunto de test.</td></tr>
-        <tr data-lines="47"><td><code>print(f"test: pérdida={perdida:.3f} | accuracy={acc: …</code></td><td>Las imprime.</td></tr>
-        <tr data-lines="48"><td><code>nuevos = np.array([[0.0, 1.0], [1.0, -0.5], [-1.0, 0 …</code></td><td>Cuatro puntos nuevos.</td></tr>
-        <tr data-lines="49"><td><code>prob = modelo.predict(nuevos, verbose=0)</code></td><td>Sus probabilidades (<code>predict</code>).</td></tr>
-        <tr data-lines="50"><td><code>print("probabilidades:", prob.ravel().round(3), "-&gt; …</code></td><td>Las imprime y las convierte en clases con el umbral 0,5 (<code>&gt; 0.5</code>).</td></tr>
-        <tr data-lines="52"><td><code>ruta = os.path.join(tempfile.mkdtemp(), "lunas.keras …</code></td><td>Ruta de guardado en una carpeta temporal.</td></tr>
-        <tr data-lines="53"><td><code>modelo.save(ruta)</code></td><td>Guarda el modelo en <code>.keras</code>.</td></tr>
-        <tr data-lines="54"><td><code>copia = keras.models.load_model(ruta)</code></td><td>Lo carga <strong>sin</strong> <code>custom_objects</code>: funciona gracias al registro.</td></tr>
-        <tr data-lines="55"><td><code>print("mismas predicciones tras cargar:", np.allclos …</code></td><td>Comprueba que el modelo cargado da las mismas predicciones.</td></tr>
-        <tr data-lines="56"><td><code>print("parámetros:", modelo.count_params())</code></td><td>Imprime el número de parámetros del modelo.</td></tr>
-      </tbody>
-    </table>
-  </details>
-  <div class="salida">
-    <strong>Salida esperada</strong>
-    <pre>época 1 : pérdida=0.388 | acc val=0.855
-época 40: pérdida=0.085 | acc val=0.970
-test: pérdida=0.092 | accuracy=0.970
-probabilidades: [0.012 0.996 0.003 1.   ] -&gt; clases [0 1 0 1]
-mismas predicciones tras cargar: True
-parámetros: 385</pre>
-    <p>La pérdida baja de 0,388 a 0,085 y la accuracy de validación sube de 0,855 a 0,970 en 40 épocas. En test: pérdida 0,092 y <strong>accuracy 0,970</strong>. Los cuatro puntos nuevos reciben probabilidades 0,012, 0,996, 0,003 y 1,0, es decir, clases 0, 1, 0 y 1. El modelo cargado da las mismas predicciones (<code>True</code>): la capa registrada se reconstruyó sola. Los <strong>385</strong> parámetros son 48 + 272 + 48 + 17.</p>
-  </div>
-</article>
-
+<a class="lab-card" href="laboratorio.html#paso-11"><span class="lc-ico" aria-hidden="true">🧪</span>
+  <span><strong>Ver el código de esta lección en el Laboratorio</strong>
+  <span>Paso 11 · Tu propia capa Dense. Y el paso 12: el proyecto de las dos lunas. Guardar, cargar y exportar, en «Más código» (fragmentos 17, 18 y 19).</span></span></a>
 </section>
 
 </div>

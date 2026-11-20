@@ -68,8 +68,8 @@ Lab.register("curso3/c3m1-grafo", function (root, api) {
       var xr = (P.a.x + P.b.x) / 2, xend = P.m2.x;
       D.path(ctx, [[P.in.x, ym + bh / 2], [P.in.x, yr], [xr - bw / 2, yr]], C.oliva, 2.4);
       D.rect(ctx, xr - bw / 2, yr - bh / 2 + 2, bw, bh - 4, C.olivaWash, C.ink, 1.4);
-      D.text(ctx, "Dense", xr, yr - 3, { align: "center", size: bw < 60 ? 10 : 11, mono: true, weight: 700, color: C.ink });
-      D.text(ctx, "(None," + st.r + ")", xr, yr + 11, { align: "center", size: bw < 60 ? 8.5 : 10, mono: true, color: C.ink2 });
+      D.text(ctx, "Dense", xr, yr - 3, { align: "center", size: 11, mono: true, weight: 700, color: C.ink });
+      D.text(ctx, bw < 72 ? String(st.r) : "(None," + st.r + ")", xr, yr + 11, { align: "center", size: 11, mono: true, color: C.ink2 });
       D.path(ctx, [[xr + bw / 2, yr], [xend - 4, yr]], C.oliva, 2.4);
       D.arrow(ctx, xend - 4, yr, xend - 4, ym + bh / 2 + 1, C.oliva, 2.4);
       D.text(ctx, "rama paralela", xr, yr + bh / 2 + 6, { align: "center", size: 11, weight: 700, color: C.olivaInk });
@@ -77,9 +77,9 @@ Lab.register("curso3/c3m1-grafo", function (root, api) {
     nodes.forEach(function (nd) {
       var p = P[nd.id];
       D.rect(ctx, p.x - bw / 2, p.y - bh / 2, bw, bh, nd.c, nd.bad ? C.terracota : C.ink, nd.bad ? 3 : 1.6);
-      var fs = bw < 60 ? 10 : 11.5;
+      var fs = 11.5;
       D.text(ctx, nd.t, p.x, p.y - 4, { align: "center", size: fs, weight: 700, color: C.ink, mono: true });
-      D.text(ctx, nd.bad ? "ERROR" : "(None," + nd.s + ")", p.x, p.y + 12, { align: "center", size: bw < 60 ? 8.5 : 10, mono: true, color: nd.bad ? C.terracotaInk : C.ink2, weight: nd.bad ? 700 : 400 });
+      D.text(ctx, nd.bad ? "ERROR" : (bw < 72 ? String(nd.s) : "(None," + nd.s + ")"), p.x, p.y + 12, { align: "center", size: 11, mono: true, color: nd.bad ? C.terracotaInk : C.ink2, weight: nd.bad ? 700 : 400 });
     });
   }
   function update() {

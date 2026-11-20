@@ -20,8 +20,8 @@
     <div>
       <p class="eyebrow">Curso 3 · Módulo 1 · Lección 7 de 8</p>
       <h1>Subclassing: el modelo es un programa, y training cambia lo que hace</h1>
-      <p class="lead">Con subclassing escribes el modelo como una clase de Python: capas en <code>__init__</code>, cálculo en <code>call</code>. Keras le pasa <code>training=True</code> al entrenar y <code>False</code> al predecir, y dos capas cambian de comportamiento según ese valor.</p>
-      <p class="meta-line"><span class="read-time" data-render="read-time"></span><a href="../modulo-1.html">Índice del módulo</a></p>
+      <p class="lead">Con subclassing escribes el modelo como una clase de Python. Keras le dice si está entrenando o prediciendo, y dos capas cambian de comportamiento según eso.</p>
+      <p class="meta-line"><span class="read-time" data-render="read-time"></span><a href="../modulo-1.html">Índice del módulo</a> · <a href="#chuleta">Ir a la chuleta</a></p>
     </div>
     <div class="hero-tile" aria-hidden="true"></div>
   </div>
@@ -29,19 +29,44 @@
 <details class="predice">
   <summary>Repites exactamente la misma predicción dos veces con el mismo usuario y salen números distintos. ¿Qué sospechas?<span class="hint"></span></summary>
   <div>
-    <p>Un <strong><code>training=True</code> que no debería estar</strong>. Con <code>training=True</code>, Dropout apaga unidades al azar distintas en cada llamada; con <code>training=False</code> no hace nada y dos llamadas dan lo mismo.</p>
+    <p>Que el modelo cree que está <strong>entrenando</strong> (<code>training=True</code>). Entonces el Dropout apaga neuronas al azar, distintas en cada llamada. Al predecir no hace nada y dos llamadas dan lo mismo.</p>
   </div>
 </details>
 
 <section>
-<h2 id="idea">Un programa en lugar de un plano</h2>
-<p>Un modelo por subclases hereda de <code>keras.Model</code> y rellena dos métodos: <code>__init__</code>, donde <strong>se crean las capas</strong> (siempre empezando por <code>super().__init__(**kwargs)</code>), y <code>call(self, x, training=False)</code>, donde se escribe <strong>el cálculo</strong> en Python normal. La funcional entrega un mapa que Keras puede leer; subclassing entrega un programa, como <em>Bandersnatch</em>, y Keras solo sabe qué hay dentro <strong>ejecutándolo</strong>. Por eso el modelo está «sin construir» (<code>built = False</code>, 0 parámetros) hasta que lo llamas una vez con datos.</p>
-<p>El argumento <code>training</code> lo recibe tu <code>call</code> y se lo pasas a las capas que lo necesitan (<code>self.bn(h, training=training)</code>):</p>
-<ul>
-  <li><strong>Dropout(p)</strong>: al entrenar apaga al azar una fracción <code>p</code> y multiplica las supervivientes por \( 1/(1-p) \) para que la media no cambie. Al predecir, no hace nada.</li>
-  <li><strong>BatchNormalization</strong>: normaliza a media 0 y desviación 1. Al entrenar usa la media y la varianza <strong>del lote</strong> y va actualizando unas medias móviles; al predecir usa <strong>las móviles</strong>, que es lo que permite predecir una sola muestra.</li>
+<h2 id="idea">1 · El modelo como una clase de Python</h2>
+<p>Una <strong>clase</strong> es un molde para fabricar objetos. Tu clase <strong>hereda</strong> de <code>keras.Model</code>: copia todo lo que sabe hacer un modelo (<code>fit</code>, <code>predict</code>…) y tú solo escribes dos métodos (recetas de la clase):</p>
+<table>
+  <thead><tr><th>Método</th><th>Qué va dentro</th></tr></thead>
+  <tbody>
+    <tr><td><code>__init__</code></td><td>Se crean las capas, una vez. Antes, una línea obligatoria (<code>super</code>) prepara el modelo como uno de Keras.</td></tr>
+    <tr><td><code>call</code></td><td>El cálculo, en Python normal: puede llevar <code>if</code> y bucles. Recibe los datos y <code>training</code>.</td></tr>
+  </tbody>
+</table>
+<p>La API funcional entrega un plano que Keras puede leer. Subclassing entrega un <strong>programa</strong>, como <em>Bandersnatch</em>: Keras solo sabe qué hay dentro ejecutándolo.</p>
+</section>
+
+<section>
+<h2 id="built">2 · Sin construir hasta que lo llamas</h2>
+<p>Por eso, recién creado, el modelo no tiene pesos: no sabe cuántas columnas tendrán los datos.</p>
+<ul class="flow">
+  <li class="a">CREAR<small>built = False · 0 parámetros</small></li>
+  <li class="b">LLAMAR CON UN LOTE<small>se ejecuta call y nacen los pesos</small></li>
+  <li class="d">CONSTRUIDO<small>built = True · 55 parámetros</small></li>
 </ul>
-<p>Úsalo solo cuando necesites Python dentro del modelo; para un grafo de capas, la funcional da lo mismo con inspección y menos riesgo.</p>
+<p>De esos 55, 43 se entrenan; los otros 12 son medias y varianzas que guarda BatchNorm (paso 5).</p>
+</section>
+
+<section>
+<h2 id="training">3 · El argumento training</h2>
+<p><code>fit</code> llama a tu <code>call</code> con <code>training=True</code>; <code>predict</code>, con <code>False</code>. Tú se lo pasas a las capas que lo necesitan: <code>self.bn(h, training=training)</code>.</p>
+<table>
+  <thead><tr><th>Capa</th><th>Entrenando</th><th>Prediciendo</th></tr></thead>
+  <tbody>
+    <tr><td><strong>Dropout</strong></td><td>Apaga neuronas al azar y reescala las demás</td><td>No hace nada</td></tr>
+    <tr><td><strong>BatchNorm</strong></td><td>Normaliza con la media del lote</td><td>Usa la media móvil guardada</td></tr>
+  </tbody>
+</table>
 </section>
 
 <figure class="demo" data-demo="curso3/c3m1-training" data-titulo="El argumento training en Dropout y BatchNormalization">
@@ -50,28 +75,49 @@
 </figure>
 
 <section>
-<h2 id="numeros">Con números: diez críticos y una media que aprende</h2>
-<div class="callout ejemplo">
-  <span class="lbl">Ejemplo numérico</span>
-  <p>Diez críticos puntúan una película con un 1 cada uno, y pasan por <code>Dropout(0,5)</code>.</p>
-  <ol class="pasos">
-    <li>Factor: \( 1/(1-0{,}5) = 2 \). Con <code>training=True</code> sale <code>[2, 0, 2, 0, 0, 0, 0, 2, 2, 0]</code>.</li>
-    <li>En media cada unidad vale 0,5 · 2 + 0,5 · 0 = <strong>1</strong>, igual que la entrada. Con <code>training=False</code>: diez unos.</li>
-  </ol>
-  <p>BatchNorm: lotes que de media han visto 5 capítulos, media móvil que empieza en 0 y momentum 0,9.</p>
-  <ol class="pasos">
-    <li>Lote 1: 0,9 · 0 + 0,1 · 5 = 0,5. Lote 2: 0,95. Lote 3: <strong>1,355</strong>.</li>
-    <li>Si predices ya, normalizas con 1,355 en vez de 5: le falta entrenar.</li>
-  </ol>
+<h2 id="dropout">4 · Con números: diez críticos y un Dropout</h2>
+<p>El <strong>Dropout</strong> apaga al azar una parte p de las neuronas para que la red no dependa de ninguna. Diez críticos puntúan con un 1 y pasan por <code>Dropout(0.5)</code>:</p>
+<div class="anim-pasos" data-titulo="Dropout(0,5) con diez unos">
+  <div class="paso"><p><strong>1.</strong> Las que sobreviven se multiplican por 1 / (1 − p).</p><span class="grande">1 / (1 − 0,5) = 2</span></div>
+  <div class="paso"><p><strong>2.</strong> Entrenando: apaga unas 5 al azar y dobla las demás.</p><span class="grande">[2, 0, 2, 0, 0, 0, 0, 2, 2, 0]</span></div>
+  <div class="paso"><p><strong>3.</strong> En media, cada una sigue valiendo 1: la red no nota el cambio de escala.</p><span class="grande">0,5 · 2 + 0,5 · 0 = 1</span></div>
+  <div class="paso"><p><strong>4.</strong> Prediciendo: no toca nada.</p><span class="grande">[1, 1, 1, 1, 1, 1, 1, 1, 1, 1]</span></div>
 </div>
 </section>
 
+<section>
+<h2 id="batchnorm">5 · BatchNorm y su media móvil</h2>
+<p><strong>BatchNormalization</strong> centra los números del lote en 0 (resta su media) y los escala. Al entrenar, además, va guardando una <strong>media móvil</strong>: un promedio que se actualiza poco a poco, con <em>momentum</em> 0,9 (90 % lo viejo, 10 % lo nuevo). Lotes que han visto 5 capítulos de media:</p>
+<div class="anim-pasos" data-titulo="La media móvil empieza en 0">
+  <div class="paso"><p><strong>1.</strong> Lote 1.</p><span class="grande">0,9 · 0 + 0,1 · 5 = 0,5</span></div>
+  <div class="paso"><p><strong>2.</strong> Lote 2.</p><span class="grande">0,9 · 0,5 + 0,1 · 5 = 0,95</span></div>
+  <div class="paso"><p><strong>3.</strong> Lote 3.</p><span class="grande">0,9 · 0,95 + 0,1 · 5 = 1,355</span></div>
+  <div class="paso"><p><strong>4.</strong> Si predices ya, normaliza con 1,355 en vez de 5: le falta entrenar.</p><span class="grande">1,355 ≠ 5</span></div>
+</div>
+<p>Al predecir usa esa media guardada; así una sola muestra se puede predecir sin depender del lote.</p>
+</section>
+
 <details class="predice">
-  <summary>Creas tu modelo por subclases y llamas a <code>summary()</code> antes de pasarle ningún dato. ¿Qué ves?<span class="hint"></span></summary>
+  <summary>Creas tu modelo por subclases y pides su <code>summary()</code> antes de pasarle ningún dato. ¿Qué ves?<span class="hint"></span></summary>
   <div>
-    <p>Formas «?» y <strong>«0 (unbuilt)»</strong> parámetros. Keras no sabe cuántas columnas tendrán los datos hasta ejecutar <code>call</code>. Llamarlo una vez con un lote (aunque sea de ceros) lo construye; <code>build((None, 3))</code> no basta si tu clase no define su propio <code>build</code>.</p>
+    <p>Formas «?» y <strong>«0 (unbuilt)»</strong>: sin construir. Llamarlo una vez con un lote lo construye; <code>build((None, 3))</code> no basta si tu clase no escribe su propio <code>build</code>.</p>
   </div>
 </details>
+
+<section>
+<h2 id="chuleta">Chuleta para repasar</h2>
+<dl class="chuleta">
+  <div><dt>Clase</dt><dd>Molde para fabricar objetos. <em>class MiRed(keras.Model).</em></dd></div>
+  <div><dt>Heredar</dt><dd>Copiar todo lo de otra clase y escribir solo lo que cambia.</dd></div>
+  <div><dt>Subclassing</dt><dd>Escribir el modelo como clase: capas en __init__, cálculo en call.</dd></div>
+  <div><dt>Built</dt><dd>¿Tiene ya sus pesos? False hasta la primera llamada con datos.</dd></div>
+  <div><dt>Training</dt><dd>True al entrenar (fit), False al predecir. Hay que pasárselo a las capas.</dd></div>
+  <div><dt>Dropout</dt><dd>Al entrenar apaga una parte p y multiplica el resto por 1/(1 − p). <em>×2 con p = 0,5.</em></dd></div>
+  <div><dt>BatchNormalization</dt><dd>Centra y escala los números del lote; al predecir usa la media móvil.</dd></div>
+  <div><dt>Media móvil</dt><dd>Promedio que se actualiza poco a poco: 90 % lo viejo, 10 % lo nuevo. <em>0,5 → 0,95 → 1,355.</em></dd></div>
+  <div><dt>No entrenable</dt><dd>Peso que no cambia con gradientes. <em>Las 12 medias y varianzas de BatchNorm.</em></dd></div>
+</dl>
+</section>
 
 <div class="resumen">
   <h2 class="sin-num sin-toc">En tres líneas</h2>
@@ -88,15 +134,15 @@
  "titulo": "¿Lo tienes?",
  "preguntas": [
   {
-   "q": "Una capa <code>Dropout(0.5)</code> recibe un lote de unos. Con <code>training=True</code>, ¿qué valores salen y por qué?",
+   "q": "Una capa <code>Dropout(0.5)</code> recibe un lote de unos. Al entrenar, ¿qué valores salen y por qué?",
    "opciones": [
-    "Unos 1.0 y otros 0.0: simplemente apaga la mitad",
+    "Unos 1,0 y otros 0,0: simplemente apaga la mitad",
     "Valores entre 0 y 1 al azar",
-    "Unos 2.0 y otros 0.0: las que sobreviven se multiplican por 1/(1−0,5) para conservar la media",
-    "Siempre 1.0: Dropout solo actúa en la capa de salida"
+    "Unos 2,0 y otros 0,0: las que sobreviven se multiplican por 1/(1−0,5) para conservar la media",
+    "Siempre 1,0: Dropout solo actúa en la capa de salida"
    ],
    "correcta": 2,
-   "porque": "Dropout apaga unidades al azar y <strong>reescala</strong> las que quedan por 1/(1−p) = 2, de modo que la media (0,5 · 2 + 0,5 · 0 = 1) sea la misma que la de la entrada. Con <code>training=False</code> sí saldrían todo 1.0. Por eso dos llamadas con <code>training=True</code> no dan lo mismo."
+   "porque": "Dropout apaga al azar y <strong>reescala</strong> las que quedan por 2, así la media sigue siendo 1 (0,5 · 2 + 0,5 · 0). Al predecir saldrían diez 1,0."
   },
   {
    "q": "En un modelo por subclases, ¿dónde se crean las capas y dónde se usan?",
@@ -107,10 +153,10 @@
     "Se crean en <code>call</code> y se usan en <code>__init__</code>"
    ],
    "correcta": 1,
-   "porque": "<code>__init__</code> crea las capas y las guarda como atributos (<code>self.oculta = layers.Dense(6)</code>); <code>call</code> pasa los datos por ellas en cada llamada. Crear capas dentro de <code>call</code> crearía pesos nuevos en cada ejecución."
+   "porque": "<code>__init__</code> crea las capas y las guarda (<code>self.oculta = layers.Dense(6)</code>); <code>call</code> pasa los datos por ellas. Crearlas en <code>call</code> haría pesos nuevos en cada llamada."
   },
   {
-   "q": "Una <code>BatchNormalization</code> recibe un lote con <code>training=False</code>. ¿Con qué media normaliza?",
+   "q": "Una <code>BatchNormalization</code> recibe un lote mientras se predice (<code>training=False</code>). ¿Con qué media normaliza?",
    "opciones": [
     "Con la media de ese lote",
     "Con la media móvil guardada durante el entrenamiento",
@@ -118,13 +164,12 @@
     "Con la media del primer lote que vio"
    ],
    "correcta": 1,
-   "porque": "Al predecir se usan las estadísticas móviles, que se fueron actualizando lote a lote durante el entrenamiento (media móvil = m · media móvil + (1 − m) · media del lote). Así una predicción no depende de qué otras muestras vengan en el lote."
+   "porque": "Al predecir usa la media móvil, que se fue actualizando lote a lote al entrenar. Así una predicción no depende de qué otras muestras vengan en el lote."
   }
  ]
 }
 </script>
 </section>
-
 <details class="profundizar">
   <summary><span>Profundizar: la explicación completa<small>La estructura y la analogía de Bandersnatch, la tabla de los 55 parámetros (43 entrenables), el aviso de build(), Dropout y BatchNormalization con todas sus cuentas y la puerta a train_step.</small></span></summary>
   <div class="prof-body">
@@ -145,7 +190,7 @@
 </div>
 
 <h3>Un modelo «sin construir»</h3>
-<p>Fíjate en la primera mitad del <a href="#frag-15">fragmento 15</a>. La clase <code>RedConRuido</code> tiene una capa densa de 6 neuronas, una <code>BatchNormalization</code>, un <code>Dropout</code> del 50 % y una capa de salida. Al crear el objeto, <code>modelo.built</code> es <code>False</code>: todavía no existen los pesos, porque Keras no sabe cuántas columnas tendrán los datos. Tras llamarlo con un lote de 4 filas × 3 columnas (4 usuarios con 3 datos cada uno) pasa a <code>True</code>, y ahí aparecen los parámetros: 55, de los cuales 43 se entrenan. (Si miras <code>summary()</code> de un modelo por subclases sin construir, verás «?» como forma de salida y «0 (unbuilt)» como número de parámetros; tras llamarlo con datos, las formas y las cifras reales.) Las cuentas:</p>
+<p>Fíjate en la primera mitad del <a href="laboratorio.html#frag-15">fragmento 15</a>. La clase <code>RedConRuido</code> tiene una capa densa de 6 neuronas, una <code>BatchNormalization</code>, un <code>Dropout</code> del 50 % y una capa de salida. Al crear el objeto, <code>modelo.built</code> es <code>False</code>: todavía no existen los pesos, porque Keras no sabe cuántas columnas tendrán los datos. Tras llamarlo con un lote de 4 filas × 3 columnas (4 usuarios con 3 datos cada uno) pasa a <code>True</code>, y ahí aparecen los parámetros: 55, de los cuales 43 se entrenan. (Si miras <code>summary()</code> de un modelo por subclases sin construir, verás «?» como forma de salida y «0 (unbuilt)» como número de parámetros; tras llamarlo con datos, las formas y las cifras reales.) Las cuentas:</p>
 <table>
   <thead><tr><th>Parte</th><th>Cuenta</th><th>Entrenables</th><th>No entrenables</th></tr></thead>
   <tbody>
@@ -172,7 +217,7 @@
   <p>Imagina diez críticos de cine que puntúan una película con un 1 cada uno. Dropout manda a casa, al azar, a la mitad (su voto pasa a valer 0) y los que se quedan votan con más fuerza para que el total no cambie.</p>
   <ol class="pasos">
     <li><strong>Factor de reescalado:</strong> \( 1/(1-0{,}5) = 2 \).</li>
-    <li><strong>Con <code>training=True</code>:</strong> cada unidad se apaga con probabilidad 0,5; las que sobreviven valen 1 · 2 = 2. El <a href="#frag-15">fragmento 15</a> da <code>[2.0, 0.0, 2.0, 0.0, 0.0, 0.0, 0.0, 2.0, 2.0, 0.0]</code>: cuatro unidades en 2 y seis en 0.</li>
+    <li><strong>Con <code>training=True</code>:</strong> cada unidad se apaga con probabilidad 0,5; las que sobreviven valen 1 · 2 = 2. El <a href="laboratorio.html#frag-15">fragmento 15</a> da <code>[2.0, 0.0, 2.0, 0.0, 0.0, 0.0, 0.0, 2.0, 2.0, 0.0]</code>: cuatro unidades en 2 y seis en 0.</li>
     <li><strong>Por qué reescalar:</strong> en media, cada unidad vale 0,5 · 2 + 0,5 · 0 = <strong>1</strong>, igual que la entrada. Así la red no ve «señales más pequeñas» al entrenar que al predecir.</li>
     <li><strong>Con <code>training=False</code>:</strong> la salida son diez 1.0, idéntica a la entrada.</li>
   </ol>
@@ -202,7 +247,7 @@
   <p><strong>Fíjate en.</strong> Dropout con <code>True</code> reescala (×2 con p = 0,5): la media sobre muchas máscaras queda ≈ igual que la suma de la entrada. Con <code>False</code> no toca nada. BatchNorm con <code>True</code> deja la salida con media ≈ 0 usando el <em>lote</em> y actualiza las medias móviles; con <code>False</code> usa las móviles, que al principio están lejos de la realidad (media 0, varianza 1): la salida sale mal normalizada hasta que se hayan visto suficientes lotes.</p>
 </div>
 
-<p>El <a href="#frag-15">fragmento 15</a> lo confirma con el modelo real: dos llamadas con <code>training=False</code> dan <strong>lo mismo</strong> (<code>True</code>), dos con <code>training=True</code> <strong>no</strong> (<code>False</code>: el Dropout apaga unidades distintas cada vez) y una con cada valor tampoco coinciden. De ahí una regla práctica: <strong>una predicción que cambia cada vez que la repites suele indicar un <code>training=True</code> que no debería estar</strong>.</p>
+<p>El <a href="laboratorio.html#frag-15">fragmento 15</a> lo confirma con el modelo real: dos llamadas con <code>training=False</code> dan <strong>lo mismo</strong> (<code>True</code>), dos con <code>training=True</code> <strong>no</strong> (<code>False</code>: el Dropout apaga unidades distintas cada vez) y una con cada valor tampoco coinciden. De ahí una regla práctica: <strong>una predicción que cambia cada vez que la repites suele indicar un <code>training=True</code> que no debería estar</strong>.</p>
 
 <div class="callout regla">
   <span class="lbl">Regla fácil</span>
@@ -214,172 +259,11 @@
   </div>
 </details>
 
-<section>
+<section class="ir-lab">
 <h2 class="sin-num">Código</h2>
-<!-- ---------- Fragmento 15 ---------- -->
-<article class="snippet" data-lang="python" id="frag-15">
-  <header>
-    <h3>15 · Modelo por subclases con <code>training</code>: Dropout, BatchNormalization y <code>build</code></h3>
-    <p class="para-que"><strong>Para qué sirve</strong> Escribir un modelo por subclases con Dropout y BatchNormalization, ver que está «sin construir» hasta la primera llamada, y comprobar con números el efecto de <code>training=True</code> y <code>training=False</code>.</p>
-  </header>
-  <pre class="code"><code>import warnings
-import numpy as np
-import keras
-from keras import layers
-
-class RedConRuido(keras.Model):
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-        self.oculta = layers.Dense(6, activation="relu", name="oculta")
-        self.bn = layers.BatchNormalization(name="bn")
-        self.drop = layers.Dropout(0.5, name="drop")
-        self.salida = layers.Dense(1, name="salida")
-
-    def call(self, x, training=False):
-        h = self.oculta(x)
-        h = self.bn(h, training=training)
-        h = self.drop(h, training=training)
-        return self.salida(h)
-
-keras.utils.set_random_seed(11)
-modelo = RedConRuido(name="red")
-x = np.random.default_rng(0).normal(size=(4, 3)).astype("float32")
-print("construido:", modelo.built)
-modelo(x)
-entrenables = sum(int(np.prod(w.shape)) for w in modelo.trainable_weights)
-print("construido:", modelo.built, "| parámetros:", modelo.count_params(), "| entrenables:", entrenables)
-
-a1 = modelo(x, training=False).numpy()
-a2 = modelo(x, training=False).numpy()
-t1 = modelo(x, training=True).numpy()
-t2 = modelo(x, training=True).numpy()
-print("inferencia repetida, igual:", np.allclose(a1, a2))
-print("entrenamiento repetido, igual:", np.allclose(t1, t2))
-print("entrenamiento frente a inferencia, igual:", np.allclose(a1, t1))
-
-drop = layers.Dropout(0.5)
-unos = np.ones((1, 10), dtype="float32")
-print(drop(unos, training=False).numpy().tolist())
-print(drop(unos, training=True).numpy().tolist())
-
-warnings.simplefilter("ignore")
-otro = RedConRuido(name="otro")
-otro.build((None, 3))
-print("tras build() sin definirlo, parámetros:", otro.count_params())</code></pre>
-  <details class="linea-a-linea">
-    <summary>Línea por línea</summary>
-    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
-    <table class="lineas">
-      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
-      <tbody>
-        <tr data-lines="1-2"><td><code>import warnings …</code></td><td>Importan <code>warnings</code> (para silenciar un aviso) y NumPy.</td></tr>
-        <tr data-lines="3-4"><td><code>import keras …</code></td><td>Importan Keras y las capas.</td></tr>
-        <tr data-lines="6"><td><code>class RedConRuido(keras.Model):</code></td><td>Define la clase <code>RedConRuido</code>, que hereda de <code>keras.Model</code>.</td></tr>
-        <tr data-lines="7-8"><td><code>def __init__(self, **kwargs): …</code></td><td><code>__init__</code> con la llamada obligatoria a <code>super().__init__(**kwargs)</code>.</td></tr>
-        <tr data-lines="9-12"><td><code>self.oculta = layers.Dense(6, activation="relu", nam …</code></td><td>Crea las cuatro capas y las guarda como atributos: densa de 6 neuronas ReLU, <code>BatchNormalization</code>, <code>Dropout(0.5)</code> (apaga el 50 %) y la salida de 1 neurona.</td></tr>
-        <tr data-lines="14"><td><code>def call(self, x, training=False):</code></td><td><code>call</code> recibe los datos <code>x</code> y el argumento <code>training</code> (por defecto <code>False</code>).</td></tr>
-        <tr data-lines="15"><td><code>h = self.oculta(x)</code></td><td>Pasa los datos por la capa densa.</td></tr>
-        <tr data-lines="16"><td><code>h = self.bn(h, training=training)</code></td><td>Por BatchNorm, <strong>pasándole <code>training</code></strong> para que sepa si usar el lote o las medias móviles.</td></tr>
-        <tr data-lines="17"><td><code>h = self.drop(h, training=training)</code></td><td>Por Dropout, también con <code>training</code>.</td></tr>
-        <tr data-lines="18"><td><code>return self.salida(h)</code></td><td>Devuelve la salida de la capa final.</td></tr>
-        <tr data-lines="20"><td><code>keras.utils.set_random_seed(11)</code></td><td>Semilla para que Dropout apague siempre las mismas unidades.</td></tr>
-        <tr data-lines="21"><td><code>modelo = RedConRuido(name="red")</code></td><td>Crea el modelo.</td></tr>
-        <tr data-lines="22"><td><code>x = np.random.default_rng(0).normal(size=(4, 3)).ast …</code></td><td>4 filas de 3 valores aleatorios.</td></tr>
-        <tr data-lines="23"><td><code>print("construido:", modelo.built)</code></td><td><code>built</code>: <code>False</code>, aún no hay pesos.</td></tr>
-        <tr data-lines="24"><td><code>modelo(x)</code></td><td>Primera llamada con datos: Keras construye las capas.</td></tr>
-        <tr data-lines="25"><td><code>entrenables = sum(int(np.prod(w.shape)) for w in mod …</code></td><td>Suma el número de elementos de los pesos <strong>entrenables</strong> (<code>np.prod</code> multiplica la forma de cada uno).</td></tr>
-        <tr data-lines="26"><td><code>print("construido:", modelo.built, "| parámetros:", …</code></td><td>Imprime <code>built</code>, el total de parámetros y los entrenables.</td></tr>
-        <tr data-lines="28-29"><td><code>a1 = modelo(x, training=False).numpy() …</code></td><td>Dos llamadas con <code>training=False</code> (modo predicción).</td></tr>
-        <tr data-lines="30-31"><td><code>t1 = modelo(x, training=True).numpy() …</code></td><td>Dos llamadas con <code>training=True</code> (modo entrenamiento).</td></tr>
-        <tr data-lines="32"><td><code>print("inferencia repetida, igual:", np.allclose(a1, …</code></td><td>¿Son iguales las dos de predicción? (<code>np.allclose</code>).</td></tr>
-        <tr data-lines="33"><td><code>print("entrenamiento repetido, igual:", np.allclose( …</code></td><td>¿Son iguales las dos de entrenamiento?</td></tr>
-        <tr data-lines="34"><td><code>print("entrenamiento frente a inferencia, igual:", n …</code></td><td>¿Es igual una de predicción y una de entrenamiento?</td></tr>
-        <tr data-lines="36"><td><code>drop = layers.Dropout(0.5)</code></td><td>Una capa <code>Dropout(0.5)</code> suelta.</td></tr>
-        <tr data-lines="37"><td><code>unos = np.ones((1, 10), dtype="float32")</code></td><td>Un lote de una fila de diez unos.</td></tr>
-        <tr data-lines="38"><td><code>print(drop(unos, training=False).numpy().tolist())</code></td><td>La capa con <code>training=False</code>: devuelve lo mismo.</td></tr>
-        <tr data-lines="39"><td><code>print(drop(unos, training=True).numpy().tolist())</code></td><td>La capa con <code>training=True</code>: apaga unos y duplica los que quedan.</td></tr>
-        <tr data-lines="41"><td><code>warnings.simplefilter("ignore")</code></td><td>Silencia los avisos de Python para que no ensucien la salida.</td></tr>
-        <tr data-lines="42"><td><code>otro = RedConRuido(name="otro")</code></td><td>Otro modelo nuevo, sin llamar.</td></tr>
-        <tr data-lines="43"><td><code>otro.build((None, 3))</code></td><td>Llama a <code>build((None, 3))</code>, que en una clase que no define su propio <code>build</code> <strong>no crea</strong> los pesos de las capas internas.</td></tr>
-        <tr data-lines="44"><td><code>print("tras build() sin definirlo, parámetros:", otr …</code></td><td>Imprime los parámetros: <code>0</code>.</td></tr>
-      </tbody>
-    </table>
-  </details>
-  <div class="salida">
-    <strong>Salida esperada</strong>
-    <pre>construido: False
-construido: True | parámetros: 55 | entrenables: 43
-inferencia repetida, igual: True
-entrenamiento repetido, igual: False
-entrenamiento frente a inferencia, igual: False
-[[1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0]]
-[[2.0, 0.0, 2.0, 0.0, 0.0, 0.0, 0.0, 2.0, 2.0, 0.0]]
-tras build() sin definirlo, parámetros: 0</pre>
-    <p>El modelo pasa de <code>built = False</code> a <code>True</code> tras la primera llamada, con <strong>55 parámetros y 43 entrenables</strong> (los 12 restantes son las medias y varianzas móviles de BatchNorm). Las dos llamadas con <code>training=False</code> dan lo mismo (<code>True</code>); las dos con <code>training=True</code> no (<code>False</code>, el Dropout apaga unidades distintas); y una de cada tampoco coinciden. El Dropout suelto devuelve diez 1.0 con <code>training=False</code> y, con <code>training=True</code>, cuatro 2.0 y seis 0.0 (cada unidad que sobrevive se multiplica por 1/(1−0,5) = 2). Por último <code>build()</code> sin definirlo deja <strong>0</strong> parámetros.</p>
-  </div>
-</article>
-
-<!-- ---------- Fragmento 10 ---------- -->
-<article class="snippet" data-lang="python" id="frag-10">
-  <header>
-    <h3>10 · El <code>print</code> dentro de <code>call</code> durante <code>fit</code></h3>
-    <p class="para-que"><strong>Para qué sirve</strong> Comprobar que Keras traza el modelo una sola vez (o unas pocas) en <code>fit</code>, de modo que un <code>print</code> de Python dentro de <code>call</code> no sale una vez por lote.</p>
-  </header>
-  <pre class="code"><code>import numpy as np
-import keras
-from keras import layers
-
-class Espia(keras.Model):
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-        self.densa = layers.Dense(1)
-
-    def call(self, x):
-        print("  [print dentro de call] forma de x:", x.shape)
-        return self.densa(x)
-
-rng = np.random.default_rng(0)
-x = rng.normal(size=(64, 3)).astype("float32")
-y = rng.normal(size=(64, 1)).astype("float32")
-
-modelo = Espia()
-modelo.compile(optimizer="sgd", loss="mse")
-print("fit: 3 épocas x 4 lotes = 12 pasos")
-modelo.fit(x, y, epochs=3, batch_size=16, verbose=0)
-print("dos llamadas directas con datos:")
-modelo(x[:2])
-modelo(x[:2])</code></pre>
-  <details class="linea-a-linea">
-    <summary>Línea por línea</summary>
-    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
-    <table class="lineas">
-      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
-      <tbody>
-        <tr data-lines="1-3"><td><code>import numpy as np …</code></td><td>Importan NumPy, Keras y las capas.</td></tr>
-        <tr data-lines="5-12"><td><code>class Espia(keras.Model): …</code></td><td>Un modelo mínimo por subclases (<code>Espia</code>) con una capa <code>Dense(1)</code>. Su <code>call</code> imprime la forma de la entrada antes de calcular. <code>__init__</code> crea la capa y <code>super().__init__(**kwargs)</code> prepara el modelo.</td></tr>
-        <tr data-lines="14-16"><td><code>rng = np.random.default_rng(0) …</code></td><td>Datos aleatorios: 64 filas con 3 columnas (<code>x</code>) y 64 objetivos (<code>y</code>), con semilla 0.</td></tr>
-        <tr data-lines="18"><td><code>modelo = Espia()</code></td><td>Crea el modelo.</td></tr>
-        <tr data-lines="19"><td><code>modelo.compile(optimizer="sgd", loss="mse")</code></td><td><code>compile</code> con el optimizador <code>sgd</code> y la pérdida <code>mse</code>.</td></tr>
-        <tr data-lines="20"><td><code>print("fit: 3 épocas x 4 lotes = 12 pasos")</code></td><td>Un mensaje que recuerda las cuentas: 3 épocas × 4 lotes (64 filas / 16) = 12 pasos.</td></tr>
-        <tr data-lines="21"><td><code>modelo.fit(x, y, epochs=3, batch_size=16, verbose=0)</code></td><td>Entrena 3 épocas con lotes de 16, sin barra de progreso (<code>verbose=0</code>).</td></tr>
-        <tr data-lines="22"><td><code>print("dos llamadas directas con datos:")</code></td><td>Otro mensaje, para separar las dos partes.</td></tr>
-        <tr data-lines="23-24"><td><code>modelo(x[:2]) …</code></td><td>Dos llamadas directas al modelo con 2 filas: se ejecutan en modo inmediato.</td></tr>
-      </tbody>
-    </table>
-  </details>
-  <div class="salida">
-    <strong>Salida esperada</strong>
-    <pre>fit: 3 épocas x 4 lotes = 12 pasos
-  [print dentro de call] forma de x: (16, 3)
-  [print dentro de call] forma de x: (16, 3)
-  [print dentro de call] forma de x: (16, 3)
-dos llamadas directas con datos:
-  [print dentro de call] forma de x: (2, 3)
-  [print dentro de call] forma de x: (2, 3)</pre>
-    <p>Durante el <code>fit</code>, con 12 pasos, el <code>print</code> sale <strong>solo 3 veces</strong> (siempre con el lote de 16 filas): el código de <code>call</code> se ejecuta al trazar, no en cada lote. En cambio las dos llamadas directas imprimen cada una su mensaje (forma <code>(2, 3)</code>). El número exacto de trazados durante <code>fit</code> depende de la versión de Keras; lo que importa es que no es uno por lote.</p>
-  </div>
-</article>
-
+<a class="lab-card" href="laboratorio.html#paso-10"><span class="lc-ico" aria-hidden="true">🧪</span>
+  <span><strong>Ver el código de esta lección en el Laboratorio</strong>
+  <span>Paso 10 · Un modelo por subclases con Dropout, BatchNorm y training. El print dentro de call durante fit, en «Más código» (fragmento 10).</span></span></a>
 </section>
 
 </div>

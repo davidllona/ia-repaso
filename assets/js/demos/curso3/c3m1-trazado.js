@@ -57,8 +57,8 @@ Lab.register("curso3/c3m1-trazado", function (root, api) {
       D.rect(ctx, x, y, bw, 50, hot ? C.olivaWash : C.cobaltoWash, hot ? C.oliva : C.ink, hot ? 3 : 1.4);
       D.text(ctx, "grafo " + (i + 1), x + 6, y + 15, { size: 11, weight: 700, color: C.ink, mono: true });
       var words = k.split(" "), line1 = words[0] + " " + (words[1] || ""), line2 = words.slice(2).join(" ");
-      D.text(ctx, line1.length * 6 > bw - 8 ? words[0] : line1, x + 6, y + 30, { size: bw < 110 ? 9.5 : 10.5, mono: true, color: C.ink2 });
-      D.text(ctx, line2 || (line1.length * 6 > bw - 8 ? words.slice(1).join(" ") : ""), x + 6, y + 43, { size: bw < 110 ? 9.5 : 10.5, mono: true, color: C.ink2 });
+      D.text(ctx, line1.length * 6.7 > bw - 8 ? words[0] : line1, x + 6, y + 30, { size: 11, mono: true, color: C.ink2 });
+      D.text(ctx, line2 || (line1.length * 6.7 > bw - 8 ? words.slice(1).join(" ") : ""), x + 6, y + 43, { size: 11, mono: true, color: C.ink2 });
     });
   }
   function update() {
