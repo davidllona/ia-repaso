@@ -31,7 +31,9 @@ Lab.register("curso2/c2m2-onehot-sparse", function (root, api) {
     for (i = 0; i < N; i++) {
       var p = M.softmax(logits[i]), l = -Math.log(p[ys[i]]); tot += l;
       var yv = st.fmt === "int" ? String(ys[i]) : "[" + p.map(function (_, k) { return k === ys[i] ? 1 : 0; }).join(", ") + "]";
-      rows.push([i + 1, "[" + p.map(function (v) { return v.toFixed(2); }).join(", ") + "]", "<b>" + yv + "</b>", l.toFixed(3)]);
+      var nar = root.clientWidth < 520;
+      if (nar && st.fmt !== "int") yv = yv.replace(/, /g, ",");
+      rows.push([i + 1, "[" + p.map(function (v) { return nar ? v.toFixed(2).replace(/^0/, "") : v.toFixed(2); }).join(nar ? "," : ", ") + "]", "<b>" + yv + "</b>", l.toFixed(nar ? 2 : 3)]);
     }
     tbl.set(rows);
     tbl.el.firstChild.style.fontSize = root.clientWidth < 520 ? ".72rem" : "";

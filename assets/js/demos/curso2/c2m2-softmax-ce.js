@@ -23,7 +23,7 @@ Lab.register("curso2/c2m2-softmax-ce", function (root, api) {
 
   function draw(ctx, w, h, C) {
     var D = api.d, p = probs(), k = st.k, left = 70, right = w - 40, top = 12, rowH = (h - top - 8) / k, i;
-    D.text(ctx, "probabilidad (softmax)", left, 9, { size: 10.5, color: C.muted });
+    D.text(ctx, "probabilidad (softmax)", left, 9, { size: 11, color: C.muted });
     for (i = 0; i < k; i++) {
       var y0 = top + i * rowH + rowH * 0.16, bh = rowH * 0.68, isT = i === st.y;
       D.text(ctx, NAMES[i], 10, y0 + bh / 2 + 4, { size: 11.5, weight: isT ? 700 : 500, color: isT ? C.terracotaInk : C.ink });
@@ -35,7 +35,7 @@ Lab.register("curso2/c2m2-softmax-ce", function (root, api) {
       D.circle(ctx, w - 18, y0 + bh / 2, 9, isT ? C.oliva : null, C.ink, 1.5);
       D.text(ctx, isT ? "1" : "0", w - 18, y0 + bh / 2 + 4, { align: "center", size: 11, weight: 700, color: isT ? C.paper : C.muted });
     }
-    D.text(ctx, "y", w - 18, 9, { align: "center", size: 10.5, color: C.muted });
+    D.text(ctx, "y", w - 18, 9, { align: "center", size: 11, color: C.muted });
   }
   function draw2(ctx, w, h, C) {
     var D = api.d, p = probs()[st.y], pts = [], i;

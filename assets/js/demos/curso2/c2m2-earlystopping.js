@@ -86,7 +86,7 @@ Lab.register("curso2/c2m2-earlystopping", function (root, api) {
     D.line(ctx, plot.x(Math.min(shown, xmax)), b.y, plot.x(Math.min(shown, xmax)), b.y + b.h, C.ink, 1, [2, 3]);
     D.text(ctx, "loss (train)", b.x + b.w - 6, b.y + 14, { align: "right", size: 11, weight: 600, color: C.cobaltoInk });
     D.text(ctx, "val_loss", b.x + b.w - 6, b.y + 28, { align: "right", size: 11, weight: 600, color: C.terracotaInk });
-    if (res.stop && shown >= res.stop) D.text(ctx, "- - lo que habría pasado sin parar", b.x + b.w - 6, b.y + 42, { align: "right", size: 10.5, color: C.muted });
+    if (res.stop && shown >= res.stop) D.text(ctx, "- - lo que habría pasado sin parar", b.x + b.w - 6, b.y + 42, { align: "right", size: 11, color: C.muted });
     var bx = Math.min(b.x + b.w - 52, plot.x(res.bestEp) + 6);
     if (shown >= res.bestEp) { C2.halo(ctx, "mejor: " + res.bestEp, bx, b.y + b.h - 8, { size: 11, bg: C.surface }); D.text(ctx, "mejor: " + res.bestEp, bx, b.y + b.h - 8, { size: 11, weight: 600, color: C.olivaInk }); }
     if (res.stop && shown >= res.stop) { var sx = Math.min(b.x + b.w - 46, plot.x(res.stop) + 6); C2.halo(ctx, "stop: " + res.stop, sx, b.y + b.h - 24, { size: 11, bg: C.surface }); D.text(ctx, "stop: " + res.stop, sx, b.y + b.h - 24, { size: 11, weight: 600, color: C.terracotaInk }); }

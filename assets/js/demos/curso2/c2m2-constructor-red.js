@@ -59,9 +59,9 @@ Lab.register("curso2/c2m2-constructor-red", function (root, api) {
       else D.text(ctx, String(col.n), xs[c], bot + 12, { align: "center", size: 11, color: C.ink2, weight: 600 });
       var title = col.kind === "in" ? "Input" : "Dense", sub = col.kind === "in" ? "(None, " + col.n + ")" : (col.act || "sin activ.");
       D.text(ctx, title, xs[c], 16, { align: "center", size: 12, weight: 600, color: C.ink });
-      D.text(ctx, sub, xs[c], 29, { align: "center", size: 10.5, color: C.muted, mono: true });
+      D.text(ctx, sub, xs[c], 29, { align: "center", size: 11, color: C.muted, mono: true });
     }
-    D.text(ctx, "neuronas por capa (se dibujan como mucho " + MAXD + ")", w / 2, h - 8, { align: "center", size: 10.5, color: C.muted });
+    D.text(ctx, "neuronas por capa (se dibujan como mucho " + MAXD + ")", w / 2, h - 8, { align: "center", size: 11, color: C.muted });
   }
   function update() {
     var info = counts(), L = info.L, rows = [], i;
@@ -69,12 +69,15 @@ Lab.register("curso2/c2m2-constructor-red", function (root, api) {
       sl[i].input.disabled = i >= st.nh; sl[i].input.parentNode.style.opacity = i >= st.nh ? 0.4 : 1;
     }
     slK.input.disabled = st.task !== "multi"; slK.input.parentNode.style.opacity = st.task !== "multi" ? 0.4 : 1;
+    var narrow = root.clientWidth < 440;
     L.forEach(function (l, k) {
-      var name = (l.out ? "salida" : "oculta" + (k + 1)) + " (Dense)";
-      var formula = st.bias ? l.nin + " × " + l.n + " + " + l.n + " = " + l.p : l.nin + " × " + l.n + " = " + l.p;
+      var name = (l.out ? "salida" : "oculta" + (k + 1)) + (narrow ? "" : " (Dense)");
+      var formula = narrow ? (st.bias ? l.nin + "×" + l.n + "+" + l.n : l.nin + "×" + l.n) :
+        (st.bias ? l.nin + " × " + l.n + " + " + l.n + " = " + l.p : l.nin + " × " + l.n + " = " + l.p);
       rows.push([name, "(None, " + l.n + ")", "<b>" + l.p + "</b><br><span style='opacity:.75;font-size:.85em'>" + formula + "</span>"]);
     });
     tbl.set(rows);
+    tbl.el.firstChild.style.fontSize = narrow ? ".72rem" : "";
     view.redraw();
     var code = "Sequential([Input(shape=(" + st.nin + ",))" + L.map(function (l) { return ", Dense(" + l.n + (l.act ? ", activation='" + l.act + "'" : "") + (st.bias ? "" : ", use_bias=False") + ")"; }).join("") + "])";
     var loss = st.task === "reg" ? "mse" : st.task === "bin" ? "binary_crossentropy" : "categorical_crossentropy (o sparse_...)";

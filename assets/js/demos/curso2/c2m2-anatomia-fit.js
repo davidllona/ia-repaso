@@ -38,7 +38,7 @@ Lab.register("curso2/c2m2-anatomia-fit", function (root, api) {
     var ep = Math.min(st.epochs - 1, Math.floor(done / g.steps)), stepIn = done >= g.total ? g.steps : done - ep * g.steps;
     var narrow = w < 520;
     D.text(ctx, (narrow ? "" : "dataset: ") + st.N + " valoraciones = " + g.ntr + " entreno" + (g.nva ? " + " + g.nva + " validación" : ""), x0, 18, { size: 12, weight: 600, color: C.ink });
-    D.text(ctx, narrow ? "cada bloque = un lote de " + st.batch + " = 1 actualización" : "cada bloque es un lote (batch) de " + st.batch + " valoraciones: pesos actualizados UNA vez", x0, 36, { size: 10.5, color: C.muted });
+    D.text(ctx, narrow ? "cada bloque = un lote de " + st.batch + " = 1 actualización" : "cada bloque es un lote (batch) de " + st.batch + " valoraciones: pesos actualizados UNA vez", x0, 36, { size: 11, color: C.muted });
     var trW = bw * g.ntr / st.N;
     D.rect(ctx, x0, barY, trW, barH, C.surface, null);
     for (i = 0; i < g.steps; i++) {
@@ -52,7 +52,7 @@ Lab.register("curso2/c2m2-anatomia-fit", function (root, api) {
     D.rect(ctx, x0, barY, trW, barH, null, C.ink, 1.5);
     if (g.nva) {
       D.rect(ctx, x0 + trW, barY, bw - trW, barH, C.line, C.ink, 1.5);
-      D.text(ctx, "validación", x0 + trW + (bw - trW) / 2, barY + barH / 2 + 4, { align: "center", size: 10.5, color: C.ink2, weight: 600 });
+      D.text(ctx, "validación", x0 + trW + (bw - trW) / 2, barY + barH / 2 + 4, { align: "center", size: 11, color: C.ink2, weight: 600 });
     }
     // marcador del lote actual
     if (done < g.total) {

@@ -165,7 +165,8 @@ window.CURRICULUM = {
             {"n": 5, "slug": "leccion-5", "title": "Para predecir un número, la última neurona va sin activación", "blurb": "Regresión: Dense(1) sin activación, MSE, ReLU y entradas normalizadas.", "min": 3},
             {"n": 6, "slug": "leccion-6", "title": "Clasificar es repartir probabilidad: sigmoide para sí o no, softmax para varias clases", "blurb": "Sigmoide + binary crossentropy; softmax + One-Hot o enteros + crossentropy.", "min": 3},
             {"n": 7, "slug": "leccion-7", "title": "Para una red densa, una imagen es una lista de 64 números entre 0 y 1", "blurb": "Dígitos: aplanar, normalizar, 64 → 64 → 10 y argmax.", "min": 3},
-            {"n": 8, "slug": "leccion-8", "title": "El tamaño justo: capas para lo difícil y parar antes de memorizar", "blurb": "Profundidad a igual tamaño, EarlyStopping, guardar el modelo y errores típicos.", "min": 3}
+            {"n": 8, "slug": "leccion-8", "title": "El tamaño justo: capas para lo difícil y parar antes de memorizar", "blurb": "Profundidad a igual tamaño, EarlyStopping, guardar el modelo y errores típicos.", "min": 3},
+            {"n": 9, "slug": "laboratorio", "title": "Laboratorio: tus primeras redes con Keras", "blurb": "Todo el código del módulo en 12 pasos explicados línea a línea: de una red que predice un número a reconocer dígitos, parar a tiempo y guardar el modelo.", "min": 55}
           ]
         },
         {

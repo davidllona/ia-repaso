@@ -10,6 +10,7 @@
 <script src="../../assets/js/curriculum.js"></script>
 <script src="../../assets/js/lab.js"></script>
 <script src="../../assets/js/demos/curso2/c2m2-mlp.js"></script>
+<script src="../../assets/js/demos/curso2/c2m2-mse-mae.js"></script>
 <script src="../../assets/js/app.js" defer></script>
 </head>
 <body data-root="../../" data-course="2" data-module="2" data-lesson="4">
@@ -21,70 +22,124 @@
     <div>
       <p class="eyebrow">Curso 2 · Módulo 2 · Lección 4 de 8</p>
       <h1>La pérdida enseña y la métrica informa: compile, fit y las curvas</h1>
-      <p class="lead"><code>compile</code> decide qué es equivocarse y cómo corregirse; <code>fit</code> entrena y deja un diario por épocas que te dice si la red generaliza.</p>
-      <p class="meta-line"><span class="read-time" data-render="read-time"></span><a href="../modulo-2.html">Índice del módulo</a></p>
+      <p class="lead"><code>compile</code> decide qué es equivocarse y cómo corregirse; <code>fit</code> entrena y deja un diario por épocas que te dice si la red sirve con datos nuevos.</p>
+      <p class="meta-line"><span class="read-time" data-render="read-time"></span><a href="../modulo-2.html">Índice del módulo</a> · <a href="#chuleta">Ir a la chuleta</a></p>
     </div>
     <div class="hero-tile" aria-hidden="true"></div>
   </div>
 </header>
 
 <details class="predice">
-  <summary>Si lo que te importa es el porcentaje de aciertos, ¿por qué no entrenar la red maximizando directamente el accuracy?<span class="hint"></span></summary>
+  <summary>Si lo que te importa es el porcentaje de aciertos, ¿por qué no entrenar la red para subir directamente ese porcentaje?<span class="hint"></span></summary>
   <div>
-    <p>Porque el accuracy cambia a saltos (cada predicción acierta o falla) y no tiene una derivada útil para el backpropagation. Se entrena con una <strong>pérdida</strong> suave y derivable y se vigila con la <strong>métrica</strong> que te interesa.</p>
+    <p>Porque el porcentaje cambia a saltos: cada predicción acierta o falla, sin término medio. Con saltos no se puede saber hacia dónde mover cada peso. Se entrena con una <strong>pérdida</strong> que cambia suave y se vigila con la <strong>métrica</strong> que te interesa.</p>
   </div>
 </details>
 
 <section>
-<h2 id="idea">Tres preguntas antes de entrenar</h2>
-<p><code>model.compile(optimizer=..., loss=..., metrics=[...])</code> no toca ningún peso: solo responde tres preguntas.</p>
+<h2 id="idea">1 · compile responde tres preguntas</h2>
+<p><code>model.compile(...)</code> no toca ningún peso. Solo responde tres preguntas:</p>
+<table>
+  <thead><tr><th>Pregunta</th><th>Argumento</th><th>Lo típico</th></tr></thead>
+  <tbody>
+    <tr><td>¿Cómo se corrigen los pesos?</td><td><code>optimizer</code></td><td><code>"adam"</code></td></tr>
+    <tr><td>¿Qué es equivocarse?</td><td><code>loss</code></td><td><code>"mse"</code></td></tr>
+    <tr><td>¿Qué quieres ver?</td><td><code>metrics</code></td><td><code>["mae"]</code></td></tr>
+  </tbody>
+</table>
 <ul>
-  <li><strong>¿Cómo se corrigen los pesos?</strong> El <em>optimizador</em>. <code>"adam"</code> es la primera opción (learning rate 0,001 por defecto).</li>
-  <li><strong>¿Qué es equivocarse?</strong> La <em>pérdida</em> (<code>loss</code>): el número que la red intenta bajar. Debe ser derivable y va en pareja con la capa final: <code>"mse"</code> para números, crossentropy para clases.</li>
-  <li><strong>¿Qué quieres ver?</strong> Las <em>métricas</em>: MAE, accuracy… Se muestran, pero <strong>no influyen</strong> en cómo aprende.</li>
+  <li>El <strong>optimizador</strong> es la receta para mover los pesos. <strong>Adam</strong> es la primera opción. Su <strong>learning rate</strong> es el tamaño del paso: 0,001 por defecto.</li>
+  <li>La <strong>pérdida</strong> (<em>loss</em>) es el número que la red intenta bajar. Debe cambiar suave, sin saltos.</li>
+  <li>Las <strong>métricas</strong> se enseñan, pero no influyen en cómo aprende.</li>
 </ul>
 <div class="callout analogia">
   <span class="lbl">Analogía</span>
-  <p>La pérdida es la regla con la que el recomendador mide su fallo («de media, 1,5 estrellas»); el optimizador, cómo se corrige; las métricas, lo que enseñas en la reunión («acierta el 90 %»).</p>
+  <p>La pérdida es la regla con la que el recomendador mide su fallo («de media, 1,5 estrellas»). El optimizador, cómo se corrige. Las métricas, lo que enseñas en la reunión («acierta el 90 %»).</p>
 </div>
-<p>Después, <code>fit</code> entrena y devuelve un <code>History</code>: <code>history.history</code> guarda una lista por época de <code>loss</code>, <code>val_loss</code> y cada métrica. Dibujadas son las <strong>curvas de aprendizaje</strong>: si bajan juntas, generaliza; si <code>loss</code> baja y <code>val_loss</code> sube, memoriza. Al final, <code>evaluate</code> mide con el test sin entrenar y <code>predict</code> devuelve las salidas sin cambiar nada.</p>
+</section>
+
+<section>
+<h2 id="numeros">2 · Dos formas de medir el fallo: MSE y MAE</h2>
+<p><strong>MSE</strong> es la media de los errores al cuadrado. <strong>MAE</strong> es la media de los errores sin signo. Notas sobre 10 que un usuario puso a tres películas, y lo que Netflix predijo:</p>
+<table>
+  <thead><tr><th>Película</th><th>Real</th><th>Predicha</th><th>Error</th></tr></thead>
+  <tbody>
+    <tr><td>Toy Story</td><td>3</td><td>2,5</td><td>−0,5</td></tr>
+    <tr><td>Matrix</td><td>5</td><td>5,5</td><td>0,5</td></tr>
+    <tr><td>Shrek</td><td>2</td><td>4</td><td>2</td></tr>
+  </tbody>
+</table>
+<div class="anim-pasos" data-titulo="MSE y MAE de las tres películas">
+  <div class="paso"><p><strong>1.</strong> Cada error al cuadrado. El signo desaparece.</p><span class="grande">0,25 · 0,25 · 4</span></div>
+  <div class="paso"><p><strong>2.</strong> MSE: la media de los cuadrados.</p><span class="grande">4,5 / 3 = 1,5</span></div>
+  <div class="paso"><p><strong>3.</strong> Cada error sin signo.</p><span class="grande">0,5 · 0,5 · 2</span></div>
+  <div class="paso"><p><strong>4.</strong> MAE: la media sin signo. Está en estrellas.</p><span class="grande">3 / 3 = 1,0</span></div>
+  <div class="paso"><p><strong>5.</strong> Shrek pone 4 de los 4,5 del MSE (89 %), pero solo 2 de los 3 del MAE (67 %). El MSE castiga mucho más los fallos grandes.</p><span class="grande">89 % frente a 67 %</span></div>
+</div>
+<p>La raíz del MSE se llama <strong>RMSE</strong> (√1,5 ≈ 1,22) y vuelve a estar en estrellas.</p>
+</section>
+
+<figure class="demo" data-demo="curso2/c2m2-mse-mae" data-titulo="Un fallo grande: cuánto pesa en el MSE y en el MAE">
+  <div class="haz">Sube la nota que predice para Shrek hasta 9. Luego bájala a 2, la real.</div>
+  <div class="observa">Al alejarse, Shrek se come casi toda la barra del MSE. En la del MAE crece mucho más despacio.</div>
+</figure>
+
+<section>
+<h2 id="history">3 · fit deja un diario: History</h2>
+<p><code>fit</code> entrena y devuelve un <strong>History</strong>: un diario con una línea por época. Guarda la pérdida con los datos de entrenamiento (<code>loss</code>) y con los de validación (<code>val_loss</code>), más cada métrica. Dibujadas, son las <strong>curvas de aprendizaje</strong>.</p>
+<div class="anim-pasos" data-titulo="El diario de la red de los dígitos (20 épocas)">
+  <div class="paso"><p><strong>1.</strong> Época 1: la red empieza al azar.</p><span class="grande">loss 2,120 · val_loss 1,849</span></div>
+  <div class="paso"><p><strong>2.</strong> Época 3: las dos bajan rápido.</p><span class="grande">loss 1,157 · val_loss 0,979</span></div>
+  <div class="paso"><p><strong>3.</strong> Época 20: siguen bajando juntas.</p><span class="grande">loss 0,122 · val_loss 0,164</span></div>
+  <div class="paso"><p><strong>4.</strong> Si bajan juntas, la red <strong>generaliza</strong>: acierta también con lo que no vio. Si <code>loss</code> baja y <code>val_loss</code> sube, <strong>memoriza</strong>.</p></div>
+</div>
 </section>
 
 <figure class="demo" data-demo="curso2/c2m2-playground" data-titulo="Entrena una red de verdad: ¿thriller o comedia? (un fit() en vivo)">
   <div class="haz">Pulsa <em>«Entrenar»</em> con los ajustes iniciales. Después prueba <code>learning_rate</code> = 0.3 o una sola capa de 2 neuronas.</div>
-  <div class="observa">Con muchas neuronas y épocas, <code>val_loss</code> sube mientras <code>loss</code> baja: sobreajuste. Un learning rate enorme hace saltar las curvas.</div>
+  <div class="observa">Con muchas neuronas y épocas, <code>val_loss</code> sube mientras <code>loss</code> baja: memoriza. Un learning rate enorme hace saltar las curvas.</div>
 </figure>
 
 <section>
-<h2 id="numeros">Con números: dos formas de medir el fallo</h2>
-<div class="callout ejemplo">
-  <span class="lbl">Ejemplo numérico: MSE y MAE</span>
-  <p>Notas sobre 10 que un usuario puso de verdad a tres películas y notas que Netflix había predicho (cifras inventadas):</p>
-  <table>
-    <thead><tr><th>Muestra</th><th>real \( y \)</th><th>predicho \( \hat y \)</th><th>error \( \hat y - y \)</th><th>error²</th><th>|error|</th></tr></thead>
-    <tbody>
-      <tr><td>1 · Toy Story</td><td>3</td><td>2,5</td><td>−0,5</td><td>0,25</td><td>0,5</td></tr>
-      <tr><td>2 · Matrix</td><td>5</td><td>5,5</td><td>0,5</td><td>0,25</td><td>0,5</td></tr>
-      <tr><td>3 · Shrek</td><td>2</td><td>4</td><td>2</td><td>4</td><td>2</td></tr>
-      <tr><td><strong>Media</strong></td><td></td><td></td><td></td><td class="res">4,5 / 3 = 1,5</td><td class="res">3 / 3 = 1,0</td></tr>
-    </tbody>
-  </table>
-  <p>MSE = 1,5 y MAE = 1,0. La raíz del MSE (RMSE = √1,5 ≈ 1,22) vuelve a estar en las unidades del target. <strong>Fíjate</strong>: la película 3 tiene un error de 2 y aporta 4 de los 4,5 del total del MSE (el 89 %), pero solo 2 de los 3 del MAE (el 67 %). Al elevar al cuadrado, el MSE <em>castiga mucho más los errores grandes</em>: es la opción estándar, pero es más sensible a los outliers; el MAE es más «robusto».</p>
-</div>
+<h2 id="usar">4 · evaluate y predict: solo miran</h2>
+<ul class="flow">
+  <li class="b">fit<small>aprende</small></li>
+  <li class="d">evaluate<small>nota con el test</small></li>
+  <li class="c">predict<small>respuestas</small></li>
+</ul>
+<p>El <strong>test</strong> son datos guardados aparte hasta el final. <code>evaluate</code> calcula con ellos la pérdida y las métricas. <code>predict</code> devuelve las salidas de la red. Ninguno de los dos cambia los pesos.</p>
 </section>
 
 <details class="predice">
-  <summary>Solo 5 de cada 100 usuarios cancelan Netflix. Un modelo responde siempre «no cancelará». ¿Qué accuracy saca?<span class="hint"></span></summary>
+  <summary>Solo 5 de cada 100 usuarios cancelan Netflix. Un modelo responde siempre «no cancelará». ¿Qué porcentaje de aciertos saca?<span class="hint"></span></summary>
   <div>
-    <p>Un 95 %, sin detectar ni a uno solo de los que se van. Con clases desequilibradas el accuracy engaña: añade <code>Precision()</code>, <code>Recall()</code> o <code>AUC()</code> en <code>metrics</code>.</p>
+    <p>Un 95 %, sin detectar ni a uno solo de los que se van. Cuando una clase es rarísima, el porcentaje de aciertos engaña. Añade otras métricas, como <code>Precision()</code> o <code>Recall()</code>, que miran solo a los que cancelan.</p>
   </div>
 </details>
+
+<section>
+<h2 id="chuleta">Chuleta para repasar</h2>
+<dl class="chuleta">
+  <div><dt>compile</dt><dd>Elige optimizador, pérdida y métricas. <em>No toca los pesos.</em></dd></div>
+  <div><dt>Optimizador</dt><dd>La receta para mover los pesos. <em>Adam.</em></dd></div>
+  <div><dt>Learning rate</dt><dd>El tamaño de cada paso al corregir. <em>0,001 por defecto en Adam.</em></dd></div>
+  <div><dt>Pérdida (loss)</dt><dd>El número que la red intenta bajar. Cambia suave. <em>MSE para números.</em></dd></div>
+  <div><dt>Métrica</dt><dd>Lo que miras tú. No cambia el aprendizaje. <em>MAE, porcentaje de aciertos.</em></dd></div>
+  <div><dt>MSE</dt><dd>Media de los errores al cuadrado. <em>4,5 / 3 = 1,5.</em></dd></div>
+  <div><dt>MAE</dt><dd>Media de los errores sin signo, en las unidades de la respuesta. <em>3 / 3 = 1 estrella.</em></dd></div>
+  <div><dt>RMSE</dt><dd>La raíz del MSE. <em>√1,5 ≈ 1,22.</em></dd></div>
+  <div><dt>History</dt><dd>El diario de fit: una línea por época. <em>loss, val_loss…</em></dd></div>
+  <div><dt>Curvas de aprendizaje</dt><dd>loss y val_loss dibujadas por época. <em>Juntas: generaliza.</em></dd></div>
+  <div><dt>Memorizar (sobreajuste)</dt><dd>loss baja y val_loss sube: acierta lo visto y falla lo nuevo.</dd></div>
+  <div><dt>Test</dt><dd>Datos guardados hasta el final para la nota de verdad.</dd></div>
+</dl>
+</section>
 
 <div class="resumen">
   <h2 class="sin-num sin-toc">En tres líneas</h2>
   <ul>
     <li><code>compile</code> = optimizador + pérdida + métricas; no entrena ni toca los pesos.</li>
-    <li>La pérdida (derivable) guía el aprendizaje; la métrica solo informa. El MSE castiga mucho los errores grandes.</li>
+    <li>La pérdida (suave) guía el aprendizaje; la métrica solo informa. El MSE castiga mucho los errores grandes.</li>
     <li><code>fit</code> devuelve <code>History</code>: si <code>val_loss</code> sube mientras <code>loss</code> baja, la red está memorizando.</li>
   </ul>
 </div>
@@ -102,18 +157,18 @@
     "20 en el MSE y 10 en el MAE"
    ],
    "correcta": 1,
-   "porque": "El MSE eleva el error al cuadrado: 10² = 100. El MAE usa el valor absoluto: 10. Por eso el MSE castiga mucho más los errores grandes y el MAE está en las unidades del objetivo (minutos)."
+   "porque": "El MSE eleva el error al cuadrado: 10² = 100. El MAE lo usa sin signo: 10. Por eso el MSE castiga mucho más los errores grandes, y el MAE está en minutos."
   },
   {
    "q": "En las curvas de <code>History</code>, <code>loss</code> sigue bajando pero <code>val_loss</code> empieza a subir. ¿Qué pasa?",
    "opciones": [
-    "Infraajuste: la red es demasiado pequeña",
-    "Sobreajuste: la red memoriza el entrenamiento",
+    "La red es demasiado pequeña",
+    "La red memoriza el entrenamiento (sobreajuste)",
     "El learning rate es demasiado pequeño",
     "Todo va bien"
    ],
    "correcta": 1,
-   "porque": "La red mejora con lo que ya ha visto y empeora con lo nuevo: está memorizando. Remedios: parar antes (<code>EarlyStopping</code>), una red más pequeña o más datos."
+   "porque": "La red mejora con lo que ya ha visto y empeora con lo nuevo: está memorizando. Remedios: parar antes (<code>EarlyStopping</code>, lección 8), una red más pequeña o más datos."
   },
   {
    "q": "¿Qué hace <code>model.evaluate(X_test, y_test)</code>?",
@@ -124,7 +179,7 @@
     "Vuelve a compilar el modelo"
    ],
    "correcta": 1,
-   "porque": "<code>evaluate</code> solo propaga los datos y mide. Con <code>return_dict=True</code> devuelve un diccionario como <code>{'loss': 0.85, 'mae': 0.73}</code>, sin depender del nombre interno de las métricas."
+   "porque": "<code>evaluate</code> solo pasa los datos por la red y mide. Con <code>return_dict=True</code> devuelve un diccionario como <code>{'loss': 0.85, 'mae': 0.73}</code>."
   }
  ]
 }
@@ -157,8 +212,7 @@
   </tbody>
 </table>
 <p>Cómo funcionan por dentro SGD, el momentum y Adam, con sus cuentas, está en el <a href="../modulo-1.html">módulo 1</a>. Aquí lo que importa es <em>cómo se pide</em>. Hay dos formas:</p>
-<pre class="ascii">model.compile(optimizer="adam", ...)                                  # con valores por defecto (learning_rate=0.001)
-model.compile(optimizer=keras.optimizers.Adam(learning_rate=0.01), ...)  # objeto: ajustas el learning rate</pre>
+<p>Con texto (<code>optimizer="adam"</code>) usas los valores por defecto; con un objeto (<code>keras.optimizers.Adam(learning_rate=0.01)</code>) eliges tú el tamaño del paso. Las dos líneas, explicadas, están en el <a href="laboratorio.html#extra-optimizador">Laboratorio</a>.</p>
 <p>El <code>learning_rate</code> es el tamaño del paso. Si es demasiado pequeño, la red aprende lentísimo; si es demasiado grande, la pérdida salta o explota (lo verás en un experimento más abajo). Con Adam, 0,001 es el valor por defecto y suele ser un buen punto de partida; 0,01 o 0,003 también aparecen mucho.</p>
 
 <h3>2 · La función de pérdida (<code>loss</code>)</h3>
@@ -240,12 +294,7 @@ Epoch 2/2
 
 <h3>El objeto <code>History</code>: la memoria del entrenamiento</h3>
 <p><code>fit</code> devuelve un objeto <code>History</code>. Lo importante es su atributo <code>history.history</code>, un <strong>diccionario</strong> con una lista por cada cosa medida, con un valor por época:</p>
-<pre class="ascii">history.history = {
-    "loss":     [43.57, 5.23, ...],   # pérdida en entrenamiento, una por época
-    "mae":      [ 5.34, 1.81, ...],   # métrica en entrenamiento
-    "val_loss": [14.02, 2.01, ...],   # pérdida en validación
-    "val_mae":  [ 3.19, 1.15, ...],   # métrica en validación
-}</pre>
+<p>Por ejemplo, <code>history.history["loss"]</code> es la lista de pérdidas de entrenamiento, una por época: <code>[43.57, 5.23, ...]</code>. El diccionario entero, explicado, está en el <a href="laboratorio.html#extra-history">Laboratorio</a>.</p>
 <p>Dibujar esas listas (con Matplotlib: <code>plt.plot(history.history["loss"])</code>) da las <strong>curvas de aprendizaje</strong>, la herramienta de diagnóstico más importante del Deep Learning. Cómo leerlas:</p>
 <table>
   <thead><tr><th>Lo que ves</th><th>Qué pasa</th><th>Qué probar</th></tr></thead>
@@ -265,8 +314,7 @@ Epoch 2/2
 
 <h3><code>evaluate()</code>: medir con datos que no ha visto</h3>
 <p><code>model.evaluate(X_test, y_test)</code> <strong>no entrena</strong>: solo propaga los datos, calcula la pérdida y las métricas que pusiste en <code>compile</code>, y las devuelve. Úsalo con el conjunto de <em>test</em>, que no se ha tocado durante el entrenamiento ni para decidir nada. En Keras 3 lo más claro es pedir un diccionario:</p>
-<pre class="ascii">resultado = model.evaluate(X_test, y_test, verbose=0, return_dict=True)
-# {'loss': 0.85, 'mae': 0.73}   (los números del fragmento 2)</pre>
+<p>Con <code>return_dict=True</code> devuelve algo como <code>{'loss': 0.85, 'mae': 0.73}</code> (los números del <a href="laboratorio.html#fragmento-2">paso 2 del laboratorio</a>). La línea, explicada, está en el <a href="laboratorio.html#extra-evaluate">Laboratorio</a>.</p>
 
 <div class="callout ojo">
   <span class="lbl">Ojo: metrics_names ya no te dice los nombres</span>
@@ -294,51 +342,12 @@ Epoch 2/2
   </div>
 </details>
 
-<section>
+<section class="ir-lab">
 <h2 class="sin-num">Código</h2>
-<article class="snippet" data-lang="python" id="fragmento-10">
-  <header>
-    <h3>10 · El objeto History: leer las curvas de aprendizaje</h3>
-    <p class="para-que"><strong>Para qué sirve</strong> Sacar del historial de <code>fit</code> los números de cada época para diagnosticar el entrenamiento. Usa el <code>history</code> del fragmento 7.</p>
-  </header>
-  <pre class="code"><code>h = history.history
-print("claves:", list(h.keys()))
-print("época  loss   val_loss  accuracy  val_accuracy")
-for e in (0, 1, 2, 17, 18, 19):
-    print(f"{e + 1:5d}  {h['loss'][e]:.3f}   {h['val_loss'][e]:.3f}    {h['accuracy'][e]:.3f}     {h['val_accuracy'][e]:.3f}")
-
-mejor = int(np.argmin(h["val_loss"]))
-print("mejor val_loss en la época", mejor + 1, "=", round(h["val_loss"][mejor], 3))</code></pre>
-  <details class="linea-a-linea">
-    <summary>Línea por línea</summary>
-    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
-    <table class="lineas">
-      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
-      <tbody>
-        <tr data-lines="1"><td><code>h = history.history</code></td><td><code>history.history</code> es un <strong>diccionario</strong> de Python: cada clave es una medida y su valor es una lista con un número por época. Lo guardamos como <code>h</code> para escribir menos.</td></tr>
-        <tr data-lines="2"><td><code>print("claves:", list(h.keys()))</code></td><td>Muestra qué claves tiene: la pérdida y el accuracy del entrenamiento y los mismos con el prefijo <code>val_</code> para la validación.</td></tr>
-        <tr data-lines="3"><td><code>print("época  loss   val_loss  accuracy  val_a …</code></td><td>Imprime la cabecera de la tabla.</td></tr>
-        <tr data-lines="4"><td><code>for e in (0, 1, 2, 17, 18, 19):</code></td><td>Recorre algunas épocas. Las listas empiezan en la posición 0, así que 0 es la época 1 y 19 la época 20.</td></tr>
-        <tr data-lines="5"><td><code>print(f"{e + 1:5d}  {h['loss'][e]:.3f}   {h['v …</code></td><td>Imprime una fila: <code>e + 1</code> es el número de época; <code>h['loss'][e]</code> es el valor de esa medida en esa época. En una f-string, <code>:.3f</code> son 3 decimales y <code>:5d</code> reserva 5 huecos para el entero.</td></tr>
-        <tr data-lines="7"><td><code>mejor = int(np.argmin(h["val_loss"]))</code></td><td><code>np.argmin</code> da la posición del valor más pequeño de <code>val_loss</code>; <code>int(...)</code> lo convierte a entero normal.</td></tr>
-        <tr data-lines="8"><td><code>print("mejor val_loss en la época", mejor + 1, …</code></td><td>Imprime en qué época ocurrió (sumando 1) y cuánto valía.</td></tr>
-      </tbody>
-    </table>
-  </details>
-  <div class="salida">
-    <strong>Salida esperada</strong>
-    <pre>claves: ['accuracy', 'loss', 'val_accuracy', 'val_loss']
-época  loss   val_loss  accuracy  val_accuracy
-    1  2.120   1.849    0.330     0.569
-    2  1.607   1.378    0.688     0.778
-    3  1.157   0.979    0.818     0.861
-   18  0.137   0.175    0.975     0.958
-   19  0.129   0.169    0.976     0.958
-   20  0.122   0.164    0.977     0.965
-mejor val_loss en la época 20 = 0.164</pre>
-    <p>En 20 épocas la pérdida de entrenamiento pasa de 2,120 a 0,122 y la de validación de 1,849 a 0,164; el accuracy sube de 0,330 a 0,977 (y de 0,569 a 0,965 en validación). Las dos curvas bajan juntas y <code>val_loss</code> sigue bajando hasta la última época: el mejor valor está en la época 20, así que <strong>todavía no hay sobreajuste</strong> y entrenar algo más habría servido. Fíjate en que en la época 1 el accuracy de validación (0,569) es mayor que el de entrenamiento (0,330): el de entrenamiento es la media de toda la época, con la red empezando desde pesos aleatorios, y el de validación se mide al terminarla.</p>
-  </div>
-</article>
+<a class="lab-card" href="laboratorio.html#paso-2"><span class="lc-ico" aria-hidden="true">🧪</span>
+  <span><strong>Ver el código de esta lección en el Laboratorio</strong>
+  <span>Paso 2 · compile, fit, evaluate y predict en un programa completo. Paso 9 · Leer el diario History época a época.</span></span></a>
+<p>Las dos formas de elegir el optimizador, el diccionario de <code>History</code> y <code>evaluate</code> con <code>return_dict</code> están en <a href="laboratorio.html#mas-l4">«Más código del módulo»</a>.</p>
 </section>
 
 </div>

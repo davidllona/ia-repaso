@@ -1,0 +1,2245 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Laboratorio · Tus primeras redes con Keras · Módulo 2 · Curso 2 · Cuaderno de IA</title>
+<meta name="description" content="Todo el código del módulo 2 en 12 pasos explicados línea a línea: el motor, una red completa en cinco pasos, contar parámetros, normalizar, sí o no, diez dígitos, argmax, History, sparse, EarlyStopping y guardar el modelo.">
+<script>var t;try{t=localStorage.getItem('cuaderno-ia:tema:v2')}catch(e){}if(t!=='light'&&t!=='dark')t=(window.matchMedia&&matchMedia('(prefers-color-scheme: light)').matches)?'light':'dark';document.documentElement.setAttribute('data-theme',t)</script>
+<link rel="stylesheet" href="../../assets/css/style.css">
+<script src="../../assets/js/curriculum.js"></script>
+<script src="../../assets/js/lab.js"></script>
+<script src="../../assets/js/app.js" defer></script>
+</head>
+<body data-root="../../" data-course="2" data-module="2" data-lesson="9">
+<main>
+<div class="page">
+
+<header class="hero leccion">
+  <div class="hero-grid">
+    <div>
+      <p class="eyebrow">Curso 2 · Módulo 2 · Laboratorio</p>
+      <h1>Laboratorio: tus primeras redes con Keras</h1>
+      <p class="lead">Vamos a construir, entrenar, medir y guardar redes neuronales de principio a fin con Python y Keras: de un número a diez dígitos.</p>
+      <p class="meta-line"><span class="read-time" data-render="read-time"></span><a href="../modulo-2.html">Índice del módulo</a> · <a href="#completo">Código completo</a> · <a href="#chuleta">Chuleta</a></p>
+    </div>
+    <div class="hero-tile" aria-hidden="true"></div>
+  </div>
+</header>
+
+<section>
+<h2 id="mapa">Lo que vamos a hacer</h2>
+<p>Doce pasos, uno por idea del módulo. Cada paso dice con qué lección conecta. Se ejecutan en orden en un mismo cuaderno: los pasos 7 a 10 comparten los datos de los dígitos; los demás funcionan solos. Los doce se leen en unos 55 minutos; «Más código del módulo», al final, es para consultar.</p>
+<ol class="lab-mapa">
+  <li><a href="#paso-1">Comprobar el motor: versiones, un tensor y la cinta</a></li>
+  <li><a href="#paso-2">Tu primera red completa, en cinco pasos</a></li>
+  <li><a href="#paso-3">Contar los parámetros con summary</a></li>
+  <li><a href="#paso-4">Una capa Dense hecha a mano</a></li>
+  <li><a href="#paso-5">Normalizar las entradas</a></li>
+  <li><a href="#paso-6">Sí o no: clasificación binaria</a></li>
+  <li><a href="#paso-7">Diez clases: reconocer dígitos</a></li>
+  <li><a href="#paso-8">De probabilidades a dígitos: argmax</a></li>
+  <li><a href="#paso-9">Leer el diario: History</a></li>
+  <li><a href="#paso-10">Etiquetas enteras: sparse</a></li>
+  <li><a href="#paso-11">Parar a tiempo: EarlyStopping</a></li>
+  <li><a href="#paso-12">Guardar, cargar y repetir</a></li>
+</ol>
+<div class="callout regla">
+  <span class="lbl">Cómo leer cada paso</span>
+  <p>Arriba, el código. Debajo, una tabla con <strong>una fila por línea</strong>: qué hace, <strong>por qué</strong> hace falta y, en las difíciles, <strong>cómo se lee en voz alta</strong>. Al final, la salida real y cómo leer cada número. En el móvil, las salidas anchas se deslizan hacia el lado.</p>
+</div>
+<div class="callout ojo">
+  <span class="lbl">Sobre los datos y las cifras</span>
+  <p>No hay datos reales de Netflix, así que usamos datos inventados con NumPy y dos conjuntos que vienen dentro de scikit-learn (tumores y dígitos), sin descargar nada. Todas las salidas son reales: TensorFlow 2.21 y Keras 3.15 en CPU, con semillas fijas. En otra versión, los últimos decimales pueden cambiar.</p>
+</div>
+</section>
+
+<section>
+<h2 id="antes">Antes de empezar: las piezas</h2>
+<p><strong>Python</strong> es el lenguaje en el que se escribe todo. Sus órdenes se leen de arriba abajo, una por línea.</p>
+<p>Python, solo, sabe hacer poco. Por eso se usan <strong>librerías</strong>: paquetes de código que otra gente ya escribió (para cuentas, para datos, para redes). La orden <code>import</code> mete una librería en tu programa; desde ese momento puedes usar sus herramientas.</p>
+<ul class="flow">
+  <li class="a">IMPORT<small>traer las librerías</small></li>
+  <li class="d">DATOS<small>X e y</small></li>
+  <li class="b">MODELO<small>Sequential</small></li>
+  <li class="b">COMPILE y FIT<small>configurar y entrenar</small></li>
+  <li class="c">EVALUATE y PREDICT<small>usarlo</small></li>
+</ul>
+<h3>La sintaxis de Python que vas a ver</h3>
+<dl class="chuleta">
+  <div><dt>Variable y el signo =</dt><dd>Un nombre que guarda un valor. <code>n = 1200</code> se lee «guarda 1.200 con el nombre n». <em>Dos signos, <code>==</code>, preguntan «¿es igual?».</em></dd></div>
+  <div><dt>print</dt><dd>Escribe algo en pantalla. Todo lo que ves en «Salida» sale de un <code>print</code>.</dd></div>
+  <div><dt>import … as …</dt><dd><code>import</code> trae una librería; <code>as</code> le pone un apodo. <em><code>import numpy as np</code>: «trae NumPy y llámala np».</em></dd></div>
+  <div><dt>from … import …</dt><dd>Trae solo una pieza de una librería. <em><code>from keras import layers</code>: «de Keras, trae el cajón de capas».</em></dd></div>
+  <div><dt>Punto y paréntesis</dt><dd><code>cosa.accion(dato)</code>: «a esta cosa, hazle esta acción con este dato». <em><code>model.fit(X, y)</code>: «modelo, entrena con X e y».</em></dd></div>
+  <div><dt>Argumento con nombre</dt><dd>Un dato que se pasa diciendo qué es. <em><code>epochs=30</code>: «el número de épocas es 30».</em></dd></div>
+  <div><dt>Lista [ ] y tupla ( )</dt><dd>Varios valores en orden. La lista va entre corchetes y se puede cambiar; la tupla, entre paréntesis, es fija. <em><code>shape=(2,)</code> es una tupla de un elemento: la coma es obligatoria.</em></dd></div>
+  <div><dt>Diccionario { }</dt><dd>Parejas «nombre → valor» entre llaves. <em>El diario <code>history.history</code> es uno.</em></dd></div>
+  <div><dt>Comentario #</dt><dd>Lo que va detrás de <code>#</code> es una nota para humanos. Python lo ignora.</dd></div>
+  <div><dt>Sangría</dt><dd>Los espacios al principio de una línea. Dicen qué líneas van <em>dentro</em> de un <code>def</code>, un <code>for</code>, un <code>if</code> o un <code>with</code>.</dd></div>
+  <div><dt>def y return</dt><dd><code>def</code> escribe una receta con nombre (una <strong>función</strong>); <code>return</code> dice qué devuelve. <em>No hace nada hasta que la llamas.</em></dd></div>
+  <div><dt>for … in …</dt><dd>Un bucle: repite las líneas sangradas una vez por cada elemento. <em><code>for capa in model.layers:</code> da una vuelta por capa.</em></dd></div>
+  <div><dt>if y else</dt><dd>«Si…» y «si no…». <em>Las líneas sangradas solo se hacen si se cumple.</em></dd></div>
+  <div><dt>with … as …</dt><dd>«Mientras dure este bloque, usa esto con este nombre». <em><code>with tf.GradientTape() as tape:</code>.</em></dd></div>
+  <div><dt>try y except</dt><dd>«Intenta esto; si da error, no te pares y haz lo otro». <em>Para provocar errores a propósito.</em></dd></div>
+  <div><dt>f-string</dt><dd>Un texto con <code>f</code> delante: lo que va entre llaves se cambia por su valor. <em><code>f"{mae:.2f}"</code>: mae con 2 decimales.</em></dd></div>
+  <div><dt>Índices [ ]</dt><dd>Se cuenta desde 0. <code>[0]</code> el primero; <code>[-1]</code> el último; <code>[:5]</code> los cinco primeros; <code>[0, 0]</code> fila 0, columna 0; <code>[:, 0]</code> todas las filas, columna 0.</dd></div>
+  <div><dt>** y @</dt><dd><code>**</code> es «elevado a» (<code>x ** 2</code>). <code>@</code> multiplica tablas, como hace una capa Dense.</dd></div>
+  <div><dt>True, False y None</dt><dd>Verdadero, falso y «nada». <em><code>None</code> en una forma: «las filas que sean».</em></dd></div>
+</dl>
+<h3>Las librerías y piezas del ejemplo</h3>
+<dl class="chuleta">
+  <div><dt>NumPy (np)</dt><dd>La librería de cuentas con listas enteras de números. El nombre viene de «Numerical Python». <em>Aquí: fabricar datos y hacer cuentas a mano.</em></dd></div>
+  <div><dt>Array</dt><dd>Una lista (o tabla) de NumPy: las cuentas se hacen con todos sus números a la vez. <em>Keras recibe los datos así.</em></dd></div>
+  <div><dt>default_rng y semilla</dt><dd><code>np.random.default_rng(42)</code> crea una máquina de azar. Con la misma semilla salen siempre los mismos números.</dd></div>
+  <div><dt>uniform y normal</dt><dd>Sortear números: todos igual de probables entre dos valores, o alrededor de 0 (el «ruido»).</dd></div>
+  <div><dt>astype y float32</dt><dd>Cambiar el tipo de número. <code>float32</code>: con decimales, en 32 bits, el de Keras.</dd></div>
+  <div><dt>shape y dtype</dt><dd>La forma (cuántos números en cada dirección) y el tipo. <em><code>(1000, 2)</code>: 1.000 filas, 2 columnas.</em></dd></div>
+  <div><dt>column_stack</dt><dd>Pega listas como columnas de una tabla.</dd></div>
+  <div><dt>argmax, argmin y argsort</dt><dd>La posición del mayor, la del menor, y las posiciones ordenadas de menor a mayor. <code>axis=1</code>: una respuesta por fila.</dd></div>
+  <div><dt>where, bincount y allclose</dt><dd>Dónde se cumple algo; cuántas veces sale cada entero; y si dos tablas son casi iguales.</dd></div>
+  <div><dt>log y maximum</dt><dd><code>np.log</code> es el logaritmo natural (ln). <code>np.maximum(0, z)</code> es la ReLU.</dd></div>
+  <div><dt>ravel</dt><dd>Aplana una tabla en una sola lista. <em>(5, 1) → 5 números.</em></dd></div>
+  <div><dt>os y tempfile</dt><dd>Cajones de Python para hablar con el sistema: notas del sistema y rutas (<code>os</code>), carpetas temporales (<code>tempfile</code>).</dd></div>
+  <div><dt>TensorFlow (tf)</dt><dd>El motor de Google: tensores, derivadas automáticas, CPU y GPU. El nombre viene de «tensores que fluyen». <em>Keras lo usa por debajo.</em></dd></div>
+  <div><dt>tf.constant y tf.Variable</dt><dd>Un tensor fijo y uno que puede cambiar. Los pesos son variables.</dd></div>
+  <div><dt>GradientTape</dt><dd>La «cinta»: graba las cuentas y luego saca las derivadas con <code>tape.gradient</code>.</dd></div>
+  <div><dt>Keras</dt><dd>El mando: piezas sencillas para construir y entrenar redes. Su nombre viene del griego «cuerno».</dd></div>
+  <div><dt>layers</dt><dd>El cajón de capas de Keras. <em>Dense, Normalization.</em></dd></div>
+  <div><dt>Sequential</dt><dd>Un modelo hecho de capas en fila.</dd></div>
+  <div><dt>Input</dt><dd>Dice cuántos números trae cada muestra. No aprende nada.</dd></div>
+  <div><dt>Dense</dt><dd>Capa en la que cada neurona ve todas las entradas. <code>activation</code>: <code>"relu"</code>, <code>"sigmoid"</code>, <code>"softmax"</code> o ninguna.</dd></div>
+  <div><dt>Normalization y adapt</dt><dd>Capa que deja cada columna con media 0 y desviación 1; <code>adapt</code> calcula la media y la desviación con el entrenamiento.</dd></div>
+  <div><dt>compile</dt><dd>Configura el aprendizaje: <code>optimizer</code>, <code>loss</code> y <code>metrics</code>. No toca los pesos.</dd></div>
+  <div><dt>optimizers.Adam</dt><dd>La receta de Adam para corregir los pesos; <code>learning_rate</code> es el tamaño del paso.</dd></div>
+  <div><dt>Pérdidas</dt><dd><code>"mse"</code> (números), <code>"binary_crossentropy"</code> (sí o no), <code>"categorical_crossentropy"</code> (One-Hot) y <code>"sparse_categorical_crossentropy"</code> (enteros). El cajón <code>keras.losses</code> las tiene sueltas.</dd></div>
+  <div><dt>Métricas</dt><dd><code>"mae"</code> (error medio sin signo) y <code>"accuracy"</code> (porcentaje de aciertos, de 0 a 1).</dd></div>
+  <div><dt>fit</dt><dd>Entrena. <code>epochs</code>: pasadas; <code>batch_size</code>: tamaño del puñado; <code>validation_data</code> o <code>validation_split</code>: con qué vigilar; <code>verbose=0</code>: en silencio.</dd></div>
+  <div><dt>History</dt><dd>El diario que devuelve <code>fit</code>; <code>.history</code> es un diccionario con una lista por cosa medida.</dd></div>
+  <div><dt>evaluate y predict</dt><dd>La nota con datos nuevos y las respuestas de la red. Ninguno cambia los pesos.</dd></div>
+  <div><dt>summary y count_params</dt><dd>La tabla de capas y parámetros, y el total de parámetros.</dd></div>
+  <div><dt>get_weights, set_weights y build</dt><dd>Sacar o poner los pesos y bias de una capa; <code>build</code> le dice cuántas entradas recibirá para que cree sus pesos.</dd></div>
+  <div><dt>set_random_seed</dt><dd><code>keras.utils.set_random_seed</code> fija todas las semillas a la vez.</dd></div>
+  <div><dt>to_categorical</dt><dd>Pasa etiquetas enteras a One-Hot. <em>5 → [0 0 0 0 0 1 0 0 0 0].</em></dd></div>
+  <div><dt>EarlyStopping y callbacks</dt><dd>El ayudante que para cuando <code>val_loss</code> deja de mejorar; se pasa a <code>fit</code> en la lista <code>callbacks</code>. <code>best_epoch</code>: la mejor, contando desde 0.</dd></div>
+  <div><dt>save y load_model</dt><dd>Guardar el modelo entero en un <code>.keras</code> y cargarlo otro día.</dd></div>
+  <div><dt>scikit-learn (sklearn)</dt><dd>La librería de Machine Learning del Curso 1. El nombre viene de «SciPy Toolkit»; <em>al importar se escribe sklearn</em>.</dd></div>
+  <div><dt>train_test_split</dt><dd>Reparte al azar en entrenamiento y test. <code>test_size</code>: qué parte al test; <code>stratify</code>: mismas proporciones de cada clase; <code>random_state</code>: fija el sorteo.</dd></div>
+  <div><dt>StandardScaler</dt><dd>El normalizador de scikit-learn: <code>fit</code> calcula media y desviación; <code>transform</code> las aplica.</dd></div>
+  <div><dt>load_breast_cancer y load_digits</dt><dd>Dos conjuntos de datos que vienen dentro de scikit-learn: 569 tumores con 30 medidas, y 1.797 dígitos de 8×8.</dd></div>
+</dl>
+<h3>Las que solo salen en «Más código del módulo»</h3>
+<dl class="chuleta">
+  <div><dt>re</dt><dd>El cajón de Python para buscar y recortar texto con patrones.</dd></div>
+  <div><dt>lambda</dt><dd>Una receta de una línea, sin nombre, que se ejecuta después.</dd></div>
+  <div><dt>pi, cos, sin, full, vstack y concatenate</dt><dd>π, coseno y seno (para dibujar espirales), una lista llena de un número, y pegar tablas o listas.</dd></div>
+  <div><dt>nan e isnan</dt><dd><code>np.nan</code> es «no es un número»: un hueco. <code>isnan</code> pregunta si lo hay.</dd></div>
+  <div><dt>optimizers.SGD</dt><dd>El descenso por gradiente sencillo del módulo 1.</dd></div>
+  <div><dt>save_weights y load_weights</dt><dd>Guardar y cargar solo los pesos (archivo <code>.weights.h5</code>).</dd></div>
+  <div><dt>keras.datasets.mnist</dt><dd>El conjunto grande de dígitos (28×28). Hay que descargarlo.</dd></div>
+  <div><dt>PyTorch (torch y nn)</dt><dd>El otro motor, de Meta. <code>nn</code> es su cajón de redes; en él el bucle de entrenar se escribe a mano.</dd></div>
+</dl>
+</section>
+
+<section class="lab-paso" id="paso-1">
+<h2><span class="paso-n">1</span>Comprobar el motor: versiones, un tensor y la cinta</h2>
+<p>Para qué sirve este paso: ver con tus ojos las dos cosas que hace el motor (TensorFlow) y que Keras usa por debajo: guardar números en tensores y sacar derivadas solo. Conecta con la <a href="leccion-1.html#numeros">lección 1</a>.</p>
+<article class="snippet" data-lang="python" id="fragmento-1">
+  <header>
+    <h3>Paso 1 · Versiones, tensores y derivadas automáticas (fragmento 1)</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Comprobar qué versiones tienes y ver las dos cosas que hace el motor: guardar datos como tensores y calcular derivadas sin que tú las escribas.</p>
+  </header>
+  <pre class="code"><code>import os
+os.environ["KERAS_BACKEND"] = "tensorflow"
+
+import tensorflow as tf
+import keras
+
+print("TensorFlow:", tf.__version__)
+print("Keras     :", keras.__version__)
+print("Backend   :", keras.backend.backend())
+
+t = tf.constant([[1.0, 2.0, 3.0],
+                 [4.0, 5.0, 6.0]])
+print("Tensor:", t.shape, t.dtype.name)
+
+x = tf.Variable(3.0)
+with tf.GradientTape() as tape:
+    y = x ** 2 + 2 * x
+dy_dx = tape.gradient(y, x)
+print("y =", y.numpy(), "| dy/dx =", dy_dx.numpy())</code></pre>
+  <details class="linea-a-linea" open>
+    <summary>Línea por línea</summary>
+    <p class="hint">Toca una fila (o pasa el ratón) para ver su línea resaltada en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace y por qué</th></tr></thead>
+      <tbody>
+        <tr data-lines="1"><td><code>import os</code></td><td>Trae <code>os</code>, el cajón de Python para hablar con el sistema operativo (el programa que maneja tu ordenador).<span class="por-que">Lo necesitamos solo para la línea siguiente: dejar un ajuste antes de cargar Keras.</span><span class="se-lee">trae el cajón os, el que habla con el sistema</span></td></tr>
+        <tr data-lines="2"><td><code>os.environ["KERAS_BACKEND"] = "tensorflow"</code></td><td>Escribe un ajuste llamado <code>KERAS_BACKEND</code> con el valor <code>"tensorflow"</code>. Es una <strong>variable de entorno</strong>: una nota que vive fuera del programa y que Keras lee al cargarse. Le dice qué motor usar debajo (<code>"tensorflow"</code>, <code>"jax"</code> o <code>"torch"</code>). Los corchetes <code>[ ]</code> eligen la nota por su nombre.<span class="por-que">Tiene que ir <em>antes</em> de <code>import keras</code>: después ya no se lee. Aquí sobra (TensorFlow es el motor por defecto), pero enseña dónde se cambia.</span><span class="se-lee">apunta en las notas del sistema que el motor de Keras será TensorFlow</span></td></tr>
+        <tr data-lines="4"><td><code>import tensorflow as tf</code></td><td>Trae TensorFlow y le pone el apodo <code>tf</code>.<span class="por-que">Así escribes <code>tf.constant</code> en vez de <code>tensorflow.constant</code>. Es el apodo que usa todo el mundo.</span><span class="se-lee">trae TensorFlow y, a partir de ahora, llámalo tf</span></td></tr>
+        <tr data-lines="5"><td><code>import keras</code></td><td>Trae Keras, el mando.<span class="por-que">Sin esta línea no existe <code>keras.Sequential</code>, ni <code>Dense</code>, ni <code>fit</code>.</span></td></tr>
+        <tr data-lines="7-9"><td><code>print("TensorFlow:", tf.__version__) …</code></td><td>Escribe la versión de TensorFlow, la de Keras y el motor que se está usando. <code>__version__</code> (con dos guiones bajos a cada lado) es donde casi toda librería guarda su número de versión.<span class="por-que">Es lo primero que conviene mirar cuando un código copiado de internet falla: casi siempre es por la versión.</span><span class="se-lee">escribe qué versión tengo de cada cosa y qué motor hay debajo</span></td></tr>
+        <tr data-lines="11-12"><td><code>t = tf.constant([[1.0, 2.0, 3.0], …</code></td><td>Crea un <strong>tensor</strong> fijo con <code>tf.constant</code>: una tabla de 2 filas y 3 columnas. Los corchetes de dentro son las filas; los de fuera las agrupan. La orden ocupa dos líneas porque el corchete sigue abierto.<span class="por-que">Es para ver qué es un tensor por dentro: una caja de números con forma.</span><span class="se-lee">t es una tabla fija con las filas 1, 2, 3 y 4, 5, 6</span></td></tr>
+        <tr data-lines="13"><td><code>print("Tensor:", t.shape, t.dtype.name)</code></td><td>Escribe su <strong>forma</strong> (<code>.shape</code>) y su tipo de número (<code>.dtype</code>). <code>float32</code> es «número con decimales, guardado en 32 bits», el tipo de siempre en Deep Learning.<span class="por-que">Comprobar formas evita la mayoría de los errores de Keras.</span></td></tr>
+        <tr data-lines="15"><td><code>x = tf.Variable(3.0)</code></td><td>Crea una <strong>variable</strong> de TensorFlow que vale 3. A diferencia de una constante, una <code>tf.Variable</code> puede cambiar: es donde se guardan los pesos de una red.<span class="por-que">La cinta solo deriva respecto a variables.</span><span class="se-lee">x es una variable que ahora vale 3</span></td></tr>
+        <tr data-lines="16"><td><code>with tf.GradientTape() as tape:</code></td><td>Abre la <strong>cinta</strong> (<code>GradientTape</code>). <code>with … as tape:</code> significa «mientras dure este bloque, usa esta cinta y llámala tape». Todo lo que se calcule en las líneas con sangría (con espacios delante) queda grabado.<span class="por-que">Sin grabar, luego no hay nada que rebobinar para sacar la derivada.</span><span class="se-lee">enciende la cinta, llámala tape y graba todo lo que haga dentro</span></td></tr>
+        <tr data-lines="17"><td><code>y = x ** 2 + 2 * x</code></td><td>Calcula y = x² + 2x. <code>**</code> es «elevado a». Con x = 3 sale 9 + 6 = 15. Va con sangría porque está dentro del <code>with</code>.<span class="por-que">Es la cuenta que la cinta graba.</span><span class="se-lee">y es x al cuadrado más dos veces x</span></td></tr>
+        <tr data-lines="18"><td><code>dy_dx = tape.gradient(y, x)</code></td><td>Pide a la cinta la <strong>derivada</strong> de y respecto a x: cuánto cambia y si x se mueve un poquito. Nadie le da la fórmula: la saca rebobinando lo grabado.<span class="por-que">Es la <strong>autodiferenciación</strong>. Con esto mismo, <code>fit</code> saca las derivadas de millones de pesos.</span><span class="se-lee">cinta, dime cuánto cambia y cuando muevo un poco x</span></td></tr>
+        <tr data-lines="19"><td><code>print("y =", y.numpy(), "| dy/dx =", dy_dx.numpy())</code></td><td>Escribe los dos números. <code>.numpy()</code> convierte el tensor en un número normal, más fácil de enseñar.<span class="por-que">Sin <code>.numpy()</code> saldría un texto largo con la forma y el tipo del tensor.</span></td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>TensorFlow: 2.21.0
+Keras     : 3.15.1
+Backend   : tensorflow
+Tensor: (2, 3) float32
+y = 15.0 | dy/dx = 8.0</pre>
+    <p><strong>Cómo leerla.</strong> <code>TensorFlow: 2.21.0</code> y <code>Keras: 3.15.1</code> son las versiones con las que se ha comprobado todo el módulo; si tienes otras, los últimos decimales de los pasos siguientes pueden variar. <code>(2, 3) float32</code>: 2 filas, 3 columnas, números con decimales. Lo importante: <code>y = 15.0</code> es 3² + 2·3, y <code>dy/dx = 8.0</code> es 2·3 + 2, la derivada que habrías calculado a mano. El punto es la coma decimal en inglés.</p>
+  </div>
+</article>
+</section>
+<section class="lab-paso" id="paso-2">
+<h2><span class="paso-n">2</span>Tu primera red completa, en cinco pasos</h2>
+<p>Para qué sirve este paso: hacer de una vez el guion entero de Keras (datos → <code>Sequential</code> → <code>compile</code> → <code>fit</code> → <code>evaluate</code> y <code>predict</code>) con datos inventados. Imagina que las dos columnas son dos rasgos de una película y de un usuario, y que <code>y</code> son los minutos que la verá. Conecta con las lecciones <a href="leccion-1.html#guion">1</a>, <a href="leccion-2.html#lotes">2</a> y <a href="leccion-4.html#idea">4</a>.</p>
+<article class="snippet" data-lang="python" id="fragmento-2">
+  <header>
+    <h3>Paso 2 · Una regresión completa: Sequential, compile, fit, evaluate y predict (fragmento 2)</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Ver el guion de cinco pasos funcionando de verdad: la red descubre una regla que nadie le dice.</p>
+  </header>
+  <pre class="code"><code>import numpy as np
+import keras
+from keras import layers
+
+rng = np.random.default_rng(42)
+
+def crear_datos(n):
+    X = rng.uniform(-3, 3, size=(n, 2))
+    y = 3 * X[:, 0] - 2 * X[:, 1] + 5 + rng.normal(0, 1, n)
+    return X.astype("float32"), y.astype("float32")
+
+X_train, y_train = crear_datos(1000)
+X_val, y_val = crear_datos(200)
+X_test, y_test = crear_datos(200)
+print("X_train:", X_train.shape, "| y_train:", y_train.shape)
+
+keras.utils.set_random_seed(42)
+model = keras.Sequential([
+    keras.Input(shape=(2,)),
+    layers.Dense(16, activation="relu"),
+    layers.Dense(8, activation="relu"),
+    layers.Dense(1),
+])
+
+model.compile(optimizer=keras.optimizers.Adam(learning_rate=0.01),
+              loss="mse",
+              metrics=["mae"])
+
+history = model.fit(X_train, y_train,
+                    epochs=30, batch_size=32,
+                    validation_data=(X_val, y_val),
+                    verbose=0)
+
+test_mse, test_mae = model.evaluate(X_test, y_test, verbose=0)
+print(f"test MSE = {test_mse:.2f} | test MAE = {test_mae:.2f}")
+
+nuevo = np.array([[2.0, 1.0]])
+pred = model.predict(nuevo, verbose=0)
+print("predict:", pred.shape, "-&gt;", round(float(pred[0, 0]), 2), "(valor real sin ruido: 9.0)")</code></pre>
+  <details class="linea-a-linea" open>
+    <summary>Línea por línea</summary>
+    <p class="hint">Toca una fila (o pasa el ratón) para ver su línea resaltada en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace y por qué</th></tr></thead>
+      <tbody>
+        <tr data-lines="1"><td><code>import numpy as np</code></td><td>Trae <strong>NumPy</strong> con el apodo <code>np</code>. Es la librería de cuentas con listas enteras de números (su nombre viene de «Numerical Python»).<span class="por-que">La usamos para fabricar los datos. Keras recibe los datos como arrays de NumPy.</span><span class="se-lee">trae NumPy y llámala np</span></td></tr>
+        <tr data-lines="2"><td><code>import keras</code></td><td>Trae Keras.<span class="por-que">Es el mando: de aquí salen <code>Sequential</code>, <code>compile</code> y <code>fit</code>.</span></td></tr>
+        <tr data-lines="3"><td><code>from keras import layers</code></td><td>De Keras, trae solo el cajón <code>layers</code> (capas). <code>from A import B</code> es «de A, trae B».<span class="por-que">Así escribimos <code>layers.Dense</code> en vez de <code>keras.layers.Dense</code>.</span><span class="se-lee">del cajón de Keras, trae el de las capas</span></td></tr>
+        <tr data-lines="5"><td><code>rng = np.random.default_rng(42)</code></td><td>Crea una máquina de números al azar, <code>rng</code>, con <strong>semilla</strong> 42. La semilla fija el azar: con la misma, salen siempre los mismos números.<span class="por-que">Así, a ti te salen los mismos datos que aquí. El 42 es un número cualquiera.</span><span class="se-lee">fabrica un generador de azar que empiece siempre igual, con la semilla 42</span></td></tr>
+        <tr data-lines="7"><td><code>def crear_datos(n):</code></td><td><code>def</code> escribe una <strong>función</strong>: una receta con nombre (<code>crear_datos</code>) que recibe un dato (<code>n</code>, cuántas muestras) y devuelve algo. Las líneas con sangría son la receta.<span class="por-que">Vamos a necesitar tres conjuntos con la misma receta: así no la escribimos tres veces.</span><span class="se-lee">apunta una receta llamada crear_datos que fabrica n muestras</span></td></tr>
+        <tr data-lines="8"><td><code>X = rng.uniform(-3, 3, size=(n, 2))</code></td><td><code>X</code>: una tabla de <code>n</code> filas y 2 columnas con números al azar entre −3 y 3. <code>size=(n, 2)</code> es un <strong>argumento con nombre</strong>: le dice a la función qué forma quieres.<span class="por-que">Son las pistas: dos features por muestra.</span><span class="se-lee">X son n filas de dos números al azar entre menos 3 y 3</span></td></tr>
+        <tr data-lines="9"><td><code>y = 3 * X[:, 0] - 2 * X[:, 1] + 5 + rng.normal(0, …</code></td><td><code>y</code>: la regla secreta, y = 3·x₀ − 2·x₁ + 5, más un ruido al azar (<code>rng.normal(0, 1, n)</code>: números alrededor de 0). <code>X[:, 0]</code> es «todas las filas, columna 0»: los dos puntos significan «todas».<span class="por-que">La red nunca verá esta regla: tiene que descubrirla. El ruido hace que ninguna predicción pueda ser perfecta, como en la vida real.</span><span class="se-lee">la respuesta es 3 por la primera columna, menos 2 por la segunda, más 5, más un poco de mala suerte</span></td></tr>
+        <tr data-lines="10"><td><code>return X.astype("float32"), y.astype("float32")</code></td><td><code>return</code> dice qué devuelve la receta: <code>X</code> e <code>y</code> convertidos a <code>float32</code> con <code>.astype</code>.<span class="por-que">Keras trabaja con <code>float32</code>; con otro tipo convierte por su cuenta y es más lento.</span><span class="se-lee">devuelve las pistas y las respuestas como números de 32 bits</span></td></tr>
+        <tr data-lines="12-14"><td><code>X_train, y_train = crear_datos(1000) …</code></td><td>Usa la receta tres veces: 1.000 muestras para entrenar, 200 para <strong>validación</strong> (medir al final de cada época) y 200 para <strong>test</strong> (la nota final). <code>X_train, y_train = …</code> guarda las dos cosas que devuelve, en orden.<span class="por-que">Si entrenas y examinas con los mismos datos, la nota sale falsa: la red ya los ha visto.</span><span class="se-lee">fabrica mil muestras para aprender, doscientas para vigilar y doscientas para el examen</span></td></tr>
+        <tr data-lines="15"><td><code>print("X_train:", X_train.shape, "| y_train:", y_t …</code></td><td>Escribe las formas.<span class="por-que">Comprueba que <code>X</code> es (muestras, features) e <code>y</code> una lista: la regla de la lección 2.</span></td></tr>
+        <tr data-lines="17"><td><code>keras.utils.set_random_seed(42)</code></td><td>Fija todas las semillas a la vez (Python, NumPy y el motor).<span class="por-que">Así los pesos iniciales, que nacen al azar, son siempre los mismos y el resultado se repite.</span><span class="se-lee">que todo el azar de aquí en adelante empiece siempre igual</span></td></tr>
+        <tr data-lines="18"><td><code>model = keras.Sequential([</code></td><td>Empieza el modelo <code>Sequential</code>: una lista de capas, entre corchetes, que los datos atraviesan en orden.<span class="por-que">Es el paso 2 del guion: el modelo.</span><span class="se-lee">el modelo es esta fila de capas</span></td></tr>
+        <tr data-lines="19"><td><code>keras.Input(shape=(2,)),</code></td><td>La entrada: cada muestra trae 2 números. <code>shape=(2,)</code> lleva coma porque es una tupla (una lista fija) de un solo elemento.<span class="por-que">Con esto Keras ya sabe cuántos pesos crear en la primera capa. El número de muestras no se pone.</span><span class="se-lee">cada muestra que entre trae dos números</span></td></tr>
+        <tr data-lines="20"><td><code>layers.Dense(16, activation="relu"),</code></td><td>Primera capa oculta: 16 neuronas con ReLU. Tiene 2·16 + 16 = 48 parámetros.<span class="por-que">Las capas ocultas con ReLU permiten aprender relaciones que no son rectas.</span><span class="se-lee">una capa de 16 neuronas que ven las dos entradas y apagan lo negativo</span></td></tr>
+        <tr data-lines="21"><td><code>layers.Dense(8, activation="relu"),</code></td><td>Segunda oculta: 8 neuronas con ReLU. 16·8 + 8 = 136 parámetros.<span class="por-que">Más capas, más combinaciones de lo que calculó la anterior.</span></td></tr>
+        <tr data-lines="22"><td><code>layers.Dense(1),</code></td><td>Salida: 1 neurona <strong>sin activación</strong>.<span class="por-que">Queremos un número cualquiera, como 8,81. Con sigmoide no podría pasar de 1 (lección 5).</span><span class="se-lee">una sola neurona que devuelve su cuenta tal cual</span></td></tr>
+        <tr data-lines="23"><td><code>])</code></td><td>Cierra la lista y el paréntesis.<span class="por-que">Python necesita cerrar cada corchete y cada paréntesis que abre.</span></td></tr>
+        <tr data-lines="25"><td><code>model.compile(optimizer=keras.optimizers.Adam(lear …</code></td><td><code>compile</code> configura el aprendizaje. <code>optimizer</code>: Adam con <code>learning_rate=0.01</code>, el tamaño del paso. La orden sigue en las dos líneas siguientes porque el paréntesis está abierto.<span class="por-que">Es el paso 3 del guion. No toca los pesos: solo elige cómo se corregirán.</span><span class="se-lee">corrige los pesos con Adam, dando pasos de tamaño 0,01</span></td></tr>
+        <tr data-lines="26"><td><code>loss="mse",</code></td><td><code>loss="mse"</code>: la pérdida es el error cuadrático medio.<span class="por-que">Es el número que la red intentará bajar. MSE es la pérdida de siempre para predecir números.</span></td></tr>
+        <tr data-lines="27"><td><code>metrics=["mae"])</code></td><td><code>metrics=["mae"]</code>: además, enséñame el error medio sin signo. Va entre corchetes porque es una lista: podrías pedir varias.<span class="por-que">El MAE está en las unidades de <code>y</code> y se entiende mejor. No cambia el aprendizaje.</span></td></tr>
+        <tr data-lines="29"><td><code>history = model.fit(X_train, y_train,</code></td><td><code>fit</code> entrena con las pistas y respuestas de entrenamiento. Lo que devuelve, el diario <code>History</code>, se guarda en <code>history</code>.<span class="por-que">Es el paso 4 y el único que cambia los pesos.</span><span class="se-lee">entrena con estos datos y guarda el diario en history</span></td></tr>
+        <tr data-lines="30"><td><code>epochs=30, batch_size=32,</code></td><td><code>epochs=30</code>: 30 pasadas completas. <code>batch_size=32</code>: corrige cada 32 muestras, así que hay ⌈1.000 / 32⌉ = 32 pasos por época y 960 correcciones en total.<span class="por-que">Es la cuenta de la lección 2.</span><span class="se-lee">repasa todo 30 veces, en puñados de 32</span></td></tr>
+        <tr data-lines="31"><td><code>validation_data=(X_val, y_val),</code></td><td><code>validation_data</code>: la pareja (pistas, respuestas) con la que medir al final de cada época. Va entre paréntesis porque son dos cosas juntas (una tupla).<span class="por-que">No se usa para aprender: solo para vigilar si la red sirve con lo nuevo.</span><span class="se-lee">al final de cada pasada, mide con los datos de validación</span></td></tr>
+        <tr data-lines="32"><td><code>verbose=0)</code></td><td><code>verbose=0</code>: que no escriba nada mientras entrena.<span class="por-que">Con 1 o 2 saldría una línea (o una barra) por época; aquí queremos una salida corta.</span></td></tr>
+        <tr data-lines="34"><td><code>test_mse, test_mae = model.evaluate(X_test, y_test …</code></td><td><code>evaluate</code> pone la nota con el test, sin entrenar. Devuelve la pérdida y luego cada métrica, en el orden de <code>compile</code>; por eso se guardan en dos nombres.<span class="por-que">Es el paso 5: la nota con datos que la red nunca ha visto.</span><span class="se-lee">examina la red con el test y guarda el MSE y el MAE</span></td></tr>
+        <tr data-lines="35"><td><code>print(f"test MSE = {test_mse:.2f} | test MAE = {te …</code></td><td>Escribe los dos números. Un texto con <code>f</code> delante es una <strong>f-string</strong>: lo que va entre llaves se cambia por su valor, y <code>:.2f</code> significa «con 2 decimales».<span class="por-que">Para leer la nota de un vistazo.</span></td></tr>
+        <tr data-lines="37"><td><code>nuevo = np.array([[2.0, 1.0]])</code></td><td>Una muestra nueva: x₀ = 2 y x₁ = 1. Lleva <strong>dos</strong> pares de corchetes: forma (1, 2), un lote de una sola muestra.<span class="por-que">Keras siempre espera la dimensión del lote, aunque sea 1. Con un solo par de corchetes daría error (fragmento 15).</span><span class="se-lee">una tabla de una fila con los números 2 y 1</span></td></tr>
+        <tr data-lines="38"><td><code>pred = model.predict(nuevo, verbose=0)</code></td><td><code>predict</code> pasa la muestra por la red ya entrenada y devuelve la salida. No cambia los pesos.<span class="por-que">Es usar el modelo.</span><span class="se-lee">red, dime qué respondes para esta muestra</span></td></tr>
+        <tr data-lines="39"><td><code>print("predict:", pred.shape, "-&gt;", round(float(pr …</code></td><td>Escribe la forma de la predicción y su valor. <code>pred[0, 0]</code> es «fila 0, columna 0»: el único número. <code>float</code> lo vuelve número normal y <code>round(…, 2)</code> lo deja con 2 decimales.<span class="por-que">Sin ruido, la regla daría 3·2 − 2·1 + 5 = 9: así sabemos cuánto se acerca.</span><span class="se-lee">escribe la forma y el número redondeado, y recuerda que lo perfecto sería 9</span></td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>X_train: (1000, 2) | y_train: (1000,)
+test MSE = 0.85 | test MAE = 0.73
+predict: (1, 1) -&gt; 8.81 (valor real sin ruido: 9.0)</pre>
+    <p><strong>Cómo leerla.</strong> <code>(1000, 2)</code>: 1.000 muestras de 2 features; <code>(1000,)</code>: 1.000 respuestas. En el test, la red se equivoca de media 0,73 (MAE) y su MSE es 0,85. El ruido que metimos tiene desviación 1, así que ni un modelo perfecto bajaría de un MAE de unos 0,8: la red ha llegado al suelo del ruido. Para la muestra (2, 1) predice 8,81 y la regla sin ruido da 9. La forma de <code>predict</code> es <code>(1, 1)</code>: una muestra, una salida.</p>
+  </div>
+</article>
+</section>
+<section class="lab-paso" id="paso-3">
+<h2><span class="paso-n">3</span>Contar los parámetros con summary</h2>
+<p>Para qué sirve este paso: ver que la cuenta a mano de la <a href="leccion-3.html#contar">lección 3</a> (entradas × neuronas + neuronas) es justo lo que hace Keras. Es la misma red del paso 2, con nombres.</p>
+<article class="snippet" data-lang="python" id="fragmento-3">
+  <header>
+    <h3>Paso 3 · model.summary() y contar los parámetros a mano (fragmento 3)</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Comprobar que cada capa Dense tiene entradas × neuronas + neuronas parámetros, y ver dónde se guardan.</p>
+  </header>
+  <pre class="code"><code>import keras
+from keras import layers
+
+model = keras.Sequential([
+    keras.Input(shape=(2,)),
+    layers.Dense(16, activation="relu", name="oculta1"),
+    layers.Dense(8, activation="relu", name="oculta2"),
+    layers.Dense(1, name="salida"),
+], name="red_regresion")
+model.summary()
+
+for capa in model.layers:
+    W, b = capa.get_weights()
+    print(f"{capa.name:8s} W{W.shape}  b{b.shape}  -&gt;  {W.size + b.size} parámetros")
+
+a_mano = (2 * 16 + 16) + (16 * 8 + 8) + (8 * 1 + 1)
+print("A mano:", a_mano, "| Keras:", model.count_params())
+
+sin_bias = layers.Dense(16, use_bias=False)
+sin_bias.build((None, 2))
+print("Dense(16) sin bias:", sin_bias.count_params(), "parámetros")</code></pre>
+  <details class="linea-a-linea" open>
+    <summary>Línea por línea</summary>
+    <p class="hint">Toca una fila (o pasa el ratón) para ver su línea resaltada en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace y por qué</th></tr></thead>
+      <tbody>
+        <tr data-lines="1-2"><td><code>import keras …</code></td><td>Traen Keras y su cajón de capas.<span class="por-que">Este paso funciona solo, sin los anteriores.</span></td></tr>
+        <tr data-lines="4"><td><code>model = keras.Sequential([</code></td><td>Empieza la red.<span class="por-que">La misma forma que en el paso 2: 2 → 16 → 8 → 1.</span></td></tr>
+        <tr data-lines="5"><td><code>keras.Input(shape=(2,)),</code></td><td>Entrada de 2 números.<span class="por-que">Sin <code>Input</code>, Keras no sabría aún cuántos pesos crear y <code>summary</code> no podría contarlos.</span></td></tr>
+        <tr data-lines="6"><td><code>layers.Dense(16, activation="relu", name="oculta1"),</code></td><td>Oculta de 16 con ReLU. <code>name="oculta1"</code> le pone nombre propio.<span class="por-que">El nombre sale en la tabla de <code>summary</code>; si no, Keras inventa uno como <code>dense_3</code>.</span><span class="se-lee">una capa de 16 neuronas llamada oculta1</span></td></tr>
+        <tr data-lines="7"><td><code>layers.Dense(8, activation="relu", name="oculta2"),</code></td><td>Oculta de 8, llamada <code>oculta2</code>.<span class="por-que">Igual que la anterior.</span></td></tr>
+        <tr data-lines="8"><td><code>layers.Dense(1, name="salida"),</code></td><td>Salida de 1 neurona sin activación, llamada <code>salida</code>.<span class="por-que">Predecir un número.</span></td></tr>
+        <tr data-lines="9"><td><code>], name="red_regresion")</code></td><td>Cierra la lista. <code>name="red_regresion"</code> pone nombre al modelo entero.<span class="por-que">Sale como título de la tabla.</span></td></tr>
+        <tr data-lines="10"><td><code>model.summary()</code></td><td><code>summary()</code> escribe una tabla: cada capa con su tipo, la forma de lo que sale y sus parámetros, más los totales.<span class="por-que">Es la forma rápida de comprobar una red antes de entrenarla.</span><span class="se-lee">enséñame la red capa a capa con sus parámetros</span></td></tr>
+        <tr data-lines="12"><td><code>for capa in model.layers:</code></td><td>Un <strong>bucle</strong> <code>for</code>: repite las líneas con sangría una vez por cada capa del modelo, llamándola <code>capa</code> cada vez.<span class="por-que">Para mirar las capas una a una.</span><span class="se-lee">para cada capa del modelo, haz lo de debajo</span></td></tr>
+        <tr data-lines="13"><td><code>W, b = capa.get_weights()</code></td><td><code>get_weights()</code> devuelve dos cosas: la tabla de pesos <code>W</code> (una fila por entrada, una columna por neurona) y la lista de bias <code>b</code>. Se guardan en dos nombres a la vez.<span class="por-que">Así vemos dónde vive cada parámetro.</span><span class="se-lee">saca de la capa su tabla de pesos y su lista de bias</span></td></tr>
+        <tr data-lines="14"><td><code>print(f"{capa.name:8s} W{W.shape}  b{b.shape}  -&gt; …</code></td><td>Escribe el nombre, la forma de <code>W</code> y de <code>b</code> y cuántos números suman. <code>.size</code> es cuántos números hay dentro. <code>:8s</code> rellena el nombre con espacios hasta 8 letras, para que las columnas queden alineadas.<span class="por-que">Para ver que pesos + bias = parámetros de la capa.</span></td></tr>
+        <tr data-lines="16"><td><code>a_mano = (2 * 16 + 16) + (16 * 8 + 8) + (8 * 1 + 1)</code></td><td>La cuenta a mano, capa a capa: entradas × neuronas + neuronas. Los paréntesis agrupan cada capa.<span class="por-que">Es la fórmula de la lección 3, escrita en Python.</span><span class="se-lee">suma, para cada capa, sus pesos y sus bias</span></td></tr>
+        <tr data-lines="17"><td><code>print("A mano:", a_mano, "| Keras:", model.count_p …</code></td><td>Compara con Keras: <code>count_params()</code> cuenta todos los parámetros del modelo.<span class="por-que">Si las dos cifras coinciden, la fórmula está bien entendida.</span></td></tr>
+        <tr data-lines="19"><td><code>sin_bias = layers.Dense(16, use_bias=False)</code></td><td>Crea una capa suelta de 16 neuronas <strong>sin bias</strong> (<code>use_bias=False</code>).<span class="por-que">Para ver cuánto aporta el bias.</span><span class="se-lee">una capa de 16 neuronas que no suma bias</span></td></tr>
+        <tr data-lines="20"><td><code>sin_bias.build((None, 2))</code></td><td>Una capa no crea sus pesos hasta saber cuántas entradas le llegan. <code>build((None, 2))</code> se lo dice: lotes de cualquier tamaño (<code>None</code>) y 2 entradas.<span class="por-que">Sin esto, <code>count_params</code> daría error: aún no hay pesos.</span><span class="se-lee">prepárate para recibir dos números por muestra</span></td></tr>
+        <tr data-lines="21"><td><code>print("Dense(16) sin bias:", sin_bias.count_params …</code></td><td>Escribe sus parámetros.<span class="por-que">Solo pesos: 2 × 16 = 32.</span></td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre style="white-space:pre">Model: "red_regresion"
+┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━┓
+┃ Layer (type)                    ┃ Output Shape           ┃       Param # ┃
+┡━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━┩
+│ oculta1 (Dense)                 │ (None, 16)             │            48 │
+├─────────────────────────────────┼────────────────────────┼───────────────┤
+│ oculta2 (Dense)                 │ (None, 8)              │           136 │
+├─────────────────────────────────┼────────────────────────┼───────────────┤
+│ salida (Dense)                  │ (None, 1)              │             9 │
+└─────────────────────────────────┴────────────────────────┴───────────────┘
+ Total params: 193 (772.00 B)
+ Trainable params: 193 (772.00 B)
+ Non-trainable params: 0 (0.00 B)
+oculta1  W(2, 16)  b(16,)  -&gt;  48 parámetros
+oculta2  W(16, 8)  b(8,)  -&gt;  136 parámetros
+salida   W(8, 1)  b(1,)  -&gt;  9 parámetros
+A mano: 193 | Keras: 193
+Dense(16) sin bias: 32 parámetros</pre>
+    <p><strong>Cómo leerla.</strong> La tabla da 48 + 136 + 9 = 193 parámetros, y la cuenta a mano da lo mismo. «772 B» son esos 193 números por 4 bytes cada uno. En <code>(None, 16)</code>, <code>None</code> es «las filas que lleguen». Los pesos de cada capa tienen forma (entradas, neuronas): (2, 16), (16, 8) y (8, 1). Sin bias, la capa de 16 tendría 32 parámetros en vez de 48. Si la tabla se ve cortada, desliza la salida hacia el lado.</p>
+  </div>
+</article>
+</section>
+<section class="lab-paso" id="paso-4">
+<h2><span class="paso-n">4</span>Una capa Dense hecha a mano</h2>
+<p>Para qué sirve este paso: hacer con NumPy las cuentas de la <a href="leccion-3.html#dense">lección 3</a> (pesos, bias, ReLU) y ver que Keras da exactamente lo mismo: 1,6.</p>
+<article class="snippet" data-lang="python" id="fragmento-4">
+  <header>
+    <h3>Paso 4 · Una capa Dense a mano con NumPy y comparada con Keras (fragmento 4)</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Comprobar que una capa Dense es «multiplicar por una tabla, sumar el bias y aplicar la activación», ni más ni menos.</p>
+  </header>
+  <pre class="code"><code>import numpy as np
+import keras
+from keras import layers
+
+model = keras.Sequential([
+    keras.Input(shape=(2,)),
+    layers.Dense(3, activation="relu"),
+    layers.Dense(1),
+])
+
+W1 = np.array([[0.5, -1.0, 0.0],
+               [0.25, 0.5, 1.0]])
+b1 = np.array([0.1, 0.0, -3.0])
+W2 = np.array([[1.0], [2.0], [3.0]])
+b2 = np.array([0.5])
+model.layers[0].set_weights([W1, b1])
+model.layers[1].set_weights([W2, b2])
+
+x = np.array([[1.0, 2.0]])
+z1 = x @ W1 + b1
+h1 = np.maximum(0, z1)
+y_mano = h1 @ W2 + b2
+
+print("z1 (antes de ReLU):", z1)
+print("h1 (después de ReLU):", h1)
+print("salida a mano:", y_mano)
+print("salida de Keras:", model.predict(x, verbose=0))</code></pre>
+  <details class="linea-a-linea" open>
+    <summary>Línea por línea</summary>
+    <p class="hint">Toca una fila (o pasa el ratón) para ver su línea resaltada en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace y por qué</th></tr></thead>
+      <tbody>
+        <tr data-lines="1-3"><td><code>import numpy as np …</code></td><td>Traen NumPy, Keras y las capas.<span class="por-que">NumPy para las cuentas a mano; Keras para comparar.</span></td></tr>
+        <tr data-lines="5-9"><td><code>model = keras.Sequential([ …</code></td><td>Una red de 2 entradas, una oculta de 3 neuronas con ReLU y una salida de 1. Sus pesos nacen al azar.<span class="por-que">Es la red de la animación de la lección 3.</span><span class="se-lee">una red con dos entradas, tres neuronas ocultas y una salida</span></td></tr>
+        <tr data-lines="11-12"><td><code>W1 = np.array([[0.5, -1.0, 0.0], …</code></td><td>La tabla de pesos de la capa oculta, <code>W1</code>: 2 filas (una por entrada) y 3 columnas (una por neurona). La columna 0, [0,5; 0,25], son los pesos de la neurona 0.<span class="por-que">Ponemos números redondos para poder hacer la cuenta a mano.</span><span class="se-lee">W1 tiene una fila de pesos para la primera entrada y otra para la segunda</span></td></tr>
+        <tr data-lines="13"><td><code>b1 = np.array([0.1, 0.0, -3.0])</code></td><td>El bias de cada neurona oculta: 0,1, 0 y −3.<span class="por-que">Uno por neurona.</span></td></tr>
+        <tr data-lines="14"><td><code>W2 = np.array([[1.0], [2.0], [3.0]])</code></td><td>Pesos de la salida: 3 filas (una por neurona oculta) y 1 columna.<span class="por-que">Forma (3, 1): 3 entradas, 1 neurona.</span></td></tr>
+        <tr data-lines="15"><td><code>b2 = np.array([0.5])</code></td><td>Bias de la neurona de salida: 0,5.<span class="por-que">Va entre corchetes porque es una lista, aunque tenga un solo número.</span></td></tr>
+        <tr data-lines="16"><td><code>model.layers[0].set_weights([W1, b1])</code></td><td><code>model.layers[0]</code> es la primera capa (se cuenta desde 0). <code>set_weights</code> cambia sus pesos al azar por los nuestros. Siempre se pasa una lista: primero la tabla, luego el bias.<span class="por-que">Así la red de Keras y nuestra cuenta usan los mismos números.</span><span class="se-lee">a la primera capa, ponle estos pesos y estos bias</span></td></tr>
+        <tr data-lines="17"><td><code>model.layers[1].set_weights([W2, b2])</code></td><td>Lo mismo para la capa de salida.<span class="por-que">Las dos capas tienen que coincidir con la cuenta a mano.</span></td></tr>
+        <tr data-lines="19"><td><code>x = np.array([[1.0, 2.0]])</code></td><td>Una muestra: x₁ = 1 y x₂ = 2, con forma (1, 2).<span class="por-que">Dos pares de corchetes: un lote de una muestra.</span></td></tr>
+        <tr data-lines="20"><td><code>z1 = x @ W1 + b1</code></td><td><code>@</code> multiplica tablas: para cada neurona, suma de entradas por pesos. Luego suma el bias. Neurona 0: 1·0,5 + 2·0,25 + 0,1 = 1,1. Neurona 1: 1·(−1) + 2·0,5 + 0 = 0. Neurona 2: 1·0 + 2·1 − 3 = −1.<span class="por-que">Es lo que hace por dentro cada capa Dense.</span><span class="se-lee">multiplica la muestra por los pesos y suma los bias</span></td></tr>
+        <tr data-lines="21"><td><code>h1 = np.maximum(0, z1)</code></td><td>ReLU: <code>np.maximum(0, z1)</code> se queda con el mayor entre 0 y cada número. De [1,1; 0; −1] queda [1,1; 0; 0].<span class="por-que">La tercera neurona se apaga para esta muestra.</span><span class="se-lee">cambia los negativos por cero</span></td></tr>
+        <tr data-lines="22"><td><code>y_mano = h1 @ W2 + b2</code></td><td>La salida (sin activación): 1,1·1 + 0·2 + 0·3 + 0,5 = 1,6.<span class="por-que">La última capa junta lo que dieron las ocultas.</span><span class="se-lee">multiplica por los pesos de salida y suma su bias</span></td></tr>
+        <tr data-lines="24-26"><td><code>print("z1 (antes de ReLU):", z1) …</code></td><td>Escriben los pasos intermedios y el resultado a mano.<span class="por-que">Para seguir la cuenta paso a paso.</span></td></tr>
+        <tr data-lines="27"><td><code>print("salida de Keras:", model.predict(x, verbose …</code></td><td>Pide a Keras la predicción de la misma muestra.<span class="por-que">Si coincide con la cuenta a mano, sabemos qué hace Keras por dentro.</span><span class="se-lee">red, calcula tú lo mismo</span></td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>z1 (antes de ReLU): [[ 1.1  0.  -1. ]]
+h1 (después de ReLU): [[1.1 0.  0. ]]
+salida a mano: [[1.6]]
+salida de Keras: [[1.6]]</pre>
+    <p><strong>Cómo leerla.</strong> Los dos resultados son 1,6: Keras ha hecho exactamente las cuentas de las líneas 20 a 22. Los dobles corchetes <code>[[1.6]]</code> son la forma (1, 1): una muestra, una salida. La ReLU convirtió el −1 en 0 y apagó una neurona.</p>
+  </div>
+</article>
+</section>
+<section class="lab-paso" id="paso-5">
+<h2><span class="paso-n">5</span>Normalizar las entradas</h2>
+<p>Para qué sirve este paso: ver con números lo que dice la <a href="leccion-5.html#normalizar">lección 5</a>. Dos columnas de escalas muy distintas, como las de Netflix (presupuesto en millones y días desde el estreno), y la misma red con y sin normalizar.</p>
+<article class="snippet" data-lang="python" id="fragmento-5">
+  <header>
+    <h3>Paso 5 · La misma red con y sin normalizar las entradas (fragmento 5)</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Ver que normalizar no es un detalle: con las mismas épocas, la red normalizada se equivoca menos de la mitad.</p>
+  </header>
+  <pre class="code"><code>import numpy as np
+import keras
+from keras import layers
+from sklearn.preprocessing import StandardScaler
+
+rng = np.random.default_rng(0)
+n = 1200
+presupuesto = rng.uniform(30, 250, n)
+dias = rng.uniform(100, 10000, n)
+X = np.column_stack([presupuesto, dias]).astype("float32")
+y = (2.0 * presupuesto - 0.01 * dias + 50 + rng.normal(0, 5, n)).astype("float32")
+X_train, y_train = X[:1000], y[:1000]
+X_val, y_val = X[1000:], y[1000:]
+print("Rango de cada columna:", X_train.min(axis=0).round(0), X_train.max(axis=0).round(0))
+
+def construir(normalizar):
+    keras.utils.set_random_seed(1)
+    capas = [keras.Input(shape=(2,))]
+    if normalizar:
+        norm = layers.Normalization()
+        norm.adapt(X_train)
+        capas.append(norm)
+    capas += [layers.Dense(16, activation="relu"),
+              layers.Dense(8, activation="relu"),
+              layers.Dense(1)]
+    modelo = keras.Sequential(capas)
+    modelo.compile(optimizer=keras.optimizers.Adam(learning_rate=0.01), loss="mse")
+    return modelo
+
+for normalizar in (False, True):
+    modelo = construir(normalizar)
+    h = modelo.fit(X_train, y_train, epochs=30, batch_size=32,
+                   validation_data=(X_val, y_val), verbose=0)
+    mse_final = h.history["val_loss"][-1]
+    print(f"normalizar={normalizar!s:5} | val_loss final = {mse_final:6.1f} | error típico (raíz) = {mse_final ** 0.5:4.1f}")
+
+norm = layers.Normalization()
+norm.adapt(X_train)
+scaler = StandardScaler().fit(X_train)
+print("Normalization == StandardScaler:", np.allclose(norm(X_val).numpy(), scaler.transform(X_val), atol=1e-4))</code></pre>
+  <details class="linea-a-linea" open>
+    <summary>Línea por línea</summary>
+    <p class="hint">Toca una fila (o pasa el ratón) para ver su línea resaltada en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace y por qué</th></tr></thead>
+      <tbody>
+        <tr data-lines="1-3"><td><code>import numpy as np …</code></td><td>Traen NumPy, Keras y las capas.<span class="por-que">Lo de siempre.</span></td></tr>
+        <tr data-lines="4"><td><code>from sklearn.preprocessing import StandardScaler</code></td><td>Trae <code>StandardScaler</code> de <strong>scikit-learn</strong> (se escribe <code>sklearn</code> al importar), el normalizador del Curso 1. Su cajón <code>preprocessing</code> es el de «preparar datos».<span class="por-que">Solo lo usamos al final, para comprobar que la capa de Keras hace lo mismo.</span><span class="se-lee">del cajón de preparar datos de scikit-learn, trae el normalizador</span></td></tr>
+        <tr data-lines="6"><td><code>rng = np.random.default_rng(0)</code></td><td>Máquina de azar con semilla 0.<span class="por-que">Mismos datos cada vez.</span></td></tr>
+        <tr data-lines="7"><td><code>n = 1200</code></td><td>1.200 muestras en total.<span class="por-que">Las repartiremos en 1.000 y 200.</span></td></tr>
+        <tr data-lines="8"><td><code>presupuesto = rng.uniform(30, 250, n)</code></td><td>Columna 1: presupuesto de una película, entre 30 y 250 millones (inventado). <code>uniform</code> sortea con todos los valores igual de probables.<span class="por-que">Números «pequeños».</span><span class="se-lee">sortea 1.200 presupuestos entre 30 y 250</span></td></tr>
+        <tr data-lines="9"><td><code>dias = rng.uniform(100, 10000, n)</code></td><td>Columna 2: días desde el estreno, entre 100 y 10.000.<span class="por-que">Números decenas de veces mayores: el problema que queremos ver.</span></td></tr>
+        <tr data-lines="10"><td><code>X = np.column_stack([presupuesto, dias]).astype("f …</code></td><td><code>np.column_stack</code> pega las dos listas como columnas: una tabla de 1.200 × 2, en <code>float32</code>.<span class="por-que">Keras quiere una tabla (muestras, features).</span><span class="se-lee">pon presupuesto y días uno al lado del otro</span></td></tr>
+        <tr data-lines="11"><td><code>y = (2.0 * presupuesto - 0.01 * dias + 50 + rng.no …</code></td><td>La respuesta (la recaudación, inventada): 2 × presupuesto − 0,01 × días + 50, más un ruido de desviación 5.<span class="por-que">El ruido marca el suelo: ninguna red podrá equivocarse menos de unos 5 de media.</span><span class="se-lee">la respuesta es dos veces el presupuesto, menos una centésima de los días, más 50, más algo de azar</span></td></tr>
+        <tr data-lines="12"><td><code>X_train, y_train = X[:1000], y[:1000]</code></td><td>Las primeras 1.000 filas, para entrenar. <code>X[:1000]</code> es «desde el principio hasta antes de la fila 1.000».<span class="por-que">En Python, el final de un rango no entra.</span><span class="se-lee">las mil primeras filas son el entrenamiento</span></td></tr>
+        <tr data-lines="13"><td><code>X_val, y_val = X[1000:], y[1000:]</code></td><td>Desde la fila 1.000 hasta el final, para validar: 200.<span class="por-que">Para vigilar sin aprender de ellas.</span></td></tr>
+        <tr data-lines="14"><td><code>print("Rango de cada columna:", X_train.min(axis=0 …</code></td><td>Escribe el mínimo y el máximo de cada columna. <code>axis=0</code> significa «recorriendo las filas»: sale una cifra por columna.<span class="por-que">Así se ve lo distintas que son las escalas.</span><span class="se-lee">dime el valor más pequeño y el más grande de cada columna</span></td></tr>
+        <tr data-lines="16"><td><code>def construir(normalizar):</code></td><td>Una receta que construye el modelo. Su dato <code>normalizar</code> (verdadero o falso) decide si lleva la capa de normalización.<span class="por-que">Para construir dos redes idénticas salvo en eso.</span><span class="se-lee">receta para montar la red, con o sin normalizar</span></td></tr>
+        <tr data-lines="17"><td><code>keras.utils.set_random_seed(1)</code></td><td>Misma semilla en las dos.<span class="por-que">Mismos pesos iniciales: la comparación es justa.</span></td></tr>
+        <tr data-lines="18"><td><code>capas = [keras.Input(shape=(2,))]</code></td><td>Empieza una lista de capas con la entrada de 2 números.<span class="por-que">La iremos rellenando.</span></td></tr>
+        <tr data-lines="19"><td><code>if normalizar:</code></td><td><code>if</code> es «si…»: las líneas con más sangría solo se hacen si <code>normalizar</code> es verdadero.<span class="por-que">Así una sola receta sirve para las dos versiones.</span><span class="se-lee">si me han pedido normalizar, haz esto</span></td></tr>
+        <tr data-lines="20"><td><code>norm = layers.Normalization()</code></td><td>Crea una capa <code>Normalization</code>: hace (x − media) / desviación con cada columna.<span class="por-que">Es normalizar dentro del modelo: viaja con él al guardarlo.</span><span class="se-lee">una capa que deja cada columna con media 0 y desviación 1</span></td></tr>
+        <tr data-lines="21"><td><code>norm.adapt(X_train)</code></td><td><code>adapt(X_train)</code> le enseña los datos de entrenamiento para que calcule la media y la desviación de cada columna.<span class="por-que">Solo con el entrenamiento: así no se cuela nada de la validación ni del test (fuga de datos).</span><span class="se-lee">mira los datos de entrenamiento y apúntate su media y su desviación</span></td></tr>
+        <tr data-lines="22"><td><code>capas.append(norm)</code></td><td><code>.append</code> añade la capa al final de la lista.<span class="por-que">Va justo detrás de la entrada.</span></td></tr>
+        <tr data-lines="23-25"><td><code>capas += [layers.Dense(16, activation="relu"), …</code></td><td>Añade las ocultas (16 y 8 con ReLU) y la salida sin activación. <code>+=</code> añade varios elementos de golpe.<span class="por-que">La misma red del paso 2.</span><span class="se-lee">añade a la lista las dos capas ocultas y la de salida</span></td></tr>
+        <tr data-lines="26"><td><code>modelo = keras.Sequential(capas)</code></td><td>Crea el modelo con la lista de capas.<span class="por-que"><code>Sequential</code> acepta una lista ya preparada.</span></td></tr>
+        <tr data-lines="27"><td><code>modelo.compile(optimizer=keras.optimizers.Adam(lea …</code></td><td>Compila con Adam (paso 0,01) y MSE.<span class="por-que">Sin <code>metrics</code>: solo nos interesa la pérdida.</span></td></tr>
+        <tr data-lines="28"><td><code>return modelo</code></td><td>Devuelve el modelo ya compilado.<span class="por-que">Quien llame a la receta recibe la red lista para <code>fit</code>.</span></td></tr>
+        <tr data-lines="30"><td><code>for normalizar in (False, True):</code></td><td>Un bucle de dos vueltas: primero con <code>False</code> (sin normalizar) y luego con <code>True</code>.<span class="por-que">El mismo experimento dos veces, cambiando solo una cosa.</span><span class="se-lee">prueba primero sin normalizar y luego normalizando</span></td></tr>
+        <tr data-lines="31"><td><code>modelo = construir(normalizar)</code></td><td>Construye la red de esta vuelta.</td></tr>
+        <tr data-lines="32-33"><td><code>h = modelo.fit(X_train, y_train, epochs=30, batch_ …</code></td><td>Entrena 30 épocas en puñados de 32 y guarda el diario en <code>h</code>.<span class="por-que">Mismo entrenamiento en las dos vueltas.</span></td></tr>
+        <tr data-lines="34"><td><code>mse_final = h.history["val_loss"][-1]</code></td><td><code>h.history["val_loss"]</code> es la lista de pérdidas de validación, una por época; <code>[-1]</code> coge la última.<span class="por-que">Es la nota final de cada versión.</span><span class="se-lee">quédate con la pérdida de validación de la última época</span></td></tr>
+        <tr data-lines="35"><td><code>print(f"normalizar={normalizar!s:5} | val_loss fin …</code></td><td>Escribe el MSE y su raíz (<code>** 0.5</code>), el «error típico», que está en las unidades de la respuesta. <code>!s:5</code> escribe el verdadero o falso ocupando 5 letras; <code>6.1f</code>, con 1 decimal y 6 de ancho.<span class="por-que">La raíz se entiende mejor que el MSE.</span></td></tr>
+        <tr data-lines="37-38"><td><code>norm = layers.Normalization() …</code></td><td>Otra capa <code>Normalization</code>, adaptada al entrenamiento.<span class="por-que">Para compararla con scikit-learn.</span></td></tr>
+        <tr data-lines="39"><td><code>scaler = StandardScaler().fit(X_train)</code></td><td>El normalizador de scikit-learn, ajustado (<code>fit</code>) con los mismos datos.<span class="por-que">Su <code>fit</code> solo calcula media y desviación.</span></td></tr>
+        <tr data-lines="40"><td><code>print("Normalization == StandardScaler:", np.allcl …</code></td><td>Compara los dos sobre la validación. <code>np.allclose</code> dice <code>True</code> si todos los números coinciden con una tolerancia pequeña (<code>atol=1e-4</code>, 0,0001).<span class="por-que">Para confirmar que la capa de Keras es el StandardScaler de siempre.</span><span class="se-lee">comprueba si las dos formas de normalizar dan casi exactamente lo mismo</span></td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>Rango de cada columna: [ 30. 129.] [ 250. 9981.]
+normalizar=False | val_loss final =  293.0 | error típico (raíz) = 17.1
+normalizar=True  | val_loss final =   48.9 | error típico (raíz) =  7.0
+Normalization == StandardScaler: True</pre>
+    <p><strong>Cómo leerla.</strong> Los presupuestos van de 30 a 250; los días, de 129 a 9.981. Sin normalizar, tras 30 épocas el error típico es 17,1; normalizando, 7,0. El mejor posible es 5 (el ruido), así que la red normalizada casi llega y la otra sigue lejos. Mismo modelo, mismos datos, mismas épocas: solo cambió la escala. La última línea confirma que <code>layers.Normalization</code> hace lo mismo que <code>StandardScaler</code>.</p>
+  </div>
+</article>
+</section>
+<section class="lab-paso" id="paso-6">
+<h2><span class="paso-n">6</span>Sí o no: clasificación binaria</h2>
+<p>Para qué sirve este paso: la receta del sí o no de la <a href="leccion-6.html#sigmoide">lección 6</a> (sigmoide y binary crossentropy). No hay datos reales de Netflix, así que usamos unos que vienen dentro de scikit-learn: 569 tumores descritos con 30 medidas, cada uno benigno (1) o maligno (0). Para la red es lo mismo que «¿terminará la película?».</p>
+<article class="snippet" data-lang="python" id="fragmento-6">
+  <header>
+    <h3>Paso 6 · Clasificación binaria: sigmoide y binary crossentropy (fragmento 6)</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Ver la receta del sí o no funcionando: probabilidades, umbral y pérdida.</p>
+  </header>
+  <pre class="code"><code>import numpy as np
+import keras
+from keras import layers
+from sklearn.datasets import load_breast_cancer
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
+
+datos = load_breast_cancer()
+X_train, X_test, y_train, y_test = train_test_split(
+    datos.data, datos.target, test_size=0.2, stratify=datos.target, random_state=42)
+
+scaler = StandardScaler().fit(X_train)
+X_train = scaler.transform(X_train)
+X_test = scaler.transform(X_test)
+print("X_train:", X_train.shape, "| clases en y_train:", np.bincount(y_train))
+
+keras.utils.set_random_seed(42)
+model = keras.Sequential([
+    keras.Input(shape=(30,)),
+    layers.Dense(16, activation="relu"),
+    layers.Dense(1, activation="sigmoid"),
+])
+model.compile(optimizer="adam", loss="binary_crossentropy", metrics=["accuracy"])
+model.fit(X_train, y_train, epochs=20, batch_size=32, validation_split=0.2, verbose=0)
+
+loss, acc = model.evaluate(X_test, y_test, verbose=0)
+print(f"test: BCE = {loss:.3f} | accuracy = {acc:.3f}")
+
+p = model.predict(X_test[:5], verbose=0).ravel()
+print("probabilidades:", p.round(3))
+print("clase (p &gt; 0.5):", (p &gt; 0.5).astype(int), "| real:", y_test[:5])
+
+p3, y3 = p[3], y_test[3]
+bce_mano = -(y3 * np.log(p3) + (1 - y3) * np.log(1 - p3))
+print("BCE de la muestra 3 a mano:", bce_mano.round(3))</code></pre>
+  <details class="linea-a-linea" open>
+    <summary>Línea por línea</summary>
+    <p class="hint">Toca una fila (o pasa el ratón) para ver su línea resaltada en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace y por qué</th></tr></thead>
+      <tbody>
+        <tr data-lines="1-3"><td><code>import numpy as np …</code></td><td>Traen NumPy, Keras y las capas.</td></tr>
+        <tr data-lines="4"><td><code>from sklearn.datasets import load_breast_cancer</code></td><td>Trae <code>load_breast_cancer</code>, un conjunto de datos que viene dentro de scikit-learn (cajón <code>datasets</code>).<span class="por-que">No hace falta internet.</span><span class="se-lee">del cajón de datos de scikit-learn, trae el de los tumores</span></td></tr>
+        <tr data-lines="5"><td><code>from sklearn.model_selection import train_test_split</code></td><td>Trae <code>train_test_split</code>, que reparte al azar en entrenamiento y test.<span class="por-que">Para tener un examen con datos no vistos.</span></td></tr>
+        <tr data-lines="6"><td><code>from sklearn.preprocessing import StandardScaler</code></td><td>Trae el normalizador.<span class="por-que">Las 30 medidas tienen escalas muy distintas (lección 5).</span></td></tr>
+        <tr data-lines="8"><td><code>datos = load_breast_cancer()</code></td><td>Carga los datos. <code>datos.data</code> son las pistas (569 × 30) y <code>datos.target</code>, las respuestas 0/1.</td></tr>
+        <tr data-lines="9-10"><td><code>X_train, X_test, y_train, y_test = train_test_split( …</code></td><td>Reparte: 20 % a test (<code>test_size=0.2</code>). <code>stratify</code> mantiene la misma proporción de benignos y malignos en los dos montones. <code>random_state=42</code> fija el sorteo. Devuelve cuatro trozos, que se guardan por orden.<span class="por-que">Sin <code>stratify</code>, por mala suerte el test podría tener muy pocos de una clase.</span><span class="se-lee">reparte pistas y respuestas, un 20 % al examen, con las mismas proporciones y el sorteo 42</span></td></tr>
+        <tr data-lines="12"><td><code>scaler = StandardScaler().fit(X_train)</code></td><td>Crea el normalizador y lo ajusta (<code>fit</code>) solo con el entrenamiento.<span class="por-que">Para no colar información del test.</span><span class="se-lee">calcula la media y la desviación solo con el entrenamiento</span></td></tr>
+        <tr data-lines="13-14"><td><code>X_train = scaler.transform(X_train) …</code></td><td>Aplica (<code>transform</code>) esa misma normalización al entrenamiento y al test.<span class="por-que">Los dos tienen que estar en la misma escala.</span></td></tr>
+        <tr data-lines="15"><td><code>print("X_train:", X_train.shape, "| clases en y_tr …</code></td><td>Escribe la forma y cuántos hay de cada clase. <code>np.bincount</code> cuenta cuántos 0 y cuántos 1 hay.<span class="por-que">Para saber si las clases están equilibradas.</span><span class="se-lee">cuenta cuántas respuestas son 0 y cuántas 1</span></td></tr>
+        <tr data-lines="17"><td><code>keras.utils.set_random_seed(42)</code></td><td>Fija las semillas.<span class="por-que">Resultado repetible.</span></td></tr>
+        <tr data-lines="18-19"><td><code>model = keras.Sequential([ …</code></td><td>La red empieza con una entrada de 30 números.<span class="por-que">Una por medida.</span></td></tr>
+        <tr data-lines="20"><td><code>layers.Dense(16, activation="relu"),</code></td><td>Oculta de 16 con ReLU.</td></tr>
+        <tr data-lines="21"><td><code>layers.Dense(1, activation="sigmoid"),</code></td><td>Salida: <strong>1 neurona con sigmoide</strong>. Da la probabilidad de la clase 1.<span class="por-que">Es la receta del sí o no: una sola probabilidad basta, la otra es 1 − p.</span><span class="se-lee">una neurona que devuelve la probabilidad de sí</span></td></tr>
+        <tr data-lines="22"><td><code>])</code></td><td>Cierra la lista.</td></tr>
+        <tr data-lines="23"><td><code>model.compile(optimizer="adam", loss="binary_cross …</code></td><td>Compila con Adam, pérdida <code>binary_crossentropy</code> y la métrica <code>accuracy</code> (porcentaje de aciertos, de 0 a 1).<span class="por-que">La pérdida va en pareja con la sigmoide.</span><span class="se-lee">aprende con la pérdida del sí o no y enséñame el porcentaje de aciertos</span></td></tr>
+        <tr data-lines="24"><td><code>model.fit(X_train, y_train, epochs=20, batch_size= …</code></td><td>Entrena 20 épocas. <code>validation_split=0.2</code> aparta el último 20 % del entrenamiento para vigilar.<span class="por-que">Aquí no se guarda el diario: no lo vamos a mirar.</span></td></tr>
+        <tr data-lines="26"><td><code>loss, acc = model.evaluate(X_test, y_test, verbose …</code></td><td>Nota con el test: pérdida y porcentaje de aciertos.</td></tr>
+        <tr data-lines="27"><td><code>print(f"test: BCE = {loss:.3f} | accuracy = {acc:. …</code></td><td>Los escribe con 3 decimales.</td></tr>
+        <tr data-lines="29"><td><code>p = model.predict(X_test[:5], verbose=0).ravel()</code></td><td>Probabilidades para las 5 primeras muestras del test. <code>X_test[:5]</code> es «las filas 0 a 4». <code>.ravel()</code> aplana la forma (5, 1) en una lista de 5.<span class="por-que">Más cómodo de leer y de comparar.</span><span class="se-lee">dame la probabilidad de sí de las cinco primeras, en una lista</span></td></tr>
+        <tr data-lines="30"><td><code>print("probabilidades:", p.round(3))</code></td><td>Las escribe con 3 decimales.</td></tr>
+        <tr data-lines="31"><td><code>print("clase (p &gt; 0.5):", (p &gt; 0.5).astype(int), " …</code></td><td>Aplica el umbral: <code>p &gt; 0.5</code> da verdadero o falso; <code>.astype(int)</code> lo convierte en 1 o 0. Al lado, las respuestas reales.<span class="por-que">Así pasamos de probabilidad a decisión.</span><span class="se-lee">si la probabilidad pasa de 0,5, di 1; si no, 0; y enséñame al lado las de verdad</span></td></tr>
+        <tr data-lines="33"><td><code>p3, y3 = p[3], y_test[3]</code></td><td>Guarda la probabilidad y la respuesta real de la muestra 3 (la cuarta).<span class="por-que">Es la dudosa: vamos a calcular su pérdida a mano.</span></td></tr>
+        <tr data-lines="34"><td><code>bce_mano = -(y3 * np.log(p3) + (1 - y3) * np.log(1 …</code></td><td>La binary crossentropy a mano: −[y·ln p + (1 − y)·ln(1 − p)]. <code>np.log</code> es el logaritmo natural (ln). Como y = 1, solo queda −ln p.<span class="por-que">Para ver que la pérdida depende de la probabilidad, no de si acertó.</span><span class="se-lee">menos el logaritmo de la probabilidad que dio a lo que pasó de verdad</span></td></tr>
+        <tr data-lines="35"><td><code>print("BCE de la muestra 3 a mano:", bce_mano.roun …</code></td><td>La escribe con 3 decimales.</td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>X_train: (455, 30) | clases en y_train: [170 285]
+test: BCE = 0.147 | accuracy = 0.930
+probabilidades: [0.    1.    0.037 0.657 0.   ]
+clase (p &gt; 0.5): [0 1 0 1 0] | real: [0 1 0 1 0]
+BCE de la muestra 3 a mano: 0.42</pre>
+    <p><strong>Cómo leerla.</strong> 455 muestras de entrenamiento con 30 medidas; 170 de clase 0 y 285 de clase 1. Con solo 16 neuronas ocultas, la red acierta el 93 % del test (pérdida 0,147). En las 5 primeras muestras acierta las 5. La muestra 3 es la dudosa: da 0,657 a «benigno» y era benigno, así que su pérdida es −ln 0,657 = 0,42, mucho mayor que la de las muestras en las que dio 1,0. <code>0.</code> y <code>1.</code> son 0 y 1 con decimales redondeados.</p>
+  </div>
+</article>
+</section>
+<section class="lab-paso" id="paso-7">
+<h2><span class="paso-n">7</span>Diez clases: reconocer dígitos</h2>
+<p>Para qué sirve este paso: el ejemplo completo de la <a href="leccion-7.html#idea">lección 7</a>. Imágenes de 8×8 (como una carátula de Netflix en miniatura) aplanadas, divididas entre 16, con la respuesta en One-Hot y una red 64 → 64 → 10. Los pasos 8, 9 y 10 usan lo que deja este: ejecútalos seguidos.</p>
+<article class="snippet" data-lang="python" id="fragmento-7">
+  <header>
+    <h3>Paso 7 · Multiclase con dígitos: aplanar, normalizar, One-Hot y softmax (fragmento 7)</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Entrenar una red que reconoce dígitos escritos a mano y comprobar que pasa del azar al 96 %.</p>
+  </header>
+  <pre class="code"><code>import numpy as np
+import keras
+from keras import layers
+from sklearn.datasets import load_digits
+from sklearn.model_selection import train_test_split
+
+digitos = load_digits()
+X = digitos.data / 16.0
+y = digitos.target
+print("Imágenes:", digitos.images.shape, "| tras aplanar:", X.shape, "| rango:", X.min(), "-", X.max())
+
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y, test_size=0.2, stratify=y, random_state=42)
+
+y_train_oh = keras.utils.to_categorical(y_train, num_classes=10)
+y_test_oh = keras.utils.to_categorical(y_test, num_classes=10)
+print("etiqueta entera:", y_train[0], "-&gt; one-hot:", y_train_oh[0].astype(int))
+
+keras.utils.set_random_seed(42)
+model = keras.Sequential([
+    keras.Input(shape=(64,)),
+    layers.Dense(64, activation="relu"),
+    layers.Dense(10, activation="softmax"),
+])
+model.compile(optimizer="adam", loss="categorical_crossentropy", metrics=["accuracy"])
+
+loss0, acc0 = model.evaluate(X_test, y_test_oh, verbose=0)
+print(f"antes de entrenar: loss = {loss0:.3f} | accuracy = {acc0:.3f} (al azar: ln 10 = {np.log(10):.3f} y 0.100)")
+
+history = model.fit(X_train, y_train_oh, epochs=20, batch_size=32,
+                    validation_split=0.1, verbose=0)
+
+loss, acc = model.evaluate(X_test, y_test_oh, verbose=0)
+print(f"test: loss = {loss:.3f} | accuracy = {acc:.3f}")
+print("parámetros:", model.count_params(), "= (64·64+64) + (64·10+10)")</code></pre>
+  <details class="linea-a-linea" open>
+    <summary>Línea por línea</summary>
+    <p class="hint">Toca una fila (o pasa el ratón) para ver su línea resaltada en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace y por qué</th></tr></thead>
+      <tbody>
+        <tr data-lines="1-3"><td><code>import numpy as np …</code></td><td>Traen NumPy, Keras y las capas.</td></tr>
+        <tr data-lines="4"><td><code>from sklearn.datasets import load_digits</code></td><td>Trae <code>load_digits</code>: 1.797 dígitos escritos a mano que vienen dentro de scikit-learn.<span class="por-que">Sin descargar nada, a diferencia de MNIST.</span><span class="se-lee">del cajón de datos de scikit-learn, trae los dígitos</span></td></tr>
+        <tr data-lines="5"><td><code>from sklearn.model_selection import train_test_split</code></td><td>Trae el repartidor en entrenamiento y test.</td></tr>
+        <tr data-lines="7"><td><code>digitos = load_digits()</code></td><td>Carga los dígitos. <code>digitos.images</code> son las imágenes de 8×8; <code>digitos.data</code>, las mismas ya aplanadas (64 números cada una).<span class="por-que">Nos ahorra aplanar a mano.</span></td></tr>
+        <tr data-lines="8"><td><code>X = digitos.data / 16.0</code></td><td>Pistas: las imágenes aplanadas divididas entre 16 (el máximo de tinta). Todos los valores quedan entre 0 y 1.<span class="por-que">Es la normalización de la lección 7: se divide entre una constante de la escala, así que no hay fuga de datos.</span><span class="se-lee">X son los 64 píxeles de cada imagen, divididos entre 16</span></td></tr>
+        <tr data-lines="9"><td><code>y = digitos.target</code></td><td>Respuestas: el dígito de cada imagen, del 0 al 9.</td></tr>
+        <tr data-lines="10"><td><code>print("Imágenes:", digitos.images.shape, "| tras a …</code></td><td>Escribe la forma antes y después de aplanar y el valor mínimo y máximo.<span class="por-que">Para comprobar que todo está entre 0 y 1.</span></td></tr>
+        <tr data-lines="12-13"><td><code>X_train, X_test, y_train, y_test = train_test_split( …</code></td><td>Reparte: 20 % a test, mismas proporciones de cada dígito (<code>stratify=y</code>) y sorteo fijo.<span class="por-que">Un examen justo con las 10 clases.</span><span class="se-lee">reparte un 20 % al examen, con los mismos dígitos en proporción, sorteo 42</span></td></tr>
+        <tr data-lines="15"><td><code>y_train_oh = keras.utils.to_categorical(y_train, n …</code></td><td><code>to_categorical</code> pasa cada etiqueta entera a <strong>One-Hot</strong>: una lista de 10 ceros con un 1 en la posición del dígito. <code>num_classes=10</code>: cuántas casillas.<span class="por-que">La pérdida <code>categorical_crossentropy</code> espera One-Hot (lección 6).</span><span class="se-lee">convierte cada dígito en diez casillas con un uno en la suya</span></td></tr>
+        <tr data-lines="16"><td><code>y_test_oh = keras.utils.to_categorical(y_test, num …</code></td><td>Lo mismo para el test.<span class="por-que">Hace falta para <code>evaluate</code>.</span></td></tr>
+        <tr data-lines="17"><td><code>print("etiqueta entera:", y_train[0], "-&gt; one-hot: …</code></td><td>Enseña la primera etiqueta y su One-Hot. <code>.astype(int)</code> quita los decimales para leerlo mejor.<span class="por-que">Para ver la conversión con un ejemplo.</span></td></tr>
+        <tr data-lines="19"><td><code>keras.utils.set_random_seed(42)</code></td><td>Fija las semillas.</td></tr>
+        <tr data-lines="20-21"><td><code>model = keras.Sequential([ …</code></td><td>La red, con entrada de 64 números.<span class="por-que">Uno por píxel.</span></td></tr>
+        <tr data-lines="22"><td><code>layers.Dense(64, activation="relu"),</code></td><td>Oculta de 64 neuronas con ReLU: 64·64 + 64 = 4.160 parámetros.<span class="por-que">Busca trazos.</span></td></tr>
+        <tr data-lines="23"><td><code>layers.Dense(10, activation="softmax"),</code></td><td>Salida: <strong>10 neuronas con softmax</strong>, una por dígito. Sus 10 probabilidades suman 1.<span class="por-que">Es la receta de varias clases.</span><span class="se-lee">diez neuronas que reparten la probabilidad entre los diez dígitos</span></td></tr>
+        <tr data-lines="24"><td><code>])</code></td><td>Cierra la lista.</td></tr>
+        <tr data-lines="25"><td><code>model.compile(optimizer="adam", loss="categorical_ …</code></td><td>Compila: Adam, <code>categorical_crossentropy</code> y porcentaje de aciertos.<span class="por-que">La pérdida va en pareja con softmax y One-Hot.</span></td></tr>
+        <tr data-lines="27"><td><code>loss0, acc0 = model.evaluate(X_test, y_test_oh, ve …</code></td><td>Nota <strong>antes</strong> de entrenar, con los pesos al azar.<span class="por-que">Para tener con qué comparar. Debería salir cerca del azar.</span><span class="se-lee">examina la red recién nacida</span></td></tr>
+        <tr data-lines="28"><td><code>print(f"antes de entrenar: loss = {loss0:.3f} | ac …</code></td><td>La escribe junto a lo esperable al azar: ln 10 y 0,100. <code>np.log(10)</code> es ln 10.<span class="por-que">Si sale muy lejos de 2,3, algo está mal (lección 7).</span></td></tr>
+        <tr data-lines="30-31"><td><code>history = model.fit(X_train, y_train_oh, epochs=20 …</code></td><td>Entrena 20 épocas, puñados de 32, apartando el último 10 % para vigilar. Guarda el diario en <code>history</code>.<span class="por-que">El paso 9 leerá ese diario.</span><span class="se-lee">entrena veinte pasadas y apunta el diario</span></td></tr>
+        <tr data-lines="33"><td><code>loss, acc = model.evaluate(X_test, y_test_oh, verb …</code></td><td>Nota después de entrenar.</td></tr>
+        <tr data-lines="34"><td><code>print(f"test: loss = {loss:.3f} | accuracy = {acc: …</code></td><td>La escribe.</td></tr>
+        <tr data-lines="35"><td><code>print("parámetros:", model.count_params(), "= (64· …</code></td><td>Escribe los parámetros con su cuenta.<span class="por-que">Comprueba la tabla de la lección 7.</span></td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>Imágenes: (1797, 8, 8) | tras aplanar: (1797, 64) | rango: 0.0 - 1.0
+etiqueta entera: 5 -&gt; one-hot: [0 0 0 0 0 1 0 0 0 0]
+antes de entrenar: loss = 2.409 | accuracy = 0.142 (al azar: ln 10 = 2.303 y 0.100)
+test: loss = 0.141 | accuracy = 0.964
+parámetros: 4810 = (64·64+64) + (64·10+10)</pre>
+    <p><strong>Cómo leerla.</strong> <code>(1797, 8, 8)</code>: 1.797 imágenes de 8×8; aplanadas, <code>(1797, 64)</code>; valores de 0 a 1. La etiqueta 5 pasa a una lista con un único 1 en la posición 5. Antes de entrenar: pérdida 2,409 y 14,2 % de aciertos, lo esperable al azar (2,303 y 10 %). Tras 20 épocas: pérdida 0,141 y 96,4 % (347 de 360) con solo 4.810 parámetros.</p>
+  </div>
+</article>
+</section>
+<section class="lab-paso" id="paso-8">
+<h2><span class="paso-n">8</span>De probabilidades a dígitos: argmax</h2>
+<p>Para qué sirve este paso: leer la respuesta de una red de varias clases, como en la <a href="leccion-7.html#argmax">lección 7</a>. Usa el <code>model</code> y el test del paso 7.</p>
+<article class="snippet" data-lang="python" id="fragmento-9">
+  <header>
+    <h3>Paso 8 · predict en multiclase: de probabilidades a dígitos con argmax (fragmento 9)</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Convertir las 10 probabilidades en un dígito, contar los fallos y encontrar la imagen más dudosa.</p>
+  </header>
+  <pre class="code"><code>probs = model.predict(X_test, verbose=0)
+print("forma de probs:", probs.shape)
+print("fila 0:", probs[0].round(3), "| suma =", probs[0].sum().round(3))
+
+pred = np.argmax(probs, axis=1)
+print("predichas:", pred[:12])
+print("reales   :", y_test[:12])
+print("accuracy a mano:", (pred == y_test).mean().round(3))
+
+errores = np.where(pred != y_test)[0]
+print("fallos:", len(errores), "de", len(y_test))
+
+dudosa = np.argmin(probs.max(axis=1))
+top3 = np.argsort(probs[dudosa])[::-1][:3]
+print("muestra más dudosa: real =", y_test[dudosa])
+for c in top3:
+    print(f"   clase {c}: {probs[dudosa, c]:.3f}")</code></pre>
+  <details class="linea-a-linea" open>
+    <summary>Línea por línea</summary>
+    <p class="hint">Toca una fila (o pasa el ratón) para ver su línea resaltada en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace y por qué</th></tr></thead>
+      <tbody>
+        <tr data-lines="1"><td><code>probs = model.predict(X_test, verbose=0)</code></td><td><code>predict</code> da 10 probabilidades por imagen del test.<span class="por-que">La red no responde «un 5»: responde 10 números.</span><span class="se-lee">dame las diez probabilidades de cada imagen del examen</span></td></tr>
+        <tr data-lines="2"><td><code>print("forma de probs:", probs.shape)</code></td><td>Escribe la forma.<span class="por-que">Debe ser (imágenes, 10).</span></td></tr>
+        <tr data-lines="3"><td><code>print("fila 0:", probs[0].round(3), "| suma =", pr …</code></td><td>La fila 0 con 3 decimales, y su suma.<span class="por-que">Para ver que softmax suma 1.</span></td></tr>
+        <tr data-lines="5"><td><code>pred = np.argmax(probs, axis=1)</code></td><td><code>np.argmax(…, axis=1)</code> da, en cada fila, la <strong>posición</strong> del valor más alto. <code>axis=1</code> es «recorriendo las columnas»: un resultado por fila.<span class="por-que">La posición es el dígito: así se pasa de probabilidades a respuesta.</span><span class="se-lee">en cada fila, quédate con la posición del número más alto</span></td></tr>
+        <tr data-lines="6-7"><td><code>print("predichas:", pred[:12]) …</code></td><td>Escribe las 12 primeras predicciones y las 12 reales. <code>[:12]</code> es «las 12 primeras».<span class="por-que">Para compararlas a ojo.</span></td></tr>
+        <tr data-lines="8"><td><code>print("accuracy a mano:", (pred == y_test).mean(). …</code></td><td><code>pred == y_test</code> da verdadero donde acierta; <code>.mean()</code> cuenta los verdaderos como 1 y hace la media: el porcentaje de aciertos.<span class="por-que">Debe coincidir con el de <code>evaluate</code>.</span><span class="se-lee">qué parte de las predicciones coincide con la realidad</span></td></tr>
+        <tr data-lines="10"><td><code>errores = np.where(pred != y_test)[0]</code></td><td><code>np.where(condición)</code> da las posiciones donde se cumple. <code>[0]</code> coge la lista de posiciones.<span class="por-que">Para saber qué imágenes falla.</span><span class="se-lee">apunta en qué filas la predicción no coincide</span></td></tr>
+        <tr data-lines="11"><td><code>print("fallos:", len(errores), "de", len(y_test))</code></td><td>Cuántos fallos de cuántas imágenes. <code>len</code> es «cuántos elementos tiene».</td></tr>
+        <tr data-lines="13"><td><code>dudosa = np.argmin(probs.max(axis=1))</code></td><td><code>probs.max(axis=1)</code> es la confianza de cada imagen (su probabilidad más alta). <code>np.argmin</code> busca la posición de la más baja: la imagen más dudosa.<span class="por-que">Las dudosas suelen ser imágenes raras o mal etiquetadas.</span><span class="se-lee">busca la imagen en la que la red está menos segura</span></td></tr>
+        <tr data-lines="14"><td><code>top3 = np.argsort(probs[dudosa])[::-1][:3]</code></td><td><code>np.argsort</code> ordena de menor a mayor y devuelve posiciones; <code>[::-1]</code> le da la vuelta (de mayor a menor) y <code>[:3]</code> coge las tres primeras.<span class="por-que">Las tres clases a las que más creyó.</span><span class="se-lee">ordena sus probabilidades de mayor a menor y quédate con las tres primeras</span></td></tr>
+        <tr data-lines="15"><td><code>print("muestra más dudosa: real =", y_test[dudosa])</code></td><td>Escribe qué dígito era de verdad.</td></tr>
+        <tr data-lines="16-17"><td><code>for c in top3: …</code></td><td>Para cada una de esas tres clases, escribe su probabilidad.<span class="por-que">Para ver entre qué dudaba.</span><span class="se-lee">para cada una de las tres, di cuánto creyó en ella</span></td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre style="white-space:pre">forma de probs: (360, 10)
+fila 0: [0.007 0.    0.    0.001 0.    0.928 0.    0.    0.003 0.06 ] | suma = 1.0
+predichas: [5 2 8 1 7 2 6 2 6 5 0 5]
+reales   : [5 2 8 1 7 2 6 2 6 5 0 5]
+accuracy a mano: 0.964
+fallos: 13 de 360
+muestra más dudosa: real = 1
+   clase 8: 0.287
+   clase 1: 0.238
+   clase 5: 0.179</pre>
+    <p><strong>Cómo leerla.</strong> <code>(360, 10)</code>: 360 imágenes, 10 probabilidades cada una; cada fila suma 1. La fila 0 da 0,928 al dígito 5, y era un 5. Las 12 primeras coinciden. Hay 13 fallos de 360: 347 / 360 = 0,964, lo mismo que <code>evaluate</code>. La más dudosa era un 1: la red repartía entre el 8 (28,7 %), el 1 (23,8 %) y el 5 (17,9 %), así que habría dicho 8.</p>
+  </div>
+</article>
+</section>
+<section class="lab-paso" id="paso-9">
+<h2><span class="paso-n">9</span>Leer el diario: History</h2>
+<p>Para qué sirve este paso: leer las curvas de aprendizaje de la <a href="leccion-4.html#history">lección 4</a> con números reales. Usa el <code>history</code> que guardó el paso 7.</p>
+<article class="snippet" data-lang="python" id="fragmento-10">
+  <header>
+    <h3>Paso 9 · El objeto History: leer las curvas de aprendizaje (fragmento 10)</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Mirar dentro del diario de fit y decidir si la red generaliza o memoriza.</p>
+  </header>
+  <pre class="code"><code>h = history.history
+print("claves:", list(h.keys()))
+print("época  loss   val_loss  accuracy  val_accuracy")
+for e in (0, 1, 2, 17, 18, 19):
+    print(f"{e + 1:5d}  {h['loss'][e]:.3f}   {h['val_loss'][e]:.3f}    {h['accuracy'][e]:.3f}     {h['val_accuracy'][e]:.3f}")
+
+mejor = int(np.argmin(h["val_loss"]))
+print("mejor val_loss en la época", mejor + 1, "=", round(h["val_loss"][mejor], 3))</code></pre>
+  <details class="linea-a-linea" open>
+    <summary>Línea por línea</summary>
+    <p class="hint">Toca una fila (o pasa el ratón) para ver su línea resaltada en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace y por qué</th></tr></thead>
+      <tbody>
+        <tr data-lines="1"><td><code>h = history.history</code></td><td><code>history.history</code> es un <strong>diccionario</strong>: parejas «nombre → lista de valores, uno por época». Lo guardamos en <code>h</code>, más corto.<span class="por-que">Es el diario de <code>fit</code>.</span><span class="se-lee">h es el diario del entrenamiento</span></td></tr>
+        <tr data-lines="2"><td><code>print("claves:", list(h.keys()))</code></td><td>Escribe los nombres que hay en el diario. <code>.keys()</code> da los nombres; <code>list</code> los convierte en lista para escribirlos.<span class="por-que">Para saber qué se puede mirar.</span></td></tr>
+        <tr data-lines="3"><td><code>print("época  loss   val_loss  accuracy  val_accur …</code></td><td>Escribe la cabecera de una tabla.<span class="por-que">Solo texto, para que se lea bien.</span></td></tr>
+        <tr data-lines="4"><td><code>for e in (0, 1, 2, 17, 18, 19):</code></td><td>Un bucle por las épocas 0, 1, 2, 17, 18 y 19 (se cuenta desde 0: son la 1, 2, 3, 18, 19 y 20).<span class="por-que">Las primeras y las últimas bastan para ver la tendencia.</span><span class="se-lee">para las tres primeras épocas y las tres últimas, haz lo de debajo</span></td></tr>
+        <tr data-lines="5"><td><code>print(f"{e + 1:5d}  {h['loss'][e]:.3f}   {h['val_l …</code></td><td>Escribe una fila: el número de época (<code>e + 1</code>) y los cuatro valores de esa época. <code>h['loss'][e]</code> es «de la lista loss, el valor de la época e». <code>5d</code> es un entero ocupando 5 huecos.<span class="por-que">Así se ven las dos pérdidas y los dos porcentajes lado a lado.</span></td></tr>
+        <tr data-lines="7"><td><code>mejor = int(np.argmin(h["val_loss"]))</code></td><td>La época con la <code>val_loss</code> más baja. <code>np.argmin</code> da su posición; <code>int</code> la deja como número normal.<span class="por-que">La mejor época es la que mejor sirve con datos nuevos.</span><span class="se-lee">busca en qué época fue más baja la pérdida de validación</span></td></tr>
+        <tr data-lines="8"><td><code>print("mejor val_loss en la época", mejor + 1, "=" …</code></td><td>La escribe (sumando 1, porque se cuenta desde 0) con su valor.</td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre style="white-space:pre">claves: ['accuracy', 'loss', 'val_accuracy', 'val_loss']
+época  loss   val_loss  accuracy  val_accuracy
+    1  2.120   1.849    0.330     0.569
+    2  1.607   1.378    0.688     0.778
+    3  1.157   0.979    0.818     0.861
+   18  0.137   0.175    0.975     0.958
+   19  0.129   0.169    0.976     0.958
+   20  0.122   0.164    0.977     0.965
+mejor val_loss en la época 20 = 0.164</pre>
+    <p><strong>Cómo leerla.</strong> El diario guarda cuatro listas: <code>loss</code> y <code>accuracy</code> (entrenamiento) y <code>val_loss</code> y <code>val_accuracy</code> (validación). En 20 épocas, <code>loss</code> baja de 2,120 a 0,122 y <code>val_loss</code> de 1,849 a 0,164; el porcentaje de aciertos sube de 0,330 a 0,977 (y de 0,569 a 0,965 en validación). Bajan juntas y la mejor época es la última: no hay sobreajuste, y entrenar algo más habría servido. En la época 1, la validación (0,569) supera al entrenamiento (0,330) porque el de entrenamiento es la media de toda la época, empezando al azar, y el de validación se mide al final.</p>
+  </div>
+</article>
+</section>
+<section class="lab-paso" id="paso-10">
+<h2><span class="paso-n">10</span>Etiquetas enteras: sparse</h2>
+<p>Para qué sirve este paso: ver que las dos formas de dar la respuesta correcta de la <a href="leccion-6.html#onehot">lección 6</a> dan la misma pérdida, y qué error sale si las mezclas. Usa <code>X_train</code>, <code>y_train</code> e <code>y_train_oh</code> del paso 7.</p>
+<article class="snippet" data-lang="python" id="fragmento-8">
+  <header>
+    <h3>Paso 10 · Etiquetas enteras: sparse, la pérdida a mano y los errores de formato (fragmento 8)</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Comprobar que One-Hot + categorical y enteros + sparse son la misma cuenta, y reconocer el error cuando se mezclan.</p>
+  </header>
+  <pre class="code"><code>import numpy as np
+import keras
+from keras import layers
+
+p = np.array([[0.70, 0.20, 0.10]])
+y_onehot = np.array([[1.0, 0.0, 0.0]])
+y_entero = np.array([0])
+print("categorical:", keras.losses.categorical_crossentropy(y_onehot, p).numpy().round(4))
+print("sparse     :", keras.losses.sparse_categorical_crossentropy(y_entero, p).numpy().round(4))
+print("a mano     :", (-np.log(0.70)).round(4))
+
+keras.utils.set_random_seed(42)
+model_sp = keras.Sequential([
+    keras.Input(shape=(64,)),
+    layers.Dense(64, activation="relu"),
+    layers.Dense(10, activation="softmax"),
+])
+model_sp.compile(optimizer="adam", loss="sparse_categorical_crossentropy",
+                 metrics=["accuracy"])
+model_sp.fit(X_train, y_train, epochs=20, batch_size=32, validation_split=0.1, verbose=0)
+loss, acc = model_sp.evaluate(X_test, y_test, verbose=0)
+print(f"sparse (etiquetas enteras): loss = {loss:.3f} | accuracy = {acc:.3f}")
+
+def intenta(loss, etiquetas):
+    modelo = keras.Sequential([keras.Input(shape=(64,)),
+                               layers.Dense(10, activation="softmax")])
+    modelo.compile(optimizer="adam", loss=loss)
+    try:
+        modelo.fit(X_train, etiquetas, epochs=1, verbose=0)
+        print("OK   ", loss)
+    except ValueError as error:
+        print("ERROR", loss)
+        print("     ", error)
+
+intenta("categorical_crossentropy", y_train_oh)
+intenta("categorical_crossentropy", y_train)
+intenta("sparse_categorical_crossentropy", y_train_oh)</code></pre>
+  <details class="linea-a-linea" open>
+    <summary>Línea por línea</summary>
+    <p class="hint">Toca una fila (o pasa el ratón) para ver su línea resaltada en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace y por qué</th></tr></thead>
+      <tbody>
+        <tr data-lines="1-3"><td><code>import numpy as np …</code></td><td>Traen NumPy, Keras y las capas.</td></tr>
+        <tr data-lines="5"><td><code>p = np.array([[0.70, 0.20, 0.10]])</code></td><td>Unas probabilidades inventadas para 3 clases: 0,70, 0,20 y 0,10.<span class="por-que">Para calcular la pérdida con números fáciles.</span></td></tr>
+        <tr data-lines="6"><td><code>y_onehot = np.array([[1.0, 0.0, 0.0]])</code></td><td>La respuesta correcta (clase 0) en One-Hot.</td></tr>
+        <tr data-lines="7"><td><code>y_entero = np.array([0])</code></td><td>La misma respuesta como entero: 0.</td></tr>
+        <tr data-lines="8"><td><code>print("categorical:", keras.losses.categorical_cro …</code></td><td>La pérdida categórica con One-Hot. <code>keras.losses</code> es el cajón de las pérdidas; se pueden usar sueltas, fuera de un modelo.<span class="por-que">Para ver el número que calcula <code>fit</code> por dentro.</span><span class="se-lee">calcula la pérdida categórica con la respuesta en casillas</span></td></tr>
+        <tr data-lines="9"><td><code>print("sparse     :", keras.losses.sparse_categori …</code></td><td>La versión <code>sparse</code> con el entero.<span class="por-que">Debe dar lo mismo.</span><span class="se-lee">calcula la misma pérdida con la respuesta como número</span></td></tr>
+        <tr data-lines="10"><td><code>print("a mano     :", (-np.log(0.70)).round(4))</code></td><td>A mano: −ln 0,70.<span class="por-que">La pérdida es −ln de la probabilidad de la clase correcta.</span></td></tr>
+        <tr data-lines="12"><td><code>keras.utils.set_random_seed(42)</code></td><td>Fija las semillas.</td></tr>
+        <tr data-lines="13-17"><td><code>model_sp = keras.Sequential([ …</code></td><td>La misma red del paso 7: 64 → 64 → 10 con softmax.<span class="por-que">Para compararla de forma justa.</span></td></tr>
+        <tr data-lines="18-19"><td><code>model_sp.compile(optimizer="adam", loss="sparse_ca …</code></td><td>Compila con <code>sparse_categorical_crossentropy</code>.<span class="por-que">Acepta las etiquetas enteras tal cual, sin One-Hot.</span><span class="se-lee">aprende con la pérdida que acepta la respuesta como número</span></td></tr>
+        <tr data-lines="20"><td><code>model_sp.fit(X_train, y_train, epochs=20, batch_si …</code></td><td>Entrena con <code>y_train</code>, los enteros del 0 al 9.<span class="por-que">Sin convertir nada.</span></td></tr>
+        <tr data-lines="21-22"><td><code>loss, acc = model_sp.evaluate(X_test, y_test, verb …</code></td><td>Nota con el test, también en enteros, y la escribe.</td></tr>
+        <tr data-lines="24"><td><code>def intenta(loss, etiquetas):</code></td><td>Una receta, <code>intenta</code>, que prueba una pérdida con unas etiquetas.<span class="por-que">Para provocar los errores a propósito.</span></td></tr>
+        <tr data-lines="25-26"><td><code>modelo = keras.Sequential([keras.Input(shape=(64,)), …</code></td><td>Una red mínima: entrada de 64 y salida de 10 con softmax.<span class="por-que">Basta para ver si las formas encajan.</span></td></tr>
+        <tr data-lines="27"><td><code>modelo.compile(optimizer="adam", loss=loss)</code></td><td>La compila con la pérdida que le llega.</td></tr>
+        <tr data-lines="28"><td><code>try:</code></td><td><code>try:</code> es «intenta esto»; si algo falla, en vez de pararse todo, salta al <code>except</code>.<span class="por-que">Así el programa sigue aunque haya error.</span><span class="se-lee">intenta lo de debajo y, si falla, no te pares</span></td></tr>
+        <tr data-lines="29"><td><code>modelo.fit(X_train, etiquetas, epochs=1, verbose=0)</code></td><td>Entrena una sola época.<span class="por-que">Si las formas no encajan, aquí salta el error.</span></td></tr>
+        <tr data-lines="30"><td><code>print("OK   ", loss)</code></td><td>Si llegó aquí, funcionó: escribe OK.</td></tr>
+        <tr data-lines="31"><td><code>except ValueError as error:</code></td><td><code>except ValueError as error:</code> es «si salió un error de tipo <code>ValueError</code> (valor no válido), guárdalo en <code>error</code> y haz lo de debajo».<span class="por-que">Es el error que da Keras cuando la forma de las etiquetas no es la esperada.</span><span class="se-lee">si falló por un valor no válido, guarda el mensaje</span></td></tr>
+        <tr data-lines="32-33"><td><code>print("ERROR", loss) …</code></td><td>Escribe ERROR y el mensaje de Keras.<span class="por-que">Para aprender a reconocerlo.</span></td></tr>
+        <tr data-lines="35"><td><code>intenta("categorical_crossentropy", y_train_oh)</code></td><td>Prueba One-Hot con <code>categorical</code>.<span class="por-que">La pareja buena.</span></td></tr>
+        <tr data-lines="36"><td><code>intenta("categorical_crossentropy", y_train)</code></td><td>Prueba enteros con <code>categorical</code>.<span class="por-que">Mezcla: debe fallar.</span></td></tr>
+        <tr data-lines="37"><td><code>intenta("sparse_categorical_crossentropy", y_train …</code></td><td>Prueba One-Hot con <code>sparse</code>.<span class="por-que">La otra mezcla: debe fallar.</span></td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>categorical: [0.3567]
+sparse     : [0.3567]
+a mano     : 0.3567
+sparse (etiquetas enteras): loss = 0.141 | accuracy = 0.964
+OK    categorical_crossentropy
+ERROR categorical_crossentropy
+      Arguments `target` and `output` must have the same rank (ndim). Received: target.shape=(None,), output.shape=(None, 10)
+ERROR sparse_categorical_crossentropy
+      Argument `output` must have rank (ndim) `target.ndim - 1`. Received: target.shape=(None, 10), output.shape=(None, 10)</pre>
+    <p><strong>Cómo leerla.</strong> Las tres primeras líneas valen 0,3567: las dos pérdidas y la cuenta a mano −ln 0,70. La red con enteros acierta lo mismo que la del paso 7 (0,141 y 0,964). De las tres pruebas, solo la pareja One-Hot + categorical funciona. Los dos mensajes dicen lo mismo: «la respuesta y la salida de la red no tienen el número de dimensiones que espera la pérdida». <code>(None,)</code> son los enteros, una dimensión; <code>(None, 10)</code>, las 10 probabilidades, dos dimensiones. <code>None</code> es el tamaño del lote.</p>
+  </div>
+</article>
+</section>
+<section class="lab-paso" id="paso-11">
+<h2><span class="paso-n">11</span>Parar a tiempo: EarlyStopping</h2>
+<p>Para qué sirve este paso: ver el sobreajuste y la parada temprana de la <a href="leccion-8.html#parar">lección 8</a> con números reales. Con solo 300 dígitos para entrenar y una red grande, la red acaba memorizando.</p>
+<article class="snippet" data-lang="python" id="fragmento-12">
+  <header>
+    <h3>Paso 11 · EarlyStopping: parar cuando la validación deja de mejorar (fragmento 12)</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Ver el sobreajuste en números y cómo EarlyStopping para a tiempo y recupera la mejor época.</p>
+  </header>
+  <pre class="code"><code>import numpy as np
+import keras
+from keras import layers
+from sklearn.datasets import load_digits
+from sklearn.model_selection import train_test_split
+
+digitos = load_digits()
+X, y = digitos.data / 16.0, digitos.target
+X_train, X_val, y_train, y_val = train_test_split(
+    X, y, train_size=300, test_size=600, stratify=y, random_state=0)
+
+def construir():
+    keras.utils.set_random_seed(42)
+    modelo = keras.Sequential([
+        keras.Input(shape=(64,)),
+        layers.Dense(128, activation="relu"),
+        layers.Dense(128, activation="relu"),
+        layers.Dense(10, activation="softmax"),
+    ])
+    modelo.compile(optimizer="adam", loss="sparse_categorical_crossentropy",
+                   metrics=["accuracy"])
+    return modelo
+
+modelo = construir()
+h = modelo.fit(X_train, y_train, epochs=100, batch_size=32,
+               validation_data=(X_val, y_val), verbose=0)
+val = h.history["val_loss"]
+mejor = int(np.argmin(val))
+print(f"Sin parar : mejor val_loss = {val[mejor]:.3f} (época {mejor + 1}) | val_loss en la época 100 = {val[-1]:.3f}")
+
+parar = keras.callbacks.EarlyStopping(monitor="val_loss", patience=5,
+                                      restore_best_weights=True)
+modelo = construir()
+h = modelo.fit(X_train, y_train, epochs=100, batch_size=32,
+               validation_data=(X_val, y_val), callbacks=[parar], verbose=0)
+print("Con parada: épocas realizadas =", len(h.history["loss"]), "| mejor época =", parar.best_epoch + 1)
+
+loss, acc = modelo.evaluate(X_val, y_val, verbose=0)
+print(f"Modelo restaurado: val_loss = {loss:.3f} | val_accuracy = {acc:.3f}")</code></pre>
+  <details class="linea-a-linea" open>
+    <summary>Línea por línea</summary>
+    <p class="hint">Toca una fila (o pasa el ratón) para ver su línea resaltada en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace y por qué</th></tr></thead>
+      <tbody>
+        <tr data-lines="1-5"><td><code>import numpy as np …</code></td><td>Traen NumPy, Keras, las capas, los dígitos y el repartidor.<span class="por-que">Este paso funciona solo.</span></td></tr>
+        <tr data-lines="7"><td><code>digitos = load_digits()</code></td><td>Carga los dígitos.</td></tr>
+        <tr data-lines="8"><td><code>X, y = digitos.data / 16.0, digitos.target</code></td><td>Pistas divididas entre 16 y respuestas, en una línea. <code>X, y = a, b</code> guarda <code>a</code> en <code>X</code> y <code>b</code> en <code>y</code>.</td></tr>
+        <tr data-lines="9-10"><td><code>X_train, X_val, y_train, y_val = train_test_split( …</code></td><td>Reparte: solo 300 para entrenar (<code>train_size=300</code>) y 600 para validar.<span class="por-que">Con pocos datos es fácil memorizar: queremos ver el sobreajuste.</span><span class="se-lee">coge solo 300 imágenes para aprender y 600 para vigilar</span></td></tr>
+        <tr data-lines="12"><td><code>def construir():</code></td><td>Una receta que construye la red.<span class="por-que">Hay que construirla dos veces, idéntica.</span></td></tr>
+        <tr data-lines="13"><td><code>keras.utils.set_random_seed(42)</code></td><td>Misma semilla siempre.<span class="por-que">Las dos redes empiezan con los mismos pesos.</span></td></tr>
+        <tr data-lines="14-19"><td><code>modelo = keras.Sequential([ …</code></td><td>Red grande: 64 → 128 → 128 → 10.<span class="por-que">Muchos parámetros para tan pocos datos: memorizará.</span></td></tr>
+        <tr data-lines="20-21"><td><code>modelo.compile(optimizer="adam", loss="sparse_cate …</code></td><td>Compila con <code>sparse</code> (etiquetas enteras) y porcentaje de aciertos.</td></tr>
+        <tr data-lines="22"><td><code>return modelo</code></td><td>Devuelve la red.</td></tr>
+        <tr data-lines="24"><td><code>modelo = construir()</code></td><td>Primera red.</td></tr>
+        <tr data-lines="25-26"><td><code>h = modelo.fit(X_train, y_train, epochs=100, batch …</code></td><td>Entrena 100 épocas <strong>sin parar</strong>, vigilando con la validación.<span class="por-que">Para ver qué pasa si entrenas de más.</span></td></tr>
+        <tr data-lines="27"><td><code>val = h.history["val_loss"]</code></td><td>La lista de pérdidas de validación.</td></tr>
+        <tr data-lines="28"><td><code>mejor = int(np.argmin(val))</code></td><td>La época con la más baja.</td></tr>
+        <tr data-lines="29"><td><code>print(f"Sin parar : mejor val_loss = {val[mejor]:. …</code></td><td>Escribe la mejor y la de la época 100 (<code>val[-1]</code>, la última).<span class="por-que">Si la última es peor que la mejor, ha memorizado.</span></td></tr>
+        <tr data-lines="31-32"><td><code>parar = keras.callbacks.EarlyStopping(monitor="val …</code></td><td>Crea el ayudante <code>EarlyStopping</code> (un <strong>callback</strong>, al que <code>fit</code> avisa al final de cada época). <code>monitor="val_loss"</code>: qué vigilar. <code>patience=5</code>: cuántas épocas sin mejorar aguantar. <code>restore_best_weights=True</code>: al parar, volver a los pesos de la mejor.<span class="por-que">Sin él, la red seguiría memorizando hasta la época 100.</span><span class="se-lee">vigila la pérdida de validación; si pasan cinco épocas sin mejorar, para y vuelve a la mejor</span></td></tr>
+        <tr data-lines="33"><td><code>modelo = construir()</code></td><td>Otra red, idéntica a la primera.</td></tr>
+        <tr data-lines="34-35"><td><code>h = modelo.fit(X_train, y_train, epochs=100, batch …</code></td><td>Entrena igual, pero con el ayudante en la lista <code>callbacks</code>.<span class="por-que">Va entre corchetes porque se pueden poner varios.</span><span class="se-lee">entrena hasta cien épocas, pero avisando al ayudante de parar</span></td></tr>
+        <tr data-lines="36"><td><code>print("Con parada: épocas realizadas =", len(h.his …</code></td><td>Cuántas épocas hizo (<code>len</code> de la lista de pérdidas) y cuál fue la mejor. <code>best_epoch</code> cuenta desde 0; por eso <code>+ 1</code>.</td></tr>
+        <tr data-lines="38-39"><td><code>loss, acc = modelo.evaluate(X_val, y_val, verbose=0) …</code></td><td>Nota del modelo restaurado con la validación.<span class="por-que">Debe ser la de la mejor época.</span></td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>Sin parar : mejor val_loss = 0.198 (época 29) | val_loss en la época 100 = 0.239
+Con parada: épocas realizadas = 34 | mejor época = 29
+Modelo restaurado: val_loss = 0.198 | val_accuracy = 0.950</pre>
+    <p><strong>Cómo leerla.</strong> Sin freno, la mejor <code>val_loss</code> fue 0,198 en la época 29, y en la 100 había empeorado a 0,239: la red siguió memorizando las 300 imágenes. Con <code>EarlyStopping</code> paró tras 34 épocas (29 + 5 de paciencia) y el modelo restaurado tiene la pérdida de la mejor, 0,198: más rápido y mejor. Ojo: como esta validación se usó para elegir la época, el 0,950 es algo optimista; la nota honesta saldría de un test aparte.</p>
+  </div>
+</article>
+</section>
+<section class="lab-paso" id="paso-12">
+<h2><span class="paso-n">12</span>Guardar, cargar y repetir</h2>
+<p>Para qué sirve este paso: lo último de la <a href="leccion-8.html#guardar-repetir">lección 8</a>. Fijar el azar para que todo se repita, y guardar un modelo para usarlo otro día.</p>
+<article class="snippet" data-lang="python" id="fragmento-13">
+  <header>
+    <h3>Paso 12 · Reproducibilidad, guardar y cargar un modelo .keras (fragmento 13)</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Repetir un entrenamiento exactamente igual, y guardar un modelo para usarlo o seguir entrenándolo otro día.</p>
+  </header>
+  <pre class="code"><code>import os
+import tempfile
+import numpy as np
+import tensorflow as tf
+import keras
+from keras import layers
+
+def pesos_iniciales(semilla_antigua):
+    if semilla_antigua:
+        np.random.seed(42)
+        tf.random.set_seed(42)
+    else:
+        keras.utils.set_random_seed(42)
+    red = keras.Sequential([keras.Input(shape=(3,)), layers.Dense(4)])
+    return red.layers[0].get_weights()[0]
+
+mismos = np.allclose(pesos_iniciales(True), pesos_iniciales(True))
+print("np.random.seed + tf.random.set_seed -&gt; mismos pesos iniciales:", mismos)
+mismos = np.allclose(pesos_iniciales(False), pesos_iniciales(False))
+print("keras.utils.set_random_seed        -&gt; mismos pesos iniciales:", mismos)
+
+X = np.random.default_rng(0).normal(size=(200, 3)).astype("float32")
+y = (X[:, 0] + 2 * X[:, 1] - X[:, 2]).astype("float32")
+
+def entrenar():
+    keras.utils.set_random_seed(123)
+    modelo = keras.Sequential([
+        keras.Input(shape=(3,)),
+        layers.Dense(8, activation="relu"),
+        layers.Dense(1),
+    ])
+    modelo.compile(optimizer="adam", loss="mse")
+    h = modelo.fit(X, y, epochs=20, batch_size=32, verbose=0)
+    return modelo, h.history["loss"][-1]
+
+m1, loss1 = entrenar()
+m2, loss2 = entrenar()
+print("Dos entrenamientos con la misma semilla -&gt; misma pérdida:", abs(loss1 - loss2) &lt; 1e-6, f"({loss1:.4f})")
+
+ruta = os.path.join(tempfile.mkdtemp(), "modelo.keras")
+m1.save(ruta)
+print("Guardado:", os.path.basename(ruta), "| tamaño &gt; 0:", os.path.getsize(ruta) &gt; 0)
+
+cargado = keras.models.load_model(ruta)
+print("Mismas predicciones:", np.allclose(m1.predict(X[:5], verbose=0), cargado.predict(X[:5], verbose=0)))
+print("Optimizador recuperado:", type(cargado.optimizer).__name__)
+
+h = cargado.fit(X, y, epochs=1, verbose=0)
+print("Puede seguir entrenando, loss:", round(h.history["loss"][0], 4))</code></pre>
+  <details class="linea-a-linea" open>
+    <summary>Línea por línea</summary>
+    <p class="hint">Toca una fila (o pasa el ratón) para ver su línea resaltada en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace y por qué</th></tr></thead>
+      <tbody>
+        <tr data-lines="1"><td><code>import os</code></td><td>Trae <code>os</code>, para manejar rutas de archivos.</td></tr>
+        <tr data-lines="2"><td><code>import tempfile</code></td><td>Trae <code>tempfile</code>, el cajón de Python para crear carpetas temporales.<span class="por-que">Para guardar el modelo sin ensuciar tu carpeta.</span></td></tr>
+        <tr data-lines="3-6"><td><code>import numpy as np …</code></td><td>Traen NumPy, TensorFlow, Keras y las capas.<span class="por-que">TensorFlow hace falta para probar la forma antigua de fijar semillas.</span></td></tr>
+        <tr data-lines="8"><td><code>def pesos_iniciales(semilla_antigua):</code></td><td>Una receta que construye una red mínima y devuelve sus pesos iniciales. Su dato decide qué forma de fijar semillas usar.<span class="por-que">Para comparar la forma antigua con la nueva.</span></td></tr>
+        <tr data-lines="9-11"><td><code>if semilla_antigua: …</code></td><td>Si <code>semilla_antigua</code> es verdadero, fija las semillas como en los tutoriales viejos: la de NumPy y la de TensorFlow.<span class="por-que">Para ver si eso todavía basta en Keras 3.</span><span class="se-lee">si te piden la forma antigua, fija la semilla de NumPy y la de TensorFlow</span></td></tr>
+        <tr data-lines="12-13"><td><code>else: …</code></td><td><code>else:</code> es «si no». Usa la forma nueva: <code>keras.utils.set_random_seed</code>.<span class="por-que">Fija todas las semillas a la vez.</span><span class="se-lee">si no, fija todas con la orden de Keras</span></td></tr>
+        <tr data-lines="14"><td><code>red = keras.Sequential([keras.Input(shape=(3,)), l …</code></td><td>Una red de 3 entradas y una capa de 4 neuronas.<span class="por-que">Basta para mirar sus pesos iniciales.</span></td></tr>
+        <tr data-lines="15"><td><code>return red.layers[0].get_weights()[0]</code></td><td>Devuelve la tabla de pesos de la primera capa: <code>get_weights()</code> da [pesos, bias] y <code>[0]</code> coge los pesos.</td></tr>
+        <tr data-lines="17"><td><code>mismos = np.allclose(pesos_iniciales(True), pesos_ …</code></td><td>Construye dos veces con la forma antigua y compara los pesos con <code>np.allclose</code>.<span class="por-que">Si da <code>True</code>, son iguales.</span><span class="se-lee">¿salen los mismos pesos dos veces con la forma antigua?</span></td></tr>
+        <tr data-lines="18"><td><code>print("np.random.seed + tf.random.set_seed -&gt; mism …</code></td><td>Escribe el resultado.</td></tr>
+        <tr data-lines="19-20"><td><code>mismos = np.allclose(pesos_iniciales(False), pesos …</code></td><td>Lo mismo con la forma nueva.</td></tr>
+        <tr data-lines="22"><td><code>X = np.random.default_rng(0).normal(size=(200, 3)) …</code></td><td>Datos inventados: 200 muestras de 3 números alrededor de 0.<span class="por-que">Para entrenar algo pequeño y rápido.</span></td></tr>
+        <tr data-lines="23"><td><code>y = (X[:, 0] + 2 * X[:, 1] - X[:, 2]).astype("floa …</code></td><td>La regla: x₀ + 2·x₁ − x₂.</td></tr>
+        <tr data-lines="25-34"><td><code>def entrenar(): …</code></td><td>Una receta que fija la semilla 123, construye una red 3 → 8 → 1, la compila, la entrena 20 épocas y devuelve el modelo y su última pérdida.<span class="por-que">Vamos a entrenar dos veces para ver si sale idéntico.</span><span class="se-lee">receta: fija el azar, monta, compila, entrena y dame el modelo y su pérdida final</span></td></tr>
+        <tr data-lines="36-37"><td><code>m1, loss1 = entrenar() …</code></td><td>Entrena dos veces. Cada llamada devuelve dos cosas, que se guardan por orden.</td></tr>
+        <tr data-lines="38"><td><code>print("Dos entrenamientos con la misma semilla -&gt; …</code></td><td>Comprueba si las pérdidas coinciden (diferencia menor que 0,000001, que es lo que significa <code>1e-6</code>).<span class="por-que">Con la misma semilla, el entrenamiento entero se repite.</span></td></tr>
+        <tr data-lines="40"><td><code>ruta = os.path.join(tempfile.mkdtemp(), "modelo.ke …</code></td><td>Prepara una ruta: una carpeta temporal nueva más el nombre <code>modelo.keras</code>. <code>os.path.join</code> pega trozos de ruta con la barra correcta de tu sistema.<span class="por-que"><code>.keras</code> es el formato actual de Keras.</span><span class="se-lee">el archivo se llamará modelo.keras, dentro de una carpeta temporal</span></td></tr>
+        <tr data-lines="41"><td><code>m1.save(ruta)</code></td><td><code>save</code> guarda el modelo entero: capas, pesos y optimizador.<span class="por-que">Así no pierdes el entrenamiento al cerrar.</span><span class="se-lee">guarda el modelo en ese archivo</span></td></tr>
+        <tr data-lines="42"><td><code>print("Guardado:", os.path.basename(ruta), "| tama …</code></td><td>Escribe el nombre del archivo y si ocupa algo.<span class="por-que">Comprueba que se ha guardado.</span></td></tr>
+        <tr data-lines="44"><td><code>cargado = keras.models.load_model(ruta)</code></td><td><code>load_model</code> lo carga de nuevo.<span class="por-que">Como si fuera otro día, en otro cuaderno.</span><span class="se-lee">carga el modelo de ese archivo</span></td></tr>
+        <tr data-lines="45"><td><code>print("Mismas predicciones:", np.allclose(m1.predi …</code></td><td>Compara las predicciones del original y del cargado para 5 muestras.<span class="por-que">Deben ser iguales.</span></td></tr>
+        <tr data-lines="46"><td><code>print("Optimizador recuperado:", type(cargado.opti …</code></td><td>Escribe qué optimizador trae. <code>type(…).__name__</code> da el nombre de la clase.<span class="por-que">Comprueba que el optimizador también viajó.</span></td></tr>
+        <tr data-lines="48"><td><code>h = cargado.fit(X, y, epochs=1, verbose=0)</code></td><td>Entrena una época más con el cargado.<span class="por-que">Para ver que sigue donde lo dejó.</span></td></tr>
+        <tr data-lines="49"><td><code>print("Puede seguir entrenando, loss:", round(h.hi …</code></td><td>Escribe esa pérdida.<span class="por-que">Si es menor que la última del original, siguió aprendiendo, no empezó de cero.</span></td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre>np.random.seed + tf.random.set_seed -&gt; mismos pesos iniciales: False
+keras.utils.set_random_seed        -&gt; mismos pesos iniciales: True
+Dos entrenamientos con la misma semilla -&gt; misma pérdida: True (2.4101)
+Guardado: modelo.keras | tamaño &gt; 0: True
+Mismas predicciones: True
+Optimizador recuperado: Adam
+Puede seguir entrenando, loss: 2.2979</pre>
+    <p><strong>Cómo leerla.</strong> La sorpresa: con la forma antigua (<code>np.random.seed</code> + <code>tf.random.set_seed</code>) salen pesos iniciales distintos (<code>False</code>); con <code>keras.utils.set_random_seed</code>, idénticos (<code>True</code>). Con esa semilla, los dos entrenamientos acaban en la misma pérdida (2,4101). El modelo guardado y cargado da las mismas predicciones, conserva Adam y sigue entrenando: su pérdida baja de 2,4101 a 2,2979 en una época más.</p>
+  </div>
+</article>
+</section>
+<section>
+<h2 id="completo">El código completo</h2>
+<p>Los doce pasos seguidos, para copiarlos y ejecutarlos de una vez. Tres formas:</p>
+<ul>
+  <li><strong>Google Colab</strong> (sin instalar nada): abre un cuaderno nuevo, pega todo en una celda y pulsa ▶. Ya trae TensorFlow, Keras y scikit-learn.</li>
+  <li><strong>Jupyter</strong>: igual, en una celda.</li>
+  <li><strong>En tu ordenador</strong>: guárdalo como <code>keras_netflix.py</code> y escribe <code>python keras_netflix.py</code> en la terminal. Antes, una vez: <code>pip install tensorflow scikit-learn</code>.</li>
+</ul>
+<p>Los <code>import</code> se repiten porque cada paso se puede ejecutar solo; repetirlos no hace daño. Tarda un par de minutos en una CPU normal.</p>
+<pre class="code"><code># ===== Paso 1 · Comprobar el motor: versiones, un tensor y la cinta =====
+import os
+os.environ["KERAS_BACKEND"] = "tensorflow"
+
+import tensorflow as tf
+import keras
+
+print("TensorFlow:", tf.__version__)
+print("Keras     :", keras.__version__)
+print("Backend   :", keras.backend.backend())
+
+t = tf.constant([[1.0, 2.0, 3.0],
+                 [4.0, 5.0, 6.0]])
+print("Tensor:", t.shape, t.dtype.name)
+
+x = tf.Variable(3.0)
+with tf.GradientTape() as tape:
+    y = x ** 2 + 2 * x
+dy_dx = tape.gradient(y, x)
+print("y =", y.numpy(), "| dy/dx =", dy_dx.numpy())
+
+# ===== Paso 2 · Tu primera red completa, en cinco pasos =====
+import numpy as np
+import keras
+from keras import layers
+
+rng = np.random.default_rng(42)
+
+def crear_datos(n):
+    X = rng.uniform(-3, 3, size=(n, 2))
+    y = 3 * X[:, 0] - 2 * X[:, 1] + 5 + rng.normal(0, 1, n)
+    return X.astype("float32"), y.astype("float32")
+
+X_train, y_train = crear_datos(1000)
+X_val, y_val = crear_datos(200)
+X_test, y_test = crear_datos(200)
+print("X_train:", X_train.shape, "| y_train:", y_train.shape)
+
+keras.utils.set_random_seed(42)
+model = keras.Sequential([
+    keras.Input(shape=(2,)),
+    layers.Dense(16, activation="relu"),
+    layers.Dense(8, activation="relu"),
+    layers.Dense(1),
+])
+
+model.compile(optimizer=keras.optimizers.Adam(learning_rate=0.01),
+              loss="mse",
+              metrics=["mae"])
+
+history = model.fit(X_train, y_train,
+                    epochs=30, batch_size=32,
+                    validation_data=(X_val, y_val),
+                    verbose=0)
+
+test_mse, test_mae = model.evaluate(X_test, y_test, verbose=0)
+print(f"test MSE = {test_mse:.2f} | test MAE = {test_mae:.2f}")
+
+nuevo = np.array([[2.0, 1.0]])
+pred = model.predict(nuevo, verbose=0)
+print("predict:", pred.shape, "-&gt;", round(float(pred[0, 0]), 2), "(valor real sin ruido: 9.0)")
+
+# ===== Paso 3 · Contar los parámetros con summary =====
+import keras
+from keras import layers
+
+model = keras.Sequential([
+    keras.Input(shape=(2,)),
+    layers.Dense(16, activation="relu", name="oculta1"),
+    layers.Dense(8, activation="relu", name="oculta2"),
+    layers.Dense(1, name="salida"),
+], name="red_regresion")
+model.summary()
+
+for capa in model.layers:
+    W, b = capa.get_weights()
+    print(f"{capa.name:8s} W{W.shape}  b{b.shape}  -&gt;  {W.size + b.size} parámetros")
+
+a_mano = (2 * 16 + 16) + (16 * 8 + 8) + (8 * 1 + 1)
+print("A mano:", a_mano, "| Keras:", model.count_params())
+
+sin_bias = layers.Dense(16, use_bias=False)
+sin_bias.build((None, 2))
+print("Dense(16) sin bias:", sin_bias.count_params(), "parámetros")
+
+# ===== Paso 4 · Una capa Dense hecha a mano =====
+import numpy as np
+import keras
+from keras import layers
+
+model = keras.Sequential([
+    keras.Input(shape=(2,)),
+    layers.Dense(3, activation="relu"),
+    layers.Dense(1),
+])
+
+W1 = np.array([[0.5, -1.0, 0.0],
+               [0.25, 0.5, 1.0]])
+b1 = np.array([0.1, 0.0, -3.0])
+W2 = np.array([[1.0], [2.0], [3.0]])
+b2 = np.array([0.5])
+model.layers[0].set_weights([W1, b1])
+model.layers[1].set_weights([W2, b2])
+
+x = np.array([[1.0, 2.0]])
+z1 = x @ W1 + b1
+h1 = np.maximum(0, z1)
+y_mano = h1 @ W2 + b2
+
+print("z1 (antes de ReLU):", z1)
+print("h1 (después de ReLU):", h1)
+print("salida a mano:", y_mano)
+print("salida de Keras:", model.predict(x, verbose=0))
+
+# ===== Paso 5 · Normalizar las entradas =====
+import numpy as np
+import keras
+from keras import layers
+from sklearn.preprocessing import StandardScaler
+
+rng = np.random.default_rng(0)
+n = 1200
+presupuesto = rng.uniform(30, 250, n)
+dias = rng.uniform(100, 10000, n)
+X = np.column_stack([presupuesto, dias]).astype("float32")
+y = (2.0 * presupuesto - 0.01 * dias + 50 + rng.normal(0, 5, n)).astype("float32")
+X_train, y_train = X[:1000], y[:1000]
+X_val, y_val = X[1000:], y[1000:]
+print("Rango de cada columna:", X_train.min(axis=0).round(0), X_train.max(axis=0).round(0))
+
+def construir(normalizar):
+    keras.utils.set_random_seed(1)
+    capas = [keras.Input(shape=(2,))]
+    if normalizar:
+        norm = layers.Normalization()
+        norm.adapt(X_train)
+        capas.append(norm)
+    capas += [layers.Dense(16, activation="relu"),
+              layers.Dense(8, activation="relu"),
+              layers.Dense(1)]
+    modelo = keras.Sequential(capas)
+    modelo.compile(optimizer=keras.optimizers.Adam(learning_rate=0.01), loss="mse")
+    return modelo
+
+for normalizar in (False, True):
+    modelo = construir(normalizar)
+    h = modelo.fit(X_train, y_train, epochs=30, batch_size=32,
+                   validation_data=(X_val, y_val), verbose=0)
+    mse_final = h.history["val_loss"][-1]
+    print(f"normalizar={normalizar!s:5} | val_loss final = {mse_final:6.1f} | error típico (raíz) = {mse_final ** 0.5:4.1f}")
+
+norm = layers.Normalization()
+norm.adapt(X_train)
+scaler = StandardScaler().fit(X_train)
+print("Normalization == StandardScaler:", np.allclose(norm(X_val).numpy(), scaler.transform(X_val), atol=1e-4))
+
+# ===== Paso 6 · Sí o no: clasificación binaria =====
+import numpy as np
+import keras
+from keras import layers
+from sklearn.datasets import load_breast_cancer
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
+
+datos = load_breast_cancer()
+X_train, X_test, y_train, y_test = train_test_split(
+    datos.data, datos.target, test_size=0.2, stratify=datos.target, random_state=42)
+
+scaler = StandardScaler().fit(X_train)
+X_train = scaler.transform(X_train)
+X_test = scaler.transform(X_test)
+print("X_train:", X_train.shape, "| clases en y_train:", np.bincount(y_train))
+
+keras.utils.set_random_seed(42)
+model = keras.Sequential([
+    keras.Input(shape=(30,)),
+    layers.Dense(16, activation="relu"),
+    layers.Dense(1, activation="sigmoid"),
+])
+model.compile(optimizer="adam", loss="binary_crossentropy", metrics=["accuracy"])
+model.fit(X_train, y_train, epochs=20, batch_size=32, validation_split=0.2, verbose=0)
+
+loss, acc = model.evaluate(X_test, y_test, verbose=0)
+print(f"test: BCE = {loss:.3f} | accuracy = {acc:.3f}")
+
+p = model.predict(X_test[:5], verbose=0).ravel()
+print("probabilidades:", p.round(3))
+print("clase (p &gt; 0.5):", (p &gt; 0.5).astype(int), "| real:", y_test[:5])
+
+p3, y3 = p[3], y_test[3]
+bce_mano = -(y3 * np.log(p3) + (1 - y3) * np.log(1 - p3))
+print("BCE de la muestra 3 a mano:", bce_mano.round(3))
+
+# ===== Paso 7 · Diez clases: reconocer dígitos =====
+import numpy as np
+import keras
+from keras import layers
+from sklearn.datasets import load_digits
+from sklearn.model_selection import train_test_split
+
+digitos = load_digits()
+X = digitos.data / 16.0
+y = digitos.target
+print("Imágenes:", digitos.images.shape, "| tras aplanar:", X.shape, "| rango:", X.min(), "-", X.max())
+
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y, test_size=0.2, stratify=y, random_state=42)
+
+y_train_oh = keras.utils.to_categorical(y_train, num_classes=10)
+y_test_oh = keras.utils.to_categorical(y_test, num_classes=10)
+print("etiqueta entera:", y_train[0], "-&gt; one-hot:", y_train_oh[0].astype(int))
+
+keras.utils.set_random_seed(42)
+model = keras.Sequential([
+    keras.Input(shape=(64,)),
+    layers.Dense(64, activation="relu"),
+    layers.Dense(10, activation="softmax"),
+])
+model.compile(optimizer="adam", loss="categorical_crossentropy", metrics=["accuracy"])
+
+loss0, acc0 = model.evaluate(X_test, y_test_oh, verbose=0)
+print(f"antes de entrenar: loss = {loss0:.3f} | accuracy = {acc0:.3f} (al azar: ln 10 = {np.log(10):.3f} y 0.100)")
+
+history = model.fit(X_train, y_train_oh, epochs=20, batch_size=32,
+                    validation_split=0.1, verbose=0)
+
+loss, acc = model.evaluate(X_test, y_test_oh, verbose=0)
+print(f"test: loss = {loss:.3f} | accuracy = {acc:.3f}")
+print("parámetros:", model.count_params(), "= (64·64+64) + (64·10+10)")
+
+# ===== Paso 8 · De probabilidades a dígitos: argmax =====
+probs = model.predict(X_test, verbose=0)
+print("forma de probs:", probs.shape)
+print("fila 0:", probs[0].round(3), "| suma =", probs[0].sum().round(3))
+
+pred = np.argmax(probs, axis=1)
+print("predichas:", pred[:12])
+print("reales   :", y_test[:12])
+print("accuracy a mano:", (pred == y_test).mean().round(3))
+
+errores = np.where(pred != y_test)[0]
+print("fallos:", len(errores), "de", len(y_test))
+
+dudosa = np.argmin(probs.max(axis=1))
+top3 = np.argsort(probs[dudosa])[::-1][:3]
+print("muestra más dudosa: real =", y_test[dudosa])
+for c in top3:
+    print(f"   clase {c}: {probs[dudosa, c]:.3f}")
+
+# ===== Paso 9 · Leer el diario: History =====
+h = history.history
+print("claves:", list(h.keys()))
+print("época  loss   val_loss  accuracy  val_accuracy")
+for e in (0, 1, 2, 17, 18, 19):
+    print(f"{e + 1:5d}  {h['loss'][e]:.3f}   {h['val_loss'][e]:.3f}    {h['accuracy'][e]:.3f}     {h['val_accuracy'][e]:.3f}")
+
+mejor = int(np.argmin(h["val_loss"]))
+print("mejor val_loss en la época", mejor + 1, "=", round(h["val_loss"][mejor], 3))
+
+# ===== Paso 10 · Etiquetas enteras: sparse =====
+import numpy as np
+import keras
+from keras import layers
+
+p = np.array([[0.70, 0.20, 0.10]])
+y_onehot = np.array([[1.0, 0.0, 0.0]])
+y_entero = np.array([0])
+print("categorical:", keras.losses.categorical_crossentropy(y_onehot, p).numpy().round(4))
+print("sparse     :", keras.losses.sparse_categorical_crossentropy(y_entero, p).numpy().round(4))
+print("a mano     :", (-np.log(0.70)).round(4))
+
+keras.utils.set_random_seed(42)
+model_sp = keras.Sequential([
+    keras.Input(shape=(64,)),
+    layers.Dense(64, activation="relu"),
+    layers.Dense(10, activation="softmax"),
+])
+model_sp.compile(optimizer="adam", loss="sparse_categorical_crossentropy",
+                 metrics=["accuracy"])
+model_sp.fit(X_train, y_train, epochs=20, batch_size=32, validation_split=0.1, verbose=0)
+loss, acc = model_sp.evaluate(X_test, y_test, verbose=0)
+print(f"sparse (etiquetas enteras): loss = {loss:.3f} | accuracy = {acc:.3f}")
+
+def intenta(loss, etiquetas):
+    modelo = keras.Sequential([keras.Input(shape=(64,)),
+                               layers.Dense(10, activation="softmax")])
+    modelo.compile(optimizer="adam", loss=loss)
+    try:
+        modelo.fit(X_train, etiquetas, epochs=1, verbose=0)
+        print("OK   ", loss)
+    except ValueError as error:
+        print("ERROR", loss)
+        print("     ", error)
+
+intenta("categorical_crossentropy", y_train_oh)
+intenta("categorical_crossentropy", y_train)
+intenta("sparse_categorical_crossentropy", y_train_oh)
+
+# ===== Paso 11 · Parar a tiempo: EarlyStopping =====
+import numpy as np
+import keras
+from keras import layers
+from sklearn.datasets import load_digits
+from sklearn.model_selection import train_test_split
+
+digitos = load_digits()
+X, y = digitos.data / 16.0, digitos.target
+X_train, X_val, y_train, y_val = train_test_split(
+    X, y, train_size=300, test_size=600, stratify=y, random_state=0)
+
+def construir():
+    keras.utils.set_random_seed(42)
+    modelo = keras.Sequential([
+        keras.Input(shape=(64,)),
+        layers.Dense(128, activation="relu"),
+        layers.Dense(128, activation="relu"),
+        layers.Dense(10, activation="softmax"),
+    ])
+    modelo.compile(optimizer="adam", loss="sparse_categorical_crossentropy",
+                   metrics=["accuracy"])
+    return modelo
+
+modelo = construir()
+h = modelo.fit(X_train, y_train, epochs=100, batch_size=32,
+               validation_data=(X_val, y_val), verbose=0)
+val = h.history["val_loss"]
+mejor = int(np.argmin(val))
+print(f"Sin parar : mejor val_loss = {val[mejor]:.3f} (época {mejor + 1}) | val_loss en la época 100 = {val[-1]:.3f}")
+
+parar = keras.callbacks.EarlyStopping(monitor="val_loss", patience=5,
+                                      restore_best_weights=True)
+modelo = construir()
+h = modelo.fit(X_train, y_train, epochs=100, batch_size=32,
+               validation_data=(X_val, y_val), callbacks=[parar], verbose=0)
+print("Con parada: épocas realizadas =", len(h.history["loss"]), "| mejor época =", parar.best_epoch + 1)
+
+loss, acc = modelo.evaluate(X_val, y_val, verbose=0)
+print(f"Modelo restaurado: val_loss = {loss:.3f} | val_accuracy = {acc:.3f}")
+
+# ===== Paso 12 · Guardar, cargar y repetir =====
+import os
+import tempfile
+import numpy as np
+import tensorflow as tf
+import keras
+from keras import layers
+
+def pesos_iniciales(semilla_antigua):
+    if semilla_antigua:
+        np.random.seed(42)
+        tf.random.set_seed(42)
+    else:
+        keras.utils.set_random_seed(42)
+    red = keras.Sequential([keras.Input(shape=(3,)), layers.Dense(4)])
+    return red.layers[0].get_weights()[0]
+
+mismos = np.allclose(pesos_iniciales(True), pesos_iniciales(True))
+print("np.random.seed + tf.random.set_seed -&gt; mismos pesos iniciales:", mismos)
+mismos = np.allclose(pesos_iniciales(False), pesos_iniciales(False))
+print("keras.utils.set_random_seed        -&gt; mismos pesos iniciales:", mismos)
+
+X = np.random.default_rng(0).normal(size=(200, 3)).astype("float32")
+y = (X[:, 0] + 2 * X[:, 1] - X[:, 2]).astype("float32")
+
+def entrenar():
+    keras.utils.set_random_seed(123)
+    modelo = keras.Sequential([
+        keras.Input(shape=(3,)),
+        layers.Dense(8, activation="relu"),
+        layers.Dense(1),
+    ])
+    modelo.compile(optimizer="adam", loss="mse")
+    h = modelo.fit(X, y, epochs=20, batch_size=32, verbose=0)
+    return modelo, h.history["loss"][-1]
+
+m1, loss1 = entrenar()
+m2, loss2 = entrenar()
+print("Dos entrenamientos con la misma semilla -&gt; misma pérdida:", abs(loss1 - loss2) &lt; 1e-6, f"({loss1:.4f})")
+
+ruta = os.path.join(tempfile.mkdtemp(), "modelo.keras")
+m1.save(ruta)
+print("Guardado:", os.path.basename(ruta), "| tamaño &gt; 0:", os.path.getsize(ruta) &gt; 0)
+
+cargado = keras.models.load_model(ruta)
+print("Mismas predicciones:", np.allclose(m1.predict(X[:5], verbose=0), cargado.predict(X[:5], verbose=0)))
+print("Optimizador recuperado:", type(cargado.optimizer).__name__)
+
+h = cargado.fit(X, y, epochs=1, verbose=0)
+print("Puede seguir entrenando, loss:", round(h.history["loss"][0], 4))</code></pre>
+<p>Se ha ejecutado entero, de una vez, y la salida es exactamente la de los doce pasos, una detrás de otra (además de algunos avisos técnicos de TensorFlow, que puedes ignorar).</p>
+</section>
+
+<section>
+<h2 id="mas-codigo">Más código del módulo</h2>
+<p>El resto del código de las lecciones: tres fragmentos completos que no caben en el ejemplo (el 14, el 11 y el 15) y los trozos cortos que había dentro de «Profundizar». Ninguno se pierde: cada uno conserva su número o su nombre, su tabla línea a línea con el <strong>por qué</strong> y el <strong>se lee así</strong>, y su salida real si se ejecutó.</p>
+<div class="callout recuerda">
+  <span class="lbl">Antes de ejecutarlos</span>
+  <p>Los fragmentos 14, 11 y 15 funcionan solos (el 11 tarda un par de minutos: entrena nueve redes). Los trozos cortos son esquemas para leer: llevan <code>...</code> o nombres inventados, y se dice en cada uno.</p>
+</div>
+<h3 class="grupo-frag" id="mas-l1">Lección 1 · El esqueleto y Keras frente a PyTorch</h3>
+<p><a href="leccion-1.html">Volver a la lección 1</a></p>
+<article class="snippet" data-lang="python" id="extra-esqueleto">
+  <header>
+    <h3>Esqueleto · Los cinco pasos de cualquier programa Keras</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Tener a mano la plantilla: casi todo programa de Keras es este esqueleto con otros números.</p>
+  </header>
+  <pre class="code"><code>X_train, y_train = ...                          # 1. DATOS: arrays de NumPy
+
+model = keras.Sequential([                      # 2. MODELO: capas en orden
+    keras.Input(shape=(n_features,)),
+    layers.Dense(16, activation="relu"),
+    layers.Dense(1),
+])
+
+model.compile(optimizer="adam",                 # 3. COMPILE: cómo aprende
+              loss="mse",
+              metrics=["mae"])
+
+history = model.fit(X_train, y_train,           # 4. FIT: entrenar
+                    epochs=30, batch_size=32,
+                    validation_split=0.2)
+
+model.evaluate(X_test, y_test)                  # 5. USARLO: medir con datos nuevos
+model.predict(X_nuevo)                          #           y predecir</code></pre>
+  <details class="linea-a-linea" open>
+    <summary>Línea por línea</summary>
+    <p class="hint">Toca una fila (o pasa el ratón) para ver su línea resaltada en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace y por qué</th></tr></thead>
+      <tbody>
+        <tr data-lines="1"><td><code>X_train, y_train = ...                          # …</code></td><td>1. Datos: las pistas y respuestas de entrenamiento. Los tres puntos (<code>...</code>) significan «aquí van tus datos». Lo que va detrás de <code>#</code> es un comentario: Python lo ignora.<span class="por-que">Todo programa de Keras empieza con <code>X</code> e <code>y</code> como arrays de NumPy.</span><span class="se-lee">aquí pongo las pistas y las respuestas</span></td></tr>
+        <tr data-lines="3"><td><code>model = keras.Sequential([                      # …</code></td><td>2. El modelo: una fila de capas.<span class="por-que">Los pesos nacen aquí, al azar.</span></td></tr>
+        <tr data-lines="4"><td><code>keras.Input(shape=(n_features,)),</code></td><td>Entrada: cada muestra trae <code>n_features</code> números (tantos como columnas tengas).<span class="se-lee">cada muestra trae tantos números como columnas</span></td></tr>
+        <tr data-lines="5"><td><code>layers.Dense(16, activation="relu"),</code></td><td>Una capa oculta de 16 neuronas con ReLU.</td></tr>
+        <tr data-lines="6"><td><code>layers.Dense(1),</code></td><td>Salida de 1 neurona sin activación: un número.</td></tr>
+        <tr data-lines="7"><td><code>])</code></td><td>Cierra la lista.</td></tr>
+        <tr data-lines="9"><td><code>model.compile(optimizer="adam",                 # …</code></td><td>3. <code>compile</code>: Adam como forma de corregir…<span class="por-que">Solo configura.</span></td></tr>
+        <tr data-lines="10"><td><code>loss="mse",</code></td><td>…MSE como pérdida…</td></tr>
+        <tr data-lines="11"><td><code>metrics=["mae"])</code></td><td>…y MAE como métrica.</td></tr>
+        <tr data-lines="13"><td><code>history = model.fit(X_train, y_train,           # …</code></td><td>4. <code>fit</code>: entrena y guarda el diario.<span class="por-que">El único paso que cambia los pesos.</span></td></tr>
+        <tr data-lines="14"><td><code>epochs=30, batch_size=32,</code></td><td>30 épocas en puñados de 32.</td></tr>
+        <tr data-lines="15"><td><code>validation_split=0.2)</code></td><td>Aparta el último 20 % para vigilar.<span class="por-que">Sin barajar: ojo si los datos vienen ordenados (lección 2).</span></td></tr>
+        <tr data-lines="17"><td><code>model.evaluate(X_test, y_test)                  # …</code></td><td>5. <code>evaluate</code>: la nota con el test.<span class="por-que">Solo mira.</span></td></tr>
+        <tr data-lines="18"><td><code>model.predict(X_nuevo)                          # …</code></td><td><code>predict</code>: respuestas para datos nuevos.<span class="por-que">Solo mira.</span><span class="se-lee">dime qué respondes para estas muestras nuevas</span></td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Sin salida</strong>
+    <p>No se ejecuta tal cual: es un esquema para leer. El <a href="#paso-2">paso 2</a> es este mismo esqueleto con datos de verdad y su salida real.</p>
+  </div>
+</article>
+<article class="snippet" data-lang="python" id="extra-pytorch">
+  <header>
+    <h3>Keras frente a PyTorch · El mismo modelo en los dos estilos</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Ver qué te ahorra Keras: en PyTorch el bucle de entrenar se escribe a mano (y por eso da más control).</p>
+  </header>
+  <pre class="code"><code># ---------- Keras: describes, compilas y entrenas ----------
+model = keras.Sequential([keras.Input(shape=(2,)),
+                          layers.Dense(8, activation="relu"),
+                          layers.Dense(1)])
+model.compile(optimizer="adam", loss="mse")
+model.fit(X, y, epochs=30, batch_size=32)
+
+# ---------- PyTorch: el bucle lo escribes tú ----------
+model = nn.Sequential(nn.Linear(2, 8), nn.ReLU(), nn.Linear(8, 1))
+opt = torch.optim.Adam(model.parameters())
+loss_fn = nn.MSELoss()
+for epoch in range(30):
+    for xb, yb in loader:                  # loader reparte los lotes de 32
+        opt.zero_grad()                    # borra los gradientes del paso anterior
+        loss = loss_fn(model(xb).squeeze(1), yb)
+        loss.backward()                    # backpropagation
+        opt.step()                         # actualiza los pesos</code></pre>
+  <details class="linea-a-linea" open>
+    <summary>Línea por línea</summary>
+    <p class="hint">Toca una fila (o pasa el ratón) para ver su línea resaltada en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace y por qué</th></tr></thead>
+      <tbody>
+        <tr data-lines="1"><td><code># ---------- Keras: describes, compilas y entrenas …</code></td><td>Comentario: empieza la versión Keras.</td></tr>
+        <tr data-lines="2-4"><td><code>model = keras.Sequential([keras.Input(shape=(2,)), …</code></td><td>La red: 2 entradas, 8 neuronas con ReLU y 1 salida.<span class="por-que">En Keras se <em>describe</em> la red.</span><span class="se-lee">una red de dos entradas, ocho neuronas ocultas y una salida</span></td></tr>
+        <tr data-lines="5"><td><code>model.compile(optimizer="adam", loss="mse")</code></td><td>Configura: Adam y MSE.</td></tr>
+        <tr data-lines="6"><td><code>model.fit(X, y, epochs=30, batch_size=32)</code></td><td>Entrena 30 épocas en puñados de 32. Todo el bucle de entrenar va escondido aquí dentro.<span class="por-que">Es lo que te ahorra Keras.</span><span class="se-lee">entrena treinta pasadas en puñados de 32</span></td></tr>
+        <tr data-lines="8"><td><code># ---------- PyTorch: el bucle lo escribes tú ---- …</code></td><td>Comentario: empieza la versión PyTorch.</td></tr>
+        <tr data-lines="9"><td><code>model = nn.Sequential(nn.Linear(2, 8), nn.ReLU(), …</code></td><td>La misma red en PyTorch. <code>nn</code> es su cajón de redes (<em>neural networks</em>); <code>nn.Linear(2, 8)</code> es lo que en Keras es <code>Dense(8)</code> con 2 entradas; la ReLU va como una pieza aparte.<span class="por-que">Misma red, otras piezas.</span><span class="se-lee">una capa de 2 a 8, una ReLU y una capa de 8 a 1</span></td></tr>
+        <tr data-lines="10"><td><code>opt = torch.optim.Adam(model.parameters())</code></td><td>El optimizador Adam. <code>model.parameters()</code> le pasa los pesos que debe mover.<span class="por-que">En PyTorch hay que decírselo explícitamente.</span></td></tr>
+        <tr data-lines="11"><td><code>loss_fn = nn.MSELoss()</code></td><td>La pérdida MSE.</td></tr>
+        <tr data-lines="12"><td><code>for epoch in range(30):</code></td><td>Un bucle de 30 épocas. <code>range(30)</code> cuenta de 0 a 29.<span class="por-que">Aquí el bucle lo escribes tú.</span><span class="se-lee">repite treinta veces</span></td></tr>
+        <tr data-lines="13"><td><code>for xb, yb in loader:                  # loader re …</code></td><td>Otro bucle dentro: por cada puñado <code>xb, yb</code> que reparte <code>loader</code> (un repartidor de lotes de 32 que habría que crear antes).<span class="se-lee">para cada puñado de pistas y respuestas</span></td></tr>
+        <tr data-lines="14"><td><code>opt.zero_grad()                    # borra los gra …</code></td><td>Borra las derivadas del puñado anterior.<span class="por-que">Si no, PyTorch las sumaría a las nuevas.</span></td></tr>
+        <tr data-lines="15"><td><code>loss = loss_fn(model(xb).squeeze(1), yb)</code></td><td>Predice el puñado y calcula la pérdida. <code>.squeeze(1)</code> quita la columna sobrante: de (32, 1) a (32,).<span class="por-que">Las formas de predicción y respuesta tienen que coincidir.</span></td></tr>
+        <tr data-lines="16"><td><code>loss.backward()                    # backpropagation</code></td><td><code>backward</code>: rebobina y saca las derivadas (backpropagation).<span class="por-que">Es la cinta de la lección 1.</span><span class="se-lee">saca las derivadas de la pérdida respecto a cada peso</span></td></tr>
+        <tr data-lines="17"><td><code>opt.step()                         # actualiza los …</code></td><td><code>step</code>: mueve los pesos un paso.<span class="por-que">Es la corrección.</span><span class="se-lee">mueve los pesos</span></td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Sin salida</strong>
+    <p>No se ejecuta tal cual: es un esquema para leer. Es un boceto para comparar estilos: no se ha ejecutado, porque todo el código del módulo es Keras sobre TensorFlow y aquí faltan <code>X</code>, <code>y</code> y <code>loader</code>.</p>
+  </div>
+</article>
+<h3 class="grupo-frag" id="mas-l3">Lección 3 · Escribir Sequential y los argumentos de Dense</h3>
+<p><a href="leccion-3.html">Volver a la lección 3</a></p>
+<article class="snippet" data-lang="python" id="extra-sequential">
+  <header>
+    <h3>Sequential · Dos formas de escribir la misma red</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Reconocer las dos formas cuando las veas en tutoriales.</p>
+  </header>
+  <pre class="code"><code>model = keras.Sequential([keras.Input(shape=(2,)), layers.Dense(16, activation="relu"), layers.Dense(1)])
+
+model = keras.Sequential()
+model.add(keras.Input(shape=(2,)))
+model.add(layers.Dense(16, activation="relu"))
+model.add(layers.Dense(1))</code></pre>
+  <details class="linea-a-linea" open>
+    <summary>Línea por línea</summary>
+    <p class="hint">Toca una fila (o pasa el ratón) para ver su línea resaltada en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace y por qué</th></tr></thead>
+      <tbody>
+        <tr data-lines="1"><td><code>model = keras.Sequential([keras.Input(shape=(2,)), …</code></td><td>Forma 1: toda la lista de capas de golpe, en una línea.<span class="por-que">La que usa este módulo.</span><span class="se-lee">el modelo es esta lista de capas</span></td></tr>
+        <tr data-lines="3"><td><code>model = keras.Sequential()</code></td><td>Forma 2: un modelo vacío…<span class="por-que">Útil cuando las capas se deciden sobre la marcha.</span></td></tr>
+        <tr data-lines="4"><td><code>model.add(keras.Input(shape=(2,)))</code></td><td>…<code>.add</code> le añade la entrada…<span class="se-lee">añade al modelo la entrada de dos números</span></td></tr>
+        <tr data-lines="5"><td><code>model.add(layers.Dense(16, activation="relu"))</code></td><td>…la oculta…</td></tr>
+        <tr data-lines="6"><td><code>model.add(layers.Dense(1))</code></td><td>…y la salida. El resultado es la misma red.</td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Sin salida</strong>
+    <p>No se ejecuta tal cual: es un esquema para leer. Las dos formas dan exactamente la misma red de 2 → 16 → 1.</p>
+  </div>
+</article>
+<article class="snippet" data-lang="python" id="extra-dense">
+  <header>
+    <h3>Dense · Todos sus argumentos</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Saber qué hace cada argumento de la capa más usada del módulo.</p>
+  </header>
+  <pre class="code"><code>layers.Dense(units, activation=None, use_bias=True,
+             kernel_initializer="glorot_uniform", bias_initializer="zeros", name=None)</code></pre>
+  <details class="linea-a-linea" open>
+    <summary>Línea por línea</summary>
+    <p class="hint">Toca una fila (o pasa el ratón) para ver su línea resaltada en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace y por qué</th></tr></thead>
+      <tbody>
+        <tr data-lines="1"><td><code>layers.Dense(units, activation=None, use_bias=True,</code></td><td>La firma de <code>Dense</code>: sus argumentos y sus valores por defecto. <code>units</code>: cuántas neuronas (el único obligatorio). <code>activation=None</code>: sin activación salvo que digas otra. <code>use_bias=True</code>: con bias.<span class="por-que">Lo que no escribes, toma el valor de después del <code>=</code>.</span><span class="se-lee">una capa densa con tantas neuronas, esta activación y con bias</span></td></tr>
+        <tr data-lines="2"><td><code>kernel_initializer="glorot_uniform", bias_initiali …</code></td><td><code>kernel_initializer</code>: con qué números al azar empiezan los pesos (Glorot uniforme por defecto). <code>bias_initializer="zeros"</code>: los bias empiezan en 0. <code>name</code>: un nombre para la capa.<span class="por-que">Los pesos no pueden empezar todos iguales; los bias sí.</span></td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Sin salida</strong>
+    <p>No se ejecuta tal cual: es un esquema para leer. Es la descripción de la capa, no una orden.</p>
+  </div>
+</article>
+<h3 class="grupo-frag" id="mas-l4">Lección 4 · compile, History y evaluate</h3>
+<p><a href="leccion-4.html">Volver a la lección 4</a></p>
+<article class="snippet" data-lang="python" id="extra-optimizador">
+  <header>
+    <h3>compile · Dos formas de elegir el optimizador</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Saber cuándo basta el texto y cuándo hace falta el objeto.</p>
+  </header>
+  <pre class="code"><code>model.compile(optimizer="adam", ...)                                  # con valores por defecto (learning_rate=0.001)
+model.compile(optimizer=keras.optimizers.Adam(learning_rate=0.01), ...)  # objeto: ajustas el learning rate</code></pre>
+  <details class="linea-a-linea" open>
+    <summary>Línea por línea</summary>
+    <p class="hint">Toca una fila (o pasa el ratón) para ver su línea resaltada en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace y por qué</th></tr></thead>
+      <tbody>
+        <tr data-lines="1"><td><code>model.compile(optimizer="adam", ...) …</code></td><td>Con texto: Adam con sus valores por defecto (paso 0,001). Los <code>...</code> son el resto de argumentos.<span class="por-que">Lo más corto.</span><span class="se-lee">usa Adam tal como viene</span></td></tr>
+        <tr data-lines="2"><td><code>model.compile(optimizer=keras.optimizers.Adam(lear …</code></td><td>Con un objeto: <code>keras.optimizers.Adam(learning_rate=0.01)</code> te deja elegir el tamaño del paso.<span class="por-que">Para cambiar el learning rate.</span><span class="se-lee">usa Adam, pero con pasos de 0,01</span></td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Sin salida</strong>
+    <p>No se ejecuta tal cual: es un esquema para leer. El <a href="#paso-2">paso 2</a> usa la segunda forma.</p>
+  </div>
+</article>
+<article class="snippet" data-lang="python" id="extra-history">
+  <header>
+    <h3>History · Qué hay dentro de history.history</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Ver la forma del diario antes de leerlo con código.</p>
+  </header>
+  <pre class="code"><code>history.history = {
+    "loss":     [43.57, 5.23, ...],   # pérdida en entrenamiento, una por época
+    "mae":      [ 5.34, 1.81, ...],   # métrica en entrenamiento
+    "val_loss": [14.02, 2.01, ...],   # pérdida en validación
+    "val_mae":  [ 3.19, 1.15, ...],   # métrica en validación
+}</code></pre>
+  <details class="linea-a-linea" open>
+    <summary>Línea por línea</summary>
+    <p class="hint">Toca una fila (o pasa el ratón) para ver su línea resaltada en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace y por qué</th></tr></thead>
+      <tbody>
+        <tr data-lines="1"><td><code>history.history = {</code></td><td>El diario es un diccionario: entre llaves, parejas «nombre: lista».<span class="se-lee">el diario tiene estas listas</span></td></tr>
+        <tr data-lines="2"><td><code>"loss":     [43.57, 5.23, ...],   # pérdida en ent …</code></td><td><code>"loss"</code>: la pérdida de entrenamiento, un valor por época.</td></tr>
+        <tr data-lines="3"><td><code>"mae":      [ 5.34, 1.81, ...],   # métrica en ent …</code></td><td><code>"mae"</code>: la métrica de entrenamiento.</td></tr>
+        <tr data-lines="4"><td><code>"val_loss": [14.02, 2.01, ...],   # pérdida en val …</code></td><td><code>"val_loss"</code>: la pérdida de validación.<span class="por-que">La que vigilas para ver si memoriza.</span></td></tr>
+        <tr data-lines="5"><td><code>"val_mae":  [ 3.19, 1.15, ...],   # métrica en val …</code></td><td><code>"val_mae"</code>: la métrica de validación.</td></tr>
+        <tr data-lines="6"><td><code>}</code></td><td>Cierra la llave.</td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Sin salida</strong>
+    <p>No se ejecuta tal cual: es un esquema para leer. Es la forma del diario con los dos primeros valores reales de cada lista. El <a href="#paso-9">paso 9</a> lo lee de verdad.</p>
+  </div>
+</article>
+<article class="snippet" data-lang="python" id="extra-evaluate">
+  <header>
+    <h3>evaluate · Pedir la nota con nombres</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Leer la nota sin depender del orden de las métricas.</p>
+  </header>
+  <pre class="code"><code>resultado = model.evaluate(X_test, y_test, verbose=0, return_dict=True)
+# {'loss': 0.85, 'mae': 0.73}   (los números del fragmento 2)</code></pre>
+  <details class="linea-a-linea" open>
+    <summary>Línea por línea</summary>
+    <p class="hint">Toca una fila (o pasa el ratón) para ver su línea resaltada en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace y por qué</th></tr></thead>
+      <tbody>
+        <tr data-lines="1"><td><code>resultado = model.evaluate(X_test, y_test, verbose …</code></td><td><code>return_dict=True</code>: que <code>evaluate</code> devuelva un diccionario con el nombre de cada cosa en vez de una lista.<span class="por-que">Así no dependes del orden ni del nombre interno de las métricas.</span><span class="se-lee">examina con el test y dame los resultados con nombre</span></td></tr>
+        <tr data-lines="2"><td><code># {'loss': 0.85, 'mae': 0.73}   (los números del f …</code></td><td>Comentario: lo que devolvería con la red del paso 2.</td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Sin salida</strong>
+    <p>No se ejecuta tal cual: es un esquema para leer. La línea 2 es un ejemplo con los números del <a href="#paso-2">paso 2</a>, redondeados.</p>
+  </div>
+</article>
+<h3 class="grupo-frag" id="mas-l5">Lección 5 · Dos modelos completos de 8 entradas</h3>
+<p><a href="leccion-5.html">Volver a la lección 5</a></p>
+<article class="snippet" data-lang="python" id="fragmento-14">
+  <header>
+    <h3>Fragmento 14 · regression_demo y classification_demo: dos modelos completos de 8 entradas</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Ver las dos recetas (número y clase) en programas completos, y que las épocas importan.</p>
+  </header>
+  <pre class="code"><code>import numpy as np
+import keras
+from keras import layers
+from keras.utils import to_categorical
+
+def regression_demo(epochs=20):
+    keras.utils.set_random_seed(42)
+    X = np.random.normal(size=(1200, 8)).astype("float32")
+    pesos = np.array([2.0, -1.5, 0.8, 3.0, -2.0, 1.2, 0.4, 2.5], dtype="float32")
+    y = (X @ pesos + 5 + np.random.normal(0, 0.5, size=1200)).astype("float32")
+    X_train, y_train, X_test, y_test = X[:1000], y[:1000], X[1000:], y[1000:]
+
+    model = keras.Sequential([
+        keras.Input(shape=(8,)),
+        layers.Dense(5, activation="relu"),
+        layers.Dense(5, activation="relu"),
+        layers.Dense(1),
+    ])
+    model.compile(optimizer="adam", loss="mean_squared_error",
+                  metrics=["mean_absolute_error"])
+    history = model.fit(X_train, y_train, epochs=epochs, batch_size=32,
+                        validation_split=0.2, verbose=0)
+    mse, mae = model.evaluate(X_test, y_test, verbose=0)
+    pred = model.predict(X_test[:1], verbose=0)[0, 0]
+    return history, mse, mae, pred, y_test[0], float(X_test[0] @ pesos + 5)
+
+for epocas in (20, 300):
+    h, mse, mae, pred, real, sin_ruido = regression_demo(epocas)
+    print(f"regresión, {epocas:3d} épocas: val_loss {h.history['val_loss'][0]:6.2f} -&gt; {h.history['val_loss'][-1]:5.2f}"
+          f" | test MSE = {mse:5.2f}, MAE = {mae:4.2f}")
+    print(f"   X_test[0]: predicción = {pred:6.2f} | valor real = {real:6.2f} | sin ruido = {sin_ruido:6.2f}")
+print("(el ruido añadido tiene desviación 0.5: el MAE no puede bajar de unos 0.40)")
+
+def classification_demo(epochs=25):
+    keras.utils.set_random_seed(42)
+    X = np.random.normal(size=(1400, 8)).astype("float32")
+    puntuaciones = np.column_stack([X[:, 0] + X[:, 1],
+                                    X[:, 2] - X[:, 3],
+                                    X[:, 4] + 0.5 * X[:, 5],
+                                    X[:, 6] - X[:, 7]])
+    etiquetas = np.argmax(puntuaciones, axis=1)
+    Y = to_categorical(etiquetas, num_classes=4)
+    X_train, Y_train, X_test = X[:1200], Y[:1200], X[1200:]
+    et_test = etiquetas[1200:]
+
+    model = keras.Sequential([
+        keras.Input(shape=(8,)),
+        layers.Dense(5, activation="relu"),
+        layers.Dense(5, activation="relu"),
+        layers.Dense(4, activation="softmax"),
+    ])
+    model.compile(optimizer="adam", loss="categorical_crossentropy",
+                  metrics=["accuracy"])
+    model.fit(X_train, Y_train, epochs=epochs, batch_size=32,
+              validation_split=0.2, verbose=0)
+    probs = model.predict(X_test, verbose=0)
+    return model, probs, et_test, etiquetas[:1200]
+
+model, probs, et_test, et_train = classification_demo()
+print("clases en entrenamiento:", np.bincount(et_train), "| parámetros:", model.count_params())
+acc = (probs.argmax(axis=1) == et_test).mean()
+print(f"clasificación (25 épocas): accuracy en test = {acc:.3f} (al azar: 0.25)")
+for i in range(3):
+    print(f"   muestra {i}: probabilidades = {probs[i].round(2)} | predicha = {probs[i].argmax()} | real = {et_test[i]}")
+print(f"pérdida de la muestra 0 a mano: -ln(p[real]) = {-np.log(probs[0, et_test[0]]):.3f}")</code></pre>
+  <details class="linea-a-linea" open>
+    <summary>Línea por línea</summary>
+    <p class="hint">Toca una fila (o pasa el ratón) para ver su línea resaltada en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace y por qué</th></tr></thead>
+      <tbody>
+        <tr data-lines="1-3"><td><code>import numpy as np …</code></td><td>Traen NumPy, Keras y las capas.</td></tr>
+        <tr data-lines="4"><td><code>from keras.utils import to_categorical</code></td><td>Trae <code>to_categorical</code> directamente, para escribirla sin <code>keras.utils.</code> delante.</td></tr>
+        <tr data-lines="6"><td><code>def regression_demo(epochs=20):</code></td><td>Una receta de regresión. <code>epochs=20</code> es un valor por defecto: si no dices otro, entrena 20 épocas.<span class="por-que">Así la podemos llamar con 20 y con 300.</span><span class="se-lee">receta de regresión; si no te digo épocas, usa 20</span></td></tr>
+        <tr data-lines="7"><td><code>keras.utils.set_random_seed(42)</code></td><td>Fija las semillas.</td></tr>
+        <tr data-lines="8"><td><code>X = np.random.normal(size=(1200, 8)).astype("float …</code></td><td>1.200 muestras de 8 números alrededor de 0.</td></tr>
+        <tr data-lines="9"><td><code>pesos = np.array([2.0, -1.5, 0.8, 3.0, -2.0, 1.2, …</code></td><td>Los pesos de la regla secreta, uno por columna.</td></tr>
+        <tr data-lines="10"><td><code>y = (X @ pesos + 5 + np.random.normal(0, 0.5, size …</code></td><td>La respuesta: cada fila por los pesos (<code>@</code>), más 5, más un ruido de desviación 0,5.<span class="por-que">El ruido marca el suelo del error.</span></td></tr>
+        <tr data-lines="11"><td><code>X_train, y_train, X_test, y_test = X[:1000], y[:10 …</code></td><td>Las 1.000 primeras para entrenar, las 200 últimas para el test.</td></tr>
+        <tr data-lines="13-18"><td><code>model = keras.Sequential([ …</code></td><td>Red 8 → 5 → 5 → 1: 45 + 30 + 6 = 81 parámetros.<span class="por-que">Pequeña a propósito.</span></td></tr>
+        <tr data-lines="19-20"><td><code>model.compile(optimizer="adam", loss="mean_squared …</code></td><td>Compila con los nombres largos de MSE y MAE.<span class="por-que">Son lo mismo que <code>"mse"</code> y <code>"mae"</code>.</span></td></tr>
+        <tr data-lines="21-22"><td><code>history = model.fit(X_train, y_train, epochs=epoch …</code></td><td>Entrena apartando un 20 % para vigilar.</td></tr>
+        <tr data-lines="23"><td><code>mse, mae = model.evaluate(X_test, y_test, verbose=0)</code></td><td>Nota con el test.</td></tr>
+        <tr data-lines="24"><td><code>pred = model.predict(X_test[:1], verbose=0)[0, 0]</code></td><td>Predice la primera muestra del test. <code>X_test[:1]</code> mantiene la forma (1, 8); <code>[0, 0]</code> saca el número.</td></tr>
+        <tr data-lines="25"><td><code>return history, mse, mae, pred, y_test[0], float(X …</code></td><td>Devuelve el diario, la nota, la predicción, el valor real y el valor sin ruido.<span class="por-que">Para compararlos fuera.</span></td></tr>
+        <tr data-lines="27"><td><code>for epocas in (20, 300):</code></td><td>Prueba con 20 y con 300 épocas.<span class="por-que">Para ver si 20 bastan.</span><span class="se-lee">entrena una vez con 20 épocas y otra con 300</span></td></tr>
+        <tr data-lines="28"><td><code>h, mse, mae, pred, real, sin_ruido = regression_de …</code></td><td>Llama a la receta y guarda lo que devuelve.</td></tr>
+        <tr data-lines="29-30"><td><code>print(f"regresión, {epocas:3d} épocas: val_loss {h …</code></td><td>Escribe la pérdida de validación de la primera y la última época, y la nota. Son dos f-strings seguidas que Python pega en una.</td></tr>
+        <tr data-lines="31"><td><code>print(f"   X_test[0]: predicción = {pred:6.2f} | v …</code></td><td>Escribe la predicción de la primera muestra, su valor real y el valor sin ruido.</td></tr>
+        <tr data-lines="32"><td><code>print("(el ruido añadido tiene desviación 0.5: el …</code></td><td>Recuerda el suelo del ruido.</td></tr>
+        <tr data-lines="34"><td><code>def classification_demo(epochs=25):</code></td><td>Una receta de clasificación en 4 clases.</td></tr>
+        <tr data-lines="35-36"><td><code>keras.utils.set_random_seed(42) …</code></td><td>Semillas y 1.400 muestras de 8 números.</td></tr>
+        <tr data-lines="37-40"><td><code>puntuaciones = np.column_stack([X[:, 0] + X[:, 1], …</code></td><td>Cuatro puntuaciones por muestra, cada una con dos columnas.<span class="por-que">La clase será la de mayor puntuación.</span></td></tr>
+        <tr data-lines="41"><td><code>etiquetas = np.argmax(puntuaciones, axis=1)</code></td><td>La clase de cada muestra: la posición de la puntuación más alta.<span class="se-lee">la clase es la puntuación más alta</span></td></tr>
+        <tr data-lines="42"><td><code>Y = to_categorical(etiquetas, num_classes=4)</code></td><td>Las clases en One-Hot de 4 casillas.</td></tr>
+        <tr data-lines="43-44"><td><code>X_train, Y_train, X_test = X[:1200], Y[:1200], X[1 …</code></td><td>1.200 para entrenar y 200 para el test (con sus clases en entero, para comparar).</td></tr>
+        <tr data-lines="46-51"><td><code>model = keras.Sequential([ …</code></td><td>Red 8 → 5 → 5 → 4 con softmax: 99 parámetros.<span class="por-que">Una neurona por clase.</span></td></tr>
+        <tr data-lines="52-53"><td><code>model.compile(optimizer="adam", loss="categorical_ …</code></td><td>Compila con categorical crossentropy.<span class="por-que">Pareja de softmax + One-Hot.</span></td></tr>
+        <tr data-lines="54-55"><td><code>model.fit(X_train, Y_train, epochs=epochs, batch_s …</code></td><td>Entrena 25 épocas.</td></tr>
+        <tr data-lines="56"><td><code>probs = model.predict(X_test, verbose=0)</code></td><td>Probabilidades del test.</td></tr>
+        <tr data-lines="57"><td><code>return model, probs, et_test, etiquetas[:1200]</code></td><td>Devuelve modelo, probabilidades y clases.</td></tr>
+        <tr data-lines="59"><td><code>model, probs, et_test, et_train = classification_d …</code></td><td>Llama a la receta.</td></tr>
+        <tr data-lines="60"><td><code>print("clases en entrenamiento:", np.bincount(et_t …</code></td><td>Cuántas muestras hay de cada clase y cuántos parámetros.<span class="por-que">Si las clases están equilibradas, el porcentaje de aciertos no engaña.</span></td></tr>
+        <tr data-lines="61"><td><code>acc = (probs.argmax(axis=1) == et_test).mean()</code></td><td>Porcentaje de aciertos a mano: <code>argmax</code> por fila y comparación con la realidad.</td></tr>
+        <tr data-lines="62"><td><code>print(f"clasificación (25 épocas): accuracy en tes …</code></td><td>Lo escribe junto al azar (25 %).</td></tr>
+        <tr data-lines="63-64"><td><code>for i in range(3): …</code></td><td>Para las 3 primeras muestras, sus probabilidades, la clase predicha y la real.</td></tr>
+        <tr data-lines="65"><td><code>print(f"pérdida de la muestra 0 a mano: -ln(p[real …</code></td><td>La pérdida de la muestra 0 a mano: −ln de la probabilidad de la clase real.</td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre style="white-space:pre">regresión,  20 épocas: val_loss  57.18 -&gt; 17.69 | test MSE = 16.64, MAE = 3.21
+   X_test[0]: predicción =   1.46 | valor real =  10.20 | sin ruido =   9.61
+regresión, 300 épocas: val_loss  57.18 -&gt;  0.25 | test MSE =  0.28, MAE = 0.43
+   X_test[0]: predicción =   9.52 | valor real =  10.20 | sin ruido =   9.61
+(el ruido añadido tiene desviación 0.5: el MAE no puede bajar de unos 0.40)
+clases en entrenamiento: [300 295 297 308] | parámetros: 99
+clasificación (25 épocas): accuracy en test = 0.795 (al azar: 0.25)
+   muestra 0: probabilidades = [0.   0.67 0.31 0.02] | predicha = 1 | real = 2
+   muestra 1: probabilidades = [0.33 0.34 0.18 0.15] | predicha = 1 | real = 1
+   muestra 2: probabilidades = [0.   0.83 0.16 0.01] | predicha = 1 | real = 1
+pérdida de la muestra 0 a mano: -ln(p[real]) = 1.180</pre>
+    <p><strong>Cómo leerla.</strong> Regresión: con 20 épocas la red está lejos (MAE 3,21 y predice 1,46 cuando lo real es 10,20). Con 300 llega a un MAE de 0,43, casi el suelo del ruido (unos 0,40), y predice 9,52 (sin ruido: 9,61). Lección: 20 épocas no siempre bastan; mira el diario. Clasificación: las 4 clases están equilibradas y la red de 99 parámetros acierta el 79,5 % (el azar daría 25 %). La muestra 0 es un fallo: dio 0,67 a la clase 1 y 0,31 a la 2, que era la buena; su pérdida es −ln 0,31 ≈ 1,18.</p>
+  </div>
+</article>
+<h3 class="grupo-frag" id="mas-l7">Lección 7 · Cargar MNIST</h3>
+<p><a href="leccion-7.html">Volver a la lección 7</a></p>
+<article class="snippet" data-lang="python" id="extra-mnist">
+  <header>
+    <h3>MNIST · El conjunto grande de dígitos</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Saber cómo se carga el conjunto clásico. Para usarlo con una red densa: aplanar a 784 y dividir entre 255.</p>
+  </header>
+  <pre class="code"><code>from keras.datasets import mnist
+(X_train, y_train), (X_test, y_test) = mnist.load_data()   # descarga unos 11 MB la primera vez
+print(X_train.shape, y_train.shape)                        # (60000, 28, 28) (60000,)</code></pre>
+  <details class="linea-a-linea" open>
+    <summary>Línea por línea</summary>
+    <p class="hint">Toca una fila (o pasa el ratón) para ver su línea resaltada en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace y por qué</th></tr></thead>
+      <tbody>
+        <tr data-lines="1"><td><code>from keras.datasets import mnist</code></td><td>Del cajón de conjuntos de datos de Keras, trae <code>mnist</code>.<span class="se-lee">del cajón de datos de Keras, trae MNIST</span></td></tr>
+        <tr data-lines="2"><td><code>(X_train, y_train), (X_test, y_test) = mnist.load_ …</code></td><td><code>load_data()</code> descarga MNIST (unos 11 MB la primera vez) y devuelve dos parejas: (pistas, respuestas) de entrenamiento y de test. Los paréntesis de la izquierda reparten cada pareja en dos nombres.<span class="por-que">Por eso necesita internet.</span><span class="se-lee">descarga MNIST y reparte entrenamiento y test</span></td></tr>
+        <tr data-lines="3"><td><code>print(X_train.shape, y_train.shape) …</code></td><td>Escribe las formas: 60.000 imágenes de 28×28 y 60.000 respuestas.</td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Sin salida</strong>
+    <p>No se ha ejecutado al preparar esta página porque necesita descargar de internet. La salida de la línea 3 es la que da habitualmente: <code>(60000, 28, 28) (60000,)</code> (salida ilustrativa).</p>
+  </div>
+</article>
+<h3 class="grupo-frag" id="mas-l8">Lección 8 · Profundidad, errores típicos y formas de guardar</h3>
+<p><a href="leccion-8.html">Volver a la lección 8</a></p>
+<article class="snippet" data-lang="python" id="fragmento-11">
+  <header>
+    <h3>Fragmento 11 · Poco profunda frente a profunda, con los mismos parámetros</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Comparar de forma justa una red ancha y una profunda: mismos parámetros y varias semillas.</p>
+  </header>
+  <pre class="code"><code>import numpy as np
+import keras
+from keras import layers
+
+def espirales(n, semilla, vueltas=2.25, ruido=0.03):
+    rng = np.random.default_rng(semilla)
+    T = 2 * np.pi * vueltas
+    t = rng.uniform(0.12, 1.0, n // 2) * T
+    r = t / T
+    X, y = [], []
+    for clase in (0, 1):
+        ang = t + clase * np.pi
+        X.append(np.column_stack([r * np.cos(ang), r * np.sin(ang)]) + rng.normal(0, ruido, (n // 2, 2)))
+        y.append(np.full(n // 2, clase))
+    return np.vstack(X).astype("float32"), np.concatenate(y)
+
+X_train, y_train = espirales(600, semilla=1)
+X_test, y_test = espirales(600, semilla=2)
+
+def entrenar(ocultas, semilla):
+    keras.utils.set_random_seed(semilla)
+    modelo = keras.Sequential([keras.Input(shape=(2,))]
+                              + [layers.Dense(u, activation="relu") for u in ocultas]
+                              + [layers.Dense(1, activation="sigmoid")])
+    modelo.compile(optimizer=keras.optimizers.Adam(learning_rate=0.01),
+                   loss="binary_crossentropy", metrics=["accuracy"])
+    modelo.fit(X_train, y_train, epochs=200, batch_size=32, verbose=0)
+    acc_train = modelo.evaluate(X_train, y_train, verbose=0)[1]
+    acc_test = modelo.evaluate(X_test, y_test, verbose=0)[1]
+    return modelo.count_params(), acc_train, acc_test
+
+REDES = [("poco profunda 1x44 ", [44]),
+         ("profunda      3x8  ", [8, 8, 8]),
+         ("poco profunda 1x128", [128])]
+tests = {nombre: [] for nombre, _ in REDES}
+
+for semilla in (42, 0, 1):
+    for nombre, ocultas in REDES:
+        n, a_tr, a_te = entrenar(ocultas, semilla)
+        tests[nombre].append(a_te)
+        print(f"semilla {semilla:2d} | {nombre} | {n:3d} parámetros | train = {a_tr:.3f} | test = {a_te:.3f}")
+
+print()
+for nombre, lista in tests.items():
+    print(f"{nombre} | accuracy test: media = {np.mean(lista):.3f} (mín {min(lista):.3f}, máx {max(lista):.3f})")</code></pre>
+  <details class="linea-a-linea" open>
+    <summary>Línea por línea</summary>
+    <p class="hint">Toca una fila (o pasa el ratón) para ver su línea resaltada en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace y por qué</th></tr></thead>
+      <tbody>
+        <tr data-lines="1-3"><td><code>import numpy as np …</code></td><td>Traen NumPy, Keras y las capas.</td></tr>
+        <tr data-lines="5"><td><code>def espirales(n, semilla, vueltas=2.25, ruido=0.03):</code></td><td>Una receta que fabrica dos espirales entrelazadas: <code>n</code> puntos, una semilla, cuántas vueltas y cuánto ruido (con valores por defecto).<span class="por-que">Un problema difícil a propósito: thrillers y comedias enroscados.</span><span class="se-lee">receta para fabricar dos espirales</span></td></tr>
+        <tr data-lines="6"><td><code>rng = np.random.default_rng(semilla)</code></td><td>Máquina de azar con la semilla que se pida.</td></tr>
+        <tr data-lines="7"><td><code>T = 2 * np.pi * vueltas</code></td><td>El ángulo total: 2π por el número de vueltas. <code>np.pi</code> es π.</td></tr>
+        <tr data-lines="8"><td><code>t = rng.uniform(0.12, 1.0, n // 2) * T</code></td><td>Ángulos al azar para la mitad de los puntos (<code>n // 2</code> es la división entera).</td></tr>
+        <tr data-lines="9"><td><code>r = t / T</code></td><td>El radio crece con el ángulo: eso hace la espiral.</td></tr>
+        <tr data-lines="10"><td><code>X, y = [], []</code></td><td>Dos listas vacías para ir guardando.</td></tr>
+        <tr data-lines="11"><td><code>for clase in (0, 1):</code></td><td>Un bucle por las dos clases.</td></tr>
+        <tr data-lines="12"><td><code>ang = t + clase * np.pi</code></td><td>La clase 1 va girada media vuelta (π): la otra espiral.</td></tr>
+        <tr data-lines="13"><td><code>X.append(np.column_stack([r * np.cos(ang), r * np. …</code></td><td>Pasa de ángulo y radio a coordenadas x, y (coseno y seno), con un poco de ruido, y lo añade a la lista.</td></tr>
+        <tr data-lines="14"><td><code>y.append(np.full(n // 2, clase))</code></td><td>Las etiquetas: <code>np.full</code> crea una lista llena del número de la clase.</td></tr>
+        <tr data-lines="15"><td><code>return np.vstack(X).astype("float32"), np.concaten …</code></td><td>Pega las dos mitades y las devuelve.</td></tr>
+        <tr data-lines="17-18"><td><code>X_train, y_train = espirales(600, semilla=1) …</code></td><td>Entrenamiento y test, con semillas distintas.<span class="por-que">Datos distintos para un examen honesto.</span></td></tr>
+        <tr data-lines="20"><td><code>def entrenar(ocultas, semilla):</code></td><td>Una receta que entrena una red con las capas ocultas que se le digan.</td></tr>
+        <tr data-lines="21"><td><code>keras.utils.set_random_seed(semilla)</code></td><td>Fija la semilla que se pida.</td></tr>
+        <tr data-lines="22-24"><td><code>modelo = keras.Sequential([keras.Input(shape=(2,))] …</code></td><td>Monta la red sumando listas: la entrada, una Dense con ReLU por cada número de <code>ocultas</code>, y la salida sigmoide. <code>[… for u in ocultas]</code> crea una lista repitiendo para cada <code>u</code>.<span class="por-que">Así la misma receta monta 1×44, 3×8 o 1×128.</span><span class="se-lee">entrada, luego una capa por cada tamaño de la lista, y una salida de sí o no</span></td></tr>
+        <tr data-lines="25-26"><td><code>modelo.compile(optimizer=keras.optimizers.Adam(lea …</code></td><td>Compila con Adam (0,01) y binary crossentropy.</td></tr>
+        <tr data-lines="27"><td><code>modelo.fit(X_train, y_train, epochs=200, batch_siz …</code></td><td>Entrena 200 épocas.<span class="por-que">Para dar tiempo a las dos.</span></td></tr>
+        <tr data-lines="28-29"><td><code>acc_train = modelo.evaluate(X_train, y_train, verb …</code></td><td>Porcentaje de aciertos en entrenamiento y en test. <code>[1]</code> coge el segundo valor (el primero es la pérdida).</td></tr>
+        <tr data-lines="30"><td><code>return modelo.count_params(), acc_train, acc_test</code></td><td>Devuelve parámetros y los dos porcentajes.</td></tr>
+        <tr data-lines="32-34"><td><code>REDES = [("poco profunda 1x44 ", [44]), …</code></td><td>Las tres redes: nombre y tamaños de las capas ocultas.<span class="por-que">Las dos primeras tienen exactamente 177 parámetros.</span></td></tr>
+        <tr data-lines="35"><td><code>tests = {nombre: [] for nombre, _ in REDES}</code></td><td>Un diccionario con una lista vacía por red: <code>{… for …}</code> lo crea de golpe. El <code>_</code> es un nombre para lo que no se usa.</td></tr>
+        <tr data-lines="37-38"><td><code>for semilla in (42, 0, 1): …</code></td><td>Dos bucles: por cada semilla, cada red.<span class="por-que">Nueve entrenamientos: por eso tarda un par de minutos.</span></td></tr>
+        <tr data-lines="39"><td><code>n, a_tr, a_te = entrenar(ocultas, semilla)</code></td><td>Entrena y guarda los tres resultados.</td></tr>
+        <tr data-lines="40"><td><code>tests[nombre].append(a_te)</code></td><td>Apunta el resultado de test.</td></tr>
+        <tr data-lines="41"><td><code>print(f"semilla {semilla:2d} | {nombre} | {n:3d} p …</code></td><td>Escribe una línea por entrenamiento.</td></tr>
+        <tr data-lines="43"><td><code>print()</code></td><td>Una línea en blanco.</td></tr>
+        <tr data-lines="44-45"><td><code>for nombre, lista in tests.items(): …</code></td><td>Para cada red, la media, el mínimo y el máximo de sus tres notas.<span class="por-que">Una sola semilla engaña.</span></td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre style="white-space:pre">semilla 42 | poco profunda 1x44  | 177 parámetros | train = 0.635 | test = 0.620
+semilla 42 | profunda      3x8   | 177 parámetros | train = 1.000 | test = 0.997
+semilla 42 | poco profunda 1x128 | 513 parámetros | train = 0.925 | test = 0.902
+semilla  0 | poco profunda 1x44  | 177 parámetros | train = 0.673 | test = 0.645
+semilla  0 | profunda      3x8   | 177 parámetros | train = 0.845 | test = 0.805
+semilla  0 | poco profunda 1x128 | 513 parámetros | train = 0.885 | test = 0.843
+semilla  1 | poco profunda 1x44  | 177 parámetros | train = 0.680 | test = 0.657
+semilla  1 | profunda      3x8   | 177 parámetros | train = 0.998 | test = 0.990
+semilla  1 | poco profunda 1x128 | 513 parámetros | train = 0.977 | test = 0.960
+
+poco profunda 1x44  | accuracy test: media = 0.641 (mín 0.620, máx 0.657)
+profunda      3x8   | accuracy test: media = 0.931 (mín 0.805, máx 0.997)
+poco profunda 1x128 | accuracy test: media = 0.902 (mín 0.843, máx 0.960)</pre>
+    <p><strong>Cómo leerla.</strong> Con 177 parámetros, la de tres capas gana con las tres semillas: 0,997, 0,805 y 0,990, frente a 0,620, 0,645 y 0,657 de la capa de 44 (que no pasa del 66 % cuando el azar da 50 %). Con 513 parámetros la ancha mejora (media 0,902) y gana a la profunda con la semilla 0: la profundidad ayuda, pero no es magia. La profunda varía mucho según la semilla. Tarda un par de minutos.</p>
+  </div>
+</article>
+<article class="snippet" data-lang="python" id="fragmento-15">
+  <header>
+    <h3>Fragmento 15 · Provocar a propósito los errores típicos</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Reconocer los mensajes de error más comunes de Keras antes de encontrártelos.</p>
+  </header>
+  <pre class="code"><code>import re
+import numpy as np
+import keras
+from keras import layers
+
+X = np.random.default_rng(0).normal(size=(64, 64)).astype("float32")
+y = np.random.default_rng(1).integers(0, 10, 64)
+
+def red(salidas=10, entrada=64, compilar=True):
+    modelo = keras.Sequential([keras.Input(shape=(entrada,)),
+                               layers.Dense(8, activation="relu"),
+                               layers.Dense(salidas, activation="softmax")])
+    if compilar:
+        modelo.compile(optimizer="adam", loss="sparse_categorical_crossentropy")
+    return modelo
+
+def provoca(titulo, accion, clave):
+    try:
+        accion()
+        print(f"{titulo:24s}-&gt; sin error")
+    except Exception as error:
+        texto = re.sub(r"\x1b\[[0-9;]*m", "", str(error))
+        texto = " ".join(texto.split())
+        frase = re.split(r"\. | Arguments", texto[texto.find(clave):])[0]
+        print(f"{titulo:24s}-&gt; {type(error).__name__}: ...{frase}")
+
+provoca("sin compile", lambda: red(compilar=False).fit(X, y, verbose=0), "You must call")
+provoca("forma de entrada", lambda: red().predict(np.zeros((3, 784)), verbose=0), "received input")
+provoca("muestra sin lote", lambda: red(entrada=2).predict(np.array([2.0, 1.0]), verbose=0), "Expected shape")
+provoca("X e y de distinto largo", lambda: red().fit(X, y[:10], verbose=0), "Data cardinality")
+provoca("pocas neuronas finales", lambda: red(salidas=5).fit(X, y, verbose=0), "Received a label")
+
+print()
+Xr = np.random.default_rng(0).uniform(-3, 3, size=(200, 2)).astype("float32")
+yr = (3 * Xr[:, 0] - 2 * Xr[:, 1] + 5).astype("float32")
+
+def regresion(optimizador):
+    modelo = keras.Sequential([keras.Input(shape=(2,)), layers.Dense(8, activation="relu"), layers.Dense(1)])
+    modelo.compile(optimizer=optimizador, loss="mse")
+    return modelo
+
+keras.utils.set_random_seed(1)
+h = regresion(keras.optimizers.SGD(learning_rate=10.0)).fit(Xr, yr, epochs=3, verbose=0)
+print("SGD con learning_rate=10:", [round(float(v), 2) for v in h.history["loss"]])
+
+keras.utils.set_random_seed(1)
+modelo = regresion("adam")
+primera = modelo.fit(Xr, yr, epochs=3, verbose=0).history["loss"]
+segunda = modelo.fit(Xr, yr, epochs=3, verbose=0).history["loss"]
+print("fit dos veces, 1.ª llamada:", [round(v, 2) for v in primera])
+print("                2.ª llamada:", [round(v, 2) for v in segunda], "(no empieza de cero)")
+
+print()
+Xn = Xr.copy()
+Xn[5, 1] = np.nan
+keras.utils.set_random_seed(1)
+modelo = regresion("adam")
+h = modelo.fit(Xn, yr, epochs=1, verbose=0)
+print("hay NaN en X:", bool(np.isnan(Xn).any()), "| pérdida de la época 1:", round(float(h.history["loss"][0]), 2))
+print("¿algún peso es NaN?:", any(bool(np.isnan(w).any()) for w in modelo.get_weights()))</code></pre>
+  <details class="linea-a-linea" open>
+    <summary>Línea por línea</summary>
+    <p class="hint">Toca una fila (o pasa el ratón) para ver su línea resaltada en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace y por qué</th></tr></thead>
+      <tbody>
+        <tr data-lines="1"><td><code>import re</code></td><td>Trae <code>re</code>, el cajón de Python para buscar y recortar texto con patrones.<span class="por-que">Solo para dejar los mensajes de error cortos.</span></td></tr>
+        <tr data-lines="2-4"><td><code>import numpy as np …</code></td><td>Traen NumPy, Keras y las capas.</td></tr>
+        <tr data-lines="6"><td><code>X = np.random.default_rng(0).normal(size=(64, 64)) …</code></td><td>64 muestras de 64 números al azar.</td></tr>
+        <tr data-lines="7"><td><code>y = np.random.default_rng(1).integers(0, 10, 64)</code></td><td>64 etiquetas enteras del 0 al 9.</td></tr>
+        <tr data-lines="9"><td><code>def red(salidas=10, entrada=64, compilar=True):</code></td><td>Una receta que monta una red pequeña; se puede elegir cuántas salidas, cuántas entradas y si se compila.<span class="por-que">Para romperla de distintas formas.</span></td></tr>
+        <tr data-lines="10-12"><td><code>modelo = keras.Sequential([keras.Input(shape=(entr …</code></td><td>Entrada, oculta de 8 y salida softmax.</td></tr>
+        <tr data-lines="13-14"><td><code>if compilar: …</code></td><td>Compila solo si se pide.</td></tr>
+        <tr data-lines="15"><td><code>return modelo</code></td><td>Devuelve la red.</td></tr>
+        <tr data-lines="17"><td><code>def provoca(titulo, accion, clave):</code></td><td>Una receta que ejecuta una acción y, si falla, escribe el error resumido.</td></tr>
+        <tr data-lines="18-20"><td><code>try: …</code></td><td>Intenta la acción; si no falla, escribe «sin error».</td></tr>
+        <tr data-lines="21"><td><code>except Exception as error:</code></td><td><code>except Exception as error:</code> atrapa cualquier error y lo guarda.<span class="por-que">Así el programa sigue tras cada error.</span></td></tr>
+        <tr data-lines="22-24"><td><code>texto = re.sub(r"\x1b\[[0-9;]*m", "", str(error)) …</code></td><td>Limpia el mensaje: quita códigos de color, junta los espacios y corta desde la frase clave hasta el primer punto.<span class="por-que">Los mensajes de Keras son muy largos.</span></td></tr>
+        <tr data-lines="25"><td><code>print(f"{titulo:24s}-&gt; {type(error).__name__}: ... …</code></td><td>Escribe el título, el tipo de error y la frase.</td></tr>
+        <tr data-lines="27"><td><code>provoca("sin compile", lambda: red(compilar=False) …</code></td><td>Error 1: entrenar sin <code>compile</code>. <code>lambda: …</code> es una receta de una línea, sin nombre, que se ejecuta después.<span class="se-lee">prueba a entrenar una red sin compilar</span></td></tr>
+        <tr data-lines="28"><td><code>provoca("forma de entrada", lambda: red().predict( …</code></td><td>Error 2: dar 784 columnas a una red que espera 64.</td></tr>
+        <tr data-lines="29"><td><code>provoca("muestra sin lote", lambda: red(entrada=2) …</code></td><td>Error 3: una muestra sin la dimensión del lote (un solo par de corchetes).</td></tr>
+        <tr data-lines="30"><td><code>provoca("X e y de distinto largo", lambda: red().f …</code></td><td>Error 4: 64 pistas pero solo 10 respuestas.</td></tr>
+        <tr data-lines="31"><td><code>provoca("pocas neuronas finales", lambda: red(sali …</code></td><td>Error 5: etiquetas hasta 9 con solo 5 neuronas de salida.</td></tr>
+        <tr data-lines="33"><td><code>print()</code></td><td>Línea en blanco.</td></tr>
+        <tr data-lines="34-35"><td><code>Xr = np.random.default_rng(0).uniform(-3, 3, size= …</code></td><td>Datos de regresión sin ruido.</td></tr>
+        <tr data-lines="37-40"><td><code>def regresion(optimizador): …</code></td><td>Una receta que monta y compila una red de regresión con el optimizador que se le dé.</td></tr>
+        <tr data-lines="42-44"><td><code>keras.utils.set_random_seed(1) …</code></td><td>Entrena con SGD y un paso enorme (<code>learning_rate=10</code>) y escribe la pérdida de cada época.<span class="por-que">Para ver qué pasa con un paso demasiado grande.</span></td></tr>
+        <tr data-lines="46-47"><td><code>keras.utils.set_random_seed(1) …</code></td><td>Una red con Adam.</td></tr>
+        <tr data-lines="48"><td><code>primera = modelo.fit(Xr, yr, epochs=3, verbose=0). …</code></td><td>Primer <code>fit</code> de 3 épocas.</td></tr>
+        <tr data-lines="49"><td><code>segunda = modelo.fit(Xr, yr, epochs=3, verbose=0). …</code></td><td>Segundo <code>fit</code> de 3 épocas, a la misma red.<span class="por-que">Para ver si empieza de cero.</span></td></tr>
+        <tr data-lines="50-51"><td><code>print("fit dos veces, 1.ª llamada:", [round(v, 2) …</code></td><td>Escribe las dos listas de pérdidas.</td></tr>
+        <tr data-lines="53"><td><code>print()</code></td><td>Línea en blanco.</td></tr>
+        <tr data-lines="54"><td><code>Xn = Xr.copy()</code></td><td>Copia los datos…</td></tr>
+        <tr data-lines="55"><td><code>Xn[5, 1] = np.nan</code></td><td>…y mete un hueco: <code>np.nan</code> es «no es un número» (<em>Not a Number</em>).<span class="por-que">Para ver qué hace Keras con un dato roto.</span></td></tr>
+        <tr data-lines="56-58"><td><code>keras.utils.set_random_seed(1) …</code></td><td>Entrena una época con esos datos.</td></tr>
+        <tr data-lines="59"><td><code>print("hay NaN en X:", bool(np.isnan(Xn).any()), " …</code></td><td>¿Hay algún hueco en X? Y la pérdida de esa época.</td></tr>
+        <tr data-lines="60"><td><code>print("¿algún peso es NaN?:", any(bool(np.isnan(w) …</code></td><td>¿Algún peso se ha convertido en hueco?<span class="por-que">Es la prueba de que el dato roto ha contaminado la red.</span></td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Salida esperada</strong>
+    <pre style="white-space:pre">sin compile             -&gt; ValueError: ...You must call `compile()` before using the model.
+forma de entrada        -&gt; ValueError: ...received input with shape (3, 784)
+muestra sin lote        -&gt; ValueError: ...Expected shape (None, 2), but input has incompatible shape (2,)
+X e y de distinto largo -&gt; ValueError: ...Data cardinality is ambiguous
+pocas neuronas finales  -&gt; InvalidArgumentError: ...Received a label value of 9 which is outside the valid range of [0, 5)
+
+SGD con learning_rate=10: [nan, nan, nan]
+fit dos veces, 1.ª llamada: [69.84, 69.13, 68.44]
+                2.ª llamada: [67.77, 67.11, 66.44] (no empieza de cero)
+
+hay NaN en X: True | pérdida de la época 1: 73.51
+¿algún peso es NaN?: True</pre>
+    <p><strong>Cómo leerla.</strong> Los cinco primeros mensajes dicen qué esperaba Keras y qué recibió: compilar antes, 64 columnas, la forma (None, 2) con lote, el mismo número de filas y etiquetas menores que el número de salidas. Con <code>SGD(learning_rate=10)</code> la pérdida es <code>nan</code> desde el principio: los pesos explotan. El segundo <code>fit</code> empieza en 67,77, donde acabó el primero (68,44), no donde empezó (69,84). Y el más traicionero: con un hueco en los datos no sale ningún error y la pérdida parece normal (73,51), pero algún peso ya es <code>nan</code>. Por eso hay que mirar los datos antes.</p>
+  </div>
+</article>
+<article class="snippet" data-lang="python" id="extra-earlystopping">
+  <header>
+    <h3>EarlyStopping · La forma general</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> La plantilla para añadir la parada temprana a cualquier entrenamiento.</p>
+  </header>
+  <pre class="code"><code>parar = keras.callbacks.EarlyStopping(monitor="val_loss", patience=5,
+                                      min_delta=0, restore_best_weights=True)
+model.fit(X_train, y_train, epochs=100, validation_data=(X_val, y_val),
+          callbacks=[parar])</code></pre>
+  <details class="linea-a-linea" open>
+    <summary>Línea por línea</summary>
+    <p class="hint">Toca una fila (o pasa el ratón) para ver su línea resaltada en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace y por qué</th></tr></thead>
+      <tbody>
+        <tr data-lines="1-2"><td><code>parar = keras.callbacks.EarlyStopping(monitor="val …</code></td><td>Crea el ayudante: vigila <code>val_loss</code>, aguanta 5 épocas sin mejorar, cualquier mejora cuenta (<code>min_delta=0</code>) y al parar vuelve a la mejor época.<span class="se-lee">vigila la pérdida de validación con paciencia 5 y vuelve a la mejor</span></td></tr>
+        <tr data-lines="3-4"><td><code>model.fit(X_train, y_train, epochs=100, validation …</code></td><td>Entrena hasta 100 épocas con datos de validación y el ayudante en la lista <code>callbacks</code>.<span class="por-que">Sin validación, el ayudante no tendría nada que vigilar.</span></td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Sin salida</strong>
+    <p>No se ejecuta tal cual: es un esquema para leer. El <a href="#paso-11">paso 11</a> es esto mismo con los dígitos y su salida real.</p>
+  </div>
+</article>
+<article class="snippet" data-lang="python" id="extra-guardar">
+  <header>
+    <h3>Guardar · El modelo entero en .keras</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Las tres órdenes para no perder un entrenamiento.</p>
+  </header>
+  <pre class="code"><code>model.save("modelo.keras")                          # guardar
+cargado = keras.models.load_model("modelo.keras")   # cargar (en otro cuaderno, otro día…)
+cargado.predict(X_nuevo)                            # ya sirve para predecir</code></pre>
+  <details class="linea-a-linea" open>
+    <summary>Línea por línea</summary>
+    <p class="hint">Toca una fila (o pasa el ratón) para ver su línea resaltada en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace y por qué</th></tr></thead>
+      <tbody>
+        <tr data-lines="1"><td><code>model.save("modelo.keras") …</code></td><td>Guarda el modelo entero en un archivo <code>.keras</code>.<span class="se-lee">guarda el modelo</span></td></tr>
+        <tr data-lines="2"><td><code>cargado = keras.models.load_model("modelo.keras") …</code></td><td>Lo carga (otro día, en otro cuaderno).</td></tr>
+        <tr data-lines="3"><td><code>cargado.predict(X_nuevo) …</code></td><td>Ya sirve para predecir.</td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Sin salida</strong>
+    <p>No se ejecuta tal cual: es un esquema para leer. El <a href="#paso-12">paso 12</a> lo hace de verdad y comprueba que el modelo cargado da las mismas predicciones.</p>
+  </div>
+</article>
+<article class="snippet" data-lang="python" id="extra-pesos">
+  <header>
+    <h3>Guardar · Solo los pesos</h3>
+    <p class="para-que"><strong>Para qué sirve</strong> Restaurar lo aprendido cuando la red ya está en tu código.</p>
+  </header>
+  <pre class="code"><code>model.save_weights("pesos.weights.h5")     # el nombre DEBE terminar en .weights.h5
+modelo_nuevo = construir_la_misma_red()    # tú vuelves a escribir la arquitectura
+modelo_nuevo.load_weights("pesos.weights.h5")</code></pre>
+  <details class="linea-a-linea" open>
+    <summary>Línea por línea</summary>
+    <p class="hint">Toca una fila (o pasa el ratón) para ver su línea resaltada en el código.</p>
+    <table class="lineas">
+      <thead><tr><th>Código</th><th>Qué hace y por qué</th></tr></thead>
+      <tbody>
+        <tr data-lines="1"><td><code>model.save_weights("pesos.weights.h5")     # el no …</code></td><td>Guarda solo los pesos. El nombre tiene que acabar en <code>.weights.h5</code>.<span class="por-que">Si no, Keras 3 se queja.</span></td></tr>
+        <tr data-lines="2"><td><code>modelo_nuevo = construir_la_misma_red()    # tú vu …</code></td><td>Vuelves a construir la misma red con tu código (aquí, una receta inventada).<span class="por-que">Los pesos solos no dicen cómo es la red.</span></td></tr>
+        <tr data-lines="3"><td><code>modelo_nuevo.load_weights("pesos.weights.h5")</code></td><td>Le cargas los pesos.<span class="por-que">Solo encajan si la red es idéntica.</span><span class="se-lee">mete en la red nueva los pesos guardados</span></td></tr>
+      </tbody>
+    </table>
+  </details>
+  <div class="salida">
+    <strong>Sin salida</strong>
+    <p>No se ejecuta tal cual: es un esquema para leer. <code>construir_la_misma_red</code> es un nombre inventado: ahí va tu propia receta.</p>
+  </div>
+</article>
+</section>
+
+<section>
+<h2 id="chuleta">Chuleta del laboratorio</h2>
+<dl class="chuleta">
+  <div><dt>keras.Sequential</dt><dd>Crea una red con capas en fila.</dd></div>
+  <div><dt>keras.Input</dt><dd>Dice cuántos números trae cada muestra.</dd></div>
+  <div><dt>layers.Dense</dt><dd>Capa de neuronas conectadas a todas las entradas.</dd></div>
+  <div><dt>layers.Normalization</dt><dd>Normaliza dentro del modelo; <code>adapt</code> con el entrenamiento.</dd></div>
+  <div><dt>compile</dt><dd>Elige optimizador, pérdida y métricas.</dd></div>
+  <div><dt>fit</dt><dd>Entrena y devuelve el diario History.</dd></div>
+  <div><dt>evaluate</dt><dd>Pérdida y métricas con datos nuevos.</dd></div>
+  <div><dt>predict</dt><dd>Las salidas de la red; con varias clases, <code>argmax</code> da la respuesta.</dd></div>
+  <div><dt>summary y count_params</dt><dd>Capas y parámetros.</dd></div>
+  <div><dt>to_categorical</dt><dd>Enteros a One-Hot.</dd></div>
+  <div><dt>EarlyStopping</dt><dd>Para cuando <code>val_loss</code> deja de mejorar.</dd></div>
+  <div><dt>set_random_seed</dt><dd>Fija el azar: todo se repite.</dd></div>
+  <div><dt>save y load_model</dt><dd>Guardar y cargar el modelo en <code>.keras</code>.</dd></div>
+  <div><dt>GradientTape</dt><dd>Graba cuentas y saca derivadas solo.</dd></div>
+</dl>
+</section>
+
+<div class="resumen">
+  <h2 class="sin-num sin-toc">En tres líneas</h2>
+  <ul>
+    <li>Siempre igual: <strong>datos</strong> → <code>Sequential</code> → <code>compile</code> → <code>fit</code> → <code>evaluate</code> y <code>predict</code>.</li>
+    <li>La última capa y la pérdida van en pareja: <code>Dense(1)</code> + MSE, sigmoide + binary, softmax + categorical (o sparse con enteros).</li>
+    <li>Normaliza, vigila <code>val_loss</code> en el diario, para a tiempo con <code>EarlyStopping</code> y guarda con <code>save</code>.</li>
+  </ul>
+</div>
+
+</div>
+</main>
+</body>
+</html>

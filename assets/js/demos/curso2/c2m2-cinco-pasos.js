@@ -107,11 +107,11 @@ Lab.register("curso2/c2m2-cinco-pasos", function (root, api) {
   function draw(ctx, w, h, C) {
     var D = api.d, narrow = w < 560, i, j;
     // columna de pasos (código)
-    var cx = 10, cw = narrow ? w - 20 : Math.min(330, w * 0.5), rh = narrow ? 19 : 26, y0 = 10;
+    var cx = 10, cw = narrow ? w - 20 : Math.min(330, w * 0.5), rh = narrow ? 21 : 26, y0 = 10;
     for (i = 0; i < STEPS.length; i++) {
       var y = y0 + i * rh, on = i === st.last, done = (i === 0 && st.data) || (i === 1 && st.model) || (i === 2 && st.compiled) || (i === 3 && st.epochs > 0);
       D.rect(ctx, cx, y, cw, rh - 3, on ? (st.err ? C.terracotaWash : C.cobaltoWash) : C.surface, on ? (st.err ? C.terracota : C.cobalto) : C.line, on ? 2 : 1);
-      D.text(ctx, STEPS[i].code, cx + 8, y + rh / 2 + 2, { size: narrow ? 10 : 11.5, mono: true, color: C.ink, weight: on ? 600 : 400 });
+      D.text(ctx, STEPS[i].code, cx + 8, y + rh / 2 + 2, { size: narrow ? 11 : 11.5, mono: true, color: C.ink, weight: on ? 600 : 400 });
       if (done) D.text(ctx, "✓", cx + cw - 10, y + rh / 2 + 3, { align: "right", size: 12, weight: 700, color: C.olivaInk });
     }
     // red
@@ -129,10 +129,10 @@ Lab.register("curso2/c2m2-cinco-pasos", function (root, api) {
         D.line(ctx, xs[0], py(i, 2), xs[1], py(j, H), v >= 0 ? C.cobalto : C.terracota, 0.6 + 4 * Math.abs(v) / maxw);
       }
       for (j = 0; j < H; j++) { var v2 = net.W2[j]; D.line(ctx, xs[1], py(j, H), xs[2], py(0, 1), v2 >= 0 ? C.cobalto : C.terracota, 0.6 + 4 * Math.abs(v2) / maxw); }
-      for (i = 0; i < 2; i++) { D.circle(ctx, xs[0], py(i, 2), 11, C.surface, C.ink, 1.5); D.text(ctx, names[i], xs[0] - 14, py(i, 2) + 4, { align: "right", size: 10.5, color: C.ink2 }); }
+      for (i = 0; i < 2; i++) { D.circle(ctx, xs[0], py(i, 2), 11, C.surface, C.ink, 1.5); D.text(ctx, names[i], xs[0] - 14, py(i, 2) + 4, { align: "right", size: 11, color: C.ink2 }); }
       for (j = 0; j < H; j++) D.circle(ctx, xs[1], py(j, H), 10, C.surface, C.ink, 1.5);
       D.circle(ctx, xs[2], py(0, 1), 12, C.surface, C.ink, 1.5);
-      D.text(ctx, "horas", xs[2] + 16, py(0, 1) + 4, { size: 10.5, color: C.ink2 });
+      D.text(ctx, "horas", xs[2] + 16, py(0, 1) + 4, { size: 11, color: C.ink2 });
     }
     // franja: ¿han cambiado los pesos?
     var by = h - 30, txt, col;

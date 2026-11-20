@@ -22,27 +22,53 @@
       <p class="eyebrow">Curso 2 · Módulo 2 · Lección 5 de 8</p>
       <h1>Para predecir un número, la última neurona va sin activación</h1>
       <p class="lead">¿Cuántos minutos verá este usuario? Una neurona final sin activación puede decir 67,4; una sigmoide no pasaría de 1.</p>
-      <p class="meta-line"><span class="read-time" data-render="read-time"></span><a href="../modulo-2.html">Índice del módulo</a></p>
+      <p class="meta-line"><span class="read-time" data-render="read-time"></span><a href="../modulo-2.html">Índice del módulo</a> · <a href="#chuleta">Ir a la chuleta</a></p>
     </div>
     <div class="hero-tile" aria-hidden="true"></div>
   </div>
 </header>
 
 <details class="predice">
-  <summary>Tu red predice minutos vistos (entre 0 y 180) y pones una sigmoide en la última capa. ¿Qué pasa?<span class="hint"></span></summary>
+  <summary>Tu red predice minutos vistos (entre 0 y 180) y en la última capa pones una sigmoide, que siempre da algo entre 0 y 1. ¿Qué pasa?<span class="hint"></span></summary>
   <div>
-    <p>La red nunca podrá decir más de 1 minuto: la sigmoide encierra la salida entre 0 y 1, y la pérdida se queda estancada. En regresión, la última capa es <code>Dense(1)</code> <strong>sin activación</strong>.</p>
+    <p>La red nunca podrá decir más de 1 minuto, y la pérdida se queda atascada. Para predecir un número, la última capa es <code>Dense(1)</code> <strong>sin activación</strong>.</p>
   </div>
 </details>
 
 <section>
-<h2 id="idea">La receta de la regresión</h2>
+<h2 id="idea">1 · La receta de la regresión</h2>
+<p><strong>Regresión</strong> es predecir un número: minutos vistos, nota, precio. La receta en Keras tiene tres piezas:</p>
 <ul class="flow">
   <li class="d">Capas ocultas<small>Dense(…, "relu")</small></li>
   <li class="c">Capa final<small>Dense(1), sin activación</small></li>
   <li class="b">compile<small>loss="mse", metrics=["mae"]</small></li>
 </ul>
-<p>Sin activación, la última capa devuelve \( z = \mathbf{x}W + b \) tal cual: cualquier número, positivo o negativo y tan grande como haga falta. Las capas ocultas con <strong>ReLU</strong> permiten aprender relaciones que no son rectas: la red dibuja una curva de <strong>tramos rectos unidos en codos</strong>, y cada neurona añade, como mucho, un codo.</p>
+<p>Una sola neurona final, porque quieres un solo número. La pérdida es el MSE y miras el MAE, que sale en minutos (<a href="leccion-4.html#numeros">lección 4</a>).</p>
+</section>
+
+<section>
+<h2 id="sin-activacion">2 · Por qué sin activación</h2>
+<p>Sin activación, la neurona final devuelve su cuenta tal cual: pesos por entradas más bias. Puede salir cualquier número.</p>
+<table>
+  <thead><tr><th>Activación final</th><th>Qué puede decir</th></tr></thead>
+  <tbody>
+    <tr><td>Ninguna</td><td>Cualquier número: 67,4 · −3 · 250</td></tr>
+    <tr><td>Sigmoide</td><td>Solo entre 0 y 1</td></tr>
+    <tr><td>ReLU</td><td>Solo 0 o más</td></tr>
+  </tbody>
+</table>
+</section>
+
+<section>
+<h2 id="codos">3 · ReLU dibuja tramos rectos</h2>
+<p>Las capas ocultas con ReLU («si sale negativo, 0») permiten aprender relaciones que no son una recta. Cada neurona añade, como mucho, un <strong>codo</strong>: un punto donde la línea cambia de inclinación.</p>
+<div class="anim-pasos" data-titulo="Dos neuronas, dos codos: minutos vistos según la duración">
+  <div class="paso"><p><strong>1.</strong> Neurona A = ReLU(duración − 1 h). Vale 0 hasta la hora; luego sube.</p><span class="grande">codo en 1 h</span></div>
+  <div class="paso"><p><strong>2.</strong> Neurona B = ReLU(duración − 2 h). Vale 0 hasta las 2 horas.</p><span class="grande">codo en 2 h</span></div>
+  <div class="paso"><p><strong>3.</strong> Salida sin activación: 20 + 60·A − 60·B.</p><span class="grande">minutos = 20 + 60A − 60B</span></div>
+  <div class="paso"><p><strong>4.</strong> Película de 1,5 h: A = 0,5 y B = 0.</p><span class="grande">20 + 30 = 50 min</span></div>
+  <div class="paso"><p><strong>5.</strong> Película de 3 h: A = 2 y B = 1. Pasadas las 2 horas, la línea se queda plana: nadie ve más de 80 minutos.</p><span class="grande">20 + 120 − 60 = 80 min</span></div>
+</div>
 </section>
 
 <figure class="demo" data-demo="curso2/c2m2-regresion-curva" data-titulo="Una red aprende una curva (regresión)">
@@ -51,9 +77,17 @@
 </figure>
 
 <section>
-<h2 id="normalizar">Normalizar: que ninguna feature grite más que otra</h2>
-<p>Si una feature es el presupuesto de la película (30–250 millones) y otra los días desde su estreno (100–10.000), la segunda llega con números mucho mayores y la pérdida se vuelve un <strong>valle largo y estrecho</strong>. Un learning rate pequeño avanza a paso de tortuga; uno grande se dispara. La solución es estandarizar cada feature: \( z = (x - \mu)/\sigma \).</p>
-<p>En Keras, con <code>layers.Normalization()</code> dentro del modelo y <code>adapt(X_train)</code>: calcula medias y desviaciones <strong>solo con el entrenamiento</strong> y la normalización viaja con el modelo al guardarlo.</p>
+<h2 id="normalizar">4 · Normalizar: que ninguna columna grite más</h2>
+<p>Una columna es el presupuesto (de 30 a 250 millones). Otra, los días desde el estreno (de 100 a 10.000). La segunda trae números mucho mayores. Entonces ningún tamaño de paso (<em>learning rate</em>) sirve para los dos pesos: el pequeño avanza a paso de tortuga y el grande se dispara.</p>
+<p>La solución es <strong>normalizar</strong>: dejar cada columna con media 0 y una dispersión de 1. A cada valor se le resta la <strong>media</strong> y se divide entre la <strong>desviación típica</strong> (cuánto se apartan los valores de la media, de media).</p>
+<div class="formula">\[ z = \frac{x - \text{media}}{\text{desviación}} \]</div>
+<div class="anim-pasos" data-titulo="Dos escalas que acaban iguales">
+  <div class="paso"><p><strong>1.</strong> Presupuestos: 60, 100 y 140 millones. Media 100; desviación 32,66.</p><span class="grande">media 100 · desv. 32,66</span></div>
+  <div class="paso"><p><strong>2.</strong> Normalizados.</p><span class="grande">(60 − 100) / 32,66 = −1,225</span></div>
+  <div class="paso"><p><strong>3.</strong> Días: 1.000, 5.000 y 9.000. Media 5.000; desviación 3.265,99.</p><span class="grande">(1.000 − 5.000) / 3.265,99 = −1,225</span></div>
+  <div class="paso"><p><strong>4.</strong> Las dos columnas quedan en −1,225 · 0 · +1,225. Ya hablan el mismo idioma.</p></div>
+</div>
+<p>En Keras se hace con la capa <code>layers.Normalization()</code> y su orden <code>adapt</code>, que calcula la media y la desviación <strong>solo con el entrenamiento</strong>.</p>
 </section>
 
 <figure class="demo" data-demo="curso2/c2m2-normalizar" data-titulo="Por qué hay que normalizar: un valle largo y estrecho">
@@ -61,20 +95,29 @@
   <div class="observa">Sin normalizar, ningún learning rate sirve para los dos pesos; normalizado, el valle es casi redondo.</div>
 </figure>
 
-<section>
-<h2 id="numeros">Con números: dos escalas que acaban iguales</h2>
-<div class="callout ejemplo">
-  <span class="lbl">Ejemplo numérico</span>
-  <p>Presupuestos de 60, 100 y 140 millones. Media \( \mu = 100 \); desviación típica \( \sigma = \sqrt{(40^2 + 0 + 40^2)/3} = \sqrt{1066{,}7} \approx 32{,}66 \). Normalizadas: \( (60-100)/32{,}66 = -1{,}225 \), \( 0 \) y \( +1{,}225 \). Días desde el estreno: 1.000, 5.000 y 9.000: \( \mu = 5.000 \), \( \sigma \approx 3.265{,}99 \) y salen <strong>los mismos</strong> \( -1{,}225,\ 0,\ +1{,}225 \). Tras normalizar, las dos features viven en la misma escala aunque una se midiera en millones de euros y la otra en días.</p>
-</div>
-</section>
-
 <details class="predice">
   <summary>Calculas la media y la desviación con <em>todos</em> los datos, test incluido, y luego normalizas. ¿Algún problema?<span class="hint"></span></summary>
   <div>
-    <p>Sí: se cuela información del test en el entrenamiento (<em>data leakage</em>) y la nota final sale optimista. La media y la desviación salen solo del entrenamiento y se aplican igual a validación, test y datos nuevos.</p>
+    <p>Sí: se cuela información del test en el entrenamiento. Se llama <strong>fuga de datos</strong> (<em>data leakage</em>) y la nota final sale demasiado buena. La media y la desviación salen solo del entrenamiento y se aplican igual a todo lo demás.</p>
   </div>
 </details>
+
+<section>
+<h2 id="chuleta">Chuleta para repasar</h2>
+<dl class="chuleta">
+  <div><dt>Regresión</dt><dd>Predecir un número. <em>Minutos vistos.</em></dd></div>
+  <div><dt>Capa final de regresión</dt><dd>Dense(1) sin activación: puede decir cualquier número. <em>67,4.</em></dd></div>
+  <div><dt>Pérdida y métrica</dt><dd>MSE para aprender, MAE para mirar. <em>MAE de 5 = falla 5 minutos de media.</em></dd></div>
+  <div><dt>Sigmoide</dt><dd>Aplasta cualquier número entre 0 y 1. <em>Mala idea para minutos.</em></dd></div>
+  <div><dt>ReLU</dt><dd>Si sale negativo, 0. <em>Cada neurona ReLU añade un codo.</em></dd></div>
+  <div><dt>Codo</dt><dd>Punto donde la línea cambia de inclinación. <em>A partir de 2 h, plana en 80 min.</em></dd></div>
+  <div><dt>Normalizar</dt><dd>Dejar cada columna con media 0 y desviación 1. <em>60 → −1,225.</em></dd></div>
+  <div><dt>Media</dt><dd>Suma entre cuántos son. <em>60, 100 y 140 → 100.</em></dd></div>
+  <div><dt>Desviación típica</dt><dd>Cuánto se apartan los valores de la media. <em>32,66 millones.</em></dd></div>
+  <div><dt>Normalization y adapt</dt><dd>La capa de Keras que normaliza; adapt calcula media y desviación con el entrenamiento.</dd></div>
+  <div><dt>Fuga de datos</dt><dd>Que el test influya en el entrenamiento. La nota sale falsa.</dd></div>
+</dl>
+</section>
 
 <div class="resumen">
   <h2 class="sin-num sin-toc">En tres líneas</h2>
@@ -98,29 +141,29 @@
     "<code>Dense(1)</code> sin activación con <code>mse</code> (y <code>mae</code> como métrica)"
    ],
    "correcta": 3,
-   "porque": "En regresión la salida es un único número sin límite, así que la capa final no lleva activación (una sigmoide lo encerraría entre 0 y 1) y la pérdida mide la distancia entre números: MSE. El MAE, que está en minutos, se ve como métrica. Softmax con una sola neurona daría siempre 1."
+   "porque": "Quieres un solo número sin límite: una neurona final sin activación (una sigmoide lo encerraría entre 0 y 1). La pérdida mide la distancia entre números: MSE. El MAE, en minutos, se mira como métrica."
   },
   {
    "q": "¿Por qué conviene normalizar las entradas antes de entrenar una red?",
    "opciones": [
-    "Porque si una feature es mucho mayor que otra, la pérdida se convierte en un valle largo y estrecho y no hay un learning rate bueno para todos los pesos",
+    "Porque si una columna trae números mucho mayores que otra, ningún tamaño de paso sirve para todos los pesos",
     "Porque Keras rechaza los números mayores que 1",
     "Porque así la red necesita menos neuronas",
     "Porque la normalización elimina el sobreajuste"
    ],
    "correcta": 0,
-   "porque": "Con escalas muy distintas, un learning rate pequeño avanza lentísimo por el lado plano y uno grande se dispara por el lado empinado. Tras estandarizar (media 0, desviación 1) el valle es casi redondo y un learning rate cómodo sirve para todos los pesos."
+   "porque": "Con escalas muy distintas, un paso pequeño avanza lentísimo en una dirección y uno grande se dispara en la otra. Tras normalizar (media 0, desviación 1) un paso cómodo sirve para todos los pesos."
   },
   {
    "q": "Tu red de regresión tiene un MAE de 5 en el test y predice minutos vistos. ¿Qué significa?",
    "opciones": [
     "Que acierta el 5 % de las veces",
     "Que de media se equivoca en 5 minutos",
-    "Que el error cuadrático es 5 minutos",
+    "Que el error al cuadrado es 5 minutos",
     "Que la red tiene 5 parámetros de más"
    ],
    "correcta": 1,
-   "porque": "El MAE es la media del error absoluto y está en las unidades del objetivo: «de media me equivoco en 5 minutos». El MSE estaría en minutos al cuadrado; por eso se mira su raíz, el RMSE."
+   "porque": "El MAE es la media del error sin signo y está en las unidades de la respuesta: «de media me equivoco en 5 minutos». El MSE estaría en minutos al cuadrado; por eso se mira su raíz, el RMSE."
   }
  ]
 }
@@ -190,7 +233,7 @@
   <li><strong>Una neurona de salida lineal:</strong> da directamente los minutos.</li>
   <li><strong><code>compile(optimizer="adam", loss="mean_squared_error", metrics=["mean_absolute_error"])</code></strong>: la pérdida penaliza con fuerza los errores grandes, y el MAE, que está en minutos, te dice «de media me equivoco en tantos minutos».</li>
 </ul>
-<p>Puedes montar exactamente esta red en el constructor del principio del módulo (tarea «Regresión», 8 entradas, dos capas de 5): verás los 81 parámetros. Una advertencia de honestidad: no tenemos los datos reales de Netflix (ni los tendremos), así que el <a href="#fragmento-14">fragmento 14</a> entrena la <strong>misma arquitectura</strong> con 1.000 muestras sintéticas de 8 características cuya fórmula conocemos, para poder comprobar si la red la recupera.</p>
+<p>Puedes montar exactamente esta red en el constructor del principio del módulo (tarea «Regresión», 8 entradas, dos capas de 5): verás los 81 parámetros. Una advertencia de honestidad: no tenemos los datos reales de Netflix (ni los tendremos), así que el <a href="laboratorio.html#fragmento-14">fragmento 14</a> entrena la <strong>misma arquitectura</strong> con 1.000 muestras sintéticas de 8 características cuya fórmula conocemos, para poder comprobar si la red la recupera.</p>
 
 <div class="callout regla">
   <span class="lbl">Regla fácil</span>
@@ -200,241 +243,12 @@
   </div>
 </details>
 
-<section>
+<section class="ir-lab">
 <h2 class="sin-num">Código</h2>
-<article class="snippet" data-lang="python" id="fragmento-5">
-  <header>
-    <h3>5 · Normalizar las entradas: la misma red con y sin normalización</h3>
-    <p class="para-que"><strong>Para qué sirve</strong> Medir cuánto cambia el resultado al normalizar. Dos features en escalas muy distintas (presupuesto en millones de € y días desde el estreno) entrenan la misma red dos veces; la única diferencia es una capa <code>Normalization</code>.</p>
-  </header>
-  <pre class="code"><code>import numpy as np
-import keras
-from keras import layers
-from sklearn.preprocessing import StandardScaler
-
-rng = np.random.default_rng(0)
-n = 1200
-presupuesto = rng.uniform(30, 250, n)
-dias = rng.uniform(100, 10000, n)
-X = np.column_stack([presupuesto, dias]).astype("float32")
-y = (2.0 * presupuesto - 0.01 * dias + 50 + rng.normal(0, 5, n)).astype("float32")
-X_train, y_train = X[:1000], y[:1000]
-X_val, y_val = X[1000:], y[1000:]
-print("Rango de cada columna:", X_train.min(axis=0).round(0), X_train.max(axis=0).round(0))
-
-def construir(normalizar):
-    keras.utils.set_random_seed(1)
-    capas = [keras.Input(shape=(2,))]
-    if normalizar:
-        norm = layers.Normalization()
-        norm.adapt(X_train)
-        capas.append(norm)
-    capas += [layers.Dense(16, activation="relu"),
-              layers.Dense(8, activation="relu"),
-              layers.Dense(1)]
-    modelo = keras.Sequential(capas)
-    modelo.compile(optimizer=keras.optimizers.Adam(learning_rate=0.01), loss="mse")
-    return modelo
-
-for normalizar in (False, True):
-    modelo = construir(normalizar)
-    h = modelo.fit(X_train, y_train, epochs=30, batch_size=32,
-                   validation_data=(X_val, y_val), verbose=0)
-    mse_final = h.history["val_loss"][-1]
-    print(f"normalizar={normalizar!s:5} | val_loss final = {mse_final:6.1f} | error típico (raíz) = {mse_final ** 0.5:4.1f}")
-
-norm = layers.Normalization()
-norm.adapt(X_train)
-scaler = StandardScaler().fit(X_train)
-print("Normalization == StandardScaler:", np.allclose(norm(X_val).numpy(), scaler.transform(X_val), atol=1e-4))</code></pre>
-  <details class="linea-a-linea">
-    <summary>Línea por línea</summary>
-    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
-    <table class="lineas">
-      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
-      <tbody>
-        <tr data-lines="1-3"><td><code>import numpy as np …</code></td><td>Importan NumPy, Keras y las capas.</td></tr>
-        <tr data-lines="4"><td><code>from sklearn.preprocessing import StandardScaler</code></td><td>Importa <code>StandardScaler</code> de Scikit-learn (el normalizador del Curso 1). Lo usamos solo al final, para comprobar que la capa de Keras hace lo mismo.</td></tr>
-        <tr data-lines="6"><td><code>rng = np.random.default_rng(0)</code></td><td>Generador de números aleatorios con semilla 0, para que los datos sean siempre los mismos.</td></tr>
-        <tr data-lines="7"><td><code>n = 1200</code></td><td>1.200 muestras en total.</td></tr>
-        <tr data-lines="8"><td><code>presupuesto = rng.uniform(30, 250, n)</code></td><td>Feature 1: el presupuesto de una película en millones de €, entre 30 y 250 (cifras inventadas). Números «pequeños».</td></tr>
-        <tr data-lines="9"><td><code>dias = rng.uniform(100, 10000, n)</code></td><td>Feature 2: los días que han pasado desde el estreno, entre 100 y 10.000. Números decenas de veces mayores.</td></tr>
-        <tr data-lines="10"><td><code>X = np.column_stack([presupuesto, dias]).astype …</code></td><td><code>np.column_stack</code> junta las dos columnas en una tabla de 1.200 filas y 2 columnas, en <code>float32</code>.</td></tr>
-        <tr data-lines="11"><td><code>y = (2.0 * presupuesto - 0.01 * dias + 50 …</code></td><td>La recaudación en millones (cifras inventadas): \( 2\cdot\text{presupuesto} - 0{,}01\cdot\text{días} + 50 \) más un ruido de desviación 5. El ruido de 5 marca el mejor error posible: ninguna red podrá bajar de ahí.</td></tr>
-        <tr data-lines="12"><td><code>X_train, y_train = X[:1000], y[:1000]</code></td><td>Las primeras 1.000 filas serán el entrenamiento. <code>X[:1000]</code> es «de la fila 0 a la 999».</td></tr>
-        <tr data-lines="13"><td><code>X_val, y_val = X[1000:], y[1000:]</code></td><td>Las 200 últimas serán la validación.</td></tr>
-        <tr data-lines="14"><td><code>print("Rango de cada columna:", X_train.min(ax …</code></td><td>Muestra el mínimo y el máximo de cada columna (<code>axis=0</code>: a lo largo de las filas, una cifra por columna). Así se ve que las escalas son muy distintas.</td></tr>
-        <tr data-lines="16"><td><code>def construir(normalizar):</code></td><td>Define una función que construye el modelo; el parámetro <code>normalizar</code> decide si lleva la capa de normalización.</td></tr>
-        <tr data-lines="17"><td><code>keras.utils.set_random_seed(1)</code></td><td>Misma semilla en las dos construcciones: la comparación es justa (mismos pesos iniciales).</td></tr>
-        <tr data-lines="18"><td><code>capas = [keras.Input(shape=(2,))]</code></td><td>Empieza la lista de capas con la entrada de 2 números.</td></tr>
-        <tr data-lines="19"><td><code>if normalizar:</code></td><td>Si se pidió normalizar…</td></tr>
-        <tr data-lines="20"><td><code>norm = layers.Normalization()</code></td><td>…crea una capa <code>Normalization</code>: una capa sin pesos que se entrena, que calcula \( (x-\mu)/\sigma \) con la media y la desviación que se le enseñen.</td></tr>
-        <tr data-lines="21"><td><code>norm.adapt(X_train)</code></td><td><code>adapt(X_train)</code> le enseña los datos de <strong>entrenamiento</strong> para que calcule la media y la desviación de cada columna. Solo con el entrenamiento: así no se cuela información del test.</td></tr>
-        <tr data-lines="22"><td><code>capas.append(norm)</code></td><td>La añade a la lista, justo después de la entrada.</td></tr>
-        <tr data-lines="23"><td><code>capas += [layers.Dense(16, activation="relu"),</code></td><td>Añade las capas ocultas (16 y 8 neuronas con ReLU)…</td></tr>
-        <tr data-lines="24"><td><code>layers.Dense(8, activation="relu"),</code></td><td>…la segunda oculta…</td></tr>
-        <tr data-lines="25"><td><code>layers.Dense(1)]</code></td><td>…y la salida de 1 neurona sin activación. <code>+=</code> añade elementos a la lista.</td></tr>
-        <tr data-lines="26"><td><code>modelo = keras.Sequential(capas)</code></td><td>Crea el modelo con la lista de capas.</td></tr>
-        <tr data-lines="27"><td><code>modelo.compile(optimizer=keras.optimizers.Adam …</code></td><td>Compila con Adam (0,01) y error cuadrático medio.</td></tr>
-        <tr data-lines="28"><td><code>return modelo</code></td><td>Devuelve el modelo ya compilado.</td></tr>
-        <tr data-lines="30"><td><code>for normalizar in (False, True):</code></td><td>Repite el experimento dos veces: primero con <code>normalizar=False</code> y luego con <code>True</code>.</td></tr>
-        <tr data-lines="31"><td><code>modelo = construir(normalizar)</code></td><td>Construye el modelo en cada caso.</td></tr>
-        <tr data-lines="32-33"><td><code>h = modelo.fit(X_train, y_train, epochs=30, ba …</code></td><td>Entrena 30 épocas con lotes de 32 y guarda el historial en <code>h</code>. Con <code>validation_data</code> mide la pérdida en las 200 muestras de validación.</td></tr>
-        <tr data-lines="34"><td><code>mse_final = h.history["val_loss"][-1]</code></td><td><code>h.history["val_loss"]</code> es la lista de pérdidas de validación, una por época; <code>[-1]</code> coge el último valor.</td></tr>
-        <tr data-lines="35"><td><code>print(f"normalizar={normalizar!s:5} | val_loss …</code></td><td>Imprime el MSE y su raíz cuadrada (el «error típico»), que está en las mismas unidades que el precio. <code>{normalizar!s:5}</code> escribe el booleano en 5 caracteres.</td></tr>
-        <tr data-lines="37-38"><td><code>norm = layers.Normalization() …</code></td><td>Crea otra capa <code>Normalization</code> y la adapta a <code>X_train</code>.</td></tr>
-        <tr data-lines="39"><td><code>scaler = StandardScaler().fit(X_train)</code></td><td>Crea el normalizador de Scikit-learn y lo ajusta con los mismos datos.</td></tr>
-        <tr data-lines="40"><td><code>print("Normalization == StandardScaler:", np.a …</code></td><td>Compara las dos transformaciones sobre la validación: <code>np.allclose</code> devuelve <code>True</code> si todos los números coinciden con una tolerancia pequeña (<code>atol=1e-4</code>).</td></tr>
-      </tbody>
-    </table>
-  </details>
-  <div class="salida">
-    <strong>Salida esperada</strong>
-    <pre>Rango de cada columna: [ 30. 129.] [ 250. 9981.]
-normalizar=False | val_loss final =  293.0 | error típico (raíz) = 17.1
-normalizar=True  | val_loss final =   48.9 | error típico (raíz) =  7.0
-Normalization == StandardScaler: True</pre>
-    <p>Sin normalizar, tras 30 épocas el error típico es <strong>17,1</strong>; normalizando, <strong>7,0</strong>. El mejor valor posible es 5 (el ruido que añadimos), así que la red normalizada casi lo alcanza y la otra sigue lejos. Es el mismo modelo, los mismos datos y las mismas épocas: solo ha cambiado la escala de las entradas. La última línea confirma que <code>layers.Normalization</code> hace lo mismo que <code>StandardScaler</code>, pero dentro del modelo.</p>
-  </div>
-</article>
-<article class="snippet" data-lang="python" id="fragmento-14">
-  <header>
-    <h3>14 · regression_demo y classification_demo: dos modelos completos de 8 entradas</h3>
-    <p class="para-que"><strong>Para qué sirve</strong> Reunir en dos funciones todo lo visto: una regresión 8 → 5 → 5 → 1 y una clasificación de 4 clases 8 → 5 → 5 → 4. Los datos son sintéticos y conocemos su regla, así que podemos saber si la red la aprende.</p>
-  </header>
-  <pre class="code"><code>import numpy as np
-import keras
-from keras import layers
-from keras.utils import to_categorical
-
-def regression_demo(epochs=20):
-    keras.utils.set_random_seed(42)
-    X = np.random.normal(size=(1200, 8)).astype("float32")
-    pesos = np.array([2.0, -1.5, 0.8, 3.0, -2.0, 1.2, 0.4, 2.5], dtype="float32")
-    y = (X @ pesos + 5 + np.random.normal(0, 0.5, size=1200)).astype("float32")
-    X_train, y_train, X_test, y_test = X[:1000], y[:1000], X[1000:], y[1000:]
-
-    model = keras.Sequential([
-        keras.Input(shape=(8,)),
-        layers.Dense(5, activation="relu"),
-        layers.Dense(5, activation="relu"),
-        layers.Dense(1),
-    ])
-    model.compile(optimizer="adam", loss="mean_squared_error",
-                  metrics=["mean_absolute_error"])
-    history = model.fit(X_train, y_train, epochs=epochs, batch_size=32,
-                        validation_split=0.2, verbose=0)
-    mse, mae = model.evaluate(X_test, y_test, verbose=0)
-    pred = model.predict(X_test[:1], verbose=0)[0, 0]
-    return history, mse, mae, pred, y_test[0], float(X_test[0] @ pesos + 5)
-
-for epocas in (20, 300):
-    h, mse, mae, pred, real, sin_ruido = regression_demo(epocas)
-    print(f"regresión, {epocas:3d} épocas: val_loss {h.history['val_loss'][0]:6.2f} -&gt; {h.history['val_loss'][-1]:5.2f}"
-          f" | test MSE = {mse:5.2f}, MAE = {mae:4.2f}")
-    print(f"   X_test[0]: predicción = {pred:6.2f} | valor real = {real:6.2f} | sin ruido = {sin_ruido:6.2f}")
-print("(el ruido añadido tiene desviación 0.5: el MAE no puede bajar de unos 0.40)")
-
-def classification_demo(epochs=25):
-    keras.utils.set_random_seed(42)
-    X = np.random.normal(size=(1400, 8)).astype("float32")
-    puntuaciones = np.column_stack([X[:, 0] + X[:, 1],
-                                    X[:, 2] - X[:, 3],
-                                    X[:, 4] + 0.5 * X[:, 5],
-                                    X[:, 6] - X[:, 7]])
-    etiquetas = np.argmax(puntuaciones, axis=1)
-    Y = to_categorical(etiquetas, num_classes=4)
-    X_train, Y_train, X_test = X[:1200], Y[:1200], X[1200:]
-    et_test = etiquetas[1200:]
-
-    model = keras.Sequential([
-        keras.Input(shape=(8,)),
-        layers.Dense(5, activation="relu"),
-        layers.Dense(5, activation="relu"),
-        layers.Dense(4, activation="softmax"),
-    ])
-    model.compile(optimizer="adam", loss="categorical_crossentropy",
-                  metrics=["accuracy"])
-    model.fit(X_train, Y_train, epochs=epochs, batch_size=32,
-              validation_split=0.2, verbose=0)
-    probs = model.predict(X_test, verbose=0)
-    return model, probs, et_test, etiquetas[:1200]
-
-model, probs, et_test, et_train = classification_demo()
-print("clases en entrenamiento:", np.bincount(et_train), "| parámetros:", model.count_params())
-acc = (probs.argmax(axis=1) == et_test).mean()
-print(f"clasificación (25 épocas): accuracy en test = {acc:.3f} (al azar: 0.25)")
-for i in range(3):
-    print(f"   muestra {i}: probabilidades = {probs[i].round(2)} | predicha = {probs[i].argmax()} | real = {et_test[i]}")
-print(f"pérdida de la muestra 0 a mano: -ln(p[real]) = {-np.log(probs[0, et_test[0]]):.3f}")</code></pre>
-  <details class="linea-a-linea">
-    <summary>Línea por línea</summary>
-    <p class="hint">Pasa el ratón por una fila para ver sus líneas resaltadas en el código.</p>
-    <table class="lineas">
-      <thead><tr><th>Código</th><th>Qué hace</th></tr></thead>
-      <tbody>
-        <tr data-lines="1-3"><td><code>import numpy as np …</code></td><td>Importan NumPy, Keras y las capas.</td></tr>
-        <tr data-lines="4"><td><code>from keras.utils import to_categorical</code></td><td>Importa <code>to_categorical</code> directamente, para escribir menos más abajo.</td></tr>
-        <tr data-lines="6"><td><code>def regression_demo(epochs=20):</code></td><td>Define la función de regresión. El parámetro <code>epochs</code> (por defecto 20) permite entrenar más o menos veces.</td></tr>
-        <tr data-lines="7"><td><code>keras.utils.set_random_seed(42)</code></td><td>Fija todas las semillas: los datos y los pesos serán siempre los mismos.</td></tr>
-        <tr data-lines="8"><td><code>X = np.random.normal(size=(1200, 8)).astype("f …</code></td><td>Crea 1.200 muestras con 8 características cada una, de una distribución normal (campana de Gauss), como <code>float32</code>.</td></tr>
-        <tr data-lines="9"><td><code>pesos = np.array([2.0, -1.5, 0.8, 3.0, -2.0, 1 …</code></td><td>Los 8 <strong>pesos verdaderos</strong> de la regla secreta. Como en el caso de los minutos vistos, cada característica influye distinto (algunas suman, otras restan).</td></tr>
-        <tr data-lines="10"><td><code>y = (X @ pesos + 5 + np.random.normal(0, 0.5, …</code></td><td>La respuesta: \( y = X\cdot w + 5 + \) ruido de desviación 0,5. <code>X @ pesos</code> multiplica cada fila por los 8 pesos y suma; el 5 es el sesgo (bias) verdadero.</td></tr>
-        <tr data-lines="11"><td><code>X_train, y_train, X_test, y_test = X[:1000], y …</code></td><td>Reparte: las primeras 1.000 filas para entrenar y las 200 últimas para test, que no se tocan hasta el final.</td></tr>
-        <tr data-lines="13"><td><code>model = keras.Sequential([</code></td><td>Empieza la red…</td></tr>
-        <tr data-lines="14"><td><code>keras.Input(shape=(8,)),</code></td><td>…con entrada de 8 números…</td></tr>
-        <tr data-lines="15"><td><code>layers.Dense(5, activation="relu"),</code></td><td>…una primera capa oculta de 5 neuronas ReLU (\( 8\cdot5+5 = 45 \) parámetros)…</td></tr>
-        <tr data-lines="16"><td><code>layers.Dense(5, activation="relu"),</code></td><td>…una segunda de 5 (\( 5\cdot5+5 = 30 \))…</td></tr>
-        <tr data-lines="17"><td><code>layers.Dense(1),</code></td><td>…y una salida de 1 neurona sin activación (\( 5+1 = 6 \)). Total: 81 parámetros.</td></tr>
-        <tr data-lines="18"><td><code>])</code></td><td>Cierra la lista de capas.</td></tr>
-        <tr data-lines="19-20"><td><code>model.compile(optimizer="adam", loss="mean_squ …</code></td><td>Compila con Adam, error cuadrático medio como pérdida y error absoluto medio como métrica. Se escriben los nombres largos, que son equivalentes a <code>"mse"</code> y <code>"mae"</code>.</td></tr>
-        <tr data-lines="21-22"><td><code>history = model.fit(X_train, y_train, epochs=e …</code></td><td>Entrena con lotes de 32 y aparta el 20 % final del entrenamiento para validar (<code>validation_split=0.2</code>): 800 muestras para aprender y 200 para validar.</td></tr>
-        <tr data-lines="23"><td><code>mse, mae = model.evaluate(X_test, y_test, verb …</code></td><td>Evalúa con el test y desempaqueta el MSE y el MAE.</td></tr>
-        <tr data-lines="24"><td><code>pred = model.predict(X_test[:1], verbose=0)[0, …</code></td><td>Predice la primera muestra de test. <code>X_test[:1]</code> mantiene la forma <code>(1, 8)</code>; <code>[0, 0]</code> extrae el único número del array <code>(1, 1)</code>.</td></tr>
-        <tr data-lines="25"><td><code>return history, mse, mae, pred, y_test[0], flo …</code></td><td>Devuelve el historial, las dos medidas, la predicción, el valor real (con ruido) y el valor que daría la regla sin ruido.</td></tr>
-        <tr data-lines="27"><td><code>for epocas in (20, 300):</code></td><td>Ejecuta la función dos veces: con las 20 épocas habituales y con 300.</td></tr>
-        <tr data-lines="28"><td><code>h, mse, mae, pred, real, sin_ruido = regressio …</code></td><td>Desempaqueta lo que devuelve.</td></tr>
-        <tr data-lines="29-30"><td><code>print(f"regresión, {epocas:3d} épocas: val_los …</code></td><td>Imprime la pérdida de validación de la primera y de la última época, y el error en test.</td></tr>
-        <tr data-lines="31"><td><code>print(f"   X_test[0]: predicción = {pred:6.2f} …</code></td><td>Imprime la predicción para esa muestra frente a su valor real y frente al valor sin ruido.</td></tr>
-        <tr data-lines="32"><td><code>print("(el ruido añadido tiene desviación 0.5: …</code></td><td>Recuerda el suelo del error: con ruido de desviación 0,5, el error absoluto medio de un modelo perfecto es \( 0{,}5\cdot0{,}8 \approx 0{,}40 \).</td></tr>
-        <tr data-lines="34"><td><code>def classification_demo(epochs=25):</code></td><td>Define la función de clasificación de 4 clases.</td></tr>
-        <tr data-lines="35"><td><code>keras.utils.set_random_seed(42)</code></td><td>Fija las semillas.</td></tr>
-        <tr data-lines="36"><td><code>X = np.random.normal(size=(1400, 8)).astype("f …</code></td><td>1.400 muestras con 8 características.</td></tr>
-        <tr data-lines="37-40"><td><code>puntuaciones = np.column_stack([X[:, 0] + X[:, …</code></td><td>Calcula <strong>4 puntuaciones</strong>, una por clase, combinando características: \( x_0+x_1 \), \( x_2-x_3 \), \( x_4+0{,}5x_5 \) y \( x_6-x_7 \).</td></tr>
-        <tr data-lines="41"><td><code>etiquetas = np.argmax(puntuaciones, axis=1)</code></td><td>La etiqueta de cada muestra es la clase con la puntuación más alta (<code>argmax</code> por filas). Es la regla secreta que la red debe aprender.</td></tr>
-        <tr data-lines="42"><td><code>Y = to_categorical(etiquetas, num_classes=4)</code></td><td>Pasa las etiquetas (0 a 3) a One-Hot, con 4 columnas.</td></tr>
-        <tr data-lines="43"><td><code>X_train, Y_train, X_test = X[:1200], Y[:1200], …</code></td><td>Entrenamiento: las 1.200 primeras muestras; test: las 200 últimas. Aquí se separan las etiquetas One-Hot para entrenar.</td></tr>
-        <tr data-lines="44"><td><code>et_test = etiquetas[1200:]</code></td><td>Las etiquetas enteras del test, para comparar después.</td></tr>
-        <tr data-lines="46-51"><td><code>model = keras.Sequential([ …</code></td><td>La red 8 → 5 → 5 → 4: la salida tiene <strong>4 neuronas con softmax, una por clase</strong> (\( 5\cdot4+4 = 24 \) parámetros; en total 99).</td></tr>
-        <tr data-lines="52-53"><td><code>model.compile(optimizer="adam", loss="categori …</code></td><td>Compila con <code>categorical_<wbr>crossentropy</code> (etiquetas One-Hot) y accuracy.</td></tr>
-        <tr data-lines="54-55"><td><code>model.fit(X_train, Y_train, epochs=epochs, bat …</code></td><td>Entrena 25 épocas, con el 20 % final de las 1.200 muestras para validar.</td></tr>
-        <tr data-lines="56"><td><code>probs = model.predict(X_test, verbose=0)</code></td><td>Predice las probabilidades de las 200 muestras de test: una fila de 4 números por muestra.</td></tr>
-        <tr data-lines="57"><td><code>return model, probs, et_test, etiquetas[:1200]</code></td><td>Devuelve el modelo, las probabilidades, las etiquetas del test y las del entrenamiento.</td></tr>
-        <tr data-lines="59"><td><code>model, probs, et_test, et_train = classificati …</code></td><td>Ejecuta la función de clasificación.</td></tr>
-        <tr data-lines="60"><td><code>print("clases en entrenamiento:", np.bincount( …</code></td><td>Cuenta cuántas muestras hay de cada clase en el entrenamiento y los parámetros del modelo.</td></tr>
-        <tr data-lines="61"><td><code>acc = (probs.argmax(axis=1) == et_test).mean()</code></td><td>El accuracy a mano: la clase predicha es la de mayor probabilidad (<code>argmax</code>) y se compara con la real.</td></tr>
-        <tr data-lines="62"><td><code>print(f"clasificación (25 épocas): accuracy en …</code></td><td>Lo muestra junto al valor del azar: con 4 clases equilibradas acertaría un 25 %.</td></tr>
-        <tr data-lines="63-64"><td><code>for i in range(3): …</code></td><td>Para las tres primeras muestras de test, imprime las 4 probabilidades, la clase predicha y la real.</td></tr>
-        <tr data-lines="65"><td><code>print(f"pérdida de la muestra 0 a mano: -ln(p[ …</code></td><td>La pérdida de la muestra 0 calculada a mano: \( -\ln \) de la probabilidad de la clase real.</td></tr>
-      </tbody>
-    </table>
-  </details>
-  <div class="salida">
-    <strong>Salida esperada</strong>
-    <pre>regresión,  20 épocas: val_loss  57.18 -&gt; 17.69 | test MSE = 16.64, MAE = 3.21
-   X_test[0]: predicción =   1.46 | valor real =  10.20 | sin ruido =   9.61
-regresión, 300 épocas: val_loss  57.18 -&gt;  0.25 | test MSE =  0.28, MAE = 0.43
-   X_test[0]: predicción =   9.52 | valor real =  10.20 | sin ruido =   9.61
-(el ruido añadido tiene desviación 0.5: el MAE no puede bajar de unos 0.40)
-clases en entrenamiento: [300 295 297 308] | parámetros: 99
-clasificación (25 épocas): accuracy en test = 0.795 (al azar: 0.25)
-   muestra 0: probabilidades = [0.   0.67 0.31 0.02] | predicha = 1 | real = 2
-   muestra 1: probabilidades = [0.33 0.34 0.18 0.15] | predicha = 1 | real = 1
-   muestra 2: probabilidades = [0.   0.83 0.16 0.01] | predicha = 1 | real = 1
-pérdida de la muestra 0 a mano: -ln(p[real]) = 1.180</pre>
-    <p><strong>Regresión.</strong> Con las 20 épocas habituales la red todavía está muy lejos: la pérdida de validación solo baja de 57 a 17,7, el MAE en test es 3,21 y para la primera muestra predice 1,46 cuando el valor real es 10,20. Con 300 épocas llega a un MAE de 0,43, casi el suelo del ruido (~0,40), y predice 9,52 (el valor sin ruido es 9,61). Lección: el número de épocas importa, y 20 no siempre bastan; mira las curvas de <code>History</code>. <strong>Clasificación.</strong> Las 4 clases están equilibradas (300, 295, 297 y 308 en el entrenamiento) y la red de 99 parámetros acierta el <strong>79,5 %</strong> en test (el azar sería el 25 %). La muestra 0 es un fallo: la red da 0,67 a la clase 1 y 0,31 a la 2, que es la real, y su pérdida es \( -\ln 0{,}31 \approx 1{,}18 \).</p>
-  </div>
-</article>
+<a class="lab-card" href="laboratorio.html#paso-5"><span class="lc-ico" aria-hidden="true">🧪</span>
+  <span><strong>Ver el código de esta lección en el Laboratorio</strong>
+  <span>Paso 5 · La misma red con y sin normalizar: error típico de 17,1 frente a 7,0.</span></span></a>
+<p>El fragmento 14 (dos modelos completos de 8 entradas, regresión y clasificación) está en <a href="laboratorio.html#fragmento-14">«Más código del módulo»</a>.</p>
 </section>
 
 </div>

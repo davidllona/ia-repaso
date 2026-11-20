@@ -69,9 +69,10 @@ Lab.register("curso2/c2m2-normalizar", function (root, api) {
     if (out) D.text(ctx, "¡se sale del gráfico: diverge!", b.x + b.w / 2, b.y + b.h - 10, { align: "center", size: 11.5, weight: 700, color: C.terracotaInk });
     D.text(ctx, "★", plot.x(mom.wopt[0]), plot.y(mom.wopt[1]) + 5, { align: "center", size: 18, color: C.olivaInk, weight: 700 });
     ctx.restore();
-    D.text(ctx, "inicio", plot.x(0) + 8, plot.y(0) - 8, { size: 10.5, weight: 600, color: C.cobaltoInk });
-    D.text(ctx, "★ mínimo", b.x + b.w - 6, b.y + 14, { align: "right", size: 10.5, weight: 600, color: C.olivaInk });
-    D.text(ctx, "tono rojizo = pérdida alta", b.x + b.w - 6, b.y + 27, { align: "right", size: 10, color: C.muted });
+    window.C2M2.halo(ctx, "inicio", plot.x(0) - 8, plot.y(0) + 20, { align: "right", size: 11, weight: 600, bg: C.surface });
+    D.text(ctx, "inicio", plot.x(0) - 8, plot.y(0) + 20, { align: "right", size: 11, weight: 600, color: C.cobaltoInk });
+    D.text(ctx, "★ mínimo", b.x + b.w - 6, b.y + 15, { align: "right", size: 11, weight: 600, color: C.olivaInk });
+    D.text(ctx, "más naranja = pérdida alta", b.x + b.w - 6, b.y + 29, { align: "right", size: 11, color: C.ink2 });
   }
   function update() {
     view.redraw();
