@@ -70,7 +70,8 @@ window.CURRICULUM = {
             {"n": 5, "slug": "leccion-5", "title": "Naive Bayes cuenta palabras y les da la vuelta con Bayes", "blurb": "Reseñas positivas o negativas: prior, verosimilitud, independencia y Laplace.", "min": 4},
             {"n": 6, "slug": "leccion-6", "title": "Un modelo falla por terco (sesgo) o por nervioso (varianza)", "blurb": "Error = sesgo² + varianza + ruido, y cómo diagnosticarlo con train y test.", "min": 4},
             {"n": 7, "slug": "leccion-7", "title": "Cien árboles distintos votan mejor que uno", "blurb": "Comités, voting, bootstrap, bagging, OOB y Random Forest.", "min": 4},
-            {"n": 8, "slug": "leccion-8", "title": "El boosting encadena árboles que corrigen al anterior", "blurb": "AdaBoost, Gradient Boosting, XGBoost y cómo elegir algoritmo midiendo.", "min": 4}
+            {"n": 8, "slug": "leccion-8", "title": "El boosting encadena árboles que corrigen al anterior", "blurb": "AdaBoost, Gradient Boosting, XGBoost y cómo elegir algoritmo midiendo.", "min": 4},
+            {"n": 9, "slug": "laboratorio", "title": "Laboratorio: ¿qué clientes de Netflix van a cancelar?", "blurb": "Ejemplo completo en Python con 1.000 clientes y todos los modelos, línea a línea (unos 40 min). Debajo, los 23 fragmentos del módulo para consultar.", "min": 40}
           ]
         },
         {

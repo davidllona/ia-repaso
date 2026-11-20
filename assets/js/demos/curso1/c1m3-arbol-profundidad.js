@@ -71,8 +71,8 @@ Lab.register("curso1/c1m3-arbol-profundidad", function (root, api) {
     D.path(ctx, accs.map(function (a) { return [plot2.x(a[0]), plot2.y(a[1])]; }), C.cobalto, 2.5);
     D.path(ctx, accs.map(function (a) { return [plot2.x(a[0]), plot2.y(a[2])]; }), C.terracota, 2.5);
     D.line(ctx, plot2.x(depth), plot2.box.y, plot2.x(depth), plot2.box.y + plot2.box.h, C.ink, 1.5, [4, 3]);
-    D.text(ctx, "train", plot2.box.x + 8, plot2.box.y + 14, { size: 11, color: C.cobaltoInk, weight: 600 });
-    D.text(ctx, "test", plot2.box.x + 48, plot2.box.y + 14, { size: 11, color: C.terracotaInk, weight: 600 });
+    D.text(ctx, "train", plot2.box.x + plot2.box.w - 44, plot2.box.y + plot2.box.h - 8, { size: 11, color: C.cobaltoInk, weight: 600, align: "right" });
+    D.text(ctx, "test", plot2.box.x + plot2.box.w - 8, plot2.box.y + plot2.box.h - 8, { size: 11, color: C.terracotaInk, weight: 600, align: "right" });
   }
   function update() {
     view.redraw(); view2.redraw();
