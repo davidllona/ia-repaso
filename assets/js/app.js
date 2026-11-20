@@ -285,6 +285,48 @@
   }
 
   /* ---------- final de módulo: marcar + navegación ---------- */
+  /* ---------- Animación «paso a paso» ----------
+     <div class="anim-pasos" data-titulo="La cuenta, paso a paso">
+       <div class="paso">…contenido del paso 1…</div>
+       <div class="paso">…paso 2…</div>
+     </div>
+     Se convierte en un reproductor: un paso cada vez, con Anterior / Siguiente / Reproducir. */
+  function buildPasos() {
+    $$(".anim-pasos").forEach(function (box) {
+      var pasos = $$(":scope > .paso", box); if (pasos.length < 2 || box.dataset.listo) return;
+      box.dataset.listo = "1";
+      var i = 0, timer = null;
+      var head = el("div", { class: "ap-head" }, el("span", { class: "ap-tag", text: "Paso a paso" }), el("strong", { text: box.getAttribute("data-titulo") || "" }));
+      var stage = el("div", { class: "ap-stage" }); pasos.forEach(function (p) { stage.appendChild(p); });
+      var dots = el("div", { class: "ap-dots", "aria-hidden": "true" });
+      pasos.forEach(function (_, k) { var d = el("button", { type: "button", tabindex: "-1" }); d.addEventListener("click", function () { stop(); go(k); }); dots.appendChild(d); });
+      var prev = el("button", { class: "btn", type: "button", text: "← Anterior" });
+      var next = el("button", { class: "btn primary", type: "button", text: "Siguiente →" });
+      var play = el("button", { class: "btn", type: "button", text: "▶ Reproducir" });
+      var count = el("span", { class: "ap-count", role: "status" });
+      var bar = el("div", { class: "ap-bar" }, prev, play, next, count);
+      box.appendChild(head); box.appendChild(stage); box.appendChild(dots); box.appendChild(bar);
+      function go(k) {
+        i = Math.max(0, Math.min(pasos.length - 1, k));
+        pasos.forEach(function (p, j) { p.classList.toggle("on", j === i); p.classList.toggle("visto", j < i); });
+        $$("button", dots).forEach(function (d, j) { d.classList.toggle("on", j === i); d.classList.toggle("visto", j < i); });
+        prev.disabled = i === 0;
+        next.textContent = i === pasos.length - 1 ? "↺ Repetir" : "Siguiente →";
+        count.textContent = (i + 1) + " / " + pasos.length;
+      }
+      function stop() { if (timer) { clearInterval(timer); timer = null; play.textContent = "▶ Reproducir"; } }
+      prev.addEventListener("click", function () { stop(); go(i - 1); });
+      next.addEventListener("click", function () { stop(); go(i === pasos.length - 1 ? 0 : i + 1); });
+      play.addEventListener("click", function () {
+        if (timer) { stop(); return; }
+        if (i === pasos.length - 1) go(0);
+        play.textContent = "❚❚ Pausa";
+        timer = setInterval(function () { if (i === pasos.length - 1) stop(); else go(i + 1); }, parseInt(box.getAttribute("data-ms") || "2600", 10));
+      });
+      go(0);
+    });
+  }
+
   function buildLessonFooter() {
     var page = $(".page"); if (!page || !curLesson) return;
     var c = courseById(curCourse), m = moduleOf(curCourse, curModule), ls = (m && m.lessons) || [];
@@ -564,6 +606,7 @@
     buildChrome();
     buildToc();
     buildHero();
+    buildPasos();
     buildModuleFooter();
     buildLessonFooter();
     /* Si se llega con un #ancla que está dentro de un bloque plegado (Profundizar, predicción), ábrelo */
